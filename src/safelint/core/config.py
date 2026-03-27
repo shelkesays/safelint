@@ -1,10 +1,43 @@
-"""Configuration defaults, constants, and config loader for safelint."""
+"""Configuration defaults, constants, and config loader for safelint.
+
+Config is searched in this priority order (highest first):
+
+1. ``pyproject.toml`` — ``[tool.safelint]`` section  (preferred)
+2. ``.ai-safety.yaml`` — legacy YAML config           (backward compat)
+3. Built-in defaults
+
+TOML support uses the stdlib ``tomllib`` module (Python 3.11+) or the
+``tomli`` backport on Python 3.10.  YAML support requires ``PyYAML``, which
+is now an optional dependency (``pip install safelint[yaml]``).
+"""
 
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 from typing import Any
+
+# ---------------------------------------------------------------------------
+# Optional parser availability flags
+# ---------------------------------------------------------------------------
+
+if sys.version_info >= (3, 11):
+    import tomllib
+
+    _TOML_AVAILABLE = True
+else:
+    try:
+        import tomllib  # type: ignore[no-redef]
+
+        _TOML_AVAILABLE = True
+    except ImportError:
+        try:
+            import tomli as tomllib  # type: ignore[import-untyped,no-redef]
+
+            _TOML_AVAILABLE = True
+        except ImportError:
+            _TOML_AVAILABLE = False
 
 try:
     import yaml
@@ -23,10 +56,15 @@ SEVERITY_ORDER: dict[str, int] = {"warning": 0, "error": 1}
 
 MODE_FAIL_ON: dict[str, str] = {"local": "error", "ci": "warning"}
 
-CONFIG_FILENAME = ".ai-safety.yaml"
+YAML_CONFIG_FILENAME = ".ai-safety.yaml"
+TOML_CONFIG_FILENAME = "pyproject.toml"
+TOML_CONFIG_KEY = "safelint"
+
+# Keep old name as alias so existing imports don't break.
+CONFIG_FILENAME = YAML_CONFIG_FILENAME
 
 # ---------------------------------------------------------------------------
-# Built-in defaults — every key here can be overridden via .ai-safety.yaml
+# Built-in defaults — every key can be overridden via pyproject.toml or yaml
 # ---------------------------------------------------------------------------
 
 DEFAULTS: dict[str, Any] = {
@@ -55,6 +93,9 @@ DEFAULTS: dict[str, Any] = {
             "test_coupling",
             "test_existence",
             "missing_assertions",
+            "tainted_sink",
+            "return_value_ignored",
+            "null_dereference",
         ],
     },
     "rules": {
@@ -116,7 +157,7 @@ DEFAULTS: dict[str, Any] = {
         "missing_assertions": {"enabled": False, "severity": "warning"},
         "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
         "test_coupling": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
-        # Dataflow hybrid rules — disabled by default; opt-in via .ai-safety.yaml
+        # Dataflow hybrid rules — disabled by default; opt-in via config
         "tainted_sink": {
             "enabled": False,
             "severity": "error",
@@ -183,8 +224,18 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
 
 
 # ---------------------------------------------------------------------------
-# Config loader
+# File parsers
 # ---------------------------------------------------------------------------
+
+
+def _parse_toml_file(candidate: Path) -> dict[str, Any] | None:
+    """Parse *candidate* as TOML and return the full document, or None on error."""
+    try:
+        with candidate.open("rb") as fp:
+            return tomllib.load(fp)
+    except Exception as exc:  # noqa: BLE001
+        _log.error("Failed to parse %s: %s — using defaults", candidate, exc)
+        return None
 
 
 def _parse_yaml_file(candidate: Path) -> dict[str, Any] | None:
@@ -196,25 +247,54 @@ def _parse_yaml_file(candidate: Path) -> dict[str, Any] | None:
         return None
 
 
-def load_config(search_from: Path | None = None) -> dict[str, Any]:
-    """Locate and load .ai-safety.yaml, merging it with the built-in defaults.
+# ---------------------------------------------------------------------------
+# Per-directory config finders
+# ---------------------------------------------------------------------------
 
-    Walks up from *search_from* (defaults to cwd) until the config file is
-    found or the filesystem root is reached. Falls back to built-in defaults
-    when no file is found or PyYAML is not installed.
-    """
+
+def _try_pyproject(directory: Path) -> dict[str, Any] | None:
+    """Return ``[tool.safelint]`` from *directory*/pyproject.toml, or None."""
+    if not _TOML_AVAILABLE:
+        return None
+    candidate = directory / TOML_CONFIG_FILENAME
+    if not candidate.exists():
+        return None
+    doc = _parse_toml_file(candidate)
+    if doc is None:
+        return None
+    return doc.get("tool", {}).get(TOML_CONFIG_KEY)
+
+
+def _try_yaml(directory: Path) -> dict[str, Any] | None:
+    """Return the parsed .ai-safety.yaml from *directory*, or None."""
     if not _YAML_AVAILABLE:
-        _log.warning(
-            "PyYAML not installed — using default config. Install with: pip install pyyaml"
-        )
-        return DEFAULTS
+        return None
+    candidate = directory / YAML_CONFIG_FILENAME
+    if not candidate.exists():
+        return None
+    return _parse_yaml_file(candidate)
 
+
+# ---------------------------------------------------------------------------
+# Public loader
+# ---------------------------------------------------------------------------
+
+
+def load_config(search_from: Path | None = None) -> dict[str, Any]:
+    """Locate and load safelint config, merging it with the built-in defaults.
+
+    Searches upward from *search_from* (defaults to cwd).  At each directory
+    the lookup order is:
+
+    1. ``pyproject.toml`` → ``[tool.safelint]``
+    2. ``.ai-safety.yaml``
+
+    Returns ``DEFAULTS`` when no config file is found or when neither TOML
+    nor YAML parsers are available.
+    """
     root = search_from or Path.cwd()
     for parent in [root, *root.parents]:
-        candidate = parent / CONFIG_FILENAME
-        if not candidate.exists():
-            continue
-        raw = _parse_yaml_file(candidate)
-        return deep_merge(DEFAULTS, raw) if raw is not None else DEFAULTS
-
+        cfg = _try_pyproject(parent) or _try_yaml(parent)
+        if cfg:
+            return deep_merge(DEFAULTS, cfg)
     return DEFAULTS

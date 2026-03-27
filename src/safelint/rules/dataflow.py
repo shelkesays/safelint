@@ -64,9 +64,7 @@ class TaintedSinkRule(BaseRule):
         "read",
     ]
 
-    def _param_names(
-        self, func: ast.FunctionDef | ast.AsyncFunctionDef
-    ) -> set[str]:
+    def _param_names(self, func: ast.FunctionDef | ast.AsyncFunctionDef) -> set[str]:
         """Return all parameter names, excluding self / cls."""
         args = func.args
         all_args = list(args.posonlyargs) + list(args.args) + list(args.kwonlyargs)
@@ -145,9 +143,7 @@ class ReturnValueIgnoredRule(BaseRule):
         "rmdir",
     ]
 
-    def _ignored_call_name(
-        self, node: ast.Expr, flagged: frozenset[str]
-    ) -> str | None:
+    def _ignored_call_name(self, node: ast.Expr, flagged: frozenset[str]) -> str | None:
         """Return the call name if this Expr discards a flagged return value."""
         if not isinstance(node.value, ast.Call):
             return None
@@ -207,9 +203,7 @@ class NullDereferenceRule(BaseRule):
         ]
     )
 
-    def _deref_hit(
-        self, node: ast.AST, nullable: frozenset[str]
-    ) -> tuple[int, str] | None:
+    def _deref_hit(self, node: ast.AST, nullable: frozenset[str]) -> tuple[int, str] | None:
         """Return (lineno, method) if *node* is an unsafe chained dereference."""
         if isinstance(node, ast.Attribute) and isinstance(node.value, ast.Call):
             name = self._call_name(node.value.func)
