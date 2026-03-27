@@ -145,6 +145,11 @@ For opt-in rules (`SAFE601`, `SAFE701`, `SAFE702`) and full configuration option
 
 SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a `.safelint.yaml` file. See [CONFIGURATION.md](CONFIGURATION.md) for all options, defaults, and examples.
 
+Ready-to-copy samples:
+
+- [examples/sample.pyproject.toml](examples/sample.pyproject.toml) — TOML format (recommended)
+- [examples/sample.safelint.yaml](examples/sample.safelint.yaml) — YAML format (legacy)
+
 ---
 
 ## Development

@@ -20,13 +20,19 @@ def run(
     target:
         A single ``.py`` file or a directory to scan recursively.
     config_path:
-        Explicit path to a ``.ai-safety.yaml`` file. When omitted, the
-        loader walks up from *target* to find one automatically.
+        Optional path that overrides the directory used for config discovery.
+        If it is a directory, it is used directly as the search root. If it is
+        a file path, its parent directory is used. When omitted, the loader
+        walks up from *target* to find a supported config file automatically.
     changed_files:
         List of files being checked (injected into test-coupling rules).
         Defaults to the files discovered from *target*.
     """
-    search_from = Path(config_path).parent if config_path else Path(target)
+    if config_path:
+        config_p = Path(config_path)
+        search_from = config_p if config_p.is_dir() else config_p.parent
+    else:
+        search_from = Path(target)
     config = load_config(search_from if search_from.is_dir() else search_from.parent)
     engine = SafetyEngine(config, changed_files=changed_files)
     return engine.check_path(target)

@@ -1,0 +1,214 @@
+# safelint configuration via pyproject.toml
+#
+# Add this block to your project's pyproject.toml file.
+# Overrides are deep-merged with built-in defaults; omitted keys inherit defaults.
+#
+# ── Severity model ────────────────────────────────────────────────────────────
+# Each rule carries a per-rule severity:
+#   severity = "error"    → violation is a candidate to block the commit
+#   severity = "warning"  → violation is informational
+#
+# The global fail_on threshold is the gate:
+#   fail_on = "error"    → only error-severity violations block        (lenient - onboarding)
+#   fail_on = "warning"  → both warning AND error violations block     (strict  - production)
+#
+# Precedence: CLI --fail-on > fail_on here > mode default
+#
+# ── Mode ──────────────────────────────────────────────────────────────────────
+# mode = "local"  → fail_on defaults to "error"   (fast feedback, low friction)
+# mode = "ci"     → fail_on defaults to "warning" (full enforcement, no bypass)
+#
+# ── Adoption path ─────────────────────────────────────────────────────────────
+#   Week 1  - mode = "local", fail_on = "error"   (get used to the tool)
+#   Week 4+ - mode = "ci",    fail_on = "warning" (full strictness in CI)
+
+[tool.safelint]
+mode = "local"
+fail_on = "error"    # upgrade to "warning" when the team is ready
+
+# Glob patterns to skip entirely - generated code, large legacy files, etc.
+exclude_paths = [
+    "scripts/*",
+    "src/myproject/integrations/legacy.py",
+]
+
+
+# ── Execution ─────────────────────────────────────────────────────────────────
+# fail_fast: stop on the first violation per file (faster pre-commit,
+#            but you only see one problem at a time)
+# order:     cheap structural rules run first so expensive checks are
+#            short-circuited when basic problems already exist
+
+[tool.safelint.execution]
+fail_fast = false
+order = [
+    "function_length",      # cheapest: one pass, no recursion
+    "nesting_depth",
+    "max_arguments",
+    "bare_except",
+    "empty_except",
+    "global_state",
+    "global_mutation",
+    "unbounded_loops",
+    "complexity",
+    "side_effects_hidden",
+    "side_effects",
+    "logging_on_error",
+    "resource_lifecycle",   # more expensive: multi-pass walk + identity tracking
+    "test_coupling",
+    "test_existence",
+    "missing_assertions",
+    "tainted_sink",         # dataflow: most expensive, disabled by default
+    "return_value_ignored",
+    "null_dereference",
+]
+
+
+# ── Structural ────────────────────────────────────────────────────────────────
+
+[tool.safelint.rules.function_length]
+enabled = true
+max_lines = 60
+severity = "error"
+
+[tool.safelint.rules.nesting_depth]
+enabled = true
+max_depth = 2
+severity = "error"
+
+[tool.safelint.rules.max_arguments]
+enabled = true
+max_args = 7
+severity = "error"
+
+[tool.safelint.rules.complexity]
+enabled = true
+max_complexity = 10    # McCabe cyclomatic complexity (branches + boolean ops)
+severity = "error"
+
+
+# ── Error handling ────────────────────────────────────────────────────────────
+
+[tool.safelint.rules.bare_except]
+enabled = true
+severity = "error"
+
+[tool.safelint.rules.empty_except]
+enabled = true
+severity = "error"
+
+[tool.safelint.rules.logging_on_error]
+enabled = true
+severity = "warning"
+
+
+# ── State & purity ────────────────────────────────────────────────────────────
+
+[tool.safelint.rules.global_state]
+enabled = true
+severity = "warning"    # declares global keyword
+
+[tool.safelint.rules.global_mutation]
+enabled = true
+severity = "error"      # actually writes to a declared global - stricter
+
+[tool.safelint.rules.side_effects_hidden]
+enabled = true
+severity = "error"      # pure-named function hiding I/O is a Holzmann core risk
+io_functions = ["open", "print", "input", "run", "Popen"]
+# NOTE: Only the final function/attribute name is matched (e.g., "run" for subprocess.run).
+# Functions whose names START WITH any of these are considered "pure" and will be
+# flagged if they contain an io_function call
+pure_prefixes = [
+    "calculate", "compute", "get", "check", "validate",
+    "is", "has", "find", "parse", "transform", "convert",
+    "format", "build", "resolve", "detect",
+]
+
+[tool.safelint.rules.side_effects]
+enabled = true
+severity = "warning"    # broader: any function not named for I/O
+io_functions = ["open", "print", "input"]
+# Functions whose names CONTAIN any of these keywords are exempt
+io_name_keywords = [
+    "print", "log", "write", "read", "save",
+    "load", "send", "fetch", "export", "import",
+]
+
+
+# ── Resource safety ───────────────────────────────────────────────────────────
+
+[tool.safelint.rules.resource_lifecycle]
+enabled = true
+severity = "error"
+# Resource-acquisition functions that must be wrapped in `with` or
+# paired with an explicit cleanup call
+tracked_functions = ["open", "connect", "session"]
+# Cleanup method names the heuristic looks for as an alternative to `with`
+cleanup_patterns = ["close", "commit", "rollback"]
+
+
+# ── Loop safety ───────────────────────────────────────────────────────────────
+
+[tool.safelint.rules.unbounded_loops]
+enabled = true
+severity = "warning"
+
+
+# ── Documentation (heuristic - disabled by default) ───────────────────────────
+
+[tool.safelint.rules.missing_assertions]
+enabled = false
+severity = "warning"
+
+
+# ── Test coverage (disabled by default - enable in CI) ────────────────────────
+
+[tool.safelint.rules.test_existence]
+enabled = false     # set to true in CI to enforce test file presence
+test_dirs = ["tests"]
+severity = "warning"
+
+[tool.safelint.rules.test_coupling]
+enabled = false     # set to true in CI: src change must include test change
+test_dirs = ["tests"]
+severity = "warning"
+
+
+# ── Dataflow hybrid rules (disabled by default - opt-in) ──────────────────────
+# These combine AST analysis with intra-procedural taint tracking.
+# More expensive than structural rules; run last.
+
+[tool.safelint.rules.tainted_sink]
+enabled = false     # set to true to catch unsanitized input flowing into eval/exec/subprocess
+severity = "error"
+# Dangerous call names - tainted args to these produce a violation
+sinks = [
+    "eval", "exec", "compile", "system",
+    "popen", "Popen", "run", "call", "check_output", "execute",
+]
+# Calls that clean taint - result of these is considered safe
+sanitizers = ["escape", "sanitize", "clean", "validate", "quote", "encode", "bleach"]
+# Calls that inject taint even without tainted arguments
+sources = ["input", "readline", "recv", "recvfrom", "read"]
+
+[tool.safelint.rules.return_value_ignored]
+enabled = false     # set to true to enforce checking of error-signalling return values
+severity = "warning"
+# Bare calls to these functions (result discarded) produce a violation
+flagged_calls = [
+    "run", "call", "check_output", "write", "send",
+    "sendall", "sendfile", "seek", "truncate",
+    "remove", "unlink", "rename", "replace",
+    "makedirs", "mkdir", "rmdir",
+]
+
+[tool.safelint.rules.null_dereference]
+enabled = false     # set to true to catch chained access on nullable-returning calls
+severity = "error"
+# Method names whose return values may be None - chaining on them without
+# a None check produces a violation (e.g. d.get("key").strip())
+nullable_methods = [
+    "get", "pop", "find", "next", "first",
+    "one_or_none", "scalar", "scalar_one_or_none", "fetchone",
+]
