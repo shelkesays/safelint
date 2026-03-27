@@ -6,9 +6,9 @@ Pre-commit hook (files passed by pre-commit as positional arguments)::
 
     safelint [--fail-on=error|warning] [--mode=local|ci] file1.py file2.py …
 
-Direct invocation / CI scan (directory or single file)::
+Direct invocation (default: git-modified files only)::
 
-    safelint check <path> [--config <cfg>] [--fail-on=error|warning] [--mode=local|ci]
+    safelint check <path> [--all-files] [--config <cfg>] [--fail-on=error|warning] [--mode=local|ci]
 
 Severity model
 --------------
@@ -24,6 +24,7 @@ Precedence: --fail-on CLI > fail_on in .safelint.yaml > mode default.
 from __future__ import annotations
 
 import argparse
+import subprocess
 import sys
 from pathlib import Path
 
@@ -87,10 +88,88 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
     return 0
 
 
+def _is_under_target(abs_path: Path, target_abs: Path) -> bool:
+    """Return True when *abs_path* is inside *target_abs* (dir) or equals it (file)."""
+    if target_abs.is_dir():
+        try:
+            abs_path.relative_to(target_abs)
+            return True
+        except ValueError:
+            return False
+    return abs_path == target_abs
+
+
+def _filter_py_files(raw: set[str], git_root: Path, target_abs: Path) -> list[str]:
+    """Filter git-relative paths to existing .py files under *target_abs*."""
+    results: list[str] = []
+    for rel in raw:
+        if not rel.endswith(".py"):
+            continue
+        abs_path = (git_root / rel).resolve()
+        if abs_path.exists() and _is_under_target(abs_path, target_abs):
+            results.append(str(abs_path))
+    return sorted(results)
+
+
+def _get_git_modified_python_files(target: Path) -> list[str] | None:
+    """Return modified/added .py paths under *target* according to git.
+
+    Combines staged and unstaged changes vs HEAD.  Returns ``None`` when git
+    is unavailable or the path is not inside a git repository — callers should
+    fall back to scanning all files.
+    """
+    try:
+        target_abs = target.resolve()
+        work_dir = target_abs if target_abs.is_dir() else target_abs.parent
+
+        root_proc = subprocess.run(
+            ["git", "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            cwd=work_dir,
+        )
+        if root_proc.returncode != 0:
+            return None
+        git_root = Path(root_proc.stdout.strip())
+
+        diff_proc = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD"],
+            capture_output=True,
+            text=True,
+            cwd=git_root,
+        )
+        cached_proc = subprocess.run(
+            ["git", "diff", "--name-only", "--cached"],
+            capture_output=True,
+            text=True,
+            cwd=git_root,
+        )
+
+        raw = set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines())
+        return _filter_py_files(raw, git_root, target_abs)
+
+    except (FileNotFoundError, OSError):
+        return None
+
+
 def _run_check(args: argparse.Namespace) -> int:
     """Execute directory/file scan mode."""
     config_path = getattr(args, "config", None)
-    results = run(args.target, config_path=config_path)
+    all_files: bool = getattr(args, "all_files", False)
+    target = Path(args.target)
+
+    files: list[str] | None = None
+    if not all_files:
+        modified = _get_git_modified_python_files(target)
+        if modified is None:
+            print("Note: git unavailable — scanning all files.")
+        elif not modified:
+            print("No modified Python files detected. Use --all-files to scan everything.")
+            return 0
+        else:
+            files = modified
+
+    results = run(target, config_path=config_path, files=files)
 
     config = load_config(Path(config_path).parent if config_path else Path(args.target))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
@@ -162,6 +241,13 @@ def main() -> None:
             type=Path,
             default=None,
             help="Path to a .safelint.yaml config file (overrides automatic discovery)",
+        )
+        parser.add_argument(
+            "--all-files",
+            dest="all_files",
+            action="store_true",
+            default=False,
+            help="Scan all Python files under target (default: git-modified files only)",
         )
         _build_common_args(parser)
         args = parser.parse_args(sys.argv[2:])  # skip 'check'

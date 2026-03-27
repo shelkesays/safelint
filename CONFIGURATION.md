@@ -6,6 +6,35 @@ All keys are optional - anything you leave out falls back to the built-in defaul
 
 ---
 
+## CLI flags
+
+These are passed on the command line and are not part of the config file.
+
+### `safelint check` flags
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--all-files` | off | Scan every `.py` file under the target. Default (without this flag) is to check only git-modified files. |
+| `--fail-on` | from config | Override the minimum severity that blocks the run: `error` or `warning`. |
+| `--mode` | from config | `local` (only errors block) or `ci` (warnings block too). |
+| `--config` | auto-discovered | Path to a `.safelint.yaml` config file. |
+
+**When to use `--all-files`:**
+- CI pipelines (clean checkout, no modified files in git terms)
+- Running a one-off full audit
+- `pre-commit run --all-files` already passes all files directly; the hook mode handles this automatically.
+
+### `safelint` hook mode flags (pre-commit)
+
+Pre-commit passes the staged files as positional arguments automatically. Only `--fail-on` and `--mode` are relevant here.
+
+```yaml
+- id: safelint
+  args: [--fail-on=error]   # or --fail-on=warning for strict CI
+```
+
+---
+
 ## Top-level options
 
 | Key | Default | What it does |
