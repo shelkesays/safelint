@@ -57,6 +57,9 @@ execution:
     - test_coupling
     - test_existence
     - missing_assertions
+    - tainted_sink         # ← dataflow: most expensive, disabled by default
+    - return_value_ignored
+    - null_dereference
 
 
 rules:
@@ -188,3 +191,77 @@ rules:
     test_dirs:
       - tests
     severity: warning
+
+  # ── Dataflow hybrid rules (disabled by default — opt-in) ──────────────────
+  # These combine AST analysis with intra-procedural taint tracking.
+  # More expensive than structural rules; run last.
+
+  tainted_sink:
+    enabled: false     # set to true to catch unsanitized input flowing into eval/exec/subprocess
+    severity: error
+    # Dangerous call names — tainted args to these produce a violation
+    sinks:
+      - eval
+      - exec
+      - compile
+      - system
+      - popen
+      - Popen
+      - run
+      - call
+      - check_output
+      - execute
+    # Calls that clean taint — result of these is considered safe
+    sanitizers:
+      - escape
+      - sanitize
+      - clean
+      - validate
+      - quote
+      - encode
+      - bleach
+    # Calls that inject taint even without tainted arguments
+    sources:
+      - input
+      - readline
+      - recv
+      - recvfrom
+      - read
+
+  return_value_ignored:
+    enabled: false     # set to true to enforce checking of error-signalling return values
+    severity: warning
+    # Bare calls to these functions (result discarded) produce a violation
+    flagged_calls:
+      - run
+      - call
+      - check_output
+      - write
+      - send
+      - sendall
+      - sendfile
+      - seek
+      - truncate
+      - remove
+      - unlink
+      - rename
+      - replace
+      - makedirs
+      - mkdir
+      - rmdir
+
+  null_dereference:
+    enabled: false     # set to true to catch chained access on nullable-returning calls
+    severity: error
+    # Method names whose return values may be None — chaining on them without
+    # a None check produces a violation (e.g. d.get("key").strip())
+    nullable_methods:
+      - get
+      - pop
+      - find
+      - next
+      - first
+      - one_or_none
+      - scalar
+      - scalar_one_or_none
+      - fetchone
