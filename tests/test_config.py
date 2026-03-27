@@ -18,7 +18,7 @@ def test_defaults_have_expected_keys() -> None:
 
 
 def test_load_config_returns_defaults_when_no_file(tmp_path: Path) -> None:
-    """load_config() falls back to DEFAULTS when no .ai-safety.yaml is found."""
+    """load_config() falls back to DEFAULTS when no .safelint.yaml is found."""
     config = load_config(tmp_path)
 
     assert config["mode"] == DEFAULTS["mode"]
@@ -27,8 +27,8 @@ def test_load_config_returns_defaults_when_no_file(tmp_path: Path) -> None:
 
 
 def test_load_config_merges_yaml_with_defaults(tmp_path: Path) -> None:
-    """load_config() deep-merges a .ai-safety.yaml with built-in defaults."""
-    (tmp_path / ".ai-safety.yaml").write_text(
+    """load_config() deep-merges a .safelint.yaml with built-in defaults."""
+    (tmp_path / ".safelint.yaml").write_text(
         "mode: ci\nrules:\n  function_length:\n    max_lines: 20\n",
         encoding="utf-8",
     )
@@ -42,8 +42,8 @@ def test_load_config_merges_yaml_with_defaults(tmp_path: Path) -> None:
 
 
 def test_load_config_walks_up_to_find_file(tmp_path: Path) -> None:
-    """load_config() walks parent directories to find .ai-safety.yaml."""
-    (tmp_path / ".ai-safety.yaml").write_text("mode: ci\n", encoding="utf-8")
+    """load_config() walks parent directories to find .safelint.yaml."""
+    (tmp_path / ".safelint.yaml").write_text("mode: ci\n", encoding="utf-8")
     nested = tmp_path / "a" / "b"
     nested.mkdir(parents=True)
 
@@ -101,9 +101,9 @@ def test_load_config_reads_pyproject_toml(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
 def test_load_config_pyproject_without_safelint_section_falls_back(tmp_path: Path) -> None:
-    """pyproject.toml without [tool.safelint] does not block .ai-safety.yaml lookup."""
+    """pyproject.toml without [tool.safelint] does not block .safelint.yaml lookup."""
     (tmp_path / "pyproject.toml").write_text("[tool.ruff]\nline-length = 88\n", encoding="utf-8")
-    (tmp_path / ".ai-safety.yaml").write_text("mode: ci\n", encoding="utf-8")
+    (tmp_path / ".safelint.yaml").write_text("mode: ci\n", encoding="utf-8")
 
     config = load_config(tmp_path)
 
@@ -112,11 +112,11 @@ def test_load_config_pyproject_without_safelint_section_falls_back(tmp_path: Pat
 
 @pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
 def test_load_config_pyproject_takes_priority_over_yaml(tmp_path: Path) -> None:
-    """pyproject.toml [tool.safelint] takes priority over .ai-safety.yaml."""
+    """pyproject.toml [tool.safelint] takes priority over .safelint.yaml."""
     (tmp_path / "pyproject.toml").write_text(
         "[tool.safelint]\nmode = 'ci'\n", encoding="utf-8"
     )
-    (tmp_path / ".ai-safety.yaml").write_text("mode: local\n", encoding="utf-8")
+    (tmp_path / ".safelint.yaml").write_text("mode: local\n", encoding="utf-8")
 
     config = load_config(tmp_path)
 

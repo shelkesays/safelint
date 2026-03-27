@@ -12,7 +12,7 @@ class ResourceLifecycleRule(BaseRule):
 
     If a tracked function (open, connect, session, …) is called outside a
     ``with`` block, the resource may not be released when an exception occurs.
-    Configure ``tracked_functions`` and ``cleanup_patterns`` in .ai-safety.yaml.
+    Configure ``tracked_functions`` and ``cleanup_patterns`` in .safelint.yaml.
     """
 
     name = "resource_lifecycle"

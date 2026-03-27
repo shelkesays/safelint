@@ -20,7 +20,7 @@ def run(
     target:
         A single ``.py`` file or a directory to scan recursively.
     config_path:
-        Explicit path to a ``.ai-safety.yaml`` file. When omitted, the
+        Explicit path to a ``.safelint.yaml`` file. When omitted, the
         loader walks up from *target* to find one automatically.
     changed_files:
         List of files being checked (injected into test-coupling rules).

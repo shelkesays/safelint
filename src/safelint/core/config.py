@@ -3,7 +3,7 @@
 Config is searched in this priority order (highest first):
 
 1. ``pyproject.toml`` - ``[tool.safelint]`` section  (preferred)
-2. ``.ai-safety.yaml`` - legacy YAML config           (backward compat)
+2. ``.safelint.yaml`` - legacy YAML config           (backward compat)
 3. Built-in defaults
 
 TOML support uses the stdlib ``tomllib`` module (Python 3.11+) or the
@@ -56,7 +56,7 @@ SEVERITY_ORDER: dict[str, int] = {"warning": 0, "error": 1}
 
 MODE_FAIL_ON: dict[str, str] = {"local": "error", "ci": "warning"}
 
-YAML_CONFIG_FILENAME = ".ai-safety.yaml"
+YAML_CONFIG_FILENAME = ".safelint.yaml"
 TOML_CONFIG_FILENAME = "pyproject.toml"
 TOML_CONFIG_KEY = "safelint"
 
@@ -266,7 +266,7 @@ def _try_pyproject(directory: Path) -> dict[str, Any] | None:
 
 
 def _try_yaml(directory: Path) -> dict[str, Any] | None:
-    """Return the parsed .ai-safety.yaml from *directory*, or None."""
+    """Return the parsed .safelint.yaml from *directory*, or None."""
     if not _YAML_AVAILABLE:  # pragma: no cover
         return None
     candidate = directory / YAML_CONFIG_FILENAME
@@ -287,7 +287,7 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
     the lookup order is:
 
     1. ``pyproject.toml`` → ``[tool.safelint]``
-    2. ``.ai-safety.yaml``
+    2. ``.safelint.yaml``
 
     Returns ``DEFAULTS`` when no config file is found or when neither TOML
     nor YAML parsers are available.

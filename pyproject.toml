@@ -32,7 +32,7 @@ Repository = "https://github.com/shelkesays/safelint"
 Issues = "https://github.com/shelkesays/safelint/issues"
 
 [project.optional-dependencies]
-# Legacy YAML config support (.ai-safety.yaml); not needed if using pyproject.toml
+# Legacy YAML config support (.safelint.yaml); not needed if using pyproject.toml
 yaml = ["PyYAML>=6.0"]
 dev = [
     "interrogate>=1.7.0",
@@ -150,7 +150,7 @@ unresolved-attribute = "warn"
 
 # ---------------------------------------------------------------------------
 # safelint - safety lint configuration
-# Configure safelint here instead of a separate .ai-safety.yaml file.
+# Configure safelint here instead of a separate .safelint.yaml file.
 # All keys are optional; unset keys fall back to built-in defaults.
 # ---------------------------------------------------------------------------
 [tool.safelint]

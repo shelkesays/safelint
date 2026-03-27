@@ -30,7 +30,7 @@ def test_run_without_config(tmp_path: Path) -> None:
 
 def test_run_with_config_path(tmp_path: Path) -> None:
     """run() loads the config from the supplied path."""
-    config_file = tmp_path / ".ai-safety.yaml"
+    config_file = tmp_path / ".safelint.yaml"
     config_file.write_text("rules:\n  function_length:\n    max_lines: 5\n", encoding="utf-8")
     sample = tmp_path / "ok.py"
     sample.write_text("x = 1\n", encoding="utf-8")
@@ -46,8 +46,8 @@ def test_run_with_config_path(tmp_path: Path) -> None:
 
 
 def test_load_config_bad_yaml_falls_back_to_defaults(tmp_path: Path) -> None:
-    """A malformed .ai-safety.yaml is skipped and defaults are returned."""
-    (tmp_path / ".ai-safety.yaml").write_text(":\n  bad: [yaml", encoding="utf-8")
+    """A malformed .safelint.yaml is skipped and defaults are returned."""
+    (tmp_path / ".safelint.yaml").write_text(":\n  bad: [yaml", encoding="utf-8")
 
     config = load_config(tmp_path)
 
