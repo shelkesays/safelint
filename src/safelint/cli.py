@@ -161,7 +161,7 @@ def main() -> None:
             "--config",
             type=Path,
             default=None,
-            help="Directory or path used as the search root for .safelint.yaml",
+            help="Path to a .safelint.yaml config file (overrides automatic discovery)",
         )
         _build_common_args(parser)
         args = parser.parse_args(sys.argv[2:])  # skip 'check'
