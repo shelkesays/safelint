@@ -16,6 +16,7 @@ class SideEffectsHiddenRule(BaseRule):
     """
 
     name = "side_effects_hidden"
+    code = "SAFE303"
 
     def _first_io_call(self, func_node: ast.AST, io_funcs: frozenset[str]) -> ast.Call | None:
         """Return the first I/O call node found inside *func_node*, or None."""
@@ -51,7 +52,7 @@ class SideEffectsHiddenRule(BaseRule):
                         io_call.lineno,
                         f'Function "{node.name}" looks pure but calls I/O primitive'
                         f' "{self._call_name(io_call.func)}"'
-                        " — rename to signal intent or use dependency injection",
+                        " - rename to signal intent or use dependency injection",
                     )
                 )
         return violations
@@ -61,6 +62,7 @@ class SideEffectsRule(BaseRule):
     """Flag I/O primitives called inside any function not explicitly named for I/O."""
 
     name = "side_effects"
+    code = "SAFE304"
 
     def _first_io_call(self, func_node: ast.AST, io_funcs: frozenset[str]) -> ast.Call | None:
         """Return the first I/O call node found inside *func_node*, or None."""
@@ -93,7 +95,7 @@ class SideEffectsRule(BaseRule):
                         io_call.lineno,
                         f'Function "{node.name}" calls I/O primitive'
                         f' "{self._call_name(io_call.func)}"'
-                        " — rename to signal intent or use dependency injection",
+                        " - rename to signal intent or use dependency injection",
                     )
                 )
         return violations

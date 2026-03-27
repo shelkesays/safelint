@@ -1,4 +1,4 @@
-"""resource_lifecycle rule — tracked resource functions must use context managers."""
+"""resource_lifecycle rule - tracked resource functions must use context managers."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ class ResourceLifecycleRule(BaseRule):
     """
 
     name = "resource_lifecycle"
+    code = "SAFE401"
 
     def _collect_guarded(self, tree: ast.AST, tracked: frozenset[str]) -> set[int]:
         """Return the set of node IDs for tracked calls already inside a with block."""
@@ -47,7 +48,7 @@ class ResourceLifecycleRule(BaseRule):
                     filepath,
                     node.lineno,
                     f'"{call_name}()" called outside a with block'
-                    f" — use a context manager or ensure {cleanup_str} is called on all exit paths",
+                    f" - use a context manager or ensure {cleanup_str} is called on all exit paths",
                 )
             )
         return violations

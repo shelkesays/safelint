@@ -1,4 +1,4 @@
-"""Rule registry — all available safelint rules and their canonical order."""
+"""Rule registry - all available safelint rules and their canonical order."""
 
 from __future__ import annotations
 
@@ -16,7 +16,7 @@ from safelint.rules.side_effects import SideEffectsHiddenRule, SideEffectsRule
 from safelint.rules.state_purity import GlobalMutationRule, GlobalStateRule
 from safelint.rules.test_coverage import TestCouplingRule, TestExistenceRule
 
-# Canonical list — cheap structural rules first, dataflow rules last
+# Canonical list - cheap structural rules first, dataflow rules last
 # (they are more expensive and disabled by default).
 ALL_RULES: list[type[BaseRule]] = [
     FunctionLengthRule,
@@ -35,7 +35,7 @@ ALL_RULES: list[type[BaseRule]] = [
     TestCouplingRule,
     TestExistenceRule,
     MissingAssertionsRule,
-    # Dataflow hybrid rules — disabled by default, enable in .ai-safety.yaml
+    # Dataflow hybrid rules - disabled by default, enable in .ai-safety.yaml
     TaintedSinkRule,
     ReturnValueIgnoredRule,
     NullDereferenceRule,

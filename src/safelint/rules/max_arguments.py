@@ -1,4 +1,4 @@
-"""max_arguments rule — argument count (excluding self/cls) must not exceed max_args."""
+"""max_arguments rule - argument count (excluding self/cls) must not exceed max_args."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ class MaxArgumentsRule(BaseRule):
     """Reject functions whose argument count (excluding self/cls) exceeds the limit."""
 
     name = "max_arguments"
+    code = "SAFE103"
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
         """Flag any function with more arguments than max_args."""

@@ -1,4 +1,4 @@
-"""nesting_depth rule — control-flow nesting must not exceed max_depth."""
+"""nesting_depth rule - control-flow nesting must not exceed max_depth."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ class NestingDepthRule(BaseRule):
     """Reject functions whose control-flow nesting exceeds the configured depth."""
 
     name = "nesting_depth"
+    code = "SAFE102"
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
         """Flag any function whose maximum control-flow nesting depth exceeds max_depth."""
@@ -36,7 +37,7 @@ class NestingDepthRule(BaseRule):
         Control-flow nodes (if/for/while/with/try) increment the depth; all
         other nodes pass through unchanged. ``elif`` chains are represented in
         the AST as an ``ast.If`` inside the ``orelse`` of another ``ast.If``
-        — they are at the *same* logical depth as the parent ``if``, so we
+        - they are at the *same* logical depth as the parent ``if``, so we
         pass ``current - 1`` to counteract the increment the child will add.
         """
         if isinstance(node, (ast.If, ast.For, ast.While, ast.With, ast.Try)):

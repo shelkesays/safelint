@@ -1,4 +1,4 @@
-"""Tests for safelint.core.engine — SafetyEngine."""
+"""Tests for safelint.core.engine - SafetyEngine."""
 
 from __future__ import annotations
 

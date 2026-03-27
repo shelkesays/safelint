@@ -15,8 +15,8 @@ Severity model
 Each rule carries per-rule severity (error | warning). The --fail-on threshold
 controls which severity level blocks the run:
 
-  --fail-on=error    → only error-severity violations block  (lenient — onboarding)
-  --fail-on=warning  → error + warning violations block      (strict  — production)
+  --fail-on=error    → only error-severity violations block  (lenient - onboarding)
+  --fail-on=warning  → error + warning violations block      (strict  - production)
 
 Precedence: --fail-on CLI > fail_on in .ai-safety.yaml > mode default.
 """
@@ -40,7 +40,8 @@ def _print_file_violations(filepath: str, violations: list[Violation]) -> None:
     print(f"{'─' * 64}")
     for v in violations:
         icon = "❌" if v.severity == "error" else "⚠️ "
-        print(f"  {icon}  [{v.rule}] line {v.lineno}: {v.message}")
+        tag = f"{v.code}" if v.code else v.rule
+        print(f"  {icon}  {tag} [{v.rule}] line {v.lineno}: {v.message}")
 
 
 def _resolve_fail_on(args: argparse.Namespace, config: dict) -> tuple[str, int]:
@@ -75,11 +76,11 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
     print()
     if all_advisory:
         print(
-            f"⚠️  {len(all_advisory)} advisory violation(s) — below --fail-on={fail_on} threshold."
+            f"⚠️  {len(all_advisory)} advisory violation(s) - below --fail-on={fail_on} threshold."
         )
     if all_blocking:
         count = len(all_blocking)
-        print(f"🚫 {count} violation(s) at or above --fail-on={fail_on} — commit rejected.")
+        print(f"🚫 {count} violation(s) at or above --fail-on={fail_on} - commit rejected.")
         return 1
 
     print("✅ All safety checks passed.")
@@ -112,10 +113,10 @@ def _run_check(args: argparse.Namespace) -> int:
     print()
     if all_advisory:
         print(
-            f"⚠️  {len(all_advisory)} advisory violation(s) — below --fail-on={fail_on} threshold."
+            f"⚠️  {len(all_advisory)} advisory violation(s) - below --fail-on={fail_on} threshold."
         )
     if all_blocking:
-        print(f"🚫 {len(all_blocking)} violation(s) at or above --fail-on={fail_on} — not clean.")
+        print(f"🚫 {len(all_blocking)} violation(s) at or above --fail-on={fail_on} - not clean.")
         return 1
 
     if not any(r.violations for r in results):
