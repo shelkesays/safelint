@@ -13,6 +13,7 @@ class Violation:
     """A single rule violation produced during static analysis."""
 
     rule: str
+    code: str
     filepath: str
     lineno: int
     message: str
@@ -23,10 +24,12 @@ class BaseRule(ABC):
     """Pluggable safety rule that analyses a parsed AST and returns violations.
 
     Subclasses declare a ``name`` class variable matching the key used in the
-    config file, then implement ``check_file``.
+    config file and a ``code`` class variable (e.g. ``SAFE101``) for display
+    and inline suppression, then implement ``check_file``.
     """
 
     name: str = ""
+    code: str = ""
 
     def __init__(self, config: dict[str, Any]) -> None:
         """Bind rule-specific config and resolve severity."""
@@ -41,6 +44,7 @@ class BaseRule(ABC):
         """Shorthand for constructing a Violation tagged with this rule."""
         return Violation(
             rule=self.name,
+            code=self.code,
             filepath=filepath,
             lineno=lineno,
             message=message,

@@ -11,11 +11,12 @@ class BareExceptRule(BaseRule):
     """Reject bare ``except:`` clauses that silently catch SystemExit and KeyboardInterrupt."""
 
     name = "bare_except"
+    code = "SAFE201"
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
         """Flag every except handler with no exception type specified."""
         return [
-            self._v(filepath, handler.lineno, "Bare except clause — specify the exception type(s)")
+            self._v(filepath, handler.lineno, "Bare except clause - specify the exception type(s)")
             for node in ast.walk(tree)
             if isinstance(node, ast.Try)
             for handler in node.handlers
@@ -27,6 +28,7 @@ class EmptyExceptRule(BaseRule):
     """Reject except blocks whose body is empty (silent failure)."""
 
     name = "empty_except"
+    code = "SAFE202"
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
         """Flag every except handler with an empty body."""
@@ -34,7 +36,7 @@ class EmptyExceptRule(BaseRule):
             self._v(
                 filepath,
                 handler.lineno,
-                "Empty except block — add error handling or a logging call",
+                "Empty except block - add error handling or a logging call",
             )
             for node in ast.walk(tree)
             if isinstance(node, ast.Try)
@@ -47,6 +49,7 @@ class LoggingOnErrorRule(BaseRule):
     """Require a logging call in every except block that does not simply re-raise."""
 
     name = "logging_on_error"
+    code = "SAFE203"
 
     _LOG_METHODS = frozenset({"debug", "info", "warning", "error", "exception", "critical"})
 
@@ -73,7 +76,7 @@ class LoggingOnErrorRule(BaseRule):
             self._v(
                 filepath,
                 handler.lineno,
-                "Except block missing logging call — errors must be logged before being swallowed",
+                "Except block missing logging call - errors must be logged before being swallowed",
             )
             for node in ast.walk(tree)
             if isinstance(node, ast.Try)

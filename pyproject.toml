@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "safelint"
-version = "0.3.0"
-description = "Safety-oriented lint rules and pre-commit integration for Python codebases"
+version = "1.0.0"
+description = "Engineering safety lint rules and pre-commit integration for modern Python codebases"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
@@ -49,7 +49,7 @@ dev = [
 safelint = "safelint.cli:main"
 
 # ---------------------------------------------------------------------------
-# setuptools — src layout
+# setuptools - src layout
 # ---------------------------------------------------------------------------
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -99,7 +99,7 @@ exclude_lines = [
 ]
 
 # ---------------------------------------------------------------------------
-# ruff — linter + formatter
+# ruff - linter + formatter
 # ---------------------------------------------------------------------------
 [tool.ruff]
 target-version = "py310"
@@ -119,7 +119,7 @@ indent-style = "space"
 skip-magic-trailing-comma = false
 
 # ---------------------------------------------------------------------------
-# ty — type checker (replaces mypy)
+# ty - type checker (replaces mypy)
 # Docs: https://docs.astral.sh/ty/
 # ---------------------------------------------------------------------------
 [tool.ty.environment]
@@ -149,7 +149,7 @@ unresolved-import = "warn"
 unresolved-attribute = "warn"
 
 # ---------------------------------------------------------------------------
-# safelint — safety lint configuration
+# safelint - safety lint configuration
 # Configure safelint here instead of a separate .ai-safety.yaml file.
 # All keys are optional; unset keys fall back to built-in defaults.
 # ---------------------------------------------------------------------------

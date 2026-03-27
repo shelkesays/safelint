@@ -1,4 +1,4 @@
-"""function_length rule — body must not exceed max_lines."""
+"""function_length rule - body must not exceed max_lines."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ class FunctionLengthRule(BaseRule):
     """Reject functions whose body exceeds the configured line limit."""
 
     name = "function_length"
+    code = "SAFE101"
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
         """Flag any function or async function longer than max_lines."""
@@ -19,7 +20,7 @@ class FunctionLengthRule(BaseRule):
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            if node.end_lineno is None:
+            if node.end_lineno is None:  # pragma: no cover
                 continue
             length = node.end_lineno - node.lineno
             if length > max_lines:

@@ -7,7 +7,7 @@ dangerous sink the hit is recorded in :attr:`TaintTracker.sink_hits`.
 
 Design goals
 ------------
-* Intra-procedural only — no cross-function call graph needed.
+* Intra-procedural only - no cross-function call graph needed.
 * Assignment propagation: ``x = tainted_y`` makes ``x`` tainted.
 * Sanitizer calls clear taint: ``x = escape(tainted_y)`` → ``x`` clean.
 * Source calls inject taint: ``x = input()`` → ``x`` tainted.
@@ -74,7 +74,7 @@ class TaintTracker(ast.NodeVisitor):
         self.sink_hits: list[tuple[int, str, str]] = []
 
     # ------------------------------------------------------------------
-    # Taint propagation helpers — each ≤ depth 1
+    # Taint propagation helpers - each ≤ depth 1
     # ------------------------------------------------------------------
 
     def _name_tainted(self, node: ast.Name) -> bool:
@@ -121,7 +121,7 @@ class TaintTracker(ast.NodeVisitor):
         return False
 
     # ------------------------------------------------------------------
-    # Assignment visitors — propagate taint to LHS names
+    # Assignment visitors - propagate taint to LHS names
     # ------------------------------------------------------------------
 
     def _update_name(self, target: ast.expr, is_tainted: bool) -> None:
@@ -153,7 +153,7 @@ class TaintTracker(ast.NodeVisitor):
         self.generic_visit(node)
 
     # ------------------------------------------------------------------
-    # Call visitor — detect tainted args at dangerous sinks
+    # Call visitor - detect tainted args at dangerous sinks
     # ------------------------------------------------------------------
 
     def _record_sink_hit(self, lineno: int, arg: ast.expr, sink: str) -> None:

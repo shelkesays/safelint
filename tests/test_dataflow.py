@@ -44,7 +44,7 @@ def test_call_name_from_attribute_node():
 
 
 def test_call_name_unknown_returns_none():
-    # Subscript call: func_map["key"]() — not a Name or Attribute
+    # Subscript call: func_map["key"]() - not a Name or Attribute
     tree = parse("func_map['key']()")
     call = tree.body[0].value
     assert _call_name(call.func) is None
@@ -216,7 +216,7 @@ def test_tainted_sink_self_cls_not_tainted():
     """
     # self is excluded from params so this must NOT flag eval("1 + 1")
     vs = violations(TaintedSinkRule, src)
-    # "1 + 1" is a literal, not tainted — expect zero hits
+    # "1 + 1" is a literal, not tainted - expect zero hits
     assert not vs
 
 
@@ -307,7 +307,7 @@ def test_null_deref_flags_dict_get_subscript():
 
 
 def test_null_deref_safe_when_result_guarded():
-    # No chained dereference — result stored first
+    # No chained dereference - result stored first
     src = """
     d = {"name": "Alice"}
     name = d.get("name")
@@ -346,7 +346,7 @@ def test_null_deref_non_nullable_call_ok():
 
 
 # ---------------------------------------------------------------------------
-# Registry integration — new rules appear in RULE_BY_NAME
+# Registry integration - new rules appear in RULE_BY_NAME
 # ---------------------------------------------------------------------------
 
 
@@ -363,3 +363,111 @@ def test_new_rules_disabled_by_default():
 
     for name in ("tainted_sink", "return_value_ignored", "null_dereference"):
         assert DEFAULTS["rules"][name]["enabled"] is False, f"{name} should be off by default"
+
+
+# ---------------------------------------------------------------------------
+# TaintTracker edge-case coverage
+# ---------------------------------------------------------------------------
+
+
+def test_tracker_container_propagates_taint():
+    """A list literal containing a tainted element is itself tainted."""
+    src = """
+    def process(data):
+        items = [data, "safe"]
+        system(items)
+    """
+    tree = parse(src)
+    func = tree.body[0]
+    tracker = make_tracker({"data"})
+    tracker.visit(func)
+    assert any(s == "system" for _, _, s in tracker.sink_hits)
+
+
+def test_tracker_clean_assignment_discards_taint():
+    """Assigning a clean value to a previously tainted variable removes the taint."""
+    src = """
+    def process(data):
+        x = data
+        x = "safe_string"
+        system(x)
+    """
+    tree = parse(src)
+    func = tree.body[0]
+    tracker = make_tracker({"data"})
+    tracker.visit(func)
+    assert not tracker.sink_hits
+
+
+def test_tracker_subscript_assignment_target_ignored():
+    """Subscript assignment targets (a["key"] = val) don't crash _update_name."""
+    src = """
+    def process(data):
+        a = {}
+        a["key"] = data
+        eval(data)
+    """
+    tree = parse(src)
+    func = tree.body[0]
+    tracker = make_tracker({"data"})
+    tracker.visit(func)
+    # data is still tainted, eval should still fire
+    assert any(s == "eval" for _, _, s in tracker.sink_hits)
+
+
+def test_tracker_aug_assign_clean_value_no_propagation():
+    """An augmented assignment with a clean RHS does not add taint to the target."""
+    src = """
+    def process():
+        cmd = "echo"
+        cmd += " hello"
+        system(cmd)
+    """
+    tree = parse(src)
+    func = tree.body[0]
+    tracker = make_tracker(set())
+    tracker.visit(func)
+    assert not tracker.sink_hits
+
+
+def test_tracker_ann_assign_propagates_taint():
+    """Annotated assignment (x: str = tainted) marks the target as tainted."""
+    src = """
+    def process(data):
+        x: str = data
+        system(x)
+    """
+    tree = parse(src)
+    func = tree.body[0]
+    tracker = make_tracker({"data"})
+    tracker.visit(func)
+    assert any(s == "system" for _, _, s in tracker.sink_hits)
+
+
+def test_tracker_regular_call_propagates_taint_to_result():
+    """A non-source, non-sanitizer call with a tainted arg produces a tainted result."""
+    src = """
+    def process(data):
+        result = fmt(data)
+        system(result)
+    """
+    tree = parse(src)
+    func = tree.body[0]
+    tracker = make_tracker({"data"})
+    tracker.visit(func)
+    assert any(s == "system" for _, _, s in tracker.sink_hits)
+
+
+def test_tracker_ann_assign_no_value_skipped():
+    """Annotated assignment with no value (x: int) does not crash or taint."""
+    src = """
+    def process(data):
+        x: int
+        system(data)
+    """
+    tree = parse(src)
+    func = tree.body[0]
+    tracker = make_tracker({"data"})
+    tracker.visit(func)
+    # data is still tainted via params; x: int (no value) is a no-op for taint
+    assert any(s == "system" for _, _, s in tracker.sink_hits)

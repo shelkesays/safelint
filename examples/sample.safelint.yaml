@@ -1,4 +1,4 @@
-# AI Safety Hook — team configuration
+# AI Safety Hook - team configuration
 # Overrides are deep-merged with built-in defaults; omitted keys inherit defaults.
 #
 # ── Severity model ────────────────────────────────────────────────────────────
@@ -7,8 +7,8 @@
 #   severity: warning  → violation is informational
 #
 # The global fail_on threshold is the gate:
-#   fail_on: error    → only error-severity violations block        (lenient — onboarding)
-#   fail_on: warning  → both warning AND error violations block     (strict  — production)
+#   fail_on: error    → only error-severity violations block        (lenient - onboarding)
+#   fail_on: warning  → both warning AND error violations block     (strict  - production)
 #
 # Precedence: CLI --fail-on > fail_on here > mode default
 #
@@ -21,13 +21,13 @@
 #   CI:         python3 scripts/ai_safety_hook.py --mode=ci    …
 #
 # ── Adoption path ─────────────────────────────────────────────────────────────
-#   Week 1  — mode: local, fail_on: error   (get used to the tool)
-#   Week 4+ — mode: ci,    fail_on: warning (full strictness in CI at minimum)
+#   Week 1  - mode: local, fail_on: error   (get used to the tool)
+#   Week 4+ - mode: ci,    fail_on: warning (full strictness in CI at minimum)
 
 mode: local
 fail_on: error   # upgrade to "warning" when the team is ready
 
-# Glob patterns to skip entirely — generated code, large legacy files, etc.
+# Glob patterns to skip entirely - generated code, large legacy files, etc.
 exclude_paths:
   - "scripts/*"
   - "src/reconcileit/integrations/database.py"  # large legacy file
@@ -35,7 +35,7 @@ exclude_paths:
 
 # ── Execution ─────────────────────────────────────────────────────────────────
 # fail_fast: stop checking a file on the first violation (faster pre-commit,
-#            but you only see one problem at a time — good for mature codebases)
+#            but you only see one problem at a time - good for mature codebases)
 # order:     cheap structural rules run first so expensive checks are short-
 #            circuited when basic problems already exist
 execution:
@@ -104,7 +104,7 @@ rules:
 
   global_mutation:
     enabled: true
-    severity: error     # actually writes to a declared global — stricter
+    severity: error     # actually writes to a declared global - stricter
 
   side_effects_hidden:
     enabled: true
@@ -174,12 +174,12 @@ rules:
     enabled: true
     severity: warning
 
-  # ── Documentation (heuristic — disabled by default) ──────────────────────────
+  # ── Documentation (heuristic - disabled by default) ──────────────────────────
   missing_assertions:
     enabled: false
     severity: warning
 
-  # ── Test coverage (disabled by default — enable in CI) ───────────────────────
+  # ── Test coverage (disabled by default - enable in CI) ───────────────────────
   test_existence:
     enabled: false     # set to true in CI to enforce test file presence
     test_dirs:
@@ -192,14 +192,14 @@ rules:
       - tests
     severity: warning
 
-  # ── Dataflow hybrid rules (disabled by default — opt-in) ──────────────────
+  # ── Dataflow hybrid rules (disabled by default - opt-in) ──────────────────
   # These combine AST analysis with intra-procedural taint tracking.
   # More expensive than structural rules; run last.
 
   tainted_sink:
     enabled: false     # set to true to catch unsanitized input flowing into eval/exec/subprocess
     severity: error
-    # Dangerous call names — tainted args to these produce a violation
+    # Dangerous call names - tainted args to these produce a violation
     sinks:
       - eval
       - exec
@@ -211,7 +211,7 @@ rules:
       - call
       - check_output
       - execute
-    # Calls that clean taint — result of these is considered safe
+    # Calls that clean taint - result of these is considered safe
     sanitizers:
       - escape
       - sanitize
@@ -253,7 +253,7 @@ rules:
   null_dereference:
     enabled: false     # set to true to catch chained access on nullable-returning calls
     severity: error
-    # Method names whose return values may be None — chaining on them without
+    # Method names whose return values may be None - chaining on them without
     # a None check produces a violation (e.g. d.get("key").strip())
     nullable_methods:
       - get

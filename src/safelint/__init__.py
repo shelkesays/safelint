@@ -1,4 +1,4 @@
-"""safelint — Holzmann-inspired safety lint rules and pre-commit integration for Python."""
+"""safelint - Holzmann-inspired safety lint rules and pre-commit integration for Python."""
 
 from safelint.core.config import DEFAULTS, load_config
 from safelint.core.engine import LintResult, SafetyEngine
