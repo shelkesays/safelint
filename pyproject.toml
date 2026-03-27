@@ -1,0 +1,155 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "safelint"
+version = "0.0.1"
+description = "Safety-oriented lint rules and pre-commit integration for Python codebases"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+keywords = ["lint", "pre-commit", "static-analysis", "safety", "python"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: Software Development :: Testing",
+]
+dependencies = [
+    "pre-commit>=4.5.1",
+    "pytest>=9.0.2",
+    "pytest-cov>=7.1.0",
+    "pytest-mock>=3.15.1",
+    "PyYAML>=6.0",
+    "ruff>=0.15.8",
+    "ty>=0.0.26",
+]
+
+[project.urls]
+Homepage = "https://github.com/shelkesays/safelint"
+Repository = "https://github.com/shelkesays/safelint"
+Issues = "https://github.com/shelkesays/safelint/issues"
+
+[project.optional-dependencies]
+dev = [
+    "interrogate>=1.7.0",
+    "pre-commit>=4.2.0",
+    "pytest>=8.3.5",
+    "pytest-cov>=6.1.1",
+    "ruff>=0.15.6",
+    "ty>=0.0.1a14",
+]
+
+[project.scripts]
+safelint = "safelint.cli:main"
+
+# ---------------------------------------------------------------------------
+# setuptools — src layout
+# ---------------------------------------------------------------------------
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+safelint = ["py.typed"]
+
+# ---------------------------------------------------------------------------
+# pytest
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-p no:warnings --cov=src --cov-report=term-missing"
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
+# ---------------------------------------------------------------------------
+# coverage
+# ---------------------------------------------------------------------------
+[tool.coverage.run]
+branch = true
+source = ["src", "tests"]
+
+[tool.coverage.paths]
+source = ["src"]
+
+[tool.coverage.report]
+fail_under = 80
+precision = 2
+show_missing = true
+skip_covered = true
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "if self\\.debug",
+    "if settings\\.DEBUG",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "return NotImplemented",
+    "if 0:",
+    "if __name__ == .__main__.:",
+    "except KeyboardInterrupt as err:",
+]
+
+# ---------------------------------------------------------------------------
+# ruff — linter + formatter
+# ---------------------------------------------------------------------------
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+src = ["src"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = []
+
+[tool.ruff.lint.isort]
+known-first-party = ["safelint"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+skip-magic-trailing-comma = false
+
+# ---------------------------------------------------------------------------
+# ty — type checker (replaces mypy)
+# Docs: https://docs.astral.sh/ty/
+# ---------------------------------------------------------------------------
+[tool.ty.environment]
+python-version = "3.11"
+root = ["src"]
+
+[tool.ty.rules]
+# Errors (must fix)
+invalid-argument-type = "error"
+invalid-return-type = "error"
+invalid-assignment = "error"
+invalid-attribute-access = "error"
+call-non-callable = "error"
+missing-argument = "error"
+too-many-positional-arguments = "error"
+invalid-type-arguments = "error"
+unsupported-operator = "error"
+division-by-zero = "error"
+
+# Warnings (should fix, non-blocking)
+redundant-cast = "warn"
+unused-ignore-comment = "warn"
+unused-type-ignore-comment = "warn"
+possibly-unresolved-reference = "warn"
+possibly-missing-attribute = "warn"
+unresolved-import = "warn"
+unresolved-attribute = "warn"
+
+[dependency-groups]
+dev = [
+    "interrogate>=1.7.0",
+]
