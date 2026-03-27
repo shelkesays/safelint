@@ -1,65 +1,176 @@
-"""Configuration dataclass and loaders for safelint."""
+"""Configuration defaults, constants, and config loader for safelint."""
 
 from __future__ import annotations
 
-import json
-from dataclasses import dataclass, field
+import logging
 from pathlib import Path
 from typing import Any
 
-import yaml
+try:
+    import yaml
 
-DEFAULT_RULES = [
-    "function-length",
-    "nesting-depth",
-    "error-handling",
-    "side-effects",
-    "resource-lifecycle",
-]
+    _YAML_AVAILABLE = True
+except ImportError:
+    _YAML_AVAILABLE = False
+
+_log = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Severity / mode constants
+# ---------------------------------------------------------------------------
+
+SEVERITY_ORDER: dict[str, int] = {"warning": 0, "error": 1}
+
+MODE_FAIL_ON: dict[str, str] = {"local": "error", "ci": "warning"}
+
+CONFIG_FILENAME = ".ai-safety.yaml"
+
+# ---------------------------------------------------------------------------
+# Built-in defaults — every key here can be overridden via .ai-safety.yaml
+# ---------------------------------------------------------------------------
+
+DEFAULTS: dict[str, Any] = {
+    "mode": "local",
+    "fail_on": "error",
+    "exclude_paths": [],
+    "execution": {
+        # Stop checking a file the moment the first violation is found.
+        # Cheap structural rules run first so expensive checks are skipped
+        # when basic problems already exist.
+        "fail_fast": False,
+        "order": [
+            "function_length",
+            "nesting_depth",
+            "max_arguments",
+            "bare_except",
+            "empty_except",
+            "global_state",
+            "global_mutation",
+            "unbounded_loops",
+            "complexity",
+            "side_effects_hidden",
+            "side_effects",
+            "logging_on_error",
+            "resource_lifecycle",
+            "test_coupling",
+            "test_existence",
+            "missing_assertions",
+        ],
+    },
+    "rules": {
+        "function_length": {"enabled": True, "max_lines": 60, "severity": "error"},
+        "nesting_depth": {"enabled": True, "max_depth": 2, "severity": "error"},
+        "max_arguments": {"enabled": True, "max_args": 7, "severity": "error"},
+        "complexity": {"enabled": True, "max_complexity": 10, "severity": "error"},
+        "bare_except": {"enabled": True, "severity": "error"},
+        "empty_except": {"enabled": True, "severity": "error"},
+        "logging_on_error": {"enabled": True, "severity": "warning"},
+        "global_state": {"enabled": True, "severity": "warning"},
+        "global_mutation": {"enabled": True, "severity": "error"},
+        "side_effects_hidden": {
+            "enabled": True,
+            "severity": "error",
+            "io_functions": ["open", "print", "input", "subprocess"],
+            "pure_prefixes": [
+                "calculate",
+                "compute",
+                "get",
+                "check",
+                "validate",
+                "is",
+                "has",
+                "find",
+                "parse",
+                "transform",
+                "convert",
+                "format",
+                "build",
+                "resolve",
+                "detect",
+            ],
+        },
+        "side_effects": {
+            "enabled": True,
+            "severity": "warning",
+            "io_functions": ["open", "print", "input"],
+            "io_name_keywords": [
+                "print",
+                "log",
+                "write",
+                "read",
+                "save",
+                "load",
+                "send",
+                "fetch",
+                "export",
+                "import",
+            ],
+        },
+        "resource_lifecycle": {
+            "enabled": True,
+            "severity": "error",
+            "tracked_functions": ["open", "connect", "session"],
+            "cleanup_patterns": ["close", "commit", "rollback"],
+        },
+        "unbounded_loops": {"enabled": True, "severity": "warning"},
+        "missing_assertions": {"enabled": False, "severity": "warning"},
+        "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
+        "test_coupling": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
+    },
+}
 
 
-@dataclass(slots=True)
-class SafeLintConfig:
-    """Holds all tunable settings that control safelint rule behaviour."""
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
 
-    max_function_lines: int = 40
-    max_nesting_depth: int = 3
-    allow_top_level_side_effects: bool = False
-    enabled_rules: list[str] = field(default_factory=lambda: list(DEFAULT_RULES))
-    include: list[str] = field(default_factory=lambda: ["**/*.py"])
-    exclude: list[str] = field(default_factory=lambda: ["**/tests/**", "**/.venv/**"])
 
-    @classmethod
-    def from_mapping(cls, payload: dict[str, Any]) -> SafeLintConfig:
-        """Construct a :class:`SafeLintConfig` from a plain dictionary."""
-        enabled_rules = payload.get("enabled_rules", DEFAULT_RULES)
-        include = payload.get("include", ["**/*.py"])
-        exclude = payload.get("exclude", ["**/tests/**", "**/.venv/**"])
-        return cls(
-            max_function_lines=int(payload.get("max_function_lines", 40)),
-            max_nesting_depth=int(payload.get("max_nesting_depth", 3)),
-            allow_top_level_side_effects=bool(payload.get("allow_top_level_side_effects", False)),
-            enabled_rules=[str(name) for name in enabled_rules],
-            include=[str(pattern) for pattern in include],
-            exclude=[str(pattern) for pattern in exclude],
-        )
-
-    @classmethod
-    def from_file(cls, path: str | Path) -> SafeLintConfig:
-        """Load config from a YAML or JSON file at *path*."""
-        config_path = Path(path)
-        if not config_path.exists():
-            raise FileNotFoundError(f"Config file not found: {config_path}")
-
-        suffix = config_path.suffix.lower()
-        raw_text = config_path.read_text(encoding="utf-8")
-        if suffix in {".yaml", ".yml"}:
-            payload = yaml.safe_load(raw_text) or {}
-        elif suffix == ".json":
-            payload = json.loads(raw_text)
+def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge *override* into *base*, returning a new dict."""
+    merged: dict[str, Any] = dict(base)
+    for key, value in override.items():
+        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
+            merged[key] = deep_merge(merged[key], value)
         else:
-            raise ValueError(f"Unsupported config format: {config_path.suffix}")
+            merged[key] = value
+    return merged
 
-        if not isinstance(payload, dict):
-            raise ValueError("Configuration payload must be a mapping")
-        return cls.from_mapping(payload)
+
+# ---------------------------------------------------------------------------
+# Config loader
+# ---------------------------------------------------------------------------
+
+
+def _parse_yaml_file(candidate: Path) -> dict[str, Any] | None:
+    """Parse *candidate* as YAML and return the mapping, or None on error."""
+    try:
+        return yaml.safe_load(candidate.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as exc:
+        _log.error("Failed to parse %s: %s — using defaults", candidate, exc)
+        return None
+
+
+def load_config(search_from: Path | None = None) -> dict[str, Any]:
+    """Locate and load .ai-safety.yaml, merging it with the built-in defaults.
+
+    Walks up from *search_from* (defaults to cwd) until the config file is
+    found or the filesystem root is reached. Falls back to built-in defaults
+    when no file is found or PyYAML is not installed.
+    """
+    if not _YAML_AVAILABLE:
+        _log.warning(
+            "PyYAML not installed — using default config. Install with: pip install pyyaml"
+        )
+        return DEFAULTS
+
+    root = search_from or Path.cwd()
+    for parent in [root, *root.parents]:
+        candidate = parent / CONFIG_FILENAME
+        if not candidate.exists():
+            continue
+        raw = _parse_yaml_file(candidate)
+        return deep_merge(DEFAULTS, raw) if raw is not None else DEFAULTS
+
+    return DEFAULTS
+
+    return DEFAULTS
