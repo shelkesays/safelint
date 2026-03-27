@@ -11,6 +11,7 @@ class GlobalStateRule(BaseRule):
     """Reject use of the ``global`` keyword inside functions."""
 
     name = "global_state"
+    code = "SAFE301"
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
         """Flag any function that declares a global variable."""
@@ -26,7 +27,7 @@ class GlobalStateRule(BaseRule):
                         filepath,
                         global_node.lineno,
                         f'Function "{node.name}" declares global: {names}'
-                        " — use dependency injection instead",
+                        " - use dependency injection instead",
                     )
                 )
         return violations
@@ -41,6 +42,7 @@ class GlobalMutationRule(BaseRule):
     """
 
     name = "global_mutation"
+    code = "SAFE302"
 
     def _mutating_assignments(self, func: ast.AST, global_names: set[str]) -> list[tuple[int, str]]:
         """Return ``(lineno, name)`` for each write to a declared global in *func*."""
@@ -81,7 +83,7 @@ class GlobalMutationRule(BaseRule):
                         filepath,
                         lineno,
                         f'Function "{func.name}" writes to global "{name}"'
-                        " — globals must not be mutated",
+                        " - globals must not be mutated",
                     )
                 )
         return violations

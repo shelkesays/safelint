@@ -1,4 +1,4 @@
-"""documentation rule — functions should contain at least one assert (heuristic)."""
+"""documentation rule - functions should contain at least one assert (heuristic)."""
 
 from __future__ import annotations
 
@@ -11,6 +11,7 @@ class MissingAssertionsRule(BaseRule):
     """Warn when a function contains no assert statements (disabled by default)."""
 
     name = "missing_assertions"
+    code = "SAFE601"
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
         """Flag functions that lack any assert statement."""

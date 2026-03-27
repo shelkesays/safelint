@@ -41,7 +41,7 @@ def test_run_with_config_path(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# load_config — invalid YAML falls back to defaults
+# load_config - invalid YAML falls back to defaults
 # ---------------------------------------------------------------------------
 
 
@@ -55,7 +55,7 @@ def test_load_config_bad_yaml_falls_back_to_defaults(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# SafetyEngine — rule-specific scenarios
+# SafetyEngine - rule-specific scenarios
 # ---------------------------------------------------------------------------
 
 
@@ -205,8 +205,8 @@ def test_partition_violations_splits_by_threshold() -> None:
 
     engine = _engine()
     violations = [
-        Violation(rule="r1", filepath="f.py", lineno=1, message="m", severity="error"),
-        Violation(rule="r2", filepath="f.py", lineno=2, message="m", severity="warning"),
+        Violation(rule="r1", code="SAFE001", filepath="f.py", lineno=1, message="m", severity="error"),
+        Violation(rule="r2", code="SAFE002", filepath="f.py", lineno=2, message="m", severity="warning"),
     ]
 
     blocking, advisory = engine.partition_violations(violations, fail_threshold=1)
@@ -421,3 +421,489 @@ def test_cli_check_mode_exits_1_on_violation(tmp_path: Path) -> None:
     result = _run_check(args)
 
     assert result == 1
+
+
+# ---------------------------------------------------------------------------
+# LintResult.has_violations
+# ---------------------------------------------------------------------------
+
+
+def test_lint_result_has_violations_true() -> None:
+    """LintResult.has_violations returns True when violations list is non-empty."""
+    from safelint.core.engine import LintResult
+    from safelint.rules.base import Violation
+
+    v = Violation(rule="r", code="SAFE001", filepath="f.py", lineno=1, message="m", severity="error")
+    result = LintResult(path="f.py", violations=[v])
+    assert result.has_violations is True
+
+
+def test_lint_result_has_violations_false() -> None:
+    """LintResult.has_violations returns False when violations list is empty."""
+    from safelint.core.engine import LintResult
+
+    result = LintResult(path="f.py")
+    assert result.has_violations is False
+
+
+# ---------------------------------------------------------------------------
+# Engine: changed_files injection into TestCouplingRule
+# ---------------------------------------------------------------------------
+
+
+def test_engine_injects_changed_files_for_test_coupling(tmp_path: Path) -> None:
+    """SafetyEngine injects changed_files into TestCouplingRule config."""
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    sample = src_dir / "mymod.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    (test_dir / "test_mymod.py").write_text("def test_x(): pass\n", encoding="utf-8")
+
+    config = deep_merge(
+        DEFAULTS,
+        {"rules": {"test_coupling": {"enabled": True, "test_dirs": [str(test_dir)]}}},
+    )
+    engine = SafetyEngine(config, changed_files=[str(sample)])
+    violations = engine.check_file(str(sample))
+    assert any(v.rule == "test_coupling" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# BaseRule._call_name returns None for non-Name/Attribute func nodes
+# ---------------------------------------------------------------------------
+
+
+def test_base_rule_call_name_returns_none_for_subscript() -> None:
+    """BaseRule._call_name returns None when the func node is a Subscript."""
+    import ast
+
+    from safelint.rules.side_effects import SideEffectsRule
+
+    rule = SideEffectsRule(
+        {"enabled": True, "severity": "warning", "io_functions": ["open"], "io_name_keywords": []}
+    )
+    tree = ast.parse("func_map['key']()")
+    call = tree.body[0].value
+    assert rule._call_name(call.func) is None
+
+
+# ---------------------------------------------------------------------------
+# ComplexityRule: BoolOp and comprehension-with-ifs branches
+# ---------------------------------------------------------------------------
+
+
+def test_complexity_bool_op_increments_cc(tmp_path: Path) -> None:
+    """ComplexityRule counts 'and'/'or' operators as branch points."""
+    source = "def foo(a, b, c):\n    return a and b and c\n"
+    sample = tmp_path / "bool_op.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine({"rules": {"complexity": {"max_complexity": 1}}}).check_file(str(sample))
+    assert any(v.rule == "complexity" for v in violations)
+
+
+def test_complexity_comprehension_with_condition(tmp_path: Path) -> None:
+    """ComplexityRule counts comprehension `if` conditions as branch points."""
+    source = "def foo(items):\n    return [x for x in items if x > 0 if x < 100]\n"
+    sample = tmp_path / "comp_ifs.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine({"rules": {"complexity": {"max_complexity": 1}}}).check_file(str(sample))
+    assert any(v.rule == "complexity" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# TaintedSinkRule: *args and **kwargs parameter names
+# ---------------------------------------------------------------------------
+
+
+def test_tainted_sink_with_vararg_param(tmp_path: Path) -> None:
+    """TaintedSinkRule marks *args as a tainted parameter."""
+    source = textwrap.dedent("""\
+        def process(*args):
+            cmd = args
+            eval(cmd)
+    """)
+    sample = tmp_path / "vararg.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(config).check_file(str(sample))
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+def test_tainted_sink_with_kwarg_param(tmp_path: Path) -> None:
+    """TaintedSinkRule marks **kwargs as a tainted parameter."""
+    source = textwrap.dedent("""\
+        def process(**kwargs):
+            cmd = kwargs
+            eval(cmd)
+    """)
+    sample = tmp_path / "kwarg.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(config).check_file(str(sample))
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# ReturnValueIgnoredRule: non-Call Expr node is silently skipped
+# ---------------------------------------------------------------------------
+
+
+def test_return_value_ignored_non_call_expr(tmp_path: Path) -> None:
+    """ReturnValueIgnoredRule does not flag bare non-call expressions."""
+    source = "x = 1\nx + 1\n"
+    sample = tmp_path / "bexpr.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"rules": {"return_value_ignored": {"enabled": True}}})
+    violations = SafetyEngine(config).check_file(str(sample))
+    assert not any(v.rule == "return_value_ignored" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# NullDereferenceRule: subscript on non-nullable call is safe
+# ---------------------------------------------------------------------------
+
+
+def test_null_deref_subscript_non_nullable_call(tmp_path: Path) -> None:
+    """NullDereferenceRule does not flag subscript access on a non-nullable call."""
+    source = "result = str(42)[0]\n"
+    sample = tmp_path / "nd_sub.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
+    violations = SafetyEngine(config).check_file(str(sample))
+    assert not any(v.rule == "null_dereference" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# LoggingOnErrorRule: bare Name logger call (e.g. error("msg")) is sufficient
+# ---------------------------------------------------------------------------
+
+
+def test_logging_on_error_bare_name_logger_is_exempt(tmp_path: Path) -> None:
+    """logging_on_error is not raised when the except block calls a bare log function."""
+    source = textwrap.dedent("""\
+        def foo():
+            try:
+                pass
+            except ValueError:
+                error("something went wrong")
+    """)
+    sample = tmp_path / "bare_log.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+    assert not any(v.rule == "logging_on_error" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# UnboundedLoopRule: while <variable> fires (non-comparison condition)
+# ---------------------------------------------------------------------------
+
+
+def test_loop_safety_while_variable_condition_fires(tmp_path: Path) -> None:
+    """unbounded_loops fires when the while condition is a bare variable (not a comparison)."""
+    source = textwrap.dedent("""\
+        def poll(flag):
+            while flag:
+                pass
+    """)
+    sample = tmp_path / "while_var.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+    assert any(v.rule == "unbounded_loops" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# MaxArgumentsRule: self/cls is excluded from the count
+# ---------------------------------------------------------------------------
+
+
+def test_max_arguments_self_excluded_from_count(tmp_path: Path) -> None:
+    """max_arguments strips 'self' before counting, so 8 real args still fires."""
+    source = "class Foo:\n    def bar(self, a, b, c, d, e, f, g, h):\n        pass\n"
+    sample = tmp_path / "method.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+    assert any(v.rule == "max_arguments" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# NestingDepthRule: elif chains are at the same depth as the parent if
+# ---------------------------------------------------------------------------
+
+
+def test_nesting_depth_elif_chain_not_deeper(tmp_path: Path) -> None:
+    """elif chains do not increase nesting depth beyond the initial if."""
+    source = textwrap.dedent("""\
+        def foo(x):
+            if x == 1:
+                pass
+            elif x == 2:
+                pass
+            elif x == 3:
+                pass
+    """)
+    sample = tmp_path / "elif.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+    assert not any(v.rule == "nesting_depth" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# SideEffectsHiddenRule: subscript call and no-io-call paths
+# ---------------------------------------------------------------------------
+
+
+def test_side_effects_hidden_subscript_call_not_flagged(tmp_path: Path) -> None:
+    """side_effects_hidden ignores calls via subscript (call_name is None)."""
+    source = textwrap.dedent("""\
+        def get_data():
+            handlers["open"]()
+    """)
+    sample = tmp_path / "sub_call.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+    assert not any(v.rule == "side_effects_hidden" for v in violations)
+
+
+def test_side_effects_hidden_pure_func_no_io_is_clean(tmp_path: Path) -> None:
+    """side_effects_hidden does not flag a pure-named function with no I/O calls."""
+    source = textwrap.dedent("""\
+        def get_value():
+            return 42
+    """)
+    sample = tmp_path / "pure.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+    assert not any(v.rule == "side_effects_hidden" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# SideEffectsRule: function name contains I/O keyword → exempt
+# ---------------------------------------------------------------------------
+
+
+def test_side_effects_rule_io_keyword_in_name_exempt(tmp_path: Path) -> None:
+    """side_effects does not flag functions whose name contains an I/O keyword."""
+    source = textwrap.dedent("""\
+        def log_data():
+            open("x.txt")
+    """)
+    sample = tmp_path / "log_func.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+    assert not any(v.rule == "side_effects" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# TestExistenceRule: clean case - test file found
+# ---------------------------------------------------------------------------
+
+
+def test_test_existence_returns_empty_when_test_found(tmp_path: Path) -> None:
+    """test_existence returns no violations when a matching test file exists."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    sample = src_dir / "mymod.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    (test_dir / "test_mymod.py").write_text("def test_x(): pass\n", encoding="utf-8")
+
+    config = deep_merge(
+        DEFAULTS,
+        {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(test_dir)]}}},
+    )
+    violations = SafetyEngine(config).check_file(str(sample))
+    assert not any(v.rule == "test_existence" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# TestCouplingRule: defer when no test file exists; clean when test updated
+# ---------------------------------------------------------------------------
+
+
+def test_test_coupling_defers_when_no_test_file(tmp_path: Path) -> None:
+    """test_coupling returns [] when no test file exists (defers to test_existence)."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    sample = src_dir / "notest.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+
+    config = deep_merge(
+        DEFAULTS,
+        {
+            "rules": {
+                "test_coupling": {
+                    "enabled": True,
+                    "test_dirs": [str(tmp_path / "tests")],
+                    "_changed_files": [str(sample)],
+                }
+            }
+        },
+    )
+    violations = SafetyEngine(config).check_file(str(sample))
+    assert not any(v.rule == "test_coupling" for v in violations)
+
+
+def test_test_coupling_clean_when_test_updated(tmp_path: Path) -> None:
+    """test_coupling returns [] when both source and test file are in changed_files."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    sample = src_dir / "mymod2.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    test_file = test_dir / "test_mymod2.py"
+    test_file.write_text("def test_x(): pass\n", encoding="utf-8")
+
+    config = deep_merge(
+        DEFAULTS,
+        {
+            "rules": {
+                "test_coupling": {
+                    "enabled": True,
+                    "test_dirs": [str(test_dir)],
+                    "_changed_files": [str(sample), str(test_file)],
+                }
+            }
+        },
+    )
+    violations = SafetyEngine(config).check_file(str(sample))
+    assert not any(v.rule == "test_coupling" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# CLI: _run_check with advisory-only violations, main(), _build_common_args
+# ---------------------------------------------------------------------------
+
+
+def test_cli_run_check_advisory_only_returns_0(tmp_path: Path) -> None:
+    """_run_check returns 0 when violations are all advisory (below fail_on threshold)."""
+    import argparse
+
+    from safelint.cli import _run_check
+
+    # logging_on_error fires at warning severity when an except block has no log call
+    source = textwrap.dedent("""\
+        def foo():
+            try:
+                pass
+            except ValueError as e:
+                x = 1
+    """)
+    (tmp_path / "warn.py").write_text(source, encoding="utf-8")
+
+    args = argparse.Namespace(target=tmp_path, config=None, fail_on="error", mode=None)
+    result = _run_check(args)
+
+    assert result == 0
+
+
+def test_cli_main_check_mode_exits_0(tmp_path: Path, monkeypatch) -> None:
+    """main() routes to check mode when 'check' is the first positional arg."""
+    import sys
+
+    from safelint.cli import main
+
+    (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["safelint", "check", str(tmp_path)])
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0
+
+
+def test_cli_main_hook_mode_exits_0(tmp_path: Path, monkeypatch) -> None:
+    """main() routes to hook mode when no 'check' subcommand is present."""
+    import sys
+
+    from safelint.cli import main
+
+    sample = tmp_path / "clean.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr(sys, "argv", ["safelint", str(sample)])
+
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0
+
+
+def test_build_common_args_adds_fail_on_and_mode() -> None:
+    """_build_common_args registers --fail-on and --mode arguments."""
+    import argparse
+
+    from safelint.cli import _build_common_args
+
+    parser = argparse.ArgumentParser()
+    _build_common_args(parser)
+    args = parser.parse_args(["--fail-on=warning", "--mode=ci"])
+
+    assert args.fail_on == "warning"
+    assert args.mode == "ci"
+
+
+# ---------------------------------------------------------------------------
+# MissingAssertionsRule: clean path - function has assertions
+# ---------------------------------------------------------------------------
+
+
+def test_missing_assertions_no_violation_when_assert_present(tmp_path: Path) -> None:
+    """missing_assertions does not fire when the function contains an assert."""
+    source = "def foo(x):\n    assert x > 0\n    return x\n"
+    sample = tmp_path / "with_assert.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True}}})
+    violations = SafetyEngine(config).check_file(str(sample))
+    assert not any(v.rule == "missing_assertions" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# LoggingOnErrorRule: Attribute-based logger and non-log Name call
+# ---------------------------------------------------------------------------
+
+
+def test_logging_on_error_attribute_logger_is_exempt(tmp_path: Path) -> None:
+    """logging_on_error is not raised when the except block uses log.error(...)."""
+    source = textwrap.dedent("""\
+        def foo():
+            try:
+                pass
+            except ValueError:
+                log.error("something went wrong")
+    """)
+    sample = tmp_path / "attr_log.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+    assert not any(v.rule == "logging_on_error" for v in violations)
+
+
+def test_logging_on_error_non_log_name_call_fires(tmp_path: Path) -> None:
+    """logging_on_error fires when the except block calls a non-log-method function."""
+    source = textwrap.dedent("""\
+        def foo():
+            try:
+                pass
+            except ValueError as e:
+                handle_error(e)
+    """)
+    sample = tmp_path / "non_log.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+    assert any(v.rule == "logging_on_error" for v in violations)

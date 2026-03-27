@@ -1,4 +1,4 @@
-"""complexity rule — cyclomatic complexity must not exceed max_complexity."""
+"""complexity rule - cyclomatic complexity must not exceed max_complexity."""
 
 from __future__ import annotations
 
@@ -16,6 +16,7 @@ class ComplexityRule(BaseRule):
     """
 
     name = "complexity"
+    code = "SAFE104"
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
         """Flag functions whose cyclomatic complexity exceeds the configured maximum."""
@@ -31,7 +32,7 @@ class ComplexityRule(BaseRule):
                         filepath,
                         node.lineno,
                         f'Function "{node.name}" has cyclomatic complexity {cc}'
-                        f" (max {max_cc}) — split into smaller functions",
+                        f" (max {max_cc}) - split into smaller functions",
                     )
                 )
         return violations

@@ -12,6 +12,7 @@ class TestExistenceRule(BaseRule):
     """Verify that a corresponding test file exists for every checked module."""
 
     name = "test_existence"
+    code = "SAFE701"
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:  # noqa: ARG002
         """Return a violation when no test_<module>.py file can be found."""
@@ -26,7 +27,7 @@ class TestExistenceRule(BaseRule):
             self._v(
                 filepath,
                 0,
-                f"No test file found for {src.name} — expected {test_name} under {dirs}/",
+                f"No test file found for {src.name} - expected {test_name} under {dirs}/",
             )
         ]
 
@@ -40,6 +41,7 @@ class TestCouplingRule(BaseRule):
     """
 
     name = "test_coupling"
+    code = "SAFE702"
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:  # noqa: ARG002
         """Return a violation when the paired test file was not part of this commit."""
@@ -60,7 +62,7 @@ class TestCouplingRule(BaseRule):
                     filepath,
                     0,
                     f"{src.name} changed but {test_name} was not updated"
-                    f" — tests must be updated alongside source changes (under {dirs}/)",
+                    f" - tests must be updated alongside source changes (under {dirs}/)",
                 )
             ]
         return []

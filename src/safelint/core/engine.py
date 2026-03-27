@@ -1,4 +1,4 @@
-"""Safety engine — orchestrates the active rule set against Python source files."""
+"""Safety engine - orchestrates the active rule set against Python source files."""
 
 from __future__ import annotations
 
@@ -83,6 +83,7 @@ class SafetyEngine:
             return [
                 Violation(
                     rule="parse",
+                    code="SAFE000",
                     filepath=filepath,
                     lineno=0,
                     message=f"Parse error: {exc}",

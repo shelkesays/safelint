@@ -3,7 +3,7 @@
 These rules combine structural AST analysis with lightweight intra-procedural
 dataflow tracking to find bugs that pure pattern matching cannot catch.
 
-All three are **disabled by default** — enable them in ``.ai-safety.yaml``
+All three are **disabled by default** - enable them in ``.ai-safety.yaml``
 under ``rules.<name>.enabled: true``.
 """
 
@@ -34,6 +34,7 @@ class TaintedSinkRule(BaseRule):
     """
 
     name = "tainted_sink"
+    code = "SAFE801"
 
     _DEFAULT_SINKS: list[str] = [
         "eval",
@@ -91,7 +92,7 @@ class TaintedSinkRule(BaseRule):
                 filepath,
                 lineno,
                 f'Tainted variable "{var}" flows into dangerous sink "{sink}"'
-                " — sanitize input before use",
+                " - sanitize input before use",
             )
             for lineno, var, sink in tracker.sink_hits
         ]
@@ -123,6 +124,7 @@ class ReturnValueIgnoredRule(BaseRule):
     """
 
     name = "return_value_ignored"
+    code = "SAFE802"
 
     _DEFAULT_FLAGGED: list[str] = [
         "run",
@@ -164,7 +166,7 @@ class ReturnValueIgnoredRule(BaseRule):
                         filepath,
                         node.lineno,
                         f'Return value of "{name}" is discarded'
-                        " — check the result or assign it to a named variable",
+                        " - check the result or assign it to a named variable",
                     )
                 )
         return violations
@@ -188,6 +190,7 @@ class NullDereferenceRule(BaseRule):
     """
 
     name = "null_dereference"
+    code = "SAFE803"
 
     _DEFAULT_NULLABLE: frozenset[str] = frozenset(
         [
@@ -229,7 +232,7 @@ class NullDereferenceRule(BaseRule):
                         filepath,
                         lineno,
                         f'Result of "{method}()" is immediately dereferenced'
-                        ' without a None check — guard with "if result is not None"',
+                        ' without a None check - guard with "if result is not None"',
                     )
                 )
         return violations
