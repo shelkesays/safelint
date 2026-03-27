@@ -90,21 +90,6 @@ repos:
         files: ^src/
 
   # ---------------------------------------------------------------------------
-  # Type checking — replaces mypy; config: [tool.ty] in pyproject.toml
-  # No official pre-commit integration yet (ty is pre-release); using local hook
-  # ---------------------------------------------------------------------------
-  - repo: local
-    hooks:
-      - id: ty
-        name: ty (type check)
-        language: system
-        entry: uv run ty check
-        args: [src/]
-        types: [python]
-        pass_filenames: false
-        always_run: true
-
-  # ---------------------------------------------------------------------------
   # SafeLint — Holzmann-inspired safety rules
   # Config: [tool.safelint] in pyproject.toml (falls back to built-in defaults)
   #
@@ -119,10 +104,23 @@ repos:
         args: [--fail-on=error]
         files: ^src/
 
+  # ---------------------------------------------------------------------------
+  # Local hooks — tools without published pre-commit integrations
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      # Type checking — replaces mypy; config: [tool.ty] in pyproject.toml
+      # No official pre-commit integration yet (ty is pre-release)
+      - id: ty
+        name: ty (type check)
+        language: system
+        entry: uv run ty check
+        args: [src/]
+        types: [python]
+        pass_filenames: false
+        always_run: true
 
-      # -----------------------------------------------------------------------
       # Tests + coverage — config: [tool.pytest.ini_options] / [tool.coverage] in pyproject.toml
-      # -----------------------------------------------------------------------
       - id: pytest-cov
         name: pytest-cov
         stages: [pre-commit]
