@@ -1,4 +1,4 @@
-# AI Safety Hook - team configuration
+# safelint - team configuration (.safelint.yaml)
 # Overrides are deep-merged with built-in defaults; omitted keys inherit defaults.
 #
 # ── Severity model ────────────────────────────────────────────────────────────

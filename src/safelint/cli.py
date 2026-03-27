@@ -18,7 +18,7 @@ controls which severity level blocks the run:
   --fail-on=error    → only error-severity violations block  (lenient - onboarding)
   --fail-on=warning  → error + warning violations block      (strict  - production)
 
-Precedence: --fail-on CLI > fail_on in .ai-safety.yaml > mode default.
+Precedence: --fail-on CLI > fail_on in .safelint.yaml > mode default.
 """
 
 from __future__ import annotations
@@ -131,7 +131,7 @@ def _build_common_args(parser: argparse.ArgumentParser) -> None:
         dest="fail_on",
         choices=["error", "warning"],
         default=None,
-        help="Minimum severity that blocks the run (overrides .ai-safety.yaml)",
+        help="Minimum severity that blocks the run (overrides configured fail_on)",
     )
     parser.add_argument(
         "--mode",
@@ -158,7 +158,10 @@ def main() -> None:
         )
         parser.add_argument("target", type=Path, help="File or directory to scan")
         parser.add_argument(
-            "--config", type=Path, default=None, help="Explicit path to .ai-safety.yaml"
+            "--config",
+            type=Path,
+            default=None,
+            help="Path to a .safelint.yaml config file (overrides automatic discovery)",
         )
         _build_common_args(parser)
         args = parser.parse_args(sys.argv[2:])  # skip 'check'
