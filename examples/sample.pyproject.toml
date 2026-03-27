@@ -115,9 +115,10 @@ severity = "error"      # actually writes to a declared global - stricter
 [tool.safelint.rules.side_effects_hidden]
 enabled = true
 severity = "error"      # pure-named function hiding I/O is a Holzmann core risk
-io_functions = ["open", "print", "input", "subprocess"]
-# Functions whose names START WITH any of these are considered "pure"
-# and will be flagged if they contain an io_function call
+io_functions = ["open", "print", "input", "run", "Popen"]
+# NOTE: Only the final function/attribute name is matched (e.g., "run" for subprocess.run).
+# Functions whose names START WITH any of these are considered "pure" and will be
+# flagged if they contain an io_function call
 pure_prefixes = [
     "calculate", "compute", "get", "check", "validate",
     "is", "has", "find", "parse", "transform", "convert",
