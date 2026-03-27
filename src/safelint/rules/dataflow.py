@@ -3,9 +3,10 @@
 These rules combine structural AST analysis with lightweight intra-procedural
 dataflow tracking to find bugs that pure pattern matching cannot catch.
 
-All three are **disabled by default** – enable them either in
-``pyproject.toml`` under ``[tool.safelint.rules.<name>] enabled = true`` or
-in ``.safelint.yaml`` under ``rules.<name>.enabled: true``.
+All three are **disabled by default**. Recommended configuration is via
+``pyproject.toml`` under ``[tool.safelint.rules.<name>] enabled = true``;
+alternatively, you can enable them in ``.safelint.yaml`` under
+``rules.<name>.enabled: true``.
 """
 
 from __future__ import annotations
