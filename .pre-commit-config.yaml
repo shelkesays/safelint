@@ -1,0 +1,136 @@
+exclude: ^tests/fixtures/
+
+repos:
+  # ---------------------------------------------------------------------------
+  # General file hygiene
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: check-added-large-files
+        files: ^src/
+      - id: check-ast
+        files: ^src/
+      - id: check-builtin-literals
+        files: ^src/
+      - id: check-case-conflict
+        files: ^src/
+      - id: check-docstring-first
+        exclude: ^(doc-source/conf|__pkginfo__|setup|tests/.*)\.py$
+        files: ^src/
+      - id: check-merge-conflict
+        files: ^src/
+      - id: debug-statements
+        files: ^src/
+      - id: check-symlinks
+        files: ^src/
+      - id: check-json
+        files: ^src/
+      - id: check-toml
+        files: ^src/
+      - id: check-yaml
+      - id: fix-byte-order-marker
+      - id: end-of-file-fixer
+        files: ^src/
+      - id: mixed-line-ending
+        files: ^src/
+      - id: trailing-whitespace
+        files: ^src/
+      - id: detect-private-key
+        files: ^src/
+      - id: requirements-txt-fixer
+        files: ^requirements\.txt$
+      - id: check-shebang-scripts-are-executable
+        files: ^src/
+      - id: name-tests-test
+        args: ['--pytest-test-first']
+        exclude: ^tests/mock_data.py$
+        files: ^tests/
+      - id: pretty-format-json
+        args: ['--autofix', '--indent', '4']
+        files: ^src/
+      - id: no-commit-to-branch
+        args: ['--branch', 'master', '--branch', 'main', '--pattern', '.*-master$', '--pattern', '.*-main$']
+        files: ^src/
+
+  - repo: https://github.com/Lucas-C/pre-commit-hooks
+    rev: v1.5.6
+    hooks:
+      - id: remove-crlf
+        files: ^src/
+      - id: forbid-crlf
+        files: ^src/
+      - id: remove-tabs
+        args: [--whitespaces-count, '4']
+        files: ^src/
+      - id: forbid-tabs
+        files: ^src/
+
+  # ---------------------------------------------------------------------------
+  # Linting + formatting — replaces: flake8, pylint, black, pyupgrade, isort, bandit
+  # Config: ruff.toml (security rules via ruff S, style via ruff format)
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.8
+    hooks:
+      - id: ruff
+        args: [--fix, --unsafe-fixes, --exit-non-zero-on-fix]
+        files: ^src/
+      - id: ruff-format
+        files: ^src/
+
+  # ---------------------------------------------------------------------------
+  # Docstring coverage — ruff D rules enforce style; interrogate enforces presence
+  # ---------------------------------------------------------------------------
+  - repo: https://github.com/econchick/interrogate
+    rev: 1.7.0
+    hooks:
+      - id: interrogate
+        args: [--quiet, --fail-under=95]
+        files: ^src/
+
+  # ---------------------------------------------------------------------------
+  # Type checking — replaces mypy; config: [tool.ty] in pyproject.toml
+  # No official pre-commit integration yet (ty is pre-release); using local hook
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: ty
+        name: ty (type check)
+        language: system
+        entry: uv run ty check
+        args: [src/]
+        types: [python]
+        pass_filenames: false
+        always_run: true
+
+      # # -----------------------------------------------------------------------
+      # # AI Safety — Holzmann-inspired structural + error-handling rules
+      # # Config: .ai-safety.yaml (tunable per repo; falls back to built-in defaults)
+      # #
+      # # Severity model
+      # #   Each rule carries severity: error | warning (set in .ai-safety.yaml).
+      # #   --fail-on controls the threshold that blocks the commit:
+      # #     --fail-on=error    only error-severity violations block  ← lenient (onboarding)
+      # #     --fail-on=warning  error + warning violations block      ← strict  (production)
+      # # -----------------------------------------------------------------------
+      # - id: ai-safety
+      #   name: AI Safety Checks (Holzmann Rules)
+      #   entry: python3 scripts/ai_safety_hook.py
+      #   args: [--fail-on=warning]
+      #   language: system
+      #   types: [python]
+      #   files: ^src/
+
+
+      # -----------------------------------------------------------------------
+      # Tests + coverage — config: [tool.pytest.ini_options] / [tool.coverage] in pyproject.toml
+      # -----------------------------------------------------------------------
+      - id: pytest-cov
+        name: pytest-cov
+        stages: [pre-commit]
+        language: system
+        entry: uv run pytest -v --cov=src --cov-report=term-missing tests/
+        types: [python]
+        pass_filenames: false
+        always_run: true
