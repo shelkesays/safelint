@@ -131,7 +131,7 @@ def _build_common_args(parser: argparse.ArgumentParser) -> None:
         dest="fail_on",
         choices=["error", "warning"],
         default=None,
-        help="Minimum severity that blocks the run (overrides .safelint.yaml)",
+        help="Minimum severity that blocks the run (overrides configured fail_on)",
     )
     parser.add_argument(
         "--mode",
