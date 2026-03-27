@@ -163,6 +163,13 @@ def _get_git_modified_python_files(target: Path) -> list[str] | None:
             text=True,
             cwd=git_root,
         )
+        if diff_proc.returncode != 0 or cached_proc.returncode != 0:
+            logger.debug(
+                "git diff command failed (diff rc=%s, cached rc=%s); treating as git unavailable",
+                diff_proc.returncode,
+                cached_proc.returncode,
+            )
+            return None
 
         raw = set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines())
         return _filter_py_files(raw, git_root, target_abs)
