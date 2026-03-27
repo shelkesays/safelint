@@ -161,7 +161,10 @@ def main() -> None:
             "--config",
             type=Path,
             default=None,
-            help="Path to a .safelint.yaml config file (overrides automatic discovery)",
+            help=(
+                "Path to a config directory, .safelint.yaml, or pyproject.toml "
+                "(overrides automatic discovery)"
+            ),
         )
         _build_common_args(parser)
         args = parser.parse_args(sys.argv[2:])  # skip 'check'
