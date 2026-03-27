@@ -24,6 +24,7 @@ Precedence: --fail-on CLI > fail_on in .safelint.yaml > mode default.
 from __future__ import annotations
 
 import argparse
+import logging
 import subprocess
 import sys
 from pathlib import Path
@@ -33,16 +34,41 @@ from safelint.core.engine import SafetyEngine
 from safelint.core.runner import run
 from safelint.rules.base import Violation
 
+logger = logging.getLogger(__name__)
 
-def _print_file_violations(filepath: str, violations: list[Violation]) -> None:
-    """Print violations for a single file in human-readable format."""
-    print(f"\n{'─' * 64}")
-    print(f"  {filepath}")
-    print(f"{'─' * 64}")
+
+def _print_violations(violations: list[Violation]) -> None:
+    """Print violations one per line in ruff-style format: file:line: CODE message  [rule]"""
     for v in violations:
-        icon = "❌" if v.severity == "error" else "⚠️ "
-        tag = f"{v.code}" if v.code else v.rule
-        print(f"  {icon}  {tag} [{v.rule}] line {v.lineno}: {v.message}")
+        tag = v.code if v.code else v.rule
+        print(f"{v.filepath}:{v.lineno}: {tag} {v.message}  [{v.rule}]")
+
+
+def _print_summary(all_violations: list[Violation], n_blocking: int, fail_on: str) -> None:
+    """Print a ruff-style summary line to stdout."""
+    print(_make_summary(all_violations, n_blocking, fail_on))
+
+
+def _print_status(message: str) -> None:
+    """Print a status/informational message to stdout."""
+    print(message)
+
+
+def _make_summary(all_violations: list[Violation], n_blocking: int, fail_on: str) -> str:
+    """Return a ruff-style summary line for *all_violations*."""
+    if not all_violations:
+        return "All checks passed."
+    n_errors = sum(1 for v in all_violations if v.severity == "error")
+    n_warnings = sum(1 for v in all_violations if v.severity == "warning")
+    parts = []
+    if n_errors:
+        parts.append(f"{n_errors} error{'s' if n_errors != 1 else ''}")
+    if n_warnings:
+        parts.append(f"{n_warnings} warning{'s' if n_warnings != 1 else ''}")
+    found = f"Found {', '.join(parts)}."
+    if n_blocking:
+        return f"{found} [--fail-on={fail_on}]"
+    return f"{found} Advisory only [--fail-on={fail_on}]."
 
 
 def _resolve_fail_on(args: argparse.Namespace, config: dict) -> tuple[str, int]:
@@ -65,27 +91,19 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
     all_blocking: list[Violation] = []
     all_advisory: list[Violation] = []
 
+    all_violations: list[Violation] = []
     for filepath in files:
         violations = engine.check_file(filepath)
         if not violations:
             continue
-        _print_file_violations(filepath, violations)
+        _print_violations(violations)
         blocking, advisory = engine.partition_violations(violations, fail_threshold)
         all_blocking.extend(blocking)
         all_advisory.extend(advisory)
+        all_violations.extend(violations)
 
-    print()
-    if all_advisory:
-        print(
-            f"⚠️  {len(all_advisory)} advisory violation(s) - below --fail-on={fail_on} threshold."
-        )
-    if all_blocking:
-        count = len(all_blocking)
-        print(f"🚫 {count} violation(s) at or above --fail-on={fail_on} - commit rejected.")
-        return 1
-
-    print("✅ All safety checks passed.")
-    return 0
+    _print_summary(all_violations, len(all_blocking), fail_on)
+    return 1 if all_blocking else 0
 
 
 def _is_under_target(abs_path: Path, target_abs: Path) -> bool:
@@ -95,6 +113,7 @@ def _is_under_target(abs_path: Path, target_abs: Path) -> bool:
             abs_path.relative_to(target_abs)
             return True
         except ValueError:
+            logger.debug("Path %s is not relative to %s", abs_path, target_abs)
             return False
     return abs_path == target_abs
 
@@ -148,7 +167,8 @@ def _get_git_modified_python_files(target: Path) -> list[str] | None:
         raw = set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines())
         return _filter_py_files(raw, git_root, target_abs)
 
-    except (FileNotFoundError, OSError):
+    except (FileNotFoundError, OSError) as exc:
+        logger.debug("git unavailable or not a repo: %s", exc)
         return None
 
 
@@ -162,9 +182,9 @@ def _run_check(args: argparse.Namespace) -> int:
     if not all_files:
         modified = _get_git_modified_python_files(target)
         if modified is None:
-            print("Note: git unavailable — scanning all files.")
+            _print_status("Note: git unavailable — scanning all files.")
         elif not modified:
-            print("No modified Python files detected. Use --all-files to scan everything.")
+            _print_status("No modified Python files detected. Use --all-files to scan everything.")
             return 0
         else:
             files = modified
@@ -181,26 +201,18 @@ def _run_check(args: argparse.Namespace) -> int:
     all_blocking: list[Violation] = []
     all_advisory: list[Violation] = []
 
+    all_violations: list[Violation] = []
     for result in results:
         if not result.violations:
             continue
-        _print_file_violations(result.path, result.violations)
+        _print_violations(result.violations)
         blocking, advisory = dummy_engine.partition_violations(result.violations, fail_threshold)
         all_blocking.extend(blocking)
         all_advisory.extend(advisory)
+        all_violations.extend(result.violations)
 
-    print()
-    if all_advisory:
-        print(
-            f"⚠️  {len(all_advisory)} advisory violation(s) - below --fail-on={fail_on} threshold."
-        )
-    if all_blocking:
-        print(f"🚫 {len(all_blocking)} violation(s) at or above --fail-on={fail_on} - not clean.")
-        return 1
-
-    if not any(r.violations for r in results):
-        print("✅ All safety checks passed.")
-    return 0
+    _print_summary(all_violations, len(all_blocking), fail_on)
+    return 1 if all_blocking else 0
 
 
 def _build_common_args(parser: argparse.ArgumentParser) -> None:
