@@ -20,8 +20,9 @@ def run(
     target:
         A single ``.py`` file or a directory to scan recursively.
     config_path:
-        Explicit path to a ``.safelint.yaml`` file. When omitted, the
-        loader walks up from *target* to find one automatically.
+        Optional path that overrides the directory used for config discovery.
+        If it is a file path, its parent directory is used. When omitted, the
+        loader walks up from *target* to find a supported config file automatically.
     changed_files:
         List of files being checked (injected into test-coupling rules).
         Defaults to the files discovered from *target*.
