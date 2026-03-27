@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from safelint.rules.base import BaseRule, Violation
 from safelint.rules.complexity import ComplexityRule
+from safelint.rules.dataflow import NullDereferenceRule, ReturnValueIgnoredRule, TaintedSinkRule
 from safelint.rules.documentation import MissingAssertionsRule
 from safelint.rules.error_handling import BareExceptRule, EmptyExceptRule, LoggingOnErrorRule
 from safelint.rules.function_length import FunctionLengthRule
@@ -15,8 +16,8 @@ from safelint.rules.side_effects import SideEffectsHiddenRule, SideEffectsRule
 from safelint.rules.state_purity import GlobalMutationRule, GlobalStateRule
 from safelint.rules.test_coverage import TestCouplingRule, TestExistenceRule
 
-# Canonical list — cheap structural rules first so expensive checks are
-# short-circuited by execution.order / fail_fast when basics already fail.
+# Canonical list — cheap structural rules first, dataflow rules last
+# (they are more expensive and disabled by default).
 ALL_RULES: list[type[BaseRule]] = [
     FunctionLengthRule,
     NestingDepthRule,
@@ -34,6 +35,10 @@ ALL_RULES: list[type[BaseRule]] = [
     TestCouplingRule,
     TestExistenceRule,
     MissingAssertionsRule,
+    # Dataflow hybrid rules — disabled by default, enable in .ai-safety.yaml
+    TaintedSinkRule,
+    ReturnValueIgnoredRule,
+    NullDereferenceRule,
 ]
 
 RULE_BY_NAME: dict[str, type[BaseRule]] = {cls.name: cls for cls in ALL_RULES}
@@ -59,4 +64,7 @@ __all__ = [
     "MissingAssertionsRule",
     "TestExistenceRule",
     "TestCouplingRule",
+    "TaintedSinkRule",
+    "ReturnValueIgnoredRule",
+    "NullDereferenceRule",
 ]
