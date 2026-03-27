@@ -198,7 +198,8 @@ def _run_check(args: argparse.Namespace) -> int:
 
     results = run(target, config_path=config_path, files=files)
 
-    config = load_config(Path(config_path).parent if config_path else Path(args.target))
+    config_dir = Path(config_path).parent if config_path else (target if target.is_dir() else target.parent)
+    config = load_config(config_dir)
     fail_on, fail_threshold = _resolve_fail_on(args, config)
 
     # Reuse engine's partition helper
