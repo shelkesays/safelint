@@ -98,7 +98,7 @@ repos:
   #   --fail-on=warning  error + warning violations block      ← strict (CI)
   # ---------------------------------------------------------------------------
   - repo: https://github.com/shelkesays/safelint
-    rev: v0.3.0
+    rev: v1.0.0
     hooks:
       - id: safelint
         args: [--fail-on=error]
