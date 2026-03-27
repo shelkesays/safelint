@@ -442,16 +442,10 @@ wheels = [
 
 [[package]]
 name = "safelint"
-version = "0.0.1"
+version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "pre-commit" },
-    { name = "pytest" },
-    { name = "pytest-cov" },
-    { name = "pytest-mock" },
     { name = "pyyaml" },
-    { name = "ruff" },
-    { name = "ty" },
 ]
 
 [package.optional-dependencies]
@@ -460,35 +454,23 @@ dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-cov" },
+    { name = "pytest-mock" },
     { name = "ruff" },
     { name = "ty" },
-]
-
-[package.dev-dependencies]
-dev = [
-    { name = "interrogate" },
 ]
 
 [package.metadata]
 requires-dist = [
     { name = "interrogate", marker = "extra == 'dev'", specifier = ">=1.7.0" },
-    { name = "pre-commit", specifier = ">=4.5.1" },
-    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.2.0" },
-    { name = "pytest", specifier = ">=9.0.2" },
-    { name = "pytest", marker = "extra == 'dev'", specifier = ">=8.3.5" },
-    { name = "pytest-cov", specifier = ">=7.1.0" },
-    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=6.1.1" },
-    { name = "pytest-mock", specifier = ">=3.15.1" },
+    { name = "pre-commit", marker = "extra == 'dev'", specifier = ">=4.5.1" },
+    { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
+    { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1.0" },
+    { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.15.1" },
     { name = "pyyaml", specifier = ">=6.0" },
-    { name = "ruff", specifier = ">=0.15.8" },
-    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.6" },
-    { name = "ty", specifier = ">=0.0.26" },
-    { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.1a14" },
+    { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.8" },
+    { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.26" },
 ]
 provides-extras = ["dev"]
-
-[package.metadata.requires-dev]
-dev = [{ name = "interrogate", specifier = ">=1.7.0" }]
 
 [[package]]
 name = "tabulate"

@@ -1,15 +1,14 @@
-"""Additional tests to reach the 80 % coverage threshold."""
+"""Additional tests to reach the 80% coverage threshold."""
 
 from __future__ import annotations
 
-import json
 import textwrap
 from pathlib import Path
 
 import pytest
 
-from safelint.core.config import SafeLintConfig
-from safelint.core.engine import SafeLintEngine
+from safelint.core.config import DEFAULTS, deep_merge, load_config
+from safelint.core.engine import SafetyEngine
 from safelint.core.runner import run
 
 
@@ -26,13 +25,13 @@ def test_run_without_config(tmp_path: Path) -> None:
     results = run(sample)
 
     assert len(results) == 1
-    assert results[0].path == sample
+    assert results[0].path == str(sample)
 
 
 def test_run_with_config_path(tmp_path: Path) -> None:
     """run() loads the config from the supplied path."""
-    config_file = tmp_path / "cfg.yaml"
-    config_file.write_text("max_function_lines: 5\n", encoding="utf-8")
+    config_file = tmp_path / ".ai-safety.yaml"
+    config_file.write_text("rules:\n  function_length:\n    max_lines: 5\n", encoding="utf-8")
     sample = tmp_path / "ok.py"
     sample.write_text("x = 1\n", encoding="utf-8")
 
@@ -42,173 +41,31 @@ def test_run_with_config_path(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# SafeLintConfig — JSON loading and error paths
+# load_config — invalid YAML falls back to defaults
 # ---------------------------------------------------------------------------
 
 
-def test_config_loads_json_file(tmp_path: Path) -> None:
-    """from_file() parses a JSON config correctly."""
-    cfg = tmp_path / "config.json"
-    cfg.write_text(json.dumps({"max_function_lines": 20}), encoding="utf-8")
+def test_load_config_bad_yaml_falls_back_to_defaults(tmp_path: Path) -> None:
+    """A malformed .ai-safety.yaml is skipped and defaults are returned."""
+    (tmp_path / ".ai-safety.yaml").write_text(":\n  bad: [yaml", encoding="utf-8")
 
-    config = SafeLintConfig.from_file(cfg)
+    config = load_config(tmp_path)
 
-    assert config.max_function_lines == 20
-
-
-def test_config_missing_file_raises(tmp_path: Path) -> None:
-    """from_file() raises FileNotFoundError for a non-existent path."""
-    with pytest.raises(FileNotFoundError):
-        SafeLintConfig.from_file(tmp_path / "missing.yaml")
-
-
-def test_config_unsupported_extension_raises(tmp_path: Path) -> None:
-    """from_file() raises ValueError for an unsupported file extension."""
-    cfg = tmp_path / "config.toml"
-    cfg.write_text("[tool]\n", encoding="utf-8")
-
-    with pytest.raises(ValueError, match="Unsupported config format"):
-        SafeLintConfig.from_file(cfg)
-
-
-def test_config_non_mapping_payload_raises(tmp_path: Path) -> None:
-    """from_file() raises ValueError when the YAML root is not a mapping."""
-    cfg = tmp_path / "config.yaml"
-    cfg.write_text("- item1\n- item2\n", encoding="utf-8")
-
-    with pytest.raises(ValueError, match="must be a mapping"):
-        SafeLintConfig.from_file(cfg)
+    assert config["mode"] == DEFAULTS["mode"]
 
 
 # ---------------------------------------------------------------------------
-# SafeLintEngine.lint_path() — directory traversal
+# SafetyEngine — rule-specific scenarios
 # ---------------------------------------------------------------------------
 
 
-def test_engine_lint_path_traverses_directory(tmp_path: Path) -> None:
-    """lint_path() with a directory visits every .py file inside it."""
-    (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
-    (tmp_path / "b.py").write_text("y = 2\n", encoding="utf-8")
-    sub = tmp_path / "sub"
-    sub.mkdir()
-    (sub / "c.py").write_text("z = 3\n", encoding="utf-8")
-
-    config = SafeLintConfig(
-        enabled_rules=["function-length"],
-        exclude=[],  # don't exclude anything so all .py files are visited
-    )
-    engine = SafeLintEngine(config=config)
-    results = engine.lint_path(tmp_path)
-
-    paths = {r.path for r in results}
-    assert tmp_path / "a.py" in paths
-    assert tmp_path / "b.py" in paths
-    assert sub / "c.py" in paths
-
-
-def test_engine_lint_path_single_file(tmp_path: Path) -> None:
-    """lint_path() with a file path delegates to lint_file."""
-    sample = tmp_path / "sample.py"
-    sample.write_text("x = 1\n", encoding="utf-8")
-
-    engine = SafeLintEngine()
-    results = engine.lint_path(sample)
-
-    assert len(results) == 1
-    assert results[0].path == sample
-
-
-# ---------------------------------------------------------------------------
-# SideEffectsRule — branch coverage
-# ---------------------------------------------------------------------------
-
-
-def _make_side_effects_engine(*, allow: bool = False) -> SafeLintEngine:
-    config = SafeLintConfig(
-        enabled_rules=["side-effects"],
-        allow_top_level_side_effects=allow,
-    )
-    return SafeLintEngine(config=config)
-
-
-def test_side_effects_allow_flag_short_circuits(tmp_path: Path) -> None:
-    """When allow_top_level_side_effects=True the rule returns empty."""
-    sample = tmp_path / "se.py"
-    sample.write_text("print('boom')\n", encoding="utf-8")
-
-    engine = _make_side_effects_engine(allow=True)
-    result = engine.lint_file(sample)
-
-    assert result.violations == []
-
-
-def test_side_effects_assignment_with_literal_is_allowed(tmp_path: Path) -> None:
-    """Module-level assignments to literals do not count as side effects."""
-    sample = tmp_path / "se.py"
-    sample.write_text("VERSION = '1.0.0'\n", encoding="utf-8")
-
-    engine = _make_side_effects_engine()
-    result = engine.lint_file(sample)
-
-    assert result.violations == []
-
-
-def test_side_effects_annotated_assignment_is_allowed(tmp_path: Path) -> None:
-    """Module-level annotated assignments with constant values are allowed."""
-    sample = tmp_path / "se.py"
-    sample.write_text("x: int = 0\n", encoding="utf-8")
-
-    engine = _make_side_effects_engine()
-    result = engine.lint_file(sample)
-
-    assert result.violations == []
-
-
-def test_side_effects_module_docstring_is_allowed(tmp_path: Path) -> None:
-    """A module-level string expression (docstring) is not flagged."""
-    sample = tmp_path / "se.py"
-    sample.write_text('"""Module docstring."""\n', encoding="utf-8")
-
-    engine = _make_side_effects_engine()
-    result = engine.lint_file(sample)
-
-    assert result.violations == []
-
-
-def test_side_effects_all_append_is_allowed(tmp_path: Path) -> None:
-    """``__all__.append(...)`` is explicitly whitelisted."""
-    sample = tmp_path / "se.py"
-    sample.write_text("__all__.append('foo')\n", encoding="utf-8")
-
-    engine = _make_side_effects_engine()
-    result = engine.lint_file(sample)
-
-    assert result.violations == []
-
-
-def test_side_effects_if_not_main_guard_is_flagged(tmp_path: Path) -> None:
-    """An if-statement that is not the __main__ guard is flagged."""
-    source = textwrap.dedent("""\
-        if some_condition:
-            do_something()
-    """)
-    sample = tmp_path / "se.py"
-    sample.write_text(source, encoding="utf-8")
-
-    engine = _make_side_effects_engine()
-    result = engine.lint_file(sample)
-
-    codes = [v.code for v in result.violations]
-    assert "SAFE301" in codes
-
-
-# ---------------------------------------------------------------------------
-# ResourceLifecycleRule — with open() usage (covers visit_With body)
-# ---------------------------------------------------------------------------
+def _engine(overrides: dict | None = None) -> SafetyEngine:
+    config = deep_merge(DEFAULTS, overrides or {})
+    return SafetyEngine(config)
 
 
 def test_resource_lifecycle_with_open_is_safe(tmp_path: Path) -> None:
-    """open() inside a with statement does not trigger SAFE401."""
+    """open() inside a with statement does not trigger resource_lifecycle."""
     source = textwrap.dedent("""\
         with open('file.txt') as f:
             data = f.read()
@@ -216,25 +73,351 @@ def test_resource_lifecycle_with_open_is_safe(tmp_path: Path) -> None:
     sample = tmp_path / "res.py"
     sample.write_text(source, encoding="utf-8")
 
-    config = SafeLintConfig(enabled_rules=["resource-lifecycle"])
-    engine = SafeLintEngine(config=config)
-    result = engine.lint_file(sample)
+    violations = _engine().check_file(str(sample))
 
-    assert result.violations == []
+    assert not any(v.rule == "resource_lifecycle" for v in violations)
 
 
-def test_resource_lifecycle_async_with_open_is_safe(tmp_path: Path) -> None:
-    """open() inside an async with statement does not trigger SAFE401."""
+def test_bare_except_is_flagged(tmp_path: Path) -> None:
+    """bare_except fires on a bare except clause."""
     source = textwrap.dedent("""\
-        async def read():
-            async with open('file.txt') as f:
-                data = f.read()
+        def foo():
+            try:
+                pass
+            except:
+                pass
     """)
-    sample = tmp_path / "res_async.py"
+    sample = tmp_path / "bare.py"
     sample.write_text(source, encoding="utf-8")
 
-    config = SafeLintConfig(enabled_rules=["resource-lifecycle"])
-    engine = SafeLintEngine(config=config)
-    result = engine.lint_file(sample)
+    violations = _engine().check_file(str(sample))
 
-    assert result.violations == []
+    assert any(v.rule == "bare_except" for v in violations)
+
+
+def test_side_effects_hidden_flags_pure_named_io_function(tmp_path: Path) -> None:
+    """side_effects_hidden fires when a get_* function calls open()."""
+    source = textwrap.dedent("""\
+        def get_data():
+            f = open('x.txt')
+            return f.read()
+    """)
+    sample = tmp_path / "se.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+
+    assert any(v.rule == "side_effects_hidden" for v in violations)
+
+
+def test_global_mutation_is_flagged(tmp_path: Path) -> None:
+    """global_mutation fires when a function writes to a declared global."""
+    source = textwrap.dedent("""\
+        counter = 0
+
+        def increment():
+            global counter
+            counter += 1
+    """)
+    sample = tmp_path / "gm.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+
+    assert any(v.rule == "global_mutation" for v in violations)
+
+
+def test_unbounded_loop_while_true_no_break(tmp_path: Path) -> None:
+    """unbounded_loops fires on while True without a break."""
+    source = textwrap.dedent("""\
+        def poll():
+            while True:
+                pass
+    """)
+    sample = tmp_path / "loop.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+
+    assert any(v.rule == "unbounded_loops" for v in violations)
+
+
+def test_unbounded_loop_while_true_with_break_is_safe(tmp_path: Path) -> None:
+    """while True with a break does not trigger unbounded_loops."""
+    source = textwrap.dedent("""\
+        def poll():
+            while True:
+                if done():
+                    break
+    """)
+    sample = tmp_path / "safe_loop.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+
+    assert not any(v.rule == "unbounded_loops" for v in violations)
+
+
+def test_max_arguments_fires_when_exceeded(tmp_path: Path) -> None:
+    """max_arguments fires when a function has too many parameters."""
+    source = "def many(a, b, c, d, e, f, g, h):\n    pass\n"
+    sample = tmp_path / "args.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+
+    assert any(v.rule == "max_arguments" for v in violations)
+
+
+def test_complexity_fires_on_high_cyclomatic_complexity(tmp_path: Path) -> None:
+    """complexity fires when cyclomatic complexity exceeds max_complexity."""
+    # Build a function with CC > 10 by chaining many if statements
+    branches = "\n".join(f"    if x == {i}:\n        return {i}" for i in range(12))
+    source = f"def complex_func(x):\n{branches}\n    return -1\n"
+    sample = tmp_path / "complex.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+
+    assert any(v.rule == "complexity" for v in violations)
+
+
+def test_violation_fields_are_populated(tmp_path: Path) -> None:
+    """Violations carry rule, filepath, lineno, message, and severity."""
+    sample = tmp_path / "v.py"
+    sample.write_text(
+        "def foo():\n    try:\n        pass\n    except:\n        pass\n",
+        encoding="utf-8",
+    )
+
+    violations = _engine().check_file(str(sample))
+    bare = next(v for v in violations if v.rule == "bare_except")
+
+    assert bare.filepath == str(sample)
+    assert bare.lineno > 0
+    assert bare.message
+    assert bare.severity in {"error", "warning"}
+
+
+def test_partition_violations_splits_by_threshold() -> None:
+    """partition_violations correctly separates blocking from advisory violations."""
+    from safelint.rules.base import Violation
+
+    engine = _engine()
+    violations = [
+        Violation(rule="r1", filepath="f.py", lineno=1, message="m", severity="error"),
+        Violation(rule="r2", filepath="f.py", lineno=2, message="m", severity="warning"),
+    ]
+
+    blocking, advisory = engine.partition_violations(violations, fail_threshold=1)
+
+    assert len(blocking) == 1 and blocking[0].severity == "error"
+    assert len(advisory) == 1 and advisory[0].severity == "warning"
+
+
+# ---------------------------------------------------------------------------
+# LoggingOnErrorRule
+# ---------------------------------------------------------------------------
+
+
+def test_logging_on_error_fires_when_no_log_call(tmp_path: Path) -> None:
+    """logging_on_error fires when an except block swallows the error silently."""
+    source = textwrap.dedent("""\
+        def foo():
+            try:
+                pass
+            except ValueError as e:
+                x = 1
+    """)
+    sample = tmp_path / "log.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+
+    assert any(v.rule == "logging_on_error" for v in violations)
+
+
+def test_logging_on_error_exempt_when_reraises(tmp_path: Path) -> None:
+    """logging_on_error is not raised when the except block only re-raises."""
+    source = textwrap.dedent("""\
+        def foo():
+            try:
+                pass
+            except ValueError:
+                raise
+    """)
+    sample = tmp_path / "reraise.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+
+    assert not any(v.rule == "logging_on_error" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# MissingAssertionsRule (enable via config override)
+# ---------------------------------------------------------------------------
+
+
+def test_missing_assertions_fires_when_enabled(tmp_path: Path) -> None:
+    """missing_assertions fires when the rule is enabled and a function has no asserts."""
+    source = "def foo(x):\n    return x + 1\n"
+    sample = tmp_path / "noassert.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True}}})
+    engine = SafetyEngine(config)
+    violations = engine.check_file(str(sample))
+
+    assert any(v.rule == "missing_assertions" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# GlobalStateRule
+# ---------------------------------------------------------------------------
+
+
+def test_global_state_fires_on_global_keyword(tmp_path: Path) -> None:
+    """global_state fires when a function uses the global keyword."""
+    source = textwrap.dedent("""\
+        _state = 0
+
+        def set_state(value):
+            global _state
+            _state = value
+    """)
+    sample = tmp_path / "gs.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample))
+
+    assert any(v.rule == "global_state" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# TestExistenceRule / TestCouplingRule (enable via config override)
+# ---------------------------------------------------------------------------
+
+
+def test_test_existence_fires_when_no_test_file(tmp_path: Path) -> None:
+    """test_existence fires when no corresponding test_<module>.py exists."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    sample = src_dir / "mymodule.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+
+    config = deep_merge(
+        DEFAULTS,
+        {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(tmp_path / "tests")]}}},
+    )
+    engine = SafetyEngine(config)
+    violations = engine.check_file(str(sample))
+
+    assert any(v.rule == "test_existence" for v in violations)
+
+
+def test_test_coupling_fires_when_test_not_updated(tmp_path: Path) -> None:
+    """test_coupling fires when the paired test file exists but was not changed."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    sample = src_dir / "mymodule.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    (test_dir / "test_mymodule.py").write_text("def test_x(): pass\n", encoding="utf-8")
+
+    config = deep_merge(
+        DEFAULTS,
+        {
+            "rules": {
+                "test_coupling": {
+                    "enabled": True,
+                    "test_dirs": [str(test_dir)],
+                    "_changed_files": [str(sample)],
+                }
+            }
+        },
+    )
+    engine = SafetyEngine(config)
+    violations = engine.check_file(str(sample))
+
+    assert any(v.rule == "test_coupling" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# CLI entry points (tested via the underlying functions, not subprocess)
+# ---------------------------------------------------------------------------
+
+
+def test_cli_hook_mode_exits_0_on_clean_file(tmp_path: Path) -> None:
+    """_run_hook returns 0 when the given files have no violations."""
+    import argparse
+
+    from safelint.cli import _run_hook
+
+    sample = tmp_path / "clean.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+
+    args = argparse.Namespace(fail_on=None, mode=None)
+    result = _run_hook(args, [str(sample)])
+
+    assert result == 0
+
+
+def test_cli_hook_mode_exits_1_on_violation(tmp_path: Path) -> None:
+    """_run_hook returns 1 when a blocking violation is found."""
+    import argparse
+
+    from safelint.cli import _run_hook
+
+    sample = tmp_path / "bad.py"
+    sample.write_text(
+        "def foo():\n    try:\n        pass\n    except:\n        pass\n",
+        encoding="utf-8",
+    )
+
+    args = argparse.Namespace(fail_on="error", mode=None)
+    result = _run_hook(args, [str(sample)])
+
+    assert result == 1
+
+
+def test_cli_hook_mode_empty_files_list_exits_0() -> None:
+    """_run_hook returns 0 immediately when no files are provided."""
+    import argparse
+
+    from safelint.cli import _run_hook
+
+    args = argparse.Namespace(fail_on=None, mode=None)
+    assert _run_hook(args, []) == 0
+
+
+def test_cli_check_mode_exits_0_on_clean_directory(tmp_path: Path) -> None:
+    """_run_check returns 0 when the scanned directory has no violations."""
+    import argparse
+
+    from safelint.cli import _run_check
+
+    (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
+
+    args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None)
+    result = _run_check(args)
+
+    assert result == 0
+
+
+def test_cli_check_mode_exits_1_on_violation(tmp_path: Path) -> None:
+    """_run_check returns 1 when violations are found."""
+    import argparse
+
+    from safelint.cli import _run_check
+
+    (tmp_path / "bad.py").write_text(
+        "def foo():\n    try:\n        pass\n    except:\n        pass\n",
+        encoding="utf-8",
+    )
+
+    args = argparse.Namespace(target=tmp_path, config=None, fail_on="error", mode=None)
+    result = _run_check(args)
+
+    assert result == 1
