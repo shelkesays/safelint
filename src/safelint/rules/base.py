@@ -3,37 +3,55 @@
 from __future__ import annotations
 
 import ast
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from pathlib import Path
-
-from safelint.core.config import SafeLintConfig
+from typing import Any
 
 
-@dataclass(slots=True, frozen=True)
+@dataclass(frozen=True)
 class Violation:
-    """A single policy violation found at a specific source location."""
+    """A single rule violation produced during static analysis."""
 
-    code: str
+    rule: str
+    filepath: str
+    lineno: int
     message: str
-    line: int
-    column: int = 0
+    severity: str  # "error" | "warning"
 
 
-class Rule:
-    """Abstract base class for all safelint rules."""
+class BaseRule(ABC):
+    """Pluggable safety rule that analyses a parsed AST and returns violations.
 
-    name = "rule"
-    code = "SAFE000"
-    description = "Base rule"
+    Subclasses declare a ``name`` class variable matching the key used in the
+    config file, then implement ``check_file``.
+    """
 
-    def __init__(self, config: SafeLintConfig) -> None:
-        """Store the shared *config* for use in :meth:`check`."""
+    name: str = ""
+
+    def __init__(self, config: dict[str, Any]) -> None:
+        """Bind rule-specific config and resolve severity."""
         self.config = config
+        self.severity: str = config.get("severity", "error")
 
-    def check(self, path: Path, tree: ast.AST, source: str) -> list[Violation]:
-        """Analyse *tree* and return any violations found."""
-        raise NotImplementedError
+    @abstractmethod
+    def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
+        """Analyse *tree* (parsed from *filepath*) and return every violation found."""
 
-    def violation(self, message: str, line: int, column: int = 0) -> Violation:
-        """Construct a :class:`Violation` using this rule's code."""
-        return Violation(code=self.code, message=message, line=line, column=column)
+    def _v(self, filepath: str, lineno: int, message: str) -> Violation:
+        """Shorthand for constructing a Violation tagged with this rule."""
+        return Violation(
+            rule=self.name,
+            filepath=filepath,
+            lineno=lineno,
+            message=message,
+            severity=self.severity,
+        )
+
+    @staticmethod
+    def _call_name(func: ast.expr) -> str | None:
+        """Return the bare name of a Call's function node, or None if not resolvable."""
+        if isinstance(func, ast.Name):
+            return func.id
+        if isinstance(func, ast.Attribute):
+            return func.attr
+        return None

@@ -104,23 +104,23 @@ repos:
         pass_filenames: false
         always_run: true
 
-      # # -----------------------------------------------------------------------
-      # # AI Safety — Holzmann-inspired structural + error-handling rules
-      # # Config: .ai-safety.yaml (tunable per repo; falls back to built-in defaults)
-      # #
-      # # Severity model
-      # #   Each rule carries severity: error | warning (set in .ai-safety.yaml).
-      # #   --fail-on controls the threshold that blocks the commit:
-      # #     --fail-on=error    only error-severity violations block  ← lenient (onboarding)
-      # #     --fail-on=warning  error + warning violations block      ← strict  (production)
-      # # -----------------------------------------------------------------------
-      # - id: ai-safety
-      #   name: AI Safety Checks (Holzmann Rules)
-      #   entry: python3 scripts/ai_safety_hook.py
-      #   args: [--fail-on=warning]
-      #   language: system
-      #   types: [python]
-      #   files: ^src/
+      # -----------------------------------------------------------------------
+      # AI Safety — Holzmann-inspired structural + error-handling rules
+      # Config: .ai-safety.yaml (tunable per repo; falls back to built-in defaults)
+      #
+      # Severity model
+      #   Each rule carries severity: error | warning (set in .ai-safety.yaml).
+      #   --fail-on controls the threshold that blocks the commit:
+      #     --fail-on=error    only error-severity violations block  ← lenient (onboarding)
+      #     --fail-on=warning  error + warning violations block      ← strict  (production)
+      # -----------------------------------------------------------------------
+      - id: safelint
+        name: AI Safety Checks (Holzmann Rules)
+        entry: safelint
+        args: [--fail-on=error]
+        language: system
+        types: [python]
+        files: ^src/
 
 
       # -----------------------------------------------------------------------

@@ -1,36 +1,33 @@
-"""SAFE101 — function-length rule."""
+"""function_length rule — body must not exceed max_lines."""
 
 from __future__ import annotations
 
 import ast
-from pathlib import Path
 
-from safelint.rules.base import Rule, Violation
+from safelint.rules.base import BaseRule, Violation
 
 
-class FunctionLengthRule(Rule):
-    """Report functions that exceed the configured line-count limit."""
+class FunctionLengthRule(BaseRule):
+    """Reject functions whose body exceeds the configured line limit."""
 
-    name = "function-length"
-    code = "SAFE101"
-    description = "Functions should remain short and reviewable"
+    name = "function_length"
 
-    def check(self, path: Path, tree: ast.AST, source: str) -> list[Violation]:
-        """Walk *tree* and flag any function longer than the configured limit."""
-        violations: list[Violation] = []
+    def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
+        """Flag any function or async function longer than max_lines."""
+        max_lines: int = self.config.get("max_lines", 60)
+        violations = []
         for node in ast.walk(tree):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            start = getattr(node, "lineno", 0)
-            end = getattr(node, "end_lineno", start)
-            length = end - start + 1
-            if length > self.config.max_function_lines:
+            if node.end_lineno is None:
+                continue
+            length = node.end_lineno - node.lineno
+            if length > max_lines:
                 violations.append(
-                    self.violation(
-                        f"Function '{node.name}' spans {length} lines;"
-                        f" limit is {self.config.max_function_lines}",
-                        start,
-                        getattr(node, "col_offset", 0),
+                    self._v(
+                        filepath,
+                        node.lineno,
+                        f'Function "{node.name}" is {length} lines (max {max_lines})',
                     )
                 )
         return violations
