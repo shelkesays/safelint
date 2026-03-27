@@ -116,6 +116,52 @@ DEFAULTS: dict[str, Any] = {
         "missing_assertions": {"enabled": False, "severity": "warning"},
         "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
         "test_coupling": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
+        # Dataflow hybrid rules — disabled by default; opt-in via .ai-safety.yaml
+        "tainted_sink": {
+            "enabled": False,
+            "severity": "error",
+            "sinks": [
+                "eval",
+                "exec",
+                "compile",
+                "system",
+                "popen",
+                "Popen",
+                "run",
+                "call",
+                "check_output",
+                "execute",
+            ],
+            "sanitizers": ["escape", "sanitize", "clean", "validate", "quote", "encode", "bleach"],
+            "sources": ["input", "readline", "recv", "recvfrom", "read"],
+        },
+        "return_value_ignored": {
+            "enabled": False,
+            "severity": "warning",
+            "flagged_calls": [
+                "run",
+                "call",
+                "check_output",
+                "write",
+                "send",
+                "sendall",
+                "sendfile",
+                "seek",
+                "truncate",
+                "remove",
+                "unlink",
+                "rename",
+                "replace",
+                "makedirs",
+                "mkdir",
+                "rmdir",
+            ],
+        },
+        "null_dereference": {
+            "enabled": False,
+            "severity": "error",
+            "nullable_methods": [],
+        },
     },
 }
 
@@ -170,7 +216,5 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
             continue
         raw = _parse_yaml_file(candidate)
         return deep_merge(DEFAULTS, raw) if raw is not None else DEFAULTS
-
-    return DEFAULTS
 
     return DEFAULTS
