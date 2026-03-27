@@ -93,9 +93,7 @@ class TaintTracker(ast.NodeVisitor):
     def _fstring_tainted(self, node: ast.JoinedStr) -> bool:
         """Return True if any interpolated value in an f-string is tainted."""
         return any(
-            self._is_tainted(v.value)
-            for v in node.values
-            if isinstance(v, ast.FormattedValue)
+            self._is_tainted(v.value) for v in node.values if isinstance(v, ast.FormattedValue)
         )
 
     def _container_tainted(self, node: ast.expr) -> bool:

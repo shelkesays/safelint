@@ -442,10 +442,10 @@ wheels = [
 
 [[package]]
 name = "safelint"
-version = "0.1.0"
+version = "0.3.0"
 source = { editable = "." }
 dependencies = [
-    { name = "pyyaml" },
+    { name = "tomli", marker = "python_full_version < '3.11'" },
 ]
 
 [package.optional-dependencies]
@@ -455,8 +455,12 @@ dev = [
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-mock" },
+    { name = "pyyaml" },
     { name = "ruff" },
     { name = "ty" },
+]
+yaml = [
+    { name = "pyyaml" },
 ]
 
 [package.metadata]
@@ -466,11 +470,13 @@ requires-dist = [
     { name = "pytest", marker = "extra == 'dev'", specifier = ">=9.0.2" },
     { name = "pytest-cov", marker = "extra == 'dev'", specifier = ">=7.1.0" },
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.15.1" },
-    { name = "pyyaml", specifier = ">=6.0" },
+    { name = "pyyaml", marker = "extra == 'dev'", specifier = ">=6.0" },
+    { name = "pyyaml", marker = "extra == 'yaml'", specifier = ">=6.0" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.8" },
+    { name = "tomli", marker = "python_full_version < '3.11'", specifier = ">=1.1.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.26" },
 ]
-provides-extras = ["dev"]
+provides-extras = ["yaml", "dev"]
 
 [[package]]
 name = "tabulate"

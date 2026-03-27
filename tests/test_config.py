@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from safelint.core.config import DEFAULTS, deep_merge, load_config
+import pytest
+
+from safelint.core.config import DEFAULTS, _TOML_AVAILABLE, deep_merge, load_config
 
 
 def test_defaults_have_expected_keys() -> None:
@@ -74,3 +76,62 @@ def test_deep_merge_does_not_mutate_base() -> None:
     deep_merge(base, {"a": {"x": 99}})
 
     assert base["a"]["x"] == 1
+
+
+# ---------------------------------------------------------------------------
+# TOML config loading
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
+def test_load_config_reads_pyproject_toml(tmp_path: Path) -> None:
+    """load_config() reads [tool.safelint] from pyproject.toml."""
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.safelint]\nmode = 'ci'\n\n[tool.safelint.rules.function_length]\nmax_lines = 25\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(tmp_path)
+
+    assert config["mode"] == "ci"
+    assert config["rules"]["function_length"]["max_lines"] == 25
+    # Keys not in the file still come from defaults
+    assert "nesting_depth" in config["rules"]
+
+
+@pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
+def test_load_config_pyproject_without_safelint_section_falls_back(tmp_path: Path) -> None:
+    """pyproject.toml without [tool.safelint] does not block .ai-safety.yaml lookup."""
+    (tmp_path / "pyproject.toml").write_text("[tool.ruff]\nline-length = 88\n", encoding="utf-8")
+    (tmp_path / ".ai-safety.yaml").write_text("mode: ci\n", encoding="utf-8")
+
+    config = load_config(tmp_path)
+
+    assert config["mode"] == "ci"
+
+
+@pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
+def test_load_config_pyproject_takes_priority_over_yaml(tmp_path: Path) -> None:
+    """pyproject.toml [tool.safelint] takes priority over .ai-safety.yaml."""
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.safelint]\nmode = 'ci'\n", encoding="utf-8"
+    )
+    (tmp_path / ".ai-safety.yaml").write_text("mode: local\n", encoding="utf-8")
+
+    config = load_config(tmp_path)
+
+    assert config["mode"] == "ci"
+
+
+@pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
+def test_load_config_pyproject_walks_up(tmp_path: Path) -> None:
+    """load_config() walks parent directories to find pyproject.toml."""
+    (tmp_path / "pyproject.toml").write_text(
+        "[tool.safelint]\nfail_on = 'warning'\n", encoding="utf-8"
+    )
+    nested = tmp_path / "src" / "mypackage"
+    nested.mkdir(parents=True)
+
+    config = load_config(nested)
+
+    assert config["fail_on"] == "warning"
