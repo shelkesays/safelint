@@ -162,9 +162,9 @@ def main() -> None:
             type=Path,
             default=None,
             help=(
-                "Path to a config file or directory to use as the config discovery "
-                "root (overrides automatic discovery; if both pyproject.toml and "
-                ".safelint.yaml exist, pyproject.toml takes precedence)"
+                "Path to a safelint config file to use instead of automatic discovery "
+                "(if both pyproject.toml and .safelint.yaml exist, pyproject.toml "
+                "takes precedence)"
             ),
         )
         _build_common_args(parser)
