@@ -39,7 +39,10 @@ def run(
     else:
         search_from = Path(target)
     config = load_config(search_from if search_from.is_dir() else search_from.parent)
-    engine = SafetyEngine(config, changed_files=changed_files or files)
+    engine = SafetyEngine(
+        config,
+        changed_files=changed_files if changed_files is not None else files,
+    )
     if files is not None:
         return [LintResult(path=f, violations=engine.check_file(f)) for f in files]
     return engine.check_path(target)
