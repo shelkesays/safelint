@@ -158,7 +158,10 @@ def main() -> None:
         )
         parser.add_argument("target", type=Path, help="File or directory to scan")
         parser.add_argument(
-            "--config", type=Path, default=None, help="Explicit path to .safelint.yaml"
+            "--config",
+            type=Path,
+            default=None,
+            help="Directory or path used as the search root for .safelint.yaml",
         )
         _build_common_args(parser)
         args = parser.parse_args(sys.argv[2:])  # skip 'check'
