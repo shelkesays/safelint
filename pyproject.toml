@@ -154,35 +154,145 @@ unresolved-attribute = "warn"
 # All keys are optional; unset keys fall back to built-in defaults.
 # ---------------------------------------------------------------------------
 [tool.safelint]
-mode = "local"           # "local" | "ci"
-fail_on = "error"        # "error" | "warning"
+mode = "local"    # "local" | "ci"
+fail_on = "error" # "error" | "warning"
 exclude_paths = ["tests/**", "docs/**"]
 
 [tool.safelint.execution]
 fail_fast = false
+order = [
+    "function_length",
+    "nesting_depth",
+    "max_arguments",
+    "bare_except",
+    "empty_except",
+    "global_state",
+    "global_mutation",
+    "unbounded_loops",
+    "complexity",
+    "side_effects_hidden",
+    "side_effects",
+    "logging_on_error",
+    "resource_lifecycle",
+    "test_coupling",
+    "test_existence",
+    "missing_assertions",
+    "tainted_sink",
+    "return_value_ignored",
+    "null_dereference",
+]
 
+# ── Structural ────────────────────────────────────────────────────────────────
 [tool.safelint.rules.function_length]
 enabled = true
 max_lines = 60
+severity = "error"
 
 [tool.safelint.rules.nesting_depth]
 enabled = true
 max_depth = 2
+severity = "error"
+
+[tool.safelint.rules.max_arguments]
+enabled = true
+max_args = 7
+severity = "error"
 
 [tool.safelint.rules.complexity]
 enabled = true
 max_complexity = 10
+severity = "error"
 
-# Dataflow rules are disabled by default — uncomment to enable:
-# [tool.safelint.rules.tainted_sink]
-# enabled = true
-# severity = "error"
-#
-# [tool.safelint.rules.null_dereference]
-# enabled = true
-# severity = "error"
-#
-# [tool.safelint.rules.return_value_ignored]
-# enabled = true
-# severity = "warning"
+# ── Error handling ────────────────────────────────────────────────────────────
+[tool.safelint.rules.bare_except]
+enabled = true
+severity = "error"
+
+[tool.safelint.rules.empty_except]
+enabled = true
+severity = "error"
+
+[tool.safelint.rules.logging_on_error]
+enabled = true
+severity = "warning"
+
+# ── State & purity ────────────────────────────────────────────────────────────
+[tool.safelint.rules.global_state]
+enabled = true
+severity = "warning"
+
+[tool.safelint.rules.global_mutation]
+enabled = true
+severity = "error"
+
+[tool.safelint.rules.side_effects_hidden]
+enabled = true
+severity = "error"
+io_functions = ["open", "print", "input", "subprocess"]
+pure_prefixes = [
+    "calculate", "compute", "get", "check", "validate",
+    "is", "has", "find", "parse", "transform", "convert",
+    "format", "build", "resolve", "detect",
+]
+
+[tool.safelint.rules.side_effects]
+enabled = true
+severity = "warning"
+io_functions = ["open", "print", "input"]
+io_name_keywords = [
+    "print", "log", "write", "read", "save", "load",
+    "send", "fetch", "export", "import",
+]
+
+# ── Resource safety ───────────────────────────────────────────────────────────
+[tool.safelint.rules.resource_lifecycle]
+enabled = true
+severity = "error"
+tracked_functions = ["open", "connect", "session"]
+cleanup_patterns = ["close", "commit", "rollback"]
+
+# ── Loop safety ───────────────────────────────────────────────────────────────
+[tool.safelint.rules.unbounded_loops]
+enabled = true
+severity = "warning"
+
+# ── Documentation (heuristic) ─────────────────────────────────────────────────
+[tool.safelint.rules.missing_assertions]
+enabled = false
+severity = "warning"
+
+# ── Test coverage (enable in CI) ──────────────────────────────────────────────
+[tool.safelint.rules.test_existence]
+enabled = false
+test_dirs = ["tests"]
+severity = "warning"
+
+[tool.safelint.rules.test_coupling]
+enabled = false
+test_dirs = ["tests"]
+severity = "warning"
+
+# ── Dataflow hybrid rules (opt-in) ────────────────────────────────────────────
+[tool.safelint.rules.tainted_sink]
+enabled = false
+severity = "error"
+sinks = ["eval", "exec", "compile", "system", "popen", "Popen", "run", "call", "check_output", "execute"]
+sanitizers = ["escape", "sanitize", "clean", "validate", "quote", "encode", "bleach"]
+sources = ["input", "readline", "recv", "recvfrom", "read"]
+
+[tool.safelint.rules.return_value_ignored]
+enabled = false
+severity = "warning"
+flagged_calls = [
+    "run", "call", "check_output",
+    "write", "send", "sendall", "sendfile",
+    "seek", "truncate",
+    "remove", "unlink", "rename", "replace",
+    "makedirs", "mkdir", "rmdir",
+]
+
+[tool.safelint.rules.null_dereference]
+enabled = false
+severity = "error"
+nullable_methods = ["get", "pop", "find", "next", "first", "one_or_none", "scalar", "scalar_one_or_none", "fetchone"]
 

@@ -1,0 +1,11 @@
+- id: safelint
+  name: SafeLint (Holzmann safety rules)
+  description: >
+    Checks Python files against safety-critical coding rules inspired by
+    Gerard J. Holzmann's Power of Ten (NASA/JPL). Catches oversized functions,
+    deep nesting, bare excepts, global mutation, unbounded loops, and more.
+  entry: safelint
+  language: python
+  types: [python]
+  args: [--fail-on=error]
+  files: ^src/
