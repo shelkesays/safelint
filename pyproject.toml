@@ -155,7 +155,7 @@ unresolved-attribute = "warn"
 # ---------------------------------------------------------------------------
 [tool.safelint]
 mode = "local"    # "local" | "ci"
-fail_on = "error" # "error" | "warning"
+fail_on = "warning" # "error" | "warning"
 exclude_paths = ["tests/**", "docs/**"]
 
 [tool.safelint.execution]
