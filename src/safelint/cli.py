@@ -162,7 +162,7 @@ def main() -> None:
             type=Path,
             default=None,
             help=(
-                "Path to a config directory, .safelint.yaml, or pyproject.toml "
+                "Path to a .safelint.yaml or pyproject.toml file "
                 "(overrides automatic discovery)"
             ),
         )
