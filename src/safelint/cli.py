@@ -89,7 +89,6 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
     engine = SafetyEngine(config, changed_files=files)
 
     all_blocking: list[Violation] = []
-    all_advisory: list[Violation] = []
 
     all_violations: list[Violation] = []
     for filepath in files:
@@ -97,9 +96,8 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
         if not violations:
             continue
         _print_violations(violations)
-        blocking, advisory = engine.partition_violations(violations, fail_threshold)
+        blocking, _ = engine.partition_violations(violations, fail_threshold)
         all_blocking.extend(blocking)
-        all_advisory.extend(advisory)
         all_violations.extend(violations)
 
     _print_summary(all_violations, len(all_blocking), fail_on)
@@ -118,19 +116,46 @@ def _is_under_target(abs_path: Path, target_abs: Path) -> bool:
     return abs_path == target_abs
 
 
+def _normalize_path(abs_path: Path, cwd: Path) -> str:
+    """Return *abs_path* relative to *cwd*, or as an absolute string if outside *cwd*."""
+    try:
+        return str(abs_path.relative_to(cwd))
+    except ValueError:
+        logger.debug("Path %s is not relative to cwd %s; using absolute path", abs_path, cwd)
+        return str(abs_path)
+
+
+def _collect_all_py_files(raw: set[str], git_root: Path) -> list[str]:
+    """Return cwd-relative paths for all existing .py files in *raw* (no target filter)."""
+    cwd = Path.cwd()
+    results: list[str] = []
+    for rel in raw:
+        if not rel.endswith(".py"):
+            continue
+        abs_path = (git_root / rel).resolve()
+        if abs_path.exists():
+            results.append(_normalize_path(abs_path, cwd))
+    return sorted(results)
+
+
 def _filter_py_files(raw: set[str], git_root: Path, target_abs: Path) -> list[str]:
-    """Filter git-relative paths to existing .py files under *target_abs*."""
+    """Filter git-relative paths to existing .py files under *target_abs*.
+
+    Returned paths are relative to cwd when possible so that diagnostic output
+    (``file:line:``) never contains a Windows drive-letter colon.
+    """
+    cwd = Path.cwd()
     results: list[str] = []
     for rel in raw:
         if not rel.endswith(".py"):
             continue
         abs_path = (git_root / rel).resolve()
         if abs_path.exists() and _is_under_target(abs_path, target_abs):
-            results.append(str(abs_path))
+            results.append(_normalize_path(abs_path, cwd))
     return sorted(results)
 
 
-def _get_git_modified_python_files(target: Path) -> list[str] | None:
+def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] | None:
     """Return modified/added .py paths under *target* according to git.
 
     Combines staged and unstaged changes vs HEAD.  Returns ``None`` when git
@@ -172,7 +197,7 @@ def _get_git_modified_python_files(target: Path) -> list[str] | None:
             return None
 
         raw = set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines())
-        return _filter_py_files(raw, git_root, target_abs)
+        return _collect_all_py_files(raw, git_root), _filter_py_files(raw, git_root, target_abs)
 
     except (FileNotFoundError, OSError) as exc:
         logger.debug("git unavailable or not a repo: %s", exc)
@@ -186,19 +211,22 @@ def _run_check(args: argparse.Namespace) -> int:
     target = Path(args.target)
 
     files: list[str] | None = None
-    if not all_files:
+    changed_files: list[str] | None = None
+    if not all_files and target.is_dir():
         modified = _get_git_modified_python_files(target)
         if modified is None:
             _print_status("Note: git unavailable — scanning all files.")
-        elif not modified:
+        elif not modified[1]:
             _print_status("No modified Python files detected. Use --all-files to scan everything.")
             return 0
         else:
-            files = modified
+            changed_files, files = modified
 
-    results = run(target, config_path=config_path, files=files)
+    results = run(target, config_path=config_path, files=files, changed_files=changed_files)
 
-    config_dir = Path(config_path).parent if config_path else (target if target.is_dir() else target.parent)
+    config_dir = (
+        Path(config_path).parent if config_path else (target if target.is_dir() else target.parent)
+    )
     config = load_config(config_dir)
     fail_on, fail_threshold = _resolve_fail_on(args, config)
 
@@ -207,16 +235,14 @@ def _run_check(args: argparse.Namespace) -> int:
     dummy_engine.exclude_paths = []
 
     all_blocking: list[Violation] = []
-    all_advisory: list[Violation] = []
 
     all_violations: list[Violation] = []
     for result in results:
         if not result.violations:
             continue
         _print_violations(result.violations)
-        blocking, advisory = dummy_engine.partition_violations(result.violations, fail_threshold)
+        blocking, _ = dummy_engine.partition_violations(result.violations, fail_threshold)
         all_blocking.extend(blocking)
-        all_advisory.extend(advisory)
         all_violations.extend(result.violations)
 
     _print_summary(all_violations, len(all_blocking), fail_on)
@@ -260,7 +286,10 @@ def main() -> None:
             "--config",
             type=Path,
             default=None,
-            help="Path to a .safelint.yaml config file (overrides automatic discovery)",
+            help=(
+                "Path to a config file (pyproject.toml, .safelint.yaml) or a directory"
+                " to use as the config search root (overrides automatic discovery)"
+            ),
         )
         parser.add_argument(
             "--all-files",

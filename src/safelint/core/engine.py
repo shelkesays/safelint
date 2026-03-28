@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import ast
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -11,6 +12,8 @@ from safelint.core.config import DEFAULTS, SEVERITY_ORDER
 from safelint.rules import ALL_RULES
 from safelint.rules.base import BaseRule, Violation
 from safelint.rules.test_coverage import TestCouplingRule
+
+_log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -80,6 +83,7 @@ class SafetyEngine:
             source = Path(filepath).read_text(encoding="utf-8")
             tree = ast.parse(source, filename=filepath)
         except (SyntaxError, OSError) as exc:
+            _log.debug("Failed to parse %s: %s", filepath, exc)
             return [
                 Violation(
                     rule="parse",
