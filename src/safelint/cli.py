@@ -59,8 +59,8 @@ def _make_summary(all_violations: list[Violation], n_blocking: int, fail_on: str
     """Return a ruff-style summary line for *all_violations*."""
     if not all_violations:
         return "All checks passed."
-    n_errors = sum(1 for v in all_violations if v.severity == "error")
     n_warnings = sum(1 for v in all_violations if v.severity == "warning")
+    n_errors = len(all_violations) - n_warnings
     parts = []
     if n_errors:
         parts.append(f"{n_errors} error{'s' if n_errors != 1 else ''}")

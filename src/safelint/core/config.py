@@ -237,7 +237,7 @@ def _read_toml_file(candidate: Path) -> dict[str, Any] | None:
         with candidate.open("rb") as fp:
             return tomllib.load(fp)
     except Exception as exc:  # noqa: BLE001
-        _log.error("Failed to parse %s: %s - using defaults", candidate, exc)
+        _log.error("Failed to parse %s: %s - skipping file", candidate, exc)
         return None
 
 
@@ -246,7 +246,7 @@ def _parse_yaml_file(candidate: Path) -> dict[str, Any] | None:
     try:
         return yaml.safe_load(candidate.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as exc:
-        _log.error("Failed to parse %s: %s - using defaults", candidate, exc)
+        _log.error("Failed to parse %s: %s - skipping file", candidate, exc)
         return None
 
 
