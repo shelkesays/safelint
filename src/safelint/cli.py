@@ -316,8 +316,9 @@ def main() -> None:
             type=Path,
             default=None,
             help=(
-                "Path to a config file (pyproject.toml, .safelint.yaml) or a directory"
-                " to use as the config search root (overrides automatic discovery)"
+                "Directory to use as the config discovery root, or a file whose parent"
+                " directory is used as the root (pyproject.toml takes precedence over"
+                " .safelint.yaml when both exist)"
             ),
         )
         parser.add_argument(
