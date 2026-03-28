@@ -45,8 +45,13 @@ class TestCouplingRule(BaseRule):
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:  # noqa: ARG002
         """Return a violation when the paired test file was not part of this commit."""
+        # No coupling context means we are not in a diff-aware run (e.g. --all-files).
+        # Firing on every file would be noise, so skip entirely.
+        if "_changed_files" not in self.config:
+            return []
+
         test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
-        changed: set[str] = set(self.config.get("_changed_files", []))
+        changed: set[str] = set(self.config["_changed_files"])
         src = Path(filepath)
         test_name = f"test_{src.stem}.py"
 

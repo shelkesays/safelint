@@ -12,6 +12,7 @@ def run(
     target: str | Path,
     config_path: str | Path | None = None,
     changed_files: list[str] | None = None,
+    files: list[str] | None = None,
 ) -> list[LintResult]:
     """Load config and lint *target* (file or directory).
 
@@ -25,8 +26,13 @@ def run(
         a file path, its parent directory is used. When omitted, the loader
         walks up from *target* to find a supported config file automatically.
     changed_files:
-        List of files being checked (injected into test-coupling rules).
-        Defaults to the files discovered from *target*.
+        Optional list of files being checked (injected into test-coupling rules).
+        When omitted, the value of *files* (if provided) is reused; otherwise
+        left unset and the engine receives no changed-files context.
+    files:
+        Explicit list of ``.py`` files to lint. When provided, skips directory
+        discovery and checks exactly these files. Also used as *changed_files*
+        for test-coupling rules when *changed_files* is not set separately.
     """
     if config_path:
         config_p = Path(config_path)
@@ -34,5 +40,10 @@ def run(
     else:
         search_from = Path(target)
     config = load_config(search_from if search_from.is_dir() else search_from.parent)
-    engine = SafetyEngine(config, changed_files=changed_files)
+    engine = SafetyEngine(
+        config,
+        changed_files=changed_files if changed_files is not None else files,
+    )
+    if files is not None:
+        return [LintResult(path=f, violations=engine.check_file(f)) for f in files]
     return engine.check_path(target)

@@ -40,6 +40,50 @@ def test_run_with_config_path(tmp_path: Path) -> None:
     assert len(results) == 1
 
 
+def test_run_files_param_checks_exactly_those_files(tmp_path: Path) -> None:
+    """run() with files= skips discovery and checks only the specified files."""
+    checked = tmp_path / "checked.py"
+    skipped = tmp_path / "skipped.py"
+    checked.write_text("x = 1\n", encoding="utf-8")
+    skipped.write_text("y = 2\n", encoding="utf-8")
+
+    results = run(tmp_path, files=[str(checked)])
+
+    assert len(results) == 1
+    assert results[0].path == str(checked)
+
+
+def test_run_changed_files_takes_precedence_over_files(tmp_path: Path) -> None:
+    """run() passes changed_files to the engine when both changed_files and files are given."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    sample = src_dir / "mymod.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    test_file = test_dir / "test_mymod.py"
+    test_file.write_text("def test_x(): pass\n", encoding="utf-8")
+
+    # files= lists only the source file; changed_files= includes the test file too.
+    # test_coupling should NOT fire because changed_files signals the test was updated.
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text(
+        f"[tool.safelint.rules.test_coupling]\nenabled = true\ntest_dirs = ['{test_dir}']\n",
+        encoding="utf-8",
+    )
+    results = run(
+        tmp_path,
+        config_path=config_file,
+        files=[str(sample)],
+        changed_files=[str(sample), str(test_file)],
+    )
+
+    paths = [r.path for r in results]
+    assert str(sample) in paths
+    coupling_violations = [v for r in results for v in r.violations if v.rule == "test_coupling"]
+    assert not coupling_violations
+
+
 # ---------------------------------------------------------------------------
 # load_config - invalid YAML falls back to defaults
 # ---------------------------------------------------------------------------
@@ -907,3 +951,108 @@ def test_logging_on_error_non_log_name_call_fires(tmp_path: Path) -> None:
 
     violations = _engine().check_file(str(sample))
     assert any(v.rule == "logging_on_error" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# CLI: git-based file selection (_get_git_modified_python_files branches)
+# ---------------------------------------------------------------------------
+
+
+def _make_proc(mocker, returncode: int = 0, stdout: str = ""):
+    m = mocker.MagicMock()
+    m.returncode = returncode
+    m.stdout = stdout
+    return m
+
+
+def test_cli_check_git_unavailable_falls_back_to_full_scan(tmp_path: Path, mocker) -> None:
+    """_run_check falls back to a full scan and exits 0 when git is not installed."""
+    import argparse
+
+    from safelint.cli import _run_check
+
+    (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
+    mocker.patch("safelint.cli.subprocess.run", side_effect=FileNotFoundError)
+
+    args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False)
+    assert _run_check(args) == 0
+
+
+def test_cli_check_git_diff_failure_falls_back_to_full_scan(tmp_path: Path, mocker) -> None:
+    """_run_check falls back to a full scan when git diff returns a non-zero exit code."""
+    import argparse
+
+    from safelint.cli import _run_check
+
+    (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
+    rev_parse = _make_proc(mocker, returncode=0, stdout=str(tmp_path) + "\n")
+    diff_fail = _make_proc(mocker, returncode=128, stdout="")
+    ok_proc = _make_proc(mocker, returncode=0, stdout="")
+    mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, diff_fail, ok_proc, ok_proc])
+
+    args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False)
+    assert _run_check(args) == 0
+
+
+def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker, capsys) -> None:
+    """_run_check exits 0 with a status message when git reports no modified Python files."""
+    import argparse
+
+    from safelint.cli import _run_check
+
+    (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
+    rev_parse = _make_proc(mocker, returncode=0, stdout=str(tmp_path) + "\n")
+    empty_diff = _make_proc(mocker, returncode=0, stdout="")
+    mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, empty_diff, empty_diff, empty_diff])
+
+    args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False)
+    assert _run_check(args) == 0
+    assert "No modified Python files detected" in capsys.readouterr().out
+
+
+def test_cli_check_all_files_bypasses_git(tmp_path: Path, mocker) -> None:
+    """_run_check does not invoke git when --all-files is set."""
+    import argparse
+
+    from safelint.cli import _run_check
+
+    (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
+    spy = mocker.patch("safelint.cli.subprocess.run")
+
+    args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=True)
+    result = _run_check(args)
+
+    spy.assert_not_called()
+    assert result == 0
+
+
+def test_cli_check_only_in_target_files_linted(tmp_path: Path, mocker) -> None:
+    """_run_check lints only in-target files; out-of-target diffs are not linted."""
+    import argparse
+
+    from safelint.cli import _run_check
+
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+
+    (src_dir / "mod.py").write_text("x = 1\n", encoding="utf-8")
+    # Violation in the out-of-target test file: bare except
+    (test_dir / "test_mod.py").write_text(
+        "def foo():\n    try:\n        pass\n    except:\n        pass\n",
+        encoding="utf-8",
+    )
+
+    # git root is tmp_path; both files are in the diff
+    rev_parse = _make_proc(mocker, returncode=0, stdout=str(tmp_path) + "\n")
+    diff_stdout = "src/mod.py\ntests/test_mod.py\n"
+    diff_proc = _make_proc(mocker, returncode=0, stdout=diff_stdout)
+    empty_proc = _make_proc(mocker, returncode=0, stdout="")
+    mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, diff_proc, diff_proc, empty_proc])
+
+    # Target is src/ only — test_mod.py must not be linted
+    args = argparse.Namespace(
+        target=src_dir, config=None, fail_on="error", mode=None, all_files=False
+    )
+    assert _run_check(args) == 0

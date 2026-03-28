@@ -61,10 +61,16 @@ pip install "safelint[yaml]"
 
 ## Usage
 
-**Check a directory:**
+**Check modified files** (default — only files changed since last commit):
 
 ```bash
 safelint check src/
+```
+
+**Check all files** (full scan, e.g. in CI):
+
+```bash
+safelint check src/ --all-files
 ```
 
 **Check specific files** (pre-commit style):
@@ -76,13 +82,13 @@ safelint src/mymodule.py src/utils.py
 **Fail on warnings too** (useful in CI):
 
 ```bash
-safelint check src/ --fail-on=warning
+safelint check src/ --all-files --fail-on=warning
 ```
 
 **Run in CI mode** (warnings become blocking):
 
 ```bash
-safelint check src/ --mode=ci
+safelint check src/ --all-files --mode=ci
 ```
 
 ---
