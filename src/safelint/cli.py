@@ -127,7 +127,10 @@ def _normalize_path(abs_path: Path, cwd: Path) -> str:
 
 
 def _collect_all_py_files(raw: set[str], git_root: Path) -> list[str]:
-    """Return cwd-relative paths for all existing .py files in *raw* (no target filter)."""
+    """Return paths for all existing .py files in *raw* (no target filter).
+
+    Paths are relative to cwd when possible, otherwise absolute.
+    """
     cwd = Path.cwd()
     results: list[str] = []
     for rel in raw:
@@ -203,11 +206,12 @@ def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] 
 
     Returns ``(all_changed_py, in_target_py)`` where:
 
-    * *all_changed_py* — every changed .py file across the whole repo (cwd-relative).
+    * *all_changed_py* — every changed .py file across the whole repo.
+      Paths are relative to cwd when possible, otherwise absolute.
       Passed to :class:`~safelint.core.engine.SafetyEngine` as ``changed_files``
       so cross-file rules (e.g. ``test_coupling``) see the full diff context.
     * *in_target_py* — the subset of those files that fall under *target*.
-      These are the files actually linted.
+      Same path format as *all_changed_py*. These are the files actually linted.
 
     Returns ``None`` when git is unavailable, the path is outside a git
     repository, or any git command fails — callers should fall back to
