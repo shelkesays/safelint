@@ -35,7 +35,7 @@ from safelint.core.engine import SafetyEngine
 from safelint.core.runner import run
 from safelint.rules.base import Violation
 
-logger = logging.getLogger(__name__)
+_log = logging.getLogger(__name__)
 
 
 def _print_violations(violations: list[Violation]) -> None:
@@ -112,7 +112,7 @@ def _is_under_target(abs_path: Path, target_abs: Path) -> bool:
             abs_path.relative_to(target_abs)
             return True
         except ValueError:
-            logger.debug("Path %s is not relative to %s", abs_path, target_abs)
+            _log.debug("Path %s is not relative to %s", abs_path, target_abs)
             return False
     return abs_path == target_abs
 
@@ -122,7 +122,7 @@ def _normalize_path(abs_path: Path, cwd: Path) -> str:
     try:
         return str(abs_path.relative_to(cwd))
     except ValueError:
-        logger.debug("Path %s is not relative to cwd %s; using absolute path", abs_path, cwd)
+        _log.debug("Path %s is not relative to cwd %s; using absolute path", abs_path, cwd)
         return str(abs_path)
 
 
@@ -181,7 +181,7 @@ def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
         timeout=10,
     )
     if diff_proc.returncode != 0 or cached_proc.returncode != 0 or untracked_proc.returncode != 0:
-        logger.debug(
+        _log.debug(
             "git command failed (diff rc=%s, cached rc=%s, untracked rc=%s); "
             "treating as git unavailable",
             diff_proc.returncode,
@@ -197,16 +197,26 @@ def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
 
 
 def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] | None:
-    """Return modified/added .py paths under *target* according to git.
+    """Return a 2-tuple of changed .py file lists, or ``None`` on git failure.
 
-    Includes staged, unstaged, and untracked files.  Returns ``None`` when git
-    is unavailable or the path is not inside a git repository — callers should
-    fall back to scanning all files.
+    Includes staged, unstaged, and untracked files.
+
+    Returns ``(all_changed_py, in_target_py)`` where:
+
+    * *all_changed_py* — every changed .py file across the whole repo (cwd-relative).
+      Passed to :class:`~safelint.core.engine.SafetyEngine` as ``changed_files``
+      so cross-file rules (e.g. ``test_coupling``) see the full diff context.
+    * *in_target_py* — the subset of those files that fall under *target*.
+      These are the files actually linted.
+
+    Returns ``None`` when git is unavailable, the path is outside a git
+    repository, or any git command fails — callers should fall back to
+    scanning all files.
     """
     try:
         git_bin = shutil.which("git")
         if not git_bin:
-            logger.debug("git executable not found on PATH")
+            _log.debug("git executable not found on PATH")
             return None
 
         target_abs = target.resolve()
@@ -229,7 +239,7 @@ def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] 
         return _collect_all_py_files(raw, git_root), _filter_py_files(raw, git_root, target_abs)
 
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired) as exc:
-        logger.debug("git unavailable or not a repo: %s", exc)
+        _log.debug("git unavailable or not a repo: %s", exc)
         return None
 
 
