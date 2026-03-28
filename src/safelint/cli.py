@@ -157,10 +157,49 @@ def _filter_py_files(raw: set[str], git_root: Path, target_abs: Path) -> list[st
     return sorted(results)
 
 
+def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
+    """Run git diff + ls-files and return the union of all changed paths, or None on error."""
+    diff_proc = subprocess.run(
+        [git_bin, "diff", "--name-only", "HEAD"],
+        capture_output=True,
+        text=True,
+        cwd=git_root,
+        timeout=10,
+    )
+    cached_proc = subprocess.run(
+        [git_bin, "diff", "--name-only", "--cached"],
+        capture_output=True,
+        text=True,
+        cwd=git_root,
+        timeout=10,
+    )
+    untracked_proc = subprocess.run(
+        [git_bin, "ls-files", "--others", "--exclude-standard"],
+        capture_output=True,
+        text=True,
+        cwd=git_root,
+        timeout=10,
+    )
+    if diff_proc.returncode != 0 or cached_proc.returncode != 0 or untracked_proc.returncode != 0:
+        logger.debug(
+            "git command failed (diff rc=%s, cached rc=%s, untracked rc=%s); "
+            "treating as git unavailable",
+            diff_proc.returncode,
+            cached_proc.returncode,
+            untracked_proc.returncode,
+        )
+        return None
+    return (
+        set(diff_proc.stdout.splitlines())
+        | set(cached_proc.stdout.splitlines())
+        | set(untracked_proc.stdout.splitlines())
+    )
+
+
 def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] | None:
     """Return modified/added .py paths under *target* according to git.
 
-    Combines staged and unstaged changes vs HEAD.  Returns ``None`` when git
+    Includes staged, unstaged, and untracked files.  Returns ``None`` when git
     is unavailable or the path is not inside a git repository — callers should
     fall back to scanning all files.
     """
@@ -184,29 +223,9 @@ def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] 
             return None
         git_root = Path(root_proc.stdout.strip())
 
-        diff_proc = subprocess.run(
-            [git_bin, "diff", "--name-only", "HEAD"],
-            capture_output=True,
-            text=True,
-            cwd=git_root,
-            timeout=10,
-        )
-        cached_proc = subprocess.run(
-            [git_bin, "diff", "--name-only", "--cached"],
-            capture_output=True,
-            text=True,
-            cwd=git_root,
-            timeout=10,
-        )
-        if diff_proc.returncode != 0 or cached_proc.returncode != 0:
-            logger.debug(
-                "git diff command failed (diff rc=%s, cached rc=%s); treating as git unavailable",
-                diff_proc.returncode,
-                cached_proc.returncode,
-            )
+        raw = _get_raw_changed_files(git_bin, git_root)
+        if raw is None:
             return None
-
-        raw = set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines())
         return _collect_all_py_files(raw, git_root), _filter_py_files(raw, git_root, target_abs)
 
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired) as exc:

@@ -987,7 +987,8 @@ def test_cli_check_git_diff_failure_falls_back_to_full_scan(tmp_path: Path, mock
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
     rev_parse = _make_proc(mocker, returncode=0, stdout=str(tmp_path) + "\n")
     diff_fail = _make_proc(mocker, returncode=128, stdout="")
-    mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, diff_fail, diff_fail])
+    ok_proc = _make_proc(mocker, returncode=0, stdout="")
+    mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, diff_fail, ok_proc, ok_proc])
 
     args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False)
     assert _run_check(args) == 0
@@ -1002,7 +1003,7 @@ def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker, capsys) -> 
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
     rev_parse = _make_proc(mocker, returncode=0, stdout=str(tmp_path) + "\n")
     empty_diff = _make_proc(mocker, returncode=0, stdout="")
-    mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, empty_diff, empty_diff])
+    mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, empty_diff, empty_diff, empty_diff])
 
     args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False)
     assert _run_check(args) == 0
@@ -1047,7 +1048,8 @@ def test_cli_check_only_in_target_files_linted(tmp_path: Path, mocker) -> None:
     rev_parse = _make_proc(mocker, returncode=0, stdout=str(tmp_path) + "\n")
     diff_stdout = "src/mod.py\ntests/test_mod.py\n"
     diff_proc = _make_proc(mocker, returncode=0, stdout=diff_stdout)
-    mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, diff_proc, diff_proc])
+    empty_proc = _make_proc(mocker, returncode=0, stdout="")
+    mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, diff_proc, diff_proc, empty_proc])
 
     # Target is src/ only — test_mod.py must not be linted
     args = argparse.Namespace(
