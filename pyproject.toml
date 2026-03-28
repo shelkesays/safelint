@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "safelint"
-version = "1.0.0"
+version = "1.1.0"
 description = "Engineering safety lint rules and pre-commit integration for modern Python codebases"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -155,7 +155,7 @@ unresolved-attribute = "warn"
 # ---------------------------------------------------------------------------
 [tool.safelint]
 mode = "local"    # "local" | "ci"
-fail_on = "error" # "error" | "warning"
+fail_on = "warning" # "error" | "warning"
 exclude_paths = ["tests/**", "docs/**"]
 
 [tool.safelint.execution]

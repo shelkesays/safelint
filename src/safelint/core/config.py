@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+_log = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # Optional parser availability flags
 # ---------------------------------------------------------------------------
@@ -32,11 +34,13 @@ else:  # pragma: no cover
 
         _TOML_AVAILABLE = True
     except ImportError:
+        _log.debug("tomllib not available; trying tomli backport")
         try:
             import tomli as tomllib  # type: ignore[import-untyped,no-redef]
 
             _TOML_AVAILABLE = True
         except ImportError:
+            _log.debug("tomli not available; TOML config support disabled")
             _TOML_AVAILABLE = False
 
 try:
@@ -44,9 +48,8 @@ try:
 
     _YAML_AVAILABLE = True
 except ImportError:  # pragma: no cover
+    _log.debug("PyYAML not available; YAML config support disabled")
     _YAML_AVAILABLE = False
-
-_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Severity / mode constants
@@ -228,13 +231,13 @@ def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]
 # ---------------------------------------------------------------------------
 
 
-def _parse_toml_file(candidate: Path) -> dict[str, Any] | None:
+def _read_toml_file(candidate: Path) -> dict[str, Any] | None:
     """Parse *candidate* as TOML and return the full document, or None on error."""
     try:
         with candidate.open("rb") as fp:
             return tomllib.load(fp)
     except Exception as exc:  # noqa: BLE001
-        _log.error("Failed to parse %s: %s - using defaults", candidate, exc)
+        _log.error("Failed to parse %s: %s - skipping file", candidate, exc)
         return None
 
 
@@ -243,7 +246,7 @@ def _parse_yaml_file(candidate: Path) -> dict[str, Any] | None:
     try:
         return yaml.safe_load(candidate.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as exc:
-        _log.error("Failed to parse %s: %s - using defaults", candidate, exc)
+        _log.error("Failed to parse %s: %s - skipping file", candidate, exc)
         return None
 
 
@@ -259,7 +262,7 @@ def _try_pyproject(directory: Path) -> dict[str, Any] | None:
     candidate = directory / TOML_CONFIG_FILENAME
     if not candidate.exists():
         return None
-    doc = _parse_toml_file(candidate)
+    doc = _read_toml_file(candidate)
     if doc is None:
         return None
     return doc.get("tool", {}).get(TOML_CONFIG_KEY)

@@ -6,9 +6,9 @@ Pre-commit hook (files passed by pre-commit as positional arguments)::
 
     safelint [--fail-on=error|warning] [--mode=local|ci] file1.py file2.py …
 
-Direct invocation / CI scan (directory or single file)::
+Direct invocation (default: git-modified files only when target is a directory)::
 
-    safelint check <path> [--config <cfg>] [--fail-on=error|warning] [--mode=local|ci]
+    safelint check <path> [--all-files] [--config <cfg>] [--fail-on=error|warning] [--mode=local|ci]
 
 Severity model
 --------------
@@ -18,12 +18,15 @@ controls which severity level blocks the run:
   --fail-on=error    → only error-severity violations block  (lenient - onboarding)
   --fail-on=warning  → error + warning violations block      (strict  - production)
 
-Precedence: --fail-on CLI > fail_on in .safelint.yaml > mode default.
+Precedence: --fail-on CLI > fail_on in config (pyproject.toml or .safelint.yaml) > mode default.
 """
 
 from __future__ import annotations
 
 import argparse
+import logging
+import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -32,16 +35,41 @@ from safelint.core.engine import SafetyEngine
 from safelint.core.runner import run
 from safelint.rules.base import Violation
 
+_log = logging.getLogger(__name__)
 
-def _print_file_violations(filepath: str, violations: list[Violation]) -> None:
-    """Print violations for a single file in human-readable format."""
-    print(f"\n{'─' * 64}")
-    print(f"  {filepath}")
-    print(f"{'─' * 64}")
+
+def _print_violations(violations: list[Violation]) -> None:
+    """Print violations one per line in ruff-style format: file:line: CODE message [rule]"""
     for v in violations:
-        icon = "❌" if v.severity == "error" else "⚠️ "
-        tag = f"{v.code}" if v.code else v.rule
-        print(f"  {icon}  {tag} [{v.rule}] line {v.lineno}: {v.message}")
+        tag = v.code if v.code else v.rule
+        print(f"{v.filepath}:{v.lineno}: {tag} {v.message} [{v.rule}]")
+
+
+def _print_summary(all_violations: list[Violation], n_blocking: int, fail_on: str) -> None:
+    """Print a ruff-style summary line to stdout."""
+    print(_make_summary(all_violations, n_blocking, fail_on))
+
+
+def _print_status(message: str) -> None:
+    """Print a status/informational message to stdout."""
+    print(message)
+
+
+def _make_summary(all_violations: list[Violation], n_blocking: int, fail_on: str) -> str:
+    """Return a ruff-style summary line for *all_violations*."""
+    if not all_violations:
+        return "All checks passed."
+    n_warnings = sum(1 for v in all_violations if v.severity == "warning")
+    n_errors = len(all_violations) - n_warnings
+    parts = []
+    if n_errors:
+        parts.append(f"{n_errors} error{'s' if n_errors != 1 else ''}")
+    if n_warnings:
+        parts.append(f"{n_warnings} warning{'s' if n_warnings != 1 else ''}")
+    found = f"Found {', '.join(parts)}."
+    if n_blocking:
+        return f"{found} [--fail-on={fail_on}]."
+    return f"{found} Advisory only [--fail-on={fail_on}]."
 
 
 def _resolve_fail_on(args: argparse.Namespace, config: dict) -> tuple[str, int]:
@@ -62,66 +90,206 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
     engine = SafetyEngine(config, changed_files=files)
 
     all_blocking: list[Violation] = []
-    all_advisory: list[Violation] = []
 
+    all_violations: list[Violation] = []
     for filepath in files:
         violations = engine.check_file(filepath)
         if not violations:
             continue
-        _print_file_violations(filepath, violations)
-        blocking, advisory = engine.partition_violations(violations, fail_threshold)
+        _print_violations(violations)
+        blocking, _ = engine.partition_violations(violations, fail_threshold)
         all_blocking.extend(blocking)
-        all_advisory.extend(advisory)
+        all_violations.extend(violations)
 
-    print()
-    if all_advisory:
-        print(
-            f"⚠️  {len(all_advisory)} advisory violation(s) - below --fail-on={fail_on} threshold."
+    _print_summary(all_violations, len(all_blocking), fail_on)
+    return 1 if all_blocking else 0
+
+
+def _is_under_target(abs_path: Path, target_abs: Path) -> bool:
+    """Return True when *abs_path* is inside *target_abs* (dir) or equals it (file)."""
+    if target_abs.is_dir():
+        try:
+            abs_path.relative_to(target_abs)
+            return True
+        except ValueError:
+            _log.debug("Path %s is not relative to %s", abs_path, target_abs)
+            return False
+    return abs_path == target_abs
+
+
+def _normalize_path(abs_path: Path, cwd: Path) -> str:
+    """Return *abs_path* relative to *cwd*, or as an absolute string if outside *cwd*."""
+    try:
+        return str(abs_path.relative_to(cwd))
+    except ValueError:
+        _log.debug("Path %s is not relative to cwd %s; using absolute path", abs_path, cwd)
+        return str(abs_path)
+
+
+def _collect_all_py_files(raw: set[str], git_root: Path) -> list[str]:
+    """Return paths for all existing .py files in *raw* (no target filter).
+
+    Paths are relative to cwd when possible, otherwise absolute.
+    """
+    cwd = Path.cwd()
+    results: list[str] = []
+    for rel in raw:
+        if not rel.endswith(".py"):
+            continue
+        abs_path = (git_root / rel).resolve()
+        if abs_path.exists():
+            results.append(_normalize_path(abs_path, cwd))
+    return sorted(results)
+
+
+def _filter_py_files(raw: set[str], git_root: Path, target_abs: Path) -> list[str]:
+    """Filter git-relative paths to existing .py files under *target_abs*.
+
+    Returned paths are relative to cwd when possible, which keeps diagnostic
+    output (``file:line:``) free of Windows drive-letter colons in the common
+    case; absolute paths are used as a fallback for files outside cwd.
+    """
+    cwd = Path.cwd()
+    results: list[str] = []
+    for rel in raw:
+        if not rel.endswith(".py"):
+            continue
+        abs_path = (git_root / rel).resolve()
+        if abs_path.exists() and _is_under_target(abs_path, target_abs):
+            results.append(_normalize_path(abs_path, cwd))
+    return sorted(results)
+
+
+def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
+    """Run git diff + ls-files and return the union of all changed paths, or None on error."""
+    diff_proc = subprocess.run(
+        [git_bin, "diff", "--name-only", "HEAD"],
+        capture_output=True,
+        text=True,
+        cwd=git_root,
+        timeout=10,
+    )
+    cached_proc = subprocess.run(
+        [git_bin, "diff", "--name-only", "--cached"],
+        capture_output=True,
+        text=True,
+        cwd=git_root,
+        timeout=10,
+    )
+    untracked_proc = subprocess.run(
+        [git_bin, "ls-files", "--others", "--exclude-standard"],
+        capture_output=True,
+        text=True,
+        cwd=git_root,
+        timeout=10,
+    )
+    if diff_proc.returncode != 0 or cached_proc.returncode != 0 or untracked_proc.returncode != 0:
+        _log.debug(
+            "git command failed (diff rc=%s, cached rc=%s, untracked rc=%s); "
+            "treating as git unavailable",
+            diff_proc.returncode,
+            cached_proc.returncode,
+            untracked_proc.returncode,
         )
-    if all_blocking:
-        count = len(all_blocking)
-        print(f"🚫 {count} violation(s) at or above --fail-on={fail_on} - commit rejected.")
-        return 1
+        return None
+    return (
+        set(diff_proc.stdout.splitlines())
+        | set(cached_proc.stdout.splitlines())
+        | set(untracked_proc.stdout.splitlines())
+    )
 
-    print("✅ All safety checks passed.")
-    return 0
+
+def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] | None:
+    """Return a 2-tuple of changed .py file lists, or ``None`` on git failure.
+
+    Includes staged, unstaged, and untracked files.
+
+    Returns ``(all_changed_py, in_target_py)`` where:
+
+    * *all_changed_py* — every changed .py file across the whole repo.
+      Paths are relative to cwd when possible, otherwise absolute.
+      Passed to :class:`~safelint.core.engine.SafetyEngine` as ``changed_files``
+      so cross-file rules (e.g. ``test_coupling``) see the full diff context.
+    * *in_target_py* — the subset of those files that fall under *target*.
+      Same path format as *all_changed_py*. These are the files actually linted.
+
+    Returns ``None`` when git is unavailable, the path is outside a git
+    repository, or any git command fails — callers should fall back to
+    scanning all files.
+    """
+    try:
+        git_bin = shutil.which("git")
+        if not git_bin:
+            _log.debug("git executable not found on PATH")
+            return None
+
+        target_abs = target.resolve()
+        work_dir = target_abs if target_abs.is_dir() else target_abs.parent
+
+        root_proc = subprocess.run(
+            [git_bin, "rev-parse", "--show-toplevel"],
+            capture_output=True,
+            text=True,
+            cwd=work_dir,
+            timeout=10,
+        )
+        if root_proc.returncode != 0:
+            return None
+        git_root = Path(root_proc.stdout.strip())
+
+        raw = _get_raw_changed_files(git_bin, git_root)
+        if raw is None:
+            return None
+        return _collect_all_py_files(raw, git_root), _filter_py_files(raw, git_root, target_abs)
+
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired) as exc:
+        _log.debug("git unavailable or not a repo: %s", exc)
+        return None
+
+
+def _config_dir(config_path: Path | None, target: Path) -> Path:
+    """Return the directory to use as the config search root."""
+    if config_path:
+        return config_path if config_path.is_dir() else config_path.parent
+    return target if target.is_dir() else target.parent
 
 
 def _run_check(args: argparse.Namespace) -> int:
     """Execute directory/file scan mode."""
     config_path = getattr(args, "config", None)
-    results = run(args.target, config_path=config_path)
+    all_files: bool = getattr(args, "all_files", False)
+    target = Path(args.target)
 
-    config = load_config(Path(config_path).parent if config_path else Path(args.target))
+    files: list[str] | None = None
+    changed_files: list[str] | None = None
+    if not all_files and target.is_dir():
+        modified = _get_git_modified_python_files(target)
+        if modified is None:
+            _print_status("Note: could not determine modified files via git — scanning all files.")
+        elif not modified[1]:
+            _print_status("No modified Python files detected. Use --all-files to scan everything.")
+            return 0
+        else:
+            changed_files, files = modified
+
+    results = run(target, config_path=config_path, files=files, changed_files=changed_files)
+
+    config = load_config(_config_dir(Path(config_path) if config_path else None, target))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
 
-    # Reuse engine's partition helper
-    dummy_engine = SafetyEngine.__new__(SafetyEngine)
-    dummy_engine.exclude_paths = []
-
     all_blocking: list[Violation] = []
-    all_advisory: list[Violation] = []
 
+    all_violations: list[Violation] = []
     for result in results:
         if not result.violations:
             continue
-        _print_file_violations(result.path, result.violations)
-        blocking, advisory = dummy_engine.partition_violations(result.violations, fail_threshold)
+        _print_violations(result.violations)
+        blocking, _ = SafetyEngine.partition_violations(result.violations, fail_threshold)
         all_blocking.extend(blocking)
-        all_advisory.extend(advisory)
+        all_violations.extend(result.violations)
 
-    print()
-    if all_advisory:
-        print(
-            f"⚠️  {len(all_advisory)} advisory violation(s) - below --fail-on={fail_on} threshold."
-        )
-    if all_blocking:
-        print(f"🚫 {len(all_blocking)} violation(s) at or above --fail-on={fail_on} - not clean.")
-        return 1
-
-    if not any(r.violations for r in results):
-        print("✅ All safety checks passed.")
-    return 0
+    _print_summary(all_violations, len(all_blocking), fail_on)
+    return 1 if all_blocking else 0
 
 
 def _build_common_args(parser: argparse.ArgumentParser) -> None:
@@ -162,10 +330,17 @@ def main() -> None:
             type=Path,
             default=None,
             help=(
-                "Path to a safelint config file to use instead of automatic discovery "
-                "(if both pyproject.toml and .safelint.yaml exist, pyproject.toml "
-                "takes precedence)"
+                "Directory to use as the config discovery root, or a file whose parent"
+                " directory is used as the root (pyproject.toml takes precedence over"
+                " .safelint.yaml when both exist)"
             ),
+        )
+        parser.add_argument(
+            "--all-files",
+            dest="all_files",
+            action="store_true",
+            default=False,
+            help="Scan all Python files under target (default: git-modified files only)",
         )
         _build_common_args(parser)
         args = parser.parse_args(sys.argv[2:])  # skip 'check'
