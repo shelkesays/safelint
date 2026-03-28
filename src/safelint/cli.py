@@ -204,6 +204,13 @@ def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] 
         return None
 
 
+def _config_dir(config_path: Path | None, target: Path) -> Path:
+    """Return the directory to use as the config search root."""
+    if config_path:
+        return config_path if config_path.is_dir() else config_path.parent
+    return target if target.is_dir() else target.parent
+
+
 def _run_check(args: argparse.Namespace) -> int:
     """Execute directory/file scan mode."""
     config_path = getattr(args, "config", None)
@@ -224,15 +231,8 @@ def _run_check(args: argparse.Namespace) -> int:
 
     results = run(target, config_path=config_path, files=files, changed_files=changed_files)
 
-    config_dir = (
-        Path(config_path).parent if config_path else (target if target.is_dir() else target.parent)
-    )
-    config = load_config(config_dir)
+    config = load_config(_config_dir(Path(config_path) if config_path else None, target))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
-
-    # Reuse engine's partition helper
-    dummy_engine = SafetyEngine.__new__(SafetyEngine)
-    dummy_engine.exclude_paths = []
 
     all_blocking: list[Violation] = []
 
@@ -241,7 +241,7 @@ def _run_check(args: argparse.Namespace) -> int:
         if not result.violations:
             continue
         _print_violations(result.violations)
-        blocking, _ = dummy_engine.partition_violations(result.violations, fail_threshold)
+        blocking, _ = SafetyEngine.partition_violations(result.violations, fail_threshold)
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 

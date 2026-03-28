@@ -144,7 +144,7 @@ def test_load_config_pyproject_walks_up(tmp_path: Path) -> None:
 
 @pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
 def test_read_toml_file_returns_none_on_invalid(tmp_path: Path) -> None:
-    """_read_toml_file returns None and logs a warning when TOML is malformed."""
+    """_read_toml_file returns None and logs an error when TOML is malformed."""
     from safelint.core.config import _read_toml_file
 
     bad_toml = tmp_path / "bad.toml"

@@ -17,7 +17,7 @@ These are passed on the command line and are not part of the config file.
 | `--all-files` | off | Scan every `.py` file under the target. Default (without this flag) is to check only git-modified files. |
 | `--fail-on` | from config | Override the minimum severity that blocks the run: `error` or `warning`. |
 | `--mode` | from config | `local` (only errors block) or `ci` (warnings block too). |
-| `--config` | auto-discovered | Path to a `.safelint.yaml` config file. |
+| `--config` | auto-discovered | Path to a config file (`pyproject.toml`, `.safelint.yaml`) or a directory to use as the config search root. |
 
 **When to use `--all-files`:**
 - CI pipelines (clean checkout, no modified files in git terms)

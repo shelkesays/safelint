@@ -26,8 +26,9 @@ def run(
         a file path, its parent directory is used. When omitted, the loader
         walks up from *target* to find a supported config file automatically.
     changed_files:
-        List of files being checked (injected into test-coupling rules).
-        Defaults to the files discovered from *target*.
+        Optional list of files being checked (injected into test-coupling rules).
+        When omitted, the value of *files* (if provided) is reused; otherwise
+        left unset and the engine receives no changed-files context.
     files:
         Explicit list of ``.py`` files to lint. When provided, skips directory
         discovery and checks exactly these files. Also used as *changed_files*

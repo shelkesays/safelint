@@ -66,8 +66,6 @@ def test_run_changed_files_takes_precedence_over_files(tmp_path: Path) -> None:
 
     # files= lists only the source file; changed_files= includes the test file too.
     # test_coupling should NOT fire because changed_files signals the test was updated.
-    from safelint.core.config import DEFAULTS, deep_merge
-
     config_file = tmp_path / "pyproject.toml"
     config_file.write_text(
         f"[tool.safelint.rules.test_coupling]\nenabled = true\ntest_dirs = ['{test_dir}']\n",

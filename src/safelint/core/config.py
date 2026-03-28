@@ -18,6 +18,8 @@ import sys
 from pathlib import Path
 from typing import Any
 
+_log = logging.getLogger(__name__)
+
 # ---------------------------------------------------------------------------
 # Optional parser availability flags
 # ---------------------------------------------------------------------------
@@ -32,13 +34,13 @@ else:  # pragma: no cover
 
         _TOML_AVAILABLE = True
     except ImportError:
-        logging.debug("tomllib not available; trying tomli backport")
+        _log.debug("tomllib not available; trying tomli backport")
         try:
             import tomli as tomllib  # type: ignore[import-untyped,no-redef]
 
             _TOML_AVAILABLE = True
         except ImportError:
-            logging.debug("tomli not available; TOML config support disabled")
+            _log.debug("tomli not available; TOML config support disabled")
             _TOML_AVAILABLE = False
 
 try:
@@ -46,10 +48,8 @@ try:
 
     _YAML_AVAILABLE = True
 except ImportError:  # pragma: no cover
-    logging.debug("PyYAML not available; YAML config support disabled")
+    _log.debug("PyYAML not available; YAML config support disabled")
     _YAML_AVAILABLE = False
-
-_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Severity / mode constants

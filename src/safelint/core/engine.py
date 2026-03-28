@@ -112,8 +112,9 @@ class SafetyEngine:
             files = sorted(str(p) for p in target.rglob("*.py") if not self._is_excluded(str(p)))
         return [LintResult(path=f, violations=self.check_file(f)) for f in files]
 
+    @staticmethod
     def partition_violations(
-        self, violations: list[Violation], fail_threshold: int
+        violations: list[Violation], fail_threshold: int
     ) -> tuple[list[Violation], list[Violation]]:
         """Split violations into (blocking, advisory) lists based on *fail_threshold*."""
         blocking: list[Violation] = []
