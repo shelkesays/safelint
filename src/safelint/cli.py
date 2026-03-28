@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import shutil
 import subprocess
 import sys
 from pathlib import Path
@@ -164,30 +165,38 @@ def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] 
     fall back to scanning all files.
     """
     try:
+        git_bin = shutil.which("git")
+        if not git_bin:
+            logger.debug("git executable not found on PATH")
+            return None
+
         target_abs = target.resolve()
         work_dir = target_abs if target_abs.is_dir() else target_abs.parent
 
         root_proc = subprocess.run(
-            ["git", "rev-parse", "--show-toplevel"],
+            [git_bin, "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
             cwd=work_dir,
+            timeout=10,
         )
         if root_proc.returncode != 0:
             return None
         git_root = Path(root_proc.stdout.strip())
 
         diff_proc = subprocess.run(
-            ["git", "diff", "--name-only", "HEAD"],
+            [git_bin, "diff", "--name-only", "HEAD"],
             capture_output=True,
             text=True,
             cwd=git_root,
+            timeout=10,
         )
         cached_proc = subprocess.run(
-            ["git", "diff", "--name-only", "--cached"],
+            [git_bin, "diff", "--name-only", "--cached"],
             capture_output=True,
             text=True,
             cwd=git_root,
+            timeout=10,
         )
         if diff_proc.returncode != 0 or cached_proc.returncode != 0:
             logger.debug(
@@ -200,7 +209,7 @@ def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] 
         raw = set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines())
         return _collect_all_py_files(raw, git_root), _filter_py_files(raw, git_root, target_abs)
 
-    except (FileNotFoundError, OSError) as exc:
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired) as exc:
         logger.debug("git unavailable or not a repo: %s", exc)
         return None
 
