@@ -68,7 +68,7 @@ def _make_summary(all_violations: list[Violation], n_blocking: int, fail_on: str
         parts.append(f"{n_warnings} warning{'s' if n_warnings != 1 else ''}")
     found = f"Found {', '.join(parts)}."
     if n_blocking:
-        return f"{found} [--fail-on={fail_on}]"
+        return f"{found} [--fail-on={fail_on}]."
     return f"{found} Advisory only [--fail-on={fail_on}]."
 
 

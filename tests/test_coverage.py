@@ -993,7 +993,7 @@ def test_cli_check_git_diff_failure_falls_back_to_full_scan(tmp_path: Path, mock
     assert _run_check(args) == 0
 
 
-def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker) -> None:
+def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker, capsys) -> None:
     """_run_check exits 0 with a status message when git reports no modified Python files."""
     import argparse
 
@@ -1006,6 +1006,7 @@ def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker) -> None:
 
     args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False)
     assert _run_check(args) == 0
+    assert "No modified Python files detected" in capsys.readouterr().out
 
 
 def test_cli_check_all_files_bypasses_git(tmp_path: Path, mocker) -> None:
