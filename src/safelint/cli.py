@@ -6,7 +6,7 @@ Pre-commit hook (files passed by pre-commit as positional arguments)::
 
     safelint [--fail-on=error|warning] [--mode=local|ci] file1.py file2.py …
 
-Direct invocation (default: git-modified files only)::
+Direct invocation (default: git-modified files only when target is a directory)::
 
     safelint check <path> [--all-files] [--config <cfg>] [--fail-on=error|warning] [--mode=local|ci]
 
@@ -251,7 +251,7 @@ def _run_check(args: argparse.Namespace) -> int:
     if not all_files and target.is_dir():
         modified = _get_git_modified_python_files(target)
         if modified is None:
-            _print_status("Note: git unavailable — scanning all files.")
+            _print_status("Note: could not determine modified files via git — scanning all files.")
         elif not modified[1]:
             _print_status("No modified Python files detected. Use --all-files to scan everything.")
             return 0
