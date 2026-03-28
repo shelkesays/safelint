@@ -18,7 +18,7 @@ controls which severity level blocks the run:
   --fail-on=error    → only error-severity violations block  (lenient - onboarding)
   --fail-on=warning  → error + warning violations block      (strict  - production)
 
-Precedence: --fail-on CLI > fail_on in .safelint.yaml > mode default.
+Precedence: --fail-on CLI > fail_on in config (pyproject.toml or .safelint.yaml) > mode default.
 """
 
 from __future__ import annotations
