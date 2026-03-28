@@ -38,10 +38,10 @@ logger = logging.getLogger(__name__)
 
 
 def _print_violations(violations: list[Violation]) -> None:
-    """Print violations one per line in ruff-style format: file:line: CODE message  [rule]"""
+    """Print violations one per line in ruff-style format: file:line: CODE message [rule]"""
     for v in violations:
         tag = v.code if v.code else v.rule
-        print(f"{v.filepath}:{v.lineno}: {tag} {v.message}  [{v.rule}]")
+        print(f"{v.filepath}:{v.lineno}: {tag} {v.message} [{v.rule}]")
 
 
 def _print_summary(all_violations: list[Violation], n_blocking: int, fail_on: str) -> None:
@@ -141,8 +141,9 @@ def _collect_all_py_files(raw: set[str], git_root: Path) -> list[str]:
 def _filter_py_files(raw: set[str], git_root: Path, target_abs: Path) -> list[str]:
     """Filter git-relative paths to existing .py files under *target_abs*.
 
-    Returned paths are relative to cwd when possible so that diagnostic output
-    (``file:line:``) never contains a Windows drive-letter colon.
+    Returned paths are relative to cwd when possible, which keeps diagnostic
+    output (``file:line:``) free of Windows drive-letter colons in the common
+    case; absolute paths are used as a fallback for files outside cwd.
     """
     cwd = Path.cwd()
     results: list[str] = []
