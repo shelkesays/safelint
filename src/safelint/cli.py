@@ -64,7 +64,8 @@ def _source_lines(filepath: str) -> tuple[str, ...]:
     """Return the lines of *filepath* as a cached tuple (empty on read error)."""
     try:
         return tuple(Path(filepath).read_text(encoding="utf-8").splitlines())
-    except OSError:
+    except OSError as exc:
+        _log.debug("Could not read source lines for %s: %s", filepath, exc)
         return ()
 
 
