@@ -83,14 +83,14 @@ def get_data(conn, query, p1, p2, p3, p4, p5, p6):  # nosafe: SAFE101, SAFE103
 
 When suppressions are active, the summary line reports the total count:
 
-```
+```text
 Found 2 errors, 1 warning.
 No fixes available (safelint does not auto-fix violations). (3 suppressed via # nosafe)
 ```
 
 If all active violations were suppressed:
 
-```
+```text
 All checks passed. (3 suppressed via # nosafe)
 No fixes available (safelint does not auto-fix violations). (3 suppressed via # nosafe)
 ```

@@ -174,7 +174,7 @@ def get_data(conn, q, p1, p2, p3, p4, p5, p6):  # nosafe: SAFE101, SAFE103
     ...
 ```
 
-Suppressed violations are counted and shown at the end of the run so they remain visible and auditable. Use suppression sparingly — prefer fixing the underlying issue or adjusting config thresholds for project-wide policy changes.
+Suppressed violations are counted and reported at the end of the run so they remain visible and auditable. Use suppression sparingly — prefer fixing the underlying issue or adjusting config thresholds for project-wide policy changes.
 
 See [CONFIGURATION.md — Inline suppression](CONFIGURATION.md#inline-suppression) for full reference.
 
