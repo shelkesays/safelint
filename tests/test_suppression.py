@@ -132,11 +132,9 @@ def test_bare_nosafe_suppresses_violation_on_that_line(tmp_path: Path) -> None:
     assert result.suppressed == 1
 
 
-def test_selective_suppression_by_code_leaves_other_violations(tmp_path: Path) -> None:
-    """Suppressing SAFE101 on a line does not suppress a different rule on that line."""
-    # bare except (SAFE201) on line 2 — suppressed
-    # nesting violation would be on a different line; here we verify
-    # that a rule whose code is NOT in the nosafe list still fires.
+def test_selective_suppression_by_code_suppresses_that_code(tmp_path: Path) -> None:
+    """Selective suppression by code suppresses violations with that specific code."""
+    # bare except (SAFE201) on line 4 — should be suppressed due to the nosafe comment
     source = textwrap.dedent("""\
         def foo():
             try:
