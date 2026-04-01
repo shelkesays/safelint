@@ -22,7 +22,7 @@ def test_engine_detects_bare_except(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     rules = {v.rule for v in violations}
     assert "bare_except" in rules
@@ -34,7 +34,7 @@ def test_engine_detects_function_length(tmp_path: Path) -> None:
     sample = tmp_path / "long.py"
     sample.write_text("".join(lines), encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "function_length" for v in violations)
 
@@ -51,7 +51,7 @@ def test_engine_detects_nesting_depth(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "nesting_depth" for v in violations)
 
@@ -61,7 +61,7 @@ def test_engine_detects_resource_lifecycle(tmp_path: Path) -> None:
     sample = tmp_path / "res.py"
     sample.write_text("f = open('data.txt')\n", encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "resource_lifecycle" for v in violations)
 
@@ -71,7 +71,7 @@ def test_engine_clean_file_produces_no_violations(tmp_path: Path) -> None:
     sample = tmp_path / "clean.py"
     sample.write_text("def add(a: int, b: int) -> int:\n    return a + b\n", encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert violations == []
 
@@ -86,7 +86,7 @@ def test_engine_excluded_path_is_skipped(tmp_path: Path) -> None:
 
     config = deep_merge(DEFAULTS, {"exclude_paths": ["**/legacy.py"]})
     engine = SafetyEngine(config)
-    violations = engine.check_file(str(sample))
+    violations = engine.check_file(str(sample)).violations
 
     assert violations == []
 
@@ -98,7 +98,7 @@ def test_engine_disabled_rule_not_applied(tmp_path: Path) -> None:
 
     config = deep_merge(DEFAULTS, {"rules": {"function_length": {"enabled": False}}})
     engine = SafetyEngine(config)
-    violations = engine.check_file(str(sample))
+    violations = engine.check_file(str(sample)).violations
 
     assert not any(v.rule == "function_length" for v in violations)
 
@@ -116,8 +116,8 @@ def test_engine_fail_fast_stops_after_first_rule_with_violations(tmp_path: Path)
     config_ff = deep_merge(DEFAULTS, {"execution": {"fail_fast": True}})
     config_no = deep_merge(DEFAULTS, {"execution": {"fail_fast": False}})
 
-    viol_ff = SafetyEngine(config_ff).check_file(str(sample))
-    viol_no = SafetyEngine(config_no).check_file(str(sample))
+    viol_ff = SafetyEngine(config_ff).check_file(str(sample)).violations
+    viol_no = SafetyEngine(config_no).check_file(str(sample)).violations
 
     # fail_fast produces fewer or equal violations
     assert len(viol_ff) <= len(viol_no)
@@ -142,7 +142,7 @@ def test_engine_parse_error_returns_parse_violation(tmp_path: Path) -> None:
     sample = tmp_path / "broken.py"
     sample.write_text("def foo(\n", encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert len(violations) == 1
     assert violations[0].rule == "parse"

@@ -45,5 +45,5 @@ def run(
         changed_files=changed_files if changed_files is not None else files,
     )
     if files is not None:
-        return [LintResult(path=f, violations=engine.check_file(f)) for f in files]
+        return [engine.check_file(f) for f in files]
     return engine.check_path(target)

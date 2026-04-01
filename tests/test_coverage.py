@@ -117,7 +117,7 @@ def test_resource_lifecycle_with_open_is_safe(tmp_path: Path) -> None:
     sample = tmp_path / "res.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert not any(v.rule == "resource_lifecycle" for v in violations)
 
@@ -134,7 +134,7 @@ def test_bare_except_is_flagged(tmp_path: Path) -> None:
     sample = tmp_path / "bare.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "bare_except" for v in violations)
 
@@ -149,7 +149,7 @@ def test_side_effects_hidden_flags_pure_named_io_function(tmp_path: Path) -> Non
     sample = tmp_path / "se.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "side_effects_hidden" for v in violations)
 
@@ -166,7 +166,7 @@ def test_global_mutation_is_flagged(tmp_path: Path) -> None:
     sample = tmp_path / "gm.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "global_mutation" for v in violations)
 
@@ -181,7 +181,7 @@ def test_unbounded_loop_while_true_no_break(tmp_path: Path) -> None:
     sample = tmp_path / "loop.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "unbounded_loops" for v in violations)
 
@@ -197,7 +197,7 @@ def test_unbounded_loop_while_true_with_break_is_safe(tmp_path: Path) -> None:
     sample = tmp_path / "safe_loop.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert not any(v.rule == "unbounded_loops" for v in violations)
 
@@ -208,7 +208,7 @@ def test_max_arguments_fires_when_exceeded(tmp_path: Path) -> None:
     sample = tmp_path / "args.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "max_arguments" for v in violations)
 
@@ -221,7 +221,7 @@ def test_complexity_fires_on_high_cyclomatic_complexity(tmp_path: Path) -> None:
     sample = tmp_path / "complex.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "complexity" for v in violations)
 
@@ -234,7 +234,7 @@ def test_violation_fields_are_populated(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
     bare = next(v for v in violations if v.rule == "bare_except")
 
     assert bare.filepath == str(sample)
@@ -276,7 +276,7 @@ def test_logging_on_error_fires_when_no_log_call(tmp_path: Path) -> None:
     sample = tmp_path / "log.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "logging_on_error" for v in violations)
 
@@ -293,7 +293,7 @@ def test_logging_on_error_exempt_when_reraises(tmp_path: Path) -> None:
     sample = tmp_path / "reraise.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert not any(v.rule == "logging_on_error" for v in violations)
 
@@ -311,7 +311,7 @@ def test_missing_assertions_fires_when_enabled(tmp_path: Path) -> None:
 
     config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True}}})
     engine = SafetyEngine(config)
-    violations = engine.check_file(str(sample))
+    violations = engine.check_file(str(sample)).violations
 
     assert any(v.rule == "missing_assertions" for v in violations)
 
@@ -333,7 +333,7 @@ def test_global_state_fires_on_global_keyword(tmp_path: Path) -> None:
     sample = tmp_path / "gs.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "global_state" for v in violations)
 
@@ -355,7 +355,7 @@ def test_test_existence_fires_when_no_test_file(tmp_path: Path) -> None:
         {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(tmp_path / "tests")]}}},
     )
     engine = SafetyEngine(config)
-    violations = engine.check_file(str(sample))
+    violations = engine.check_file(str(sample)).violations
 
     assert any(v.rule == "test_existence" for v in violations)
 
@@ -383,7 +383,7 @@ def test_test_coupling_fires_when_test_not_updated(tmp_path: Path) -> None:
         },
     )
     engine = SafetyEngine(config)
-    violations = engine.check_file(str(sample))
+    violations = engine.check_file(str(sample)).violations
 
     assert any(v.rule == "test_coupling" for v in violations)
 
@@ -510,7 +510,7 @@ def test_engine_injects_changed_files_for_test_coupling(tmp_path: Path) -> None:
         {"rules": {"test_coupling": {"enabled": True, "test_dirs": [str(test_dir)]}}},
     )
     engine = SafetyEngine(config, changed_files=[str(sample)])
-    violations = engine.check_file(str(sample))
+    violations = engine.check_file(str(sample)).violations
     assert any(v.rule == "test_coupling" for v in violations)
 
 
@@ -544,7 +544,7 @@ def test_complexity_bool_op_increments_cc(tmp_path: Path) -> None:
     sample = tmp_path / "bool_op.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine({"rules": {"complexity": {"max_complexity": 1}}}).check_file(str(sample))
+    violations = _engine({"rules": {"complexity": {"max_complexity": 1}}}).check_file(str(sample)).violations
     assert any(v.rule == "complexity" for v in violations)
 
 
@@ -554,7 +554,7 @@ def test_complexity_comprehension_with_condition(tmp_path: Path) -> None:
     sample = tmp_path / "comp_ifs.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine({"rules": {"complexity": {"max_complexity": 1}}}).check_file(str(sample))
+    violations = _engine({"rules": {"complexity": {"max_complexity": 1}}}).check_file(str(sample)).violations
     assert any(v.rule == "complexity" for v in violations)
 
 
@@ -574,7 +574,7 @@ def test_tainted_sink_with_vararg_param(tmp_path: Path) -> None:
     sample.write_text(source, encoding="utf-8")
 
     config = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
-    violations = SafetyEngine(config).check_file(str(sample))
+    violations = SafetyEngine(config).check_file(str(sample)).violations
     assert any(v.rule == "tainted_sink" for v in violations)
 
 
@@ -589,7 +589,7 @@ def test_tainted_sink_with_kwarg_param(tmp_path: Path) -> None:
     sample.write_text(source, encoding="utf-8")
 
     config = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
-    violations = SafetyEngine(config).check_file(str(sample))
+    violations = SafetyEngine(config).check_file(str(sample)).violations
     assert any(v.rule == "tainted_sink" for v in violations)
 
 
@@ -605,7 +605,7 @@ def test_return_value_ignored_non_call_expr(tmp_path: Path) -> None:
     sample.write_text(source, encoding="utf-8")
 
     config = deep_merge(DEFAULTS, {"rules": {"return_value_ignored": {"enabled": True}}})
-    violations = SafetyEngine(config).check_file(str(sample))
+    violations = SafetyEngine(config).check_file(str(sample)).violations
     assert not any(v.rule == "return_value_ignored" for v in violations)
 
 
@@ -621,7 +621,7 @@ def test_null_deref_subscript_non_nullable_call(tmp_path: Path) -> None:
     sample.write_text(source, encoding="utf-8")
 
     config = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
-    violations = SafetyEngine(config).check_file(str(sample))
+    violations = SafetyEngine(config).check_file(str(sample)).violations
     assert not any(v.rule == "null_dereference" for v in violations)
 
 
@@ -642,7 +642,7 @@ def test_logging_on_error_bare_name_logger_is_exempt(tmp_path: Path) -> None:
     sample = tmp_path / "bare_log.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
     assert not any(v.rule == "logging_on_error" for v in violations)
 
 
@@ -661,7 +661,7 @@ def test_loop_safety_while_variable_condition_fires(tmp_path: Path) -> None:
     sample = tmp_path / "while_var.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
     assert any(v.rule == "unbounded_loops" for v in violations)
 
 
@@ -676,7 +676,7 @@ def test_max_arguments_self_excluded_from_count(tmp_path: Path) -> None:
     sample = tmp_path / "method.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
     assert any(v.rule == "max_arguments" for v in violations)
 
 
@@ -699,7 +699,7 @@ def test_nesting_depth_elif_chain_not_deeper(tmp_path: Path) -> None:
     sample = tmp_path / "elif.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
     assert not any(v.rule == "nesting_depth" for v in violations)
 
 
@@ -717,7 +717,7 @@ def test_side_effects_hidden_subscript_call_not_flagged(tmp_path: Path) -> None:
     sample = tmp_path / "sub_call.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
     assert not any(v.rule == "side_effects_hidden" for v in violations)
 
 
@@ -730,7 +730,7 @@ def test_side_effects_hidden_pure_func_no_io_is_clean(tmp_path: Path) -> None:
     sample = tmp_path / "pure.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
     assert not any(v.rule == "side_effects_hidden" for v in violations)
 
 
@@ -748,7 +748,7 @@ def test_side_effects_rule_io_keyword_in_name_exempt(tmp_path: Path) -> None:
     sample = tmp_path / "log_func.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
     assert not any(v.rule == "side_effects" for v in violations)
 
 
@@ -771,7 +771,7 @@ def test_test_existence_returns_empty_when_test_found(tmp_path: Path) -> None:
         DEFAULTS,
         {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(test_dir)]}}},
     )
-    violations = SafetyEngine(config).check_file(str(sample))
+    violations = SafetyEngine(config).check_file(str(sample)).violations
     assert not any(v.rule == "test_existence" for v in violations)
 
 
@@ -799,7 +799,7 @@ def test_test_coupling_defers_when_no_test_file(tmp_path: Path) -> None:
             }
         },
     )
-    violations = SafetyEngine(config).check_file(str(sample))
+    violations = SafetyEngine(config).check_file(str(sample)).violations
     assert not any(v.rule == "test_coupling" for v in violations)
 
 
@@ -826,7 +826,7 @@ def test_test_coupling_clean_when_test_updated(tmp_path: Path) -> None:
             }
         },
     )
-    violations = SafetyEngine(config).check_file(str(sample))
+    violations = SafetyEngine(config).check_file(str(sample)).violations
     assert not any(v.rule == "test_coupling" for v in violations)
 
 
@@ -912,7 +912,7 @@ def test_missing_assertions_no_violation_when_assert_present(tmp_path: Path) -> 
     sample.write_text(source, encoding="utf-8")
 
     config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True}}})
-    violations = SafetyEngine(config).check_file(str(sample))
+    violations = SafetyEngine(config).check_file(str(sample)).violations
     assert not any(v.rule == "missing_assertions" for v in violations)
 
 
@@ -933,7 +933,7 @@ def test_logging_on_error_attribute_logger_is_exempt(tmp_path: Path) -> None:
     sample = tmp_path / "attr_log.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
     assert not any(v.rule == "logging_on_error" for v in violations)
 
 
@@ -949,7 +949,7 @@ def test_logging_on_error_non_log_name_call_fires(tmp_path: Path) -> None:
     sample = tmp_path / "non_log.py"
     sample.write_text(source, encoding="utf-8")
 
-    violations = _engine().check_file(str(sample))
+    violations = _engine().check_file(str(sample)).violations
     assert any(v.rule == "logging_on_error" for v in violations)
 
 
