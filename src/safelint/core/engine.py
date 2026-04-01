@@ -30,7 +30,8 @@ def _nosafe_codes(comment: str) -> set[str] | None | Literal[False]:
     Returns:
         ``None``           — bare ``# nosafe`` (suppress all on this line)
         ``set[str]``       — ``# nosafe: CODE, ...`` (suppress named codes/rules)
-        ``Literal[False]`` — comment is not a nosafe directive
+        ``Literal[False]`` — comment is not a nosafe directive, or is malformed
+                             (e.g. ``# nosafe:`` with an empty payload)
     """
     body = comment[1:].strip()  # strip leading '#'
     if not body.lower().startswith(_NOSAFE_PREFIX):
@@ -40,6 +41,12 @@ def _nosafe_codes(comment: str) -> set[str] | None | Literal[False]:
         return None  # bare # nosafe
     if remainder.startswith(":"):
         codes_str = remainder[1:].strip()
+        if not codes_str:
+            # Malformed directive: "# nosafe:" with no codes or rule names
+            _log.debug(
+                "Ignoring malformed nosafe directive with empty payload: %r", comment.strip()
+            )
+            return False
         return {tok.strip() for tok in codes_str.split(",") if tok.strip()}
     return False
 
@@ -147,7 +154,8 @@ class SafetyEngine:
         in :attr:`LintResult.violations`.
 
         When ``fail_fast`` is enabled the loop stops after the first rule that
-        produces at least one violation.
+        produces at least one unsuppressed (active) violation, i.e. a violation
+        that is not filtered out by an inline ``# nosafe`` directive.
         """
         if self._is_excluded(filepath):
             return LintResult(path=filepath)
