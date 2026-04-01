@@ -36,8 +36,8 @@ def _nosafe_codes(comment: str) -> set[str] | None | Literal[False]:
     body = comment[1:].strip()  # strip leading '#'
     if not body.lower().startswith(_NOSAFE_PREFIX):
         return False
-    remainder = body[len(_NOSAFE_PREFIX) :]
-    if remainder == "" or remainder.isspace():
+    remainder = body[len(_NOSAFE_PREFIX) :].lstrip()
+    if remainder == "":
         return None  # bare # nosafe
     if remainder.startswith(":"):
         codes_str = remainder[1:].strip()
