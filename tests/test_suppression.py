@@ -253,9 +253,12 @@ def test_fail_fast_does_not_stop_on_suppressed_violation(tmp_path: Path) -> None
 
 
 def test_fail_fast_stops_after_first_unsuppressed_rule(tmp_path: Path) -> None:
-    """fail_fast stops the rule loop after the first rule with active violations."""
-    # bare_except fires early in rule order; function_length fires later.
-    # With fail_fast only bare_except violations should be present.
+    """fail_fast stops the rule loop after the first rule with active violations.
+
+    Ordering dependency: function_length is first in DEFAULTS['execution']['order'],
+    so it fires before bare_except. fail_fast therefore stops after function_length
+    and must not produce bare_except violations. Without fail_fast both rules fire.
+    """
     lines = ["def foo():\n    try:\n        pass\n    except:\n        pass\n"]
     lines += ["    x = 1\n"] * 60  # push function_length over threshold
     source = "".join(lines)
@@ -268,4 +271,18 @@ def test_fail_fast_stops_after_first_unsuppressed_rule(tmp_path: Path) -> None:
     result_ff = SafetyEngine(config_ff).check_file(str(sample))
     result_no = SafetyEngine(config_no).check_file(str(sample))
 
-    assert len(result_ff.violations) < len(result_no.violations)
+    # fail_fast: function_length violation present, bare_except absent
+    assert any(v.rule == "function_length" for v in result_ff.violations), (
+        "Expected function_length violation with fail_fast enabled"
+    )
+    assert not any(v.rule == "bare_except" for v in result_ff.violations), (
+        "bare_except should be skipped by fail_fast after function_length fires"
+    )
+
+    # without fail_fast: both rules must have fired
+    assert any(v.rule == "function_length" for v in result_no.violations), (
+        "Expected function_length violation without fail_fast"
+    )
+    assert any(v.rule == "bare_except" for v in result_no.violations), (
+        "Expected bare_except violation without fail_fast"
+    )
