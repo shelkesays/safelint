@@ -147,6 +147,39 @@ For opt-in rules (`SAFE601`, `SAFE701`, `SAFE702`) and full configuration option
 
 ---
 
+## Suppressing violations inline
+
+Add a `# nosafe` comment to suppress a violation on a specific line without changing global config.
+
+**Suppress all violations on a line:**
+```python
+result = eval(user_input)  # nosafe
+```
+
+**Suppress a specific rule by code:**
+```python
+while True:  # nosafe: SAFE501
+    ...
+```
+
+**Suppress by rule name:**
+```python
+while True:  # nosafe: unbounded_loops
+    ...
+```
+
+**Suppress multiple rules at once:**
+```python
+def get_data(conn, q, p1, p2, p3, p4, p5, p6):  # nosafe: SAFE101, SAFE103
+    ...
+```
+
+Suppressed violations are counted and shown at the end of the run so they remain visible and auditable. Use suppression sparingly — prefer fixing the underlying issue or adjusting config thresholds for project-wide policy changes.
+
+See [CONFIGURATION.md — Inline suppression](CONFIGURATION.md#inline-suppression) for full reference.
+
+---
+
 ## Configuration
 
 SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a `.safelint.yaml` file. See [CONFIGURATION.md](CONFIGURATION.md) for all options, defaults, and examples.

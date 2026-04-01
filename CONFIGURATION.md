@@ -35,6 +35,77 @@ Pre-commit passes the staged files as positional arguments automatically. Only `
 
 ---
 
+## Inline suppression
+
+Add a `# nosafe` comment to the end of any line to suppress violations on that specific line. This is the escape hatch for the rare case where a violation is a deliberate, justified choice.
+
+Suppressed violations do not appear in output and do not count toward the blocking total, but the number suppressed is always reported at the end of the run so they remain auditable.
+
+### Syntax
+
+| Comment | Effect |
+|---|---|
+| `# nosafe` | Suppress **all** violations on this line |
+| `# nosafe: SAFE101` | Suppress only the rule with code `SAFE101` |
+| `# nosafe: function_length` | Suppress only the rule named `function_length` |
+| `# nosafe: SAFE101, SAFE103` | Suppress multiple rules (comma-separated codes or names) |
+
+Both rule codes (e.g. `SAFE101`) and rule names (e.g. `function_length`) are accepted and can be mixed in the same comment.
+
+### Examples
+
+**Suppress all violations on a line** — use when a line genuinely triggers multiple unrelated rules and fixing each would make the code worse:
+```python
+result = eval(user_input)  # nosafe
+```
+
+**Suppress a single code** — preferred; makes the intent explicit and leaves other rules active:
+```python
+while True:  # nosafe: SAFE501
+    item = queue.get()     # blocking poll — bounded by the caller's timeout
+    if item is None:
+        break
+```
+
+**Suppress by rule name** — identical behaviour to suppressing by code; use whichever is more readable in context:
+```python
+while True:  # nosafe: unbounded_loops
+    ...
+```
+
+**Suppress multiple rules** — keep the list short; a long list is a signal the code needs refactoring:
+```python
+def get_data(conn, query, p1, p2, p3, p4, p5, p6):  # nosafe: SAFE101, SAFE103
+    ...
+```
+
+### End-of-run summary
+
+When suppressions are active, the summary line reports the total count:
+
+```
+Found 2 errors, 1 warning.
+No fixes available (safelint does not auto-fix violations). (3 suppressed via # nosafe)
+```
+
+If all active violations were suppressed:
+
+```
+All checks passed. (3 suppressed via # nosafe)
+No fixes available (safelint does not auto-fix violations). (3 suppressed via # nosafe)
+```
+
+### When to use suppression
+
+Use `# nosafe` when:
+- A violation is correct by design and fixing it would make the code worse (e.g. a deliberate `while True` polling loop with an external timeout).
+- A third-party integration forces a pattern safelint flags (e.g. a framework-required function signature with many parameters).
+- You are mid-refactor and need to commit a transitional state without breaking CI.
+
+Prefer **config changes** (adjusting thresholds or disabling rules) over `# nosafe` when the exception applies to the entire project or a whole file pattern. Inline suppressions are for line-level exceptions only.
+
+---
+
 ## Top-level options
 
 | Key | Default | What it does |

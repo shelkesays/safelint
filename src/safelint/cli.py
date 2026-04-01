@@ -24,6 +24,7 @@ Precedence: --fail-on CLI > fail_on in config (pyproject.toml or .safelint.yaml)
 from __future__ import annotations
 
 import argparse
+import functools
 import logging
 import shutil
 import subprocess
@@ -37,17 +38,64 @@ from safelint.rules.base import Violation
 
 _log = logging.getLogger(__name__)
 
+# ── ANSI colour helpers ───────────────────────────────────────────────────────
+# Colours are suppressed automatically when stdout is not a TTY (e.g. CI logs,
+# pipe to file) so downstream tools always receive plain text.
+
+_COLOUR = sys.stdout.isatty()
+
+_RED = "\033[31m"  # error codes
+_YELLOW = "\033[33m"  # warning codes
+_PURPLE = "\033[35m"  # --> arrow
+_CYAN = "\033[36m"  # "help:" / "note:" labels
+_BOLD = "\033[1m"
+_RESET = "\033[0m"
+
+
+def _c(text: str, *codes: str) -> str:
+    """Wrap *text* in ANSI *codes* when colour is enabled."""
+    if not _COLOUR:
+        return text
+    return "".join(codes) + text + _RESET
+
+
+@functools.lru_cache(maxsize=256)
+def _source_lines(filepath: str) -> tuple[str, ...]:
+    """Return the lines of *filepath* as a cached tuple (empty on read error)."""
+    try:
+        return tuple(Path(filepath).read_text(encoding="utf-8").splitlines())
+    except OSError:
+        return ()
+
 
 def _print_violations(violations: list[Violation]) -> None:
-    """Print violations one per line in ruff-style format: file:line: CODE message [rule]"""
+    """Print violations in a ruff/ty-inspired multi-line coloured format."""
     for v in violations:
         tag = v.code if v.code else v.rule
-        print(f"{v.filepath}:{v.lineno}: {tag} {v.message} [{v.rule}]")
+        colour = _RED if v.severity == "error" else _YELLOW
+        # First line: coloured CODE  message [rule]
+        print(f"{_c(tag, _BOLD, colour)} {v.message} [{v.rule}]")
+        # Second line: purple arrow + location
+        print(f"   {_c('-->', _PURPLE)} {v.filepath}:{v.lineno}")
+        # Source context: gutter (line number + pipe) in purple, content normal
+        lines = _source_lines(v.filepath)
+        if lines and 1 <= v.lineno <= len(lines):
+            w = len(str(v.lineno))
+            sep = _c(" " * w + " |", _PURPLE)
+            num = _c(str(v.lineno).rjust(w) + " |", _PURPLE)
+            print(f"   {sep}")
+            print(f"   {num} {lines[v.lineno - 1].rstrip()}")
+            print(f"   {sep}")
+        print()  # blank line between violations for readability
 
 
-def _print_summary(all_violations: list[Violation], n_blocking: int, fail_on: str) -> None:
-    """Print a ruff-style summary line to stdout."""
-    print(_make_summary(all_violations, n_blocking, fail_on))
+def _print_summary(
+    all_violations: list[Violation], n_blocking: int, fail_on: str, n_suppressed: int = 0
+) -> None:
+    """Print a ruff-style summary block to stdout."""
+    found, fixes = _make_summary(all_violations, n_blocking, fail_on, n_suppressed)
+    print(found)
+    print(fixes)
 
 
 def _print_status(message: str) -> None:
@@ -55,21 +103,31 @@ def _print_status(message: str) -> None:
     print(message)
 
 
-def _make_summary(all_violations: list[Violation], n_blocking: int, fail_on: str) -> str:
-    """Return a ruff-style summary line for *all_violations*."""
+def _make_summary(
+    all_violations: list[Violation], n_blocking: int, fail_on: str, n_suppressed: int = 0
+) -> tuple[str, str]:
+    """Return a (found_line, fixes_line) pair for *all_violations*."""
+    suppressed_note = (
+        f" ({_c(str(n_suppressed), _CYAN)} suppressed via # nosafe)" if n_suppressed else ""
+    )
+    fixes_line = f"No fixes available (safelint does not auto-fix violations).{suppressed_note}"
     if not all_violations:
-        return "All checks passed."
+        if n_suppressed:
+            return f"All checks passed.{suppressed_note}", fixes_line
+        return "All checks passed.", fixes_line
     n_warnings = sum(1 for v in all_violations if v.severity == "warning")
     n_errors = len(all_violations) - n_warnings
     parts = []
     if n_errors:
-        parts.append(f"{n_errors} error{'s' if n_errors != 1 else ''}")
+        parts.append(f"{_c(str(n_errors), _BOLD, _RED)} error{'s' if n_errors != 1 else ''}")
     if n_warnings:
-        parts.append(f"{n_warnings} warning{'s' if n_warnings != 1 else ''}")
+        parts.append(
+            f"{_c(str(n_warnings), _BOLD, _YELLOW)} warning{'s' if n_warnings != 1 else ''}"
+        )
     found = f"Found {', '.join(parts)}."
-    if n_blocking:
-        return f"{found} [--fail-on={fail_on}]."
-    return f"{found} Advisory only [--fail-on={fail_on}]."
+    if not n_blocking:
+        found = f"{found} Advisory only [--fail-on={fail_on}]."
+    return found, fixes_line
 
 
 def _resolve_fail_on(args: argparse.Namespace, config: dict) -> tuple[str, int]:
@@ -90,18 +148,20 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
     engine = SafetyEngine(config, changed_files=files)
 
     all_blocking: list[Violation] = []
-
     all_violations: list[Violation] = []
-    for filepath in files:
-        violations = engine.check_file(filepath)
-        if not violations:
-            continue
-        _print_violations(violations)
-        blocking, _ = engine.partition_violations(violations, fail_threshold)
-        all_blocking.extend(blocking)
-        all_violations.extend(violations)
+    n_suppressed = 0
 
-    _print_summary(all_violations, len(all_blocking), fail_on)
+    for filepath in files:
+        result = engine.check_file(filepath)
+        n_suppressed += result.suppressed
+        if not result.violations:
+            continue
+        _print_violations(result.violations)
+        blocking, _ = engine.partition_violations(result.violations, fail_threshold)
+        all_blocking.extend(blocking)
+        all_violations.extend(result.violations)
+
+    _print_summary(all_violations, len(all_blocking), fail_on, n_suppressed)
     return 1 if all_blocking else 0
 
 
@@ -278,9 +338,11 @@ def _run_check(args: argparse.Namespace) -> int:
     fail_on, fail_threshold = _resolve_fail_on(args, config)
 
     all_blocking: list[Violation] = []
-
     all_violations: list[Violation] = []
+    n_suppressed = 0
+
     for result in results:
+        n_suppressed += result.suppressed
         if not result.violations:
             continue
         _print_violations(result.violations)
@@ -288,7 +350,7 @@ def _run_check(args: argparse.Namespace) -> int:
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 
-    _print_summary(all_violations, len(all_blocking), fail_on)
+    _print_summary(all_violations, len(all_blocking), fail_on, n_suppressed)
     return 1 if all_blocking else 0
 
 

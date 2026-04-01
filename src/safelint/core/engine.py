@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 import logging
+import re
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -15,6 +16,41 @@ from safelint.rules.test_coverage import TestCouplingRule
 
 _log = logging.getLogger(__name__)
 
+# Matches:  # nosafe           (suppress all on this line)
+#           # nosafe: SAFE101  (suppress specific code or rule name)
+#           # nosafe: SAFE101, function_length  (comma-separated list)
+_NOSAFE_RE = re.compile(r"#\s*nosafe(?::\s*(.+))?", re.IGNORECASE)
+
+
+def _parse_suppressions(source: str) -> dict[int, set[str] | None]:
+    """Return a {lineno: codes} suppression map parsed from inline comments.
+
+    ``None`` means "suppress everything on this line" (bare ``# nosafe``).
+    A ``set`` means suppress only the listed codes / rule names.
+    Line numbers are 1-based.
+    """
+    suppressions: dict[int, set[str] | None] = {}
+    for lineno, line in enumerate(source.splitlines(), start=1):
+        m = _NOSAFE_RE.search(line)
+        if not m:
+            continue
+        raw = m.group(1)
+        if raw:
+            suppressions[lineno] = {tok.strip() for tok in raw.split(",") if tok.strip()}
+        else:
+            suppressions[lineno] = None  # bare # nosafe → suppress all
+    return suppressions
+
+
+def _is_suppressed(v: Violation, suppressions: dict[int, set[str] | None]) -> bool:
+    """Return True when *v* is covered by a nosafe comment on its line."""
+    if v.lineno not in suppressions:
+        return False
+    codes = suppressions[v.lineno]
+    if codes is None:  # bare # nosafe
+        return True
+    return v.code in codes or v.rule in codes
+
 
 @dataclass
 class LintResult:
@@ -22,6 +58,7 @@ class LintResult:
 
     path: str
     violations: list[Violation] = field(default_factory=list)
+    suppressed: int = 0
 
     @property
     def has_violations(self) -> bool:
@@ -71,37 +108,49 @@ class SafetyEngine:
         p = Path(filepath)
         return any(p.match(pattern) for pattern in self.exclude_paths)
 
-    def check_file(self, filepath: str) -> list[Violation]:
-        """Parse *filepath*, run every active rule, and return all violations.
+    def check_file(self, filepath: str) -> LintResult:
+        """Parse *filepath*, run every active rule, apply inline suppressions, and
+        return a LintResult.
+
+        Violations on lines that carry a ``# nosafe`` comment (optionally
+        followed by a comma-separated list of codes / rule names) are filtered
+        out and counted in :attr:`LintResult.suppressed` instead of appearing
+        in :attr:`LintResult.violations`.
 
         When ``fail_fast`` is enabled the loop stops after the first rule that
         produces at least one violation.
         """
         if self._is_excluded(filepath):
-            return []
+            return LintResult(path=filepath)
         try:
             source = Path(filepath).read_text(encoding="utf-8")
             tree = ast.parse(source, filename=filepath)
         except (SyntaxError, OSError) as exc:
             _log.debug("Failed to parse %s: %s", filepath, exc)
-            return [
-                Violation(
-                    rule="parse",
-                    code="SAFE000",
-                    filepath=filepath,
-                    lineno=0,
-                    message=f"Parse error: {exc}",
-                    severity="error",
-                )
-            ]
+            return LintResult(
+                path=filepath,
+                violations=[
+                    Violation(
+                        rule="parse",
+                        code="SAFE000",
+                        filepath=filepath,
+                        lineno=0,
+                        message=f"Parse error: {exc}",
+                        severity="error",
+                    )
+                ],
+            )
 
-        violations: list[Violation] = []
+        raw: list[Violation] = []
         for rule in self.rules:
             rule_violations = rule.check_file(filepath, tree)
-            violations.extend(rule_violations)
+            raw.extend(rule_violations)
             if self.fail_fast and rule_violations:
                 break
-        return violations
+
+        suppressions = _parse_suppressions(source)
+        active = [v for v in raw if not _is_suppressed(v, suppressions)]
+        return LintResult(path=filepath, violations=active, suppressed=len(raw) - len(active))
 
     def check_path(self, path: str | Path) -> list[LintResult]:
         """Lint a single file or recursively lint all Python files under a directory."""
@@ -110,7 +159,7 @@ class SafetyEngine:
             files = [str(target)]
         else:
             files = sorted(str(p) for p in target.rglob("*.py") if not self._is_excluded(str(p)))
-        return [LintResult(path=f, violations=self.check_file(f)) for f in files]
+        return [self.check_file(f) for f in files]
 
     @staticmethod
     def partition_violations(
