@@ -126,8 +126,11 @@ def _make_summary(
             f"{_c(str(n_warnings), _BOLD, _YELLOW)} warning{'s' if n_warnings != 1 else ''}"
         )
     found = f"Found {', '.join(parts)}."
+    fail_note = f" [--fail-on={fail_on}]"
     if not n_blocking:
-        found = f"{found} Advisory only [--fail-on={fail_on}]."
+        found = f"{found} Advisory only{fail_note}."
+    else:
+        found = f"{found}{fail_note}"
     return found, fixes_line
 
 

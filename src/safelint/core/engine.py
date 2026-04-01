@@ -47,7 +47,15 @@ def _nosafe_codes(comment: str) -> set[str] | None | Literal[False]:
                 "Ignoring malformed nosafe directive with empty payload: %r", comment.strip()
             )
             return False
-        return {tok.strip() for tok in codes_str.split(",") if tok.strip()}
+        codes = {tok.strip() for tok in codes_str.split(",") if tok.strip()}
+        if not codes:
+            # Malformed directive: payload contains only commas/whitespace, no actual codes
+            _log.debug(
+                "Ignoring malformed nosafe directive with no usable codes: %r",
+                comment.strip(),
+            )
+            return False
+        return codes
     return False
 
 
