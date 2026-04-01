@@ -146,7 +146,12 @@ class SafetyEngine:
 
     def check_file(self, filepath: str) -> LintResult:
         """Parse *filepath*, run every active rule, apply inline suppressions, and
-        return a LintResult.
+        return a :class:`LintResult`.
+
+        .. note::
+            **Breaking change (1.2.0):** this method previously returned
+            ``list[Violation]``.  Callers that relied on the old return type
+            must be updated to access ``result.violations`` instead.
 
         Violations on lines that carry a ``# nosafe`` comment (optionally
         followed by a comma-separated list of codes / rule names) are filtered
