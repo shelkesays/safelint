@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import ast
+import io
 import logging
-import re
+import tokenize
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from safelint.core.config import DEFAULTS, SEVERITY_ORDER
 from safelint.rules import ALL_RULES
@@ -16,29 +17,57 @@ from safelint.rules.test_coverage import TestCouplingRule
 
 _log = logging.getLogger(__name__)
 
+# Applied only to real COMMENT tokens — not string literals.
 # Matches:  # nosafe           (suppress all on this line)
 #           # nosafe: SAFE101  (suppress specific code or rule name)
 #           # nosafe: SAFE101, function_length  (comma-separated list)
-_NOSAFE_RE = re.compile(r"#\s*nosafe(?::\s*(.+))?", re.IGNORECASE)
+_NOSAFE_PREFIX = "nosafe"
+
+
+def _nosafe_codes(comment: str) -> set[str] | None | Literal[False]:
+    """Parse a single comment token string and return the nosafe payload.
+
+    Returns:
+        ``None``           — bare ``# nosafe`` (suppress all on this line)
+        ``set[str]``       — ``# nosafe: CODE, ...`` (suppress named codes/rules)
+        ``Literal[False]`` — comment is not a nosafe directive
+    """
+    body = comment[1:].strip()  # strip leading '#'
+    if not body.lower().startswith(_NOSAFE_PREFIX):
+        return False
+    remainder = body[len(_NOSAFE_PREFIX) :]
+    if remainder == "" or remainder.isspace():
+        return None  # bare # nosafe
+    if remainder.startswith(":"):
+        codes_str = remainder[1:].strip()
+        return {tok.strip() for tok in codes_str.split(",") if tok.strip()}
+    return False
 
 
 def _parse_suppressions(source: str) -> dict[int, set[str] | None]:
-    """Return a {lineno: codes} suppression map parsed from inline comments.
+    """Return a {lineno: codes} suppression map from real comment tokens only.
+
+    Uses :mod:`tokenize` so that occurrences of ``# nosafe`` inside string
+    literals are never mistaken for suppression comments.
 
     ``None`` means "suppress everything on this line" (bare ``# nosafe``).
     A ``set`` means suppress only the listed codes / rule names.
     Line numbers are 1-based.
     """
+    try:
+        token_list = list(tokenize.generate_tokens(io.StringIO(source).readline))
+    except tokenize.TokenError:
+        # Incomplete source (e.g. mid-edit) — fall back to no suppressions
+        _log.debug("tokenize failed while parsing suppressions; no suppressions applied")
+        return {}
+
     suppressions: dict[int, set[str] | None] = {}
-    for lineno, line in enumerate(source.splitlines(), start=1):
-        m = _NOSAFE_RE.search(line)
-        if not m:
+    for tok_type, tok_string, (lineno, _), _, _ in token_list:
+        if tok_type != tokenize.COMMENT:
             continue
-        raw = m.group(1)
-        if raw:
-            suppressions[lineno] = {tok.strip() for tok in raw.split(",") if tok.strip()}
-        else:
-            suppressions[lineno] = None  # bare # nosafe → suppress all
+        payload = _nosafe_codes(tok_string)
+        if payload is not False:
+            suppressions[lineno] = payload
     return suppressions
 
 
@@ -141,16 +170,19 @@ class SafetyEngine:
                 ],
             )
 
-        raw: list[Violation] = []
+        suppressions = _parse_suppressions(source)
+
+        active: list[Violation] = []
+        suppressed = 0
         for rule in self.rules:
             rule_violations = rule.check_file(filepath, tree)
-            raw.extend(rule_violations)
-            if self.fail_fast and rule_violations:
+            rule_active = [v for v in rule_violations if not _is_suppressed(v, suppressions)]
+            suppressed += len(rule_violations) - len(rule_active)
+            active.extend(rule_active)
+            if self.fail_fast and rule_active:
                 break
 
-        suppressions = _parse_suppressions(source)
-        active = [v for v in raw if not _is_suppressed(v, suppressions)]
-        return LintResult(path=filepath, violations=active, suppressed=len(raw) - len(active))
+        return LintResult(path=filepath, violations=active, suppressed=suppressed)
 
     def check_path(self, path: str | Path) -> list[LintResult]:
         """Lint a single file or recursively lint all Python files under a directory."""
