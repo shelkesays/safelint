@@ -42,8 +42,6 @@ _log = logging.getLogger(__name__)
 # Colours are suppressed automatically when stdout is not a TTY (e.g. CI logs,
 # pipe to file) so downstream tools always receive plain text.
 
-_COLOUR = sys.stdout.isatty()
-
 _RED = "\033[31m"  # error codes
 _YELLOW = "\033[33m"  # warning codes
 _PURPLE = "\033[35m"  # --> arrow
@@ -54,7 +52,9 @@ _RESET = "\033[0m"
 
 def _c(text: str, *codes: str) -> str:
     """Wrap *text* in ANSI *codes* when colour is enabled."""
-    if not _COLOUR:
+    stream = getattr(sys, "stdout", None)
+    isatty = getattr(stream, "isatty", None)
+    if not callable(isatty) or not isatty():
         return text
     return "".join(codes) + text + _RESET
 
