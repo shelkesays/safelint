@@ -130,7 +130,7 @@ def _make_summary(
     if not n_blocking:
         found = f"{found} Advisory only{fail_note}."
     else:
-        found = f"{found}{fail_note}"
+        found = f"{found}{fail_note}."
     return found, fixes_line
 
 
