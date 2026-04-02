@@ -39,6 +39,16 @@ def test_parse_nosafe_multiple_codes() -> None:
     assert result == {1: {"SAFE101", "function_length"}}
 
 
+def test_parse_nosafe_empty_payload_ignored() -> None:
+    """# nosafe: with no codes is treated as malformed and ignored."""
+    assert _parse_suppressions("x = 1  # nosafe:\n") == {}
+
+
+def test_parse_nosafe_only_commas_ignored() -> None:
+    """# nosafe: with no usable codes is treated as malformed and ignored."""
+    assert _parse_suppressions("x = 1  # nosafe: , ,  \n") == {}
+
+
 def test_parse_nosafe_case_insensitive() -> None:
     """# NOSAFE and # NoSafe are treated identically to # nosafe."""
     assert _parse_suppressions("x = 1  # NOSAFE\n") == {1: None}
