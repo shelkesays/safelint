@@ -141,7 +141,12 @@ def _make_summary(
 
 
 def _file_summary_line(filepath: str, violations: list[Violation]) -> str:
-    """Return a coloured per-file count line: 'path/file.py — 1 error, 3 warnings.'"""
+    """Return a coloured per-file count line: 'path/file.py — 1 error, 3 warnings.'
+
+    Precondition: *violations* must be non-empty; callers must check before invoking.
+    Both ``_run_hook`` and ``_run_check`` guard with ``if not result.violations: continue``
+    before calling this function, so the empty-list case never arises in practice.
+    """
     return f"{filepath} \u2014 {', '.join(_severity_parts(violations))}."
 
 
