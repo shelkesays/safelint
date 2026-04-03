@@ -50,6 +50,16 @@ _BOLD = "\033[1m"
 _RESET = "\033[0m"
 
 
+def _is_error(severity: str) -> bool:
+    """Return True when *severity* should be treated as an error.
+
+    Any severity that is not explicitly ``"warning"`` is an error, matching
+    the behaviour of :meth:`~safelint.core.engine.SafetyEngine.partition_violations`
+    which uses ``SEVERITY_ORDER.get(v.severity, 1)`` (default = error level).
+    """
+    return severity != "warning"
+
+
 def _c(text: str, *codes: str) -> str:
     """Wrap *text* in ANSI *codes* when colour is enabled."""
     stream = getattr(sys, "stdout", None)
@@ -73,7 +83,7 @@ def _print_violations(violations: list[Violation]) -> None:
     """Print violations in a ruff/ty-inspired multi-line coloured format."""
     for v in violations:
         tag = v.code if v.code else v.rule
-        colour = _RED if v.severity == "error" else _YELLOW
+        colour = _RED if _is_error(v.severity) else _YELLOW
         # First line: coloured CODE  message [rule]
         print(f"{_c(tag, _BOLD, colour)} {v.message} [{v.rule}]")
         # Second line: purple arrow + location
@@ -105,13 +115,8 @@ def _print_status(message: str) -> None:
 
 
 def _severity_parts(violations: list[Violation]) -> list[str]:
-    """Return coloured 'N error(s)' / 'N warning(s)' parts for *violations*.
-
-    Any severity that is not explicitly ``"warning"`` is counted as an error,
-    consistent with :meth:`~safelint.core.engine.SafetyEngine.partition_violations`
-    which uses ``SEVERITY_ORDER.get(v.severity, 1)`` (default = error level).
-    """
-    n_warnings = sum(1 for v in violations if v.severity == "warning")
+    """Return coloured 'N error(s)' / 'N warning(s)' parts for *violations*."""
+    n_warnings = sum(1 for v in violations if not _is_error(v.severity))
     n_errors = len(violations) - n_warnings
     parts: list[str] = []
     if n_errors:
