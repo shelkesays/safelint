@@ -134,6 +134,20 @@ def _make_summary(
     return found, fixes_line
 
 
+def _file_summary_line(filepath: str, violations: list[Violation]) -> str:
+    """Return a coloured per-file count line: 'path/file.py — 1 error, 3 warnings.'"""
+    n_warnings = sum(1 for v in violations if v.severity == "warning")
+    n_errors = len(violations) - n_warnings
+    parts: list[str] = []
+    if n_errors:
+        parts.append(f"{_c(str(n_errors), _BOLD, _RED)} error{'s' if n_errors != 1 else ''}")
+    if n_warnings:
+        parts.append(
+            f"{_c(str(n_warnings), _BOLD, _YELLOW)} warning{'s' if n_warnings != 1 else ''}"
+        )
+    return f"{filepath} \u2014 {', '.join(parts)}."
+
+
 def _resolve_fail_on(args: argparse.Namespace, config: dict) -> tuple[str, int]:
     """Return (fail_on label, integer threshold) from CLI args and config."""
     mode: str = getattr(args, "mode", None) or config.get("mode", "local")
@@ -162,6 +176,8 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
             continue
         _print_violations(result.violations)
         blocking, _ = engine.partition_violations(result.violations, fail_threshold)
+        print(_file_summary_line(filepath, result.violations))
+        print()
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 
@@ -351,6 +367,8 @@ def _run_check(args: argparse.Namespace) -> int:
             continue
         _print_violations(result.violations)
         blocking, _ = SafetyEngine.partition_violations(result.violations, fail_threshold)
+        print(_file_summary_line(result.path, result.violations))
+        print()
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 
