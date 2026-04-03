@@ -194,7 +194,8 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 
-    _print_summary(all_violations, len(all_blocking), fail_on, n_suppressed)
+    if all_violations or n_suppressed:
+        _print_summary(all_violations, len(all_blocking), fail_on, n_suppressed)
     return 1 if all_blocking else 0
 
 
