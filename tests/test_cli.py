@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import re
+from unittest.mock import MagicMock, patch
 
 import pytest
 
-from safelint.cli import _file_summary_line, _make_summary
+from safelint.cli import _file_summary_line, _make_summary, _run_hook
 from safelint.rules.base import Violation
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
@@ -121,3 +122,46 @@ def test_make_summary_unknown_severity_counted_as_error() -> None:
     found = _strip(found)
     assert "1 error" in found
     assert "warning" not in found
+
+
+# ---------------------------------------------------------------------------
+# _run_hook summary gate
+# ---------------------------------------------------------------------------
+
+
+def _make_args(fail_on: str = "error", mode: str = "local") -> MagicMock:
+    """Return a minimal argparse.Namespace stand-in."""
+    args = MagicMock()
+    args.fail_on = fail_on
+    args.mode = mode
+    return args
+
+
+def test_run_hook_no_output_when_clean(tmp_path: pytest.TempPathFactory, capsys: pytest.CaptureFixture) -> None:
+    """_run_hook produces no stdout when the file has zero violations."""
+    clean = tmp_path / "clean.py"
+    clean.write_text("x = 1\n")
+
+    _run_hook(_make_args(), [str(clean)])
+
+    captured = capsys.readouterr()
+    assert captured.out == ""
+
+
+def test_run_hook_prints_summary_when_suppressed(tmp_path: pytest.TempPathFactory, capsys: pytest.CaptureFixture) -> None:
+    """_run_hook prints a summary line when there are suppressed violations."""
+    clean = tmp_path / "clean.py"
+    clean.write_text("x = 1\n")
+
+    # Patch SafetyEngine.check_file to return a result with 1 suppressed issue
+    # and no active violations so the per-file block is not triggered.
+    from safelint.core.engine import LintResult
+
+    fake_result = LintResult(path=str(clean), violations=[], suppressed=1)
+
+    with patch("safelint.cli.SafetyEngine.check_file", return_value=fake_result):
+        _run_hook(_make_args(), [str(clean)])
+
+    captured = capsys.readouterr()
+    assert "All checks passed." in captured.out
+    assert "suppressed" in captured.out
