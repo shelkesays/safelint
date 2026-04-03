@@ -104,6 +104,20 @@ def _print_status(message: str) -> None:
     print(message)
 
 
+def _severity_parts(violations: list[Violation]) -> list[str]:
+    """Return coloured 'N error(s)' / 'N warning(s)' parts for *violations*."""
+    n_warnings = sum(1 for v in violations if v.severity == "warning")
+    n_errors = len(violations) - n_warnings
+    parts: list[str] = []
+    if n_errors:
+        parts.append(f"{_c(str(n_errors), _BOLD, _RED)} error{'s' if n_errors != 1 else ''}")
+    if n_warnings:
+        parts.append(
+            f"{_c(str(n_warnings), _BOLD, _YELLOW)} warning{'s' if n_warnings != 1 else ''}"
+        )
+    return parts
+
+
 def _make_summary(
     all_violations: list[Violation], n_blocking: int, fail_on: str, n_suppressed: int = 0
 ) -> tuple[str, str]:
@@ -116,15 +130,7 @@ def _make_summary(
         if n_suppressed:
             return f"All checks passed.{suppressed_note}", fixes_line
         return "All checks passed.", fixes_line
-    n_warnings = sum(1 for v in all_violations if v.severity == "warning")
-    n_errors = len(all_violations) - n_warnings
-    parts = []
-    if n_errors:
-        parts.append(f"{_c(str(n_errors), _BOLD, _RED)} error{'s' if n_errors != 1 else ''}")
-    if n_warnings:
-        parts.append(
-            f"{_c(str(n_warnings), _BOLD, _YELLOW)} warning{'s' if n_warnings != 1 else ''}"
-        )
+    parts = _severity_parts(all_violations)
     found = f"Found {', '.join(parts)}."
     fail_note = f" [--fail-on={fail_on}]"
     if not n_blocking:
@@ -136,16 +142,7 @@ def _make_summary(
 
 def _file_summary_line(filepath: str, violations: list[Violation]) -> str:
     """Return a coloured per-file count line: 'path/file.py — 1 error, 3 warnings.'"""
-    n_warnings = sum(1 for v in violations if v.severity == "warning")
-    n_errors = len(violations) - n_warnings
-    parts: list[str] = []
-    if n_errors:
-        parts.append(f"{_c(str(n_errors), _BOLD, _RED)} error{'s' if n_errors != 1 else ''}")
-    if n_warnings:
-        parts.append(
-            f"{_c(str(n_warnings), _BOLD, _YELLOW)} warning{'s' if n_warnings != 1 else ''}"
-        )
-    return f"{filepath} \u2014 {', '.join(parts)}."
+    return f"{filepath} \u2014 {', '.join(_severity_parts(violations))}."
 
 
 def _resolve_fail_on(args: argparse.Namespace, config: dict) -> tuple[str, int]:
