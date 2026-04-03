@@ -65,6 +65,12 @@ def test_file_summary_line_mixed_violations() -> None:
     assert line == "path/file.py \u2014 1 error, 2 warnings."
 
 
+def test_file_summary_line_unknown_severity_counted_as_error() -> None:
+    """Unknown severities are treated as errors, consistent with partition_violations."""
+    line = _strip(_file_summary_line("path/file.py", [_v("critical")]))
+    assert line == "path/file.py \u2014 1 error."
+
+
 # ---------------------------------------------------------------------------
 # _make_summary (collective summary)
 # ---------------------------------------------------------------------------
@@ -99,3 +105,11 @@ def test_make_summary_suppressed_note() -> None:
     found, fixes = _make_summary([], n_blocking=0, fail_on="error", n_suppressed=3)
     assert "3 suppressed" in _strip(found)
     assert "3 suppressed" in _strip(fixes)
+
+
+def test_make_summary_unknown_severity_counted_as_error() -> None:
+    """Unknown severities are treated as errors in the collective summary."""
+    found, _ = _make_summary([_v("critical")], n_blocking=1, fail_on="error")
+    found = _strip(found)
+    assert "1 error" in found
+    assert "warning" not in found
