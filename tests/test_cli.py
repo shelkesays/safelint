@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import re
 
+import pytest
+
 from safelint.cli import _file_summary_line, _make_summary
 from safelint.rules.base import Violation
 
@@ -73,8 +75,6 @@ def test_file_summary_line_unknown_severity_counted_as_error() -> None:
 
 def test_file_summary_line_empty_violations_raises() -> None:
     """Empty violations list raises ValueError."""
-    import pytest
-
     with pytest.raises(ValueError, match="violations must be non-empty"):
         _file_summary_line("path/file.py", [])
 
