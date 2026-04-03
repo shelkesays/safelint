@@ -7,6 +7,7 @@ import re
 from pathlib import Path
 
 import pytest
+from pytest_mock import MockerFixture
 
 from safelint.cli import _file_summary_line, _make_summary, _run_hook
 from safelint.core.engine import LintResult
@@ -136,10 +137,15 @@ def _make_args(fail_on: str = "error", mode: str = "local") -> argparse.Namespac
     return argparse.Namespace(fail_on=fail_on, mode=mode)
 
 
-def test_run_hook_no_output_when_clean(tmp_path: Path, capsys: pytest.CaptureFixture) -> None:
-    """_run_hook produces no stdout when the file has zero violations."""
+def test_run_hook_no_output_when_clean(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """_run_hook produces no stdout when check_file returns no violations or suppressed counts."""
     clean = tmp_path / "clean.py"
     clean.write_text("x = 1\n", encoding="utf-8")
+
+    mocker.patch(
+        "safelint.cli.SafetyEngine.check_file",
+        return_value=LintResult(path=str(clean), violations=[], suppressed=0),
+    )
 
     assert _run_hook(_make_args(), [str(clean)]) == 0
 
@@ -147,7 +153,7 @@ def test_run_hook_no_output_when_clean(tmp_path: Path, capsys: pytest.CaptureFix
     assert captured.out == ""
 
 
-def test_run_hook_prints_summary_when_suppressed(tmp_path: Path, capsys: pytest.CaptureFixture, mocker: pytest.MonkeyPatch) -> None:
+def test_run_hook_prints_summary_when_suppressed(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
     """_run_hook prints a summary line when there are suppressed violations."""
     clean = tmp_path / "clean.py"
     clean.write_text("x = 1\n", encoding="utf-8")
