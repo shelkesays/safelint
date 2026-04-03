@@ -106,8 +106,8 @@ def _print_status(message: str) -> None:
 
 def _severity_parts(violations: list[Violation]) -> list[str]:
     """Return coloured 'N error(s)' / 'N warning(s)' parts for *violations*."""
+    n_errors = sum(1 for v in violations if v.severity == "error")
     n_warnings = sum(1 for v in violations if v.severity == "warning")
-    n_errors = len(violations) - n_warnings
     parts: list[str] = []
     if n_errors:
         parts.append(f"{_c(str(n_errors), _BOLD, _RED)} error{'s' if n_errors != 1 else ''}")
