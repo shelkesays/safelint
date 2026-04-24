@@ -91,6 +91,12 @@ safelint check src/ --all-files --fail-on=warning
 safelint check src/ --all-files --mode=ci
 ```
 
+**Ignore specific rules for one run:**
+
+```bash
+safelint check src/ --ignore SAFE203 side_effects
+```
+
 ---
 
 ## Pre-commit integration
@@ -174,9 +180,15 @@ def get_data(conn, q, p1, p2, p3, p4, p5, p6):  # nosafe: SAFE101, SAFE103
     ...
 ```
 
-When at least one violation is suppressed, the CLI summary reports the count so suppressions remain visible and auditable. Use suppression sparingly — prefer fixing the underlying issue or adjusting config thresholds for project-wide policy changes.
+When at least one violation is suppressed, the CLI summary reports the count so suppressions remain visible and auditable. Use `# nosafe` sparingly — it's for line-level exceptions only. For project-wide suppression of a rule, use the `ignore` key in your config file instead:
 
-See [CONFIGURATION.md — Inline suppression](CONFIGURATION.md#inline-suppression) for full reference.
+```toml
+# pyproject.toml
+[tool.safelint]
+ignore = ["SAFE203", "side_effects"]
+```
+
+See [CONFIGURATION.md — Inline suppression](CONFIGURATION.md#inline-suppression) and [CONFIGURATION.md — Global ignore list](CONFIGURATION.md#global-ignore-list) for full reference.
 
 ---
 

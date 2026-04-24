@@ -132,6 +132,7 @@ class SafetyEngine:
         exec_cfg: dict[str, Any] = config.get("execution", {})
         self.fail_fast: bool = exec_cfg.get("fail_fast", False)
         self.exclude_paths: list[str] = config.get("exclude_paths", [])
+        ignored: frozenset[str] = frozenset(config.get("ignore", []))
 
         order: list[str] = exec_cfg.get("order", [r.name for r in ALL_RULES])
         order_index: dict[str, int] = {name: i for i, name in enumerate(order)}
@@ -141,6 +142,8 @@ class SafetyEngine:
             rule_cfg = dict(rules_cfg.get(cls.name, {}))
             default_enabled = DEFAULTS["rules"].get(cls.name, {}).get("enabled", True)
             if not rule_cfg.get("enabled", default_enabled):
+                continue
+            if cls.code in ignored or cls.name in ignored:
                 continue
             if cls is TestCouplingRule and changed_files is not None:
                 rule_cfg["_changed_files"] = changed_files

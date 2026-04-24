@@ -18,6 +18,7 @@ These are passed on the command line and are not part of the config file.
 | `--fail-on` | from config | Override the minimum severity that blocks the run: `error` or `warning`. |
 | `--mode` | from config | `local` (only errors block) or `ci` (warnings block too). |
 | `--config` | auto-discovered | Path to a config file (`pyproject.toml`, `.safelint.yaml`) or a directory to use as the config search root. |
+| `--ignore` | none | Space-separated rule codes or names to suppress for this run only, e.g. `--ignore SAFE101 function_length`. Stacks on top of the `ignore` list in the config file. |
 
 **When to use `--all-files`:**
 - CI pipelines (clean checkout, no modified files in git terms)
@@ -26,11 +27,15 @@ These are passed on the command line and are not part of the config file.
 
 ### `safelint` hook mode flags (pre-commit)
 
-Pre-commit passes the staged files as positional arguments automatically. Only `--fail-on` and `--mode` are relevant here.
+Pre-commit passes the staged files as positional arguments automatically. `--fail-on`, `--mode`, and `--ignore` are all supported here.
 
 ```yaml
 - id: safelint
   args: [--fail-on=error]   # or --fail-on=warning for strict CI
+
+# Ignore specific rules in the hook:
+- id: safelint
+  args: [--fail-on=error, --ignore, SAFE203, side_effects]
 ```
 
 ---
@@ -113,12 +118,61 @@ Prefer **config changes** (adjusting thresholds or disabling rules) over `# nosa
 | `mode` | `"local"` | Sets the default failure threshold. `"local"` = only errors block. `"ci"` = warnings block too. |
 | `fail_on` | `"error"` | Minimum severity that blocks the run. `"error"` or `"warning"`. Overrides `mode`. |
 | `exclude_paths` | `[]` | Glob patterns for files to skip entirely, e.g. `["tests/**", "migrations/**"]`. |
+| `ignore` | `[]` | List of rule codes or names to suppress globally across the entire project. |
 
 ```toml
 [tool.safelint]
 mode = "local"
 fail_on = "error"
 exclude_paths = ["tests/**", "docs/**"]
+ignore = ["SAFE203", "side_effects"]
+```
+
+---
+
+## Global ignore list
+
+The `ignore` key lets you suppress one or more rules project-wide without touching each rule's own config section. Both rule codes (e.g. `SAFE101`) and rule names (e.g. `function_length`) are accepted and can be mixed.
+
+```toml
+# pyproject.toml
+[tool.safelint]
+ignore = ["SAFE203", "SAFE304", "side_effects_hidden"]
+```
+
+```yaml
+# .safelint.yaml
+ignore:
+  - SAFE203
+  - SAFE304
+  - side_effects_hidden
+```
+
+Rules in the `ignore` list are skipped entirely — they produce no violations and add no overhead.
+
+### `ignore` vs. per-rule `enabled: false`
+
+Both achieve the same result, but they serve different purposes:
+
+| | `ignore` | `enabled: false` |
+|---|---|---|
+| Location | Single top-level list | Inside each rule's own section |
+| Accepts | Code or name | — (the key is the name) |
+| Best for | Quick, temporary suppression; CI overrides; onboarding | Permanent project policy for a specific rule |
+| `--ignore` CLI flag | Yes — stacks on top of the config list | No CLI equivalent |
+
+Use `ignore` (or `--ignore`) when you want to suppress a rule without committing to a permanent config change for that rule. Use `enabled: false` when the rule simply does not apply to your project.
+
+### `--ignore` CLI flag
+
+Pass codes or names on the command line to suppress rules for a single run. These stack on top of whatever is already in the config file's `ignore` list — they do not replace it.
+
+```bash
+# Ignore two rules for this run only
+safelint check src/ --ignore SAFE203 side_effects
+
+# Useful in CI to temporarily unblock a branch
+safelint check src/ --all-files --fail-on=warning --ignore SAFE801
 ```
 
 ---
