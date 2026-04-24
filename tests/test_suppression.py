@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-import textwrap
 from pathlib import Path
+import textwrap
 
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine, _is_suppressed, _parse_suppressions
