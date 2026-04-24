@@ -119,6 +119,7 @@ Prefer **config changes** (adjusting thresholds or disabling rules) over `# nosa
 | `fail_on` | `"error"` | Minimum severity that blocks the run. `"error"` or `"warning"`. Overrides `mode`. |
 | `exclude_paths` | `[]` | Glob patterns for files to skip entirely, e.g. `["tests/**", "migrations/**"]`. |
 | `ignore` | `[]` | List of rule codes or names to suppress globally across the entire project. |
+| `per_file_ignores` | `{}` | Map of glob pattern → list of codes/names to suppress only for matching files. |
 
 ```toml
 [tool.safelint]
@@ -126,6 +127,9 @@ mode = "local"
 fail_on = "error"
 exclude_paths = ["tests/**", "docs/**"]
 ignore = ["SAFE203", "side_effects"]
+
+[tool.safelint.per_file_ignores]
+"tests/**" = ["SAFE101", "SAFE103"]
 ```
 
 ---
@@ -174,6 +178,46 @@ safelint check src/ --ignore SAFE203 --ignore side_effects
 # Useful in CI to temporarily unblock a branch
 safelint check src/ --all-files --fail-on=warning --ignore SAFE801
 ```
+
+---
+
+## Per-file ignore list
+
+The `per_file_ignores` key suppresses specific rules for files matching a glob pattern. Unlike the global `ignore` list (which skips rules entirely), per-file ignores let rules run on most of the codebase while silencing them for particular directories or file types.
+
+```toml
+# pyproject.toml
+[tool.safelint.per_file_ignores]
+"tests/**"      = ["SAFE101", "SAFE103", "missing_assertions"]
+"migrations/**" = ["SAFE201", "SAFE202"]
+"src/legacy/**" = ["SAFE301", "SAFE302", "complexity"]
+```
+
+```yaml
+# .safelint.yaml
+per_file_ignores:
+  "tests/**":
+    - SAFE101
+    - SAFE103
+    - missing_assertions
+  "migrations/**":
+    - SAFE201
+    - SAFE202
+```
+
+Both rule codes (e.g. `SAFE101`) and rule names (e.g. `function_length`) are accepted and can be mixed in the same list. Multiple patterns can match a file — their ignore lists are unioned. Suppressed violations are counted in the end-of-run summary alongside `# nosafe` suppressions.
+
+### How it differs from other suppression mechanisms
+
+| Mechanism | Scope | Rule runs? | Counted as suppressed? |
+|---|---|---|---|
+| `enabled: false` | Project-wide | No | No |
+| `ignore` | Project-wide | No | No |
+| `per_file_ignores` | Matching files only | Yes | Yes |
+| `# nosafe` | One line | Yes | Yes |
+| `exclude_paths` | Matching files only | No (file skipped) | No |
+
+Use `per_file_ignores` when a rule is valid for production code but noise in a specific context — for example, test files deliberately use many assertions and long helper functions, or legacy files are under active migration and you do not want to fix every violation before merging.
 
 ---
 
