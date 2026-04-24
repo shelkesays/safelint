@@ -6,9 +6,9 @@ Config is searched in this priority order (highest first):
 2. ``.safelint.yaml`` - legacy YAML config           (backward compat)
 3. Built-in defaults
 
-TOML support uses the stdlib ``tomllib`` module (Python 3.11+) or the
-``tomli`` backport on Python 3.10.  YAML support requires ``PyYAML``, which
-is now an optional dependency (``pip install safelint[yaml]``).
+TOML support uses the stdlib ``tomllib`` module (Python 3.11+).  YAML support
+requires ``PyYAML``, which is an optional dependency
+(``pip install safelint[yaml]``).
 """
 
 from __future__ import annotations
@@ -20,13 +20,6 @@ from typing import Any
 
 
 _log = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Optional parser availability flags
-# ---------------------------------------------------------------------------
-
-
-_TOML_AVAILABLE = True
 
 try:
     import yaml
@@ -243,8 +236,6 @@ def _parse_yaml_file(candidate: Path) -> dict[str, Any] | None:
 
 def _try_pyproject(directory: Path) -> dict[str, Any] | None:
     """Return ``[tool.safelint]`` from *directory*/pyproject.toml, or None."""
-    if not _TOML_AVAILABLE:  # pragma: no cover
-        return None
     candidate = directory / TOML_CONFIG_FILENAME
     if not candidate.exists():
         return None

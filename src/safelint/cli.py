@@ -171,9 +171,10 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
         return 0
 
     config = load_config()
-    cli_ignore = getattr(args, "ignore", [])
+    cli_ignore = args.ignore or []
     if cli_ignore:
-        config["ignore"] = list(set(config.get("ignore", [])) | set(cli_ignore))
+        existing = config.get("ignore", [])
+        config["ignore"] = list(dict.fromkeys(existing + cli_ignore))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
     engine = SafetyEngine(config, changed_files=files)
 
@@ -365,7 +366,7 @@ def _run_check(args: argparse.Namespace) -> int:
         else:
             changed_files, files = modified
 
-    results = run(target, config_path=config_path, files=files, changed_files=changed_files, ignore=getattr(args, "ignore", None) or None)
+    results = run(target, config_path=config_path, files=files, changed_files=changed_files, ignore=args.ignore)
 
     config = load_config(_config_dir(Path(config_path) if config_path else None, target))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
@@ -406,10 +407,10 @@ def _build_common_args(parser: argparse.ArgumentParser) -> None:
     )
     parser.add_argument(
         "--ignore",
-        nargs="+",
-        default=[],
+        action="append",
+        default=None,
         metavar="CODE",
-        help="Rule codes or names to ignore, e.g. --ignore SAFE101 function_length",
+        help="Repeatable flag to ignore a rule code or name, e.g. --ignore SAFE101 --ignore function_length",
     )
 
 

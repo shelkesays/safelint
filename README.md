@@ -94,7 +94,7 @@ safelint check src/ --all-files --mode=ci
 **Ignore specific rules for one run:**
 
 ```bash
-safelint check src/ --ignore SAFE203 side_effects
+safelint check src/ --ignore SAFE203 --ignore side_effects
 ```
 
 ---

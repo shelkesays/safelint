@@ -18,7 +18,7 @@ These are passed on the command line and are not part of the config file.
 | `--fail-on` | from config | Override the minimum severity that blocks the run: `error` or `warning`. |
 | `--mode` | from config | `local` (only errors block) or `ci` (warnings block too). |
 | `--config` | auto-discovered | Path to a config file (`pyproject.toml`, `.safelint.yaml`) or a directory to use as the config search root. |
-| `--ignore` | none | Space-separated rule codes or names to suppress for this run only, e.g. `--ignore SAFE101 function_length`. Stacks on top of the `ignore` list in the config file. |
+| `--ignore` | none | Repeatable flag to suppress a rule for this run only, e.g. `--ignore SAFE101 --ignore function_length`. Stacks on top of the `ignore` list in the config file. |
 
 **When to use `--all-files`:**
 - CI pipelines (clean checkout, no modified files in git terms)
@@ -35,7 +35,7 @@ Pre-commit passes the staged files as positional arguments automatically. `--fai
 
 # Ignore specific rules in the hook:
 - id: safelint
-  args: [--fail-on=error, --ignore, SAFE203, side_effects]
+  args: [--fail-on=error, --ignore=SAFE203, --ignore=side_effects]
 ```
 
 ---
@@ -169,7 +169,7 @@ Pass codes or names on the command line to suppress rules for a single run. Thes
 
 ```bash
 # Ignore two rules for this run only
-safelint check src/ --ignore SAFE203 side_effects
+safelint check src/ --ignore SAFE203 --ignore side_effects
 
 # Useful in CI to temporarily unblock a branch
 safelint check src/ --all-files --fail-on=warning --ignore SAFE801

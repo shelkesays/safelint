@@ -134,7 +134,7 @@ def test_make_summary_unknown_severity_counted_as_error() -> None:
 
 def _make_args(fail_on: str = "error", mode: str = "local") -> argparse.Namespace:
     """Return a minimal argparse.Namespace stand-in."""
-    return argparse.Namespace(fail_on=fail_on, mode=mode)
+    return argparse.Namespace(fail_on=fail_on, mode=mode, ignore=None)
 
 
 def test_run_hook_no_output_when_clean(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
