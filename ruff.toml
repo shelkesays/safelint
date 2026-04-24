@@ -1,0 +1,138 @@
+
+# Global settings
+line-length = 200
+target-version = "py311"
+show-fixes = true
+fix = true
+respect-gitignore = true
+src = ["src", "tests"]
+extend-exclude = []
+
+# Formatter settings
+[format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# Rule configuration
+[lint]
+dummy-variable-rgx = "^(_+|(_+[a-zA-Z0-9_]*[a-zA-Z0-9]+?))$"
+ignore = [
+    "COM812",
+    "D203", "D211", "D212", "D213",
+    "DTZ005",
+    "EXE002",
+    "G004",    # f-strings in logging — intentional style across codebase
+    "ISC001",
+    "PGH003",  # ty (the project's type checker) only supports bare `# type: ignore` without
+               # specific codes — requiring bracketed codes would conflict with ty's suppression
+    "S101",
+    "SLF001",
+    "T201",
+    "TRY400",  # 132 logger.error() in except blocks — intentional (was previously suppressed
+               # via 130 individual noqa: TRY400 comments; re-added globally after noqa cleanup)
+]
+select = [
+    "A", "ANN", "ARG",
+    "B", "BLE",
+    "C4", "C90", "COM",
+    "D", "DTZ",
+    "E", "EM", "EXE",
+    "F", "FBT",
+    "FURB",
+    "G",
+    "I",     
+    "ICN", "INP",
+    "LOG",   
+    "N",
+    "PERF",  
+    "PGH", "PIE", "PL", "PT", "PTH", "PYI",
+    "Q",
+    "RET", "RSE", "RUF",
+    "S", "SIM", "SLF",
+    "T10", "T20",
+    "TC",    
+    "TID", "TRY",
+    "UP", "W", "YTT",
+]
+fixable = ["ALL"] 
+unfixable = []
+
+[lint.per-file-ignores]
+"__init__.py" = ["D104", "F401"]
+# Tests: security (S), assertions (S101 already global), and fixture/magic patterns
+# Migrated from: [bandit] exclude = tests in setup.cfg
+"tests/**" = ["S", "ANN", "D", "PLR2004", "ARG"]
+
+[lint.flake8-comprehensions]
+allow-dict-calls-with-keyword-arguments = false
+
+[lint.flake8-errmsg]
+max-string-length = 20
+
+[lint.flake8-implicit-str-concat]
+allow-multiline = false
+
+[lint.flake8-pytest-style]
+fixture-parentheses = true
+mark-parentheses = true
+parametrize-names-type = "list"
+parametrize-values-row-type = "list"
+parametrize-values-type = "tuple"
+raises-extend-require-match-for = []
+
+[lint.flake8-quotes]
+avoid-escape = true
+docstring-quotes = "double"
+inline-quotes = "double"
+multiline-quotes = "double"
+
+[lint.flake8-tidy-imports]
+ban-relative-imports = "all"
+
+[lint.flake8-type-checking]
+strict = true
+exempt-modules = ["typing"]
+
+[lint.flake8-unused-arguments]
+ignore-variadic-names = true
+
+[lint.isort]
+lines-after-imports = 2
+force-single-line = false
+force-sort-within-sections = true
+force-wrap-aliases = true
+order-by-type = true
+classes = []
+constants = []
+extra-standard-library = []
+force-to-top = []
+known-third-party = ["fastapi", "pydantic", "starlette"]
+
+[lint.pycodestyle]
+max-doc-length = 200
+ignore-overlong-task-comments = true
+
+[lint.pylint]
+# Migrated and reconciled from [pylint.designs] in setup.cfg
+max-args = 7            # setup.cfg: max-args=7 ✓
+max-branches = 12       # setup.cfg had 10; kept 12 — common.py orchestration needs headroom
+max-returns = 6         # setup.cfg had 4; raised to 6 — razorpay/matcher need it
+max-statements = 50     # setup.cfg: max-statements=50 ✓
+allow-magic-value-types = ["str", "bytes", "int"]
+# Note: max-attributes=7, max-parents=7, min-public-methods=2 from setup.cfg have
+# no ruff equivalent (PLR0902/PLR0901 not implemented). PLR0904/PLR0914/PLR0916
+# (max-public-methods, max-locals, max-bool-expr) require --preview mode.
+
+[lint.mccabe]
+max-complexity = 15
+
+[lint.flake8-annotations]
+allow-star-arg-any = true
+ignore-fully-untyped = true
+mypy-init-return = true
+suppress-dummy-args = true
+suppress-none-returning = true
+
+[lint.flake8-bandit]
+check-typed-exception = true
