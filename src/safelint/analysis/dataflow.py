@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import ast
 
+
 # ---------------------------------------------------------------------------
 # Module-level helper (no self dependency, so top-level is cleaner)
 # ---------------------------------------------------------------------------
@@ -92,9 +93,7 @@ class TaintTracker(ast.NodeVisitor):
 
     def _fstring_tainted(self, node: ast.JoinedStr) -> bool:
         """Return True if any interpolated value in an f-string is tainted."""
-        return any(
-            self._is_tainted(v.value) for v in node.values if isinstance(v, ast.FormattedValue)
-        )
+        return any(self._is_tainted(v.value) for v in node.values if isinstance(v, ast.FormattedValue))
 
     def _container_tainted(self, node: ast.expr) -> bool:
         """Return True if any element of a list/tuple/set literal is tainted."""
@@ -106,7 +105,7 @@ class TaintTracker(ast.NodeVisitor):
         tainted_names = {n.id for n in ast.walk(node) if isinstance(n, ast.Name)}
         return bool(self.tainted & tainted_names)
 
-    def _is_tainted(self, node: ast.expr) -> bool:  # noqa: PLR0911
+    def _is_tainted(self, node: ast.expr) -> bool:
         """Return True if *node* may carry tainted data."""
         if isinstance(node, ast.Name):
             return self._name_tainted(node)
@@ -124,7 +123,7 @@ class TaintTracker(ast.NodeVisitor):
     # Assignment visitors - propagate taint to LHS names
     # ------------------------------------------------------------------
 
-    def _update_name(self, target: ast.expr, is_tainted: bool) -> None:
+    def _update_name(self, target: ast.expr, *, is_tainted: bool) -> None:
         """Add or remove *target* from the tainted set."""
         if not isinstance(target, ast.Name):
             return
@@ -133,23 +132,23 @@ class TaintTracker(ast.NodeVisitor):
         else:
             self.tainted.discard(target.id)
 
-    def visit_Assign(self, node: ast.Assign) -> None:  # noqa: N802
+    def visit_Assign(self, node: ast.Assign) -> None:
         """Propagate taint through plain assignment."""
         is_tainted = self._is_tainted(node.value)
         for target in node.targets:
-            self._update_name(target, is_tainted)
+            self._update_name(target, is_tainted=is_tainted)
         self.generic_visit(node)
 
-    def visit_AugAssign(self, node: ast.AugAssign) -> None:  # noqa: N802
+    def visit_AugAssign(self, node: ast.AugAssign) -> None:
         """Propagate taint through augmented assignment (+=, |=, …)."""
         if self._is_tainted(node.value):
-            self._update_name(node.target, True)
+            self._update_name(node.target, is_tainted=True)
         self.generic_visit(node)
 
-    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:  # noqa: N802
+    def visit_AnnAssign(self, node: ast.AnnAssign) -> None:
         """Propagate taint through annotated assignment."""
         if node.value and self._is_tainted(node.value):
-            self._update_name(node.target, True)
+            self._update_name(node.target, is_tainted=True)
         self.generic_visit(node)
 
     # ------------------------------------------------------------------
@@ -167,7 +166,7 @@ class TaintTracker(ast.NodeVisitor):
             if self._is_tainted(arg):
                 self._record_sink_hit(node.lineno, arg, sink)
 
-    def visit_Call(self, node: ast.Call) -> None:  # noqa: N802
+    def visit_Call(self, node: ast.Call) -> None:
         """Check whether this Call reaches a sink with tainted arguments."""
         name = _call_name(node.func)
         if name in self.sinks:

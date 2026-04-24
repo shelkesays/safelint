@@ -3,9 +3,14 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 from safelint.core.config import load_config
-from safelint.core.engine import LintResult, SafetyEngine
+from safelint.core.engine import SafetyEngine
+
+
+if TYPE_CHECKING:
+    from safelint.core.engine import LintResult
 
 
 def run(
@@ -33,6 +38,7 @@ def run(
         Explicit list of ``.py`` files to lint. When provided, skips directory
         discovery and checks exactly these files. Also used as *changed_files*
         for test-coupling rules when *changed_files* is not set separately.
+
     """
     if config_path:
         config_p = Path(config_path)

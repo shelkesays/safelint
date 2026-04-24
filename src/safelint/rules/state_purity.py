@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import ast
+from typing import TYPE_CHECKING
 
-from safelint.rules.base import BaseRule, Violation
+from safelint.rules.base import BaseRule
+
+
+if TYPE_CHECKING:
+    from safelint.rules.base import Violation
 
 
 class GlobalStateRule(BaseRule):
@@ -26,8 +31,7 @@ class GlobalStateRule(BaseRule):
                     self._v(
                         filepath,
                         global_node.lineno,
-                        f'Function "{node.name}" declares global: {names}'
-                        " - use dependency injection instead",
+                        f'Function "{node.name}" declares global: {names} - use dependency injection instead',
                     )
                 )
         return violations
@@ -56,11 +60,7 @@ class GlobalMutationRule(BaseRule):
                 lineno = node.lineno
             else:
                 continue
-            results.extend(
-                (lineno, target.id)
-                for target in targets
-                if isinstance(target, ast.Name) and target.id in global_names
-            )
+            results.extend((lineno, target.id) for target in targets if isinstance(target, ast.Name) and target.id in global_names)
         return results
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
@@ -69,12 +69,7 @@ class GlobalMutationRule(BaseRule):
         for func in ast.walk(tree):
             if not isinstance(func, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
-            global_names: set[str] = {
-                name
-                for node in ast.walk(func)
-                if isinstance(node, ast.Global)
-                for name in node.names
-            }
+            global_names: set[str] = {name for node in ast.walk(func) if isinstance(node, ast.Global) for name in node.names}
             if not global_names:
                 continue
             for lineno, name in self._mutating_assignments(func, global_names):
@@ -82,8 +77,7 @@ class GlobalMutationRule(BaseRule):
                     self._v(
                         filepath,
                         lineno,
-                        f'Function "{func.name}" writes to global "{name}"'
-                        " - globals must not be mutated",
+                        f'Function "{func.name}" writes to global "{name}" - globals must not be mutated',
                     )
                 )
         return violations

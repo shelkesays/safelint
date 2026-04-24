@@ -3,17 +3,22 @@
 from __future__ import annotations
 
 import ast
+from dataclasses import dataclass, field
 import io
 import logging
-import tokenize
-from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Literal
+import tokenize
+from typing import TYPE_CHECKING, Any, Literal
 
 from safelint.core.config import DEFAULTS, SEVERITY_ORDER
 from safelint.rules import ALL_RULES
-from safelint.rules.base import BaseRule, Violation
+from safelint.rules.base import Violation
 from safelint.rules.test_coverage import TestCouplingRule
+
+
+if TYPE_CHECKING:
+    from safelint.rules.base import BaseRule
+
 
 _log = logging.getLogger(__name__)
 
@@ -32,6 +37,7 @@ def _nosafe_codes(comment: str) -> set[str] | None | Literal[False]:
         ``set[str]``       — ``# nosafe: CODE, ...`` (suppress named codes/rules)
         ``Literal[False]`` — comment is not a nosafe directive, or is malformed
                              (e.g. ``# nosafe:`` with an empty payload)
+
     """
     body = comment[1:].strip()  # strip leading '#'
     if not body.lower().startswith(_NOSAFE_PREFIX):
@@ -43,9 +49,7 @@ def _nosafe_codes(comment: str) -> set[str] | None | Literal[False]:
         codes_str = remainder[1:].strip()
         if not codes_str:
             # Malformed directive: "# nosafe:" with no codes or rule names
-            _log.debug(
-                "Ignoring malformed nosafe directive with empty payload: %r", comment.strip()
-            )
+            _log.debug("Ignoring malformed nosafe directive with empty payload: %r", comment.strip())
             return False
         codes = {tok.strip() for tok in codes_str.split(",") if tok.strip()}
         if not codes:
@@ -153,8 +157,7 @@ class SafetyEngine:
         return any(p.match(pattern) for pattern in self.exclude_paths)
 
     def check_file(self, filepath: str) -> LintResult:
-        """Parse *filepath*, run every active rule, apply inline suppressions, and
-        return a :class:`LintResult`.
+        """Parse *filepath*, run every active rule, apply inline suppressions, and return a :class:`LintResult`.
 
         .. note::
             **Breaking change (1.2.0):** this method previously returned
@@ -208,16 +211,11 @@ class SafetyEngine:
     def check_path(self, path: str | Path) -> list[LintResult]:
         """Lint a single file or recursively lint all Python files under a directory."""
         target = Path(path)
-        if target.is_file():
-            files = [str(target)]
-        else:
-            files = sorted(str(p) for p in target.rglob("*.py") if not self._is_excluded(str(p)))
+        files = [str(target)] if target.is_file() else sorted(str(p) for p in target.rglob("*.py") if not self._is_excluded(str(p)))
         return [self.check_file(f) for f in files]
 
     @staticmethod
-    def partition_violations(
-        violations: list[Violation], fail_threshold: int
-    ) -> tuple[list[Violation], list[Violation]]:
+    def partition_violations(violations: list[Violation], fail_threshold: int) -> tuple[list[Violation], list[Violation]]:
         """Split violations into (blocking, advisory) lists based on *fail_threshold*."""
         blocking: list[Violation] = []
         advisory: list[Violation] = []

@@ -14,9 +14,10 @@ is now an optional dependency (``pip install safelint[yaml]``).
 from __future__ import annotations
 
 import logging
-import sys
 from pathlib import Path
+import tomllib
 from typing import Any
+
 
 _log = logging.getLogger(__name__)
 
@@ -24,24 +25,8 @@ _log = logging.getLogger(__name__)
 # Optional parser availability flags
 # ---------------------------------------------------------------------------
 
-if sys.version_info >= (3, 11):
-    import tomllib
 
-    _TOML_AVAILABLE = True
-else:  # pragma: no cover
-    try:
-        import tomllib  # type: ignore[no-redef]
-
-        _TOML_AVAILABLE = True
-    except ImportError:
-        _log.debug("tomllib not available; trying tomli backport")
-        try:
-            import tomli as tomllib  # type: ignore[import-untyped,no-redef]
-
-            _TOML_AVAILABLE = True
-        except ImportError:
-            _log.debug("tomli not available; TOML config support disabled")
-            _TOML_AVAILABLE = False
+_TOML_AVAILABLE = True
 
 try:
     import yaml

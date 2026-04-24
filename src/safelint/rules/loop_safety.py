@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import ast
+from typing import TYPE_CHECKING
 
-from safelint.rules.base import BaseRule, Violation
+from safelint.rules.base import BaseRule
+
+
+if TYPE_CHECKING:
+    from safelint.rules.base import Violation
 
 
 class UnboundedLoopRule(BaseRule):
@@ -17,9 +22,7 @@ class UnboundedLoopRule(BaseRule):
         """Return a violation if *node* is an unbounded while loop, else None."""
         is_literal_true = isinstance(node.test, ast.Constant) and node.test.value is True
         if is_literal_true and not any(isinstance(n, ast.Break) for n in ast.walk(node)):
-            return self._v(
-                filepath, node.lineno, "while True loop has no break - potential infinite loop"
-            )
+            return self._v(filepath, node.lineno, "while True loop has no break - potential infinite loop")
         if not is_literal_true and not isinstance(node.test, ast.Compare):
             return self._v(
                 filepath,

@@ -2,10 +2,16 @@
 
 from __future__ import annotations
 
-import ast
 from pathlib import Path
+from typing import TYPE_CHECKING
 
-from safelint.rules.base import BaseRule, Violation
+from safelint.rules.base import BaseRule
+
+
+if TYPE_CHECKING:
+    import ast
+
+    from safelint.rules.base import Violation
 
 
 class TestExistenceRule(BaseRule):
@@ -66,8 +72,7 @@ class TestCouplingRule(BaseRule):
                 self._v(
                     filepath,
                     0,
-                    f"{src.name} changed but {test_name} was not updated"
-                    f" - tests must be updated alongside source changes (under {dirs}/)",
+                    f"{src.name} changed but {test_name} was not updated - tests must be updated alongside source changes (under {dirs}/)",
                 )
             ]
         return []

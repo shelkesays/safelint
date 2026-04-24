@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import ast
+from typing import TYPE_CHECKING
 
-from safelint.rules.base import BaseRule, Violation
+from safelint.rules.base import BaseRule
+
+
+if TYPE_CHECKING:
+    from safelint.rules.base import Violation
 
 
 class MissingAssertionsRule(BaseRule):
