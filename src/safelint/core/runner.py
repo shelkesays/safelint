@@ -51,7 +51,8 @@ def run(
         search_from = Path(target)
     config = load_config(search_from if search_from.is_dir() else search_from.parent)
     if ignore:
-        config["ignore"] = list(set(config.get("ignore", [])) | set(ignore))
+        existing = config.get("ignore", [])
+        config["ignore"] = list(dict.fromkeys(existing + ignore))
     engine = SafetyEngine(
         config,
         changed_files=changed_files if changed_files is not None else files,

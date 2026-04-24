@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from safelint.core.config import DEFAULTS, _TOML_AVAILABLE, deep_merge, load_config
+from safelint.core.config import DEFAULTS, deep_merge, load_config
 
 
 def test_defaults_have_expected_keys() -> None:
@@ -83,7 +83,6 @@ def test_deep_merge_does_not_mutate_base() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
 def test_load_config_reads_pyproject_toml(tmp_path: Path) -> None:
     """load_config() reads [tool.safelint] from pyproject.toml."""
     (tmp_path / "pyproject.toml").write_text(
@@ -99,7 +98,6 @@ def test_load_config_reads_pyproject_toml(tmp_path: Path) -> None:
     assert "nesting_depth" in config["rules"]
 
 
-@pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
 def test_load_config_pyproject_without_safelint_section_falls_back(tmp_path: Path) -> None:
     """pyproject.toml without [tool.safelint] does not block .safelint.yaml lookup."""
     (tmp_path / "pyproject.toml").write_text("[tool.ruff]\nline-length = 88\n", encoding="utf-8")
@@ -110,7 +108,6 @@ def test_load_config_pyproject_without_safelint_section_falls_back(tmp_path: Pat
     assert config["mode"] == "ci"
 
 
-@pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
 def test_load_config_pyproject_takes_priority_over_yaml(tmp_path: Path) -> None:
     """pyproject.toml [tool.safelint] takes priority over .safelint.yaml."""
     (tmp_path / "pyproject.toml").write_text(
@@ -123,7 +120,6 @@ def test_load_config_pyproject_takes_priority_over_yaml(tmp_path: Path) -> None:
     assert config["mode"] == "ci"
 
 
-@pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
 def test_load_config_pyproject_walks_up(tmp_path: Path) -> None:
     """load_config() walks parent directories to find pyproject.toml."""
     (tmp_path / "pyproject.toml").write_text(
@@ -142,7 +138,6 @@ def test_load_config_pyproject_walks_up(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
 def test_read_toml_file_returns_none_on_invalid(tmp_path: Path) -> None:
     """_read_toml_file returns None and logs an error when TOML is malformed."""
     from safelint.core.config import _read_toml_file
@@ -155,7 +150,6 @@ def test_read_toml_file_returns_none_on_invalid(tmp_path: Path) -> None:
     assert result is None
 
 
-@pytest.mark.skipif(not _TOML_AVAILABLE, reason="tomllib/tomli not available")
 def test_try_pyproject_returns_none_for_invalid_toml(tmp_path: Path) -> None:
     """_try_pyproject returns None when pyproject.toml fails to parse."""
     from safelint.core.config import _try_pyproject

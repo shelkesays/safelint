@@ -132,7 +132,15 @@ class SafetyEngine:
         exec_cfg: dict[str, Any] = config.get("execution", {})
         self.fail_fast: bool = exec_cfg.get("fail_fast", False)
         self.exclude_paths: list[str] = config.get("exclude_paths", [])
-        ignored: frozenset[str] = frozenset(config.get("ignore", []))
+
+        raw_ignore: list[str] = config.get("ignore", [])
+        known_names: frozenset[str] = frozenset(cls.name for cls in ALL_RULES)
+        known_codes_upper: frozenset[str] = frozenset(cls.code.upper() for cls in ALL_RULES)
+        unknown = frozenset(e for e in raw_ignore if e not in known_names and e.upper() not in known_codes_upper)
+        if unknown:
+            _log.warning("Unknown entries in ignore list (typo or stale rule?): %s", ", ".join(sorted(unknown)))
+        ignored_names: frozenset[str] = frozenset(raw_ignore)
+        ignored_codes_upper: frozenset[str] = frozenset(e.upper() for e in raw_ignore)
 
         order: list[str] = exec_cfg.get("order", [r.name for r in ALL_RULES])
         order_index: dict[str, int] = {name: i for i, name in enumerate(order)}
@@ -143,7 +151,7 @@ class SafetyEngine:
             default_enabled = DEFAULTS["rules"].get(cls.name, {}).get("enabled", True)
             if not rule_cfg.get("enabled", default_enabled):
                 continue
-            if cls.code in ignored or cls.name in ignored:
+            if cls.code.upper() in ignored_codes_upper or cls.name in ignored_names:
                 continue
             if cls is TestCouplingRule and changed_files is not None:
                 rule_cfg["_changed_files"] = changed_files
