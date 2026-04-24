@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ast
 from dataclasses import dataclass, field
+import fnmatch
 import io
 import logging
 from pathlib import Path
@@ -147,9 +148,20 @@ class SafetyEngine:
         ignored_names: frozenset[str] = frozenset(raw_ignore)
         ignored_codes_upper: frozenset[str] = frozenset(e.upper() for e in raw_ignore)
 
+        self.rules: list[BaseRule] = self._build_active_rules(rules_cfg, exec_cfg, ignored_names, ignored_codes_upper, changed_files)
+        self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = self._parse_per_file_ignores(config.get("per_file_ignores", {}), known_names, known_codes_upper)
+
+    @staticmethod
+    def _build_active_rules(
+        rules_cfg: dict[str, Any],
+        exec_cfg: dict[str, Any],
+        ignored_names: frozenset[str],
+        ignored_codes_upper: frozenset[str],
+        changed_files: list[str] | None,
+    ) -> list[BaseRule]:
+        """Return the ordered list of active rules derived from config."""
         order: list[str] = exec_cfg.get("order", [r.name for r in ALL_RULES])
         order_index: dict[str, int] = {name: i for i, name in enumerate(order)}
-
         active_rules: list[BaseRule] = []
         for cls in ALL_RULES:
             rule_cfg = dict(rules_cfg.get(cls.name, {}))
@@ -161,27 +173,45 @@ class SafetyEngine:
             if cls is TestCouplingRule and changed_files is not None:
                 rule_cfg["_changed_files"] = changed_files
             active_rules.append(cls(rule_cfg))
+        return sorted(active_rules, key=lambda r: order_index.get(r.name, len(order)))
 
-        self.rules: list[BaseRule] = sorted(
-            active_rules,
-            key=lambda r: order_index.get(r.name, len(order)),
-        )
-
-        raw_pfi: dict[str, list[str]] = config.get("per_file_ignores", {})
-        self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = [(pattern, frozenset(entries), frozenset(e.upper() for e in entries)) for pattern, entries in raw_pfi.items()]
+    @staticmethod
+    def _parse_per_file_ignores(
+        raw_pfi: dict[str, list[str]],
+        known_names: frozenset[str],
+        known_codes_upper: frozenset[str],
+    ) -> list[tuple[str, frozenset[str], frozenset[str]]]:
+        """Validate and parse per_file_ignores config into (pattern, names, codes_upper) triples."""
+        if not isinstance(raw_pfi, dict):
+            msg = f"per_file_ignores must be a mapping, got {type(raw_pfi).__name__}"
+            raise TypeError(msg)
+        result: list[tuple[str, frozenset[str], frozenset[str]]] = []
+        for pattern, entries in raw_pfi.items():
+            if not isinstance(entries, (list, tuple)):
+                msg = f"per_file_ignores[{pattern!r}] must be a list of strings, got {type(entries).__name__}"
+                raise TypeError(msg)
+            pfi_unknown = frozenset(e for e in entries if e not in known_names and e.upper() not in known_codes_upper)
+            if pfi_unknown:
+                _log.warning(
+                    "Unknown entries in per_file_ignores[%r] (typo or stale rule?): %s",
+                    pattern,
+                    ", ".join(sorted(pfi_unknown)),
+                )
+            result.append((pattern, frozenset(entries), frozenset(e.upper() for e in entries)))
+        return result
 
     def _is_excluded(self, filepath: str) -> bool:
         """Return True when *filepath* matches any configured exclusion pattern."""
-        p = Path(filepath)
-        return any(p.match(pattern) for pattern in self.exclude_paths)
+        posix = Path(filepath).as_posix()
+        return any(fnmatch.fnmatchcase(posix, pattern) for pattern in self.exclude_paths)
 
     def _file_ignored_set(self, filepath: str) -> tuple[frozenset[str], frozenset[str]]:
         """Return (names, codes_upper) accumulated from all per-file patterns matching *filepath*."""
-        p = Path(filepath)
+        posix = Path(filepath).as_posix()
         names: set[str] = set()
         codes_upper: set[str] = set()
         for pattern, pfi_names, pfi_codes_upper in self.per_file_ignores:
-            if p.match(pattern):
+            if fnmatch.fnmatchcase(posix, pattern):
                 names |= pfi_names
                 codes_upper |= pfi_codes_upper
         return frozenset(names), frozenset(codes_upper)
@@ -194,14 +224,17 @@ class SafetyEngine:
             ``list[Violation]``.  Callers that relied on the old return type
             must be updated to access ``result.violations`` instead.
 
-        Violations on lines that carry a ``# nosafe`` comment (optionally
-        followed by a comma-separated list of codes / rule names) are filtered
-        out and counted in :attr:`LintResult.suppressed` instead of appearing
-        in :attr:`LintResult.violations`.
+        Violations are filtered by two suppression mechanisms, both of which
+        count toward :attr:`LintResult.suppressed`:
+
+        * **Inline** ``# nosafe`` comments (optionally with a comma-separated
+          list of codes / rule names) suppress violations on a specific line.
+        * **Per-file** ``per_file_ignores`` patterns suppress all violations
+          whose code or name matches an entry for the file's path.
 
         When ``fail_fast`` is enabled the loop stops after the first rule that
-        produces at least one unsuppressed (active) violation, i.e. a violation
-        that is not filtered out by an inline ``# nosafe`` directive.
+        produces at least one violation that survives both filtering passes
+        (i.e. not suppressed by either ``# nosafe`` or ``per_file_ignores``).
         """
         if self._is_excluded(filepath):
             return LintResult(path=filepath)
