@@ -412,10 +412,6 @@ def test_cli_hook_mode_exits_0_on_clean_file(tmp_path: Path) -> None:
 
 def test_cli_hook_mode_exits_1_on_violation(tmp_path: Path) -> None:
     """_run_hook returns 1 when a blocking violation is found."""
-    import argparse
-
-    from safelint.cli import _run_hook
-
     sample = tmp_path / "bad.py"
     sample.write_text(
         "def foo():\n    try:\n        pass\n    except:\n        pass\n",
@@ -430,9 +426,6 @@ def test_cli_hook_mode_exits_1_on_violation(tmp_path: Path) -> None:
 
 def test_cli_hook_mode_empty_files_list_exits_0() -> None:
     """_run_hook returns 0 immediately when no files are provided."""
-    import argparse
-
-    from safelint.cli import _run_hook
 
     args = argparse.Namespace(fail_on=None, mode=None, ignore=None)
     assert _run_hook(args, []) == 0
@@ -440,9 +433,6 @@ def test_cli_hook_mode_empty_files_list_exits_0() -> None:
 
 def test_cli_check_mode_exits_0_on_clean_directory(tmp_path: Path) -> None:
     """_run_check returns 0 when the scanned directory has no violations."""
-    import argparse
-
-    from safelint.cli import _run_check
 
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
 
@@ -454,9 +444,6 @@ def test_cli_check_mode_exits_0_on_clean_directory(tmp_path: Path) -> None:
 
 def test_cli_check_mode_exits_1_on_violation(tmp_path: Path) -> None:
     """_run_check returns 1 when violations are found."""
-    import argparse
-
-    from safelint.cli import _run_check
 
     (tmp_path / "bad.py").write_text(
         "def foo():\n    try:\n        pass\n    except:\n        pass\n",
@@ -476,8 +463,6 @@ def test_cli_check_mode_exits_1_on_violation(tmp_path: Path) -> None:
 
 def test_lint_result_has_violations_true() -> None:
     """LintResult.has_violations returns True when violations list is non-empty."""
-    from safelint.core.engine import LintResult
-    from safelint.rules.base import Violation
 
     v = Violation(rule="r", code="SAFE001", filepath="f.py", lineno=1, message="m", severity="error")
     result = LintResult(path="f.py", violations=[v])
@@ -486,7 +471,6 @@ def test_lint_result_has_violations_true() -> None:
 
 def test_lint_result_has_violations_false() -> None:
     """LintResult.has_violations returns False when violations list is empty."""
-    from safelint.core.engine import LintResult
 
     result = LintResult(path="f.py")
     assert result.has_violations is False
@@ -523,16 +507,20 @@ def test_engine_injects_changed_files_for_test_coupling(tmp_path: Path) -> None:
 
 def test_base_rule_call_name_returns_none_for_subscript() -> None:
     """BaseRule._call_name returns None when the func node is a Subscript."""
-    import ast
-
-    from safelint.rules.side_effects import SideEffectsRule
 
     rule = SideEffectsRule(
         {"enabled": True, "severity": "warning", "io_functions": ["open"], "io_name_keywords": []}
     )
     tree = ast.parse("func_map['key']()")
-    call = tree.body[0].value
-    assert rule._call_name(call.func) is None
+    expr = tree.body[0]
+    if isinstance(expr, ast.Expr):
+        call = expr.value
+        if isinstance(call, ast.Call):
+            assert rule._call_name(call.func) is None
+        else:
+            pytest.fail("Expected ast.Call node")
+    else:
+        pytest.fail("Expected ast.Expr node")
 
 
 # ---------------------------------------------------------------------------
@@ -839,9 +827,6 @@ def test_test_coupling_clean_when_test_updated(tmp_path: Path) -> None:
 
 def test_cli_run_check_advisory_only_returns_0(tmp_path: Path) -> None:
     """_run_check returns 0 when violations are all advisory (below fail_on threshold)."""
-    import argparse
-
-    from safelint.cli import _run_check
 
     # logging_on_error fires at warning severity when an except block has no log call
     source = textwrap.dedent("""\
@@ -861,9 +846,6 @@ def test_cli_run_check_advisory_only_returns_0(tmp_path: Path) -> None:
 
 def test_cli_main_check_mode_exits_0(tmp_path: Path, monkeypatch) -> None:
     """main() routes to check mode when 'check' is the first positional arg."""
-    import sys
-
-    from safelint.cli import main
 
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
     monkeypatch.setattr(sys, "argv", ["safelint", "check", str(tmp_path)])
@@ -875,9 +857,6 @@ def test_cli_main_check_mode_exits_0(tmp_path: Path, monkeypatch) -> None:
 
 def test_cli_main_hook_mode_exits_0(tmp_path: Path, monkeypatch) -> None:
     """main() routes to hook mode when no 'check' subcommand is present."""
-    import sys
-
-    from safelint.cli import main
 
     sample = tmp_path / "clean.py"
     sample.write_text("x = 1\n", encoding="utf-8")
@@ -890,9 +869,6 @@ def test_cli_main_hook_mode_exits_0(tmp_path: Path, monkeypatch) -> None:
 
 def test_build_common_args_adds_fail_on_and_mode() -> None:
     """_build_common_args registers --fail-on and --mode arguments."""
-    import argparse
-
-    from safelint.cli import _build_common_args
 
     parser = argparse.ArgumentParser()
     _build_common_args(parser)
@@ -969,9 +945,6 @@ def _make_proc(mocker, returncode: int = 0, stdout: str = ""):
 
 def test_cli_check_git_unavailable_falls_back_to_full_scan(tmp_path: Path, mocker) -> None:
     """_run_check falls back to a full scan and exits 0 when git is not installed."""
-    import argparse
-
-    from safelint.cli import _run_check
 
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
     mocker.patch("safelint.cli.subprocess.run", side_effect=FileNotFoundError)
@@ -982,9 +955,6 @@ def test_cli_check_git_unavailable_falls_back_to_full_scan(tmp_path: Path, mocke
 
 def test_cli_check_git_diff_failure_falls_back_to_full_scan(tmp_path: Path, mocker) -> None:
     """_run_check falls back to a full scan when git diff returns a non-zero exit code."""
-    import argparse
-
-    from safelint.cli import _run_check
 
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
     rev_parse = _make_proc(mocker, returncode=0, stdout=str(tmp_path) + "\n")
@@ -998,9 +968,6 @@ def test_cli_check_git_diff_failure_falls_back_to_full_scan(tmp_path: Path, mock
 
 def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker, capsys) -> None:
     """_run_check exits 0 with a status message when git reports no modified Python files."""
-    import argparse
-
-    from safelint.cli import _run_check
 
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
     rev_parse = _make_proc(mocker, returncode=0, stdout=str(tmp_path) + "\n")
@@ -1014,9 +981,6 @@ def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker, capsys) -> 
 
 def test_cli_check_all_files_bypasses_git(tmp_path: Path, mocker) -> None:
     """_run_check does not invoke git when --all-files is set."""
-    import argparse
-
-    from safelint.cli import _run_check
 
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
     spy = mocker.patch("safelint.cli.subprocess.run")
@@ -1030,9 +994,6 @@ def test_cli_check_all_files_bypasses_git(tmp_path: Path, mocker) -> None:
 
 def test_cli_check_only_in_target_files_linted(tmp_path: Path, mocker) -> None:
     """_run_check lints only in-target files; out-of-target diffs are not linted."""
-    import argparse
-
-    from safelint.cli import _run_check
 
     src_dir = tmp_path / "src"
     src_dir.mkdir()
