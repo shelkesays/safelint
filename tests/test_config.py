@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from safelint.core.config import DEFAULTS, deep_merge, load_config
+from safelint.core.config import DEFAULTS, _read_toml_file, _try_pyproject, deep_merge, load_config
 
 
 def test_defaults_have_expected_keys() -> None:
@@ -140,8 +140,6 @@ def test_load_config_pyproject_walks_up(tmp_path: Path) -> None:
 
 def test_read_toml_file_returns_none_on_invalid(tmp_path: Path) -> None:
     """_read_toml_file returns None and logs an error when TOML is malformed."""
-    from safelint.core.config import _read_toml_file
-
     bad_toml = tmp_path / "bad.toml"
     bad_toml.write_bytes(b"\xff\xfe this is not valid toml \x00\x01")
 
@@ -152,8 +150,6 @@ def test_read_toml_file_returns_none_on_invalid(tmp_path: Path) -> None:
 
 def test_try_pyproject_returns_none_for_invalid_toml(tmp_path: Path) -> None:
     """_try_pyproject returns None when pyproject.toml fails to parse."""
-    from safelint.core.config import _try_pyproject
-
     (tmp_path / "pyproject.toml").write_bytes(b"\xff\xfe not toml \x00")
 
     result = _try_pyproject(tmp_path)
