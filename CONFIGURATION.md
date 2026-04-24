@@ -90,14 +90,14 @@ When suppressions are active, the summary line reports the total count:
 
 ```text
 Found 2 errors, 1 warning. [--fail-on=error].
-No fixes available (safelint does not auto-fix violations). (3 suppressed via # nosafe)
+No fixes available (safelint does not auto-fix violations). (3 suppressed)
 ```
 
 If all active violations were suppressed:
 
 ```text
-All checks passed. (3 suppressed via # nosafe)
-No fixes available (safelint does not auto-fix violations). (3 suppressed via # nosafe)
+All checks passed. (3 suppressed)
+No fixes available (safelint does not auto-fix violations). (3 suppressed)
 ```
 
 ### When to use suppression
@@ -203,9 +203,15 @@ per_file_ignores:
   "migrations/**":
     - SAFE201
     - SAFE202
+  "src/legacy/**":
+    - SAFE301
+    - SAFE302
+    - complexity
 ```
 
 Both rule codes (e.g. `SAFE101`) and rule names (e.g. `function_length`) are accepted and can be mixed in the same list. Multiple patterns can match a file — their ignore lists are unioned. Suppressed violations are counted in the end-of-run summary alongside `# nosafe` suppressions.
+
+Patterns follow shell-glob semantics via Python's `fnmatch` module, where `**` matches any number of path segments (including zero), `*` matches within a single segment, and matching is case-sensitive on all platforms. The same dialect applies to `exclude_paths`.
 
 ### How it differs from other suppression mechanisms
 
