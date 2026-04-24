@@ -180,15 +180,18 @@ def get_data(conn, q, p1, p2, p3, p4, p5, p6):  # nosafe: SAFE101, SAFE103
     ...
 ```
 
-When at least one violation is suppressed, the CLI summary reports the count so suppressions remain visible and auditable. Use `# nosafe` sparingly — it's for line-level exceptions only. For project-wide suppression of a rule, use the `ignore` key in your config file instead:
+When at least one violation is suppressed, the CLI summary reports the count so suppressions remain visible and auditable. Use `# nosafe` sparingly — it's for line-level exceptions only. For broader suppression use the config-level options:
 
 ```toml
 # pyproject.toml
 [tool.safelint]
-ignore = ["SAFE203", "side_effects"]
+ignore = ["SAFE203", "side_effects"]          # suppress project-wide
+
+[tool.safelint.per_file_ignores]
+"tests/**" = ["SAFE101", "SAFE103"]           # suppress only for matching files
 ```
 
-See [CONFIGURATION.md — Inline suppression](CONFIGURATION.md#inline-suppression) and [CONFIGURATION.md — Global ignore list](CONFIGURATION.md#global-ignore-list) for full reference.
+See [CONFIGURATION.md — Inline suppression](CONFIGURATION.md#inline-suppression), [CONFIGURATION.md — Global ignore list](CONFIGURATION.md#global-ignore-list), and [CONFIGURATION.md — Per-file ignore list](CONFIGURATION.md#per-file-ignore-list) for full reference.
 
 ---
 

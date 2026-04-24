@@ -100,6 +100,11 @@ def _is_suppressed(v: Violation, suppressions: dict[int, set[str] | None]) -> bo
     return v.code in codes or v.rule in codes
 
 
+def _is_per_file_ignored(v: Violation, pfi_names: frozenset[str], pfi_codes_upper: frozenset[str]) -> bool:
+    """Return True when *v* is suppressed by a per-file ignore pattern."""
+    return v.code.upper() in pfi_codes_upper or v.rule in pfi_names
+
+
 @dataclass
 class LintResult:
     """Aggregated violations for a single linted file."""
@@ -162,10 +167,24 @@ class SafetyEngine:
             key=lambda r: order_index.get(r.name, len(order)),
         )
 
+        raw_pfi: dict[str, list[str]] = config.get("per_file_ignores", {})
+        self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = [(pattern, frozenset(entries), frozenset(e.upper() for e in entries)) for pattern, entries in raw_pfi.items()]
+
     def _is_excluded(self, filepath: str) -> bool:
         """Return True when *filepath* matches any configured exclusion pattern."""
         p = Path(filepath)
         return any(p.match(pattern) for pattern in self.exclude_paths)
+
+    def _file_ignored_set(self, filepath: str) -> tuple[frozenset[str], frozenset[str]]:
+        """Return (names, codes_upper) accumulated from all per-file patterns matching *filepath*."""
+        p = Path(filepath)
+        names: set[str] = set()
+        codes_upper: set[str] = set()
+        for pattern, pfi_names, pfi_codes_upper in self.per_file_ignores:
+            if p.match(pattern):
+                names |= pfi_names
+                codes_upper |= pfi_codes_upper
+        return frozenset(names), frozenset(codes_upper)
 
     def check_file(self, filepath: str) -> LintResult:
         """Parse *filepath*, run every active rule, apply inline suppressions, and return a :class:`LintResult`.
@@ -206,15 +225,17 @@ class SafetyEngine:
             )
 
         suppressions = _parse_suppressions(source)
+        pfi_names, pfi_codes_upper = self._file_ignored_set(filepath)
 
         active: list[Violation] = []
         suppressed = 0
         for rule in self.rules:
             rule_violations = rule.check_file(filepath, tree)
-            rule_active = [v for v in rule_violations if not _is_suppressed(v, suppressions)]
-            suppressed += len(rule_violations) - len(rule_active)
-            active.extend(rule_active)
-            if self.fail_fast and rule_active:
+            after_nosafe = [v for v in rule_violations if not _is_suppressed(v, suppressions)]
+            after_pfi = [v for v in after_nosafe if not _is_per_file_ignored(v, pfi_names, pfi_codes_upper)]
+            suppressed += len(rule_violations) - len(after_pfi)
+            active.extend(after_pfi)
+            if self.fail_fast and after_pfi:
                 break
 
         return LintResult(path=filepath, violations=active, suppressed=suppressed)

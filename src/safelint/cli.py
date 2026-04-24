@@ -131,7 +131,7 @@ def _severity_parts(violations: list[Violation]) -> list[str]:
 
 def _make_summary(all_violations: list[Violation], n_blocking: int, fail_on: str, n_suppressed: int = 0) -> tuple[str, str]:
     """Return a (found_line, fixes_line) pair for *all_violations*."""
-    suppressed_note = f" ({_c(str(n_suppressed), _CYAN)} suppressed via # nosafe)" if n_suppressed else ""
+    suppressed_note = f" ({_c(str(n_suppressed), _CYAN)} suppressed)" if n_suppressed else ""
     fixes_line = f"No fixes available (safelint does not auto-fix violations).{suppressed_note}"
     if not all_violations:
         if n_suppressed:
