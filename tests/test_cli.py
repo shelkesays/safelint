@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import argparse
-import re
 from pathlib import Path
+import re
 
 import pytest
 from pytest_mock import MockerFixture
@@ -12,6 +12,7 @@ from pytest_mock import MockerFixture
 from safelint.cli import _file_summary_line, _make_summary, _run_hook
 from safelint.core.engine import LintResult
 from safelint.rules.base import Violation
+
 
 _ANSI_RE = re.compile(r"\x1b\[[0-9;]*m")
 
