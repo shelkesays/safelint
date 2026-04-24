@@ -2,14 +2,20 @@
 
 from __future__ import annotations
 
+import argparse
+import ast
+import sys
 import textwrap
 from pathlib import Path
 
 import pytest
 
+from safelint.cli import _build_common_args, _run_check, _run_hook, main
 from safelint.core.config import DEFAULTS, deep_merge, load_config
-from safelint.core.engine import SafetyEngine
+from safelint.core.engine import LintResult, SafetyEngine
 from safelint.core.runner import run
+from safelint.rules.base import Violation
+from safelint.rules.side_effects import SideEffectsRule
 
 
 # ---------------------------------------------------------------------------
@@ -245,8 +251,6 @@ def test_violation_fields_are_populated(tmp_path: Path) -> None:
 
 def test_partition_violations_splits_by_threshold() -> None:
     """partition_violations correctly separates blocking from advisory violations."""
-    from safelint.rules.base import Violation
-
     engine = _engine()
     violations = [
         Violation(rule="r1", code="SAFE001", filepath="f.py", lineno=1, message="m", severity="error"),
@@ -255,8 +259,10 @@ def test_partition_violations_splits_by_threshold() -> None:
 
     blocking, advisory = engine.partition_violations(violations, fail_threshold=1)
 
-    assert len(blocking) == 1 and blocking[0].severity == "error"
-    assert len(advisory) == 1 and advisory[0].severity == "warning"
+    assert len(blocking) == 1
+    assert blocking[0].severity == "error"
+    assert len(advisory) == 1
+    assert advisory[0].severity == "warning"
 
 
 # ---------------------------------------------------------------------------
@@ -395,10 +401,6 @@ def test_test_coupling_fires_when_test_not_updated(tmp_path: Path) -> None:
 
 def test_cli_hook_mode_exits_0_on_clean_file(tmp_path: Path) -> None:
     """_run_hook returns 0 when the given files have no violations."""
-    import argparse
-
-    from safelint.cli import _run_hook
-
     sample = tmp_path / "clean.py"
     sample.write_text("x = 1\n", encoding="utf-8")
 
