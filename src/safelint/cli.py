@@ -26,15 +26,20 @@ from __future__ import annotations
 import argparse
 import functools
 import logging
+from pathlib import Path
 import shutil
 import subprocess
 import sys
-from pathlib import Path
+from typing import TYPE_CHECKING
 
 from safelint.core.config import MODE_FAIL_ON, SEVERITY_ORDER, load_config
 from safelint.core.engine import SafetyEngine
 from safelint.core.runner import run
-from safelint.rules.base import Violation
+
+
+if TYPE_CHECKING:
+    from safelint.rules.base import Violation
+
 
 _log = logging.getLogger(__name__)
 
@@ -82,7 +87,7 @@ def _source_lines(filepath: str) -> tuple[str, ...]:
 def _print_violations(violations: list[Violation]) -> None:
     """Print violations in a ruff/ty-inspired multi-line coloured format."""
     for v in violations:
-        tag = v.code if v.code else v.rule
+        tag = v.code or v.rule
         colour = _RED if _is_error(v.severity) else _YELLOW
         # First line: coloured CODE  message [rule]
         print(f"{_c(tag, _BOLD, colour)} {v.message} [{v.rule}]")
@@ -100,9 +105,7 @@ def _print_violations(violations: list[Violation]) -> None:
         print()  # blank line between violations for readability
 
 
-def _print_summary(
-    all_violations: list[Violation], n_blocking: int, fail_on: str, n_suppressed: int = 0
-) -> None:
+def _print_summary(all_violations: list[Violation], n_blocking: int, fail_on: str, n_suppressed: int = 0) -> None:
     """Print a ruff-style summary block to stdout."""
     found, fixes = _make_summary(all_violations, n_blocking, fail_on, n_suppressed)
     print(found)
@@ -122,19 +125,13 @@ def _severity_parts(violations: list[Violation]) -> list[str]:
     if n_errors:
         parts.append(f"{_c(str(n_errors), _BOLD, _RED)} error{'s' if n_errors != 1 else ''}")
     if n_warnings:
-        parts.append(
-            f"{_c(str(n_warnings), _BOLD, _YELLOW)} warning{'s' if n_warnings != 1 else ''}"
-        )
+        parts.append(f"{_c(str(n_warnings), _BOLD, _YELLOW)} warning{'s' if n_warnings != 1 else ''}")
     return parts
 
 
-def _make_summary(
-    all_violations: list[Violation], n_blocking: int, fail_on: str, n_suppressed: int = 0
-) -> tuple[str, str]:
+def _make_summary(all_violations: list[Violation], n_blocking: int, fail_on: str, n_suppressed: int = 0) -> tuple[str, str]:
     """Return a (found_line, fixes_line) pair for *all_violations*."""
-    suppressed_note = (
-        f" ({_c(str(n_suppressed), _CYAN)} suppressed via # nosafe)" if n_suppressed else ""
-    )
+    suppressed_note = f" ({_c(str(n_suppressed), _CYAN)} suppressed via # nosafe)" if n_suppressed else ""
     fixes_line = f"No fixes available (safelint does not auto-fix violations).{suppressed_note}"
     if not all_violations:
         if n_suppressed:
@@ -143,21 +140,20 @@ def _make_summary(
     parts = _severity_parts(all_violations)
     found = f"Found {', '.join(parts)}."
     fail_note = f" [--fail-on={fail_on}]"
-    if not n_blocking:
-        found = f"{found} Advisory only{fail_note}."
-    else:
-        found = f"{found}{fail_note}."
+    found = f"{found} Advisory only{fail_note}." if not n_blocking else f"{found}{fail_note}."
     return found, fixes_line
 
 
 def _file_summary_line(filepath: str, violations: list[Violation]) -> str:
-    """Return a coloured per-file count line: 'path/file.py — 1 error, 3 warnings.'
+    """Return a coloured per-file count line: 'path/file.py — 1 error, 3 warnings.'.
 
     Raises:
         ValueError: If *violations* is empty.
+
     """
     if not violations:
-        raise ValueError("violations must be non-empty")
+        msg = "violations must be non-empty"
+        raise ValueError(msg)
     return f"{filepath} \u2014 {', '.join(_severity_parts(violations))}."
 
 
@@ -204,10 +200,11 @@ def _is_under_target(abs_path: Path, target_abs: Path) -> bool:
     if target_abs.is_dir():
         try:
             abs_path.relative_to(target_abs)
-            return True
         except ValueError:
             _log.debug("Path %s is not relative to %s", abs_path, target_abs)
             return False
+        else:
+            return True
     return abs_path == target_abs
 
 
@@ -256,41 +253,39 @@ def _filter_py_files(raw: set[str], git_root: Path, target_abs: Path) -> list[st
 
 def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
     """Run git diff + ls-files and return the union of all changed paths, or None on error."""
-    diff_proc = subprocess.run(
+    diff_proc = subprocess.run(  # noqa: S603
         [git_bin, "diff", "--name-only", "HEAD"],
         capture_output=True,
         text=True,
         cwd=git_root,
         timeout=10,
+        check=False,
     )
-    cached_proc = subprocess.run(
+    cached_proc = subprocess.run(  # noqa: S603
         [git_bin, "diff", "--name-only", "--cached"],
         capture_output=True,
         text=True,
         cwd=git_root,
         timeout=10,
+        check=False,
     )
-    untracked_proc = subprocess.run(
+    untracked_proc = subprocess.run(  # noqa: S603
         [git_bin, "ls-files", "--others", "--exclude-standard"],
         capture_output=True,
         text=True,
         cwd=git_root,
         timeout=10,
+        check=False,
     )
     if diff_proc.returncode != 0 or cached_proc.returncode != 0 or untracked_proc.returncode != 0:
         _log.debug(
-            "git command failed (diff rc=%s, cached rc=%s, untracked rc=%s); "
-            "treating as git unavailable",
+            "git command failed (diff rc=%s, cached rc=%s, untracked rc=%s); treating as git unavailable",
             diff_proc.returncode,
             cached_proc.returncode,
             untracked_proc.returncode,
         )
         return None
-    return (
-        set(diff_proc.stdout.splitlines())
-        | set(cached_proc.stdout.splitlines())
-        | set(untracked_proc.stdout.splitlines())
-    )
+    return set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines()) | set(untracked_proc.stdout.splitlines())
 
 
 def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] | None:
@@ -320,12 +315,13 @@ def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] 
         target_abs = target.resolve()
         work_dir = target_abs if target_abs.is_dir() else target_abs.parent
 
-        root_proc = subprocess.run(
+        root_proc = subprocess.run(  # noqa: S603
             [git_bin, "rev-parse", "--show-toplevel"],
             capture_output=True,
             text=True,
             cwd=work_dir,
             timeout=10,
+            check=False,
         )
         if root_proc.returncode != 0:
             return None
@@ -427,11 +423,7 @@ def main() -> None:
             "--config",
             type=Path,
             default=None,
-            help=(
-                "Directory to use as the config discovery root, or a file whose parent"
-                " directory is used as the root (pyproject.toml takes precedence over"
-                " .safelint.yaml when both exist)"
-            ),
+            help=("Directory to use as the config discovery root, or a file whose parent directory is used as the root (pyproject.toml takes precedence over .safelint.yaml when both exist)"),
         )
         parser.add_argument(
             "--all-files",

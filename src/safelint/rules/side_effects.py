@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import ast
+from typing import TYPE_CHECKING
 
-from safelint.rules.base import BaseRule, Violation
+from safelint.rules.base import BaseRule
+
+
+if TYPE_CHECKING:
+    from safelint.rules.base import Violation
 
 
 class SideEffectsHiddenRule(BaseRule):
@@ -30,9 +35,7 @@ class SideEffectsHiddenRule(BaseRule):
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
-        io_funcs: frozenset[str] = frozenset(
-            self.config.get("io_functions", ["open", "print", "input"])
-        )
+        io_funcs: frozenset[str] = frozenset(self.config.get("io_functions", ["open", "print", "input"]))
         pure_prefixes: tuple[str, ...] = tuple(self.config.get("pure_prefixes", []))
 
         violations = []
@@ -40,9 +43,7 @@ class SideEffectsHiddenRule(BaseRule):
             if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
                 continue
             name_lower = node.name.lower()
-            if not any(
-                name_lower.startswith(p) or name_lower == p.rstrip("_") for p in pure_prefixes
-            ):
+            if not any(name_lower.startswith(p) or name_lower == p.rstrip("_") for p in pure_prefixes):
                 continue
             io_call = self._first_io_call(node, io_funcs)
             if io_call:
@@ -50,9 +51,7 @@ class SideEffectsHiddenRule(BaseRule):
                     self._v(
                         filepath,
                         io_call.lineno,
-                        f'Function "{node.name}" looks pure but calls I/O primitive'
-                        f' "{self._call_name(io_call.func)}"'
-                        " - rename to signal intent or use dependency injection",
+                        f'Function "{node.name}" looks pure but calls I/O primitive "{self._call_name(io_call.func)}" - rename to signal intent or use dependency injection',
                     )
                 )
         return violations
@@ -76,9 +75,7 @@ class SideEffectsRule(BaseRule):
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""
-        io_funcs: frozenset[str] = frozenset(
-            self.config.get("io_functions", ["open", "print", "input"])
-        )
+        io_funcs: frozenset[str] = frozenset(self.config.get("io_functions", ["open", "print", "input"]))
         io_keywords: list[str] = self.config.get("io_name_keywords", [])
 
         violations = []
@@ -93,9 +90,7 @@ class SideEffectsRule(BaseRule):
                     self._v(
                         filepath,
                         io_call.lineno,
-                        f'Function "{node.name}" calls I/O primitive'
-                        f' "{self._call_name(io_call.func)}"'
-                        " - rename to signal intent or use dependency injection",
+                        f'Function "{node.name}" calls I/O primitive "{self._call_name(io_call.func)}" - rename to signal intent or use dependency injection',
                     )
                 )
         return violations

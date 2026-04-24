@@ -12,9 +12,15 @@ alternatively, you can enable them in ``.safelint.yaml`` under
 from __future__ import annotations
 
 import ast
+from typing import TYPE_CHECKING, ClassVar
 
 from safelint.analysis.dataflow import TaintTracker
-from safelint.rules.base import BaseRule, Violation
+from safelint.rules.base import BaseRule
+
+
+if TYPE_CHECKING:
+    from safelint.rules.base import Violation
+
 
 # ---------------------------------------------------------------------------
 # TaintedSinkRule
@@ -38,7 +44,7 @@ class TaintedSinkRule(BaseRule):
     name = "tainted_sink"
     code = "SAFE801"
 
-    _DEFAULT_SINKS: list[str] = [
+    _DEFAULT_SINKS: ClassVar[list[str]] = [
         "eval",
         "exec",
         "compile",
@@ -50,7 +56,7 @@ class TaintedSinkRule(BaseRule):
         "check_output",
         "execute",
     ]
-    _DEFAULT_SANITIZERS: list[str] = [
+    _DEFAULT_SANITIZERS: ClassVar[list[str]] = [
         "escape",
         "sanitize",
         "clean",
@@ -59,7 +65,7 @@ class TaintedSinkRule(BaseRule):
         "encode",
         "bleach",
     ]
-    _DEFAULT_SOURCES: list[str] = [
+    _DEFAULT_SOURCES: ClassVar[list[str]] = [
         "input",
         "readline",
         "recv",
@@ -93,8 +99,7 @@ class TaintedSinkRule(BaseRule):
             self._v(
                 filepath,
                 lineno,
-                f'Tainted variable "{var}" flows into dangerous sink "{sink}"'
-                " - sanitize input before use",
+                f'Tainted variable "{var}" flows into dangerous sink "{sink}" - sanitize input before use',
             )
             for lineno, var, sink in tracker.sink_hits
         ]
@@ -128,7 +133,7 @@ class ReturnValueIgnoredRule(BaseRule):
     name = "return_value_ignored"
     code = "SAFE802"
 
-    _DEFAULT_FLAGGED: list[str] = [
+    _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
         "call",
         "check_output",
@@ -167,8 +172,7 @@ class ReturnValueIgnoredRule(BaseRule):
                     self._v(
                         filepath,
                         node.lineno,
-                        f'Return value of "{name}" is discarded'
-                        " - check the result or assign it to a named variable",
+                        f'Return value of "{name}" is discarded - check the result or assign it to a named variable',
                     )
                 )
         return violations
@@ -233,8 +237,7 @@ class NullDereferenceRule(BaseRule):
                     self._v(
                         filepath,
                         lineno,
-                        f'Result of "{method}()" is immediately dereferenced'
-                        ' without a None check - guard with "if result is not None"',
+                        f'Result of "{method}()" is immediately dereferenced without a None check - guard with "if result is not None"',
                     )
                 )
         return violations
