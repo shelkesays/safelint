@@ -223,6 +223,31 @@ pytest
 safelint check src/
 ```
 
+## Releasing to PyPI (Trusted Publishing)
+
+This project publishes to PyPI via GitHub Actions using PyPI Trusted Publishing (OIDC). Do not use local `uv publish` username/password auth.
+
+One-time setup:
+
+1. In PyPI, open your project → **Manage** → **Publishing** → **Add a trusted publisher**.
+2. Use:
+   - Owner: `shelkesays`
+   - Repository: `safelint`
+   - Workflow: `publish.yml`
+   - Environment: `pypi`
+3. In GitHub, create an environment named `pypi` in **Settings → Environments**.
+
+Release flow:
+
+```bash
+# 1) bump version in pyproject.toml
+# 2) commit and push
+git tag vX.Y.Z
+git push origin vX.Y.Z
+```
+
+Pushing the version tag triggers `.github/workflows/publish.yml`, which builds and publishes to PyPI.
+
 ---
 
 ## Contributing
