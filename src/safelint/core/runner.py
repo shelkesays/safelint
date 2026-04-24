@@ -18,6 +18,7 @@ def run(
     config_path: str | Path | None = None,
     changed_files: list[str] | None = None,
     files: list[str] | None = None,
+    ignore: list[str] | None = None,
 ) -> list[LintResult]:
     """Load config and lint *target* (file or directory).
 
@@ -38,6 +39,9 @@ def run(
         Explicit list of ``.py`` files to lint. When provided, skips directory
         discovery and checks exactly these files. Also used as *changed_files*
         for test-coupling rules when *changed_files* is not set separately.
+    ignore:
+        Extra rule codes or names to suppress on top of whatever is listed in
+        the config file's ``ignore`` key.
 
     """
     if config_path:
@@ -46,6 +50,8 @@ def run(
     else:
         search_from = Path(target)
     config = load_config(search_from if search_from.is_dir() else search_from.parent)
+    if ignore:
+        config["ignore"] = list(set(config.get("ignore", [])) | set(ignore))
     engine = SafetyEngine(
         config,
         changed_files=changed_files if changed_files is not None else files,

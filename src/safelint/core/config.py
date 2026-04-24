@@ -59,6 +59,7 @@ DEFAULTS: dict[str, Any] = {
     "mode": "local",
     "fail_on": "error",
     "exclude_paths": [],
+    "ignore": [],
     "execution": {
         # Stop checking a file the moment the first violation is found.
         # Cheap structural rules run first so expensive checks are skipped
