@@ -21,10 +21,7 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Testing",
 ]
-dependencies = [
-    # tomllib is stdlib on Python 3.11+; tomli is the official backport for 3.10
-    "tomli>=1.1.0; python_version < '3.11'",
-]
+dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/shelkesays/safelint"
