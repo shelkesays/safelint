@@ -5,8 +5,6 @@ from __future__ import annotations
 import ast
 import textwrap
 
-import pytest
-
 from safelint.analysis.dataflow import TaintTracker, _call_name
 from safelint.rules.dataflow import NullDereferenceRule, ReturnValueIgnoredRule, TaintedSinkRule
 
