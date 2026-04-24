@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import ast
+from typing import TYPE_CHECKING
 
-from safelint.rules.base import BaseRule, Violation
+from safelint.rules.base import BaseRule
+
+
+if TYPE_CHECKING:
+    from safelint.rules.base import Violation
 
 
 class ResourceLifecycleRule(BaseRule):
@@ -26,8 +31,7 @@ class ResourceLifecycleRule(BaseRule):
             for node in ast.walk(tree)
             if isinstance(node, ast.With)
             for item in node.items
-            if isinstance(item.context_expr, ast.Call)
-            and self._call_name(item.context_expr.func) in tracked
+            if isinstance(item.context_expr, ast.Call) and self._call_name(item.context_expr.func) in tracked
         }
 
     def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
@@ -48,8 +52,7 @@ class ResourceLifecycleRule(BaseRule):
                 self._v(
                     filepath,
                     node.lineno,
-                    f'"{call_name}()" called outside a with block'
-                    f" - use a context manager or ensure {cleanup_str} is called on all exit paths",
+                    f'"{call_name}()" called outside a with block - use a context manager or ensure {cleanup_str} is called on all exit paths',
                 )
             )
         return violations

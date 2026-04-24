@@ -3,8 +3,13 @@
 from __future__ import annotations
 
 import ast
+from typing import TYPE_CHECKING
 
-from safelint.rules.base import BaseRule, Violation
+from safelint.rules.base import BaseRule
+
+
+if TYPE_CHECKING:
+    from safelint.rules.base import Violation
 
 
 class ComplexityRule(BaseRule):
@@ -31,8 +36,7 @@ class ComplexityRule(BaseRule):
                     self._v(
                         filepath,
                         node.lineno,
-                        f'Function "{node.name}" has cyclomatic complexity {cc}'
-                        f" (max {max_cc}) - split into smaller functions",
+                        f'Function "{node.name}" has cyclomatic complexity {cc} (max {max_cc}) - split into smaller functions',
                     )
                 )
         return violations

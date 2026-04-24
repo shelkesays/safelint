@@ -16,6 +16,7 @@ from safelint.rules.side_effects import SideEffectsHiddenRule, SideEffectsRule
 from safelint.rules.state_purity import GlobalMutationRule, GlobalStateRule
 from safelint.rules.test_coverage import TestCouplingRule, TestExistenceRule
 
+
 # Canonical list - cheap structural rules first, dataflow rules last
 # (they are more expensive and disabled by default).
 ALL_RULES: list[type[BaseRule]] = [
@@ -47,25 +48,25 @@ RULE_BY_NAME: dict[str, type[BaseRule]] = {cls.name: cls for cls in ALL_RULES}
 __all__ = [
     "ALL_RULES",
     "RULE_BY_NAME",
-    "BaseRule",
-    "Violation",
-    "FunctionLengthRule",
-    "NestingDepthRule",
-    "MaxArgumentsRule",
-    "ComplexityRule",
     "BareExceptRule",
+    "BaseRule",
+    "ComplexityRule",
     "EmptyExceptRule",
-    "LoggingOnErrorRule",
-    "GlobalStateRule",
+    "FunctionLengthRule",
     "GlobalMutationRule",
+    "GlobalStateRule",
+    "LoggingOnErrorRule",
+    "MaxArgumentsRule",
+    "MissingAssertionsRule",
+    "NestingDepthRule",
+    "NullDereferenceRule",
+    "ResourceLifecycleRule",
+    "ReturnValueIgnoredRule",
     "SideEffectsHiddenRule",
     "SideEffectsRule",
-    "ResourceLifecycleRule",
-    "UnboundedLoopRule",
-    "MissingAssertionsRule",
-    "TestExistenceRule",
-    "TestCouplingRule",
     "TaintedSinkRule",
-    "ReturnValueIgnoredRule",
-    "NullDereferenceRule",
+    "TestCouplingRule",
+    "TestExistenceRule",
+    "UnboundedLoopRule",
+    "Violation",
 ]
