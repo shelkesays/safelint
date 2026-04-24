@@ -5,7 +5,11 @@ from __future__ import annotations
 import ast
 import textwrap
 
+import pytest
+
 from safelint.analysis.dataflow import TaintTracker, _call_name
+from safelint.core.config import DEFAULTS
+from safelint.rules import RULE_BY_NAME
 from safelint.rules.dataflow import NullDereferenceRule, ReturnValueIgnoredRule, TaintedSinkRule
 
 
@@ -14,7 +18,7 @@ from safelint.rules.dataflow import NullDereferenceRule, ReturnValueIgnoredRule,
 # ---------------------------------------------------------------------------
 
 
-def parse(src: str) -> ast.AST:
+def parse(src: str) -> ast.Module:
     return ast.parse(textwrap.dedent(src))
 
 
@@ -31,21 +35,42 @@ def violations(rule_cls, src: str, config: dict | None = None):
 
 def test_call_name_from_name_node():
     tree = parse("foo()")
-    call = tree.body[0].value
-    assert _call_name(call.func) == "foo"
+    expr = tree.body[0]
+    if isinstance(expr, ast.Expr):
+        call = expr.value
+        if isinstance(call, ast.Call):
+            assert _call_name(call.func) == "foo"
+        else:
+            pytest.fail("Expected ast.Call node")
+    else:
+        pytest.fail("Expected ast.Expr node")
 
 
 def test_call_name_from_attribute_node():
     tree = parse("obj.method()")
-    call = tree.body[0].value
-    assert _call_name(call.func) == "method"
+    expr = tree.body[0]
+    if isinstance(expr, ast.Expr):
+        call = expr.value
+        if isinstance(call, ast.Call):
+            assert _call_name(call.func) == "method"
+        else:
+            pytest.fail("Expected ast.Call node")
+    else:
+        pytest.fail("Expected ast.Expr node")
 
 
 def test_call_name_unknown_returns_none():
     # Subscript call: func_map["key"]() - not a Name or Attribute
     tree = parse("func_map['key']()")
-    call = tree.body[0].value
-    assert _call_name(call.func) is None
+    expr = tree.body[0]
+    if isinstance(expr, ast.Expr):
+        call = expr.value
+        if isinstance(call, ast.Call):
+            assert _call_name(call.func) is None
+        else:
+            pytest.fail("Expected ast.Call node")
+    else:
+        pytest.fail("Expected ast.Expr node")
 
 
 # ---------------------------------------------------------------------------
@@ -72,7 +97,7 @@ def test_tracker_direct_param_to_sink():
     tracker = make_tracker({"user_input"})
     tracker.visit(func)
     assert len(tracker.sink_hits) == 1
-    lineno, var, sink = tracker.sink_hits[0]
+    _lineno, var, sink = tracker.sink_hits[0]
     assert var == "user_input"
     assert sink == "eval"
 
@@ -349,7 +374,6 @@ def test_null_deref_non_nullable_call_ok():
 
 
 def test_new_rules_in_registry():
-    from safelint.rules import RULE_BY_NAME
 
     assert "tainted_sink" in RULE_BY_NAME
     assert "return_value_ignored" in RULE_BY_NAME
@@ -357,7 +381,6 @@ def test_new_rules_in_registry():
 
 
 def test_new_rules_disabled_by_default():
-    from safelint.core.config import DEFAULTS
 
     for name in ("tainted_sink", "return_value_ignored", "null_dereference"):
         assert DEFAULTS["rules"][name]["enabled"] is False, f"{name} should be off by default"

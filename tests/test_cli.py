@@ -3,11 +3,16 @@
 from __future__ import annotations
 
 import argparse
-from pathlib import Path
 import re
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    from pytest_mock import MockerFixture
 
 import pytest
-from pytest_mock import MockerFixture
 
 from safelint.cli import _file_summary_line, _make_summary, _run_hook
 from safelint.core.engine import LintResult
