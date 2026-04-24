@@ -171,6 +171,9 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
         return 0
 
     config = load_config()
+    cli_ignore = getattr(args, "ignore", [])
+    if cli_ignore:
+        config["ignore"] = list(set(config.get("ignore", [])) | set(cli_ignore))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
     engine = SafetyEngine(config, changed_files=files)
 
@@ -362,7 +365,7 @@ def _run_check(args: argparse.Namespace) -> int:
         else:
             changed_files, files = modified
 
-    results = run(target, config_path=config_path, files=files, changed_files=changed_files)
+    results = run(target, config_path=config_path, files=files, changed_files=changed_files, ignore=getattr(args, "ignore", None) or None)
 
     config = load_config(_config_dir(Path(config_path) if config_path else None, target))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
@@ -387,7 +390,7 @@ def _run_check(args: argparse.Namespace) -> int:
 
 
 def _build_common_args(parser: argparse.ArgumentParser) -> None:
-    """Add --fail-on and --mode to *parser*."""
+    """Add --fail-on, --mode, and --ignore to *parser*."""
     parser.add_argument(
         "--fail-on",
         dest="fail_on",
@@ -400,6 +403,13 @@ def _build_common_args(parser: argparse.ArgumentParser) -> None:
         choices=["local", "ci"],
         default=None,
         help="Execution mode: local (fail_on=error) | ci (fail_on=warning)",
+    )
+    parser.add_argument(
+        "--ignore",
+        nargs="+",
+        default=[],
+        metavar="CODE",
+        help="Rule codes or names to ignore, e.g. --ignore SAFE101 function_length",
     )
 
 
