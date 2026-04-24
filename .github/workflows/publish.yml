@@ -1,0 +1,61 @@
+name: Publish to PyPI
+
+# Triggered by pushing a version tag, e.g.:  git tag v1.3.1 && git push --tags
+#
+# PyPI setup (one-time, before the first release):
+#   1. Create the project on pypi.org (first upload) or configure Trusted Publishing.
+#   2. On pypi.org → your project → Manage → Publishing → add a trusted publisher:
+#        Owner:      shelkesays
+#        Repository: safelint
+#        Workflow:   publish.yml
+#        Environment: pypi
+#   3. In GitHub → Settings → Environments → create an environment named "pypi".
+#      (Optionally add a protection rule requiring a reviewer before deploy.)
+#   No API token or secret is needed when using Trusted Publishing.
+
+on:
+  push:
+    tags:
+      - "v[0-9]+.[0-9]+.[0-9]+"
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    name: Build distribution
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: Build sdist and wheel
+        run: uv build
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    name: Publish to PyPI
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/safelint
+
+    permissions:
+      id-token: write  # required for OIDC trusted publishing
+
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
