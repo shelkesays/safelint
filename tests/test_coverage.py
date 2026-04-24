@@ -512,9 +512,7 @@ def test_engine_injects_changed_files_for_test_coupling(tmp_path: Path) -> None:
 def test_base_rule_call_name_returns_none_for_subscript() -> None:
     """BaseRule._call_name returns None when the func node is a Subscript."""
 
-    rule = SideEffectsRule(
-        {"enabled": True, "severity": "warning", "io_functions": ["open"], "io_name_keywords": []}
-    )
+    rule = SideEffectsRule({"enabled": True, "severity": "warning", "io_functions": ["open"], "io_name_keywords": []})
     tree = ast.parse("func_map['key']()")
     expr = tree.body[0]
     if isinstance(expr, ast.Expr):
@@ -1019,7 +1017,5 @@ def test_cli_check_only_in_target_files_linted(tmp_path: Path, mocker) -> None:
     mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, diff_proc, diff_proc, empty_proc])
 
     # Target is src/ only — test_mod.py must not be linted
-    args = argparse.Namespace(
-        target=src_dir, config=None, fail_on="error", mode=None, all_files=False, ignore=None
-    )
+    args = argparse.Namespace(target=src_dir, config=None, fail_on="error", mode=None, all_files=False, ignore=None)
     assert _run_check(args) == 0

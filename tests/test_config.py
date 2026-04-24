@@ -112,9 +112,7 @@ def test_load_config_pyproject_without_safelint_section_falls_back(tmp_path: Pat
 
 def test_load_config_pyproject_takes_priority_over_yaml(tmp_path: Path) -> None:
     """pyproject.toml [tool.safelint] takes priority over .safelint.yaml."""
-    (tmp_path / "pyproject.toml").write_text(
-        "[tool.safelint]\nmode = 'ci'\n", encoding="utf-8"
-    )
+    (tmp_path / "pyproject.toml").write_text("[tool.safelint]\nmode = 'ci'\n", encoding="utf-8")
     (tmp_path / ".safelint.yaml").write_text("mode: local\n", encoding="utf-8")
 
     config = load_config(tmp_path)
@@ -124,9 +122,7 @@ def test_load_config_pyproject_takes_priority_over_yaml(tmp_path: Path) -> None:
 
 def test_load_config_pyproject_walks_up(tmp_path: Path) -> None:
     """load_config() walks parent directories to find pyproject.toml."""
-    (tmp_path / "pyproject.toml").write_text(
-        "[tool.safelint]\nfail_on = 'warning'\n", encoding="utf-8"
-    )
+    (tmp_path / "pyproject.toml").write_text("[tool.safelint]\nfail_on = 'warning'\n", encoding="utf-8")
     nested = tmp_path / "src" / "mypackage"
     nested.mkdir(parents=True)
 

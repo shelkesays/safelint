@@ -47,11 +47,7 @@ def test_engine_detects_nesting_depth(tmp_path: Path) -> None:
     """nesting_depth rule fires on deeply nested control flow."""
     sample = tmp_path / "nested.py"
     sample.write_text(
-        "def deep():\n"
-        "    if True:\n"
-        "        for x in []:\n"
-        "            while True:\n"
-        "                break\n",
+        "def deep():\n    if True:\n        for x in []:\n            while True:\n                break\n",
         encoding="utf-8",
     )
 
@@ -111,9 +107,7 @@ def test_engine_fail_fast_stops_after_first_rule_with_violations(tmp_path: Path)
     """fail_fast=True stops after the first rule that produces violations."""
     sample = tmp_path / "multi.py"
     sample.write_text(
-        "def foo():\n"
-        "    try:\n        pass\n    except:\n        pass\n"
-        + "    x = 1\n" * 65,
+        "def foo():\n    try:\n        pass\n    except:\n        pass\n" + "    x = 1\n" * 65,
         encoding="utf-8",
     )
 

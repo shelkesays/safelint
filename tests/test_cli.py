@@ -70,10 +70,12 @@ def test_file_summary_line_warnings_plural() -> None:
 
 def test_file_summary_line_mixed_violations() -> None:
     """Mixed severities: errors are listed before warnings."""
-    line = _strip(_file_summary_line(
-        "path/file.py",
-        [_v("error"), _v("warning"), _v("warning")],
-    ))
+    line = _strip(
+        _file_summary_line(
+            "path/file.py",
+            [_v("error"), _v("warning"), _v("warning")],
+        )
+    )
     assert line == "path/file.py \u2014 1 error, 2 warnings."
 
 
