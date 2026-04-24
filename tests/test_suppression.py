@@ -244,13 +244,7 @@ def test_fail_fast_does_not_stop_on_suppressed_violation(tmp_path: Path) -> None
     # has a bare except (bare_except fires, line ~4).  Suppress function_length
     # by code so the loop should continue to bare_except.
     long_body = "    x = 1\n" * 61
-    source = (
-        "def foo():  # nosafe: SAFE101\n"
-        "    try:\n"
-        "        pass\n"
-        "    except:\n"
-        "        pass\n"
-    ) + long_body
+    source = ("def foo():  # nosafe: SAFE101\n    try:\n        pass\n    except:\n        pass\n") + long_body
     sample = tmp_path / "s.py"
     sample.write_text(source, encoding="utf-8")
 
@@ -284,17 +278,9 @@ def test_fail_fast_stops_after_first_unsuppressed_rule(tmp_path: Path) -> None:
     result_no = SafetyEngine(config_no).check_file(str(sample))
 
     # fail_fast: function_length violation present, bare_except absent
-    assert any(v.rule == "function_length" for v in result_ff.violations), (
-        "Expected function_length violation with fail_fast enabled"
-    )
-    assert not any(v.rule == "bare_except" for v in result_ff.violations), (
-        "bare_except should be skipped by fail_fast after function_length fires"
-    )
+    assert any(v.rule == "function_length" for v in result_ff.violations), "Expected function_length violation with fail_fast enabled"
+    assert not any(v.rule == "bare_except" for v in result_ff.violations), "bare_except should be skipped by fail_fast after function_length fires"
 
     # without fail_fast: both rules must have fired
-    assert any(v.rule == "function_length" for v in result_no.violations), (
-        "Expected function_length violation without fail_fast"
-    )
-    assert any(v.rule == "bare_except" for v in result_no.violations), (
-        "Expected bare_except violation without fail_fast"
-    )
+    assert any(v.rule == "function_length" for v in result_no.violations), "Expected function_length violation without fail_fast"
+    assert any(v.rule == "bare_except" for v in result_no.violations), "Expected bare_except violation without fail_fast"
