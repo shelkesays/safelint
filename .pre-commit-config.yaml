@@ -72,7 +72,7 @@ repos:
   # Config: [tool.ruff] / [tool.ruff.lint] in pyproject.toml
   # ---------------------------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.11
+    rev: v0.15.12
     hooks:
       - id: ruff
         args: [--fix, --unsafe-fixes, --exit-non-zero-on-fix]
@@ -89,7 +89,7 @@ repos:
   #   --fail-on=warning  error + warning violations block      ← strict (CI)
   # ---------------------------------------------------------------------------
   - repo: https://github.com/shelkesays/safelint
-    rev: v1.3.1
+    rev: v1.3.2
     hooks:
       - id: safelint
         args: [--fail-on=error]
