@@ -193,9 +193,9 @@ class SafetyEngine:
         if raw_max == 0:
             default = DEFAULTS["max_file_size_bytes"]
             _diagnostics.print_warning(
-                f"max_file_size_bytes = 0 disables the per-file size guard and would read every file unbounded; "
-                f"falling back to the default of {default:,} bytes. "
-                f"Set a large positive value explicitly if you really need a higher bound."
+                f"max_file_size_bytes = 0 is not supported — it would read every file unbounded and defeat "
+                f"the OOM guard. Falling back to the built-in default of {default:,} bytes. "
+                f"To allow larger files, set a positive value explicitly (e.g. 50_000_000 for 50 MB)."
             )
             return default
         return raw_max
@@ -392,8 +392,7 @@ class SafetyEngine:
         active, suppressed = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes)
         return LintResult(path=filepath, violations=active, suppressed=suppressed)
 
-    @staticmethod
-    def _walk_supported_files(target: Path, ext_tuple: tuple[str, ...]) -> set[str]:
+    def _walk_supported_files(self, target: Path, ext_tuple: tuple[str, ...]) -> set[str]:
         """Return the set of regular-file paths under *target* whose name ends with one of *ext_tuple*.
 
         Uses ``os.walk(..., followlinks=False)`` so symlink cycles
@@ -408,10 +407,20 @@ class SafetyEngine:
         FIFO would block the process forever, and reading a device file
         is undefined behaviour. The stat cost is bounded to suffix
         matches (the cheap string check runs first).
+
+        Excluded subtrees (matching ``exclude_paths`` glob patterns) are
+        pruned during descent by mutating ``dirnames`` in place — saves
+        the cost of walking large excluded trees like ``node_modules``,
+        ``.venv``, or ``build/`` when the user has explicit directory
+        excludes. Files matching exclude patterns are still filtered
+        at the per-file step (handles patterns that target file names
+        rather than directories).
         """
         seen: set[str] = set()
-        for dirpath, _dirnames, filenames in os.walk(target, followlinks=False):
+        for dirpath, dirnames, filenames in os.walk(target, followlinks=False):
             dir_path = Path(dirpath)
+            # In-place mutation tells os.walk which subdirs to descend into.
+            dirnames[:] = [d for d in dirnames if not self._is_excluded(str(dir_path / d))]
             # Two-stage generator: build the joined Path once per suffix
             # match, then filter on ``is_file()`` using that same object.
             # Avoids constructing ``dir_path / name`` twice and keeps the

@@ -1172,6 +1172,42 @@ def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
     assert len(files) == 1
 
 
+def test_discover_files_prunes_excluded_subtrees(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Excluded directories should be pruned during ``os.walk`` descent —
+    not just filtered at the end. Verified by spying on ``Path.is_file``:
+    if we ever query a file inside an excluded subtree, the prune logic
+    broke and we did the wasted descent.
+    """
+    target = tmp_path / "root"
+    (target / "src").mkdir(parents=True)
+    (target / "src" / "good.py").write_text("x = 1\n", encoding="utf-8")
+    excluded_dir = target / "node_modules"
+    excluded_dir.mkdir()
+    (excluded_dir / "evil.py").write_text("x = 2\n", encoding="utf-8")
+    (excluded_dir / "deep").mkdir()
+    (excluded_dir / "deep" / "deeper.py").write_text("x = 3\n", encoding="utf-8")
+
+    queried: list[str] = []
+    original_is_file = _Path.is_file
+
+    def spy(self: _Path) -> bool:
+        queried.append(str(self))
+        return original_is_file(self)
+
+    monkeypatch.setattr(_Path, "is_file", spy)
+
+    # Pattern matches the excluded directory's exact path so `_is_excluded`
+    # prunes it during descent.
+    cfg = deep_merge(DEFAULTS, {"exclude_paths": [str(excluded_dir)]})
+    files = SafetyEngine(cfg)._discover_files(target)
+
+    assert any(f.endswith("good.py") for f in files), "real file should still be discovered"
+    assert not any("evil.py" in f or "deeper.py" in f for f in files), "files inside excluded subtree must not appear in results"
+    # Critical: is_file() must never have been called on anything inside
+    # node_modules — the whole point of pruning is skipping the descent.
+    assert not any("node_modules" in q for q in queried), f"discovery descended into excluded subtree; queried paths: {[q for q in queried if 'node_modules' in q]}"
+
+
 def test_check_file_skips_non_regular_path(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``check_file`` is invoked directly by the CLI hook mode with an
     explicit file list — bypassing ``_discover_files``'s regular-file
@@ -1287,11 +1323,15 @@ def test_check_file_size_bound_zero_falls_back_to_default(tmp_path: Path, capsys
     cfg = deep_merge(DEFAULTS, {"max_file_size_bytes": 0})
     engine = SafetyEngine(cfg)
 
-    # Init-time warning fires.
+    # Init-time warning fires. Case-insensitive substring matches keep the
+    # test resilient to small wording tweaks of the warning copy — only the
+    # *behaviour* (warns + falls back) is what's contractually locked in.
     captured = capsys.readouterr()
-    assert "safelint: warning:" in captured.err
-    assert "max_file_size_bytes = 0" in captured.err
-    assert "falling back to the default" in captured.err
+    err_lower = captured.err.lower()
+    assert "safelint: warning:" in err_lower
+    assert "max_file_size_bytes = 0" in err_lower
+    assert "falling back" in err_lower
+    assert "default" in err_lower
 
     # The runtime value is the default, not 0.
     assert engine.max_file_size_bytes == DEFAULTS["max_file_size_bytes"]
