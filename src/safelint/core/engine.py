@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import fnmatch
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
@@ -124,6 +125,7 @@ class SafetyEngine:
         exec_cfg: dict[str, Any] = config.get("execution", {})
         self.fail_fast: bool = exec_cfg.get("fail_fast", False)
         self.exclude_paths: list[str] = config.get("exclude_paths", [])
+        self.max_file_size_bytes: int = config.get("max_file_size_bytes", DEFAULTS["max_file_size_bytes"])
 
         raw_ignore = config.get("ignore", [])
         if not isinstance(raw_ignore, (list, tuple)):
@@ -297,6 +299,19 @@ class SafetyEngine:
         if lang is None:
             return LintResult(path=filepath)
 
+        # Size guard: skip oversize inputs with a stderr diagnostic instead
+        # of OOM-ing the process. ``max_file_size_bytes = 0`` disables.
+        if self.max_file_size_bytes > 0:
+            try:
+                size = Path(filepath).stat().st_size
+            # If we can't stat the file, fall through to the read which will
+            # produce a SAFE000 with the underlying error.
+            except OSError:  # nosafe: SAFE203
+                size = -1
+            if size > self.max_file_size_bytes:
+                _diagnostics.print_warning(f"skipping {filepath} ({size:,} bytes exceeds max_file_size_bytes={self.max_file_size_bytes:,})")
+                return LintResult(path=filepath)
+
         try:
             source = Path(filepath).read_text(encoding="utf-8")
         # Read failures are surfaced to the user as a SAFE000 parse-error
@@ -322,20 +337,27 @@ class SafetyEngine:
         active, suppressed = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes)
         return LintResult(path=filepath, violations=active, suppressed=suppressed)
 
-    def _discover_files(self, target: Path) -> list[str]:
-        """Return every supported source file under *target*, deduplicated and sorted.
+    @staticmethod
+    def _walk_supported_files(target: Path, ext_tuple: tuple[str, ...]) -> set[str]:
+        """Return the set of file paths under *target* whose name ends with one of *ext_tuple*.
 
-        One ``rglob('*')`` pass — keeps discovery O(number_of_files) rather
-        than O(number_of_extensions * number_of_files). The suffix check
-        is a cheap string comparison; ``is_file()`` only runs on suffix
-        matches, so the stat cost stays bounded by the count of source
-        files (not the size of the tree).
+        Uses ``os.walk(..., followlinks=False)`` so symlink cycles
+        (e.g. ``a/sub -> ..``) cannot cause infinite descent — ``os.walk``
+        skips into linked subdirectories outright. Matches what ruff and
+        flake8 do by default.
         """
-        extensions = supported_extensions()
         seen: set[str] = set()
-        for path in target.rglob("*"):
-            if path.suffix in extensions and path.is_file():
-                seen.add(str(path))
+        for dirpath, _dirnames, filenames in os.walk(target, followlinks=False):
+            dir_path = Path(dirpath)
+            seen.update(str(dir_path / name) for name in filenames if name.endswith(ext_tuple))
+        return seen
+
+    def _discover_files(self, target: Path) -> list[str]:
+        """Return every supported source file under *target*, deduplicated and sorted."""
+        # Pre-build a tuple for ``str.endswith`` so the per-file check
+        # stays a cheap string operation (no Path() construction per name).
+        ext_tuple = tuple(supported_extensions())
+        seen = self._walk_supported_files(target, ext_tuple)
         return sorted(p for p in seen if not self._is_excluded(p))
 
     def check_path(self, path: str | Path) -> list[LintResult]:

@@ -44,6 +44,12 @@ DEFAULTS: dict[str, Any] = {
     "exclude_paths": [],
     "ignore": [],
     "per_file_ignores": {},
+    # Skip files whose size exceeds this many bytes. Guards against
+    # OOM on accidentally-huge inputs (binary blobs masquerading as
+    # ``.py``, very large generated parsers, etc.). Set to ``0`` to
+    # disable the bound entirely. Default 5 MiB is large enough that
+    # no realistic source file should hit it.
+    "max_file_size_bytes": 5 * 1024 * 1024,
     "execution": {
         # Stop checking a file the moment the first violation is found.
         # Cheap structural rules run first so expensive checks are skipped

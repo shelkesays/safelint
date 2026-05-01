@@ -32,6 +32,11 @@ exclude_paths = [
     "src/myproject/integrations/legacy.py",
 ]
 
+# Skip files larger than this many bytes with a "safelint: warning:" diagnostic
+# instead of attempting to parse them. Guards against OOM on accidentally-huge
+# inputs. Set to 0 to disable the bound entirely.
+max_file_size_bytes = 5242880   # 5 MiB
+
 
 # ── Execution ─────────────────────────────────────────────────────────────────
 # fail_fast: stop on the first violation per file (faster pre-commit,
