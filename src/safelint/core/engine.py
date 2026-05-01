@@ -319,6 +319,40 @@ class SafetyEngine:
                 break
         return active, suppressed
 
+    def _pre_read_skip(self, filepath: str, path_obj: Path) -> LintResult | None:
+        """Return an empty LintResult to skip *filepath*, or None to proceed.
+
+        Catches the two pre-read conditions that mean we shouldn't even
+        attempt to read the file:
+
+        * **Non-regular path** — FIFOs, device files, broken symlinks.
+          ``check_file`` is also called via CLI hook mode with an explicit
+          file list (bypassing ``_discover_files``'s filter), so a FIFO
+          path passed straight in would block ``read_text`` forever.
+        * **Oversize input** — files larger than ``max_file_size_bytes``
+          would OOM the process when fully read.
+
+        Stat failures fall through to the read path so the user sees a
+        real ``SAFE000`` parse-error rather than a misleading skip.
+        """
+        try:
+            is_regular = path_obj.is_file()
+        except OSError:  # nosafe: SAFE203
+            # Can't stat — let read_text produce a SAFE000 with the
+            # actual error rather than guess at "not a regular file".
+            return None
+        if not is_regular:
+            _diagnostics.print_warning(f"skipping {filepath} (not a regular file)")
+            return LintResult(path=filepath)
+        try:
+            size = path_obj.stat().st_size
+        except OSError:  # nosafe: SAFE203
+            return None
+        if size > self.max_file_size_bytes:
+            _diagnostics.print_warning(f"skipping {filepath} ({size:,} bytes exceeds max_file_size_bytes={self.max_file_size_bytes:,})")
+            return LintResult(path=filepath)
+        return None
+
     def check_file(self, filepath: str) -> LintResult:
         """Parse *filepath*, run every active rule, apply inline suppressions, return a LintResult."""
         if self._is_excluded(filepath):
@@ -328,21 +362,13 @@ class SafetyEngine:
         if lang is None:
             return LintResult(path=filepath)
 
-        # Size guard: skip oversize inputs with a stderr diagnostic instead
-        # of OOM-ing the process. The bound is always positive — see
-        # ``__init__`` where 0 is rejected with a fallback warning.
-        try:
-            size = Path(filepath).stat().st_size
-        # If we can't stat the file, fall through to the read which will
-        # produce a SAFE000 with the underlying error.
-        except OSError:  # nosafe: SAFE203
-            size = -1
-        if size > self.max_file_size_bytes:
-            _diagnostics.print_warning(f"skipping {filepath} ({size:,} bytes exceeds max_file_size_bytes={self.max_file_size_bytes:,})")
-            return LintResult(path=filepath)
+        path_obj = Path(filepath)
+        skip = self._pre_read_skip(filepath, path_obj)
+        if skip is not None:
+            return skip
 
         try:
-            source = Path(filepath).read_text(encoding="utf-8")
+            source = path_obj.read_text(encoding="utf-8")
         # Read failures are surfaced to the user as a SAFE000 parse-error
         # violation — the error is reported, not swallowed.
         except (OSError, UnicodeDecodeError) as exc:  # nosafe: SAFE203
@@ -386,7 +412,12 @@ class SafetyEngine:
         seen: set[str] = set()
         for dirpath, _dirnames, filenames in os.walk(target, followlinks=False):
             dir_path = Path(dirpath)
-            seen.update(str(dir_path / name) for name in filenames if name.endswith(ext_tuple) and (dir_path / name).is_file())
+            # Two-stage generator: build the joined Path once per suffix
+            # match, then filter on ``is_file()`` using that same object.
+            # Avoids constructing ``dir_path / name`` twice and keeps the
+            # comprehension readable.
+            candidates = (dir_path / name for name in filenames if name.endswith(ext_tuple))
+            seen.update(str(p) for p in candidates if p.is_file())
         return seen
 
     def _discover_files(self, target: Path) -> list[str]:

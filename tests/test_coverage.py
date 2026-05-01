@@ -1172,6 +1172,29 @@ def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
     assert len(files) == 1
 
 
+def test_check_file_skips_non_regular_path(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``check_file`` is invoked directly by the CLI hook mode with an
+    explicit file list — bypassing ``_discover_files``'s regular-file
+    filter. Passing a FIFO straight in must not hang ``read_text``; the
+    engine must skip it with a stderr warning and return an empty result.
+    """
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("os.mkfifo not available on this platform")
+    fifo = tmp_path / "stuck.py"
+    try:
+        os.mkfifo(fifo)
+    except (OSError, NotImplementedError):
+        pytest.skip("filesystem does not support mkfifo")
+
+    result = _engine().check_file(str(fifo))
+
+    assert result.violations == []
+    captured = capsys.readouterr()
+    assert "safelint: warning:" in captured.err
+    assert "not a regular file" in captured.err
+    assert "stuck.py" in captured.err
+
+
 def test_discover_files_skips_non_regular_entries(tmp_path: Path) -> None:
     """``os.walk`` lists FIFOs / device files / broken symlinks alongside
     regular files. Reading a FIFO with ``read_text()`` would block the
