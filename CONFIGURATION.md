@@ -148,7 +148,7 @@ These messages always appear before the lint output (they are emitted at config-
 | `exclude_paths` | `[]` | Glob patterns for files to skip entirely, e.g. `["tests/**", "migrations/**"]`. |
 | `ignore` | `[]` | List of rule codes or names to suppress globally across the entire project. |
 | `per_file_ignores` | `{}` | Map of glob pattern → list of codes/names to suppress only for matching files. |
-| `max_file_size_bytes` | `5242880` (5 MiB) | Skip files larger than this many bytes with a `safelint: warning:` diagnostic instead of trying to parse them. Set to `0` to disable the bound entirely. Guards against OOM on accidentally-huge inputs (binary blobs masquerading as `.py`, very large generated parsers). |
+| `max_file_size_bytes` | `5242880` (5 MiB) | Skip files larger than this many bytes with a `safelint: warning:` diagnostic instead of trying to parse them. Guards against OOM on accidentally-huge inputs (binary blobs masquerading as `.py`, very large generated parsers). To allow larger files, raise the bound explicitly — `0` is rejected as a likely typo and falls back to the default with a warning, since `0` would defeat the OOM guard entirely. Must be a non-negative integer. |
 
 ```toml
 [tool.safelint]
@@ -156,7 +156,7 @@ mode = "local"
 fail_on = "error"
 exclude_paths = ["tests/**", "docs/**"]
 ignore = ["SAFE203", "side_effects"]
-max_file_size_bytes = 5242880   # 5 MiB; 0 to disable
+max_file_size_bytes = 5242880   # 5 MiB; raise explicitly to allow larger files
 
 [tool.safelint.per_file_ignores]
 "tests/**" = ["SAFE101", "SAFE103"]

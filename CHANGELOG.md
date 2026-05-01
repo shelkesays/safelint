@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.4.1] - 2026-05-01
 
 ### Added
-- `max_file_size_bytes` top-level config option (default **5 MiB**, set to `0` to disable). Files larger than the bound are skipped with a `safelint: warning: skipping <path> (<size> bytes exceeds max_file_size_bytes=…)` diagnostic to stderr instead of being read into memory and parsed. Guards against OOM on accidentally-huge inputs (binary blobs masquerading as `.py`, very large generated files). Closes #20.
+- `max_file_size_bytes` top-level config option (default **5 MiB**). Files larger than the bound are skipped with a `safelint: warning: skipping <path> (<size> bytes exceeds max_file_size_bytes=…)` diagnostic to stderr instead of being read into memory and parsed. Guards against OOM on accidentally-huge inputs (binary blobs masquerading as `.py`, very large generated files). To allow larger files, raise the bound explicitly — `0` is rejected as a likely typo (it would disable the OOM guard entirely) and falls back to the default with an init-time warning. Engine init validates the value: must be a non-negative integer, otherwise `TypeError`/`ValueError` fires before any file is read. Closes #20.
 
 ### Fixed
 - File discovery is now safe against symlink cycles. `SafetyEngine._discover_files` switched from `Path.rglob('*')` (which follows symlinks and can recurse forever on a cycle like `a/sub -> ..`) to `os.walk(target, followlinks=False)`. Same single-pass O(number_of_files) cost, but safe by construction. Matches what ruff and flake8 do by default. Closes #19.
