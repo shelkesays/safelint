@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.4.1] - 2026-05-01
+
 ### Added
 - `max_file_size_bytes` top-level config option (default **5 MiB**, set to `0` to disable). Files larger than the bound are skipped with a `safelint: warning: skipping <path> (<size> bytes exceeds max_file_size_bytes=…)` diagnostic to stderr instead of being read into memory and parsed. Guards against OOM on accidentally-huge inputs (binary blobs masquerading as `.py`, very large generated files). Closes #20.
 
@@ -76,7 +78,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.4.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.4.1...HEAD
+[1.4.1]: https://github.com/shelkesays/safelint/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/shelkesays/safelint/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/shelkesays/safelint/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/shelkesays/safelint/releases/tag/v1.3.0
