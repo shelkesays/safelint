@@ -35,7 +35,9 @@ class SideEffectsHiddenRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
         io_funcs: frozenset[str] = frozenset(self.config.get("io_functions", ["open", "print", "input"]))
-        pure_prefixes: tuple[str, ...] = tuple(self.config.get("pure_prefixes", []))
+        # Normalise both sides of the comparison so user-supplied prefixes
+        # like ``["Get", "Calculate"]`` still match ``get_data`` / ``calculate_x``.
+        pure_prefixes: tuple[str, ...] = tuple(p.lower() for p in self.config.get("pure_prefixes", []))
 
         violations = []
         for node in walk(tree.root_node):
@@ -68,7 +70,10 @@ class SideEffectsRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""
         io_funcs: frozenset[str] = frozenset(self.config.get("io_functions", ["open", "print", "input"]))
-        io_keywords: list[str] = self.config.get("io_name_keywords", [])
+        # Lowercase BOTH sides so the substring check is genuinely
+        # case-insensitive — mixed-case keywords in config (e.g. ``"Write"``)
+        # still match camelCase function names like ``writeLog``.
+        io_keywords: list[str] = [kw.lower() for kw in self.config.get("io_name_keywords", [])]
 
         violations = []
         for node in walk(tree.root_node):
@@ -76,9 +81,6 @@ class SideEffectsRule(BaseRule):
                 continue
             name_node = node.child_by_field_name("name")
             func_name = node_text(name_node) if name_node else ""
-            # Match keywords case-insensitively so MixedCase / camelCase names
-            # like ``writeLog`` or ``IOWriter`` get exempted the same as
-            # ``write_log``. Mirrors what SideEffectsHiddenRule already does.
             name_lower = func_name.lower()
             if any(kw in name_lower for kw in io_keywords):
                 continue

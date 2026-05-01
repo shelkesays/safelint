@@ -948,6 +948,37 @@ def test_side_effects_io_keyword_match_is_case_insensitive(tmp_path: Path) -> No
     assert not any(v.rule == "side_effects" for v in violations)
 
 
+def test_side_effects_uppercase_config_keyword_still_matches(tmp_path: Path) -> None:
+    """A user-supplied keyword like ``"Write"`` (uppercase) must still exempt
+    a function named ``writeLog``. Both sides of the substring check must be
+    normalised, not just the function name."""
+    source = "def writeLog(msg):\n    print(msg)\n"
+    sample = tmp_path / "mixed_upper_kw.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"side_effects": {"io_name_keywords": ["Write", "Log"]}}},
+    )
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert not any(v.rule == "side_effects" for v in violations)
+
+
+def test_side_effects_hidden_uppercase_pure_prefix_still_matches(tmp_path: Path) -> None:
+    """SideEffectsHiddenRule must also normalise user-supplied prefixes:
+    ``"Get"`` in config should still flag ``get_data`` (which calls open)."""
+    source = "def get_data():\n    f = open('x.txt')\n    return f.read()\n"
+    sample = tmp_path / "upper_prefix.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"side_effects_hidden": {"pure_prefixes": ["Get"]}}},
+    )
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "side_effects_hidden" for v in violations)
+
+
 def test_state_purity_does_not_attribute_class_body_global_to_outer(tmp_path: Path) -> None:
     """A ``global`` declared inside a nested class body lives in the class's
     own scope and must not be attributed to the enclosing function."""
