@@ -176,6 +176,11 @@ class SafetyEngine:
             if not isinstance(entries, (list, tuple)):
                 msg = f"per_file_ignores[{pattern!r}] must be a list of strings, got {type(entries).__name__}"
                 raise TypeError(msg)
+            non_strings = [e for e in entries if not isinstance(e, str)]
+            if non_strings:
+                bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
+                msg = f"per_file_ignores[{pattern!r}] must contain only strings — got: {bad}"
+                raise TypeError(msg)
             unknown_entries = frozenset(e for e in entries if e not in known_names and e.upper() not in known_codes_upper)
             if unknown_entries:
                 _diagnostics.print_warning(f"unknown entries in per_file_ignores[{pattern!r}] (typo or stale rule?): {', '.join(sorted(unknown_entries))}")

@@ -28,7 +28,8 @@ class FunctionLengthRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
                 continue
-            length = end_lineno(node) - lineno(node)
+            # Inclusive line count: a function spanning lines 10..69 is 60 lines.
+            length = end_lineno(node) - lineno(node) + 1
             if length > max_lines:
                 name_node = node.child_by_field_name("name")
                 func_name = node_text(name_node) if name_node else "<anonymous>"

@@ -33,6 +33,7 @@ PYTHON: LanguageDefinition = LanguageDefinition(
 
 FUNCTION_DEF = "function_definition"
 ASYNC_FUNCTION_DEF = "async_function_definition"
+CLASS_DEF = "class_definition"
 
 IF_STATEMENT = "if_statement"
 FOR_STATEMENT = "for_statement"

@@ -140,13 +140,14 @@ def _format_suppressed_breakdown(suppressed: list[Violation]) -> str:
 
     Codes are sorted by descending count, ties broken alphabetically so the
     output is deterministic across runs. Returns an empty string when there
-    are no suppressions.
+    are no suppressions. Falls back to the rule name when ``code`` is empty,
+    matching the tag convention in ``_print_violations``.
     """
     if not suppressed:
         return ""
-    counts = Counter(v.code for v in suppressed)
+    counts = Counter(v.code or v.rule for v in suppressed)
     ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
-    parts = [f"{n} {_c(code, _CYAN)}" for code, n in ordered]
+    parts = [f"{n} {_c(tag, _CYAN)}" for tag, n in ordered]
     return f"{', '.join(parts)} suppressed"
 
 

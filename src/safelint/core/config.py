@@ -14,6 +14,7 @@ TOML support uses the stdlib ``tomllib`` module (Python 3.11+).
 
 from __future__ import annotations
 
+import copy
 from pathlib import Path
 import tomllib
 from typing import Any
@@ -250,7 +251,11 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
     1. ``safelint.toml`` (standalone — keys at top level)
     2. ``pyproject.toml`` → ``[tool.safelint]``
 
-    Returns ``DEFAULTS`` when no config file is found.
+    Always returns a fresh, deep-copied dict so callers can mutate the
+    result (e.g. appending to ``ignore``) without corrupting the module
+    ``DEFAULTS`` or sharing nested lists across loads.
+
+    Returns a copy of ``DEFAULTS`` when no config file is found.
     """
     root = search_from or Path.cwd()
     for parent in [root, *root.parents]:
@@ -261,5 +266,5 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
         if cfg is None:
             cfg = _try_pyproject(parent)
         if cfg is not None:
-            return deep_merge(DEFAULTS, cfg)
-    return DEFAULTS
+            return deep_merge(copy.deepcopy(DEFAULTS), cfg)
+    return copy.deepcopy(DEFAULTS)

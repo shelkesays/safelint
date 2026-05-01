@@ -195,7 +195,7 @@ See [CONFIGURATION.md — Inline suppression](CONFIGURATION.md#inline-suppressio
 
 ## Configuration
 
-SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` file at your project root. See [CONFIGURATION.md](CONFIGURATION.md) for all options, defaults, and examples.
+SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` file at your project root. When both exist in the same directory, **`safelint.toml` wins** — its values override anything in `[tool.safelint]` — matching ruff's `ruff.toml` / `pyproject.toml` precedence. See [CONFIGURATION.md](CONFIGURATION.md) for all options, defaults, and examples.
 
 Ready-to-copy samples:
 

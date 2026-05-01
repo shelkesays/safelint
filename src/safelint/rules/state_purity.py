@@ -10,6 +10,7 @@ from safelint.languages.python import (
     ASSIGNMENT,
     ASYNC_FUNCTION_DEF,
     AUGMENTED_ASSIGNMENT,
+    CLASS_DEF,
     FUNCTION_DEF,
     GLOBAL_STATEMENT,
     IDENTIFIER,
@@ -38,7 +39,10 @@ def _iter_functions(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
             yield node
 
 
-_NESTED_DEF_TYPES = (FUNCTION_DEF, ASYNC_FUNCTION_DEF)
+# Class bodies are their own scope: a `global X` declared inside a nested
+# class belongs to that class body, not the enclosing function. Same for
+# nested function definitions. Stop the per-function walk at any of these.
+_NESTED_SCOPE_TYPES = (FUNCTION_DEF, ASYNC_FUNCTION_DEF, CLASS_DEF)
 
 
 def _iter_global_statements(func_node: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
@@ -47,7 +51,7 @@ def _iter_global_statements(func_node: tree_sitter.Node) -> Iterator[tree_sitter
     Stops at nested function definitions: a ``global`` declared in an inner
     function belongs to that inner function's scope, not the outer one's.
     """
-    for child in walk(func_node, skip_types=_NESTED_DEF_TYPES):
+    for child in walk(func_node, skip_types=_NESTED_SCOPE_TYPES):
         if child.type == GLOBAL_STATEMENT:
             yield child
 
@@ -116,7 +120,7 @@ class GlobalMutationRule(BaseRule):
         their own scope and must not be attributed to the outer function.
         """
         results: list[tuple[int, str]] = []
-        for node in walk(func_node, skip_types=_NESTED_DEF_TYPES):
+        for node in walk(func_node, skip_types=_NESTED_SCOPE_TYPES):
             target = _assignment_target(node)
             if target is not None and node_text(target) in global_names:
                 results.append((lineno(node), node_text(target)))

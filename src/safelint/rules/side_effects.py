@@ -76,7 +76,11 @@ class SideEffectsRule(BaseRule):
                 continue
             name_node = node.child_by_field_name("name")
             func_name = node_text(name_node) if name_node else ""
-            if any(kw in func_name for kw in io_keywords):
+            # Match keywords case-insensitively so MixedCase / camelCase names
+            # like ``writeLog`` or ``IOWriter`` get exempted the same as
+            # ``write_log``. Mirrors what SideEffectsHiddenRule already does.
+            name_lower = func_name.lower()
+            if any(kw in name_lower for kw in io_keywords):
                 continue
             io_call = _first_io_call(node, io_funcs)
             if io_call:

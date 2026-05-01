@@ -158,6 +158,10 @@ class TaintTracker:
             return self._call_tainted(node)
         if node_type == STRING:
             return self._fstring_tainted(node)
+        if node_type == "keyword_argument":
+            # foo(name=expr) — only the value carries data flow.
+            value = node.child_by_field_name("value")
+            return self._is_tainted(value) if value is not None else False
         if node_type == CONCATENATED_STRING or node_type in _CONTAINER_TYPES or node_type in _SPREADING_TYPES:
             return any(self._is_tainted(child) for child in node.named_children)
         return False

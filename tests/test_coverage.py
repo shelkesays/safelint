@@ -864,6 +864,106 @@ def test_parse_error_reports_location_and_kind(tmp_path: Path) -> None:
     assert ("missing" in v.message) or ("syntax error" in v.message)
 
 
+def test_function_length_counts_inclusively(tmp_path: Path) -> None:
+    """A function spanning N lines (including its def line) should report length N.
+
+    Previously the calculation was ``end_lineno - lineno`` which under-reported
+    by 1 — a 60-line function read as 59. The fix is ``+ 1`` for inclusive
+    line counting.
+    """
+    # 5-line function (def + 4 body lines), max_lines=4 → must fire.
+    body = "\n".join(f"    x{i} = {i}" for i in range(4))
+    source = f"def f():\n{body}\n"
+    sample = tmp_path / "len5.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"function_length": {"max_lines": 4}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "function_length"]
+    assert flagged
+    assert "5 lines" in flagged[0].message
+
+
+def test_side_effects_io_keyword_match_is_case_insensitive(tmp_path: Path) -> None:
+    """A function whose name contains an io keyword in mixed case should be exempt.
+
+    Without lowercasing, ``writeLog`` would not match the lowercase keywords
+    ``write`` / ``log`` and would incorrectly fire SAFE304.
+    """
+    source = "def writeLog(msg):\n    print(msg)\n"
+    sample = tmp_path / "mixed.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert not any(v.rule == "side_effects" for v in violations)
+
+
+def test_state_purity_does_not_attribute_class_body_global_to_outer(tmp_path: Path) -> None:
+    """A ``global`` declared inside a nested class body lives in the class's
+    own scope and must not be attributed to the enclosing function."""
+    source = textwrap.dedent("""\
+        counter = 0
+        def outer():
+            class Inner:
+                global counter
+                counter = 1
+            return Inner
+    """)
+    sample = tmp_path / "nested_class_global.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "global_state"]
+    # outer() doesn't declare a global itself; only Inner's body does.
+    assert not any('"outer"' in v.message for v in flagged)
+
+
+def test_taint_tracker_handles_keyword_argument(tmp_path: Path) -> None:
+    """``eval(code=user_input)`` should be flagged: the keyword-argument
+    wrapper must not hide the tainted value from the sink check."""
+    source = textwrap.dedent("""\
+        def run(user_input):
+            eval(code=user_input)
+    """)
+    sample = tmp_path / "kwarg_taint.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+def test_per_file_ignores_rejects_non_string_entries(tmp_path: Path) -> None:
+    """A list containing a non-string entry should fail loud at engine init,
+    not crash later when ``.upper()`` is called on it."""
+    cfg = deep_merge(DEFAULTS, {"per_file_ignores": {"tests/**": ["SAFE101", 42]}})
+    with pytest.raises(TypeError, match="must contain only strings"):
+        SafetyEngine(cfg)
+
+
+def test_load_config_returns_isolated_copy(tmp_path: Path) -> None:
+    """Mutating the result of load_config() must not leak into DEFAULTS."""
+    config = load_config(tmp_path)
+    config["ignore"] = ["SAFE101"]
+    config.setdefault("rules", {}).setdefault("function_length", {})["max_lines"] = 999
+
+    fresh = load_config(tmp_path)
+    assert fresh["ignore"] == DEFAULTS["ignore"]
+    assert fresh["rules"]["function_length"]["max_lines"] == DEFAULTS["rules"]["function_length"]["max_lines"]
+
+
+def test_load_config_treats_empty_standalone_safelint_toml_as_present(tmp_path: Path) -> None:
+    """An empty ``safelint.toml`` next to a populated ``[tool.safelint]`` blocks
+    fallback to pyproject.toml — the standalone file is the chosen source even
+    if it has nothing to say."""
+    (tmp_path / "pyproject.toml").write_text("[tool.safelint]\nmode = 'ci'\n", encoding="utf-8")
+    (tmp_path / "safelint.toml").write_text("", encoding="utf-8")
+
+    config = load_config(tmp_path)
+    # safelint.toml wins; with nothing in it, defaults apply (mode != 'ci').
+    assert config["mode"] == DEFAULTS["mode"]
+
+
 def test_load_config_treats_empty_safelint_section_as_present(tmp_path: Path) -> None:
     """An empty ``[tool.safelint]`` is a *present* config — the loader must
     stop at the first directory containing one, not fall through to an
