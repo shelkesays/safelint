@@ -125,7 +125,15 @@ class SafetyEngine:
         self.fail_fast: bool = exec_cfg.get("fail_fast", False)
         self.exclude_paths: list[str] = config.get("exclude_paths", [])
 
-        raw_ignore: list[str] = config.get("ignore", [])
+        raw_ignore = config.get("ignore", [])
+        if not isinstance(raw_ignore, (list, tuple)):
+            msg = f"ignore must be a list of strings, got {type(raw_ignore).__name__}"
+            raise TypeError(msg)
+        non_strings = [e for e in raw_ignore if not isinstance(e, str)]
+        if non_strings:
+            bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
+            msg = f"ignore must contain only strings — got: {bad}"
+            raise TypeError(msg)
         known_names: frozenset[str] = frozenset(cls.name for cls in ALL_RULES)
         known_codes_upper: frozenset[str] = frozenset(cls.code.upper() for cls in ALL_RULES)
         unknown = frozenset(e for e in raw_ignore if e not in known_names and e.upper() not in known_codes_upper)

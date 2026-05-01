@@ -1053,6 +1053,22 @@ def test_per_file_ignores_rejects_non_string_entries(tmp_path: Path) -> None:
         SafetyEngine(cfg)
 
 
+def test_ignore_rejects_non_string_entries(tmp_path: Path) -> None:
+    """Top-level ``ignore`` list — same contract as per_file_ignores: every
+    entry must be a string. A non-string entry would crash on ``.upper()``
+    inside the unknown-entries filter, so we surface the type error early."""
+    cfg = deep_merge(DEFAULTS, {"ignore": ["SAFE101", 42]})
+    with pytest.raises(TypeError, match="must contain only strings"):
+        SafetyEngine(cfg)
+
+
+def test_ignore_rejects_non_list_value(tmp_path: Path) -> None:
+    """``ignore`` must be a list/tuple, not a bare string or scalar."""
+    cfg = deep_merge(DEFAULTS, {"ignore": "SAFE101"})
+    with pytest.raises(TypeError, match="must be a list"):
+        SafetyEngine(cfg)
+
+
 def test_load_config_returns_isolated_copy(tmp_path: Path) -> None:
     """Mutating the result of load_config() must not leak into DEFAULTS."""
     config = load_config(tmp_path)
