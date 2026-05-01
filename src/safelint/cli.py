@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING
 from safelint.core.config import MODE_FAIL_ON, SEVERITY_ORDER, load_config
 from safelint.core.engine import SafetyEngine
 from safelint.core.runner import run
+from safelint.formatters import format_json, format_sarif
 
 
 if TYPE_CHECKING:
@@ -197,6 +198,54 @@ def _print_file_summary(filepath: str, violations: list[Violation]) -> None:
     print()
 
 
+def _print_results(
+    output_format: str,
+    violations: list[Violation],
+    suppressed: list[Violation],
+    *,
+    blocking_count: int,
+    fail_on: str,
+    files_checked: int,
+) -> None:
+    """Emit accumulated lint results in the chosen format.
+
+    For ``pretty`` (default), prints the ruff/ty-style summary block; the
+    per-file violations were already streamed during the run. For ``json``
+    and ``sarif``, prints a single machine-readable document on stdout
+    that contains both the violation list and the summary.
+
+    Stderr diagnostics (configuration warnings, oversize-skip messages)
+    are unaffected — they are always written as they are produced,
+    regardless of format.
+    """
+    if output_format == "pretty":
+        if violations or suppressed:
+            _print_summary(violations, blocking_count, fail_on, suppressed)
+        return
+    if output_format == "json":
+        print(
+            format_json(
+                violations,
+                suppressed,
+                blocking_count=blocking_count,
+                fail_on=fail_on,
+                files_checked=files_checked,
+            )
+        )
+        return
+    if output_format == "sarif":
+        print(
+            format_sarif(
+                violations,
+                suppressed,
+                blocking_count=blocking_count,
+                fail_on=fail_on,
+                files_checked=files_checked,
+            )
+        )
+        return
+
+
 def _resolve_fail_on(args: argparse.Namespace, config: dict) -> tuple[str, int]:
     """Return (fail_on label, integer threshold) from CLI args and config."""
     mode: str = getattr(args, "mode", None) or config.get("mode", "local")
@@ -218,6 +267,7 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
     fail_on, fail_threshold = _resolve_fail_on(args, config)
     engine = SafetyEngine(config, changed_files=files)
 
+    output_format: str = getattr(args, "output_format", "pretty")
     all_blocking: list[Violation] = []
     all_violations: list[Violation] = []
     all_suppressed: list[Violation] = []
@@ -227,14 +277,23 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
         all_suppressed.extend(result.suppressed)
         if not result.violations:
             continue
-        _print_violations(result.violations)
+        # Stream per-file pretty output as we go; non-pretty formats emit
+        # one consolidated document at the end (in ``_print_results``).
+        if output_format == "pretty":
+            _print_violations(result.violations)
+            _print_file_summary(filepath, result.violations)
         blocking, _ = engine.partition_violations(result.violations, fail_threshold)
-        _print_file_summary(filepath, result.violations)
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 
-    if all_violations or all_suppressed:
-        _print_summary(all_violations, len(all_blocking), fail_on, all_suppressed)
+    _print_results(
+        output_format,
+        all_violations,
+        all_suppressed,
+        blocking_count=len(all_blocking),
+        fail_on=fail_on,
+        files_checked=len(files),
+    )
     return 1 if all_blocking else 0
 
 
@@ -406,6 +465,7 @@ def _run_check(args: argparse.Namespace) -> int:
     config = load_config(_config_dir(Path(config_path) if config_path else None, target))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
 
+    output_format: str = getattr(args, "output_format", "pretty")
     all_blocking: list[Violation] = []
     all_violations: list[Violation] = []
     all_suppressed: list[Violation] = []
@@ -414,13 +474,21 @@ def _run_check(args: argparse.Namespace) -> int:
         all_suppressed.extend(result.suppressed)
         if not result.violations:
             continue
-        _print_violations(result.violations)
+        if output_format == "pretty":
+            _print_violations(result.violations)
+            _print_file_summary(result.path, result.violations)
         blocking, _ = SafetyEngine.partition_violations(result.violations, fail_threshold)
-        _print_file_summary(result.path, result.violations)
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 
-    _print_summary(all_violations, len(all_blocking), fail_on, all_suppressed)
+    _print_results(
+        output_format,
+        all_violations,
+        all_suppressed,
+        blocking_count=len(all_blocking),
+        fail_on=fail_on,
+        files_checked=len(results),
+    )
     return 1 if all_blocking else 0
 
 
@@ -445,6 +513,20 @@ def _build_common_args(parser: argparse.ArgumentParser) -> None:
         default=None,
         metavar="CODE",
         help="Repeatable flag to ignore a rule code or name, e.g. --ignore SAFE101 --ignore function_length",
+    )
+    parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["pretty", "json", "sarif"],
+        default="pretty",
+        help=(
+            "Output format. 'pretty' (default) writes the ruff/ty-style "
+            "multi-line coloured violations + summary to stdout. 'json' and "
+            "'sarif' emit machine-readable documents on stdout for tooling "
+            "consumers (editor plugins, CI scanners, the upcoming Claude Code "
+            "skill / VSCode plugin). Diagnostic warnings on stderr are "
+            "unaffected by this flag."
+        ),
     )
 
 
