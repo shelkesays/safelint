@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
-import ast
 from typing import TYPE_CHECKING
 
+from safelint.languages._node_utils import lineno, node_text, walk
+from safelint.languages.python import ASSERT_STATEMENT, ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.rules.base import BaseRule
 
 
 if TYPE_CHECKING:
+    import tree_sitter
+
     from safelint.rules.base import Violation
 
 
@@ -18,18 +21,24 @@ class MissingAssertionsRule(BaseRule):
     name = "missing_assertions"
     code = "SAFE601"
 
-    def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that lack any assert statement."""
         violations = []
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        for node in walk(tree.root_node):
+            if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
                 continue
-            if not any(isinstance(n, ast.Assert) for n in ast.walk(node)):
+            # Don't credit the outer function for asserts that live inside
+            # nested defs — those are scored as their own functions.
+            inner = walk(node, skip_types=(FUNCTION_DEF, ASYNC_FUNCTION_DEF))
+            has_assert = any(c.type == ASSERT_STATEMENT for c in inner)
+            if not has_assert:
+                name_node = node.child_by_field_name("name")
+                func_name = node_text(name_node) if name_node else "<anonymous>"
                 violations.append(
-                    self._v(
+                    self._make_violation(
                         filepath,
-                        node.lineno,
-                        f'Function "{node.name}" has no assert statements',
+                        lineno(node),
+                        f'Function "{func_name}" has no assert statements',
                     )
                 )
         return violations

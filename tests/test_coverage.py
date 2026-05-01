@@ -3,23 +3,24 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import sys
 import textwrap
 from typing import TYPE_CHECKING
 
-
-if TYPE_CHECKING:
-    from pathlib import Path
-
 import pytest
+import tree_sitter
+import tree_sitter_python
 
 from safelint.cli import _build_common_args, _run_check, _run_hook, main
 from safelint.core.config import DEFAULTS, deep_merge, load_config
 from safelint.core.engine import LintResult, SafetyEngine
 from safelint.core.runner import run
+from safelint.languages._node_utils import call_name, walk
 from safelint.rules.base import Violation
-from safelint.rules.side_effects import SideEffectsRule
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 
 # ---------------------------------------------------------------------------
@@ -40,8 +41,11 @@ def test_run_without_config(tmp_path: Path) -> None:
 
 def test_run_with_config_path(tmp_path: Path) -> None:
     """run() loads the config from the supplied path."""
-    config_file = tmp_path / ".safelint.yaml"
-    config_file.write_text("rules:\n  function_length:\n    max_lines: 5\n", encoding="utf-8")
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text(
+        "[tool.safelint.rules.function_length]\nmax_lines = 5\n",
+        encoding="utf-8",
+    )
     sample = tmp_path / "ok.py"
     sample.write_text("x = 1\n", encoding="utf-8")
 
@@ -92,20 +96,6 @@ def test_run_changed_files_takes_precedence_over_files(tmp_path: Path) -> None:
     assert str(sample) in paths
     coupling_violations = [v for r in results for v in r.violations if v.rule == "test_coupling"]
     assert not coupling_violations
-
-
-# ---------------------------------------------------------------------------
-# load_config - invalid YAML falls back to defaults
-# ---------------------------------------------------------------------------
-
-
-def test_load_config_bad_yaml_falls_back_to_defaults(tmp_path: Path) -> None:
-    """A malformed .safelint.yaml is skipped and defaults are returned."""
-    (tmp_path / ".safelint.yaml").write_text(":\n  bad: [yaml", encoding="utf-8")
-
-    config = load_config(tmp_path)
-
-    assert config["mode"] == DEFAULTS["mode"]
 
 
 # ---------------------------------------------------------------------------
@@ -221,6 +211,56 @@ def test_max_arguments_fires_when_exceeded(tmp_path: Path) -> None:
     violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "max_arguments" for v in violations)
+
+
+def test_complexity_does_not_double_count_if_branches(tmp_path: Path) -> None:
+    """Lock in McCabe semantics: each if/elif counts exactly once.
+
+    Tree-sitter-python's ``if_statement`` does *not* contain an ``if_clause``
+    child (its named children are identifier/block/elif_clause/else_clause).
+    ``if_clause`` only appears inside comprehensions like
+    ``[x for x in y if z]``. The rule's set therefore must include
+    ``IF_STATEMENT`` to count plain ``if`` branches at all — removing it
+    would silently undercount.
+
+    Assertions below use ``max_complexity`` boundaries that fail loudly if
+    counts drift in either direction:
+
+    * Plain ``if``:        CC = 2 (1 base + 1 if). Must fire at max=1, not at max=2.
+    * if+elif:             CC = 3 (1 + if + elif). Must fire at max=2, not at max=3.
+    * Comprehension ``if``: CC = 2 (1 + comprehension if_clause). Must fire at max=1.
+    """
+    cases = [
+        ("plain_if.py", "def f(x):\n    if x: return 1\n", 2, 1),
+        ("if_elif.py", "def f(x):\n    if x: return 1\n    elif y: return 2\n", 3, 2),
+        ("comp_if.py", "def f(items):\n    return [i for i in items if i > 0]\n", 2, 1),
+        # Nested ifs: each ``if_statement`` is its own node (inner lives
+        # inside outer's ``block``), so each contributes exactly +1.
+        # Two nested ifs → CC = 3, three nested → CC = 4.
+        (
+            "nested_if.py",
+            "def f(x, y):\n    if x:\n        if y:\n            return 1\n",
+            3,
+            2,
+        ),
+        (
+            "deep_nested_if.py",
+            "def f(a, b, c):\n    if a:\n        if b:\n            if c:\n                return 1\n",
+            4,
+            3,
+        ),
+    ]
+    for name, source, expected_cc, threshold in cases:
+        sample = tmp_path / name
+        sample.write_text(source, encoding="utf-8")
+
+        cfg_at = deep_merge(DEFAULTS, {"rules": {"complexity": {"max_complexity": expected_cc}}})
+        violations_at_limit = SafetyEngine(cfg_at).check_file(str(sample)).violations
+        assert not any(v.rule == "complexity" for v in violations_at_limit), f"{name}: must NOT fire at max_complexity={expected_cc} (CC={expected_cc})"
+
+        cfg_below = deep_merge(DEFAULTS, {"rules": {"complexity": {"max_complexity": threshold}}})
+        violations_below = SafetyEngine(cfg_below).check_file(str(sample)).violations
+        assert any(v.rule == "complexity" for v in violations_below), f"{name}: must fire at max_complexity={threshold} (CC={expected_cc})"
 
 
 def test_complexity_fires_on_high_cyclomatic_complexity(tmp_path: Path) -> None:
@@ -510,19 +550,11 @@ def test_engine_injects_changed_files_for_test_coupling(tmp_path: Path) -> None:
 
 
 def test_base_rule_call_name_returns_none_for_subscript() -> None:
-    """BaseRule._call_name returns None when the func node is a Subscript."""
-
-    rule = SideEffectsRule({"enabled": True, "severity": "warning", "io_functions": ["open"], "io_name_keywords": []})
-    tree = ast.parse("func_map['key']()")
-    expr = tree.body[0]
-    if isinstance(expr, ast.Expr):
-        call = expr.value
-        if isinstance(call, ast.Call):
-            assert rule._call_name(call.func) is None
-        else:
-            pytest.fail("Expected ast.Call node")
-    else:
-        pytest.fail("Expected ast.Expr node")
+    """call_name returns None when the function expression is not identifier or attribute."""
+    language = tree_sitter.Language(tree_sitter_python.language())
+    tree = tree_sitter.Parser(language).parse(b"func_map['key']()")
+    call_node = next(n for n in walk(tree.root_node) if n.type == "call")
+    assert call_name(call_node) is None
 
 
 # ---------------------------------------------------------------------------
@@ -670,6 +702,448 @@ def test_max_arguments_self_excluded_from_count(tmp_path: Path) -> None:
 
     violations = _engine().check_file(str(sample)).violations
     assert any(v.rule == "max_arguments" for v in violations)
+
+
+def test_max_arguments_counts_args_kwargs_splats(tmp_path: Path) -> None:
+    """*args and **kwargs each count as a parameter; 6 regular + *a + **k = 8 fires."""
+    source = "def many(a, b, c, d, e, f, *args, **kwargs):\n    pass\n"
+    sample = tmp_path / "splats.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.rule == "max_arguments" for v in violations)
+
+
+def test_max_arguments_args_only_does_not_fire_under_limit(tmp_path: Path) -> None:
+    """A single *args with no other params is one parameter — should not fire."""
+    source = "def variadic(*args):\n    pass\n"
+    sample = tmp_path / "variadic.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert not any(v.rule == "max_arguments" for v in violations)
+
+
+def test_max_arguments_keyword_only_separator_not_counted(tmp_path: Path) -> None:
+    """The bare `*` keyword-only separator must not be counted as a parameter.
+
+    `def f(a, b, c, d, e, f, g, *, h):` has 8 named parameters but no splat;
+    the bare `*` is just a separator. Without correct handling we would either
+    miss the violation (if treated as a separator that drops following names)
+    or over-count (if treated as a parameter). 8 named params should fire.
+    """
+    source = "def f(a, b, c, d, e, ff, g, *, h):\n    pass\n"
+    sample = tmp_path / "kwonly.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.rule == "max_arguments" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# Nested-def isolation: per-function rules must not aggregate metrics from
+# nested ``def`` / ``async def`` bodies into their enclosing function.
+# ---------------------------------------------------------------------------
+
+
+def test_complexity_does_not_count_branches_in_nested_defs(tmp_path: Path) -> None:
+    """An outer function whose own body is simple must not be flagged just
+    because a nested helper has many branches. The inner def is its own
+    function and is checked separately."""
+    branches = "\n".join(f"        if x == {i}: return {i}" for i in range(15))
+    source = "def outer():\n    def inner(x):\n" + branches + "\n        return -1\n    return inner\n"
+    sample = tmp_path / "nested_complexity.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    # `inner` should fire (cc > 10); `outer` must not.
+    flagged = [v for v in violations if v.rule == "complexity"]
+    assert any('"inner"' in v.message for v in flagged)
+    assert not any('"outer"' in v.message for v in flagged)
+
+
+def test_nesting_depth_does_not_count_nested_def_bodies(tmp_path: Path) -> None:
+    """A deeply-nested helper inside an otherwise-flat outer function must
+    not push the outer function over the depth limit."""
+    source = textwrap.dedent("""\
+        def outer():
+            def inner():
+                if True:
+                    if True:
+                        if True:
+                            if True:
+                                return 1
+            return inner
+    """)
+    sample = tmp_path / "nested_depth.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "nesting_depth"]
+    assert any('"inner"' in v.message for v in flagged)
+    assert not any('"outer"' in v.message for v in flagged)
+
+
+def test_missing_assertions_does_not_credit_outer_for_inner_assert(tmp_path: Path) -> None:
+    """An assert inside a nested def must not count toward the outer
+    function's assertion check."""
+    source = textwrap.dedent("""\
+        def outer(x):
+            def inner(y):
+                assert y > 0
+                return y
+            return inner(x)
+    """)
+    sample = tmp_path / "nested_assert.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "missing_assertions"]
+    # `outer` has no assert of its own; `inner` does.
+    assert any('"outer"' in v.message for v in flagged)
+    assert not any('"inner"' in v.message for v in flagged)
+
+
+def test_unbounded_loops_break_inside_nested_for_does_not_count(tmp_path: Path) -> None:
+    """A break inside a nested for-loop exits the inner loop, not the
+    outer ``while True``. The outer while is still infinite."""
+    source = textwrap.dedent("""\
+        def watch():
+            while True:
+                for item in [1, 2, 3]:
+                    if item == 99:
+                        break
+    """)
+    sample = tmp_path / "nested_break.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.rule == "unbounded_loops" for v in violations)
+
+
+def test_logging_on_error_ignores_log_call_inside_nested_def(tmp_path: Path) -> None:
+    """A logging call buried inside a nested ``def`` defined in the except
+    body must not satisfy SAFE203 — that helper isn't executed when the
+    exception fires, so the caller is still effectively swallowing the
+    error silently."""
+    source = textwrap.dedent("""\
+        import logging
+
+        log = logging.getLogger(__name__)
+
+        def fetch():
+            try:
+                do_work()
+            except ValueError:
+                def _later_helper():
+                    log.error("would log if called")
+                pass
+    """)
+    sample = tmp_path / "fake_log.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"logging_on_error": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "logging_on_error" for v in violations)
+
+
+def test_logging_on_error_accepts_real_log_call_in_body(tmp_path: Path) -> None:
+    """Sanity check: a logging call directly in the except body still passes."""
+    source = textwrap.dedent("""\
+        import logging
+
+        log = logging.getLogger(__name__)
+
+        def fetch():
+            try:
+                do_work()
+            except ValueError:
+                log.error("real log call")
+    """)
+    sample = tmp_path / "real_log.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"logging_on_error": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert not any(v.rule == "logging_on_error" for v in violations)
+
+
+def test_global_state_does_not_attribute_nested_def_global_to_outer(tmp_path: Path) -> None:
+    """A ``global`` declared in a nested function belongs to the inner
+    scope; the outer function must not be flagged for it."""
+    source = textwrap.dedent("""\
+        counter = 0
+        def outer():
+            def inner():
+                global counter
+                return counter
+            return inner
+    """)
+    sample = tmp_path / "nested_global.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "global_state"]
+    assert any('"inner"' in v.message for v in flagged)
+    assert not any('"outer"' in v.message for v in flagged)
+
+
+def test_parse_error_reports_location_and_kind(tmp_path: Path) -> None:
+    """Parse failures should report a non-zero line and a kind hint, not just a generic message.
+
+    A function header missing its colon is a clear case where Tree-sitter
+    flags a missing-token error. We expect the violation to point at the
+    line where the syntax breaks, not lineno=0.
+    """
+    # `def foo()` without the closing `:` and a body — Tree-sitter cannot
+    # complete the function_definition rule and reports a missing token.
+    source = "x = 1\ndef foo()\n    pass\n"
+    sample = tmp_path / "broken.py"
+    sample.write_text(source, encoding="utf-8")
+
+    result = _engine().check_file(str(sample))
+
+    parse_violations = [v for v in result.violations if v.code == "SAFE000"]
+    assert len(parse_violations) == 1
+    v = parse_violations[0]
+    assert v.lineno >= 2  # error is on the def line or later, not line 0
+    # Message should mention "Parse error" and either "missing" or "syntax error".
+    assert "Parse error" in v.message
+    assert "line" in v.message
+    assert ("missing" in v.message) or ("syntax error" in v.message)
+
+
+def test_function_length_counts_inclusively(tmp_path: Path) -> None:
+    """A function spanning N lines (including its def line) should report length N.
+
+    Previously the calculation was ``end_lineno - lineno`` which under-reported
+    by 1 — a 60-line function read as 59. The fix is ``+ 1`` for inclusive
+    line counting.
+    """
+    # 5-line function (def + 4 body lines), max_lines=4 → must fire.
+    body = "\n".join(f"    x{i} = {i}" for i in range(4))
+    source = f"def f():\n{body}\n"
+    sample = tmp_path / "len5.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"function_length": {"max_lines": 4}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "function_length"]
+    assert flagged
+    assert "5 lines" in flagged[0].message
+
+
+def test_side_effects_io_keyword_match_is_case_insensitive(tmp_path: Path) -> None:
+    """A function whose name contains an io keyword in mixed case should be exempt.
+
+    Without lowercasing, ``writeLog`` would not match the lowercase keywords
+    ``write`` / ``log`` and would incorrectly fire SAFE304.
+    """
+    source = "def writeLog(msg):\n    print(msg)\n"
+    sample = tmp_path / "mixed.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert not any(v.rule == "side_effects" for v in violations)
+
+
+def test_side_effects_uppercase_config_keyword_still_matches(tmp_path: Path) -> None:
+    """A user-supplied keyword like ``"Write"`` (uppercase) must still exempt
+    a function named ``writeLog``. Both sides of the substring check must be
+    normalised, not just the function name."""
+    source = "def writeLog(msg):\n    print(msg)\n"
+    sample = tmp_path / "mixed_upper_kw.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"side_effects": {"io_name_keywords": ["Write", "Log"]}}},
+    )
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert not any(v.rule == "side_effects" for v in violations)
+
+
+def test_side_effects_hidden_uppercase_pure_prefix_still_matches(tmp_path: Path) -> None:
+    """SideEffectsHiddenRule must also normalise user-supplied prefixes:
+    ``"Get"`` in config should still flag ``get_data`` (which calls open)."""
+    source = "def get_data():\n    f = open('x.txt')\n    return f.read()\n"
+    sample = tmp_path / "upper_prefix.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"side_effects_hidden": {"pure_prefixes": ["Get"]}}},
+    )
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "side_effects_hidden" for v in violations)
+
+
+def test_state_purity_does_not_attribute_class_body_global_to_outer(tmp_path: Path) -> None:
+    """A ``global`` declared inside a nested class body lives in the class's
+    own scope and must not be attributed to the enclosing function."""
+    source = textwrap.dedent("""\
+        counter = 0
+        def outer():
+            class Inner:
+                global counter
+                counter = 1
+            return Inner
+    """)
+    sample = tmp_path / "nested_class_global.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "global_state"]
+    # outer() doesn't declare a global itself; only Inner's body does.
+    assert not any('"outer"' in v.message for v in flagged)
+
+
+def test_taint_tracker_handles_keyword_argument(tmp_path: Path) -> None:
+    """``eval(code=user_input)`` should be flagged: the keyword-argument
+    wrapper must not hide the tainted value from the sink check."""
+    source = textwrap.dedent("""\
+        def run(user_input):
+            eval(code=user_input)
+    """)
+    sample = tmp_path / "kwarg_taint.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+def test_taint_tracker_propagates_through_tuple_destructure(tmp_path: Path) -> None:
+    """``a, b = user_input`` must mark both ``a`` and ``b`` as tainted, so
+    a later ``eval(a)`` is caught."""
+    source = textwrap.dedent("""\
+        def run(user_input):
+            a, b = user_input
+            eval(a)
+    """)
+    sample = tmp_path / "tuple_destructure.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+def test_taint_tracker_propagates_through_list_destructure(tmp_path: Path) -> None:
+    """List-pattern destructure should also propagate taint to every name."""
+    source = textwrap.dedent("""\
+        def run(user_input):
+            [a, b] = user_input
+            eval(b)
+    """)
+    sample = tmp_path / "list_destructure.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+def test_taint_tracker_propagates_through_starred_destructure(tmp_path: Path) -> None:
+    """``a, *rest = tainted`` should taint both ``a`` and ``rest``."""
+    source = textwrap.dedent("""\
+        def run(user_input):
+            a, *rest = user_input
+            eval(rest)
+    """)
+    sample = tmp_path / "starred_destructure.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+def test_taint_tracker_propagates_through_chained_assignment(tmp_path: Path) -> None:
+    """``a = b = user_input`` must taint both ``a`` and ``b``, so an ``eval``
+    on the *outer* target (``a``, the one furthest from the RHS) is flagged."""
+    source = textwrap.dedent("""\
+        def run(user_input):
+            a = b = user_input
+            eval(a)
+    """)
+    sample = tmp_path / "chained_assign.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+def test_per_file_ignores_rejects_non_string_entries(tmp_path: Path) -> None:
+    """A list containing a non-string entry should fail loud at engine init,
+    not crash later when ``.upper()`` is called on it."""
+    cfg = deep_merge(DEFAULTS, {"per_file_ignores": {"tests/**": ["SAFE101", 42]}})
+    with pytest.raises(TypeError, match="must contain only strings"):
+        SafetyEngine(cfg)
+
+
+def test_ignore_rejects_non_string_entries(tmp_path: Path) -> None:
+    """Top-level ``ignore`` list — same contract as per_file_ignores: every
+    entry must be a string. A non-string entry would crash on ``.upper()``
+    inside the unknown-entries filter, so we surface the type error early."""
+    cfg = deep_merge(DEFAULTS, {"ignore": ["SAFE101", 42]})
+    with pytest.raises(TypeError, match="must contain only strings"):
+        SafetyEngine(cfg)
+
+
+def test_ignore_rejects_non_list_value(tmp_path: Path) -> None:
+    """``ignore`` must be a list/tuple, not a bare string or scalar."""
+    cfg = deep_merge(DEFAULTS, {"ignore": "SAFE101"})
+    with pytest.raises(TypeError, match="must be a list"):
+        SafetyEngine(cfg)
+
+
+def test_load_config_returns_isolated_copy(tmp_path: Path) -> None:
+    """Mutating the result of load_config() must not leak into DEFAULTS."""
+    config = load_config(tmp_path)
+    config["ignore"] = ["SAFE101"]
+    config.setdefault("rules", {}).setdefault("function_length", {})["max_lines"] = 999
+
+    fresh = load_config(tmp_path)
+    assert fresh["ignore"] == DEFAULTS["ignore"]
+    assert fresh["rules"]["function_length"]["max_lines"] == DEFAULTS["rules"]["function_length"]["max_lines"]
+
+
+def test_load_config_treats_empty_standalone_safelint_toml_as_present(tmp_path: Path) -> None:
+    """An empty ``safelint.toml`` next to a populated ``[tool.safelint]`` blocks
+    fallback to pyproject.toml — the standalone file is the chosen source even
+    if it has nothing to say."""
+    (tmp_path / "pyproject.toml").write_text("[tool.safelint]\nmode = 'ci'\n", encoding="utf-8")
+    (tmp_path / "safelint.toml").write_text("", encoding="utf-8")
+
+    config = load_config(tmp_path)
+    # safelint.toml wins; with nothing in it, defaults apply (mode != 'ci').
+    assert config["mode"] == DEFAULTS["mode"]
+
+
+def test_load_config_treats_empty_safelint_section_as_present(tmp_path: Path) -> None:
+    """An empty ``[tool.safelint]`` is a *present* config — the loader must
+    stop at the first directory containing one, not fall through to an
+    ancestor's config."""
+    # Parent has a real config, child has an empty section. Loader is
+    # invoked from the child. It should return DEFAULTS (the empty section
+    # has nothing to merge), not the parent's config.
+    parent = tmp_path / "parent"
+    child = parent / "child"
+    child.mkdir(parents=True)
+    (parent / "pyproject.toml").write_text(
+        "[tool.safelint]\nmode = 'ci'\n",
+        encoding="utf-8",
+    )
+    (child / "pyproject.toml").write_text(
+        "[tool.safelint]\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(child)
+    assert config["mode"] == DEFAULTS["mode"]
 
 
 # ---------------------------------------------------------------------------

@@ -7,6 +7,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+This release contains a breaking library API change (`LintResult.suppressed` type) — the version is being bumped to **2.0.0** when tagged.
+
+### Added
+- Standalone `safelint.toml` configuration file (top-level keys, no `[tool.safelint]` wrapper). When both `safelint.toml` and `pyproject.toml` `[tool.safelint]` exist in the same directory, `safelint.toml` wins — matching `ruff.toml` / `pyproject.toml` precedence.
+- `examples/sample.safelint.toml` reference covering every supported configuration key.
+- Public `safelint.languages.supported_extensions() -> frozenset[str]` for callers that need to know which file extensions have a registered language. Use this instead of importing the private `_REGISTRY`.
+- `walk()` in `safelint.languages._node_utils` accepts an optional `skip_types` parameter that prunes subtrees rooted at any matching node type (used by per-function rules to avoid descending into nested `def` / `async def` bodies).
+
+### Changed
+- `side_effects` (SAFE304) and `side_effects_hidden` (SAFE303) now normalise **both** sides of the name comparison. Function names are lowercased for matching, and user-supplied `io_name_keywords` / `pure_prefixes` are lowercased once at config load — so configurations like `io_name_keywords = ["Write", "Log"]` or `pure_prefixes = ["Get", "Calculate"]` behave the same as their lowercase forms. Previously only the function name was lowered, leaving uppercase config entries silently unmatched.
+- `load_config()` now returns a fresh deep copy of the merged config on every call. Mutating the result (e.g. `config["ignore"].append(...)`) no longer corrupts the module-global `DEFAULTS`.
+- **Removed** YAML (`.safelint.yaml`) configuration support and the `safelint[yaml]` install extra. Migrate to `[tool.safelint]` in `pyproject.toml` or to a standalone `safelint.toml`.
+- CLI summary "All checks passed." is now bold green to match `ruff` / `ty`.
+- The "No fixes available …" line is no longer printed on clean runs (with or without suppressions). It only appears when there are active violations a developer might wonder about auto-fixing.
+- Suppressed-violation summary now shows a per-code breakdown — e.g. `(2 SAFE501, 1 SAFE304 suppressed)` — instead of a bare `(N suppressed)` count, so it is clear which rules were silenced.
+- **Breaking (library API):** `LintResult.suppressed` is now `list[Violation]` (was `int`). Use `len(result.suppressed)` for the count and iterate to inspect codes, rules, file paths, and line numbers of suppressed violations.
+- Replaced internal use of Python's `logging` module with a dedicated diagnostics channel that writes formatted single-line messages to stderr (`safelint: warning: …`, `safelint: error: …`). Configuration typos and malformed-TOML errors are now surfaced cleanly instead of leaking through Python's `lastResort` logging handler.
+- `walk()` now traverses only `named_children` (skips Tree-sitter's anonymous punctuation/keyword tokens), reducing the number of nodes visited per traversal across every rule and the suppression parser.
+- Parse-error violations (`SAFE000`) now include line, column (1-based), and a kind hint such as `missing ':'` or `syntax error`. The lineno on the violation now points at the offending location instead of being hardcoded to 0.
+- `MaxArgumentsRule` now counts `*args` and `**kwargs` parameters, each as one argument. Previously they were silently ignored, allowing functions to exceed `max_args` without triggering.
+- An empty `[tool.safelint]` section in `pyproject.toml` (or an empty `safelint.toml`) is now treated as a present-but-empty config. Previously the loader fell through to an ancestor directory's config, hiding unintentionally-blank sections.
+- Self-development pre-commit hook switched from `repo: https://github.com/shelkesays/safelint @ v1.3.2` to `repo: local`, so contributors run the in-tree code rather than an outdated published release while iterating on safelint itself.
+
+### Fixed
+- Per-function rules no longer incorrectly aggregate metrics from nested `def` / `async def` bodies into the enclosing function. Affects `complexity`, `nesting_depth`, `missing_assertions`, `unbounded_loops`, `global_state`, `global_mutation`, `logging_on_error` (a logging call inside a nested helper would have falsely satisfied the rule), and the dataflow `TaintTracker`. Each nested function is scored as its own unit, as the outer-walk loop already intended.
+- `state_purity` (`global_state`, `global_mutation`) now also stops at nested class definitions — a `global X` declared inside a nested class body lives in that class's scope, not the enclosing function's.
+- `function_length` (SAFE101) reported counts that were off by one (a 60-line function showed `59 lines`). The calculation is now inclusive of the `def` line.
+- Dataflow taint tracker now unwraps `keyword_argument` nodes — `eval(code=user_input)` is no longer missed because the tainted value was hidden behind a kwarg wrapper.
+- Dataflow taint tracker now propagates taint through tuple/list destructure targets (`a, b = tainted`, `[a, b] = tainted`, `(a, b) = tainted`), starred destructures (`a, *rest = tainted`), and chained assignments (`a = b = tainted`). Previously the LHS shape was assumed to be a single bare identifier, so every other form silently dropped the taint.
+- Top-level `ignore` and `per_file_ignores` entries now validate that every value is a string. Non-string elements (e.g. `["SAFE101", 42]`) and wrong-shape values (e.g. `ignore = "SAFE101"`) are reported with a clear `TypeError` at engine init instead of crashing later on `.upper()`.
+- File discovery now does a single `rglob('*')` pass and filters by suffix, instead of one `rglob('*<ext>')` per registered extension. Discovery is now O(number_of_files) rather than O(number_of_extensions * number_of_files). No behaviour change on a single-language registry, but matters as more languages are added.
+
 ## [1.3.1] - 2026-04-24
 
 ### Added

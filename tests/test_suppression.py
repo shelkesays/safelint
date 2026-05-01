@@ -2,67 +2,80 @@
 
 from __future__ import annotations
 
+import textwrap
 from typing import TYPE_CHECKING
+
+import tree_sitter
+import tree_sitter_python
+
+from safelint.core.config import DEFAULTS, deep_merge
+from safelint.core.engine import SafetyEngine, _is_suppressed, _parse_suppressions
+from safelint.languages.python import PYTHON
+from safelint.rules.base import Violation
 
 
 if TYPE_CHECKING:
     from pathlib import Path
-import textwrap
 
-from safelint.core.config import DEFAULTS, deep_merge
-from safelint.core.engine import SafetyEngine, _is_suppressed, _parse_suppressions
-from safelint.rules.base import Violation
+_PYTHON_LANGUAGE = tree_sitter.Language(tree_sitter_python.language())
+
+
+def _parse_python(source: str) -> tree_sitter.Tree:
+    return tree_sitter.Parser(_PYTHON_LANGUAGE).parse(source.encode("utf-8"))
+
+
+def _suppressions(source: str) -> dict[int, set[str] | None]:
+    return _parse_suppressions(
+        _parse_python(source),
+        PYTHON.comment_node_type,
+        PYTHON.comment_prefix,
+    )
 
 
 # ---------------------------------------------------------------------------
-# _parse_suppressions — unit tests against the tokenizer-based parser
+# _parse_suppressions — unit tests against the Tree-sitter comment-node parser
 # ---------------------------------------------------------------------------
 
 
 def test_parse_bare_nosafe() -> None:
     """Bare # nosafe maps the line to None (suppress all)."""
-    result = _parse_suppressions("x = 1  # nosafe\n")
-    assert result == {1: None}
+    assert _suppressions("x = 1  # nosafe\n") == {1: None}
 
 
 def test_parse_nosafe_single_code() -> None:
     """# nosafe: CODE maps the line to a set containing that code."""
-    result = _parse_suppressions("x = 1  # nosafe: SAFE101\n")
-    assert result == {1: {"SAFE101"}}
+    assert _suppressions("x = 1  # nosafe: SAFE101\n") == {1: {"SAFE101"}}
 
 
 def test_parse_nosafe_rule_name() -> None:
     """# nosafe: rule_name maps the line to a set containing that name."""
-    result = _parse_suppressions("x = 1  # nosafe: function_length\n")
-    assert result == {1: {"function_length"}}
+    assert _suppressions("x = 1  # nosafe: function_length\n") == {1: {"function_length"}}
 
 
 def test_parse_nosafe_multiple_codes() -> None:
     """# nosafe: A, B maps the line to a set containing both tokens."""
-    result = _parse_suppressions("x = 1  # nosafe: SAFE101, function_length\n")
-    assert result == {1: {"SAFE101", "function_length"}}
+    assert _suppressions("x = 1  # nosafe: SAFE101, function_length\n") == {1: {"SAFE101", "function_length"}}
 
 
 def test_parse_nosafe_empty_payload_ignored() -> None:
     """# nosafe: with no codes is treated as malformed and ignored."""
-    assert _parse_suppressions("x = 1  # nosafe:\n") == {}
+    assert _suppressions("x = 1  # nosafe:\n") == {}
 
 
 def test_parse_nosafe_only_commas_ignored() -> None:
     """# nosafe: with no usable codes is treated as malformed and ignored."""
-    assert _parse_suppressions("x = 1  # nosafe: , ,  \n") == {}
+    assert _suppressions("x = 1  # nosafe: , ,  \n") == {}
 
 
 def test_parse_nosafe_case_insensitive() -> None:
     """# NOSAFE and # NoSafe are treated identically to # nosafe."""
-    assert _parse_suppressions("x = 1  # NOSAFE\n") == {1: None}
-    assert _parse_suppressions("x = 1  # NoSafe: SAFE101\n") == {1: {"SAFE101"}}
+    assert _suppressions("x = 1  # NOSAFE\n") == {1: None}
+    assert _suppressions("x = 1  # NoSafe: SAFE101\n") == {1: {"SAFE101"}}
 
 
 def test_parse_nosafe_inside_string_literal_ignored() -> None:
     """# nosafe inside a string literal is not treated as a suppression."""
-    source = 'x = "# nosafe"\ny = 1\n'
-    assert _parse_suppressions(source) == {}
+    assert _suppressions('x = "# nosafe"\ny = 1\n') == {}
 
 
 def test_parse_nosafe_inside_docstring_ignored() -> None:
@@ -72,21 +85,15 @@ def test_parse_nosafe_inside_docstring_ignored() -> None:
             \"\"\"Do not suppress: # nosafe\"\"\"
             pass
     """)
-    assert _parse_suppressions(source) == {}
+    assert _suppressions(source) == {}
 
 
 def test_parse_nosafe_only_on_annotated_line() -> None:
     """Suppression applies only to the line carrying the comment, not adjacent lines."""
-    source = "x = 1\ny = 2  # nosafe\nz = 3\n"
-    result = _parse_suppressions(source)
+    result = _suppressions("x = 1\ny = 2  # nosafe\nz = 3\n")
     assert 1 not in result
     assert result[2] is None
     assert 3 not in result
-
-
-def test_parse_incomplete_source_returns_empty() -> None:
-    """Tokenize failure on malformed source returns an empty suppression map."""
-    assert _parse_suppressions("def foo(\n") == {}
 
 
 # ---------------------------------------------------------------------------
@@ -143,7 +150,7 @@ def test_bare_nosafe_suppresses_violation_on_that_line(tmp_path: Path) -> None:
     result = SafetyEngine(DEFAULTS).check_file(str(sample))
 
     assert not any(v.rule == "resource_lifecycle" for v in result.violations)
-    assert result.suppressed == 1
+    assert len(result.suppressed) == 1
 
 
 def test_selective_suppression_by_code_suppresses_that_code(tmp_path: Path) -> None:
@@ -163,7 +170,7 @@ def test_selective_suppression_by_code_suppresses_that_code(tmp_path: Path) -> N
 
     # bare_except (SAFE201) on line 4 should be suppressed
     assert not any(v.rule == "bare_except" for v in result.violations)
-    assert result.suppressed >= 1
+    assert len(result.suppressed) >= 1
 
 
 def test_selective_suppression_by_rule_name(tmp_path: Path) -> None:
@@ -175,7 +182,7 @@ def test_selective_suppression_by_rule_name(tmp_path: Path) -> None:
     result = SafetyEngine(DEFAULTS).check_file(str(sample))
 
     assert not any(v.rule == "resource_lifecycle" for v in result.violations)
-    assert result.suppressed >= 1
+    assert len(result.suppressed) >= 1
 
 
 def test_unsuppressed_violations_still_reported(tmp_path: Path) -> None:
@@ -194,7 +201,7 @@ def test_unsuppressed_violations_still_reported(tmp_path: Path) -> None:
     result = SafetyEngine(DEFAULTS).check_file(str(sample))
 
     assert any(v.rule == "bare_except" for v in result.violations)
-    assert result.suppressed == 0
+    assert len(result.suppressed) == 0
 
 
 def test_suppressed_count_reflects_number_of_suppressed_violations(tmp_path: Path) -> None:
@@ -209,7 +216,7 @@ def test_suppressed_count_reflects_number_of_suppressed_violations(tmp_path: Pat
 
     result = SafetyEngine(DEFAULTS).check_file(str(sample))
 
-    assert result.suppressed == 2
+    assert len(result.suppressed) == 2
     assert not any(v.rule == "resource_lifecycle" for v in result.violations)
 
 
@@ -222,7 +229,7 @@ def test_nosafe_inside_string_does_not_suppress(tmp_path: Path) -> None:
     result = SafetyEngine(DEFAULTS).check_file(str(sample))
 
     assert any(v.rule == "resource_lifecycle" for v in result.violations)
-    assert result.suppressed == 0
+    assert len(result.suppressed) == 0
 
 
 # ---------------------------------------------------------------------------
@@ -255,7 +262,7 @@ def test_fail_fast_does_not_stop_on_suppressed_violation(tmp_path: Path) -> None
     assert not any(v.rule == "function_length" for v in result.violations)
     # bare_except must still have been checked and reported
     assert any(v.rule == "bare_except" for v in result.violations)
-    assert result.suppressed >= 1
+    assert len(result.suppressed) >= 1
 
 
 def test_fail_fast_stops_after_first_unsuppressed_rule(tmp_path: Path) -> None:

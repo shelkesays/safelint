@@ -9,7 +9,7 @@ from safelint.rules.base import BaseRule
 
 
 if TYPE_CHECKING:
-    import ast
+    import tree_sitter
 
     from safelint.rules.base import Violation
 
@@ -20,7 +20,7 @@ class TestExistenceRule(BaseRule):
     name = "test_existence"
     code = "SAFE701"
 
-    def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:  # noqa: ARG002
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:  # noqa: ARG002
         """Return a violation when no test_<module>.py file can be found."""
         test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
         src = Path(filepath)
@@ -30,7 +30,7 @@ class TestExistenceRule(BaseRule):
                 return []
         dirs = ", ".join(test_dirs)
         return [
-            self._v(
+            self._make_violation(
                 filepath,
                 0,
                 f"No test file found for {src.name} - expected {test_name} under {dirs}/",
@@ -49,7 +49,7 @@ class TestCouplingRule(BaseRule):
     name = "test_coupling"
     code = "SAFE702"
 
-    def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:  # noqa: ARG002
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:  # noqa: ARG002
         """Return a violation when the paired test file was not part of this commit."""
         # No coupling context means we are not in a diff-aware run (e.g. --all-files).
         # Firing on every file would be noise, so skip entirely.
@@ -69,7 +69,7 @@ class TestCouplingRule(BaseRule):
         if not any(test_name in f for f in changed):
             dirs = ", ".join(test_dirs)
             return [
-                self._v(
+                self._make_violation(
                     filepath,
                     0,
                     f"{src.name} changed but {test_name} was not updated - tests must be updated alongside source changes (under {dirs}/)",

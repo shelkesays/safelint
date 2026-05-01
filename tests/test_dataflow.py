@@ -1,76 +1,59 @@
-"""Tests for the AST + dataflow hybrid rules and analysis infrastructure."""
+"""Tests for the Tree-sitter dataflow rules and analysis infrastructure."""
 
 from __future__ import annotations
 
-import ast
 import textwrap
 
-import pytest
+import tree_sitter
+import tree_sitter_python
 
-from safelint.analysis.dataflow import TaintTracker, _call_name
+from safelint.analysis.dataflow import TaintTracker
 from safelint.core.config import DEFAULTS
+from safelint.languages._node_utils import call_name, walk
 from safelint.rules import RULE_BY_NAME
 from safelint.rules.dataflow import NullDereferenceRule, ReturnValueIgnoredRule, TaintedSinkRule
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+_PYTHON_LANGUAGE = tree_sitter.Language(tree_sitter_python.language())
 
 
-def parse(src: str) -> ast.Module:
-    return ast.parse(textwrap.dedent(src))
+def _parse(src: str) -> tree_sitter.Tree:
+    return tree_sitter.Parser(_PYTHON_LANGUAGE).parse(textwrap.dedent(src).encode("utf-8"))
+
+
+def _parse_func(src: str) -> tree_sitter.Node:
+    """Return the first function_definition (or async_function_definition) node in src."""
+    tree = _parse(src)
+    return next(n for n in walk(tree.root_node) if n.type in ("function_definition", "async_function_definition"))
 
 
 def violations(rule_cls, src: str, config: dict | None = None):
     cfg = config or {"enabled": True, "severity": "error"}
     rule = rule_cls(cfg)
-    return rule.check_file("<test>", parse(src))
+    return rule.check_file("<test>", _parse(src))
 
 
 # ---------------------------------------------------------------------------
-# _call_name (module-level helper in analysis.dataflow)
+# call_name
 # ---------------------------------------------------------------------------
 
 
 def test_call_name_from_name_node():
-    tree = parse("foo()")
-    expr = tree.body[0]
-    if isinstance(expr, ast.Expr):
-        call = expr.value
-        if isinstance(call, ast.Call):
-            assert _call_name(call.func) == "foo"
-        else:
-            pytest.fail("Expected ast.Call node")
-    else:
-        pytest.fail("Expected ast.Expr node")
+    tree = _parse("foo()")
+    call_node = next(n for n in walk(tree.root_node) if n.type == "call")
+    assert call_name(call_node) == "foo"
 
 
 def test_call_name_from_attribute_node():
-    tree = parse("obj.method()")
-    expr = tree.body[0]
-    if isinstance(expr, ast.Expr):
-        call = expr.value
-        if isinstance(call, ast.Call):
-            assert _call_name(call.func) == "method"
-        else:
-            pytest.fail("Expected ast.Call node")
-    else:
-        pytest.fail("Expected ast.Expr node")
+    tree = _parse("obj.method()")
+    call_node = next(n for n in walk(tree.root_node) if n.type == "call")
+    assert call_name(call_node) == "method"
 
 
 def test_call_name_unknown_returns_none():
-    # Subscript call: func_map["key"]() - not a Name or Attribute
-    tree = parse("func_map['key']()")
-    expr = tree.body[0]
-    if isinstance(expr, ast.Expr):
-        call = expr.value
-        if isinstance(call, ast.Call):
-            assert _call_name(call.func) is None
-        else:
-            pytest.fail("Expected ast.Call node")
-    else:
-        pytest.fail("Expected ast.Expr node")
+    tree = _parse("func_map['key']()")
+    call_node = next(n for n in walk(tree.root_node) if n.type == "call")
+    assert call_name(call_node) is None
 
 
 # ---------------------------------------------------------------------------
@@ -92,8 +75,7 @@ def test_tracker_direct_param_to_sink():
     def process(user_input):
         eval(user_input)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"user_input"})
     tracker.visit(func)
     assert len(tracker.sink_hits) == 1
@@ -108,8 +90,7 @@ def test_tracker_propagation_through_assignment():
         x = data
         exec(x)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"data"})
     tracker.visit(func)
     assert any(v == "x" and s == "exec" for _, v, s in tracker.sink_hits)
@@ -121,11 +102,9 @@ def test_tracker_sanitizer_clears_taint():
         safe = escape(user_input)
         eval(safe)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"user_input"})
     tracker.visit(func)
-    # safe is cleaned by escape() so eval(safe) must NOT be flagged
     assert not tracker.sink_hits
 
 
@@ -135,9 +114,8 @@ def test_tracker_source_call_injects_taint():
         data = input()
         exec(data)
     """
-    tree = parse(src)
-    func = tree.body[0]
-    tracker = make_tracker(set())  # no params tainted initially
+    func = _parse_func(src)
+    tracker = make_tracker(set())
     tracker.visit(func)
     assert len(tracker.sink_hits) == 1
     _, var, sink = tracker.sink_hits[0]
@@ -151,8 +129,7 @@ def test_tracker_fstring_propagates_taint():
         cmd = f"echo {name}"
         system(cmd)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"name"})
     tracker.visit(func)
     assert any(s == "system" for _, _, s in tracker.sink_hits)
@@ -163,9 +140,8 @@ def test_tracker_clean_param_no_hit():
     def greet(name):
         print(name)
     """
-    tree = parse(src)
-    func = tree.body[0]
-    tracker = make_tracker(set())  # name is NOT tainted
+    func = _parse_func(src)
+    tracker = make_tracker(set())
     tracker.visit(func)
     assert not tracker.sink_hits
 
@@ -177,8 +153,7 @@ def test_tracker_aug_assign_propagates_taint():
         cmd += fragment
         system(cmd)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"fragment"})
     tracker.visit(func)
     assert any(s == "system" for _, _, s in tracker.sink_hits)
@@ -225,7 +200,13 @@ def test_tainted_sink_respects_custom_sinks():
     def query(user_input):
         db_execute(user_input)
     """
-    cfg = {"enabled": True, "severity": "error", "sinks": ["db_execute"], "sanitizers": [], "sources": []}
+    cfg = {
+        "enabled": True,
+        "severity": "error",
+        "sinks": ["db_execute"],
+        "sanitizers": [],
+        "sources": [],
+    }
     vs = violations(TaintedSinkRule, src, cfg)
     assert len(vs) == 1
     assert "db_execute" in vs[0].message
@@ -237,9 +218,7 @@ def test_tainted_sink_self_cls_not_tainted():
         def run(self, data):
             eval("1 + 1")
     """
-    # self is excluded from params so this must NOT flag eval("1 + 1")
     vs = violations(TaintedSinkRule, src)
-    # "1 + 1" is a literal, not tainted - expect zero hits
     assert not vs
 
 
@@ -330,7 +309,6 @@ def test_null_deref_flags_dict_get_subscript():
 
 
 def test_null_deref_safe_when_result_guarded():
-    # No chained dereference - result stored first
     src = """
     d = {"name": "Alice"}
     name = d.get("name")
@@ -369,19 +347,17 @@ def test_null_deref_non_nullable_call_ok():
 
 
 # ---------------------------------------------------------------------------
-# Registry integration - new rules appear in RULE_BY_NAME
+# Registry integration
 # ---------------------------------------------------------------------------
 
 
 def test_new_rules_in_registry():
-
     assert "tainted_sink" in RULE_BY_NAME
     assert "return_value_ignored" in RULE_BY_NAME
     assert "null_dereference" in RULE_BY_NAME
 
 
 def test_new_rules_disabled_by_default():
-
     for name in ("tainted_sink", "return_value_ignored", "null_dereference"):
         assert DEFAULTS["rules"][name]["enabled"] is False, f"{name} should be off by default"
 
@@ -398,8 +374,7 @@ def test_tracker_container_propagates_taint():
         items = [data, "safe"]
         system(items)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"data"})
     tracker.visit(func)
     assert any(s == "system" for _, _, s in tracker.sink_hits)
@@ -413,8 +388,7 @@ def test_tracker_clean_assignment_discards_taint():
         x = "safe_string"
         system(x)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"data"})
     tracker.visit(func)
     assert not tracker.sink_hits
@@ -428,11 +402,9 @@ def test_tracker_subscript_assignment_target_ignored():
         a["key"] = data
         eval(data)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"data"})
     tracker.visit(func)
-    # data is still tainted, eval should still fire
     assert any(s == "eval" for _, _, s in tracker.sink_hits)
 
 
@@ -444,8 +416,7 @@ def test_tracker_aug_assign_clean_value_no_propagation():
         cmd += " hello"
         system(cmd)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker(set())
     tracker.visit(func)
     assert not tracker.sink_hits
@@ -458,8 +429,7 @@ def test_tracker_ann_assign_propagates_taint():
         x: str = data
         system(x)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"data"})
     tracker.visit(func)
     assert any(s == "system" for _, _, s in tracker.sink_hits)
@@ -472,8 +442,7 @@ def test_tracker_regular_call_propagates_taint_to_result():
         result = fmt(data)
         system(result)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"data"})
     tracker.visit(func)
     assert any(s == "system" for _, _, s in tracker.sink_hits)
@@ -486,9 +455,7 @@ def test_tracker_ann_assign_no_value_skipped():
         x: int
         system(data)
     """
-    tree = parse(src)
-    func = tree.body[0]
+    func = _parse_func(src)
     tracker = make_tracker({"data"})
     tracker.visit(func)
-    # data is still tainted via params; x: int (no value) is a no-op for taint
     assert any(s == "system" for _, _, s in tracker.sink_hits)

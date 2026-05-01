@@ -1,118 +1,109 @@
-"""Safety engine - orchestrates the active rule set against Python source files."""
+"""Safety engine - orchestrates the active rule set against source files."""
 
 from __future__ import annotations
 
-import ast
 from dataclasses import dataclass, field
 import fnmatch
-import io
-import logging
 from pathlib import Path
-import tokenize
 from typing import TYPE_CHECKING, Any, Literal
 
+from safelint.core import _diagnostics
 from safelint.core.config import DEFAULTS, SEVERITY_ORDER
+from safelint.languages import get_language_for_file, supported_extensions
+from safelint.languages._node_utils import lineno as node_lineno
+from safelint.languages._node_utils import node_text, walk
 from safelint.rules import ALL_RULES
 from safelint.rules.base import Violation
 from safelint.rules.test_coverage import TestCouplingRule
 
 
 if TYPE_CHECKING:
+    import tree_sitter
+
     from safelint.rules.base import BaseRule
 
 
-_log = logging.getLogger(__name__)
-
-# Applied only to real COMMENT tokens — not string literals.
-# Matches:  # nosafe           (suppress all on this line)
-#           # nosafe: SAFE101  (suppress specific code or rule name)
-#           # nosafe: SAFE101, function_length  (comma-separated list)
 _NOSAFE_PREFIX = "nosafe"
 
 
-def _nosafe_codes(comment: str) -> set[str] | None | Literal[False]:
-    """Parse a single comment token string and return the nosafe payload.
+def _nosafe_codes(comment: str, prefix: str = "#") -> set[str] | None | Literal[False]:
+    """Parse a single comment string and return the nosafe payload.
 
     Returns:
-        ``None``           — bare ``# nosafe`` (suppress all on this line)
-        ``set[str]``       — ``# nosafe: CODE, ...`` (suppress named codes/rules)
-        ``Literal[False]`` — comment is not a nosafe directive, or is malformed
-                             (e.g. ``# nosafe:`` with an empty payload)
+        ``None``           — bare nosafe (suppress everything on this line)
+        ``set[str]``       — nosafe: CODE, ... (suppress named codes/rules)
+        ``Literal[False]`` — not a nosafe directive, or malformed
 
     """
-    body = comment[1:].strip()  # strip leading '#'
+    body = comment[len(prefix) :].strip()
     if not body.lower().startswith(_NOSAFE_PREFIX):
         return False
     remainder = body[len(_NOSAFE_PREFIX) :].lstrip()
     if remainder == "":
-        return None  # bare # nosafe
+        return None
     if remainder.startswith(":"):
         codes_str = remainder[1:].strip()
         if not codes_str:
-            # Malformed directive: "# nosafe:" with no codes or rule names
-            _log.debug("Ignoring malformed nosafe directive with empty payload: %r", comment.strip())
             return False
         codes = {tok.strip() for tok in codes_str.split(",") if tok.strip()}
         if not codes:
-            # Malformed directive: payload contains only commas/whitespace, no actual codes
-            _log.debug(
-                "Ignoring malformed nosafe directive with no usable codes: %r",
-                comment.strip(),
-            )
             return False
         return codes
     return False
 
 
-def _parse_suppressions(source: str) -> dict[int, set[str] | None]:
-    """Return a {lineno: codes} suppression map from real comment tokens only.
+def _parse_suppressions(
+    tree: tree_sitter.Tree,
+    comment_node_type: str,
+    comment_prefix: str,
+) -> dict[int, set[str] | None]:
+    """Return a {lineno: codes} suppression map by querying comment nodes in the Tree-sitter tree.
 
-    Uses :mod:`tokenize` so that occurrences of ``# nosafe`` inside string
-    literals are never mistaken for suppression comments.
+    This replaces the old tokenize-based implementation. Because Tree-sitter
+    parses comment nodes as first-class tree nodes, there is no risk of
+    confusing a nosafe directive inside a string literal with a real one.
 
-    ``None`` means "suppress everything on this line" (bare ``# nosafe``).
-    A ``set`` means suppress only the listed codes / rule names.
-    Line numbers are 1-based.
+    ``comment_node_type`` and ``comment_prefix`` come from the LanguageDefinition,
+    so this function works for any language without modification.
     """
-    try:
-        token_list = list(tokenize.generate_tokens(io.StringIO(source).readline))
-    except tokenize.TokenError:
-        # Incomplete source (e.g. mid-edit) — fall back to no suppressions
-        _log.debug("tokenize failed while parsing suppressions; no suppressions applied")
-        return {}
-
     suppressions: dict[int, set[str] | None] = {}
-    for tok_type, tok_string, (lineno, _), _, _ in token_list:
-        if tok_type != tokenize.COMMENT:
+    for node in walk(tree.root_node):
+        if node.type != comment_node_type:
             continue
-        payload = _nosafe_codes(tok_string)
+        comment_text = node_text(node)
+        payload = _nosafe_codes(comment_text, prefix=comment_prefix)
         if payload is not False:
-            suppressions[lineno] = payload
+            suppressions[node_lineno(node)] = payload
     return suppressions
 
 
-def _is_suppressed(v: Violation, suppressions: dict[int, set[str] | None]) -> bool:
-    """Return True when *v* is covered by a nosafe comment on its line."""
-    if v.lineno not in suppressions:
+def _is_suppressed(violation: Violation, suppressions: dict[int, set[str] | None]) -> bool:
+    """Return True when *violation* is covered by a nosafe comment on its line."""
+    if violation.lineno not in suppressions:
         return False
-    codes = suppressions[v.lineno]
-    if codes is None:  # bare # nosafe
+    codes = suppressions[violation.lineno]
+    if codes is None:
         return True
-    return v.code in codes or v.rule in codes
+    return violation.code in codes or violation.rule in codes
 
 
-def _is_per_file_ignored(v: Violation, pfi_names: frozenset[str], pfi_codes_upper: frozenset[str]) -> bool:
-    """Return True when *v* is suppressed by a per-file ignore pattern."""
-    return v.code.upper() in pfi_codes_upper or v.rule in pfi_names
+def _is_per_file_ignored(violation: Violation, ignored_names: frozenset[str], ignored_codes: frozenset[str]) -> bool:
+    """Return True when *violation* is suppressed by a per-file ignore pattern."""
+    return violation.code.upper() in ignored_codes or violation.rule in ignored_names
 
 
 @dataclass
 class LintResult:
-    """Aggregated violations for a single linted file."""
+    """Aggregated violations for a single linted file.
+
+    ``suppressed`` is the list of violations that were filtered out by inline
+    ``# nosafe`` directives or per-file ignore patterns. Use ``len(...)`` for
+    the count and iterate to inspect codes/rules/lines.
+    """
 
     path: str
     violations: list[Violation] = field(default_factory=list)
-    suppressed: int = 0
+    suppressed: list[Violation] = field(default_factory=list)
 
     @property
     def has_violations(self) -> bool:
@@ -121,30 +112,33 @@ class LintResult:
 
 
 class SafetyEngine:
-    """Orchestrates the active rule set against a collection of Python files."""
+    """Orchestrates the active rule set against a collection of source files."""
 
     def __init__(
         self,
         config: dict[str, Any],
         changed_files: list[str] | None = None,
     ) -> None:
-        """Build the ordered, active rule set from *config*.
-
-        Rules are sorted by ``execution.order``; rules not listed there are
-        appended at the end. Disabled rules are excluded entirely.
-        ``changed_files`` is injected into test-coupling rules that need it.
-        """
+        """Build the ordered, active rule set from *config*."""
         rules_cfg: dict[str, Any] = config.get("rules", {})
         exec_cfg: dict[str, Any] = config.get("execution", {})
         self.fail_fast: bool = exec_cfg.get("fail_fast", False)
         self.exclude_paths: list[str] = config.get("exclude_paths", [])
 
-        raw_ignore: list[str] = config.get("ignore", [])
+        raw_ignore = config.get("ignore", [])
+        if not isinstance(raw_ignore, (list, tuple)):
+            msg = f"ignore must be a list of strings, got {type(raw_ignore).__name__}"
+            raise TypeError(msg)
+        non_strings = [e for e in raw_ignore if not isinstance(e, str)]
+        if non_strings:
+            bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
+            msg = f"ignore must contain only strings — got: {bad}"
+            raise TypeError(msg)
         known_names: frozenset[str] = frozenset(cls.name for cls in ALL_RULES)
         known_codes_upper: frozenset[str] = frozenset(cls.code.upper() for cls in ALL_RULES)
         unknown = frozenset(e for e in raw_ignore if e not in known_names and e.upper() not in known_codes_upper)
         if unknown:
-            _log.warning("Unknown entries in ignore list (typo or stale rule?): %s", ", ".join(sorted(unknown)))
+            _diagnostics.print_warning(f"unknown entries in ignore list (typo or stale rule?): {', '.join(sorted(unknown))}")
         ignored_names: frozenset[str] = frozenset(raw_ignore)
         ignored_codes_upper: frozenset[str] = frozenset(e.upper() for e in raw_ignore)
 
@@ -190,13 +184,14 @@ class SafetyEngine:
             if not isinstance(entries, (list, tuple)):
                 msg = f"per_file_ignores[{pattern!r}] must be a list of strings, got {type(entries).__name__}"
                 raise TypeError(msg)
-            pfi_unknown = frozenset(e for e in entries if e not in known_names and e.upper() not in known_codes_upper)
-            if pfi_unknown:
-                _log.warning(
-                    "Unknown entries in per_file_ignores[%r] (typo or stale rule?): %s",
-                    pattern,
-                    ", ".join(sorted(pfi_unknown)),
-                )
+            non_strings = [e for e in entries if not isinstance(e, str)]
+            if non_strings:
+                bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
+                msg = f"per_file_ignores[{pattern!r}] must contain only strings — got: {bad}"
+                raise TypeError(msg)
+            unknown_entries = frozenset(e for e in entries if e not in known_names and e.upper() not in known_codes_upper)
+            if unknown_entries:
+                _diagnostics.print_warning(f"unknown entries in per_file_ignores[{pattern!r}] (typo or stale rule?): {', '.join(sorted(unknown_entries))}")
             result.append((pattern, frozenset(entries), frozenset(e.upper() for e in entries)))
         return result
 
@@ -210,73 +205,143 @@ class SafetyEngine:
         posix = Path(filepath).as_posix()
         names: set[str] = set()
         codes_upper: set[str] = set()
-        for pattern, pfi_names, pfi_codes_upper in self.per_file_ignores:
+        for pattern, ignored_names, ignored_codes in self.per_file_ignores:
             if fnmatch.fnmatchcase(posix, pattern):
-                names |= pfi_names
-                codes_upper |= pfi_codes_upper
+                names |= ignored_names
+                codes_upper |= ignored_codes
         return frozenset(names), frozenset(codes_upper)
 
-    def check_file(self, filepath: str) -> LintResult:
-        """Parse *filepath*, run every active rule, apply inline suppressions, and return a :class:`LintResult`.
+    @staticmethod
+    def _parse_error_result(filepath: str, message: str, lineno: int = 0) -> LintResult:
+        """Build a LintResult carrying a single SAFE000 parse-error violation."""
+        return LintResult(
+            path=filepath,
+            violations=[
+                Violation(
+                    rule="parse",
+                    code="SAFE000",
+                    filepath=filepath,
+                    lineno=lineno,
+                    message=message,
+                    severity="error",
+                )
+            ],
+        )
 
-        .. note::
-            **Breaking change (1.2.0):** this method previously returned
-            ``list[Violation]``.  Callers that relied on the old return type
-            must be updated to access ``result.violations`` instead.
+    @staticmethod
+    def _first_parse_error(root: tree_sitter.Node) -> tuple[int, int, str] | None:
+        """Return ``(lineno, column, kind)`` for the earliest parse-error node, else None.
 
-        Violations are filtered by two suppression mechanisms, both of which
-        count toward :attr:`LintResult.suppressed`:
-
-        * **Inline** ``# nosafe`` comments (optionally with a comma-separated
-          list of codes / rule names) suppress violations on a specific line.
-        * **Per-file** ``per_file_ignores`` patterns suppress all violations
-          whose code or name matches an entry for the file's path.
-
-        When ``fail_fast`` is enabled the loop stops after the first rule that
-        produces at least one violation that survives both filtering passes
-        (i.e. not suppressed by either ``# nosafe`` or ``per_file_ignores``).
+        Walks every child (named *and* anonymous) because Tree-sitter records
+        missing-token errors on anonymous nodes. Prunes subtrees whose
+        ``has_error`` is False, so the traversal stays cheap on mostly-valid
+        files. ``lineno`` is 1-based; ``column`` is 0-based to match
+        Tree-sitter's own coordinates.
         """
-        if self._is_excluded(filepath):
-            return LintResult(path=filepath)
-        try:
-            source = Path(filepath).read_text(encoding="utf-8")
-            tree = ast.parse(source, filename=filepath)
-        except (SyntaxError, OSError) as exc:
-            _log.debug("Failed to parse %s: %s", filepath, exc)
-            return LintResult(
-                path=filepath,
-                violations=[
-                    Violation(
-                        rule="parse",
-                        code="SAFE000",
-                        filepath=filepath,
-                        lineno=0,
-                        message=f"Parse error: {exc}",
-                        severity="error",
-                    )
-                ],
-            )
+        stack: list[tree_sitter.Node] = [root]
+        while stack:  # nosafe: SAFE501
+            node = stack.pop()
+            if not node.has_error:
+                continue
+            if node.is_missing:
+                return node.start_point[0] + 1, node.start_point[1], f"missing {node.type!r}"
+            if node.type == "ERROR":
+                return node.start_point[0] + 1, node.start_point[1], "syntax error"
+            # Pre-order DFS: push reversed so the first original child pops first.
+            stack.extend(reversed(node.children))
+        return None
 
-        suppressions = _parse_suppressions(source)
-        pfi_names, pfi_codes_upper = self._file_ignored_set(filepath)
-
+    @staticmethod
+    def _partition_rule_output(
+        rule_violations: list[Violation],
+        suppressions: dict[int, set[str] | None],
+        ignored_names: frozenset[str],
+        ignored_codes: frozenset[str],
+    ) -> tuple[list[Violation], list[Violation]]:
+        """Split a single rule's output into (active, suppressed) violation lists."""
         active: list[Violation] = []
-        suppressed = 0
+        suppressed: list[Violation] = []
+        for v in rule_violations:
+            if _is_suppressed(v, suppressions) or _is_per_file_ignored(v, ignored_names, ignored_codes):
+                suppressed.append(v)
+            else:
+                active.append(v)
+        return active, suppressed
+
+    def _run_rules(
+        self,
+        filepath: str,
+        tree: tree_sitter.Tree,
+        suppressions: dict[int, set[str] | None],
+        ignored_names: frozenset[str],
+        ignored_codes: frozenset[str],
+    ) -> tuple[list[Violation], list[Violation]]:
+        """Run active rules against *tree*, returning (active, suppressed) violation lists."""
+        active: list[Violation] = []
+        suppressed: list[Violation] = []
         for rule in self.rules:
             rule_violations = rule.check_file(filepath, tree)
-            after_nosafe = [v for v in rule_violations if not _is_suppressed(v, suppressions)]
-            after_pfi = [v for v in after_nosafe if not _is_per_file_ignored(v, pfi_names, pfi_codes_upper)]
-            suppressed += len(rule_violations) - len(after_pfi)
-            active.extend(after_pfi)
-            if self.fail_fast and after_pfi:
+            rule_active, rule_suppressed = self._partition_rule_output(rule_violations, suppressions, ignored_names, ignored_codes)
+            active.extend(rule_active)
+            suppressed.extend(rule_suppressed)
+            if self.fail_fast and rule_active:
                 break
+        return active, suppressed
 
+    def check_file(self, filepath: str) -> LintResult:
+        """Parse *filepath*, run every active rule, apply inline suppressions, return a LintResult."""
+        if self._is_excluded(filepath):
+            return LintResult(path=filepath)
+
+        lang = get_language_for_file(filepath)
+        if lang is None:
+            return LintResult(path=filepath)
+
+        try:
+            source = Path(filepath).read_text(encoding="utf-8")
+        # Read failures are surfaced to the user as a SAFE000 parse-error
+        # violation — the error is reported, not swallowed.
+        except (OSError, UnicodeDecodeError) as exc:  # nosafe: SAFE203
+            return self._parse_error_result(filepath, f"Read error: {exc}")
+
+        tree = lang.create_parser().parse(source.encode("utf-8"))
+        if tree.root_node.has_error:
+            location = self._first_parse_error(tree.root_node)
+            if location is None:
+                msg = "Parse error: tree-sitter could not fully parse this file"
+                err_lineno = 0
+            else:
+                line, col, kind = location
+                # column is reported 1-based to match common editor convention.
+                msg = f"Parse error ({kind}) at line {line}, column {col + 1} - check syntax near this location"
+                err_lineno = line
+            return self._parse_error_result(filepath, msg, lineno=err_lineno)
+
+        suppressions = _parse_suppressions(tree, lang.comment_node_type, lang.comment_prefix)
+        ignored_names, ignored_codes = self._file_ignored_set(filepath)
+        active, suppressed = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes)
         return LintResult(path=filepath, violations=active, suppressed=suppressed)
 
+    def _discover_files(self, target: Path) -> list[str]:
+        """Return every supported source file under *target*, deduplicated and sorted.
+
+        One ``rglob('*')`` pass — keeps discovery O(number_of_files) rather
+        than O(number_of_extensions * number_of_files). The suffix check
+        is a cheap string comparison; ``is_file()`` only runs on suffix
+        matches, so the stat cost stays bounded by the count of source
+        files (not the size of the tree).
+        """
+        extensions = supported_extensions()
+        seen: set[str] = set()
+        for path in target.rglob("*"):
+            if path.suffix in extensions and path.is_file():
+                seen.add(str(path))
+        return sorted(p for p in seen if not self._is_excluded(p))
+
     def check_path(self, path: str | Path) -> list[LintResult]:
-        """Lint a single file or recursively lint all Python files under a directory."""
+        """Lint a single file or recursively lint all supported files under a directory."""
         target = Path(path)
-        files = [str(target)] if target.is_file() else sorted(str(p) for p in target.rglob("*.py") if not self._is_excluded(str(p)))
+        files = [str(target)] if target.is_file() else self._discover_files(target)
         return [self.check_file(f) for f in files]
 
     @staticmethod

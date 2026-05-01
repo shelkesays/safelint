@@ -36,8 +36,9 @@ ALL_RULES: list[type[BaseRule]] = [
     TestCouplingRule,
     TestExistenceRule,
     MissingAssertionsRule,
-    # Dataflow hybrid rules - disabled by default; enable in .safelint.yaml
-    # or via [tool.safelint.rules.<rule>] in pyproject.toml (preferred).
+    # Dataflow hybrid rules - disabled by default; enable via
+    # [tool.safelint.rules.<rule>] in pyproject.toml, or [rules.<rule>] in
+    # a standalone safelint.toml.
     TaintedSinkRule,
     ReturnValueIgnoredRule,
     NullDereferenceRule,

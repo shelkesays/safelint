@@ -1,4 +1,4 @@
-"""Dataflow analysis infrastructure for hybrid AST + dataflow rules."""
+"""Intra-procedural dataflow analysis using Tree-sitter."""
 
 from __future__ import annotations
 

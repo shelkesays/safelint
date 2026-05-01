@@ -1,6 +1,6 @@
 # SafeLint Configuration Reference
 
-SafeLint is configured via `[tool.safelint]` in your `pyproject.toml` (preferred) or a `.safelint.yaml` file in your project root.
+SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` in your project root (TOML keys at the top level — no `[tool.safelint]` wrapper). When both files are present, `safelint.toml` wins.
 
 All keys are optional - anything you leave out falls back to the built-in defaults shown below.
 
@@ -17,7 +17,7 @@ These are passed on the command line and are not part of the config file.
 | `--all-files` | off | Scan every `.py` file under the target. Default (without this flag) is to check only git-modified files. |
 | `--fail-on` | from config | Override the minimum severity that blocks the run: `error` or `warning`. |
 | `--mode` | from config | `local` (only errors block) or `ci` (warnings block too). |
-| `--config` | auto-discovered | Path to a config file (`pyproject.toml`, `.safelint.yaml`) or a directory to use as the config search root. |
+| `--config` | auto-discovered | Path to a config file (`pyproject.toml` or `safelint.toml`) or a directory to use as the config search root. |
 | `--ignore` | none | Repeatable flag to suppress a rule for this run only, e.g. `--ignore SAFE101 --ignore function_length`. Stacks on top of the `ignore` list in the config file. |
 
 **When to use `--all-files`:**
@@ -30,6 +30,7 @@ These are passed on the command line and are not part of the config file.
 Pre-commit passes the staged files as positional arguments automatically. `--fail-on`, `--mode`, and `--ignore` are all supported here.
 
 ```yaml
+# .pre-commit-config.yaml
 - id: safelint
   args: [--fail-on=error]   # or --fail-on=warning for strict CI
 
@@ -44,7 +45,7 @@ Pre-commit passes the staged files as positional arguments automatically. `--fai
 
 Add a `# nosafe` comment to the end of any line to suppress violations on that specific line. This is the escape hatch for the rare case where a violation is a deliberate, justified choice.
 
-Suppressed violations do not appear in output and do not count toward the blocking total, but the number suppressed is always reported at the end of the run so they remain auditable.
+Suppressed violations do not appear in output and do not count toward the blocking total, but a per-code breakdown of what was suppressed is always reported at the end of the run so suppressions remain auditable.
 
 ### Syntax
 
@@ -86,18 +87,30 @@ def get_data(conn, query, p1, p2, p3, p4, p5, p6):  # nosafe: SAFE101, SAFE103
 
 ### End-of-run summary
 
-When suppressions are active, the summary line reports the total count:
+When suppressions are active, the summary surfaces a per-code breakdown so it
+is clear *which* rules were silenced. Codes are ordered by descending count,
+ties broken alphabetically.
+
+When there are still active violations, the breakdown rides on the
+"no fixes" line:
 
 ```text
 Found 2 errors, 1 warning. [--fail-on=error].
-No fixes available (safelint does not auto-fix violations). (3 suppressed)
+No fixes available (safelint does not auto-fix violations). (2 SAFE501, 1 SAFE304 suppressed)
 ```
 
-If all active violations were suppressed:
+When the run is otherwise clean (no active violations), only the all-clear
+line is printed — there is nothing to fix, so the "no fixes" line is omitted:
 
 ```text
-All checks passed. (3 suppressed)
-No fixes available (safelint does not auto-fix violations). (3 suppressed)
+All checks passed. (2 SAFE501, 1 SAFE304 suppressed)
+```
+
+A fully clean run with no suppressions prints a single line in bold green to
+match `ruff` / `ty`:
+
+```text
+All checks passed.
 ```
 
 ### When to use suppression
@@ -108,6 +121,21 @@ Use `# nosafe` when:
 - You are mid-refactor and need to commit a transitional state without breaking CI.
 
 Prefer **config changes** (adjusting thresholds or disabling rules) over `# nosafe` when the exception applies to the entire project or a whole file pattern. Inline suppressions are for line-level exceptions only.
+
+---
+
+## Diagnostic output
+
+Lint violations and the run summary are written to **stdout** in the ruff/ty multi-line format. Issues that aren't lint violations — typos in your `ignore` list, malformed TOML, etc. — are written to **stderr** as single-line `safelint: warning:` / `safelint: error:` messages so they stay out of the violation stream and are captured separately by pre-commit, CI, and editor integrations.
+
+Examples:
+
+```text
+safelint: warning: unknown entries in ignore list (typo or stale rule?): SAFFE101
+safelint: error: failed to parse /path/to/pyproject.toml: Expected '=' after a key in a key/value pair (at line 5, column 12) — skipping file
+```
+
+These messages always appear before the lint output (they are emitted at config-load and engine-construction time). Misconfigurations are reported but never fail the run on their own — safelint falls back to defaults and continues.
 
 ---
 
@@ -144,12 +172,9 @@ The `ignore` key lets you suppress one or more rules project-wide without touchi
 ignore = ["SAFE203", "SAFE304", "side_effects_hidden"]
 ```
 
-```yaml
-# .safelint.yaml
-ignore:
-  - SAFE203
-  - SAFE304
-  - side_effects_hidden
+```toml
+# safelint.toml (standalone — no [tool.safelint] wrapper)
+ignore = ["SAFE203", "SAFE304", "side_effects_hidden"]
 ```
 
 Rules in the `ignore` list are skipped entirely — they produce no violations and add no overhead.
@@ -193,20 +218,12 @@ The `per_file_ignores` key suppresses specific rules for files matching a glob p
 "src/legacy/**" = ["SAFE301", "SAFE302", "complexity"]
 ```
 
-```yaml
-# .safelint.yaml
-per_file_ignores:
-  "tests/**":
-    - SAFE101
-    - SAFE103
-    - missing_assertions
-  "migrations/**":
-    - SAFE201
-    - SAFE202
-  "src/legacy/**":
-    - SAFE301
-    - SAFE302
-    - complexity
+```toml
+# safelint.toml (standalone)
+[per_file_ignores]
+"tests/**"      = ["SAFE101", "SAFE103", "missing_assertions"]
+"migrations/**" = ["SAFE201", "SAFE202"]
+"src/legacy/**" = ["SAFE301", "SAFE302", "complexity"]
 ```
 
 Both rule codes (e.g. `SAFE101`) and rule names (e.g. `function_length`) are accepted and can be mixed in the same list. Multiple patterns can match a file — their ignore lists are unioned. Suppressed violations are counted in the end-of-run summary alongside `# nosafe` suppressions.
@@ -304,13 +321,13 @@ max_depth = 2
 
 **What it flags:** Functions with more than `max_args` parameters.
 
-Too many arguments usually means a function is doing too much, or needs a config object. `self` and `cls` are excluded from the count.
+Too many arguments usually means a function is doing too much, or needs a config object. `self` and `cls` are excluded from the count. `*args` and `**kwargs` each count as one parameter — they bring real callers, just an unbounded number of them, so they cannot be free.
 
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"error"` | `"error"` or `"warning"` |
-| `max_args` | `7` | Maximum number of parameters (excluding `self`/`cls`) |
+| `max_args` | `7` | Maximum number of parameters (excluding `self`/`cls`; `*args`/`**kwargs` each count as one) |
 
 ```toml
 [tool.safelint.rules.max_arguments]

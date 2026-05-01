@@ -72,7 +72,7 @@ repos:
   # Config: [tool.ruff] / [tool.ruff.lint] in pyproject.toml
   # ---------------------------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.11
+    rev: v0.15.12
     hooks:
       - id: ruff
         args: [--fix, --unsafe-fixes, --exit-non-zero-on-fix]
@@ -82,17 +82,24 @@ repos:
 
   # ---------------------------------------------------------------------------
   # SafeLint - Holzmann-inspired safety rules
-  # Config: [tool.safelint] in pyproject.toml (falls back to built-in defaults)
+  # Self-development hook: runs the in-tree code via `uv run safelint`,
+  # not the published release. Avoids drift between hook and source while
+  # iterating on safelint itself. Downstream consumers should pin
+  # `repo: https://github.com/shelkesays/safelint` with a `rev: vX.Y.Z`
+  # — see README "Pre-commit integration".
   #
   # Severity model:
   #   --fail-on=error    only error-severity violations block  ← default (lenient)
   #   --fail-on=warning  error + warning violations block      ← strict (CI)
   # ---------------------------------------------------------------------------
-  - repo: https://github.com/shelkesays/safelint
-    rev: v1.3.1
+  - repo: local
     hooks:
       - id: safelint
+        name: safelint (in-tree)
+        language: system
+        entry: uv run --extra dev safelint
         args: [--fail-on=error]
+        types: [python]
         files: ^src/
 
   # ---------------------------------------------------------------------------
