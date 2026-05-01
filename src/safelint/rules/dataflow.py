@@ -51,7 +51,14 @@ def _param_names(func_node: tree_sitter.Node) -> set[str]:
     params_node = func_node.child_by_field_name("parameters")
     if params_node is None:
         return set()
-    return {name for child in params_node.named_children if child.type in _ALL_PARAM_TYPES for name in [_param_node_name(child)] if name and name not in ("self", "cls")}
+    names: set[str] = set()
+    for child in params_node.named_children:
+        if child.type not in _ALL_PARAM_TYPES:
+            continue
+        name = _param_node_name(child)
+        if name and name not in ("self", "cls"):
+            names.add(name)
+    return names
 
 
 class TaintedSinkRule(BaseRule):

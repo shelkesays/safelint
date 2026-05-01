@@ -142,8 +142,12 @@ def test_make_summary_suppressed_with_violations_surfaces_breakdown_in_fixes_lin
     _, fixes = _make_summary([_v("error")], n_blocking=1, fail_on="error", suppressed=suppressed)
     assert fixes is not None
     fixes_text = _strip(fixes)
+    # The fixes line should still carry the no-fix preamble alongside the
+    # suppression breakdown, in the canonical "(... suppressed)" form.
+    assert fixes_text.startswith("No fixes available (safelint does not auto-fix violations).")
     assert "1 SAFE304" in fixes_text
     assert "1 SAFE501" in fixes_text
+    assert "suppressed)" in fixes_text
 
 
 def test_make_summary_suppressed_breakdown_sorted_by_count_desc_then_code() -> None:

@@ -22,6 +22,7 @@ from safelint.languages._node_utils import call_name, lineno, node_text, walk
 from safelint.languages.python import (
     ANNOTATED_ASSIGNMENT,
     ASSIGNMENT,
+    ASYNC_FUNCTION_DEF,
     AUGMENTED_ASSIGNMENT,
     BINARY_OPERATOR,
     BOOLEAN_OPERATOR,
@@ -29,6 +30,7 @@ from safelint.languages.python import (
     COMPARISON_OPERATOR,
     CONCATENATED_STRING,
     CONDITIONAL_EXPRESSION,
+    FUNCTION_DEF,
     IDENTIFIER,
     INTERPOLATION,
     LIST,
@@ -81,11 +83,13 @@ class TaintTracker:
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
 
-        Iterative walk; bound is the finite node count of *root*'s subtree.
+        Skips descent into nested ``def`` / ``async def`` bodies — those are
+        analysed separately by the caller for each function found, with their
+        own parameter set. Without this guard, an inner function's body would
+        be treated as part of the outer function's flow, leaking taint between
+        scopes that don't actually share variables.
         """
-        stack: list[tree_sitter.Node] = [root]
-        while stack:  # nosafe: SAFE501
-            node = stack.pop()
+        for node in walk(root, skip_types=(FUNCTION_DEF, ASYNC_FUNCTION_DEF)):
             if node.type == ASSIGNMENT:
                 self._visit_assignment(node)
             elif node.type == AUGMENTED_ASSIGNMENT:
@@ -94,7 +98,6 @@ class TaintTracker:
                 self._visit_ann_assignment(node)
             elif node.type == CALL:
                 self._visit_call(node)
-            stack.extend(reversed(node.children))
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x = value``."""

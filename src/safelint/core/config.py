@@ -253,7 +253,12 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
     """
     root = search_from or Path.cwd()
     for parent in [root, *root.parents]:
-        cfg = _try_standalone(parent) or _try_pyproject(parent)
-        if cfg:
+        # ``or`` short-circuits on falsy, so an empty-but-present
+        # standalone config (``{}``) would let us silently fall through
+        # to pyproject.toml. Check presence (None vs anything) explicitly.
+        cfg = _try_standalone(parent)
+        if cfg is None:
+            cfg = _try_pyproject(parent)
+        if cfg is not None:
             return deep_merge(DEFAULTS, cfg)
     return DEFAULTS

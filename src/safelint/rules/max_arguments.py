@@ -14,6 +14,8 @@ if TYPE_CHECKING:
 
     from safelint.rules.base import Violation
 
+_SPLAT_PARAM_TYPES = frozenset({"list_splat_pattern", "dictionary_splat_pattern"})
+
 _COUNTED_PARAM_TYPES = frozenset(
     {
         "identifier",
@@ -21,6 +23,7 @@ _COUNTED_PARAM_TYPES = frozenset(
         "default_parameter",
         "typed_default_parameter",
     }
+    | _SPLAT_PARAM_TYPES
 )
 
 
@@ -28,6 +31,10 @@ def _param_identifier(child: tree_sitter.Node) -> str | None:
     """Return the bare identifier name for a counted parameter node, else None."""
     if child.type == "identifier":
         return node_text(child)
+    if child.type in _SPLAT_PARAM_TYPES:
+        # `*args` / `**kwargs` carry their identifier as the first named child.
+        inner = child.named_children[0] if child.named_children else None
+        return node_text(inner) if inner else None
     name_node = child.child_by_field_name("name")
     return node_text(name_node) if name_node else None
 

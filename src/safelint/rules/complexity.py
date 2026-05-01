@@ -54,9 +54,14 @@ class ComplexityRule(BaseRule):
 
     @staticmethod
     def _cyclomatic_complexity(func_node: tree_sitter.Node) -> int:
-        """Count cyclomatic complexity for *func_node* (McCabe 1976)."""
+        """Count cyclomatic complexity for *func_node* (McCabe 1976).
+
+        Skips nested function definitions — they are scored separately by the
+        outer ``check_file`` walk so their branches must not also count toward
+        the parent.
+        """
         complexity = 1
-        for node in walk(func_node):
+        for node in walk(func_node, skip_types=(FUNCTION_DEF, ASYNC_FUNCTION_DEF)):
             if (
                 node.type
                 in (

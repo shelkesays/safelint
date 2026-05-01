@@ -27,7 +27,10 @@ class MissingAssertionsRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
                 continue
-            has_assert = any(c.type == ASSERT_STATEMENT for c in walk(node))
+            # Don't credit the outer function for asserts that live inside
+            # nested defs — those are scored as their own functions.
+            inner = walk(node, skip_types=(FUNCTION_DEF, ASYNC_FUNCTION_DEF))
+            has_assert = any(c.type == ASSERT_STATEMENT for c in inner)
             if not has_assert:
                 name_node = node.child_by_field_name("name")
                 func_name = node_text(name_node) if name_node else "<anonymous>"

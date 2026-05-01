@@ -10,27 +10,39 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Iterable, Iterator
 
     import tree_sitter
 
 
-def walk(node: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
-    """Yield every node in the subtree rooted at *node*, depth-first.
+def walk(
+    node: tree_sitter.Node,
+    skip_types: Iterable[str] | None = None,
+) -> Iterator[tree_sitter.Node]:
+    """Yield every named node in the subtree rooted at *node*, depth-first.
 
-    This replaces ``ast.walk(tree)`` from the old code.
-    Usage: ``for node in walk(tree.root_node): ...``
+    Anonymous tokens (punctuation, keyword tokens) are skipped — only the
+    grammar's named nodes are yielded. This is the Tree-sitter analogue
+    of the old ``ast.walk()``.
 
     Implemented iteratively (not recursively) to avoid Python's default
-    recursion limit of 1000. ast.walk() is also iterative for the same
-    reason. A recursive implementation will crash with RecursionError on
-    large or deeply nested source files.
+    recursion limit of 1000.
+
+    ``skip_types`` opts into pruning: any descendant whose ``node.type`` is in
+    the set has its subtree skipped. The starting *node* itself is always
+    yielded even when its type matches — this is the natural shape for
+    per-function rules that walk a function body but want to avoid descending
+    into nested function definitions.
     """
-    stack = [node]
+    skip = frozenset(skip_types) if skip_types else frozenset()
+    yield node
+    stack: list[tree_sitter.Node] = list(reversed(node.named_children))
     while stack:  # nosafe: SAFE501
         current = stack.pop()
         yield current
-        stack.extend(reversed(current.children))
+        if current.type in skip:
+            continue
+        stack.extend(reversed(current.named_children))
 
 
 def lineno(node: tree_sitter.Node) -> int:

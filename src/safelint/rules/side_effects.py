@@ -15,21 +15,22 @@ if TYPE_CHECKING:
     from safelint.rules.base import Violation
 
 
+def _first_io_call(func_node: tree_sitter.Node, io_funcs: frozenset[str]) -> tree_sitter.Node | None:
+    """Return the first I/O call inside *func_node* (skipping nested defs), or None."""
+    for child in walk(func_node, skip_types=(FUNCTION_DEF, ASYNC_FUNCTION_DEF)):
+        if child.type != CALL:
+            continue
+        name = call_name(child)
+        if name and name in io_funcs:
+            return child
+    return None
+
+
 class SideEffectsHiddenRule(BaseRule):
     """Reject functions with pure-sounding names that perform I/O."""
 
     name = "side_effects_hidden"
     code = "SAFE303"
-
-    def _first_io_call(self, func_node: tree_sitter.Node, io_funcs: frozenset[str]) -> tree_sitter.Node | None:
-        """Return the first I/O call node found inside *func_node*, or None."""
-        for child in walk(func_node):
-            if child.type != CALL:
-                continue
-            name = call_name(child)
-            if name and name in io_funcs:
-                return child
-        return None
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
@@ -45,7 +46,7 @@ class SideEffectsHiddenRule(BaseRule):
             name_lower = func_name.lower()
             if not any(name_lower.startswith(p) or name_lower == p.rstrip("_") for p in pure_prefixes):
                 continue
-            io_call = self._first_io_call(node, io_funcs)
+            io_call = _first_io_call(node, io_funcs)
             if io_call:
                 io_name = call_name(io_call) or "<unknown>"
                 violations.append(
@@ -64,16 +65,6 @@ class SideEffectsRule(BaseRule):
     name = "side_effects"
     code = "SAFE304"
 
-    def _first_io_call(self, func_node: tree_sitter.Node, io_funcs: frozenset[str]) -> tree_sitter.Node | None:
-        """Return the first I/O call node found inside *func_node*, or None."""
-        for child in walk(func_node):
-            if child.type != CALL:
-                continue
-            name = call_name(child)
-            if name and name in io_funcs:
-                return child
-        return None
-
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""
         io_funcs: frozenset[str] = frozenset(self.config.get("io_functions", ["open", "print", "input"]))
@@ -87,7 +78,7 @@ class SideEffectsRule(BaseRule):
             func_name = node_text(name_node) if name_node else ""
             if any(kw in func_name for kw in io_keywords):
                 continue
-            io_call = self._first_io_call(node, io_funcs)
+            io_call = _first_io_call(node, io_funcs)
             if io_call:
                 io_name = call_name(io_call) or "<unknown>"
                 violations.append(

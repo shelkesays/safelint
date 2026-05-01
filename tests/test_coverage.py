@@ -12,7 +12,7 @@ import tree_sitter
 import tree_sitter_python
 
 from safelint.cli import _build_common_args, _run_check, _run_hook, main
-from safelint.core.config import DEFAULTS, deep_merge
+from safelint.core.config import DEFAULTS, deep_merge, load_config
 from safelint.core.engine import LintResult, SafetyEngine
 from safelint.core.runner import run
 from safelint.languages._node_utils import call_name, walk
@@ -652,6 +652,167 @@ def test_max_arguments_self_excluded_from_count(tmp_path: Path) -> None:
 
     violations = _engine().check_file(str(sample)).violations
     assert any(v.rule == "max_arguments" for v in violations)
+
+
+def test_max_arguments_counts_args_kwargs_splats(tmp_path: Path) -> None:
+    """*args and **kwargs each count as a parameter; 6 regular + *a + **k = 8 fires."""
+    source = "def many(a, b, c, d, e, f, *args, **kwargs):\n    pass\n"
+    sample = tmp_path / "splats.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.rule == "max_arguments" for v in violations)
+
+
+def test_max_arguments_args_only_does_not_fire_under_limit(tmp_path: Path) -> None:
+    """A single *args with no other params is one parameter — should not fire."""
+    source = "def variadic(*args):\n    pass\n"
+    sample = tmp_path / "variadic.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert not any(v.rule == "max_arguments" for v in violations)
+
+
+def test_max_arguments_keyword_only_separator_not_counted(tmp_path: Path) -> None:
+    """The bare `*` keyword-only separator must not be counted as a parameter.
+
+    `def f(a, b, c, d, e, f, g, *, h):` has 8 named parameters but no splat;
+    the bare `*` is just a separator. Without correct handling we would either
+    miss the violation (if treated as a separator that drops following names)
+    or over-count (if treated as a parameter). 8 named params should fire.
+    """
+    source = "def f(a, b, c, d, e, ff, g, *, h):\n    pass\n"
+    sample = tmp_path / "kwonly.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.rule == "max_arguments" for v in violations)
+
+
+# ---------------------------------------------------------------------------
+# Nested-def isolation: per-function rules must not aggregate metrics from
+# nested ``def`` / ``async def`` bodies into their enclosing function.
+# ---------------------------------------------------------------------------
+
+
+def test_complexity_does_not_count_branches_in_nested_defs(tmp_path: Path) -> None:
+    """An outer function whose own body is simple must not be flagged just
+    because a nested helper has many branches. The inner def is its own
+    function and is checked separately."""
+    branches = "\n".join(f"        if x == {i}: return {i}" for i in range(15))
+    source = "def outer():\n    def inner(x):\n" + branches + "\n        return -1\n    return inner\n"
+    sample = tmp_path / "nested_complexity.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    # `inner` should fire (cc > 10); `outer` must not.
+    flagged = [v for v in violations if v.rule == "complexity"]
+    assert any('"inner"' in v.message for v in flagged)
+    assert not any('"outer"' in v.message for v in flagged)
+
+
+def test_nesting_depth_does_not_count_nested_def_bodies(tmp_path: Path) -> None:
+    """A deeply-nested helper inside an otherwise-flat outer function must
+    not push the outer function over the depth limit."""
+    source = textwrap.dedent("""\
+        def outer():
+            def inner():
+                if True:
+                    if True:
+                        if True:
+                            if True:
+                                return 1
+            return inner
+    """)
+    sample = tmp_path / "nested_depth.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "nesting_depth"]
+    assert any('"inner"' in v.message for v in flagged)
+    assert not any('"outer"' in v.message for v in flagged)
+
+
+def test_missing_assertions_does_not_credit_outer_for_inner_assert(tmp_path: Path) -> None:
+    """An assert inside a nested def must not count toward the outer
+    function's assertion check."""
+    source = textwrap.dedent("""\
+        def outer(x):
+            def inner(y):
+                assert y > 0
+                return y
+            return inner(x)
+    """)
+    sample = tmp_path / "nested_assert.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "missing_assertions"]
+    # `outer` has no assert of its own; `inner` does.
+    assert any('"outer"' in v.message for v in flagged)
+    assert not any('"inner"' in v.message for v in flagged)
+
+
+def test_unbounded_loops_break_inside_nested_for_does_not_count(tmp_path: Path) -> None:
+    """A break inside a nested for-loop exits the inner loop, not the
+    outer ``while True``. The outer while is still infinite."""
+    source = textwrap.dedent("""\
+        def watch():
+            while True:
+                for item in [1, 2, 3]:
+                    if item == 99:
+                        break
+    """)
+    sample = tmp_path / "nested_break.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.rule == "unbounded_loops" for v in violations)
+
+
+def test_global_state_does_not_attribute_nested_def_global_to_outer(tmp_path: Path) -> None:
+    """A ``global`` declared in a nested function belongs to the inner
+    scope; the outer function must not be flagged for it."""
+    source = textwrap.dedent("""\
+        counter = 0
+        def outer():
+            def inner():
+                global counter
+                return counter
+            return inner
+    """)
+    sample = tmp_path / "nested_global.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "global_state"]
+    assert any('"inner"' in v.message for v in flagged)
+    assert not any('"outer"' in v.message for v in flagged)
+
+
+def test_load_config_treats_empty_safelint_section_as_present(tmp_path: Path) -> None:
+    """An empty ``[tool.safelint]`` is a *present* config — the loader must
+    stop at the first directory containing one, not fall through to an
+    ancestor's config."""
+    # Parent has a real config, child has an empty section. Loader is
+    # invoked from the child. It should return DEFAULTS (the empty section
+    # has nothing to merge), not the parent's config.
+    parent = tmp_path / "parent"
+    child = parent / "child"
+    child.mkdir(parents=True)
+    (parent / "pyproject.toml").write_text(
+        "[tool.safelint]\nmode = 'ci'\n",
+        encoding="utf-8",
+    )
+    (child / "pyproject.toml").write_text(
+        "[tool.safelint]\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(child)
+    assert config["mode"] == DEFAULTS["mode"]
 
 
 # ---------------------------------------------------------------------------

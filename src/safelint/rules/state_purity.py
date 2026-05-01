@@ -38,9 +38,16 @@ def _iter_functions(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
             yield node
 
 
+_NESTED_DEF_TYPES = (FUNCTION_DEF, ASYNC_FUNCTION_DEF)
+
+
 def _iter_global_statements(func_node: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
-    """Yield every ``global X, Y`` statement found inside *func_node*."""
-    for child in walk(func_node):
+    """Yield every ``global X, Y`` statement found inside *func_node*.
+
+    Stops at nested function definitions: a ``global`` declared in an inner
+    function belongs to that inner function's scope, not the outer one's.
+    """
+    for child in walk(func_node, skip_types=_NESTED_DEF_TYPES):
         if child.type == GLOBAL_STATEMENT:
             yield child
 
@@ -103,9 +110,13 @@ class GlobalMutationRule(BaseRule):
         func_node: tree_sitter.Node,
         global_names: set[str],
     ) -> list[tuple[int, str]]:
-        """Return (lineno, name) for each write to a declared global in *func_node*."""
+        """Return (lineno, name) for each write to a declared global in *func_node*.
+
+        Stops at nested defs — assignments inside inner functions belong to
+        their own scope and must not be attributed to the outer function.
+        """
         results: list[tuple[int, str]] = []
-        for node in walk(func_node):
+        for node in walk(func_node, skip_types=_NESTED_DEF_TYPES):
             target = _assignment_target(node)
             if target is not None and node_text(target) in global_names:
                 results.append((lineno(node), node_text(target)))

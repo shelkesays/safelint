@@ -67,6 +67,10 @@ class NestingDepthRule(BaseRule):
         ``elif_clause`` is NOT in this set — in Tree-sitter's Python grammar,
         elif is its own node type, so it does not double-count like it did with
         the ast module's representation.
+
+        Skips nested ``def`` / ``async def`` bodies — those are scored as their
+        own functions by the outer ``check_file`` walk and must not inflate the
+        parent's nesting count.
         """
         max_seen = 0
         stack: list[tuple[tree_sitter.Node, int]] = [(root, 0)]
@@ -75,5 +79,7 @@ class NestingDepthRule(BaseRule):
             if node.type in _DEPTH_NODE_TYPES:
                 depth += 1
             max_seen = max(max_seen, depth)
-            stack.extend((child, depth) for child in node.children)
+            if node is not root and node.type in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
+                continue
+            stack.extend((child, depth) for child in node.named_children)
         return max_seen
