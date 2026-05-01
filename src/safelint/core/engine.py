@@ -231,6 +231,28 @@ class SafetyEngine:
         posix = Path(filepath).as_posix()
         return any(fnmatch.fnmatchcase(posix, pattern) for pattern in self.exclude_paths)
 
+    def _is_excluded_dir(self, dir_path: Path) -> bool:
+        """Return True when *dir_path* should be pruned during walk descent.
+
+        Tests the directory candidate in two forms against each pattern:
+
+        * **Without trailing slash** (``"src/legacy"``) — supports patterns
+          that name a specific directory exactly, e.g.
+          ``exclude_paths = ["src/legacy"]``.
+        * **With trailing slash** (``"src/legacy/"``) — supports the very
+          common ``/**`` glob, e.g. ``exclude_paths = ["tests/**"]``.
+          ``fnmatch.fnmatchcase('tests', 'tests/**')`` is ``False`` because
+          the pattern requires a literal ``/`` after ``tests``; appending
+          the slash explicitly lets the prune fire as users naturally
+          expect.
+
+        Files are still matched without modification via ``_is_excluded``
+        at the per-file step, so file-level patterns are unaffected.
+        """
+        bare = dir_path.as_posix().rstrip("/")
+        with_slash = bare + "/"
+        return any(fnmatch.fnmatchcase(bare, pattern) or fnmatch.fnmatchcase(with_slash, pattern) for pattern in self.exclude_paths)
+
     def _file_ignored_set(self, filepath: str) -> tuple[frozenset[str], frozenset[str]]:
         """Return (names, codes_upper) accumulated from all per-file patterns matching *filepath*."""
         posix = Path(filepath).as_posix()
@@ -420,7 +442,9 @@ class SafetyEngine:
         for dirpath, dirnames, filenames in os.walk(target, followlinks=False):
             dir_path = Path(dirpath)
             # In-place mutation tells os.walk which subdirs to descend into.
-            dirnames[:] = [d for d in dirnames if not self._is_excluded(str(dir_path / d))]
+            # Use the directory-aware excluder so ``tests/**``-style globs
+            # prune at descent time (not just per-file at the end).
+            dirnames[:] = [d for d in dirnames if not self._is_excluded_dir(dir_path / d)]
             # Two-stage generator: build the joined Path once per suffix
             # match, then filter on ``is_file()`` using that same object.
             # Avoids constructing ``dir_path / name`` twice and keeps the
