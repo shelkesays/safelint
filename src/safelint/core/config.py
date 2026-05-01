@@ -2,13 +2,14 @@
 
 Config is searched in this priority order (highest first):
 
-1. ``pyproject.toml`` - ``[tool.safelint]`` section  (preferred)
-2. ``.safelint.yaml`` - legacy YAML config           (backward compat)
+1. ``safelint.toml`` - standalone TOML, keys at the top level (no wrapper)
+2. ``pyproject.toml`` - ``[tool.safelint]`` section
 3. Built-in defaults
 
-TOML support uses the stdlib ``tomllib`` module (Python 3.11+).  YAML support
-requires ``PyYAML``, which is an optional dependency
-(``pip install safelint[yaml]``).
+When both files exist in the same directory, ``safelint.toml`` wins (matching
+ruff's ``ruff.toml`` precedence convention).
+
+TOML support uses the stdlib ``tomllib`` module (Python 3.11+).
 """
 
 from __future__ import annotations
@@ -21,14 +22,6 @@ from typing import Any
 
 _log = logging.getLogger(__name__)
 
-try:
-    import yaml
-
-    _YAML_AVAILABLE = True
-except ImportError:  # pragma: no cover
-    _log.debug("PyYAML not available; YAML config support disabled")
-    _YAML_AVAILABLE = False
-
 # ---------------------------------------------------------------------------
 # Severity / mode constants
 # ---------------------------------------------------------------------------
@@ -37,15 +30,12 @@ SEVERITY_ORDER: dict[str, int] = {"warning": 0, "error": 1}
 
 MODE_FAIL_ON: dict[str, str] = {"local": "error", "ci": "warning"}
 
-YAML_CONFIG_FILENAME = ".safelint.yaml"
 TOML_CONFIG_FILENAME = "pyproject.toml"
 TOML_CONFIG_KEY = "safelint"
-
-# Keep old name as alias so existing imports don't break.
-CONFIG_FILENAME = YAML_CONFIG_FILENAME
+STANDALONE_TOML_FILENAME = "safelint.toml"
 
 # ---------------------------------------------------------------------------
-# Built-in defaults - every key can be overridden via pyproject.toml or yaml
+# Built-in defaults - every key can be overridden via pyproject.toml
 # ---------------------------------------------------------------------------
 
 DEFAULTS: dict[str, Any] = {
@@ -221,18 +211,17 @@ def _read_toml_file(candidate: Path) -> dict[str, Any] | None:
         return None
 
 
-def _parse_yaml_file(candidate: Path) -> dict[str, Any] | None:
-    """Parse *candidate* as YAML and return the mapping, or None on error."""
-    try:
-        return yaml.safe_load(candidate.read_text(encoding="utf-8")) or {}
-    except yaml.YAMLError as exc:
-        _log.error("Failed to parse %s: %s - skipping file", candidate, exc)
-        return None
-
-
 # ---------------------------------------------------------------------------
 # Per-directory config finders
 # ---------------------------------------------------------------------------
+
+
+def _try_standalone(directory: Path) -> dict[str, Any] | None:
+    """Return the parsed safelint.toml from *directory*, or None."""
+    candidate = directory / STANDALONE_TOML_FILENAME
+    if not candidate.exists():
+        return None
+    return _read_toml_file(candidate)
 
 
 def _try_pyproject(directory: Path) -> dict[str, Any] | None:
@@ -246,16 +235,6 @@ def _try_pyproject(directory: Path) -> dict[str, Any] | None:
     return doc.get("tool", {}).get(TOML_CONFIG_KEY)
 
 
-def _try_yaml(directory: Path) -> dict[str, Any] | None:
-    """Return the parsed .safelint.yaml from *directory*, or None."""
-    if not _YAML_AVAILABLE:  # pragma: no cover
-        return None
-    candidate = directory / YAML_CONFIG_FILENAME
-    if not candidate.exists():
-        return None
-    return _parse_yaml_file(candidate)
-
-
 # ---------------------------------------------------------------------------
 # Public loader
 # ---------------------------------------------------------------------------
@@ -264,18 +243,17 @@ def _try_yaml(directory: Path) -> dict[str, Any] | None:
 def load_config(search_from: Path | None = None) -> dict[str, Any]:
     """Locate and load safelint config, merging it with the built-in defaults.
 
-    Searches upward from *search_from* (defaults to cwd).  At each directory
+    Searches upward from *search_from* (defaults to cwd). At each directory
     the lookup order is:
 
-    1. ``pyproject.toml`` → ``[tool.safelint]``
-    2. ``.safelint.yaml``
+    1. ``safelint.toml`` (standalone — keys at top level)
+    2. ``pyproject.toml`` → ``[tool.safelint]``
 
-    Returns ``DEFAULTS`` when no config file is found or when neither TOML
-    nor YAML parsers are available.
+    Returns ``DEFAULTS`` when no config file is found.
     """
     root = search_from or Path.cwd()
     for parent in [root, *root.parents]:
-        cfg = _try_pyproject(parent) or _try_yaml(parent)
+        cfg = _try_standalone(parent) or _try_pyproject(parent)
         if cfg:
             return deep_merge(DEFAULTS, cfg)
     return DEFAULTS

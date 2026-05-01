@@ -2,54 +2,73 @@
 
 from __future__ import annotations
 
-import ast
 from typing import TYPE_CHECKING
 
+from safelint.languages._node_utils import lineno, node_text, walk
+from safelint.languages.python import (
+    ASYNC_FUNCTION_DEF,
+    BOOLEAN_OPERATOR,
+    CONDITIONAL_EXPRESSION,
+    ELIF_CLAUSE,
+    EXCEPT_CLAUSE,
+    FOR_STATEMENT,
+    FUNCTION_DEF,
+    IF_CLAUSE,
+    IF_STATEMENT,
+    WHILE_STATEMENT,
+)
 from safelint.rules.base import BaseRule
 
 
 if TYPE_CHECKING:
+    import tree_sitter
+
     from safelint.rules.base import Violation
 
 
 class ComplexityRule(BaseRule):
-    """Reject functions whose cyclomatic complexity exceeds max_complexity.
-
-    Cyclomatic complexity starts at 1 and increments for each branching
-    decision point: if/elif, for, while, except, ternary, boolean operators,
-    and comprehension conditions.
-    """
+    """Reject functions whose cyclomatic complexity exceeds max_complexity."""
 
     name = "complexity"
     code = "SAFE104"
 
-    def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions whose cyclomatic complexity exceeds the configured maximum."""
         max_cc: int = self.config.get("max_complexity", 10)
         violations = []
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        for node in walk(tree.root_node):
+            if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
                 continue
-            cc = self._cyclomatic_complexity(node)
-            if cc > max_cc:
+            complexity = self._cyclomatic_complexity(node)
+            if complexity > max_cc:
+                name_node = node.child_by_field_name("name")
+                func_name = node_text(name_node) if name_node else "<anonymous>"
                 violations.append(
-                    self._v(
+                    self._make_violation(
                         filepath,
-                        node.lineno,
-                        f'Function "{node.name}" has cyclomatic complexity {cc} (max {max_cc}) - split into smaller functions',
+                        lineno(node),
+                        f'Function "{func_name}" has cyclomatic complexity {complexity} (max {max_cc}) - split into smaller functions',
                     )
                 )
         return violations
 
     @staticmethod
-    def _cyclomatic_complexity(func: ast.FunctionDef | ast.AsyncFunctionDef) -> int:
-        """Count cyclomatic complexity for *func* (McCabe 1976)."""
-        cc = 1  # base complexity
-        for node in ast.walk(func):
-            if isinstance(node, (ast.If, ast.For, ast.While, ast.ExceptHandler, ast.IfExp)):
-                cc += 1
-            elif isinstance(node, ast.BoolOp):  # `and` / `or` chains
-                cc += len(node.values) - 1
-            elif isinstance(node, ast.comprehension) and node.ifs:
-                cc += len(node.ifs)
-        return cc
+    def _cyclomatic_complexity(func_node: tree_sitter.Node) -> int:
+        """Count cyclomatic complexity for *func_node* (McCabe 1976)."""
+        complexity = 1
+        for node in walk(func_node):
+            if (
+                node.type
+                in (
+                    IF_STATEMENT,
+                    ELIF_CLAUSE,
+                    FOR_STATEMENT,
+                    WHILE_STATEMENT,
+                    EXCEPT_CLAUSE,
+                    CONDITIONAL_EXPRESSION,
+                    IF_CLAUSE,
+                )
+                or node.type == BOOLEAN_OPERATOR
+            ):
+                complexity += 1
+        return complexity

@@ -2,57 +2,80 @@
 
 from __future__ import annotations
 
-import ast
 from typing import TYPE_CHECKING
 
+from safelint.languages._node_utils import call_name, lineno, walk
+from safelint.languages.python import CALL, WITH_ITEM
 from safelint.rules.base import BaseRule
 
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
+    import tree_sitter
+
     from safelint.rules.base import Violation
 
 
-class ResourceLifecycleRule(BaseRule):
-    """Require tracked resource-acquisition calls to be wrapped in a with statement.
+def _with_item_call(item: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the call node opened by *item*, unwrapping ``as_pattern`` if present."""
+    value = item.child_by_field_name("value")
+    if value is None:
+        return None
+    if value.type == "as_pattern" and value.named_children:
+        value = value.named_children[0]
+    return value if value.type == CALL else None
 
-    If a tracked function (open, connect, session, …) is called outside a
-    ``with`` block, the resource may not be released when an exception occurs.
-    Configure ``tracked_functions`` and ``cleanup_patterns`` in ``.safelint.yaml`` or under
-    ``[tool.safelint.rules.resource_lifecycle]`` in ``pyproject.toml``.
+
+def _iter_with_items(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
+    """Yield every ``with_item`` node in *tree*.
+
+    ``with_item`` only appears inside ``with_statement`` in tree-sitter-python,
+    so a flat walk is sufficient.
     """
+    for node in walk(tree.root_node):
+        if node.type == WITH_ITEM:
+            yield node
+
+
+class ResourceLifecycleRule(BaseRule):
+    """Require tracked resource-acquisition calls to be wrapped in a with statement."""
 
     name = "resource_lifecycle"
     code = "SAFE401"
 
-    def _collect_guarded(self, tree: ast.AST, tracked: frozenset[str]) -> set[int]:
-        """Return the set of node IDs for tracked calls already inside a with block."""
-        return {
-            id(item.context_expr)
-            for node in ast.walk(tree)
-            if isinstance(node, ast.With)
-            for item in node.items
-            if isinstance(item.context_expr, ast.Call) and self._call_name(item.context_expr.func) in tracked
-        }
+    @staticmethod
+    def _collect_guarded(tree: tree_sitter.Tree, tracked: frozenset[str]) -> set[int]:
+        """Return the set of start_byte values for tracked calls already inside a with block."""
+        guarded: set[int] = set()
+        for item in _iter_with_items(tree):
+            call_node = _with_item_call(item)
+            if call_node is None:
+                continue
+            name = call_name(call_node)
+            if name and name in tracked:
+                guarded.add(call_node.start_byte)
+        return guarded
 
-    def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag unguarded calls to tracked resource-acquisition functions."""
         tracked: frozenset[str] = frozenset(self.config.get("tracked_functions", ["open"]))
         cleanup: frozenset[str] = frozenset(self.config.get("cleanup_patterns", ["close"]))
         guarded = self._collect_guarded(tree, tracked)
         cleanup_str = " / ".join(sorted(cleanup))
 
-        violations = []
-        for node in ast.walk(tree):
-            if not isinstance(node, ast.Call):
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type != CALL:
                 continue
-            call_name = self._call_name(node.func)
-            if not call_name or call_name not in tracked or id(node) in guarded:
+            name = call_name(node)
+            if not name or name not in tracked or node.start_byte in guarded:
                 continue
             violations.append(
-                self._v(
+                self._make_violation(
                     filepath,
-                    node.lineno,
-                    f'"{call_name}()" called outside a with block - use a context manager or ensure {cleanup_str} is called on all exit paths',
+                    lineno(node),
+                    f'"{name}()" called outside a with block - use a context manager or ensure {cleanup_str} is called on all exit paths',
                 )
             )
         return violations

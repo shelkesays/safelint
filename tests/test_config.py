@@ -8,7 +8,14 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
-from safelint.core.config import DEFAULTS, _read_toml_file, _try_pyproject, deep_merge, load_config
+from safelint.core.config import (
+    DEFAULTS,
+    _read_toml_file,
+    _try_pyproject,
+    _try_standalone,
+    deep_merge,
+    load_config,
+)
 
 
 def test_defaults_have_expected_keys() -> None:
@@ -20,38 +27,12 @@ def test_defaults_have_expected_keys() -> None:
 
 
 def test_load_config_returns_defaults_when_no_file(tmp_path: Path) -> None:
-    """load_config() falls back to DEFAULTS when no .safelint.yaml is found."""
+    """load_config() falls back to DEFAULTS when no config file is found."""
     config = load_config(tmp_path)
 
     assert config["mode"] == DEFAULTS["mode"]
     assert config["fail_on"] == DEFAULTS["fail_on"]
     assert "rules" in config
-
-
-def test_load_config_merges_yaml_with_defaults(tmp_path: Path) -> None:
-    """load_config() deep-merges a .safelint.yaml with built-in defaults."""
-    (tmp_path / ".safelint.yaml").write_text(
-        "mode: ci\nrules:\n  function_length:\n    max_lines: 20\n",
-        encoding="utf-8",
-    )
-
-    config = load_config(tmp_path)
-
-    assert config["mode"] == "ci"
-    assert config["rules"]["function_length"]["max_lines"] == 20
-    # Keys not in the file should still come from defaults
-    assert "nesting_depth" in config["rules"]
-
-
-def test_load_config_walks_up_to_find_file(tmp_path: Path) -> None:
-    """load_config() walks parent directories to find .safelint.yaml."""
-    (tmp_path / ".safelint.yaml").write_text("mode: ci\n", encoding="utf-8")
-    nested = tmp_path / "a" / "b"
-    nested.mkdir(parents=True)
-
-    config = load_config(nested)
-
-    assert config["mode"] == "ci"
 
 
 def test_deep_merge_overrides_scalar_values() -> None:
@@ -101,23 +82,12 @@ def test_load_config_reads_pyproject_toml(tmp_path: Path) -> None:
 
 
 def test_load_config_pyproject_without_safelint_section_falls_back(tmp_path: Path) -> None:
-    """pyproject.toml without [tool.safelint] does not block .safelint.yaml lookup."""
+    """pyproject.toml without [tool.safelint] falls back to defaults."""
     (tmp_path / "pyproject.toml").write_text("[tool.ruff]\nline-length = 88\n", encoding="utf-8")
-    (tmp_path / ".safelint.yaml").write_text("mode: ci\n", encoding="utf-8")
 
     config = load_config(tmp_path)
 
-    assert config["mode"] == "ci"
-
-
-def test_load_config_pyproject_takes_priority_over_yaml(tmp_path: Path) -> None:
-    """pyproject.toml [tool.safelint] takes priority over .safelint.yaml."""
-    (tmp_path / "pyproject.toml").write_text("[tool.safelint]\nmode = 'ci'\n", encoding="utf-8")
-    (tmp_path / ".safelint.yaml").write_text("mode: local\n", encoding="utf-8")
-
-    config = load_config(tmp_path)
-
-    assert config["mode"] == "ci"
+    assert config["mode"] == DEFAULTS["mode"]
 
 
 def test_load_config_pyproject_walks_up(tmp_path: Path) -> None:
@@ -153,3 +123,55 @@ def test_try_pyproject_returns_none_for_invalid_toml(tmp_path: Path) -> None:
     result = _try_pyproject(tmp_path)
 
     assert result is None
+
+
+# ---------------------------------------------------------------------------
+# Standalone safelint.toml
+# ---------------------------------------------------------------------------
+
+
+def test_load_config_reads_standalone_safelint_toml(tmp_path: Path) -> None:
+    """load_config() reads top-level keys from safelint.toml (no wrapper)."""
+    (tmp_path / "safelint.toml").write_text(
+        "mode = 'ci'\n\n[rules.function_length]\nmax_lines = 25\n",
+        encoding="utf-8",
+    )
+
+    config = load_config(tmp_path)
+
+    assert config["mode"] == "ci"
+    assert config["rules"]["function_length"]["max_lines"] == 25
+    assert "nesting_depth" in config["rules"]
+
+
+def test_load_config_standalone_takes_priority_over_pyproject(tmp_path: Path) -> None:
+    """safelint.toml wins when both it and pyproject.toml [tool.safelint] exist."""
+    (tmp_path / "pyproject.toml").write_text("[tool.safelint]\nmode = 'local'\n", encoding="utf-8")
+    (tmp_path / "safelint.toml").write_text("mode = 'ci'\n", encoding="utf-8")
+
+    config = load_config(tmp_path)
+
+    assert config["mode"] == "ci"
+
+
+def test_load_config_standalone_walks_up(tmp_path: Path) -> None:
+    """load_config() walks parent directories to find safelint.toml."""
+    (tmp_path / "safelint.toml").write_text("fail_on = 'warning'\n", encoding="utf-8")
+    nested = tmp_path / "src" / "mypackage"
+    nested.mkdir(parents=True)
+
+    config = load_config(nested)
+
+    assert config["fail_on"] == "warning"
+
+
+def test_try_standalone_returns_none_when_missing(tmp_path: Path) -> None:
+    """_try_standalone returns None when safelint.toml is absent."""
+    assert _try_standalone(tmp_path) is None
+
+
+def test_try_standalone_returns_none_for_invalid_toml(tmp_path: Path) -> None:
+    """_try_standalone returns None when safelint.toml fails to parse."""
+    (tmp_path / "safelint.toml").write_bytes(b"\xff\xfe not toml \x00")
+
+    assert _try_standalone(tmp_path) is None

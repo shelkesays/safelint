@@ -18,12 +18,13 @@ controls which severity level blocks the run:
   --fail-on=error    → only error-severity violations block  (lenient - onboarding)
   --fail-on=warning  → error + warning violations block      (strict  - production)
 
-Precedence: --fail-on CLI > fail_on in config (pyproject.toml or .safelint.yaml) > mode default.
+Precedence: --fail-on CLI > fail_on in config (safelint.toml or pyproject.toml) > mode default.
 """
 
 from __future__ import annotations
 
 import argparse
+from collections import Counter
 import functools
 import logging
 from pathlib import Path
@@ -48,6 +49,7 @@ _log = logging.getLogger(__name__)
 # pipe to file) so downstream tools always receive plain text.
 
 _RED = "\033[31m"  # error codes
+_GREEN = "\033[32m"  # all-clear summary
 _YELLOW = "\033[33m"  # warning codes
 _PURPLE = "\033[35m"  # --> arrow
 _CYAN = "\033[36m"  # "help:" / "note:" labels
@@ -105,11 +107,17 @@ def _print_violations(violations: list[Violation]) -> None:
         print()  # blank line between violations for readability
 
 
-def _print_summary(all_violations: list[Violation], n_blocking: int, fail_on: str, n_suppressed: int = 0) -> None:
+def _print_summary(
+    all_violations: list[Violation],
+    n_blocking: int,
+    fail_on: str,
+    suppressed: list[Violation] | None = None,
+) -> None:
     """Print a ruff-style summary block to stdout."""
-    found, fixes = _make_summary(all_violations, n_blocking, fail_on, n_suppressed)
+    found, fixes = _make_summary(all_violations, n_blocking, fail_on, suppressed or [])
     print(found)
-    print(fixes)
+    if fixes is not None:
+        print(fixes)
 
 
 def _print_status(message: str) -> None:
@@ -129,18 +137,45 @@ def _severity_parts(violations: list[Violation]) -> list[str]:
     return parts
 
 
-def _make_summary(all_violations: list[Violation], n_blocking: int, fail_on: str, n_suppressed: int = 0) -> tuple[str, str]:
-    """Return a (found_line, fixes_line) pair for *all_violations*."""
-    suppressed_note = f" ({_c(str(n_suppressed), _CYAN)} suppressed)" if n_suppressed else ""
-    fixes_line = f"No fixes available (safelint does not auto-fix violations).{suppressed_note}"
+def _format_suppressed_breakdown(suppressed: list[Violation]) -> str:
+    """Return ``"2 SAFE501, 1 SAFE304 suppressed"`` for the given violations.
+
+    Codes are sorted by descending count, ties broken alphabetically so the
+    output is deterministic across runs. Returns an empty string when there
+    are no suppressions.
+    """
+    if not suppressed:
+        return ""
+    counts = Counter(v.code for v in suppressed)
+    ordered = sorted(counts.items(), key=lambda kv: (-kv[1], kv[0]))
+    parts = [f"{n} {_c(code, _CYAN)}" for code, n in ordered]
+    return f"{', '.join(parts)} suppressed"
+
+
+def _make_summary(
+    all_violations: list[Violation],
+    n_blocking: int,
+    fail_on: str,
+    suppressed: list[Violation] | None = None,
+) -> tuple[str, str | None]:
+    """Return a (found_line, fixes_line) pair for *all_violations*.
+
+    ``fixes_line`` is ``None`` on a clean run (no active violations) so the
+    caller can skip printing the no-fixes notice when there is nothing to
+    fix — even if some violations were suppressed. The suppression breakdown
+    is rolled into the all-clear line in that case.
+    """
+    suppressed = suppressed or []
+    breakdown = _format_suppressed_breakdown(suppressed)
+    suppressed_note = f" ({breakdown})" if breakdown else ""
     if not all_violations:
-        if n_suppressed:
-            return f"All checks passed.{suppressed_note}", fixes_line
-        return "All checks passed.", fixes_line
+        all_clear = _c("All checks passed.", _BOLD, _GREEN)
+        return f"{all_clear}{suppressed_note}", None
     parts = _severity_parts(all_violations)
     found = f"Found {', '.join(parts)}."
     fail_note = f" [--fail-on={fail_on}]"
     found = f"{found} Advisory only{fail_note}." if not n_blocking else f"{found}{fail_note}."
+    fixes_line = f"No fixes available (safelint does not auto-fix violations).{suppressed_note}"
     return found, fixes_line
 
 
@@ -155,6 +190,12 @@ def _file_summary_line(filepath: str, violations: list[Violation]) -> str:
         msg = "violations must be non-empty"
         raise ValueError(msg)
     return f"{filepath} \u2014 {', '.join(_severity_parts(violations))}."
+
+
+def _print_file_summary(filepath: str, violations: list[Violation]) -> None:
+    """Print the per-file summary line followed by a blank separator line."""
+    print(_file_summary_line(filepath, violations))
+    print()
 
 
 def _resolve_fail_on(args: argparse.Namespace, config: dict) -> tuple[str, int]:
@@ -180,22 +221,21 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
 
     all_blocking: list[Violation] = []
     all_violations: list[Violation] = []
-    n_suppressed = 0
+    all_suppressed: list[Violation] = []
 
     for filepath in files:
         result = engine.check_file(filepath)
-        n_suppressed += result.suppressed
+        all_suppressed.extend(result.suppressed)
         if not result.violations:
             continue
         _print_violations(result.violations)
         blocking, _ = engine.partition_violations(result.violations, fail_threshold)
-        print(_file_summary_line(filepath, result.violations))
-        print()
+        _print_file_summary(filepath, result.violations)
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 
-    if all_violations or n_suppressed:
-        _print_summary(all_violations, len(all_blocking), fail_on, n_suppressed)
+    if all_violations or all_suppressed:
+        _print_summary(all_violations, len(all_blocking), fail_on, all_suppressed)
     return 1 if all_blocking else 0
 
 
@@ -373,20 +413,19 @@ def _run_check(args: argparse.Namespace) -> int:
 
     all_blocking: list[Violation] = []
     all_violations: list[Violation] = []
-    n_suppressed = 0
+    all_suppressed: list[Violation] = []
 
     for result in results:
-        n_suppressed += result.suppressed
+        all_suppressed.extend(result.suppressed)
         if not result.violations:
             continue
         _print_violations(result.violations)
         blocking, _ = SafetyEngine.partition_violations(result.violations, fail_threshold)
-        print(_file_summary_line(result.path, result.violations))
-        print()
+        _print_file_summary(result.path, result.violations)
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 
-    _print_summary(all_violations, len(all_blocking), fail_on, n_suppressed)
+    _print_summary(all_violations, len(all_blocking), fail_on, all_suppressed)
     return 1 if all_blocking else 0
 
 
@@ -434,7 +473,11 @@ def main() -> None:
             "--config",
             type=Path,
             default=None,
-            help=("Directory to use as the config discovery root, or a file whose parent directory is used as the root (pyproject.toml takes precedence over .safelint.yaml when both exist)"),
+            help=(
+                "Directory to use as the config discovery root, or a file whose parent "
+                "directory is used as the root (safelint.toml takes precedence over "
+                "pyproject.toml [tool.safelint] when both exist)"
+            ),
         )
         parser.add_argument(
             "--all-files",

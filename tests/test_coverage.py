@@ -3,23 +3,24 @@
 from __future__ import annotations
 
 import argparse
-import ast
 import sys
 import textwrap
 from typing import TYPE_CHECKING
 
+import pytest
+import tree_sitter
+import tree_sitter_python
+
+from safelint.cli import _build_common_args, _run_check, _run_hook, main
+from safelint.core.config import DEFAULTS, deep_merge
+from safelint.core.engine import LintResult, SafetyEngine
+from safelint.core.runner import run
+from safelint.languages._node_utils import call_name, walk
+from safelint.rules.base import Violation
+
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-import pytest
-
-from safelint.cli import _build_common_args, _run_check, _run_hook, main
-from safelint.core.config import DEFAULTS, deep_merge, load_config
-from safelint.core.engine import LintResult, SafetyEngine
-from safelint.core.runner import run
-from safelint.rules.base import Violation
-from safelint.rules.side_effects import SideEffectsRule
 
 
 # ---------------------------------------------------------------------------
@@ -40,8 +41,11 @@ def test_run_without_config(tmp_path: Path) -> None:
 
 def test_run_with_config_path(tmp_path: Path) -> None:
     """run() loads the config from the supplied path."""
-    config_file = tmp_path / ".safelint.yaml"
-    config_file.write_text("rules:\n  function_length:\n    max_lines: 5\n", encoding="utf-8")
+    config_file = tmp_path / "pyproject.toml"
+    config_file.write_text(
+        "[tool.safelint.rules.function_length]\nmax_lines = 5\n",
+        encoding="utf-8",
+    )
     sample = tmp_path / "ok.py"
     sample.write_text("x = 1\n", encoding="utf-8")
 
@@ -92,20 +96,6 @@ def test_run_changed_files_takes_precedence_over_files(tmp_path: Path) -> None:
     assert str(sample) in paths
     coupling_violations = [v for r in results for v in r.violations if v.rule == "test_coupling"]
     assert not coupling_violations
-
-
-# ---------------------------------------------------------------------------
-# load_config - invalid YAML falls back to defaults
-# ---------------------------------------------------------------------------
-
-
-def test_load_config_bad_yaml_falls_back_to_defaults(tmp_path: Path) -> None:
-    """A malformed .safelint.yaml is skipped and defaults are returned."""
-    (tmp_path / ".safelint.yaml").write_text(":\n  bad: [yaml", encoding="utf-8")
-
-    config = load_config(tmp_path)
-
-    assert config["mode"] == DEFAULTS["mode"]
 
 
 # ---------------------------------------------------------------------------
@@ -510,19 +500,11 @@ def test_engine_injects_changed_files_for_test_coupling(tmp_path: Path) -> None:
 
 
 def test_base_rule_call_name_returns_none_for_subscript() -> None:
-    """BaseRule._call_name returns None when the func node is a Subscript."""
-
-    rule = SideEffectsRule({"enabled": True, "severity": "warning", "io_functions": ["open"], "io_name_keywords": []})
-    tree = ast.parse("func_map['key']()")
-    expr = tree.body[0]
-    if isinstance(expr, ast.Expr):
-        call = expr.value
-        if isinstance(call, ast.Call):
-            assert rule._call_name(call.func) is None
-        else:
-            pytest.fail("Expected ast.Call node")
-    else:
-        pytest.fail("Expected ast.Expr node")
+    """call_name returns None when the function expression is not identifier or attribute."""
+    language = tree_sitter.Language(tree_sitter_python.language())
+    tree = tree_sitter.Parser(language).parse(b"func_map['key']()")
+    call_node = next(n for n in walk(tree.root_node) if n.type == "call")
+    assert call_name(call_node) is None
 
 
 # ---------------------------------------------------------------------------

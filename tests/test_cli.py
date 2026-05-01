@@ -27,11 +27,11 @@ def _strip(text: str) -> str:
     return _ANSI_RE.sub("", text)
 
 
-def _v(severity: str) -> Violation:
-    """Return a minimal Violation with the given severity."""
+def _v(severity: str, code: str = "SAFE999", rule: str = "test_rule") -> Violation:
+    """Return a minimal Violation with the given severity (and optional code/rule)."""
     return Violation(
-        rule="test_rule",
-        code="SAFE999",
+        rule=rule,
+        code=code,
         filepath="path/file.py",
         lineno=1,
         message="test message",
@@ -97,10 +97,10 @@ def test_file_summary_line_empty_violations_raises() -> None:
 
 
 def test_make_summary_no_violations() -> None:
-    """No violations returns the all-clear message."""
+    """No violations returns the all-clear message and no fixes line."""
     found, fixes = _make_summary([], n_blocking=0, fail_on="error")
     assert _strip(found) == "All checks passed."
-    assert "No fixes available" in _strip(fixes)
+    assert fixes is None
 
 
 def test_make_summary_advisory_only() -> None:
@@ -120,11 +120,47 @@ def test_make_summary_blocking() -> None:
     assert "[--fail-on=error]" in found
 
 
-def test_make_summary_suppressed_note() -> None:
-    """Suppressed count appears in both summary lines."""
-    found, fixes = _make_summary([], n_blocking=0, fail_on="error", n_suppressed=3)
-    assert "3 suppressed" in _strip(found)
-    assert "3 suppressed" in _strip(fixes)
+def test_make_summary_suppressed_clean_run_breaks_down_by_code() -> None:
+    """Clean run with suppressions surfaces a per-code breakdown and no fixes line."""
+    suppressed = [
+        _v("warning", code="SAFE501"),
+        _v("warning", code="SAFE501"),
+        _v("warning", code="SAFE304"),
+    ]
+    found, fixes = _make_summary([], n_blocking=0, fail_on="error", suppressed=suppressed)
+    found_text = _strip(found)
+    assert "All checks passed." in found_text
+    assert "2 SAFE501" in found_text
+    assert "1 SAFE304" in found_text
+    assert "suppressed" in found_text
+    assert fixes is None
+
+
+def test_make_summary_suppressed_with_violations_surfaces_breakdown_in_fixes_line() -> None:
+    """When violations exist, the suppression breakdown rides on the fixes line."""
+    suppressed = [_v("warning", code="SAFE501"), _v("warning", code="SAFE304")]
+    _, fixes = _make_summary([_v("error")], n_blocking=1, fail_on="error", suppressed=suppressed)
+    assert fixes is not None
+    fixes_text = _strip(fixes)
+    assert "1 SAFE304" in fixes_text
+    assert "1 SAFE501" in fixes_text
+
+
+def test_make_summary_suppressed_breakdown_sorted_by_count_desc_then_code() -> None:
+    """Codes with the same count appear alphabetically; higher counts come first."""
+    suppressed = [
+        _v("warning", code="SAFE304"),
+        _v("warning", code="SAFE501"),
+        _v("warning", code="SAFE501"),
+        _v("warning", code="SAFE201"),
+    ]
+    found, _ = _make_summary([], n_blocking=0, fail_on="error", suppressed=suppressed)
+    found_text = _strip(found)
+    # SAFE501 (count 2) first, then SAFE201 and SAFE304 (count 1) alphabetically.
+    pos_501 = found_text.find("2 SAFE501")
+    pos_201 = found_text.find("1 SAFE201")
+    pos_304 = found_text.find("1 SAFE304")
+    assert 0 <= pos_501 < pos_201 < pos_304
 
 
 def test_make_summary_unknown_severity_counted_as_error() -> None:
@@ -152,7 +188,7 @@ def test_run_hook_no_output_when_clean(tmp_path: Path, capsys: pytest.CaptureFix
 
     mocker.patch(
         "safelint.cli.SafetyEngine.check_file",
-        return_value=LintResult(path=str(clean), violations=[], suppressed=0),
+        return_value=LintResult(path=str(clean), violations=[], suppressed=[]),
     )
 
     assert _run_hook(_make_args(), [str(clean)]) == 0
@@ -166,11 +202,15 @@ def test_run_hook_prints_summary_when_suppressed(tmp_path: Path, capsys: pytest.
     clean = tmp_path / "clean.py"
     clean.write_text("x = 1\n", encoding="utf-8")
 
-    fake_result = LintResult(path=str(clean), violations=[], suppressed=1)
+    fake_result = LintResult(path=str(clean), violations=[], suppressed=[_v("warning", code="SAFE501")])
     mocker.patch("safelint.cli.SafetyEngine.check_file", return_value=fake_result)
 
     assert _run_hook(_make_args(), [str(clean)]) == 0
 
     captured = capsys.readouterr()
-    assert "All checks passed." in captured.out
-    assert "suppressed" in captured.out
+    out = _strip(captured.out)
+    assert "All checks passed." in out
+    assert "1 SAFE501" in out
+    assert "suppressed" in out
+    # Clean run should NOT print the no-fixes line.
+    assert "No fixes available" not in out

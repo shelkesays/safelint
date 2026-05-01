@@ -55,12 +55,6 @@ Original paper: [spinroot.com/gerard/pdf/P10.pdf](https://spinroot.com/gerard/pd
 pip install safelint
 ```
 
-To also support YAML config files (`.safelint.yaml`):
-
-```bash
-pip install "safelint[yaml]"
-```
-
 ---
 
 ## Usage
@@ -184,7 +178,7 @@ def get_data(conn, q, p1, p2, p3, p4, p5, p6):  # nosafe: SAFE101, SAFE103
     ...
 ```
 
-When at least one violation is suppressed, the CLI summary reports the count so suppressions remain visible and auditable. Use `# nosafe` sparingly — it's for line-level exceptions only. For broader suppression use the config-level options:
+When at least one violation is suppressed, the CLI summary reports a per-code breakdown (e.g. `(2 SAFE501, 1 SAFE304 suppressed)`) so suppressions remain visible and auditable. Use `# nosafe` sparingly — it's for line-level exceptions only. For broader suppression use the config-level options:
 
 ```toml
 # pyproject.toml
@@ -201,12 +195,12 @@ See [CONFIGURATION.md — Inline suppression](CONFIGURATION.md#inline-suppressio
 
 ## Configuration
 
-SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a `.safelint.yaml` file. See [CONFIGURATION.md](CONFIGURATION.md) for all options, defaults, and examples.
+SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` file at your project root. See [CONFIGURATION.md](CONFIGURATION.md) for all options, defaults, and examples.
 
 Ready-to-copy samples:
 
-- [examples/sample.pyproject.toml](examples/sample.pyproject.toml) — TOML format (recommended)
-- [examples/sample.safelint.yaml](examples/sample.safelint.yaml) — YAML format (legacy)
+- [examples/sample.pyproject.toml](examples/sample.pyproject.toml) — `[tool.safelint]` block for an existing pyproject.toml
+- [examples/sample.safelint.toml](examples/sample.safelint.toml) — standalone `safelint.toml` (no `[tool.safelint]` wrapper)
 
 ---
 

@@ -2,56 +2,57 @@
 
 from __future__ import annotations
 
-import ast
 from typing import TYPE_CHECKING
 
+from safelint.languages._node_utils import call_name, lineno, node_text, walk
+from safelint.languages.python import ASYNC_FUNCTION_DEF, CALL, FUNCTION_DEF
 from safelint.rules.base import BaseRule
 
 
 if TYPE_CHECKING:
+    import tree_sitter
+
     from safelint.rules.base import Violation
 
 
 class SideEffectsHiddenRule(BaseRule):
-    """Reject functions with pure-sounding names that perform I/O.
-
-    A function named ``calculate_total`` or ``get_user`` implies referential
-    transparency. If it calls ``open()``, ``print()``, or similar primitives
-    it is hiding a side effect, which is a Holzmann core risk.
-    """
+    """Reject functions with pure-sounding names that perform I/O."""
 
     name = "side_effects_hidden"
     code = "SAFE303"
 
-    def _first_io_call(self, func_node: ast.AST, io_funcs: frozenset[str]) -> ast.Call | None:
+    def _first_io_call(self, func_node: tree_sitter.Node, io_funcs: frozenset[str]) -> tree_sitter.Node | None:
         """Return the first I/O call node found inside *func_node*, or None."""
-        for child in ast.walk(func_node):
-            if not isinstance(child, ast.Call):
+        for child in walk(func_node):
+            if child.type != CALL:
                 continue
-            call_name = self._call_name(child.func)
-            if call_name and call_name in io_funcs:
+            name = call_name(child)
+            if name and name in io_funcs:
                 return child
         return None
 
-    def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
         io_funcs: frozenset[str] = frozenset(self.config.get("io_functions", ["open", "print", "input"]))
         pure_prefixes: tuple[str, ...] = tuple(self.config.get("pure_prefixes", []))
 
         violations = []
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        for node in walk(tree.root_node):
+            if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
                 continue
-            name_lower = node.name.lower()
+            name_node = node.child_by_field_name("name")
+            func_name = node_text(name_node) if name_node else ""
+            name_lower = func_name.lower()
             if not any(name_lower.startswith(p) or name_lower == p.rstrip("_") for p in pure_prefixes):
                 continue
             io_call = self._first_io_call(node, io_funcs)
             if io_call:
+                io_name = call_name(io_call) or "<unknown>"
                 violations.append(
-                    self._v(
+                    self._make_violation(
                         filepath,
-                        io_call.lineno,
-                        f'Function "{node.name}" looks pure but calls I/O primitive "{self._call_name(io_call.func)}" - rename to signal intent or use dependency injection',
+                        lineno(io_call),
+                        f'Function "{func_name}" looks pure but calls I/O primitive "{io_name}" - rename to signal intent or use dependency injection',
                     )
                 )
         return violations
@@ -63,34 +64,37 @@ class SideEffectsRule(BaseRule):
     name = "side_effects"
     code = "SAFE304"
 
-    def _first_io_call(self, func_node: ast.AST, io_funcs: frozenset[str]) -> ast.Call | None:
+    def _first_io_call(self, func_node: tree_sitter.Node, io_funcs: frozenset[str]) -> tree_sitter.Node | None:
         """Return the first I/O call node found inside *func_node*, or None."""
-        for child in ast.walk(func_node):
-            if not isinstance(child, ast.Call):
+        for child in walk(func_node):
+            if child.type != CALL:
                 continue
-            call_name = self._call_name(child.func)
-            if call_name and call_name in io_funcs:
+            name = call_name(child)
+            if name and name in io_funcs:
                 return child
         return None
 
-    def check_file(self, filepath: str, tree: ast.AST) -> list[Violation]:
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""
         io_funcs: frozenset[str] = frozenset(self.config.get("io_functions", ["open", "print", "input"]))
         io_keywords: list[str] = self.config.get("io_name_keywords", [])
 
         violations = []
-        for node in ast.walk(tree):
-            if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+        for node in walk(tree.root_node):
+            if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
                 continue
-            if any(kw in node.name for kw in io_keywords):
+            name_node = node.child_by_field_name("name")
+            func_name = node_text(name_node) if name_node else ""
+            if any(kw in func_name for kw in io_keywords):
                 continue
             io_call = self._first_io_call(node, io_funcs)
             if io_call:
+                io_name = call_name(io_call) or "<unknown>"
                 violations.append(
-                    self._v(
+                    self._make_violation(
                         filepath,
-                        io_call.lineno,
-                        f'Function "{node.name}" calls I/O primitive "{self._call_name(io_call.func)}" - rename to signal intent or use dependency injection',
+                        lineno(io_call),
+                        f'Function "{func_name}" calls I/O primitive "{io_name}" - rename to signal intent or use dependency injection',
                     )
                 )
         return violations

@@ -207,3 +207,6 @@ marimo/_lsp/
 __marimo__/
 
 .vscode/
+
+# Claude Code local guide — kept out of version control by project convention.
+CLAUDE.md

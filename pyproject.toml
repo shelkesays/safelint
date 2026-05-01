@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "safelint"
-version = "1.3.2"
+version = "1.4.0"
 description = "Engineering safety lint rules and pre-commit integration for modern Python codebases"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -12,7 +12,7 @@ license = "MIT"
 license-files = ["LICENSE"]
 keywords = ["lint", "pre-commit", "static-analysis", "safety", "python"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
+    "Development Status :: 4 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
@@ -20,8 +20,11 @@ classifiers = [
     "Programming Language :: Python :: 3.13",
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Testing",
+] 
+dependencies = [
+    "tree-sitter>=0.23.0",
+    "tree-sitter-python>=0.23.0",
 ]
-dependencies = []
 
 [project.urls]
 Homepage = "https://github.com/shelkesays/safelint"
@@ -29,8 +32,6 @@ Repository = "https://github.com/shelkesays/safelint"
 Issues = "https://github.com/shelkesays/safelint/issues"
 
 [project.optional-dependencies]
-# Legacy YAML config support (.safelint.yaml); not needed if using pyproject.toml
-yaml = ["PyYAML>=6.0"]
 dev = [
     "pre-commit>=4.5.1",
     "pytest>=9.0.2",
@@ -38,7 +39,6 @@ dev = [
     "pytest-mock>=3.15.1",
     "ruff>=0.15.8",
     "ty>=0.0.26",
-    "PyYAML>=6.0",  # needed to test YAML config loading in CI
 ]
 
 [project.scripts]
@@ -149,7 +149,6 @@ unresolved-attribute = "warn"
 
 # ---------------------------------------------------------------------------
 # safelint - safety lint configuration
-# Configure safelint here instead of a separate .safelint.yaml file.
 # All keys are optional; unset keys fall back to built-in defaults.
 # ---------------------------------------------------------------------------
 [tool.safelint]
@@ -294,4 +293,12 @@ flagged_calls = [
 enabled = false
 severity = "error"
 nullable_methods = ["get", "pop", "find", "next", "first", "one_or_none", "scalar", "scalar_one_or_none", "fetchone"]
+
+[tool.uv.sources]
+safelint = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "safelint",
+]
 
