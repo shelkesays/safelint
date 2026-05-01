@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-This release contains a breaking library API change (`LintResult.suppressed` type) — the version is being bumped to **2.0.0** when tagged.
+## [1.4.0] - 2026-05-01
+
+> **Heads-up — breaking library API change.** `LintResult.suppressed` is now `list[Violation]` (was `int`). Library consumers that read this field directly need to switch to `len(result.suppressed)` for the count. CLI users are unaffected. See **Changed** below for details and migration notes.
 
 ### Added
 - Standalone `safelint.toml` configuration file (top-level keys, no `[tool.safelint]` wrapper). When both `safelint.toml` and `pyproject.toml` `[tool.safelint]` exist in the same directory, `safelint.toml` wins — matching `ruff.toml` / `pyproject.toml` precedence.
@@ -68,6 +70,7 @@ This release contains a breaking library API change (`LintResult.suppressed` typ
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.3.1...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.4.0...HEAD
+[1.4.0]: https://github.com/shelkesays/safelint/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/shelkesays/safelint/compare/v1.3.0...v1.3.1
 [1.3.0]: https://github.com/shelkesays/safelint/releases/tag/v1.3.0
