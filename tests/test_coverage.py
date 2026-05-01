@@ -213,6 +213,56 @@ def test_max_arguments_fires_when_exceeded(tmp_path: Path) -> None:
     assert any(v.rule == "max_arguments" for v in violations)
 
 
+def test_complexity_does_not_double_count_if_branches(tmp_path: Path) -> None:
+    """Lock in McCabe semantics: each if/elif counts exactly once.
+
+    Tree-sitter-python's ``if_statement`` does *not* contain an ``if_clause``
+    child (its named children are identifier/block/elif_clause/else_clause).
+    ``if_clause`` only appears inside comprehensions like
+    ``[x for x in y if z]``. The rule's set therefore must include
+    ``IF_STATEMENT`` to count plain ``if`` branches at all — removing it
+    would silently undercount.
+
+    Assertions below use ``max_complexity`` boundaries that fail loudly if
+    counts drift in either direction:
+
+    * Plain ``if``:        CC = 2 (1 base + 1 if). Must fire at max=1, not at max=2.
+    * if+elif:             CC = 3 (1 + if + elif). Must fire at max=2, not at max=3.
+    * Comprehension ``if``: CC = 2 (1 + comprehension if_clause). Must fire at max=1.
+    """
+    cases = [
+        ("plain_if.py", "def f(x):\n    if x: return 1\n", 2, 1),
+        ("if_elif.py", "def f(x):\n    if x: return 1\n    elif y: return 2\n", 3, 2),
+        ("comp_if.py", "def f(items):\n    return [i for i in items if i > 0]\n", 2, 1),
+        # Nested ifs: each ``if_statement`` is its own node (inner lives
+        # inside outer's ``block``), so each contributes exactly +1.
+        # Two nested ifs → CC = 3, three nested → CC = 4.
+        (
+            "nested_if.py",
+            "def f(x, y):\n    if x:\n        if y:\n            return 1\n",
+            3,
+            2,
+        ),
+        (
+            "deep_nested_if.py",
+            "def f(a, b, c):\n    if a:\n        if b:\n            if c:\n                return 1\n",
+            4,
+            3,
+        ),
+    ]
+    for name, source, expected_cc, threshold in cases:
+        sample = tmp_path / name
+        sample.write_text(source, encoding="utf-8")
+
+        cfg_at = deep_merge(DEFAULTS, {"rules": {"complexity": {"max_complexity": expected_cc}}})
+        violations_at_limit = SafetyEngine(cfg_at).check_file(str(sample)).violations
+        assert not any(v.rule == "complexity" for v in violations_at_limit), f"{name}: must NOT fire at max_complexity={expected_cc} (CC={expected_cc})"
+
+        cfg_below = deep_merge(DEFAULTS, {"rules": {"complexity": {"max_complexity": threshold}}})
+        violations_below = SafetyEngine(cfg_below).check_file(str(sample)).violations
+        assert any(v.rule == "complexity" for v in violations_below), f"{name}: must fire at max_complexity={threshold} (CC={expected_cc})"
+
+
 def test_complexity_fires_on_high_cyclomatic_complexity(tmp_path: Path) -> None:
     """complexity fires when cyclomatic complexity exceeds max_complexity."""
     # Build a function with CC > 10 by chaining many if statements
