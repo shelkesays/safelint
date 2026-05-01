@@ -21,4 +21,19 @@ def get_language_for_file(filepath: str) -> LanguageDefinition | None:
     return _REGISTRY.get(suffix)
 
 
-__all__ = ["PYTHON", "LanguageDefinition", "get_language_for_file"]
+def supported_extensions() -> frozenset[str]:
+    """Return the set of file extensions that have a registered language.
+
+    Each extension includes the leading dot, e.g. ``".py"``. Use this when
+    discovering source files in a directory; pair with
+    :func:`get_language_for_file` to retrieve the matching definition.
+    """
+    return frozenset(_REGISTRY)
+
+
+__all__ = [
+    "PYTHON",
+    "LanguageDefinition",
+    "get_language_for_file",
+    "supported_extensions",
+]

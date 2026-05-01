@@ -26,7 +26,6 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 import functools
-import logging
 from pathlib import Path
 import shutil
 import subprocess
@@ -41,8 +40,6 @@ from safelint.core.runner import run
 if TYPE_CHECKING:
     from safelint.rules.base import Violation
 
-
-_log = logging.getLogger(__name__)
 
 # ── ANSI colour helpers ───────────────────────────────────────────────────────
 # Colours are suppressed automatically when stdout is not a TTY (e.g. CI logs,
@@ -81,8 +78,9 @@ def _source_lines(filepath: str) -> tuple[str, ...]:
     """Return the lines of *filepath* as a cached tuple (empty on read error)."""
     try:
         return tuple(Path(filepath).read_text(encoding="utf-8").splitlines())
-    except OSError as exc:
-        _log.debug("Could not read source lines for %s: %s", filepath, exc)
+    # Best-effort source context for the violation gutter; an empty tuple
+    # makes the renderer omit the source preview, which is acceptable.
+    except OSError:  # nosafe: SAFE203
         return ()
 
 
@@ -244,8 +242,9 @@ def _is_under_target(abs_path: Path, target_abs: Path) -> bool:
     if target_abs.is_dir():
         try:
             abs_path.relative_to(target_abs)
-        except ValueError:
-            _log.debug("Path %s is not relative to %s", abs_path, target_abs)
+        # ``relative_to`` raising ValueError means "not under" — that's the
+        # answer this predicate exists to compute, not an error to log.
+        except ValueError:  # nosafe: SAFE203
             return False
         else:
             return True
@@ -256,8 +255,9 @@ def _normalize_path(abs_path: Path, cwd: Path) -> str:
     """Return *abs_path* relative to *cwd*, or as an absolute string if outside *cwd*."""
     try:
         return str(abs_path.relative_to(cwd))
-    except ValueError:
-        _log.debug("Path %s is not relative to cwd %s; using absolute path", abs_path, cwd)
+    # ValueError means the path is outside cwd; falling back to the absolute
+    # form is the documented behaviour, not an error.
+    except ValueError:  # nosafe: SAFE203
         return str(abs_path)
 
 
@@ -322,12 +322,6 @@ def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
         check=False,
     )
     if diff_proc.returncode != 0 or cached_proc.returncode != 0 or untracked_proc.returncode != 0:
-        _log.debug(
-            "git command failed (diff rc=%s, cached rc=%s, untracked rc=%s); treating as git unavailable",
-            diff_proc.returncode,
-            cached_proc.returncode,
-            untracked_proc.returncode,
-        )
         return None
     return set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines()) | set(untracked_proc.stdout.splitlines())
 
@@ -353,7 +347,6 @@ def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] 
     try:
         git_bin = shutil.which("git")
         if not git_bin:
-            _log.debug("git executable not found on PATH")
             return None
 
         target_abs = target.resolve()
@@ -376,8 +369,9 @@ def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] 
             return None
         return _collect_all_py_files(raw, git_root), _filter_py_files(raw, git_root, target_abs)
 
-    except (FileNotFoundError, OSError, subprocess.TimeoutExpired) as exc:
-        _log.debug("git unavailable or not a repo: %s", exc)
+    # Any git-side failure (no git, not a repo, timeout) means we fall back
+    # to scanning all files — that's a documented behaviour, not an error.
+    except (FileNotFoundError, OSError, subprocess.TimeoutExpired):  # nosafe: SAFE203
         return None
 
 

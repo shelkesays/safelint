@@ -124,6 +124,21 @@ Prefer **config changes** (adjusting thresholds or disabling rules) over `# nosa
 
 ---
 
+## Diagnostic output
+
+Lint violations and the run summary are written to **stdout** in the ruff/ty multi-line format. Issues that aren't lint violations — typos in your `ignore` list, malformed TOML, etc. — are written to **stderr** as single-line `safelint: warning:` / `safelint: error:` messages so they stay out of the violation stream and are captured separately by pre-commit, CI, and editor integrations.
+
+Examples:
+
+```text
+safelint: warning: unknown entries in ignore list (typo or stale rule?): SAFFE101
+safelint: error: failed to parse /path/to/pyproject.toml: Expected '=' after a key in a key/value pair (at line 5, column 12) — skipping file
+```
+
+These messages always appear before the lint output (they are emitted at config-load and engine-construction time). Misconfigurations are reported but never fail the run on their own — safelint falls back to defaults and continues.
+
+---
+
 ## Top-level options
 
 | Key | Default | What it does |
@@ -306,13 +321,13 @@ max_depth = 2
 
 **What it flags:** Functions with more than `max_args` parameters.
 
-Too many arguments usually means a function is doing too much, or needs a config object. `self` and `cls` are excluded from the count.
+Too many arguments usually means a function is doing too much, or needs a config object. `self` and `cls` are excluded from the count. `*args` and `**kwargs` each count as one parameter — they bring real callers, just an unbounded number of them, so they cannot be free.
 
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"error"` | `"error"` or `"warning"` |
-| `max_args` | `7` | Maximum number of parameters (excluding `self`/`cls`) |
+| `max_args` | `7` | Maximum number of parameters (excluding `self`/`cls`; `*args`/`**kwargs` each count as one) |
 
 ```toml
 [tool.safelint.rules.max_arguments]

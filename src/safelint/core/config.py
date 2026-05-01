@@ -14,13 +14,12 @@ TOML support uses the stdlib ``tomllib`` module (Python 3.11+).
 
 from __future__ import annotations
 
-import logging
 from pathlib import Path
 import tomllib
 from typing import Any
 
+from safelint.core import _diagnostics
 
-_log = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Severity / mode constants
@@ -206,8 +205,10 @@ def _read_toml_file(candidate: Path) -> dict[str, Any] | None:
     try:
         with candidate.open("rb") as fp:
             return tomllib.load(fp)
-    except Exception as exc:  # noqa: BLE001
-        _log.error("Failed to parse %s: %s - skipping file", candidate, exc)
+    # The error IS reported via _diagnostics.print_error; SAFE203's heuristic
+    # only recognises stdlib logging method names so it can't see the call.
+    except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as exc:  # nosafe: SAFE203
+        _diagnostics.print_error(f"failed to parse {candidate}: {exc} — skipping file")
         return None
 
 

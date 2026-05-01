@@ -792,6 +792,31 @@ def test_global_state_does_not_attribute_nested_def_global_to_outer(tmp_path: Pa
     assert not any('"outer"' in v.message for v in flagged)
 
 
+def test_parse_error_reports_location_and_kind(tmp_path: Path) -> None:
+    """Parse failures should report a non-zero line and a kind hint, not just a generic message.
+
+    A function header missing its colon is a clear case where Tree-sitter
+    flags a missing-token error. We expect the violation to point at the
+    line where the syntax breaks, not lineno=0.
+    """
+    # `def foo()` without the closing `:` and a body — Tree-sitter cannot
+    # complete the function_definition rule and reports a missing token.
+    source = "x = 1\ndef foo()\n    pass\n"
+    sample = tmp_path / "broken.py"
+    sample.write_text(source, encoding="utf-8")
+
+    result = _engine().check_file(str(sample))
+
+    parse_violations = [v for v in result.violations if v.code == "SAFE000"]
+    assert len(parse_violations) == 1
+    v = parse_violations[0]
+    assert v.lineno >= 2  # error is on the def line or later, not line 0
+    # Message should mention "Parse error" and either "missing" or "syntax error".
+    assert "Parse error" in v.message
+    assert "line" in v.message
+    assert ("missing" in v.message) or ("syntax error" in v.message)
+
+
 def test_load_config_treats_empty_safelint_section_as_present(tmp_path: Path) -> None:
     """An empty ``[tool.safelint]`` is a *present* config — the loader must
     stop at the first directory containing one, not fall through to an
