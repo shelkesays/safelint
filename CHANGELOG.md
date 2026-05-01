@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- `max_file_size_bytes` top-level config option (default **5 MiB**, set to `0` to disable). Files larger than the bound are skipped with a `safelint: warning: skipping <path> (<size> bytes exceeds max_file_size_bytes=…)` diagnostic to stderr instead of being read into memory and parsed. Guards against OOM on accidentally-huge inputs (binary blobs masquerading as `.py`, very large generated files). Closes #20.
+
+### Fixed
+- File discovery is now safe against symlink cycles. `SafetyEngine._discover_files` switched from `Path.rglob('*')` (which follows symlinks and can recurse forever on a cycle like `a/sub -> ..`) to `os.walk(target, followlinks=False)`. Same single-pass O(number_of_files) cost, but safe by construction. Matches what ruff and flake8 do by default. Closes #19.
+
 ## [1.4.0] - 2026-05-01
 
 > **Heads-up — breaking library API change.** `LintResult.suppressed` is now `list[Violation]` (was `int`). Library consumers that read this field directly need to switch to `len(result.suppressed)` for the count. CLI users are unaffected. See **Changed** below for details and migration notes.

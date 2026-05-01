@@ -39,6 +39,11 @@ exclude_paths = [
 # Project-wide rule suppression - codes or names accepted, mixable.
 ignore = []
 
+# Skip files larger than this many bytes with a "safelint: warning:" diagnostic
+# instead of attempting to parse them. Guards against OOM on accidentally-huge
+# inputs. Set to 0 to disable the bound entirely.
+max_file_size_bytes = 5242880   # 5 MiB
+
 # Per-file suppression - glob → list of codes/names to silence for matching files.
 [per_file_ignores]
 "tests/**" = ["SAFE101", "SAFE103"]
