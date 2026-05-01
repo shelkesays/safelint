@@ -5,9 +5,9 @@ from __future__ import annotations
 import argparse
 import os
 from pathlib import Path as _Path
+import signal
 import sys
 import textwrap
-import threading
 from typing import TYPE_CHECKING
 
 import pytest
@@ -1136,12 +1136,15 @@ def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
     Without the fix, ``Path.rglob('*')`` would follow ``loop/`` back to
     ``target/`` and recurse forever.
 
-    The discovery call is run in a daemon thread with a 5-second timeout so
-    that a regression which re-introduces cycle-following fails the test
-    instead of hanging the whole pytest run.
+    Wraps the discovery call in a ``signal.alarm``-based timeout so any
+    hang from a regression is interrupted in-place (no leftover work
+    or daemon thread continuing after the test fails). POSIX-only —
+    Windows lacks ``SIGALRM`` and is skipped.
     """
     if not hasattr(os, "symlink"):
         pytest.skip("symlink not supported on this platform")
+    if not hasattr(signal, "SIGALRM"):
+        pytest.skip("signal.SIGALRM not available (Windows)")
     target = tmp_path / "target"
     target.mkdir()
     real_file = target / "a.py"
@@ -1151,22 +1154,18 @@ def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
     except (OSError, NotImplementedError):
         pytest.skip("filesystem does not support directory symlinks")
 
-    result: dict[str, list[str] | Exception] = {}
+    def _on_alarm(_signum: int, _frame: object) -> None:
+        msg = "discovery did not finish within 5s — symlink-cycle protection regressed"
+        raise TimeoutError(msg)
 
-    def run() -> None:
-        try:
-            result["files"] = _engine()._discover_files(target)
-        except Exception as exc:  # noqa: BLE001 — capture any unexpected failure for the main thread to assert on
-            result["error"] = exc
+    previous = signal.signal(signal.SIGALRM, _on_alarm)
+    signal.alarm(5)
+    try:
+        files = _engine()._discover_files(target)
+    finally:
+        signal.alarm(0)
+        signal.signal(signal.SIGALRM, previous)
 
-    thread = threading.Thread(target=run, daemon=True)
-    thread.start()
-    thread.join(timeout=5.0)
-    assert not thread.is_alive(), "discovery did not finish within 5s — symlink-cycle protection regressed"
-
-    assert "error" not in result, f"discovery raised: {result.get('error')!r}"
-    files = result["files"]
-    assert isinstance(files, list)
     assert str(real_file) in files
     # And no infinite duplicates from symlink-following.
     assert len(files) == 1
@@ -1206,6 +1205,47 @@ def test_discover_files_prunes_excluded_subtrees(tmp_path: Path, monkeypatch: py
     # Critical: is_file() must never have been called on anything inside
     # node_modules — the whole point of pruning is skipping the descent.
     assert not any("node_modules" in q for q in queried), f"discovery descended into excluded subtree; queried paths: {[q for q in queried if 'node_modules' in q]}"
+
+
+def test_discover_files_prunes_glob_pattern_directories(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Patterns like ``tests/**`` must prune the matching directory during
+    descent, not just filter at the end. ``fnmatch.fnmatchcase('tests',
+    'tests/**')`` is False (the candidate has no trailing slash), so a
+    naive ``_is_excluded(str(dir_path / d))`` check would still descend.
+    The fix: compose a directory-form candidate with a trailing slash.
+
+    Verified by spying on ``Path.is_file`` — files inside the
+    ``tests/**``-pruned subtree must never be queried.
+    """
+    target = tmp_path / "root"
+    (target / "src").mkdir(parents=True)
+    (target / "src" / "main.py").write_text("x = 1\n", encoding="utf-8")
+    excluded = target / "tests"
+    excluded.mkdir()
+    (excluded / "test_a.py").write_text("x = 2\n", encoding="utf-8")
+    (excluded / "deep").mkdir()
+    (excluded / "deep" / "test_b.py").write_text("x = 3\n", encoding="utf-8")
+
+    queried: list[str] = []
+    original_is_file = _Path.is_file
+
+    def spy(self: _Path) -> bool:
+        queried.append(self.as_posix())
+        return original_is_file(self)
+
+    monkeypatch.setattr(_Path, "is_file", spy)
+
+    # Run discovery from inside *target* so the patterns match relatively.
+    monkeypatch.chdir(target)
+    cfg = deep_merge(DEFAULTS, {"exclude_paths": ["tests/**"]})
+    files = SafetyEngine(cfg)._discover_files(_Path())
+
+    assert any(f.endswith("main.py") for f in files), "real file should still be discovered"
+    assert not any("test_a.py" in f or "test_b.py" in f for f in files), "files inside the tests/** subtree must not appear in results"
+    # Critical: prune actually happened, not just final filter.
+    assert not any("tests/test_a.py" in q or "tests/deep" in q for q in queried), (
+        f"discovery descended into tests/ subtree despite tests/** pattern; queried paths: {[q for q in queried if 'tests' in q]}"
+    )
 
 
 def test_check_file_skips_non_regular_path(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
