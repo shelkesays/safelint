@@ -125,7 +125,7 @@ class SafetyEngine:
         exec_cfg: dict[str, Any] = config.get("execution", {})
         self.fail_fast: bool = exec_cfg.get("fail_fast", False)
         self.exclude_paths: list[str] = config.get("exclude_paths", [])
-        self.max_file_size_bytes: int = config.get("max_file_size_bytes", DEFAULTS["max_file_size_bytes"])
+        self.max_file_size_bytes: int = self._resolve_max_file_size_bytes(config)
 
         raw_ignore = config.get("ignore", [])
         if not isinstance(raw_ignore, (list, tuple)):
@@ -170,6 +170,35 @@ class SafetyEngine:
                 rule_cfg["_changed_files"] = changed_files
             active_rules.append(cls(rule_cfg))
         return sorted(active_rules, key=lambda r: order_index.get(r.name, len(order)))
+
+    @staticmethod
+    def _resolve_max_file_size_bytes(config: dict[str, Any]) -> int:
+        """Validate ``max_file_size_bytes`` from *config* and return the resolved value.
+
+        Rules:
+        * Must be a non-negative integer (``bool`` is rejected since it
+          subclasses ``int`` — ``true`` would silently coerce to ``1``).
+        * Negative values raise ``ValueError`` with a clear message.
+        * ``0`` would defeat the OOM guard entirely; treat it as a likely
+          typo, emit a stderr warning, and fall back to the built-in
+          default rather than silently disabling the safety net.
+        """
+        raw_max = config.get("max_file_size_bytes", DEFAULTS["max_file_size_bytes"])
+        if not isinstance(raw_max, int) or isinstance(raw_max, bool):
+            msg = f"max_file_size_bytes must be a non-negative integer, got {type(raw_max).__name__}"
+            raise TypeError(msg)
+        if raw_max < 0:
+            msg = f"max_file_size_bytes must be >= 0, got {raw_max}"
+            raise ValueError(msg)
+        if raw_max == 0:
+            default = DEFAULTS["max_file_size_bytes"]
+            _diagnostics.print_warning(
+                f"max_file_size_bytes = 0 disables the per-file size guard and would read every file unbounded; "
+                f"falling back to the default of {default:,} bytes. "
+                f"Set a large positive value explicitly if you really need a higher bound."
+            )
+            return default
+        return raw_max
 
     @staticmethod
     def _parse_per_file_ignores(
@@ -300,17 +329,17 @@ class SafetyEngine:
             return LintResult(path=filepath)
 
         # Size guard: skip oversize inputs with a stderr diagnostic instead
-        # of OOM-ing the process. ``max_file_size_bytes = 0`` disables.
-        if self.max_file_size_bytes > 0:
-            try:
-                size = Path(filepath).stat().st_size
-            # If we can't stat the file, fall through to the read which will
-            # produce a SAFE000 with the underlying error.
-            except OSError:  # nosafe: SAFE203
-                size = -1
-            if size > self.max_file_size_bytes:
-                _diagnostics.print_warning(f"skipping {filepath} ({size:,} bytes exceeds max_file_size_bytes={self.max_file_size_bytes:,})")
-                return LintResult(path=filepath)
+        # of OOM-ing the process. The bound is always positive — see
+        # ``__init__`` where 0 is rejected with a fallback warning.
+        try:
+            size = Path(filepath).stat().st_size
+        # If we can't stat the file, fall through to the read which will
+        # produce a SAFE000 with the underlying error.
+        except OSError:  # nosafe: SAFE203
+            size = -1
+        if size > self.max_file_size_bytes:
+            _diagnostics.print_warning(f"skipping {filepath} ({size:,} bytes exceeds max_file_size_bytes={self.max_file_size_bytes:,})")
+            return LintResult(path=filepath)
 
         try:
             source = Path(filepath).read_text(encoding="utf-8")
@@ -339,17 +368,25 @@ class SafetyEngine:
 
     @staticmethod
     def _walk_supported_files(target: Path, ext_tuple: tuple[str, ...]) -> set[str]:
-        """Return the set of file paths under *target* whose name ends with one of *ext_tuple*.
+        """Return the set of regular-file paths under *target* whose name ends with one of *ext_tuple*.
 
         Uses ``os.walk(..., followlinks=False)`` so symlink cycles
-        (e.g. ``a/sub -> ..``) cannot cause infinite descent — ``os.walk``
-        skips into linked subdirectories outright. Matches what ruff and
-        flake8 do by default.
+        (e.g. ``a/sub -> ..``) cannot cause infinite descent: when this
+        flag is off, ``os.walk`` does not follow symlinks to
+        subdirectories during descent. Matches what ruff and flake8
+        do by default.
+
+        ``os.walk`` lists every non-directory entry in *filenames*, which
+        includes FIFOs, sockets, device files, and broken symlinks. The
+        ``is_file()`` guard drops those — calling ``read_text()`` on a
+        FIFO would block the process forever, and reading a device file
+        is undefined behaviour. The stat cost is bounded to suffix
+        matches (the cheap string check runs first).
         """
         seen: set[str] = set()
         for dirpath, _dirnames, filenames in os.walk(target, followlinks=False):
             dir_path = Path(dirpath)
-            seen.update(str(dir_path / name) for name in filenames if name.endswith(ext_tuple))
+            seen.update(str(dir_path / name) for name in filenames if name.endswith(ext_tuple) and (dir_path / name).is_file())
         return seen
 
     def _discover_files(self, target: Path) -> list[str]:

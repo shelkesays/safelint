@@ -1126,8 +1126,9 @@ def test_load_config_treats_empty_standalone_safelint_toml_as_present(tmp_path: 
 
 def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
     """A symlink cycle inside the target directory must not hang discovery
-    (issue #19). ``os.walk(..., followlinks=False)`` skips into linked
-    subdirectories, breaking any cycle by construction.
+    (issue #19). ``os.walk(..., followlinks=False)`` does not follow
+    symlinks to subdirectories during descent, breaking any cycle by
+    construction.
 
     Build: target/a.py is a real file, target/loop/ is a symlink to target/.
     Without the fix, ``Path.rglob('*')`` would follow ``loop/`` back to
@@ -1153,6 +1154,31 @@ def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
     assert len(files) == 1
 
 
+def test_discover_files_skips_non_regular_entries(tmp_path: Path) -> None:
+    """``os.walk`` lists FIFOs / device files / broken symlinks alongside
+    regular files. Reading a FIFO with ``read_text()`` would block the
+    process forever, so discovery must filter to ``is_file()`` matches
+    only — preserving the safety guarantee from the previous
+    ``Path.rglob('*') + is_file()`` implementation.
+    """
+    if not hasattr(os, "mkfifo"):
+        pytest.skip("os.mkfifo not available on this platform")
+    target = tmp_path / "target"
+    target.mkdir()
+    real_file = target / "good.py"
+    real_file.write_text("x = 1\n", encoding="utf-8")
+    fifo_path = target / "evil.py"
+    try:
+        os.mkfifo(fifo_path)
+    except (OSError, NotImplementedError):
+        pytest.skip("filesystem does not support mkfifo")
+
+    files = _engine()._discover_files(target)
+    assert str(real_file) in files
+    # FIFO with a `.py` name must NOT be picked up — would block read_text.
+    assert str(fifo_path) not in files
+
+
 def test_check_file_skips_oversized_input(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A file larger than ``max_file_size_bytes`` is skipped with a stderr
     diagnostic and produces no violations (issue #20)."""
@@ -1170,17 +1196,52 @@ def test_check_file_skips_oversized_input(tmp_path: Path, capsys: pytest.Capture
     assert "huge.py" in captured.err
 
 
-def test_check_file_size_bound_zero_disables_check(tmp_path: Path) -> None:
-    """``max_file_size_bytes = 0`` opts out of the size guard entirely.
-    Useful for projects with intentionally-large generated files."""
-    big = tmp_path / "ok.py"
-    big.write_text("x = 1\n" * 40, encoding="utf-8")  # 200 bytes
+def test_max_file_size_bytes_rejects_non_integer(tmp_path: Path) -> None:
+    """A user typo'ing ``max_file_size_bytes = "5MB"`` in TOML should fail
+    fast at engine init with a clear ``TypeError``, not crash later when
+    ``check_file`` tries to compare the value against an int."""
+    cfg = deep_merge(DEFAULTS, {"max_file_size_bytes": "5MB"})
+    with pytest.raises(TypeError, match="max_file_size_bytes must be a non-negative integer"):
+        SafetyEngine(cfg)
 
+
+def test_max_file_size_bytes_rejects_bool(tmp_path: Path) -> None:
+    """``bool`` is a subclass of ``int`` in Python — explicitly reject it
+    so ``max_file_size_bytes = true`` doesn't silently coerce to ``1``."""
+    cfg = deep_merge(DEFAULTS, {"max_file_size_bytes": True})
+    with pytest.raises(TypeError, match="max_file_size_bytes must be a non-negative integer"):
+        SafetyEngine(cfg)
+
+
+def test_max_file_size_bytes_rejects_negative(tmp_path: Path) -> None:
+    """A negative bound is nonsensical (``0`` is the documented opt-out).
+    Reject it with a clear ``ValueError`` at engine init."""
+    cfg = deep_merge(DEFAULTS, {"max_file_size_bytes": -1})
+    with pytest.raises(ValueError, match="max_file_size_bytes must be >= 0"):
+        SafetyEngine(cfg)
+
+
+def test_check_file_size_bound_zero_falls_back_to_default(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``max_file_size_bytes = 0`` is rejected as a likely typo (it would
+    disable the OOM guard entirely). Engine init must emit a stderr
+    warning and replace the value with the built-in default, so the
+    safety net stays in place."""
     cfg = deep_merge(DEFAULTS, {"max_file_size_bytes": 0})
-    result = SafetyEngine(cfg).check_file(str(big))
+    engine = SafetyEngine(cfg)
 
-    # No skip diagnostic and the file gets actually parsed (no violations
-    # from this trivial source).
+    # Init-time warning fires.
+    captured = capsys.readouterr()
+    assert "safelint: warning:" in captured.err
+    assert "max_file_size_bytes = 0" in captured.err
+    assert "falling back to the default" in captured.err
+
+    # The runtime value is the default, not 0.
+    assert engine.max_file_size_bytes == DEFAULTS["max_file_size_bytes"]
+
+    # And a normal-sized file is still parsed cleanly with that default.
+    sample = tmp_path / "ok.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    result = engine.check_file(str(sample))
     assert result.violations == []
 
 

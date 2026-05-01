@@ -41,7 +41,9 @@ ignore = []
 
 # Skip files larger than this many bytes with a "safelint: warning:" diagnostic
 # instead of attempting to parse them. Guards against OOM on accidentally-huge
-# inputs. Set to 0 to disable the bound entirely.
+# inputs. To allow larger files, raise this value explicitly — 0 is rejected
+# as a likely typo (it would defeat the OOM guard) and falls back to the
+# built-in default with a warning.
 max_file_size_bytes = 5242880   # 5 MiB
 
 # Per-file suppression - glob → list of codes/names to silence for matching files.
