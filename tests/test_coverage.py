@@ -772,6 +772,53 @@ def test_unbounded_loops_break_inside_nested_for_does_not_count(tmp_path: Path) 
     assert any(v.rule == "unbounded_loops" for v in violations)
 
 
+def test_logging_on_error_ignores_log_call_inside_nested_def(tmp_path: Path) -> None:
+    """A logging call buried inside a nested ``def`` defined in the except
+    body must not satisfy SAFE203 — that helper isn't executed when the
+    exception fires, so the caller is still effectively swallowing the
+    error silently."""
+    source = textwrap.dedent("""\
+        import logging
+
+        log = logging.getLogger(__name__)
+
+        def fetch():
+            try:
+                do_work()
+            except ValueError:
+                def _later_helper():
+                    log.error("would log if called")
+                pass
+    """)
+    sample = tmp_path / "fake_log.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"logging_on_error": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "logging_on_error" for v in violations)
+
+
+def test_logging_on_error_accepts_real_log_call_in_body(tmp_path: Path) -> None:
+    """Sanity check: a logging call directly in the except body still passes."""
+    source = textwrap.dedent("""\
+        import logging
+
+        log = logging.getLogger(__name__)
+
+        def fetch():
+            try:
+                do_work()
+            except ValueError:
+                log.error("real log call")
+    """)
+    sample = tmp_path / "real_log.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"logging_on_error": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert not any(v.rule == "logging_on_error" for v in violations)
+
+
 def test_global_state_does_not_attribute_nested_def_global_to_outer(tmp_path: Path) -> None:
     """A ``global`` declared in a nested function belongs to the inner
     scope; the outer function must not be flagged for it."""

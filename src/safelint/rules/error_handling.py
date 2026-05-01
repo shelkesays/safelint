@@ -6,9 +6,11 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import call_name, lineno, walk
 from safelint.languages.python import (
+    ASYNC_FUNCTION_DEF,
     ATTRIBUTE,
     CALL,
     EXCEPT_CLAUSE,
+    FUNCTION_DEF,
     IDENTIFIER,
     RAISE_STATEMENT,
     TUPLE,
@@ -105,8 +107,17 @@ class LoggingOnErrorRule(BaseRule):
         return not stmts[0].named_children
 
     def _has_log_call(self, except_node: tree_sitter.Node) -> bool:
-        """Return True when the handler body contains at least one logging call."""
-        return any(call_name(node) in self._LOG_METHODS for node in walk(except_node) if node.type == CALL)
+        """Return True when the handler body contains at least one logging call.
+
+        Walks only the body block (skipping the exception-type spec) and
+        prunes nested ``def`` / ``async def`` so a logging call inside an
+        inner function definition — which the except handler never actually
+        executes — does not count as logging the caught error.
+        """
+        body = _except_body(except_node)
+        if body is None:
+            return False
+        return any(call_name(node) in self._LOG_METHODS for node in walk(body, skip_types=(FUNCTION_DEF, ASYNC_FUNCTION_DEF)) if node.type == CALL)
 
     def _is_unlogged(self, except_node: tree_sitter.Node) -> bool:
         """Return True when this except clause swallows an error without logging."""

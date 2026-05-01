@@ -33,7 +33,7 @@ def _suppressions(source: str) -> dict[int, set[str] | None]:
 
 
 # ---------------------------------------------------------------------------
-# _parse_suppressions — unit tests against the tokenizer-based parser
+# _parse_suppressions — unit tests against the Tree-sitter comment-node parser
 # ---------------------------------------------------------------------------
 
 

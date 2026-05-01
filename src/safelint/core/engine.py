@@ -310,10 +310,18 @@ class SafetyEngine:
         return LintResult(path=filepath, violations=active, suppressed=suppressed)
 
     def _discover_files(self, target: Path) -> list[str]:
-        """Return every supported source file under *target*, deduplicated and sorted."""
+        """Return every supported source file under *target*, deduplicated and sorted.
+
+        One ``rglob('*')`` pass — keeps discovery O(number_of_files) rather
+        than O(number_of_extensions * number_of_files). The suffix check
+        is a cheap string comparison; ``is_file()`` only runs on suffix
+        matches, so the stat cost stays bounded by the count of source
+        files (not the size of the tree).
+        """
+        extensions = supported_extensions()
         seen: set[str] = set()
-        for ext in supported_extensions():
-            for path in target.rglob(f"*{ext}"):
+        for path in target.rglob("*"):
+            if path.suffix in extensions and path.is_file():
                 seen.add(str(path))
         return sorted(p for p in seen if not self._is_excluded(p))
 
