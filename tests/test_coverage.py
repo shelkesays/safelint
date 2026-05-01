@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import argparse
 import os
+from pathlib import Path as _Path
 import sys
 import textwrap
+import threading
 from typing import TYPE_CHECKING
 
 import pytest
@@ -1132,8 +1134,11 @@ def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
 
     Build: target/a.py is a real file, target/loop/ is a symlink to target/.
     Without the fix, ``Path.rglob('*')`` would follow ``loop/`` back to
-    ``target/`` and recurse forever. We assert discovery returns and
-    that ``a.py`` was found.
+    ``target/`` and recurse forever.
+
+    The discovery call is run in a daemon thread with a 5-second timeout so
+    that a regression which re-introduces cycle-following fails the test
+    instead of hanging the whole pytest run.
     """
     if not hasattr(os, "symlink"):
         pytest.skip("symlink not supported on this platform")
@@ -1146,9 +1151,22 @@ def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
     except (OSError, NotImplementedError):
         pytest.skip("filesystem does not support directory symlinks")
 
-    # Use a tight per-iteration timeout via subprocess? Simpler: trust that
-    # os.walk with followlinks=False completes quickly.
-    files = _engine()._discover_files(target)
+    result: dict[str, list[str] | Exception] = {}
+
+    def run() -> None:
+        try:
+            result["files"] = _engine()._discover_files(target)
+        except Exception as exc:  # noqa: BLE001 — capture any unexpected failure for the main thread to assert on
+            result["error"] = exc
+
+    thread = threading.Thread(target=run, daemon=True)
+    thread.start()
+    thread.join(timeout=5.0)
+    assert not thread.is_alive(), "discovery did not finish within 5s — symlink-cycle protection regressed"
+
+    assert "error" not in result, f"discovery raised: {result.get('error')!r}"
+    files = result["files"]
+    assert isinstance(files, list)
     assert str(real_file) in files
     # And no infinite duplicates from symlink-following.
     assert len(files) == 1
@@ -1179,12 +1197,29 @@ def test_discover_files_skips_non_regular_entries(tmp_path: Path) -> None:
     assert str(fifo_path) not in files
 
 
-def test_check_file_skips_oversized_input(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_check_file_skips_oversized_input(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """A file larger than ``max_file_size_bytes`` is skipped with a stderr
-    diagnostic and produces no violations (issue #20)."""
+    diagnostic and produces no violations (issue #20).
+
+    Defence-in-depth: monkeypatch ``Path.read_text`` to raise loudly if it
+    is invoked. The whole point of the size guard is that the file's
+    contents never enter the process — if we ever regressed and started
+    reading the file before checking its size, this assertion would
+    surface that immediately.
+    """
     big = tmp_path / "huge.py"
     # 200 bytes, but we'll set max_file_size_bytes to 100 to trigger the bound.
     big.write_text("x = 1\n" * 40, encoding="utf-8")
+
+    def _fail_if_read(*_args: object, **_kwargs: object) -> str:
+        msg = "Path.read_text must not be called for an oversize file"
+        raise AssertionError(msg)
+
+    monkeypatch.setattr(_Path, "read_text", _fail_if_read)
 
     cfg = deep_merge(DEFAULTS, {"max_file_size_bytes": 100})
     result = SafetyEngine(cfg).check_file(str(big))

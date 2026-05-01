@@ -126,16 +126,20 @@ Prefer **config changes** (adjusting thresholds or disabling rules) over `# nosa
 
 ## Diagnostic output
 
-Lint violations and the run summary are written to **stdout** in the ruff/ty multi-line format. Issues that aren't lint violations — typos in your `ignore` list, malformed TOML, etc. — are written to **stderr** as single-line `safelint: warning:` / `safelint: error:` messages so they stay out of the violation stream and are captured separately by pre-commit, CI, and editor integrations.
+Lint violations and the run summary are written to **stdout** in the ruff/ty multi-line format. Issues that aren't lint violations — typos in your `ignore` list, malformed TOML, files skipped because they exceed `max_file_size_bytes`, etc. — are written to **stderr** as single-line `safelint: warning:` / `safelint: error:` messages so they stay out of the violation stream and are captured separately by pre-commit, CI, and editor integrations.
 
 Examples:
 
 ```text
 safelint: warning: unknown entries in ignore list (typo or stale rule?): SAFFE101
 safelint: error: failed to parse /path/to/pyproject.toml: Expected '=' after a key in a key/value pair (at line 5, column 12) — skipping file
+safelint: warning: skipping /path/to/huge_generated.py (12,345,678 bytes exceeds max_file_size_bytes=5,242,880)
 ```
 
-These messages always appear before the lint output (they are emitted at config-load and engine-construction time). Misconfigurations are reported but never fail the run on their own — safelint falls back to defaults and continues.
+Diagnostics fall into two timing buckets:
+
+* **Config-load / engine-construction time** — typos in `ignore` / `per_file_ignores`, malformed TOML, the `max_file_size_bytes = 0` fallback warning. These are emitted once, up front, before any file is linted. None of them fails the run on their own — safelint falls back to defaults and continues.
+* **Per-file runtime** — `max_file_size_bytes` skip warnings fire from `SafetyEngine.check_file()` as the engine walks the file list, so they are interleaved with lint output (one warning per oversize file, just before that file's spot in the run). The skipped file produces no violations and does not affect exit status.
 
 ---
 
