@@ -48,6 +48,12 @@ ASSIGNMENT = "assignment"
 AUGMENTED_ASSIGNMENT = "augmented_assignment"
 ANNOTATED_ASSIGNMENT = "annotated_assignment"
 
+# LHS destructure shapes: ``a, b``, ``(a, b)``, ``[a, b]``, ``a, *rest``.
+PATTERN_LIST = "pattern_list"
+TUPLE_PATTERN = "tuple_pattern"
+LIST_PATTERN = "list_pattern"
+LIST_SPLAT_PATTERN = "list_splat_pattern"
+
 CALL = "call"
 IDENTIFIER = "identifier"
 ATTRIBUTE = "attribute"

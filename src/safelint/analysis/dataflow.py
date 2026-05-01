@@ -34,14 +34,20 @@ from safelint.languages.python import (
     IDENTIFIER,
     INTERPOLATION,
     LIST,
+    LIST_PATTERN,
+    LIST_SPLAT_PATTERN,
+    PATTERN_LIST,
     SET,
     STRING,
     TUPLE,
+    TUPLE_PATTERN,
     UNARY_OPERATOR,
 )
 
 
 if TYPE_CHECKING:
+    from collections.abc import Iterator
+
     import tree_sitter
 
 
@@ -56,6 +62,9 @@ _SPREADING_TYPES = frozenset(
 )
 
 _CONTAINER_TYPES = frozenset({LIST, TUPLE, SET})
+
+# Destructure shapes recognised on the LHS of an assignment.
+_PATTERN_TYPES = frozenset({PATTERN_LIST, TUPLE_PATTERN, LIST_PATTERN, LIST_SPLAT_PATTERN})
 
 
 class TaintTracker:
@@ -99,12 +108,44 @@ class TaintTracker:
             elif node.type == CALL:
                 self._visit_call(node)
 
+    def _iter_target_identifiers(self, target: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
+        """Yield each bare identifier inside *target*.
+
+        Handles destructuring: ``a, b = …``, ``(a, b) = …``, ``[a, b] = …``,
+        and starred targets like ``a, *rest = …``. Subscript / attribute
+        targets (``a[0] = …``, ``obj.x = …``) are not bare names and are
+        skipped — TaintTracker only tracks identifiers.
+        """
+        if target.type == IDENTIFIER:
+            yield target
+            return
+        if target.type in _PATTERN_TYPES:
+            for child in target.named_children:
+                yield from self._iter_target_identifiers(child)
+
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
-        """Propagate taint through ``x = value``."""
-        left = node.child_by_field_name("left")
-        right = node.child_by_field_name("right")
-        if left and right:
-            self._update_name(left, is_tainted=self._is_tainted(right))
+        """Propagate taint through ``x = value``, including destructuring and chains.
+
+        Chained assignments (``a = b = value``) parse as nested ``assignment``
+        nodes — we follow the chain to find the innermost real RHS, then mark
+        every LHS target with the same taint state. Destructuring on any of
+        those LHS targets is expanded via ``_iter_target_identifiers``.
+        """
+        targets: list[tree_sitter.Node] = []
+        cursor = node
+        # Bounded by the depth of nested ``assignment`` nodes in the parse
+        # tree — finite by source structure, not by runtime data.
+        while cursor is not None and cursor.type == ASSIGNMENT:  # nosafe: SAFE501
+            left = cursor.child_by_field_name("left")
+            if left is not None:
+                targets.append(left)
+            cursor = cursor.child_by_field_name("right")
+        if cursor is None or not targets:
+            return
+        is_tainted = self._is_tainted(cursor)
+        for target in targets:
+            for ident in self._iter_target_identifiers(target):
+                self._update_name(ident, is_tainted=is_tainted)
 
     def _visit_aug_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x += value``."""

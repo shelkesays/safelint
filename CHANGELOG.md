@@ -35,6 +35,7 @@ This release contains a breaking library API change (`LintResult.suppressed` typ
 - `state_purity` (`global_state`, `global_mutation`) now also stops at nested class definitions — a `global X` declared inside a nested class body lives in that class's scope, not the enclosing function's.
 - `function_length` (SAFE101) reported counts that were off by one (a 60-line function showed `59 lines`). The calculation is now inclusive of the `def` line.
 - Dataflow taint tracker now unwraps `keyword_argument` nodes — `eval(code=user_input)` is no longer missed because the tainted value was hidden behind a kwarg wrapper.
+- Dataflow taint tracker now propagates taint through tuple/list destructure targets (`a, b = tainted`, `[a, b] = tainted`, `(a, b) = tainted`), starred destructures (`a, *rest = tainted`), and chained assignments (`a = b = tainted`). Previously the LHS shape was assumed to be a single bare identifier, so every other form silently dropped the taint.
 - `per_file_ignores` now validates that every entry in each list is a string. Non-string elements (e.g. `["SAFE101", 42]`) are reported with a clear `TypeError` at engine init instead of crashing later on `.upper()`.
 - File discovery now does a single `rglob('*')` pass and filters by suffix, instead of one `rglob('*<ext>')` per registered extension. Discovery is now O(number_of_files) rather than O(number_of_extensions * number_of_files). No behaviour change on a single-language registry, but matters as more languages are added.
 

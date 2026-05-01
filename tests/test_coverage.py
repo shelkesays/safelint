@@ -933,6 +933,68 @@ def test_taint_tracker_handles_keyword_argument(tmp_path: Path) -> None:
     assert any(v.rule == "tainted_sink" for v in violations)
 
 
+def test_taint_tracker_propagates_through_tuple_destructure(tmp_path: Path) -> None:
+    """``a, b = user_input`` must mark both ``a`` and ``b`` as tainted, so
+    a later ``eval(a)`` is caught."""
+    source = textwrap.dedent("""\
+        def run(user_input):
+            a, b = user_input
+            eval(a)
+    """)
+    sample = tmp_path / "tuple_destructure.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+def test_taint_tracker_propagates_through_list_destructure(tmp_path: Path) -> None:
+    """List-pattern destructure should also propagate taint to every name."""
+    source = textwrap.dedent("""\
+        def run(user_input):
+            [a, b] = user_input
+            eval(b)
+    """)
+    sample = tmp_path / "list_destructure.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+def test_taint_tracker_propagates_through_starred_destructure(tmp_path: Path) -> None:
+    """``a, *rest = tainted`` should taint both ``a`` and ``rest``."""
+    source = textwrap.dedent("""\
+        def run(user_input):
+            a, *rest = user_input
+            eval(rest)
+    """)
+    sample = tmp_path / "starred_destructure.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
+def test_taint_tracker_propagates_through_chained_assignment(tmp_path: Path) -> None:
+    """``a = b = user_input`` must taint both ``a`` and ``b``, so an ``eval``
+    on the *outer* target (``a``, the one furthest from the RHS) is flagged."""
+    source = textwrap.dedent("""\
+        def run(user_input):
+            a = b = user_input
+            eval(a)
+    """)
+    sample = tmp_path / "chained_assign.py"
+    sample.write_text(source, encoding="utf-8")
+
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    assert any(v.rule == "tainted_sink" for v in violations)
+
+
 def test_per_file_ignores_rejects_non_string_entries(tmp_path: Path) -> None:
     """A list containing a non-string entry should fail loud at engine init,
     not crash later when ``.upper()`` is called on it."""
