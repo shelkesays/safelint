@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
+
 from safelint.core.config import (
     DEFAULTS,
     _read_toml_file,
@@ -197,6 +199,23 @@ def test_find_config_root_skips_malformed_standalone_and_walks_up(tmp_path: Path
     # Valid standalone in tmp_path: that's where the walk should land.
     (tmp_path / "safelint.toml").write_text("ignore = []\n", encoding="utf-8")
     assert find_config_root(inner) == tmp_path
+
+
+def test_find_config_root_does_not_double_print_parse_diagnostic(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Probing a malformed config must not emit the parse-error diagnostic.
+
+    The ``load_config`` path is the authoritative reporter; the probe
+    used by ``find_config_root`` (and downstream by the cache anchor)
+    is silent so a single broken file isn't surfaced to stderr twice
+    per run.
+    """
+    (tmp_path / "safelint.toml").write_bytes(b"\xff\xfe not toml \x00")
+    find_config_root(tmp_path)
+    captured = capsys.readouterr()
+    assert "failed to parse" not in captured.err
 
 
 def test_find_config_root_returns_dir_with_tool_safelint_pyproject(tmp_path: Path) -> None:

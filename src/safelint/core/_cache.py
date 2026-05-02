@@ -7,12 +7,18 @@ content makes re-lints essentially instant when nothing has changed.
 
 Design:
 
-* **Per-file key** = ``sha256(source_bytes + engine_fingerprint)``. The
-  engine fingerprint folds in the safelint version, an internal cache
-  schema version, and the active rule set + per-rule config — so any
-  semantically meaningful change to *what* would be reported invalidates
-  the cache automatically. Editing source contents also invalidates,
-  by construction.
+* **Per-file key** = ``sha256(source_bytes + engine_fingerprint +
+  normalised_filepath)``. The engine fingerprint folds in the safelint
+  version, an internal cache schema version, and the active rule set +
+  per-rule config — so any semantically meaningful change to *what*
+  would be reported invalidates the cache automatically. The filepath
+  is folded in (with backslashes normalised to forward slashes for
+  cross-platform stability) because several rules legitimately depend
+  on the path — ``test_existence`` and ``test_coupling`` look at the
+  test directory layout, ``per_file_ignores`` matches glob patterns
+  against the path, and every emitted ``Violation`` carries
+  ``filepath`` verbatim. Editing source contents *or* renaming/moving
+  the file therefore invalidates by construction.
 * **Storage** = one JSON file per key under ``<cache_dir>/<key>.json``.
   The file holds two flat lists of violations + suppressed entries
   serialised via ``dataclasses.asdict``. JSON (not pickle) is deliberate:

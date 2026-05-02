@@ -126,9 +126,9 @@ class SafetyEngine:
 
         *cache* is an optional :class:`safelint.core._cache.LintCache`. If
         provided (and not pointing at ``None``), per-file lint results are
-        memoised by ``sha256(source + engine_fingerprint)`` so re-runs on
-        unchanged files become essentially instant. Pass ``None`` (the
-        default) to disable caching.
+        memoised by ``sha256(source + engine_fingerprint + filepath)`` so
+        re-runs on unchanged files become essentially instant. Pass
+        ``None`` (the default) to disable caching.
         """
         rules_cfg: dict[str, Any] = config.get("rules", {})
         exec_cfg: dict[str, Any] = config.get("execution", {})
@@ -475,9 +475,11 @@ class SafetyEngine:
                 # column is reported 1-based to match common editor convention.
                 msg = f"Parse error ({kind}) at line {line}, column {col + 1} - check syntax near this location"
                 err_lineno = line
-            # Parse errors aren't cached — they're path-specific (the
-            # filepath is in the message) and re-running parse on a
-            # buffer that's still broken will land the same error fast.
+            # Parse errors aren't cached: they're typically transient
+            # (a file mid-edit), and re-parsing a still-broken buffer
+            # is cheap — Tree-sitter bails on the first ERROR/MISSING
+            # node, so the cost saved by caching wouldn't be material
+            # against the extra read/JSON-parse round-trip.
             return self._parse_error_result(filepath, msg, lineno=err_lineno)
 
         suppressions = _parse_suppressions(tree, lang.comment_node_type, lang.comment_prefix)
@@ -488,18 +490,22 @@ class SafetyEngine:
         return LintResult(path=filepath, violations=active, suppressed=suppressed)
 
     def _apply_cached(self, filepath: str, cached: tuple[list[Violation], list[Violation]]) -> LintResult:
-        """Build a LintResult from a cache hit, re-applying per-call path filters.
+        """Build a LintResult from a cache hit, re-applying per-file ignore patterns.
 
         The cache key already folds in the filepath, so cached entries are
-        guaranteed to belong to *filepath* (no cross-file leakage). What
-        *can* still vary between cache write and read is the active
-        ``per_file_ignores`` set: a CLI ``--ignore`` flag adds to the
-        engine's ignore list at construction time but is *not* part of the
-        key (it would defeat the cache for every editor keystroke that
-        toggles a flag). Re-running the per-file filter on the cached
-        active list catches that case — anything filtered out is moved
-        into the suppressed list so the caller's downstream counts stay
-        accurate.
+        guaranteed to belong to *filepath* (no cross-file leakage). The
+        active rule set is reflected in the engine fingerprint — a CLI
+        ``--ignore`` flag (or a top-level ``ignore`` list in config)
+        removes rules from ``self.rules``, which feeds the fingerprint —
+        so changes there already produce a different cache entry.
+
+        What is *not* part of the key is the ``per_file_ignores``
+        configuration: those glob patterns are applied per-violation
+        after rules run (post-filter), so two engines with identical
+        rule sets but different ``per_file_ignores`` blocks share the
+        same cached entry. Re-running the per-file filter on the cached
+        active list catches that case — anything matched is moved into
+        the suppressed list so downstream counts stay accurate.
         """
         cached_violations, cached_suppressed = cached
         ignored_names, ignored_codes = self._file_ignored_set(filepath)

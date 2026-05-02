@@ -613,7 +613,7 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
         default=False,
         help=(
             "Disable the per-file lint-result cache. By default safelint "
-            "memoises rule output keyed on sha256(source + engine config) "
+            "memoises rule output keyed on sha256(source + engine config + filepath) "
             "in a ``.safelint_cache/`` directory next to the config file, "
             "so re-runs on unchanged files are essentially instant."
         ),
