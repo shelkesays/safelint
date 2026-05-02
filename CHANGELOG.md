@@ -8,6 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Fixed
+- Argv routing no longer breaks when a value-taking global flag precedes the `check` subcommand. Previously `safelint --format json check src` saw `json` as the first non-`-` token and fell into hook mode, silently no-oping (`json` and `check` aren't `.py`) with exit 0. The router now recognises the value-taking flags (`--format`, `--fail-on`, `--mode`, `--ignore`, `--config`, `--stdin-filename`) and skips their values when looking for the subcommand.
 - Cache key now includes the normalised filepath (in addition to source bytes and engine fingerprint), so two files with identical contents under different paths no longer share a cache entry. Without this, every emitted `Violation` from the second-served file would carry the *first* file's path, and path-dependent rules (`test_existence`, `test_coupling`) would draw conclusions from the wrong file.
 - Cache directory now anchors to the *discovered* config root (where `safelint.toml` or `[tool.safelint]` was actually found while walking up), not to the directory the user happened to pass to `safelint check`. Hook mode resolves the location the same way as check mode, so a single project can no longer end up with multiple `.safelint_cache/` directories scattered across subdirectories.
 - `safelint check` in pretty mode now prints the `All checks passed.` summary on a clean run (matching ruff/ty's UX). Pre-commit hook mode and `--stdin` mode stay silent on success via a new `silent_on_clean` flag.
