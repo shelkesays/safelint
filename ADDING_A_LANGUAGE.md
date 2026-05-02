@@ -127,6 +127,16 @@ Alternative: a `language` field on `BaseRule` indicating which language the rule
 * `README.md` should list the supported languages prominently.
 * `CHANGELOG.md` gets an entry under **Added**.
 
+### 7. Update the Claude Code skill
+
+The skill at `skills/safelint/` mirrors the `languages/` package: each language safelint can lint has a corresponding addendum file in `skills/safelint/languages/`. Add yours:
+
+* Create `skills/safelint/languages/<lang>.md` modelled on `languages/python.md`. Cover install nuance (if any), file extensions, language-specific phrasing for the universal rule rationales, and idiomatic fix patterns for the rules most likely to fire.
+* Add a row to the **Step 2** registry table in `skills/safelint/SKILL.md` pointing at your new addendum.
+* Keep the skill core (`SKILL.md`) language-neutral — per-language detail belongs in the addendum, not the entry point.
+
+The skill is just Markdown — no test harness needed. A quick smoke test ("ask Claude Code to /safelint a sample <lang> project") is enough.
+
 ## Things to leave alone
 
 * Don't touch `_parse_suppressions` itself unless block-comment handling is genuinely needed; the current impl is generic via `LanguageDefinition`.
