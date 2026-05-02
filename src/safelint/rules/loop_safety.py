@@ -42,7 +42,9 @@ class UnboundedLoopRule(BaseRule):
     def _check_while_node(self, filepath: str, node: tree_sitter.Node) -> Violation | None:
         """Return a violation if *node* is an unbounded while loop, else None."""
         condition = node.child_by_field_name("condition")
-        if condition is None:
+        # ``while`` without a condition can't appear in valid Python; this
+        # is a defensive guard in case the parser produces an ERROR node.
+        if condition is None:  # pragma: no cover
             return None
 
         is_literal_true = condition.type == TRUE

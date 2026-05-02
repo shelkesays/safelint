@@ -45,7 +45,10 @@ def _count_args(func_node: tree_sitter.Node) -> tuple[int, str | None]:
     ``first_param_name`` is used to detect and skip ``self`` / ``cls``.
     """
     params_node = func_node.child_by_field_name("parameters")
-    if params_node is None:
+    # Every Python function definition has a parameters list (possibly
+    # empty). This guard fires only on malformed AST that Tree-sitter
+    # produced with errors, in which case zero args is a safe answer.
+    if params_node is None:  # pragma: no cover
         return 0, None
     counted = [c for c in params_node.named_children if c.type in _COUNTED_PARAM_TYPES]
     first_name = _param_identifier(counted[0]) if counted else None

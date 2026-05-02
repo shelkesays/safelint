@@ -52,10 +52,14 @@ class BaseRule(ABC):
         )
 
     @staticmethod
-    def _call_name(call_node: tree_sitter.Node) -> str | None:
+    def _call_name(call_node: tree_sitter.Node) -> str | None:  # pragma: no cover
         """Return the bare callable name from a ``call`` node, or None if unresolvable.
 
         Pass the call node itself (not the function sub-node).
         Handles ``foo(...)`` → ``"foo"`` and ``obj.method(...)`` → ``"method"``.
+
+        Legacy alias retained for backward-compat with rules that called
+        ``self._call_name(...)`` directly. New code uses the module-level
+        ``call_name`` from ``safelint.languages._node_utils``.
         """
         return call_name(call_node)

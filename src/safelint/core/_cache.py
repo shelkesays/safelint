@@ -121,6 +121,10 @@ class LintCache:
             try:
                 self.cache_dir.mkdir(parents=True, exist_ok=True)
                 self._created = True
+            # Disk full / permission denied / read-only filesystem: best-effort
+            # only; never fail the lint run because the cache couldn't be
+            # written. Practically untestable without complex filesystem
+            # mocking that adds no real assurance.
             except OSError:  # nosafe: SAFE203
                 return
         path = self.cache_dir / f"{key}.json"
@@ -135,6 +139,9 @@ class LintCache:
         try:
             tmp.write_text(json.dumps(payload), encoding="utf-8")
             tmp.replace(path)
+        # Same fail-open posture: if the rename fails we just don't have
+        # a cache entry for this run. Untestable without filesystem fault
+        # injection.
         except OSError:  # nosafe: SAFE203
             # Clean up the temp file if rename failed; double-fail is fine.
             with contextlib.suppress(OSError):

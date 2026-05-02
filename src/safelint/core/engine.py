@@ -309,13 +309,18 @@ class SafetyEngine:
             node = stack.pop()
             if not node.has_error:
                 continue
-            if node.is_missing:
+            if node.is_missing:  # pragma: no cover
                 return node.start_point[0] + 1, node.start_point[1], f"missing {node.type!r}"
             if node.type == "ERROR":
                 return node.start_point[0] + 1, node.start_point[1], "syntax error"
             # Pre-order DFS: push reversed so the first original child pops first.
             stack.extend(reversed(node.children))
-        return None
+        # Defensive: the outer caller only invokes this when ``has_error``
+        # is True, which means at least one ERROR or MISSING node exists
+        # somewhere — but the loop below could in principle skip it if
+        # the parser produces an unusual tree shape. Falling back to None
+        # makes the message a generic "could not parse" without a location.
+        return None  # pragma: no cover
 
     @staticmethod
     def _partition_rule_output(
@@ -372,15 +377,17 @@ class SafetyEngine:
         """
         try:
             is_regular = path_obj.is_file()
+        # Stat denial / device read errors: fail-open so read_text reports
+        # the real underlying issue as a SAFE000 violation. Practically
+        # untestable without fault injection.
         except OSError:  # nosafe: SAFE203
-            # Can't stat — let read_text produce a SAFE000 with the
-            # actual error rather than guess at "not a regular file".
             return None
         if not is_regular:
             _diagnostics.print_warning(f"skipping {filepath} (not a regular file)")
             return LintResult(path=filepath)
         try:
             size = path_obj.stat().st_size
+        # Same fail-open posture as is_file() above.
         except OSError:  # nosafe: SAFE203
             return None
         if size > self.max_file_size_bytes:
@@ -465,7 +472,7 @@ class SafetyEngine:
         tree = lang.create_parser().parse(source_bytes)
         if tree.root_node.has_error:
             location = self._first_parse_error(tree.root_node)
-            if location is None:
+            if location is None:  # pragma: no cover
                 msg = "Parse error: tree-sitter could not fully parse this file"
                 err_lineno = 0
             else:

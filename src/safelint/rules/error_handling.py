@@ -36,12 +36,18 @@ def _iter_except_clauses(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
 
 
 def _except_body(except_node: tree_sitter.Node) -> tree_sitter.Node | None:
-    """Return the body block of *except_node*, or None if it has no body."""
+    """Return the body block of *except_node*, or None if it has no body.
+
+    The first branch (body field present) hits in normal code; the
+    fallback (last named child) is defensive for AST shapes where the
+    field isn't directly populated. Empty children should never happen
+    in valid Python (an except always has a body or a single ``pass``).
+    """
     body_node = except_node.child_by_field_name("body")
     if body_node is not None:
         return body_node
     named = except_node.named_children
-    return named[-1] if named else None
+    return named[-1] if named else None  # pragma: no cover
 
 
 def _has_typed_exception(except_node: tree_sitter.Node) -> bool:
@@ -99,7 +105,9 @@ class LoggingOnErrorRule(BaseRule):
     def _only_reraises(self, except_node: tree_sitter.Node) -> bool:
         """Return True when the handler body is just a bare ``raise``."""
         body_node = _except_body(except_node)
-        if body_node is None:
+        # Defensive — ``_except_body`` only returns None for malformed AST
+        # that this rule can't sensibly classify anyway.
+        if body_node is None:  # pragma: no cover
             return False
         stmts = body_node.named_children
         if len(stmts) != 1 or stmts[0].type != RAISE_STATEMENT:
@@ -115,14 +123,17 @@ class LoggingOnErrorRule(BaseRule):
         executes — does not count as logging the caught error.
         """
         body = _except_body(except_node)
-        if body is None:
+        if body is None:  # pragma: no cover
             return False
         return any(call_name(node) in self._LOG_METHODS for node in walk(body, skip_types=(FUNCTION_DEF, ASYNC_FUNCTION_DEF)) if node.type == CALL)
 
     def _is_unlogged(self, except_node: tree_sitter.Node) -> bool:
         """Return True when this except clause swallows an error without logging."""
         body_node = _except_body(except_node)
-        if body_node is None or not body_node.named_children:
+        # Empty body (no named children) means this rule's job is done by
+        # ``empty_except`` (SAFE202); skip here. ``body_node is None`` is
+        # the same defensive case as elsewhere.
+        if body_node is None or not body_node.named_children:  # pragma: no branch
             return False
         return not self._only_reraises(except_node) and not self._has_log_call(except_node)
 

@@ -77,7 +77,14 @@ source = ["src", "tests"]
 source = ["src"]
 
 [tool.coverage.report]
-fail_under = 80
+# Coverage is at 97-98% currently. Reaching exactly 100% requires
+# extensive ``# pragma: no cover`` annotations for genuinely
+# fail-safe / fail-open defensive paths in the taint tracker and
+# rule helpers (branches that fire only on malformed AST that
+# Tree-sitter rarely produces). The current bar is set high enough
+# to catch real coverage regressions; raise it as more pragmas
+# are added or genuinely-testable branches get tests.
+fail_under = 97
 precision = 2
 show_missing = true
 skip_covered = true
@@ -92,6 +99,15 @@ exclude_lines = [
     "if 0:",
     "if __name__ == .__main__.:",
     "except KeyboardInterrupt as err:",
+    # ``if TYPE_CHECKING:`` blocks only execute under type-checkers (mypy,
+    # ty), never at runtime. They contain forward-declared imports used
+    # for annotations only and are inherently uncoverable by unit tests.
+    "if TYPE_CHECKING:",
+    "if typing\\.TYPE_CHECKING:",
+]
+partial_branches = [
+    "pragma: no branch",
+    "if TYPE_CHECKING:",
 ]
 
 # ---------------------------------------------------------------------------
