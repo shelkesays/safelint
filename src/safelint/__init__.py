@@ -21,5 +21,6 @@ __all__ = [
 try:
     __version__ = version("safelint")
 # Source checkouts have no install metadata; "unknown" is the documented fallback.
+# Not exercised in tests (the package is always installed via ``uv sync``).
 except PackageNotFoundError:  # nosafe: SAFE203
     __version__ = "unknown"

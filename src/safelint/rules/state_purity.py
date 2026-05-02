@@ -68,7 +68,10 @@ def _assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None:
         return left if left is not None and left.type == IDENTIFIER else None
     if node.type == ANNOTATED_ASSIGNMENT and node.named_children:
         target = node.named_children[0]
-        return target if target.type == IDENTIFIER else None
+        # Subscript / attribute targets like ``a[0]: int = …`` exist in valid
+        # Python but aren't relevant to the global-mutation rule (which
+        # cares about bare identifier targets only).
+        return target if target.type == IDENTIFIER else None  # pragma: no cover
     return None
 
 

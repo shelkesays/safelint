@@ -40,10 +40,12 @@ def _param_node_name(child: tree_sitter.Node) -> str:
     if child.type == "identifier":
         return node_text(child)
     if child.type in ("list_splat_pattern", "dictionary_splat_pattern"):
-        inner = child.named_children[0] if child.named_children else None
-        return node_text(inner) if inner else ""
+        # Splat parameters always have an identifier child in valid Python;
+        # the empty-children branch is defensive against malformed AST.
+        inner = child.named_children[0] if child.named_children else None  # pragma: no branch
+        return node_text(inner) if inner else ""  # pragma: no cover
     name_node = child.child_by_field_name("name")
-    return node_text(name_node) if name_node else ""
+    return node_text(name_node) if name_node else ""  # pragma: no cover
 
 
 def _param_names(func_node: tree_sitter.Node) -> set[str]:

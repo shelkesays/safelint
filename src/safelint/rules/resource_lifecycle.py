@@ -20,7 +20,9 @@ if TYPE_CHECKING:
 def _with_item_call(item: tree_sitter.Node) -> tree_sitter.Node | None:
     """Return the call node opened by *item*, unwrapping ``as_pattern`` if present."""
     value = item.child_by_field_name("value")
-    if value is None:
+    # ``with_item`` always has a ``value`` field in valid Python; this is
+    # a defensive guard against malformed AST.
+    if value is None:  # pragma: no cover
         return None
     if value.type == "as_pattern" and value.named_children:
         value = value.named_children[0]
