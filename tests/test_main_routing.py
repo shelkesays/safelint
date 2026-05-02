@@ -72,6 +72,79 @@ def test_main_propagates_nonzero_exit_from_runner(monkeypatch: pytest.MonkeyPatc
     assert exc.value.code == 1
 
 
+def test_main_routes_to_check_when_global_flag_precedes_subcommand(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: object) -> None:
+    """``safelint --format json check src`` routes to check, not hook.
+
+    Regression for an argv-routing bug: the scanner used to take the first
+    non-``-`` token as the subcommand, but ``--format json`` puts ``json``
+    in that position because the value of a value-taking option doesn't
+    start with a dash.
+    """
+    monkeypatch.setattr("sys.argv", ["safelint", "--format", "json", "check", str(tmp_path)])
+    spy = mocker.patch.object(cli, "_run_check", return_value=0)
+    hook_spy = mocker.patch.object(cli, "_run_hook", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    spy.assert_called_once()
+    hook_spy.assert_not_called()
+    # The check parser still sees --format json after the routing strip.
+    args = spy.call_args.args[0]
+    assert args.output_format == "json"
+
+
+def test_main_routes_to_check_with_multiple_value_taking_flags(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: object) -> None:
+    """Several global flags before ``check`` all have their values skipped."""
+    monkeypatch.setattr(
+        "sys.argv",
+        ["safelint", "--mode", "ci", "--fail-on", "warning", "--ignore", "SAFE101", "check", str(tmp_path)],
+    )
+    spy = mocker.patch.object(cli, "_run_check", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    args = spy.call_args.args[0]
+    assert args.mode == "ci"
+    assert args.fail_on == "warning"
+    assert args.ignore == ["SAFE101"]
+
+
+def test_main_routes_to_check_with_equals_form_flag(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: object) -> None:
+    """``--format=json`` (equals form) is one token, so routing still works."""
+    monkeypatch.setattr("sys.argv", ["safelint", "--format=json", "check", str(tmp_path)])
+    spy = mocker.patch.object(cli, "_run_check", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    spy.assert_called_once()
+
+
+def test_main_routes_to_hook_when_first_positional_is_a_file(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """A leading global flag with a value still routes to hook when no ``check``."""
+    monkeypatch.setattr("sys.argv", ["safelint", "--fail-on", "warning", "a.py"])
+    spy = mocker.patch.object(cli, "_run_hook", return_value=0)
+    check_spy = mocker.patch.object(cli, "_run_check", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    spy.assert_called_once()
+    check_spy.assert_not_called()
+
+
+def test_first_positional_index_skips_value_taking_options() -> None:
+    """``_first_positional_index`` returns the index of the first true positional."""
+    assert cli._first_positional_index(["--format", "json", "check", "src"]) == 2
+    assert cli._first_positional_index(["--mode", "ci", "--fail-on", "warning", "x"]) == 4
+    # Equals form is one token — no skip.
+    assert cli._first_positional_index(["--format=json", "check"]) == 1
+    # Store-true flag — no skip.
+    assert cli._first_positional_index(["--all-files", "src"]) == 1
+    # Nothing positional.
+    assert cli._first_positional_index(["--format", "json"]) is None
+    # Empty.
+    assert cli._first_positional_index([]) is None
+
+
 def test_run_hook_returns_zero_for_empty_files_list() -> None:
     """Hook mode with no .py files passed in (e.g. pre-commit ran on
     a non-Python diff) exits 0 immediately without engine setup."""

@@ -711,22 +711,71 @@ def _build_hook_parser() -> argparse.ArgumentParser:
     return parser
 
 
+# Long options that consume the *following* argv token as their value
+# (i.e. used in ``--flag VALUE`` form, not ``--flag=VALUE``). Used by the
+# routing scanner to skip those values when looking for the first true
+# positional argument. Without this, ``safelint --format json check src``
+# sees ``json`` as the first positional and falls into hook mode by
+# mistake. The ``--flag=VALUE`` form is unaffected because the ``=`` is
+# part of the same token. Store-true flags (``--all-files``, ``--no-cache``,
+# ``--stdin``) are deliberately omitted — they don't take a separate value.
+_VALUE_TAKING_OPTIONS: frozenset[str] = frozenset(
+    {
+        "--fail-on",
+        "--mode",
+        "--ignore",
+        "--format",
+        "--stdin-filename",
+        "--config",
+    }
+)
+
+
+def _first_positional_index(argv: list[str]) -> int | None:
+    """Return the index of the first true positional in *argv*, or None.
+
+    Skips both options (anything starting with ``-``) and the *values*
+    that follow value-taking long options. Recognises the ``=``-form
+    (``--format=json``) as self-contained, so only the space-separated
+    form (``--format json``) triggers the look-ahead.
+    """
+    skip_next = False
+    for i, arg in enumerate(argv):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in _VALUE_TAKING_OPTIONS:
+            skip_next = True
+            continue
+        if arg.startswith("-"):
+            continue
+        return i
+    return None
+
+
 def main() -> None:
     """Entry point for direct CLI invocation, pre-commit hook, and stdin mode.
 
     Routing logic (in order):
     - ``--stdin`` anywhere in argv → read source from stdin (editor mode).
-    - First non-flag argument is ``check`` → ``check`` subcommand.
+    - First true positional argument is ``check`` → ``check`` subcommand.
+      Global flags (``--format``, ``--fail-on``, ``--mode``, ``--ignore``,
+      ``--config``) may appear before ``check``; the scanner skips their
+      values so ``safelint --format json check src`` is routed correctly.
     - Otherwise → pre-commit hook mode (``.py`` positional arguments are files).
     """
     if "--stdin" in sys.argv[1:]:
         args = _build_stdin_parser().parse_args()
         sys.exit(_run_stdin(args))
 
-    non_flag = [a for a in sys.argv[1:] if not a.startswith("-")]
-
-    if non_flag and non_flag[0] == "check":
-        args = _build_check_parser().parse_args(sys.argv[2:])  # skip 'check'
+    rest = sys.argv[1:]
+    idx = _first_positional_index(rest)
+    if idx is not None and rest[idx] == "check":
+        # Drop the ``check`` token but keep every flag (and its value)
+        # before and after it so e.g. ``safelint --format json check src``
+        # parses cleanly as ``--format json src``.
+        argv_for_check = rest[:idx] + rest[idx + 1 :]
+        args = _build_check_parser().parse_args(argv_for_check)
         sys.exit(_run_check(args))
 
     args = _build_hook_parser().parse_args()
