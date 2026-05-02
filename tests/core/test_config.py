@@ -14,6 +14,7 @@ from safelint.core.config import (
     _try_pyproject,
     _try_standalone,
     deep_merge,
+    find_config_root,
     load_config,
 )
 
@@ -175,3 +176,43 @@ def test_try_standalone_returns_none_for_invalid_toml(tmp_path: Path) -> None:
     (tmp_path / "safelint.toml").write_bytes(b"\xff\xfe not toml \x00")
 
     assert _try_standalone(tmp_path) is None
+
+
+def test_find_config_root_returns_dir_with_standalone(tmp_path: Path) -> None:
+    """``find_config_root`` returns the directory containing ``safelint.toml``."""
+    (tmp_path / "safelint.toml").write_text("ignore = []\n", encoding="utf-8")
+    assert find_config_root(tmp_path) == tmp_path
+
+
+def test_find_config_root_skips_malformed_standalone_and_walks_up(tmp_path: Path) -> None:
+    """A malformed ``safelint.toml`` is treated as not-a-config so the walk continues.
+
+    Mirrors :func:`load_config` semantics — a broken file would otherwise
+    anchor the cache at a directory whose config never actually loads.
+    """
+    inner = tmp_path / "subdir"
+    inner.mkdir()
+    # Malformed standalone in subdir: must NOT anchor here.
+    (inner / "safelint.toml").write_bytes(b"\xff\xfe not toml \x00")
+    # Valid standalone in tmp_path: that's where the walk should land.
+    (tmp_path / "safelint.toml").write_text("ignore = []\n", encoding="utf-8")
+    assert find_config_root(inner) == tmp_path
+
+
+def test_find_config_root_returns_dir_with_tool_safelint_pyproject(tmp_path: Path) -> None:
+    """``find_config_root`` returns the dir of a pyproject with ``[tool.safelint]``."""
+    (tmp_path / "pyproject.toml").write_text('[tool.safelint]\nfail_on = "error"\n', encoding="utf-8")
+    assert find_config_root(tmp_path) == tmp_path
+
+
+def test_find_config_root_skips_pyproject_without_safelint(tmp_path: Path) -> None:
+    """A ``pyproject.toml`` without ``[tool.safelint]`` does not anchor."""
+    (tmp_path / "pyproject.toml").write_text('[tool.poetry]\nname = "x"\n', encoding="utf-8")
+    assert find_config_root(tmp_path) is None
+
+
+def test_find_config_root_returns_none_when_no_config_anywhere(tmp_path: Path) -> None:
+    """``find_config_root`` returns ``None`` when nothing matches up the tree."""
+    nested = tmp_path / "deep" / "deeper"
+    nested.mkdir(parents=True)
+    assert find_config_root(nested) is None
