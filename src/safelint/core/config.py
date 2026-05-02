@@ -251,15 +251,31 @@ def _try_pyproject(directory: Path) -> dict[str, Any] | None:
 
 
 def _directory_has_config(directory: Path) -> bool:
-    """Return True when *directory* contains an active safelint config file.
+    """Return True when *directory* contains an *active* safelint config file.
 
-    A ``pyproject.toml`` only counts when it actually has a
-    ``[tool.safelint]`` section — an unrelated ``pyproject.toml`` higher
-    up the tree shouldn't anchor the cache there. ``safelint.toml`` is
-    presence-only since the file's whole purpose is safelint config.
+    "Active" mirrors :func:`load_config` exactly:
+
+    * ``safelint.toml`` is parsed; a malformed file is treated as
+      *not* a config (so the upward walk continues, just like
+      ``load_config`` falls through to the next candidate). Without
+      this, a broken ``safelint.toml`` would still anchor the cache
+      at a directory whose config never actually loads — and the
+      user would silently get an unexpected ``.safelint_cache/``
+      placement on top of the (already loud) parse-error diagnostic.
+    * ``pyproject.toml`` only counts when it actually has a
+      ``[tool.safelint]`` section — an unrelated ``pyproject.toml``
+      higher up the tree (e.g. a Python package whose author never
+      configured safelint) shouldn't pin the cache there.
+
+    ``_read_toml_file`` itself emits a stderr diagnostic on parse
+    failure; calling it here means a malformed ``safelint.toml``
+    diagnostics twice (once from this probe, once from
+    ``load_config``). That's acceptable — both paths point at the
+    same real problem and both diagnostics reinforce it.
     """
-    if (directory / STANDALONE_TOML_FILENAME).exists():
-        return True
+    standalone = directory / STANDALONE_TOML_FILENAME
+    if standalone.exists():
+        return _read_toml_file(standalone) is not None
     pyproject = directory / TOML_CONFIG_FILENAME
     if not pyproject.exists():
         return False

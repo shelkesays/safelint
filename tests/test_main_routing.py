@@ -80,9 +80,26 @@ def test_run_hook_returns_zero_for_empty_files_list() -> None:
 
 
 def test_run_hook_threads_cli_ignore_into_engine_config(tmp_path: pytest.TempPathFactory, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
-    """``--ignore`` from the hook-mode CLI augments the config's ignore list."""
+    """``--ignore`` from the hook-mode CLI augments the config's ignore list.
+
+    Patches the ``SafetyEngine`` constructor used by ``cli._run_hook`` to
+    capture the merged config dict, then asserts ``SAFE999`` (passed via
+    ``args.ignore``) ended up in ``config["ignore"]``. Without this
+    assertion the test only proved ``_run_hook`` returned 0 — it didn't
+    actually verify the CLI flag was threaded through.
+    """
     sample = tmp_path / "f.py"
     sample.write_text("x = 1\n", encoding="utf-8")
+    captured: dict[str, object] = {}
+
+    real_engine_init = cli.SafetyEngine.__init__
+
+    def _capture_init(self: cli.SafetyEngine, config: dict, *args_: object, **kwargs: object) -> None:
+        captured["config"] = config
+        real_engine_init(self, config, *args_, **kwargs)
+
+    mocker.patch.object(cli.SafetyEngine, "__init__", _capture_init)
+
     args = argparse.Namespace(
         fail_on=None,
         mode=None,
@@ -94,6 +111,9 @@ def test_run_hook_threads_cli_ignore_into_engine_config(tmp_path: pytest.TempPat
     )
     rc = cli._run_hook(args, [str(sample)])
     assert rc == 0
+    config = captured["config"]
+    assert isinstance(config, dict)
+    assert "SAFE999" in config["ignore"]
 
 
 def test_c_returns_ansi_when_stdout_is_a_tty(monkeypatch: pytest.MonkeyPatch) -> None:
