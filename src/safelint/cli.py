@@ -819,8 +819,9 @@ def main() -> None:
     - Otherwise → pre-commit hook mode (``.py`` positional arguments are files).
 
     Global flags (``--format``, ``--fail-on``, ``--mode``, ``--ignore``,
-    ``--config``) may appear before the subcommand; the scanner skips
-    their values so ``safelint --format json check src`` is routed correctly.
+    ``--config``, ``--stdin-filename``) may appear before the subcommand;
+    the scanner skips their values so ``safelint --format json check src``
+    is routed correctly.
     """
     if "--stdin" in sys.argv[1:]:
         args = _build_stdin_parser().parse_args()
