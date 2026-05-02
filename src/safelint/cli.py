@@ -837,9 +837,16 @@ def main() -> None:
         args = _build_check_parser().parse_args(argv_for_check)
         sys.exit(_run_check(args))
     if idx is not None and rest[idx] == "skill":
-        # Drop the ``skill`` token; everything after it becomes the
-        # ``skill`` subcommand's argv (action + flags).
-        argv_for_skill = rest[idx + 1 :]
+        # Drop the ``skill`` token but keep every flag (and its value)
+        # before and after it. Pre-skill tokens then fall to the skill
+        # parser, which rejects unknowns — matching the "fail loudly on
+        # unknown flags" posture of every other branch. Without this,
+        # ``safelint --formta=json skill install`` would silently swallow
+        # the typo. The skill parser doesn't accept the global formatter
+        # flags by design (there's no JSON output for ``skill install``);
+        # passing one in front of ``skill`` is therefore an error, not a
+        # global override.
+        argv_for_skill = rest[:idx] + rest[idx + 1 :]
         args = _build_skill_parser().parse_args(argv_for_skill)
         sys.exit(_run_skill(args))
 
