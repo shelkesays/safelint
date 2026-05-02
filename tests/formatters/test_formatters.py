@@ -3,10 +3,17 @@
 from __future__ import annotations
 
 import json
+from typing import TYPE_CHECKING
 
 from safelint import __version__
 from safelint.formatters import format_json, format_sarif
 from safelint.rules.base import Violation
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+    import pytest
 
 
 def _v(severity: str = "error", code: str = "SAFE101", rule: str = "function_length", lineno: int = 10) -> Violation:
@@ -168,6 +175,52 @@ def test_sarif_suppressed_violations_carry_in_source_marker() -> None:
     results = doc["runs"][0]["results"]
     assert len(results) == 1
     assert results[0].get("suppressions") == [{"kind": "inSource"}]
+
+
+def test_sarif_artifact_uri_normalises_windows_separators() -> None:
+    """Backslash-style filepaths are emitted as forward-slash POSIX URIs.
+
+    Windows hosts otherwise produce ``src\\foo.py`` which fails SARIF
+    consumers like GitHub code scanning that expect a URI reference.
+    """
+    v = Violation(rule="function_length", code="SAFE101", filepath="src\\sub\\foo.py", lineno=1, message="m", severity="error")
+    out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
+    doc = json.loads(out)
+    uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+    assert uri == "src/sub/foo.py"
+
+
+def test_sarif_artifact_uri_makes_absolute_paths_repo_relative(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Absolute paths under cwd are emitted as cwd-relative POSIX URIs."""
+    monkeypatch.chdir(tmp_path)
+    abs_path = str(tmp_path / "pkg" / "foo.py")
+    v = Violation(rule="function_length", code="SAFE101", filepath=abs_path, lineno=1, message="m", severity="error")
+    out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
+    doc = json.loads(out)
+    uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+    assert uri == "pkg/foo.py"
+
+
+def test_sarif_artifact_uri_falls_back_for_paths_outside_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Absolute paths outside cwd fall back to the absolute POSIX form."""
+    monkeypatch.chdir(tmp_path)
+    elsewhere = str(tmp_path.parent / "outside" / "foo.py")
+    v = Violation(rule="function_length", code="SAFE101", filepath=elsewhere, lineno=1, message="m", severity="error")
+    out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
+    doc = json.loads(out)
+    uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+    # No drive letter, no backslashes — but it's still absolute (starts with /).
+    assert uri.startswith("/")
+    assert "\\" not in uri
+
+
+def test_sarif_artifact_uri_percent_encodes_special_chars() -> None:
+    """Spaces and other special URI characters are percent-encoded; ``/`` is preserved."""
+    v = Violation(rule="r", code="SAFE001", filepath="src/has space/file#1.py", lineno=1, message="m", severity="error")
+    out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
+    doc = json.loads(out)
+    uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
+    assert uri == "src/has%20space/file%231.py"
 
 
 def test_sarif_rules_descriptor_deduplicates() -> None:

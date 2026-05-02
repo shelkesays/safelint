@@ -32,10 +32,10 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
-from safelint.core._cache import CACHE_DIR_NAME, LintCache
+from safelint.core._cache import LintCache
 from safelint.core.config import MODE_FAIL_ON, SEVERITY_ORDER, load_config
 from safelint.core.engine import SafetyEngine
-from safelint.core.runner import run
+from safelint.core.runner import resolve_cache_dir, run
 from safelint.formatters import format_json, format_sarif
 
 
@@ -120,9 +120,17 @@ def _print_summary(
         print(fixes)
 
 
-def _print_status(message: str) -> None:
-    """Print a status/informational message to stdout."""
-    print(message)
+def _print_status(message: str, *, output_format: str = "pretty") -> None:
+    """Print a status/informational message.
+
+    In ``pretty`` mode the message goes to stdout where the user expects
+    it (it's part of the human-readable run summary). In ``json`` /
+    ``sarif`` mode stdout must remain a single, parseable document — so
+    status text is redirected to stderr where tools that capture only
+    stdout won't be tripped up.
+    """
+    stream = sys.stdout if output_format == "pretty" else sys.stderr
+    print(message, file=stream)
 
 
 def _severity_parts(violations: list[Violation]) -> list[str]:
@@ -207,6 +215,7 @@ def _print_results(
     blocking_count: int,
     fail_on: str,
     files_checked: int,
+    silent_on_clean: bool = False,
 ) -> None:
     """Emit accumulated lint results in the chosen format.
 
@@ -215,12 +224,18 @@ def _print_results(
     and ``sarif``, prints a single machine-readable document on stdout
     that contains both the violation list and the summary.
 
+    *silent_on_clean* — when True, pretty mode emits nothing on a clean
+    run (no violations and no suppressed entries). Hook mode and stdin
+    mode set this so a clean pre-commit run is silent (the long-standing
+    ruff/ty contract); ``safelint check`` leaves it False so the user
+    gets explicit ``All checks passed.`` confirmation.
+
     Stderr diagnostics (configuration warnings, oversize-skip messages)
     are unaffected — they are always written as they are produced,
     regardless of format.
     """
     if output_format == "pretty":
-        if violations or suppressed:
+        if violations or suppressed or not silent_on_clean:
             _print_summary(violations, blocking_count, fail_on, suppressed)
         return
     if output_format == "json":
@@ -292,6 +307,7 @@ def _run_stdin(args: argparse.Namespace) -> int:
         blocking_count=len(blocking),
         fail_on=fail_on,
         files_checked=1,
+        silent_on_clean=True,
     )
     return 1 if blocking else 0
 
@@ -308,7 +324,11 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
         config["ignore"] = list(dict.fromkeys(existing + cli_ignore))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
     no_cache = getattr(args, "no_cache", False)
-    cache_dir = None if no_cache else Path.cwd() / CACHE_DIR_NAME
+    # Resolve the cache directory the same way ``check`` mode does: walk
+    # up from cwd to the discovered config root so a single project never
+    # ends up with multiple ``.safelint_cache/`` directories scattered
+    # across subdirectories pre-commit happened to fire from.
+    cache_dir = resolve_cache_dir(Path.cwd(), no_cache=no_cache)
     engine = SafetyEngine(config, changed_files=files, cache=LintCache(cache_dir))
 
     output_format: str = getattr(args, "output_format", "pretty")
@@ -337,6 +357,7 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
         blocking_count=len(all_blocking),
         fail_on=fail_on,
         files_checked=len(files),
+        silent_on_clean=True,
     )
     return 1 if all_blocking else 0
 
@@ -486,23 +507,54 @@ def _config_dir(config_path: Path | None, target: Path) -> Path:
     return target if target.is_dir() else target.parent
 
 
+def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format: str) -> tuple[list[str] | None, list[str] | None, bool]:
+    """Resolve the (changed_files, files, no_targets) tuple for ``check`` mode.
+
+    Returns a 3-tuple:
+
+    * ``changed_files`` — the full repo-wide diff list passed to the engine
+      so cross-file rules see the right context, or None to skip that hint.
+    * ``files`` — the explicit list of files to lint (a subset of *target*
+      that's been git-modified), or None to fall back to directory discovery.
+    * ``no_targets`` — True when git reported no modified files under
+      *target* and the caller should short-circuit with an empty result.
+    """
+    if getattr(args, "all_files", False) or not target.is_dir():
+        return None, None, False
+    modified = _get_git_modified_python_files(target)
+    if modified is None:
+        _print_status(
+            "Note: could not determine modified files via git — scanning all files.",
+            output_format=output_format,
+        )
+        return None, None, False
+    if not modified[1]:
+        _print_status(
+            "No modified Python files detected. Use --all-files to scan everything.",
+            output_format=output_format,
+        )
+        return None, None, True
+    changed_files, files = modified
+    return changed_files, files, False
+
+
 def _run_check(args: argparse.Namespace) -> int:
     """Execute directory/file scan mode."""
     config_path = getattr(args, "config", None)
-    all_files: bool = getattr(args, "all_files", False)
     target = Path(args.target)
+    output_format: str = getattr(args, "output_format", "pretty")
 
-    files: list[str] | None = None
-    changed_files: list[str] | None = None
-    if not all_files and target.is_dir():
-        modified = _get_git_modified_python_files(target)
-        if modified is None:
-            _print_status("Note: could not determine modified files via git — scanning all files.")
-        elif not modified[1]:
-            _print_status("No modified Python files detected. Use --all-files to scan everything.")
-            return 0
-        else:
-            changed_files, files = modified
+    changed_files, files, no_targets = _resolve_check_targets(args, target, output_format)
+    config = load_config(_config_dir(Path(config_path) if config_path else None, target))
+    fail_on, fail_threshold = _resolve_fail_on(args, config)
+
+    if no_targets:
+        # Machine modes still need a parseable empty document on stdout
+        # so downstream tools (CI uploaders, SARIF consumers) don't choke
+        # on empty input. Pretty mode already emitted the human-readable
+        # status above and exits 0 silently.
+        _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, silent_on_clean=True)
+        return 0
 
     results = run(
         target,
@@ -513,10 +565,6 @@ def _run_check(args: argparse.Namespace) -> int:
         no_cache=getattr(args, "no_cache", False),
     )
 
-    config = load_config(_config_dir(Path(config_path) if config_path else None, target))
-    fail_on, fail_threshold = _resolve_fail_on(args, config)
-
-    output_format: str = getattr(args, "output_format", "pretty")
     all_blocking: list[Violation] = []
     all_violations: list[Violation] = []
     all_suppressed: list[Violation] = []
@@ -532,14 +580,7 @@ def _run_check(args: argparse.Namespace) -> int:
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 
-    _print_results(
-        output_format,
-        all_violations,
-        all_suppressed,
-        blocking_count=len(all_blocking),
-        fail_on=fail_on,
-        files_checked=len(results),
-    )
+    _print_results(output_format, all_violations, all_suppressed, blocking_count=len(all_blocking), fail_on=fail_on, files_checked=len(results))
     return 1 if all_blocking else 0
 
 
@@ -608,6 +649,68 @@ def _build_common_args(parser: argparse.ArgumentParser) -> None:
     _add_stdin_args(parser)
 
 
+def _build_stdin_parser() -> argparse.ArgumentParser:
+    """Build the stdin-mode parser (editor / Claude Code skill).
+
+    Pre-commit hooks sometimes still pass file paths positionally even
+    with ``--stdin``; accept them with ``nargs='*'`` so they don't
+    trigger an "unknown argument" error, while still using ``parse_args``
+    so genuine flag typos like ``--formta=json`` fail loudly instead of
+    silently falling back to defaults.
+    """
+    parser = argparse.ArgumentParser(
+        prog="safelint --stdin",
+        description="Lint source read from stdin as if from --stdin-filename",
+    )
+    _build_common_args(parser)
+    parser.add_argument("files", nargs="*", help=argparse.SUPPRESS)
+    return parser
+
+
+def _build_check_parser() -> argparse.ArgumentParser:
+    """Build the ``check`` subcommand parser (direct / CI scan mode)."""
+    parser = argparse.ArgumentParser(
+        prog="safelint check",
+        description="Scan a file or directory for safety violations",
+    )
+    parser.add_argument("target", type=Path, help="File or directory to scan")
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=None,
+        help=(
+            "Directory to use as the config discovery root, or a file whose parent directory is used as the root (safelint.toml takes precedence over pyproject.toml [tool.safelint] when both exist)"
+        ),
+    )
+    parser.add_argument(
+        "--all-files",
+        dest="all_files",
+        action="store_true",
+        default=False,
+        help="Scan all Python files under target (default: git-modified files only)",
+    )
+    _build_common_args(parser)
+    return parser
+
+
+def _build_hook_parser() -> argparse.ArgumentParser:
+    """Build the pre-commit hook-mode parser.
+
+    Explicit positional ``files`` (rather than ``parse_known_args``) so an
+    unrecognised *flag* fails loudly — silently dropping ``--formta=json``
+    would let the user think pretty output was a deliberate choice.
+    Pre-commit passes everything (Markdown, Makefiles, ``.py``) as
+    positional args, so we filter to ``.py`` after parsing.
+    """
+    parser = argparse.ArgumentParser(
+        prog="safelint",
+        description="AI Safety pre-commit hook (Holzmann rules)",
+    )
+    _build_common_args(parser)
+    parser.add_argument("files", nargs="*", help=argparse.SUPPRESS)
+    return parser
+
+
 def main() -> None:
     """Entry point for direct CLI invocation, pre-commit hook, and stdin mode.
 
@@ -617,57 +720,18 @@ def main() -> None:
     - Otherwise → pre-commit hook mode (``.py`` positional arguments are files).
     """
     if "--stdin" in sys.argv[1:]:
-        # ── Stdin mode (editor / Claude Code skill) ───────────────────────
-        parser = argparse.ArgumentParser(
-            prog="safelint --stdin",
-            description="Lint source read from stdin as if from --stdin-filename",
-        )
-        _build_common_args(parser)
-        # Stdin mode ignores positional file arguments — `parse_known_args`
-        # silently drops them rather than erroring.
-        args, _ignored = parser.parse_known_args()
+        args = _build_stdin_parser().parse_args()
         sys.exit(_run_stdin(args))
 
     non_flag = [a for a in sys.argv[1:] if not a.startswith("-")]
 
     if non_flag and non_flag[0] == "check":
-        # ── Direct / CI scan mode ─────────────────────────────────────────
-        parser = argparse.ArgumentParser(
-            prog="safelint check",
-            description="Scan a file or directory for safety violations",
-        )
-        parser.add_argument("target", type=Path, help="File or directory to scan")
-        parser.add_argument(
-            "--config",
-            type=Path,
-            default=None,
-            help=(
-                "Directory to use as the config discovery root, or a file whose parent "
-                "directory is used as the root (safelint.toml takes precedence over "
-                "pyproject.toml [tool.safelint] when both exist)"
-            ),
-        )
-        parser.add_argument(
-            "--all-files",
-            dest="all_files",
-            action="store_true",
-            default=False,
-            help="Scan all Python files under target (default: git-modified files only)",
-        )
-        _build_common_args(parser)
-        args = parser.parse_args(sys.argv[2:])  # skip 'check'
+        args = _build_check_parser().parse_args(sys.argv[2:])  # skip 'check'
         sys.exit(_run_check(args))
 
-    else:
-        # ── Pre-commit hook mode ──────────────────────────────────────────
-        parser = argparse.ArgumentParser(
-            prog="safelint",
-            description="AI Safety pre-commit hook (Holzmann rules)",
-        )
-        _build_common_args(parser)
-        args, remaining = parser.parse_known_args()
-        files = [f for f in remaining if f.endswith(".py")]
-        sys.exit(_run_hook(args, files))
+    args = _build_hook_parser().parse_args()
+    files = [f for f in args.files if f.endswith(".py")]
+    sys.exit(_run_hook(args, files))
 
 
 if __name__ == "__main__":

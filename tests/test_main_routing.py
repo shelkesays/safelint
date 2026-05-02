@@ -147,3 +147,112 @@ def test_config_dir_uses_parent_when_supplied_path_is_file(tmp_path: pytest.Temp
     cfg_file.write_text("", encoding="utf-8")
     out = cli._config_dir(cfg_file, tmp_path / "irrelevant.py")
     assert out == tmp_path
+
+
+def test_print_status_writes_to_stderr_in_machine_modes(capsys: pytest.CaptureFixture[str]) -> None:
+    """In ``json``/``sarif`` modes, status messages go to stderr so stdout
+    stays a single parseable document."""
+    cli._print_status("info", output_format="json")
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert "info" in captured.err
+
+
+def test_print_status_writes_to_stdout_in_pretty_mode(capsys: pytest.CaptureFixture[str]) -> None:
+    """Pretty mode keeps the existing behaviour: status text on stdout."""
+    cli._print_status("info", output_format="pretty")
+    captured = capsys.readouterr()
+    assert "info" in captured.out
+    assert captured.err == ""
+
+
+def test_run_check_json_emits_empty_doc_when_no_modified_files(
+    tmp_path: pytest.TempPathFactory,
+    mocker: MockerFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``--format json`` with no git-modified files still emits a parseable
+    JSON document on stdout (so CI tools that pipe stdout don't get an
+    empty stream)."""
+    import json  # noqa: PLC0415
+
+    mocker.patch.object(cli, "_get_git_modified_python_files", return_value=([], []))
+    args = argparse.Namespace(
+        target=tmp_path,
+        config=None,
+        all_files=False,
+        fail_on=None,
+        mode=None,
+        ignore=None,
+        output_format="json",
+        no_cache=True,
+        stdin=False,
+        stdin_filename="",
+    )
+    rc = cli._run_check(args)
+    assert rc == 0
+    out = capsys.readouterr().out
+    doc = json.loads(out)
+    assert doc["summary"]["files_checked"] == 0
+    assert doc["violations"] == []
+
+
+def test_run_check_pretty_prints_all_clear_on_clean_run(
+    tmp_path: pytest.TempPathFactory,
+    mocker: MockerFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``safelint check`` in pretty mode prints ``All checks passed.`` even
+    when the run is clean (matching ruff/ty's UX contract; hook mode
+    stays silent on success via ``silent_on_clean``)."""
+    sample = tmp_path / "ok.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    # Skip the git-modified-files probe so all_files-style discovery runs.
+    mocker.patch.object(cli, "_get_git_modified_python_files", return_value=None)
+    args = argparse.Namespace(
+        target=sample,
+        config=None,
+        all_files=True,
+        fail_on=None,
+        mode=None,
+        ignore=None,
+        output_format="pretty",
+        no_cache=True,
+        stdin=False,
+        stdin_filename="",
+    )
+    rc = cli._run_check(args)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "All checks passed." in out
+
+
+def test_run_check_json_emits_doc_with_violations(
+    tmp_path: pytest.TempPathFactory,
+    mocker: MockerFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``--format json`` skips the per-file pretty stream and emits a single
+    JSON doc with the violation list."""
+    import json  # noqa: PLC0415
+
+    sample = tmp_path / "long.py"
+    sample.write_text("def f():\n" + "    a = 1\n" * 80 + "    return a\n", encoding="utf-8")
+    mocker.patch.object(cli, "_get_git_modified_python_files", return_value=None)
+    args = argparse.Namespace(
+        target=sample,
+        config=None,
+        all_files=True,
+        fail_on=None,
+        mode=None,
+        ignore=None,
+        output_format="json",
+        no_cache=True,
+        stdin=False,
+        stdin_filename="",
+    )
+    rc = cli._run_check(args)
+    assert rc == 1  # function_length is error-severity
+    out = capsys.readouterr().out
+    doc = json.loads(out)
+    assert any(v["code"] == "SAFE101" for v in doc["violations"])

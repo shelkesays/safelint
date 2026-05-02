@@ -26,8 +26,11 @@ safelint doesn't emit those today.
 
 from __future__ import annotations
 
+import contextlib
 import json
+from pathlib import Path
 from typing import TYPE_CHECKING, Any
+from urllib.parse import quote
 
 from safelint import __version__
 
@@ -49,6 +52,36 @@ def _level(severity: str) -> str:
     return "error"
 
 
+def _artifact_uri(filepath: str) -> str:
+    r"""Return a SARIF-conformant URI for *filepath*.
+
+    SARIF ``artifactLocation.uri`` must be a valid URI reference (RFC 3986).
+    Raw filepaths can fail that contract on Windows (backslash separators
+    aren't legal URI characters) and for absolute paths that begin with a
+    drive letter or root slash.
+
+    Behaviour:
+
+    * Backslash separators are normalised to forward slashes *before*
+      constructing the ``Path``. ``pathlib.PosixPath`` would otherwise
+      treat ``\\`` as part of the filename on a POSIX runner, so a SARIF
+      file produced on Linux that's about to be uploaded to GitHub code
+      scanning would still leak Windows-style backslashes through.
+    * Absolute paths are converted to a path *relative to cwd* when
+      possible — keeps the SARIF artefact list short and consumable
+      (GitHub code scanning treats ``uri`` as repo-relative). Falls back
+      to the absolute POSIX form for paths outside cwd.
+    * Special characters (spaces, ``#``, ``?``) are percent-encoded;
+      the path separator ``/`` is preserved.
+    """
+    p = Path(filepath.replace("\\", "/"))
+    if p.is_absolute():
+        with contextlib.suppress(ValueError):
+            # Outside cwd — fall back to the absolute form.
+            p = p.relative_to(Path.cwd())
+    return quote(p.as_posix(), safe="/")
+
+
 def _result_for_violation(v: Violation, *, suppressed: bool) -> dict[str, Any]:
     """Build a SARIF ``results`` entry for one violation."""
     entry: dict[str, Any] = {
@@ -58,7 +91,7 @@ def _result_for_violation(v: Violation, *, suppressed: bool) -> dict[str, Any]:
         "locations": [
             {
                 "physicalLocation": {
-                    "artifactLocation": {"uri": v.filepath},
+                    "artifactLocation": {"uri": _artifact_uri(v.filepath)},
                     "region": {"startLine": v.lineno},
                 }
             }

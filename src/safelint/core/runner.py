@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from safelint.core._cache import CACHE_DIR_NAME, LintCache
-from safelint.core.config import load_config
+from safelint.core.config import find_config_root, load_config
 from safelint.core.engine import SafetyEngine
 
 
@@ -14,19 +14,26 @@ if TYPE_CHECKING:
     from safelint.core.engine import LintResult
 
 
-def _resolve_cache_dir(search_from: Path, *, no_cache: bool) -> Path | None:
+def resolve_cache_dir(search_from: Path, *, no_cache: bool) -> Path | None:
     """Decide where to put the cache (or None to disable).
 
     ``--no-cache`` always disables. Otherwise the cache lives next to the
-    discovered config file (``<search_from>/.safelint_cache/``), matching
-    pytest's ``.pytest_cache`` convention. ``search_from`` is the same
-    directory the config loader walks up from, so the cache shares the
-    project root.
+    *discovered* config file — i.e. the directory ``find_config_root``
+    located while walking up from *search_from*. When no config file is
+    discoverable, the cache falls back to *search_from* itself (treated
+    as the directory if it's a directory, otherwise its parent).
+
+    Anchoring on the actual config-root directory matches pytest's
+    ``.pytest_cache`` convention and avoids creating multiple cache
+    directories under subdirectories when ``safelint check`` is run from
+    different parts of the same project. Exposed (no leading underscore)
+    so the CLI's hook mode can resolve the same location.
     """
     if no_cache:
         return None
     base = search_from if search_from.is_dir() else search_from.parent
-    return base / CACHE_DIR_NAME
+    config_root = find_config_root(base)
+    return (config_root or base) / CACHE_DIR_NAME
 
 
 def run(
@@ -62,9 +69,11 @@ def run(
         the config file's ``ignore`` key.
     no_cache:
         When True, the per-file lint-result cache is disabled. By default
-        the cache lives at ``<config-dir>/.safelint_cache/`` and memoises
-        rule output keyed on ``sha256(source + engine fingerprint)`` so
-        re-runs on unchanged files are essentially instant.
+        the cache lives at ``<config-dir>/.safelint_cache/`` (the directory
+        where ``safelint.toml`` or ``pyproject.toml`` was found) and
+        memoises rule output keyed on ``sha256(source + engine fingerprint
+        + filepath)`` so re-runs on unchanged files are essentially
+        instant.
 
     """
     if config_path:
@@ -76,7 +85,7 @@ def run(
     if ignore:
         existing = config.get("ignore", [])
         config["ignore"] = list(dict.fromkeys(existing + ignore))
-    cache = LintCache(_resolve_cache_dir(search_from, no_cache=no_cache))
+    cache = LintCache(resolve_cache_dir(search_from, no_cache=no_cache))
     engine = SafetyEngine(
         config,
         changed_files=changed_files if changed_files is not None else files,

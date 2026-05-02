@@ -250,6 +250,48 @@ def _try_pyproject(directory: Path) -> dict[str, Any] | None:
 # ---------------------------------------------------------------------------
 
 
+def _directory_has_config(directory: Path) -> bool:
+    """Return True when *directory* contains an active safelint config file.
+
+    A ``pyproject.toml`` only counts when it actually has a
+    ``[tool.safelint]`` section — an unrelated ``pyproject.toml`` higher
+    up the tree shouldn't anchor the cache there. ``safelint.toml`` is
+    presence-only since the file's whole purpose is safelint config.
+    """
+    if (directory / STANDALONE_TOML_FILENAME).exists():
+        return True
+    pyproject = directory / TOML_CONFIG_FILENAME
+    if not pyproject.exists():
+        return False
+    doc = _read_toml_file(pyproject)
+    return doc is not None and doc.get("tool", {}).get(TOML_CONFIG_KEY) is not None
+
+
+def find_config_root(search_from: Path | None = None) -> Path | None:
+    """Return the directory holding the active safelint config, or None if defaults are used.
+
+    Walks upward from *search_from* (defaults to cwd) using the same
+    precedence as :func:`load_config`:
+
+    1. ``safelint.toml``
+    2. ``pyproject.toml`` containing a ``[tool.safelint]`` section
+
+    Returns ``None`` when no config file is discoverable along the
+    upward walk — the caller can then fall back to a sensible default
+    (e.g. *search_from* itself) for any path that wants to live "next
+    to the config".
+
+    Used by the cache-dir resolver so ``.safelint_cache/`` ends up at
+    the actual project root instead of an arbitrary subdirectory the
+    user happened to pass to ``safelint check``.
+    """
+    root = search_from or Path.cwd()
+    for parent in [root, *root.parents]:
+        if _directory_has_config(parent):
+            return parent
+    return None
+
+
 def load_config(search_from: Path | None = None) -> dict[str, Any]:
     """Locate and load safelint config, merging it with the built-in defaults.
 
