@@ -227,6 +227,14 @@ Ready-to-copy samples:
 
 ---
 
+## Editor / agent integrations
+
+- **Claude Code skill** — [`skills/safelint/`](skills/safelint/) ships a ready-to-install skill. Symlink it into `~/.claude/skills/` and ask Claude Code things like *"run safelint"* or *"do a Power-of-Ten review on src/api/auth.py"*. See [`skills/safelint/README.md`](skills/safelint/README.md) for installation.
+- **Stdin mode** — `safelint --stdin --stdin-filename PATH --format json` lints unsaved buffer contents fed via stdin. Designed for editor extensions (VSCode plugin, Claude Code skill, custom LSP wrappers).
+- **JSON / SARIF output** — `--format json` and `--format sarif` emit stable, machine-readable documents. The JSON schema is documented in [`docs/JSON_SCHEMA.md`](docs/JSON_SCHEMA.md). SARIF output is GitHub code-scanning compatible.
+
+---
+
 ## Development
 
 ```bash
