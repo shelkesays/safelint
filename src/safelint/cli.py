@@ -32,6 +32,7 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
+from safelint.core._cache import CACHE_DIR_NAME, LintCache
 from safelint.core.config import MODE_FAIL_ON, SEVERITY_ORDER, load_config
 from safelint.core.engine import SafetyEngine
 from safelint.core.runner import run
@@ -269,7 +270,12 @@ def _run_stdin(args: argparse.Namespace) -> int:
         existing = config.get("ignore", [])
         config["ignore"] = list(dict.fromkeys(existing + cli_ignore))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
-    engine = SafetyEngine(config, changed_files=[args.stdin_filename])
+    # Stdin mode deliberately bypasses the on-disk cache: every keystroke
+    # in an editor produces a slightly different buffer (cache miss
+    # every time anyway) and writing to ``.safelint_cache/`` per keystroke
+    # would just churn the project tree. ``--no-cache`` is therefore
+    # irrelevant here — caching is unconditionally off.
+    engine = SafetyEngine(config, changed_files=[args.stdin_filename], cache=None)
 
     source = sys.stdin.read()
     result = engine.check_source(args.stdin_filename, source)
@@ -301,7 +307,9 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
         existing = config.get("ignore", [])
         config["ignore"] = list(dict.fromkeys(existing + cli_ignore))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
-    engine = SafetyEngine(config, changed_files=files)
+    no_cache = getattr(args, "no_cache", False)
+    cache_dir = None if no_cache else Path.cwd() / CACHE_DIR_NAME
+    engine = SafetyEngine(config, changed_files=files, cache=LintCache(cache_dir))
 
     output_format: str = getattr(args, "output_format", "pretty")
     all_blocking: list[Violation] = []
@@ -496,7 +504,14 @@ def _run_check(args: argparse.Namespace) -> int:
         else:
             changed_files, files = modified
 
-    results = run(target, config_path=config_path, files=files, changed_files=changed_files, ignore=args.ignore)
+    results = run(
+        target,
+        config_path=config_path,
+        files=files,
+        changed_files=changed_files,
+        ignore=args.ignore,
+        no_cache=getattr(args, "no_cache", False),
+    )
 
     config = load_config(_config_dir(Path(config_path) if config_path else None, target))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
@@ -528,28 +543,15 @@ def _run_check(args: argparse.Namespace) -> int:
     return 1 if all_blocking else 0
 
 
-def _build_common_args(parser: argparse.ArgumentParser) -> None:
-    """Add --fail-on, --mode, and --ignore to *parser*."""
-    parser.add_argument(
-        "--fail-on",
-        dest="fail_on",
-        choices=["error", "warning"],
-        default=None,
-        help="Minimum severity that blocks the run (overrides configured fail_on)",
-    )
-    parser.add_argument(
-        "--mode",
-        choices=["local", "ci"],
-        default=None,
-        help="Execution mode: local (fail_on=error) | ci (fail_on=warning)",
-    )
-    parser.add_argument(
-        "--ignore",
-        action="append",
-        default=None,
-        metavar="CODE",
-        help="Repeatable flag to ignore a rule code or name, e.g. --ignore SAFE101 --ignore function_length",
-    )
+def _add_severity_args(parser: argparse.ArgumentParser) -> None:
+    """Add --fail-on, --mode, --ignore: control which violations block."""
+    parser.add_argument("--fail-on", dest="fail_on", choices=["error", "warning"], default=None, help="Minimum severity that blocks the run (overrides configured fail_on)")
+    parser.add_argument("--mode", choices=["local", "ci"], default=None, help="Execution mode: local (fail_on=error) | ci (fail_on=warning)")
+    parser.add_argument("--ignore", action="append", default=None, metavar="CODE", help="Repeatable flag to ignore a rule code or name, e.g. --ignore SAFE101 --ignore function_length")
+
+
+def _add_output_args(parser: argparse.ArgumentParser) -> None:
+    """Add --format and --no-cache: how output is emitted and cached."""
     parser.add_argument(
         "--format",
         dest="output_format",
@@ -557,13 +559,28 @@ def _build_common_args(parser: argparse.ArgumentParser) -> None:
         default="pretty",
         help=(
             "Output format. 'pretty' (default) writes the ruff/ty-style "
-            "multi-line coloured violations + summary to stdout. 'json' and "
-            "'sarif' emit machine-readable documents on stdout for tooling "
-            "consumers (editor plugins, CI scanners, the upcoming Claude Code "
-            "skill / VSCode plugin). Diagnostic warnings on stderr are "
-            "unaffected by this flag."
+            "multi-line coloured violations + summary to stdout. 'json' "
+            "and 'sarif' emit machine-readable documents for tooling "
+            "consumers (editor plugins, CI scanners, the Claude Code "
+            "skill / VSCode plugin). Stderr diagnostics are unaffected."
         ),
     )
+    parser.add_argument(
+        "--no-cache",
+        dest="no_cache",
+        action="store_true",
+        default=False,
+        help=(
+            "Disable the per-file lint-result cache. By default safelint "
+            "memoises rule output keyed on sha256(source + engine config) "
+            "in a ``.safelint_cache/`` directory next to the config file, "
+            "so re-runs on unchanged files are essentially instant."
+        ),
+    )
+
+
+def _add_stdin_args(parser: argparse.ArgumentParser) -> None:
+    """Add --stdin and --stdin-filename: read source from stdin (editor mode)."""
     parser.add_argument(
         "--stdin",
         action="store_true",
@@ -572,8 +589,7 @@ def _build_common_args(parser: argparse.ArgumentParser) -> None:
             "Read source from stdin instead of from disk. Use with "
             "--stdin-filename to give the buffer a path for diagnostics, "
             "language detection, and exclude_paths matching. Designed for "
-            "editor integrations that want to lint un-saved buffers without "
-            "writing them to a temp file."
+            "editor integrations linting un-saved buffers."
         ),
     )
     parser.add_argument(
@@ -583,6 +599,13 @@ def _build_common_args(parser: argparse.ArgumentParser) -> None:
         metavar="PATH",
         help=("Pseudo-filename for the source read from stdin (default '<stdin>.py'). Determines language by extension and is shown as the violation file path. Only meaningful with --stdin."),
     )
+
+
+def _build_common_args(parser: argparse.ArgumentParser) -> None:
+    """Add the full set of CLI flags shared by check / hook / stdin modes."""
+    _add_severity_args(parser)
+    _add_output_args(parser)
+    _add_stdin_args(parser)
 
 
 def main() -> None:

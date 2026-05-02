@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from safelint.core._cache import CACHE_DIR_NAME, LintCache
 from safelint.core.config import load_config
 from safelint.core.engine import SafetyEngine
 
@@ -13,12 +14,29 @@ if TYPE_CHECKING:
     from safelint.core.engine import LintResult
 
 
+def _resolve_cache_dir(search_from: Path, *, no_cache: bool) -> Path | None:
+    """Decide where to put the cache (or None to disable).
+
+    ``--no-cache`` always disables. Otherwise the cache lives next to the
+    discovered config file (``<search_from>/.safelint_cache/``), matching
+    pytest's ``.pytest_cache`` convention. ``search_from`` is the same
+    directory the config loader walks up from, so the cache shares the
+    project root.
+    """
+    if no_cache:
+        return None
+    base = search_from if search_from.is_dir() else search_from.parent
+    return base / CACHE_DIR_NAME
+
+
 def run(
     target: str | Path,
     config_path: str | Path | None = None,
     changed_files: list[str] | None = None,
     files: list[str] | None = None,
     ignore: list[str] | None = None,
+    *,
+    no_cache: bool = False,
 ) -> list[LintResult]:
     """Load config and lint *target* (file or directory).
 
@@ -42,6 +60,11 @@ def run(
     ignore:
         Extra rule codes or names to suppress on top of whatever is listed in
         the config file's ``ignore`` key.
+    no_cache:
+        When True, the per-file lint-result cache is disabled. By default
+        the cache lives at ``<config-dir>/.safelint_cache/`` and memoises
+        rule output keyed on ``sha256(source + engine fingerprint)`` so
+        re-runs on unchanged files are essentially instant.
 
     """
     if config_path:
@@ -53,9 +76,11 @@ def run(
     if ignore:
         existing = config.get("ignore", [])
         config["ignore"] = list(dict.fromkeys(existing + ignore))
+    cache = LintCache(_resolve_cache_dir(search_from, no_cache=no_cache))
     engine = SafetyEngine(
         config,
         changed_files=changed_files if changed_files is not None else files,
+        cache=cache,
     )
     if files is not None:
         return [engine.check_file(f) for f in files]

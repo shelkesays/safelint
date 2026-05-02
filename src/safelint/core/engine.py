@@ -8,7 +8,7 @@ import os
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
-from safelint.core import _diagnostics
+from safelint.core import _cache, _diagnostics
 from safelint.core.config import DEFAULTS, SEVERITY_ORDER
 from safelint.languages import get_language_for_file, supported_extensions
 from safelint.languages._node_utils import lineno as node_lineno
@@ -120,8 +120,16 @@ class SafetyEngine:
         self,
         config: dict[str, Any],
         changed_files: list[str] | None = None,
+        cache: _cache.LintCache | None = None,
     ) -> None:
-        """Build the ordered, active rule set from *config*."""
+        """Build the ordered, active rule set from *config*.
+
+        *cache* is an optional :class:`safelint.core._cache.LintCache`. If
+        provided (and not pointing at ``None``), per-file lint results are
+        memoised by ``sha256(source + engine_fingerprint)`` so re-runs on
+        unchanged files become essentially instant. Pass ``None`` (the
+        default) to disable caching.
+        """
         rules_cfg: dict[str, Any] = config.get("rules", {})
         exec_cfg: dict[str, Any] = config.get("execution", {})
         self.fail_fast: bool = exec_cfg.get("fail_fast", False)
@@ -147,6 +155,10 @@ class SafetyEngine:
 
         self.rules: list[BaseRule] = self._build_active_rules(rules_cfg, exec_cfg, ignored_names, ignored_codes_upper, changed_files)
         self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = self._parse_per_file_ignores(config.get("per_file_ignores", {}), known_names, known_codes_upper)
+        self._cache = cache
+        # Lazy: only computed when the cache is non-trivial — saves the
+        # JSON-encode + sha256 round-trip when ``--no-cache`` is in use.
+        self._engine_fingerprint: str | None = None
 
     @staticmethod
     def _build_active_rules(
@@ -429,8 +441,28 @@ class SafetyEngine:
         Caller has already done exclusion and language lookup. Used by
         both :meth:`check_file` (after a disk read) and :meth:`check_source`
         (with a caller-provided buffer).
+
+        If a cache is configured, this method consults it before parsing
+        and stores the result on miss. Cache key folds in the engine
+        fingerprint (rules + their config + safelint version), so any
+        config change invalidates entries automatically.
         """
-        tree = lang.create_parser().parse(source.encode("utf-8"))
+        source_bytes = source.encode("utf-8")
+        cache_key: str | None = None
+        if self._cache is not None and self._cache.cache_dir is not None:
+            cache_key = _cache.compute_file_key(source_bytes, self._get_engine_fingerprint())
+            cached = self._cache.get(cache_key)
+            if cached is not None:
+                cached_violations, cached_suppressed = cached
+                # Pre-file ignores apply per-call (paths can vary between
+                # caller and cached entry's filepath via stdin pseudo-names),
+                # so re-run the per-file filter on the cached results.
+                ignored_names, ignored_codes = self._file_ignored_set(filepath)
+                kept_violations = [v for v in cached_violations if not _is_per_file_ignored(v, ignored_names, ignored_codes)]
+                # Suppressed entries from cache are already correctly classified.
+                return LintResult(path=filepath, violations=kept_violations, suppressed=cached_suppressed)
+
+        tree = lang.create_parser().parse(source_bytes)
         if tree.root_node.has_error:
             location = self._first_parse_error(tree.root_node)
             if location is None:
@@ -441,12 +473,32 @@ class SafetyEngine:
                 # column is reported 1-based to match common editor convention.
                 msg = f"Parse error ({kind}) at line {line}, column {col + 1} - check syntax near this location"
                 err_lineno = line
+            # Parse errors aren't cached — they're path-specific (the
+            # filepath is in the message) and re-running parse on a
+            # buffer that's still broken will land the same error fast.
             return self._parse_error_result(filepath, msg, lineno=err_lineno)
 
         suppressions = _parse_suppressions(tree, lang.comment_node_type, lang.comment_prefix)
         ignored_names, ignored_codes = self._file_ignored_set(filepath)
         active, suppressed = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes)
+        if cache_key is not None and self._cache is not None:
+            self._cache.put(cache_key, active, suppressed)
         return LintResult(path=filepath, violations=active, suppressed=suppressed)
+
+    def _get_engine_fingerprint(self) -> str:
+        """Return (and lazily compute) the cache fingerprint for this engine."""
+        if self._engine_fingerprint is None:
+            # Local import to avoid the engine ↔ package-init circular
+            # path (``safelint/__init__.py`` re-exports SafetyEngine and
+            # also wants ``__version__``). Lazy lookup is fine here:
+            # called at most once per engine instance.
+            from safelint import __version__  # noqa: PLC0415
+
+            self._engine_fingerprint = _cache.compute_engine_fingerprint(
+                __version__,
+                ((r.name, r.code, r.severity, r.config) for r in self.rules),
+            )
+        return self._engine_fingerprint
 
     def _walk_supported_files(self, target: Path, ext_tuple: tuple[str, ...]) -> set[str]:
         """Return the set of regular-file paths under *target* whose name ends with one of *ext_tuple*.
