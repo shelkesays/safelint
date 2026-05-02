@@ -210,3 +210,6 @@ __marimo__/
 
 # Claude Code local guide — kept out of version control by project convention.
 CLAUDE.md
+
+# Safelint per-project lint-result cache
+.safelint_cache/
