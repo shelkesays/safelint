@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.5.0] - 2026-05-02
+
+This release adds the foundations needed by editor integrations and the upcoming Claude Code skill / VSCode plugin: structured output formats, an in-process stdin mode, and a content-addressed result cache. No breaking changes.
+
+### Added
+- **`--format`** flag with three choices: `pretty` (default — unchanged ruff/ty multi-line coloured output), `json`, and `sarif`. The JSON format emits a stable schema with a `version`, `summary` (counts + suppressed breakdown), and flat `violations` / `suppressed` lists. The SARIF format is SARIF 2.1.0 conformant and consumable by GitHub code scanning, Azure DevOps, and similar tools. The flag is available in both `safelint check` and pre-commit hook modes.
+- **`--stdin`** / **`--stdin-filename PATH`** flags read source from stdin instead of from disk and lint it as if it came from `PATH`. Designed for editor integrations that need to lint un-saved buffers without round-tripping through a temp file. The pseudo-filename drives language detection by extension and shows up as the violation file path.
+- **`SafetyEngine.check_source(filepath, source)`** public method runs the same rule pipeline as `check_file` but on a caller-provided buffer. Used by stdin mode and available to library consumers building editor integrations.
+- **Per-file lint-result cache** keyed on `sha256(source + engine fingerprint)` where the engine fingerprint folds in safelint version, an internal cache schema version, and the active rule set with per-rule config. The cache lives at `<config-dir>/.safelint_cache/` (next to `pyproject.toml` / `safelint.toml`, mirroring `.pytest_cache`'s convention) and stores one JSON file per key. Re-runs on unchanged files are essentially instant — important for editor "lint on save" loops.
+- **`--no-cache`** flag disables the cache for the current run (e.g. CI where every run is fresh anyway, or when debugging cache-related issues). `.safelint_cache/` added to the project's `.gitignore`.
+- **`ADDING_A_LANGUAGE.md`** developer guide: a concrete walkthrough of adding a new language (TypeScript, Go, Rust, …), with a per-rule audit of which Python rules are portable, language-agnostic, or Python-only.
+
+### Notes
+- `--stdin` mode unconditionally bypasses the disk cache. Editor keystrokes produce a slightly different buffer every time; caching them would only churn the project tree without ever helping. The `--no-cache` flag is therefore a no-op in stdin mode.
+- The new public `LintCache` class accepts `cache_dir=None` to opt out of caching at the engine level — used by `--no-cache`, by stdin mode, and recommended for any tests / library callers that need isolation.
+
 ## [1.4.1] - 2026-05-01
 
 ### Added
@@ -78,7 +94,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.4.1...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.5.0...HEAD
+[1.5.0]: https://github.com/shelkesays/safelint/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/shelkesays/safelint/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/shelkesays/safelint/compare/v1.3.1...v1.4.0
 [1.3.1]: https://github.com/shelkesays/safelint/compare/v1.3.0...v1.3.1

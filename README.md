@@ -95,6 +95,29 @@ safelint check src/ --all-files --mode=ci
 safelint check src/ --ignore SAFE203 --ignore side_effects
 ```
 
+**Machine-readable output for tooling consumers (editors, CI, the Claude Code skill):**
+
+```bash
+safelint check src/ --format=json     # stable JSON schema
+safelint check src/ --format=sarif    # SARIF 2.1.0 (GitHub code scanning, etc.)
+```
+
+**Lint un-saved buffer contents from stdin (editor mode):**
+
+```bash
+cat my_module.py | safelint --stdin --stdin-filename my_module.py --format=json
+```
+
+`--stdin-filename` drives language detection by extension and is shown as the violation file path. Combine with `--format=json` so the editor can parse the result.
+
+**Disable the lint-result cache:**
+
+```bash
+safelint check src/ --no-cache       # otherwise: ~instant re-runs on unchanged files
+```
+
+By default safelint memoises rule output keyed on `sha256(source + engine config)` in a `.safelint_cache/` directory next to your config file (mirroring `.pytest_cache`). Add `.safelint_cache/` to `.gitignore`.
+
 ---
 
 ## Pre-commit integration
