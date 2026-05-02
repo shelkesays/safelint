@@ -21,6 +21,7 @@ from safelint.rules.test_coverage import TestCouplingRule
 if TYPE_CHECKING:
     import tree_sitter
 
+    from safelint.languages._types import LanguageDefinition
     from safelint.rules.base import BaseRule
 
 
@@ -376,7 +377,11 @@ class SafetyEngine:
         return None
 
     def check_file(self, filepath: str) -> LintResult:
-        """Parse *filepath*, run every active rule, apply inline suppressions, return a LintResult."""
+        """Parse *filepath* from disk, run every active rule, return a LintResult.
+
+        Use :meth:`check_source` instead when you already have the source
+        in memory (e.g. an editor's unsaved buffer fed via ``--stdin``).
+        """
         if self._is_excluded(filepath):
             return LintResult(path=filepath)
 
@@ -396,6 +401,35 @@ class SafetyEngine:
         except (OSError, UnicodeDecodeError) as exc:  # nosafe: SAFE203
             return self._parse_error_result(filepath, f"Read error: {exc}")
 
+        return self._lint_parsed_source(filepath, source, lang)
+
+    def check_source(self, filepath: str, source: str) -> LintResult:
+        """Lint pre-loaded *source* as if it came from *filepath*.
+
+        Used by editor integrations and the ``--stdin`` mode: the caller
+        has the buffer contents in memory and doesn't want safelint to
+        re-read from disk. The pre-read pre-checks (size guard, regular
+        file guard) are skipped since by definition the source is already
+        in hand. Exclusion and language detection still apply because
+        config-driven excludes and unsupported extensions still mean
+        "no lint".
+        """
+        if self._is_excluded(filepath):
+            return LintResult(path=filepath)
+
+        lang = get_language_for_file(filepath)
+        if lang is None:
+            return LintResult(path=filepath)
+
+        return self._lint_parsed_source(filepath, source, lang)
+
+    def _lint_parsed_source(self, filepath: str, source: str, lang: LanguageDefinition) -> LintResult:
+        """Inner: parse *source* with *lang*'s parser and run rules.
+
+        Caller has already done exclusion and language lookup. Used by
+        both :meth:`check_file` (after a disk read) and :meth:`check_source`
+        (with a caller-provided buffer).
+        """
         tree = lang.create_parser().parse(source.encode("utf-8"))
         if tree.root_node.has_error:
             location = self._first_parse_error(tree.root_node)

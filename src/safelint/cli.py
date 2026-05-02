@@ -254,6 +254,42 @@ def _resolve_fail_on(args: argparse.Namespace, config: dict) -> tuple[str, int]:
     return fail_on, SEVERITY_ORDER.get(fail_on, 1)
 
 
+def _run_stdin(args: argparse.Namespace) -> int:
+    """Read source from stdin and lint it as if it were *--stdin-filename*.
+
+    Engineered for editor integrations: VSCode / Claude Code want to lint
+    un-saved buffer contents without round-tripping through a temp file
+    (temp files are slow on every keystroke and miss ``# nosafe`` directives
+    that aren't yet on disk). The pseudo-filename drives language
+    detection (by extension) and shows up as the violation file path.
+    """
+    config = load_config()
+    cli_ignore = args.ignore or []
+    if cli_ignore:
+        existing = config.get("ignore", [])
+        config["ignore"] = list(dict.fromkeys(existing + cli_ignore))
+    fail_on, fail_threshold = _resolve_fail_on(args, config)
+    engine = SafetyEngine(config, changed_files=[args.stdin_filename])
+
+    source = sys.stdin.read()
+    result = engine.check_source(args.stdin_filename, source)
+
+    output_format: str = getattr(args, "output_format", "pretty")
+    if output_format == "pretty" and result.violations:
+        _print_violations(result.violations)
+        _print_file_summary(args.stdin_filename, result.violations)
+    blocking, _ = SafetyEngine.partition_violations(result.violations, fail_threshold)
+    _print_results(
+        output_format,
+        result.violations,
+        result.suppressed,
+        blocking_count=len(blocking),
+        fail_on=fail_on,
+        files_checked=1,
+    )
+    return 1 if blocking else 0
+
+
 def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
     """Execute pre-commit hook mode against an explicit list of .py files."""
     if not files:
@@ -528,15 +564,47 @@ def _build_common_args(parser: argparse.ArgumentParser) -> None:
             "unaffected by this flag."
         ),
     )
+    parser.add_argument(
+        "--stdin",
+        action="store_true",
+        default=False,
+        help=(
+            "Read source from stdin instead of from disk. Use with "
+            "--stdin-filename to give the buffer a path for diagnostics, "
+            "language detection, and exclude_paths matching. Designed for "
+            "editor integrations that want to lint un-saved buffers without "
+            "writing them to a temp file."
+        ),
+    )
+    parser.add_argument(
+        "--stdin-filename",
+        dest="stdin_filename",
+        default="<stdin>.py",
+        metavar="PATH",
+        help=("Pseudo-filename for the source read from stdin (default '<stdin>.py'). Determines language by extension and is shown as the violation file path. Only meaningful with --stdin."),
+    )
 
 
 def main() -> None:
-    """Entry point for both pre-commit hook and direct CLI invocation.
+    """Entry point for direct CLI invocation, pre-commit hook, and stdin mode.
 
-    Routing logic:
-    - If the first non-flag argument is ``check``, use the ``check`` subcommand.
-    - Otherwise, treat all ``.py`` positional arguments as files (pre-commit mode).
+    Routing logic (in order):
+    - ``--stdin`` anywhere in argv → read source from stdin (editor mode).
+    - First non-flag argument is ``check`` → ``check`` subcommand.
+    - Otherwise → pre-commit hook mode (``.py`` positional arguments are files).
     """
+    if "--stdin" in sys.argv[1:]:
+        # ── Stdin mode (editor / Claude Code skill) ───────────────────────
+        parser = argparse.ArgumentParser(
+            prog="safelint --stdin",
+            description="Lint source read from stdin as if from --stdin-filename",
+        )
+        _build_common_args(parser)
+        # Stdin mode ignores positional file arguments — `parse_known_args`
+        # silently drops them rather than erroring.
+        args, _ignored = parser.parse_known_args()
+        sys.exit(_run_stdin(args))
+
     non_flag = [a for a in sys.argv[1:] if not a.startswith("-")]
 
     if non_flag and non_flag[0] == "check":
