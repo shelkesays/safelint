@@ -148,7 +148,7 @@ When safelint adds a new language (TypeScript, Go, Rust, …):
 
 1. Add the language registration in safelint itself (`src/safelint/languages/<lang>.py`).
 2. Add a row to the **Step 2** registry table above.
-3. Create `skills/safelint/languages/<lang>.md` mirroring the existing addendums. The addendum should cover at minimum:
+3. Create `src/safelint/skill_files/languages/<lang>.md` mirroring the existing addendums. The addendum should cover at minimum:
    - Install nuance specific to that ecosystem (if any — safelint stays a Python install for now).
    - File extensions and how to recognise them in this skill's context.
    - Language-specific phrasing for rule rationales (e.g. how `bare_except` maps to that language's catch-all idiom).
