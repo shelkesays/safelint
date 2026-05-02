@@ -450,24 +450,19 @@ class SafetyEngine:
         (with a caller-provided buffer).
 
         If a cache is configured, this method consults it before parsing
-        and stores the result on miss. Cache key folds in the engine
-        fingerprint (rules + their config + safelint version), so any
-        config change invalidates entries automatically.
+        and stores the result on miss. The cache key folds in the engine
+        fingerprint (rules + their config + safelint version) *and* the
+        filepath itself, so two files with identical contents under
+        different paths never share an entry. Any config change invalidates
+        entries automatically.
         """
         source_bytes = source.encode("utf-8")
         cache_key: str | None = None
         if self._cache is not None and self._cache.cache_dir is not None:
-            cache_key = _cache.compute_file_key(source_bytes, self._get_engine_fingerprint())
+            cache_key = _cache.compute_file_key(source_bytes, self._get_engine_fingerprint(), filepath)
             cached = self._cache.get(cache_key)
             if cached is not None:
-                cached_violations, cached_suppressed = cached
-                # Pre-file ignores apply per-call (paths can vary between
-                # caller and cached entry's filepath via stdin pseudo-names),
-                # so re-run the per-file filter on the cached results.
-                ignored_names, ignored_codes = self._file_ignored_set(filepath)
-                kept_violations = [v for v in cached_violations if not _is_per_file_ignored(v, ignored_names, ignored_codes)]
-                # Suppressed entries from cache are already correctly classified.
-                return LintResult(path=filepath, violations=kept_violations, suppressed=cached_suppressed)
+                return self._apply_cached(filepath, cached)
 
         tree = lang.create_parser().parse(source_bytes)
         if tree.root_node.has_error:
@@ -491,6 +486,31 @@ class SafetyEngine:
         if cache_key is not None and self._cache is not None:
             self._cache.put(cache_key, active, suppressed)
         return LintResult(path=filepath, violations=active, suppressed=suppressed)
+
+    def _apply_cached(self, filepath: str, cached: tuple[list[Violation], list[Violation]]) -> LintResult:
+        """Build a LintResult from a cache hit, re-applying per-call path filters.
+
+        The cache key already folds in the filepath, so cached entries are
+        guaranteed to belong to *filepath* (no cross-file leakage). What
+        *can* still vary between cache write and read is the active
+        ``per_file_ignores`` set: a CLI ``--ignore`` flag adds to the
+        engine's ignore list at construction time but is *not* part of the
+        key (it would defeat the cache for every editor keystroke that
+        toggles a flag). Re-running the per-file filter on the cached
+        active list catches that case — anything filtered out is moved
+        into the suppressed list so the caller's downstream counts stay
+        accurate.
+        """
+        cached_violations, cached_suppressed = cached
+        ignored_names, ignored_codes = self._file_ignored_set(filepath)
+        kept: list[Violation] = []
+        newly_suppressed: list[Violation] = []
+        for v in cached_violations:
+            if _is_per_file_ignored(v, ignored_names, ignored_codes):
+                newly_suppressed.append(v)
+            else:
+                kept.append(v)
+        return LintResult(path=filepath, violations=kept, suppressed=[*cached_suppressed, *newly_suppressed])
 
     def _get_engine_fingerprint(self) -> str:
         """Return (and lazily compute) the cache fingerprint for this engine."""

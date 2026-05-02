@@ -75,12 +75,25 @@ def compute_engine_fingerprint(
     return hashlib.sha256(blob).hexdigest()
 
 
-def compute_file_key(source: bytes, engine_fingerprint: str) -> str:
-    """Return a hex digest for caching the lint of *source* under this engine."""
+def compute_file_key(source: bytes, engine_fingerprint: str, filepath: str) -> str:
+    r"""Return a hex digest for caching the lint of *source* under this engine.
+
+    *filepath* is folded in (after normalising to POSIX form) because several
+    rules legitimately depend on the path — ``test_existence`` and
+    ``test_coupling`` look at the test directory layout, ``per_file_ignores``
+    matches glob patterns against the path, and every emitted ``Violation``
+    carries ``filepath`` verbatim. Without the path in the key, two files
+    with identical contents under different paths would share a cache entry
+    and the second caller would see violations stamped with the *first*
+    file's path. Normalising to POSIX (``\\`` → ``/``) keeps the key stable
+    across Windows and POSIX.
+    """
     digest = hashlib.sha256()
     digest.update(source)
     digest.update(b"\x00")
     digest.update(engine_fingerprint.encode("utf-8"))
+    digest.update(b"\x00")
+    digest.update(filepath.replace("\\", "/").encode("utf-8"))
     return digest.hexdigest()
 
 

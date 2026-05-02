@@ -52,14 +52,35 @@ def test_engine_fingerprint_independent_of_rule_order() -> None:
 def test_file_key_changes_with_source() -> None:
     """Editing the source produces a different key, even with the same engine."""
     fp = compute_engine_fingerprint("1.5.0", [])
-    assert compute_file_key(b"x = 1", fp) != compute_file_key(b"x = 2", fp)
+    assert compute_file_key(b"x = 1", fp, "f.py") != compute_file_key(b"x = 2", fp, "f.py")
 
 
 def test_file_key_changes_with_engine() -> None:
     """Same source under different engine config hashes to different keys."""
     fp_a = compute_engine_fingerprint("1.5.0", [("a", "SAFE001", "error", {})])
     fp_b = compute_engine_fingerprint("1.5.0", [("b", "SAFE002", "error", {})])
-    assert compute_file_key(b"x = 1", fp_a) != compute_file_key(b"x = 1", fp_b)
+    assert compute_file_key(b"x = 1", fp_a, "f.py") != compute_file_key(b"x = 1", fp_b, "f.py")
+
+
+def test_file_key_changes_with_filepath() -> None:
+    """Two files with identical contents under different paths must hash differently.
+
+    Path-dependent rules (``test_existence``, ``test_coupling``,
+    ``per_file_ignores`` patterns) and ``Violation.filepath`` itself would
+    otherwise be wrong on a cross-file cache hit.
+    """
+    fp = compute_engine_fingerprint("1.5.0", [])
+    assert compute_file_key(b"x = 1", fp, "src/a.py") != compute_file_key(b"x = 1", fp, "src/b.py")
+
+
+def test_file_key_normalises_windows_separators() -> None:
+    """Backslash- and forward-slash filepaths produce the same key.
+
+    Lets a Windows-host editor and a POSIX CI runner share the same
+    on-disk cache without spurious misses.
+    """
+    fp = compute_engine_fingerprint("1.5.0", [])
+    assert compute_file_key(b"x = 1", fp, "src\\a.py") == compute_file_key(b"x = 1", fp, "src/a.py")
 
 
 # ---------------------------------------------------------------------------
@@ -176,6 +197,64 @@ def test_engine_cache_invalidates_on_engine_config_change(tmp_path: Path) -> Non
     loose_result = loose_engine.check_file(str(sample))
     # A different engine config must not pull A's cached violation forward.
     assert not any(v.rule == "function_length" for v in loose_result.violations)
+
+
+def test_engine_cache_isolates_by_filepath(tmp_path: Path) -> None:
+    """Two files with identical contents under different paths must not share cache entries.
+
+    The cache key folds the filepath in, so each call gets its own entry
+    and every emitted Violation carries the *current* call's filepath
+    (not the path of whichever file populated the cache first).
+    """
+    sample_a = tmp_path / "a_long_name.py"
+    sample_b = tmp_path / "b_long_name.py"
+    long_body = "def f():\n" + "    a = 1\n" * 80 + "    return a\n"
+    sample_a.write_text(long_body, encoding="utf-8")
+    sample_b.write_text(long_body, encoding="utf-8")
+    cache_dir = tmp_path / "cache"
+    engine = SafetyEngine(DEFAULTS, cache=LintCache(cache_dir))
+
+    result_a = engine.check_file(str(sample_a))
+    result_b = engine.check_file(str(sample_b))
+
+    cache_files = list(cache_dir.glob("*.json"))
+    # Each path yielded its own cache entry — no cross-file aliasing.
+    assert len(cache_files) >= 2
+    # Every reported violation points at the file the caller asked about.
+    assert all(v.filepath == str(sample_a) for v in result_a.violations)
+    assert all(v.filepath == str(sample_b) for v in result_b.violations)
+    # And both files were actually flagged (sanity check the rule fired).
+    assert result_a.violations
+    assert result_b.violations
+
+
+def test_engine_cache_hit_reapplies_per_file_ignores(tmp_path: Path) -> None:
+    """``per_file_ignores`` added between cache write and read suppresses cached violations.
+
+    ``per_file_ignores`` is *not* part of the cache key (a CLI ``--ignore``
+    flag would invalidate every editor keystroke otherwise), so the engine
+    must re-run the per-file-ignore filter against cached violations on
+    every hit and move now-ignored entries into the suppressed list.
+    """
+    sample = tmp_path / "func.py"
+    sample.write_text("def f():\n" + "    a = 1\n" * 80 + "    return a\n", encoding="utf-8")
+    cache_dir = tmp_path / "cache"
+
+    # Run 1: no per-file-ignores. Populates the cache with a function_length violation.
+    cfg_a = {**DEFAULTS, "per_file_ignores": {}}
+    engine_a = SafetyEngine(cfg_a, cache=LintCache(cache_dir))
+    result_a = engine_a.check_file(str(sample))
+    assert any(v.rule == "function_length" for v in result_a.violations)
+    assert all(v.rule != "function_length" for v in result_a.suppressed)
+
+    # Run 2: same source + cache, but with a per-file-ignores entry that
+    # silences SAFE101. The engine must move the cached violation into
+    # ``suppressed`` rather than report it as active.
+    cfg_b = {**DEFAULTS, "per_file_ignores": {"**/func.py": ["SAFE101"]}}
+    engine_b = SafetyEngine(cfg_b, cache=LintCache(cache_dir))
+    result_b = engine_b.check_file(str(sample))
+    assert all(v.rule != "function_length" for v in result_b.violations)
+    assert any(v.rule == "function_length" for v in result_b.suppressed)
 
 
 def test_engine_cache_invalidates_on_source_change(tmp_path: Path) -> None:
