@@ -213,3 +213,22 @@ def test_cli_skill_without_action_errors_out(monkeypatch: pytest.MonkeyPatch, ca
     assert exc.value.code == 2
     err = capsys.readouterr().err
     assert "skill" in err.lower()
+
+
+def test_cli_skill_rejects_unknown_flag_before_subcommand(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """Mistyped flags before ``skill`` must fail loudly, not be silently dropped.
+
+    Regression for argv-routing parity: the ``check`` branch already passes
+    pre-subcommand tokens through to its parser so typos like
+    ``--formta=json`` get rejected; the ``skill`` branch should do the
+    same. Without this, ``safelint --formta=json skill install`` would
+    silently install the skill while the user thinks they passed an
+    output-format flag (one that doesn't apply to skill anyway).
+    """
+    monkeypatch.setattr("sys.argv", ["safelint", "--formta=json", "skill", "install"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    # argparse exits 2 on unknown flag.
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert "formta" in err or "unrecognized" in err.lower()
