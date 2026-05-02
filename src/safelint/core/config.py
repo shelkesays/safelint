@@ -221,6 +221,30 @@ def _read_toml_file(candidate: Path) -> dict[str, Any] | None:
         return None
 
 
+def _peek_toml_file(candidate: Path) -> dict[str, Any] | None:
+    """Parse *candidate* quietly: same as :func:`_read_toml_file` but no diagnostic.
+
+    Used by probes (e.g. :func:`_directory_has_config`) that decide
+    whether a directory contains an active config file *before*
+    ``load_config`` runs. Without a quiet variant, a malformed
+    ``safelint.toml`` would print the same parse-error diagnostic
+    twice — once from the probe, once from the real load — confusing
+    users who'd see the file flagged repeatedly. Real load remains
+    the authoritative reporter.
+    """
+    try:
+        # nosafe: SAFE304 — this *is* an I/O probe by design; the
+        # alternative names ("read", "load") would imply an authoritative
+        # read, but this helper is deliberately a quiet peek.
+        with candidate.open("rb") as fp:  # nosafe: SAFE304
+            return tomllib.load(fp)
+    # Fail-silent on purpose: the actual load path will surface the
+    # error to the user. SAFE203's heuristic doesn't see the silence
+    # as logging, so the suppression marker isn't needed.
+    except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError):  # nosafe: SAFE203
+        return None
+
+
 # ---------------------------------------------------------------------------
 # Per-directory config finders
 # ---------------------------------------------------------------------------
@@ -255,31 +279,30 @@ def _directory_has_config(directory: Path) -> bool:
 
     "Active" mirrors :func:`load_config` exactly:
 
-    * ``safelint.toml`` is parsed; a malformed file is treated as
-      *not* a config (so the upward walk continues, just like
+    * ``safelint.toml`` is parsed quietly; a malformed file is treated
+      as *not* a config (so the upward walk continues, just like
       ``load_config`` falls through to the next candidate). Without
       this, a broken ``safelint.toml`` would still anchor the cache
-      at a directory whose config never actually loads — and the
-      user would silently get an unexpected ``.safelint_cache/``
-      placement on top of the (already loud) parse-error diagnostic.
+      at a directory whose config never actually loads, and the user
+      would silently get an unexpected ``.safelint_cache/`` placement.
     * ``pyproject.toml`` only counts when it actually has a
       ``[tool.safelint]`` section — an unrelated ``pyproject.toml``
       higher up the tree (e.g. a Python package whose author never
       configured safelint) shouldn't pin the cache there.
 
-    ``_read_toml_file`` itself emits a stderr diagnostic on parse
-    failure; calling it here means a malformed ``safelint.toml``
-    diagnostics twice (once from this probe, once from
-    ``load_config``). That's acceptable — both paths point at the
-    same real problem and both diagnostics reinforce it.
+    Uses :func:`_peek_toml_file` (silent) rather than
+    :func:`_read_toml_file` (verbose) so a malformed file's
+    diagnostic is emitted exactly once — by the actual load path
+    that follows. Otherwise the same broken file would print the
+    same parse-error to stderr twice per run.
     """
     standalone = directory / STANDALONE_TOML_FILENAME
     if standalone.exists():
-        return _read_toml_file(standalone) is not None
+        return _peek_toml_file(standalone) is not None
     pyproject = directory / TOML_CONFIG_FILENAME
     if not pyproject.exists():
         return False
-    doc = _read_toml_file(pyproject)
+    doc = _peek_toml_file(pyproject)
     return doc is not None and doc.get("tool", {}).get(TOML_CONFIG_KEY) is not None
 
 

@@ -116,7 +116,7 @@ cat my_module.py | safelint --stdin --stdin-filename my_module.py --format=json
 safelint check src/ --no-cache       # otherwise: ~instant re-runs on unchanged files
 ```
 
-By default safelint memoises rule output keyed on `sha256(source + engine config)` in a `.safelint_cache/` directory next to your config file (mirroring `.pytest_cache`). Add `.safelint_cache/` to `.gitignore`.
+By default safelint memoises rule output keyed on `sha256(source + engine config + filepath)` in a `.safelint_cache/` directory next to your config file (mirroring `.pytest_cache`). The filepath is folded in so two files with identical contents under different paths get separate entries, and `Violation.filepath` always reflects the current call. Add `.safelint_cache/` to `.gitignore`.
 
 ---
 
