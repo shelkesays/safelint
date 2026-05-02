@@ -6,7 +6,6 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import lineno, node_text, walk
 from safelint.languages.python import (
-    ANNOTATED_ASSIGNMENT,
     ASSIGNMENT,
     ASYNC_FUNCTION_DEF,
     AUGMENTED_ASSIGNMENT,
@@ -62,16 +61,17 @@ def _global_identifiers(global_stmt: tree_sitter.Node) -> list[tree_sitter.Node]
 
 
 def _assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None:
-    """Return the bare identifier target of *node* if it is one, else None."""
+    """Return the bare identifier target of *node* if it is one, else None.
+
+    tree-sitter-python parses both regular and *annotated* assignments
+    (``x = 1`` and ``x: int = 1``) as the same ``assignment`` node type
+    — annotated form just adds ``:`` and ``type`` as inline children.
+    ``child_by_field_name("left")`` correctly returns the identifier in
+    both cases, so a single branch handles both.
+    """
     if node.type in (ASSIGNMENT, AUGMENTED_ASSIGNMENT):
         left = node.child_by_field_name("left")
         return left if left is not None and left.type == IDENTIFIER else None
-    if node.type == ANNOTATED_ASSIGNMENT and node.named_children:
-        target = node.named_children[0]
-        # Subscript / attribute targets like ``a[0]: int = …`` exist in valid
-        # Python but aren't relevant to the global-mutation rule (which
-        # cares about bare identifier targets only).
-        return target if target.type == IDENTIFIER else None  # pragma: no cover
     return None
 
 

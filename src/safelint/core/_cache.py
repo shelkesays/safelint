@@ -60,6 +60,7 @@ _CACHE_SCHEMA_VERSION = "1"
 def compute_engine_fingerprint(
     safelint_version: str,
     active_rules: Iterable[tuple[str, str, str, dict[str, Any]]],
+    per_file_ignores: Iterable[tuple[str, Iterable[str], Iterable[str]]] = (),
 ) -> str:
     """Return a hex digest summarising the engine state that affects rule output.
 
@@ -68,6 +69,18 @@ def compute_engine_fingerprint(
     config in means a user changing e.g. ``max_lines = 60`` to ``70``
     invalidates the cache for every file even though the source is
     unchanged.
+
+    *per_file_ignores* is an iterable of ``(pattern, names, codes_upper)``
+    tuples — one per ``[tool.safelint.per_file_ignores]`` entry. It must
+    be folded in because per-file ignore patterns affect *what* is
+    reported (they suppress matching violations) but are applied
+    post-rule, so they don't change ``self.rules``. Without this, a user
+    removing a pattern between runs would still see the previously
+    suppressed violations come back from the cache as suppressed —
+    which is the opposite of what they asked for. Including the dict
+    means any add/remove/edit invalidates every entry that mentions
+    the affected pattern. (Cache regeneration on a per-file-ignores
+    edit is cheap; correctness wins over a one-time cache rebuild.)
     """
     payload: dict[str, Any] = {
         "schema_version": _CACHE_SCHEMA_VERSION,
@@ -75,6 +88,10 @@ def compute_engine_fingerprint(
         "rules": sorted(
             [{"name": name, "code": code, "severity": severity, "config": config} for name, code, severity, config in active_rules],
             key=lambda r: r["code"],
+        ),
+        "per_file_ignores": sorted(
+            [{"pattern": pattern, "names": sorted(names), "codes": sorted(codes)} for pattern, names, codes in per_file_ignores],
+            key=lambda r: r["pattern"],
         ),
     }
     blob = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")

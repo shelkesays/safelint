@@ -49,6 +49,28 @@ def test_engine_fingerprint_independent_of_rule_order() -> None:
     assert compute_engine_fingerprint("1.5.0", rules_a) == compute_engine_fingerprint("1.5.0", rules_b)
 
 
+def test_engine_fingerprint_changes_with_per_file_ignores() -> None:
+    """Adding/removing/editing a ``per_file_ignores`` entry shifts the fingerprint."""
+    pfi_a: list[tuple[str, list[str], list[str]]] = []
+    pfi_b: list[tuple[str, list[str], list[str]]] = [("**/tests/**", ["function_length"], ["SAFE101"])]
+    pfi_c: list[tuple[str, list[str], list[str]]] = [("**/tests/**", ["function_length"], ["SAFE102"])]
+    fp_empty = compute_engine_fingerprint("1.5.0", [], per_file_ignores=pfi_a)
+    fp_b = compute_engine_fingerprint("1.5.0", [], per_file_ignores=pfi_b)
+    fp_c = compute_engine_fingerprint("1.5.0", [], per_file_ignores=pfi_c)
+    assert fp_empty != fp_b
+    assert fp_b != fp_c
+
+
+def test_engine_fingerprint_independent_of_per_file_ignores_order() -> None:
+    """Two equivalent ``per_file_ignores`` lists hash the same regardless of order."""
+    pfi_a: list[tuple[str, list[str], list[str]]] = [
+        ("**/tests/**", ["function_length"], ["SAFE101"]),
+        ("**/migrations/**", ["nesting_depth"], ["SAFE102"]),
+    ]
+    pfi_b = list(reversed(pfi_a))
+    assert compute_engine_fingerprint("1.5.0", [], per_file_ignores=pfi_a) == compute_engine_fingerprint("1.5.0", [], per_file_ignores=pfi_b)
+
+
 def test_file_key_changes_with_source() -> None:
     """Editing the source produces a different key, even with the same engine."""
     fp = compute_engine_fingerprint("1.5.0", [])
@@ -228,33 +250,62 @@ def test_engine_cache_isolates_by_filepath(tmp_path: Path) -> None:
     assert result_b.violations
 
 
-def test_engine_cache_hit_reapplies_per_file_ignores(tmp_path: Path) -> None:
-    """``per_file_ignores`` added between cache write and read suppresses cached violations.
+def test_engine_cache_invalidates_when_per_file_ignores_added(tmp_path: Path) -> None:
+    """Adding a ``per_file_ignores`` entry between runs invalidates the cache.
 
-    ``per_file_ignores`` is *not* part of the cache key (a CLI ``--ignore``
-    flag would invalidate every editor keystroke otherwise), so the engine
-    must re-run the per-file-ignore filter against cached violations on
-    every hit and move now-ignored entries into the suppressed list.
+    Because ``per_file_ignores`` is folded into the engine fingerprint,
+    the second engine has a different cache key — so the cached
+    "no-suppression" entry from the first run isn't reused, and the
+    fresh lint correctly moves SAFE101 into ``suppressed``.
     """
     sample = tmp_path / "func.py"
     sample.write_text("def f():\n" + "    a = 1\n" * 80 + "    return a\n", encoding="utf-8")
     cache_dir = tmp_path / "cache"
 
-    # Run 1: no per-file-ignores. Populates the cache with a function_length violation.
+    # Run 1: no per_file_ignores → SAFE101 is active, gets cached as such.
     cfg_a = {**DEFAULTS, "per_file_ignores": {}}
     engine_a = SafetyEngine(cfg_a, cache=LintCache(cache_dir))
     result_a = engine_a.check_file(str(sample))
     assert any(v.rule == "function_length" for v in result_a.violations)
-    assert all(v.rule != "function_length" for v in result_a.suppressed)
 
-    # Run 2: same source + cache, but with a per-file-ignores entry that
-    # silences SAFE101. The engine must move the cached violation into
-    # ``suppressed`` rather than report it as active.
+    # Run 2: per_file_ignores adds a SAFE101 silence. Different fingerprint,
+    # different cache key — fresh lint correctly suppresses SAFE101.
     cfg_b = {**DEFAULTS, "per_file_ignores": {"**/func.py": ["SAFE101"]}}
     engine_b = SafetyEngine(cfg_b, cache=LintCache(cache_dir))
     result_b = engine_b.check_file(str(sample))
     assert all(v.rule != "function_length" for v in result_b.violations)
     assert any(v.rule == "function_length" for v in result_b.suppressed)
+
+
+def test_engine_cache_invalidates_when_per_file_ignores_removed(tmp_path: Path) -> None:
+    """Removing a ``per_file_ignores`` entry between runs invalidates the cache.
+
+    Regression for a real bug: an earlier implementation kept the cached
+    suppressed list as-is on hit and only re-ran the per-file filter
+    over the active list. That meant loosening ``per_file_ignores``
+    would wrongly leave previously suppressed violations suppressed —
+    the user removed the silence in config but kept seeing it applied.
+    Folding the patterns into the fingerprint invalidates the entry,
+    forcing a fresh lint that correctly returns SAFE101 to active.
+    """
+    sample = tmp_path / "func.py"
+    sample.write_text("def f():\n" + "    a = 1\n" * 80 + "    return a\n", encoding="utf-8")
+    cache_dir = tmp_path / "cache"
+
+    # Run 1: per_file_ignores silences SAFE101. Cached as suppressed.
+    cfg_strict = {**DEFAULTS, "per_file_ignores": {"**/func.py": ["SAFE101"]}}
+    engine_strict = SafetyEngine(cfg_strict, cache=LintCache(cache_dir))
+    result_strict = engine_strict.check_file(str(sample))
+    assert any(v.rule == "function_length" for v in result_strict.suppressed)
+    assert all(v.rule != "function_length" for v in result_strict.violations)
+
+    # Run 2: user removes the silence. The cache MUST invalidate so the
+    # violation comes back as active — not stay suppressed from cache.
+    cfg_open = {**DEFAULTS, "per_file_ignores": {}}
+    engine_open = SafetyEngine(cfg_open, cache=LintCache(cache_dir))
+    result_open = engine_open.check_file(str(sample))
+    assert any(v.rule == "function_length" for v in result_open.violations)
+    assert all(v.rule != "function_length" for v in result_open.suppressed)
 
 
 def test_engine_cache_invalidates_on_source_change(tmp_path: Path) -> None:

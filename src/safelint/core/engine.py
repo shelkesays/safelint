@@ -490,33 +490,32 @@ class SafetyEngine:
         return LintResult(path=filepath, violations=active, suppressed=suppressed)
 
     def _apply_cached(self, filepath: str, cached: tuple[list[Violation], list[Violation]]) -> LintResult:
-        """Build a LintResult from a cache hit, re-applying per-file ignore patterns.
+        """Build a LintResult from a cache hit.
 
-        The cache key already folds in the filepath, so cached entries are
-        guaranteed to belong to *filepath* (no cross-file leakage). The
-        active rule set is reflected in the engine fingerprint — a CLI
-        ``--ignore`` flag (or a top-level ``ignore`` list in config)
-        removes rules from ``self.rules``, which feeds the fingerprint —
-        so changes there already produce a different cache entry.
+        The cache key folds in everything that affects what gets reported
+        for this file:
 
-        What is *not* part of the key is the ``per_file_ignores``
-        configuration: those glob patterns are applied per-violation
-        after rules run (post-filter), so two engines with identical
-        rule sets but different ``per_file_ignores`` blocks share the
-        same cached entry. Re-running the per-file filter on the cached
-        active list catches that case — anything matched is moved into
-        the suppressed list so downstream counts stay accurate.
+        * source bytes — inline ``# nosafe`` directives live in source.
+        * filepath — path-dependent rules (``test_existence``,
+          ``test_coupling``) and ``Violation.filepath`` itself.
+        * engine fingerprint — safelint version, schema version, the
+          active rule set + per-rule config (so CLI ``--ignore`` /
+          top-level ``ignore`` already invalidate, since they remove
+          rules from ``self.rules``), *and* the ``per_file_ignores``
+          mapping (so adding/removing/editing a glob entry between
+          runs invalidates the affected entries).
+
+        With all of that in the key, a hit means the cached lists are
+        already correctly partitioned for the current call — no
+        post-hit re-filter needed. An earlier version re-applied
+        ``per_file_ignores`` here, but that was both redundant *and*
+        wrong: it only walked the cached active list, never the
+        suppressed list, so loosening ``per_file_ignores`` would
+        wrongly leave previously suppressed violations suppressed.
+        Folding the dict into the fingerprint fixes both issues.
         """
         cached_violations, cached_suppressed = cached
-        ignored_names, ignored_codes = self._file_ignored_set(filepath)
-        kept: list[Violation] = []
-        newly_suppressed: list[Violation] = []
-        for v in cached_violations:
-            if _is_per_file_ignored(v, ignored_names, ignored_codes):
-                newly_suppressed.append(v)
-            else:
-                kept.append(v)
-        return LintResult(path=filepath, violations=kept, suppressed=[*cached_suppressed, *newly_suppressed])
+        return LintResult(path=filepath, violations=cached_violations, suppressed=cached_suppressed)
 
     def _get_engine_fingerprint(self) -> str:
         """Return (and lazily compute) the cache fingerprint for this engine."""
@@ -530,6 +529,7 @@ class SafetyEngine:
             self._engine_fingerprint = _cache.compute_engine_fingerprint(
                 __version__,
                 ((r.name, r.code, r.severity, r.config) for r in self.rules),
+                per_file_ignores=((p, sorted(names), sorted(codes)) for p, names, codes in self.per_file_ignores),
             )
         return self._engine_fingerprint
 

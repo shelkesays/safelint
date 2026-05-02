@@ -174,6 +174,30 @@ def test_global_mutation_is_flagged(tmp_path: Path) -> None:
     assert any(v.rule == "global_mutation" for v in violations)
 
 
+def test_global_mutation_flags_annotated_assignment(tmp_path: Path) -> None:
+    """``x: int = 1`` inside a ``global x`` function fires global_mutation.
+
+    Annotated assignments are a distinct Tree-sitter node type from
+    regular assignments; the rule's target extractor has to handle them
+    separately. This regression makes sure the bare-identifier branch
+    of that extractor is exercised (``a[0]: int = …`` is the only path
+    we don't cover, by design).
+    """
+    source = textwrap.dedent("""\
+        counter = 0
+
+        def increment():
+            global counter
+            counter: int = counter + 1
+    """)
+    sample = tmp_path / "gm_annotated.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+
+    assert any(v.rule == "global_mutation" for v in violations)
+
+
 def test_unbounded_loop_while_true_no_break(tmp_path: Path) -> None:
     """unbounded_loops fires on while True without a break."""
     source = textwrap.dedent("""\
