@@ -711,6 +711,47 @@ def _build_hook_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _build_skill_parser() -> argparse.ArgumentParser:
+    """Build the ``skill`` subcommand parser.
+
+    Two actions today: ``install`` (materialises the bundled skill into
+    ``~/.claude/skills/safelint/`` or a project-local equivalent) and
+    ``path`` (prints the bundled-files location for debugging).
+    """
+    parser = argparse.ArgumentParser(
+        prog="safelint skill",
+        description="Manage the bundled Claude Code skill for safelint",
+    )
+    sub = parser.add_subparsers(dest="skill_action", required=True, metavar="ACTION")
+
+    install = sub.add_parser(
+        "install",
+        help="Install the bundled skill into Claude Code (default: ~/.claude/skills/safelint)",
+    )
+    install.add_argument(
+        "--project",
+        action="store_true",
+        default=False,
+        help="Install into <cwd>/.claude/skills/safelint instead of the user-global location",
+    )
+    install.add_argument(
+        "--symlink",
+        action="store_true",
+        default=False,
+        help="Symlink to the bundled files instead of copying. Lets ``pip upgrade safelint`` automatically update the skill, but requires symlink support (POSIX, or Windows developer mode)",
+    )
+    install.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Replace any existing safelint skill at the target location",
+    )
+
+    sub.add_parser("path", help="Print the on-disk location of the bundled skill files")
+
+    return parser
+
+
 # Long options that consume the *following* argv token as their value
 # (i.e. used in ``--flag VALUE`` form, not ``--flag=VALUE``). Used by the
 # routing scanner to skip those values when looking for the first true
@@ -753,16 +794,33 @@ def _first_positional_index(argv: list[str]) -> int | None:
     return None
 
 
+def _run_skill(args: argparse.Namespace) -> int:
+    """Dispatch the ``safelint skill <action>`` subcommands."""
+    # Local import keeps importlib.resources off the hot path for
+    # check/hook/stdin invocations — only paid when the user explicitly
+    # asks for skill management.
+    from safelint import _skill_install  # noqa: PLC0415
+
+    if args.skill_action == "install":
+        return _skill_install.run_install(args)
+    if args.skill_action == "path":
+        return _skill_install.run_path(args)
+    return 1  # pragma: no cover — argparse rejects unknown actions before this
+
+
 def main() -> None:
     """Entry point for direct CLI invocation, pre-commit hook, and stdin mode.
 
     Routing logic (in order):
     - ``--stdin`` anywhere in argv → read source from stdin (editor mode).
     - First true positional argument is ``check`` → ``check`` subcommand.
-      Global flags (``--format``, ``--fail-on``, ``--mode``, ``--ignore``,
-      ``--config``) may appear before ``check``; the scanner skips their
-      values so ``safelint --format json check src`` is routed correctly.
+    - First true positional argument is ``skill`` → ``skill`` subcommand
+      (install / path).
     - Otherwise → pre-commit hook mode (``.py`` positional arguments are files).
+
+    Global flags (``--format``, ``--fail-on``, ``--mode``, ``--ignore``,
+    ``--config``) may appear before the subcommand; the scanner skips
+    their values so ``safelint --format json check src`` is routed correctly.
     """
     if "--stdin" in sys.argv[1:]:
         args = _build_stdin_parser().parse_args()
@@ -777,6 +835,12 @@ def main() -> None:
         argv_for_check = rest[:idx] + rest[idx + 1 :]
         args = _build_check_parser().parse_args(argv_for_check)
         sys.exit(_run_check(args))
+    if idx is not None and rest[idx] == "skill":
+        # Drop the ``skill`` token; everything after it becomes the
+        # ``skill`` subcommand's argv (action + flags).
+        argv_for_skill = rest[idx + 1 :]
+        args = _build_skill_parser().parse_args(argv_for_skill)
+        sys.exit(_run_skill(args))
 
     args = _build_hook_parser().parse_args()
     files = [f for f in args.files if f.endswith(".py")]

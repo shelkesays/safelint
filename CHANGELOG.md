@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.6.0] - 2026-05-02
+
+This release ships the Claude Code skill inside the wheel and adds a one-line install command, plus a batch of correctness fixes from the v1.5.0 review cycle (caching, argv routing, SARIF URIs, CLI strictness, clean-run UX).
+
+### Added
+- **`safelint skill install`** subcommand — copies the bundled Claude Code skill into `~/.claude/skills/safelint/` (default) or `<cwd>/.claude/skills/safelint/` (with `--project`). Use `--symlink` for a live link to the bundled location, `--force` to replace an existing install. New install flow is `pip install safelint && safelint skill install`.
+- **`safelint skill path`** subcommand — prints the on-disk location of the bundled skill files. Useful for inspecting `SKILL.md` directly or debugging install issues.
+- **Skill files are now bundled in the wheel** at `safelint/skill_files/` (mirroring `safelint/languages/` one-to-one). `safelint skill install` finds them via `importlib.resources`, so the same code path works for `pip install`, `uv add`, and editable installs from a checkout.
+- **`docs/JSON_SCHEMA.md`** — the stable schema for `safelint check --format json`. Documents top-level keys, the Violation object, severity / fail_on / blocking semantics, and example consumers in bash / Python / Node. Versioning policy: additions are non-breaking; removals require a major bump.
+
+### Changed
+- The Claude Code skill now lives at `src/safelint/skill_files/` in the source tree (was `skills/safelint/`). The skill itself is also more modular: a language-agnostic core (`SKILL.md`) plus per-language addendums under `languages/<lang>.md`, mirroring `src/safelint/languages/<lang>.py`. To add a new language, follow the new step 7 in [`ADDING_A_LANGUAGE.md`](ADDING_A_LANGUAGE.md).
+
 ### Fixed
 - `per_file_ignores` is now folded into the engine fingerprint, so adding/removing/editing a glob entry between runs invalidates the affected cache entries. Previously a cache hit carried the cached `suppressed` list over unchanged, which meant *removing* a `per_file_ignores` entry left previously suppressed violations stuck in the suppressed list — the user would loosen config and still see the silence applied. The post-hit re-filter (which only walked the active list and never the suppressed list) is now also redundant and has been removed.
 - Argv routing no longer breaks when a value-taking global flag precedes the `check` subcommand. Previously `safelint --format json check src` saw `json` as the first non-`-` token and fell into hook mode, silently no-oping (`json` and `check` aren't `.py`) with exit 0. The router now recognises the value-taking flags (`--format`, `--fail-on`, `--mode`, `--ignore`, `--config`, `--stdin-filename`) and skips their values when looking for the subcommand.
@@ -16,6 +29,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SARIF `artifactLocation.uri` now emits a valid URI reference: backslash separators are normalised to forward slashes, absolute paths are made cwd-relative when possible, and special characters are percent-encoded. GitHub code scanning previously rejected SARIF docs produced on Windows hosts.
 - CLI now fails loudly on unknown flags. `--formta=json` and similar typos used to be silently ignored (because hook/stdin parsing called `parse_known_args`); they now surface as `error: unrecognized arguments: --formta=json`.
 - In `--format json`/`--format sarif`, status messages from the git-modified-files probe go to stderr instead of stdout, so machine-readable output stays a single parseable document. The "no modified Python files" early-return now also emits an empty JSON/SARIF doc on stdout in those modes.
+
+### Migration
+
+If you installed the v1.5.0 skill by symlinking `skills/safelint/` from a git checkout, that path no longer exists in v1.6.0. To migrate:
+
+```bash
+rm ~/.claude/skills/safelint           # remove the stale symlink
+pip install --upgrade safelint
+safelint skill install
+```
 
 ## [1.5.0] - 2026-05-02
 
@@ -104,7 +127,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.5.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.6.0...HEAD
+[1.6.0]: https://github.com/shelkesays/safelint/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/shelkesays/safelint/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/shelkesays/safelint/compare/v1.4.0...v1.4.1
 [1.4.0]: https://github.com/shelkesays/safelint/compare/v1.3.1...v1.4.0

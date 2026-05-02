@@ -129,13 +129,13 @@ Alternative: a `language` field on `BaseRule` indicating which language the rule
 
 ### 7. Update the Claude Code skill
 
-The skill at `skills/safelint/` mirrors the `languages/` package: each language safelint can lint has a corresponding addendum file in `skills/safelint/languages/`. Add yours:
+The skill at `src/safelint/skill_files/` mirrors the `languages/` package: each language safelint can lint has a corresponding addendum file in `src/safelint/skill_files/languages/`. Add yours:
 
-* Create `skills/safelint/languages/<lang>.md` modelled on `languages/python.md`. Cover install nuance (if any), file extensions, language-specific phrasing for the universal rule rationales, and idiomatic fix patterns for the rules most likely to fire.
-* Add a row to the **Step 2** registry table in `skills/safelint/SKILL.md` pointing at your new addendum.
+* Create `src/safelint/skill_files/languages/<lang>.md` modelled on `languages/python.md`. Cover install nuance (if any), file extensions, language-specific phrasing for the universal rule rationales, and idiomatic fix patterns for the rules most likely to fire.
+* Add a row to the **Step 2** registry table in `src/safelint/skill_files/SKILL.md` pointing at your new addendum.
 * Keep the skill core (`SKILL.md`) language-neutral — per-language detail belongs in the addendum, not the entry point.
 
-The skill is just Markdown — no test harness needed. A quick smoke test ("ask Claude Code to /safelint a sample <lang> project") is enough.
+The skill is just Markdown — no test harness needed. A quick smoke test ("ask Claude Code to /safelint a sample <lang> project after `safelint skill install --force`") is enough. Bundling is automatic via `[tool.setuptools.package-data]` in `pyproject.toml` (`skill_files/**/*.md`), so new addendum files ship in the next wheel without further config.
 
 ## Things to leave alone
 

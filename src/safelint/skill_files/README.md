@@ -13,39 +13,63 @@ Once installed, ask Claude Code things like:
 
 ## Install
 
-The skill lives at `skills/safelint/` in this repo. Activate it for your user account:
-
 ```bash
-mkdir -p ~/.claude/skills
-ln -s "$(pwd)/skills/safelint" ~/.claude/skills/safelint
+pip install safelint              # or: uv add safelint
+safelint skill install            # copies the skill to ~/.claude/skills/safelint/
 ```
 
-(Replace `$(pwd)` with the absolute path to your safelint checkout if you're not running from the repo root.)
+Restart Claude Code (or open a new session) to pick up the skill.
 
-Prefer a copy over a symlink? Just `cp -r skills/safelint ~/.claude/skills/`. You'll need to repeat that on each safelint upgrade if you want skill changes to land.
+### Options
 
-To activate it only inside one project:
+| Flag | Effect |
+|---|---|
+| (no flags) | Copy the bundled skill into `~/.claude/skills/safelint/`. Default. Stable across `pip upgrade safelint` runs — re-run `safelint skill install --force` to pick up newer skill content. |
+| `--project` | Install into `<cwd>/.claude/skills/safelint/` instead of the user-global location. Activates the skill only inside this project — useful for team-shared overrides. |
+| `--symlink` | Symlink to the bundled location instead of copying. `pip upgrade safelint` then immediately changes what Claude Code sees. Requires symlink support (POSIX, or Windows developer mode). |
+| `--force` | Replace any existing `safelint/` skill at the target. Use this when re-installing after an upgrade. |
+
+### Examples
 
 ```bash
-mkdir -p .claude/skills
-cp -r /path/to/safelint/skills/safelint .claude/skills/
+# User-global (most common)
+safelint skill install
+
+# Project-local override (e.g. with project-specific guidance baked into SKILL.md)
+safelint skill install --project
+
+# Re-install after upgrading safelint itself
+safelint skill install --force
+
+# Skill development (changes to bundled files take effect immediately)
+safelint skill install --symlink --force
 ```
+
+### Where are the bundled files?
+
+```bash
+safelint skill path
+```
+
+Prints the on-disk location of the skill files inside your active safelint install. Useful for inspecting `SKILL.md` directly, or for debugging install issues.
 
 ## Layout
 
+The skill ships *inside* the safelint Python package, under `safelint/skill_files/`:
+
 ```
-skills/safelint/
-├── SKILL.md              # Language-agnostic core (the entry point Claude reads)
-├── README.md             # This file
-└── languages/            # One addendum per supported language
-    └── python.md         # Python-specific install / rationale / idiomatic fixes
+src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill path`
+├── SKILL.md                 # Language-agnostic core (the entry point Claude reads)
+├── README.md                # This file
+└── languages/               # One addendum per supported language
+    └── python.md            # Python-specific install / rationale / idiomatic fixes
 ```
 
 The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint source tree. Each language safelint can lint has a corresponding addendum file here.
 
 ## Requirements
 
-- `safelint` 1.5.0 or later on `PATH` — the skill relies on the `--format json` output and the v1.5.0 JSON schema (documented in [`docs/JSON_SCHEMA.md`](../../docs/JSON_SCHEMA.md)).
+- `safelint` 1.6.0 or later on `PATH`. The `safelint skill install` subcommand and bundled skill files were added in v1.6.0.
 - A project with at least one source file in a language safelint supports (currently Python).
 
 ## What the skill does
