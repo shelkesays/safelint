@@ -17,7 +17,7 @@ For pre-commit integration, add to `.pre-commit-config.yaml`:
 
 ```yaml
 - repo: https://github.com/shelkesays/safelint
-  rev: v1.5.0
+  rev: v1.8.0
   hooks:
     - id: safelint
 ```

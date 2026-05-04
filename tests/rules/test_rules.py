@@ -347,7 +347,7 @@ def test_bare_except_is_flagged(tmp_path: Path) -> None:
 
 
 def test_bare_except_attaches_replace_with_exception_suggestion(tmp_path: Path) -> None:
-    """SAFE201 attaches an advisory suggestion to replace ``except:`` with ``except Exception:`` (1.10.0)."""
+    """SAFE201 attaches an advisory suggestion to replace ``except:`` with ``except Exception:`` (1.8.0)."""
     source = textwrap.dedent("""\
         def foo():
             try:

@@ -54,7 +54,7 @@ CACHE_DIR_NAME = ".safelint_cache"
 # Bump when the cache file schema changes in a way old entries can't
 # satisfy. Folded into the key, so old entries become unreachable
 # automatically — no migration code needed.
-_CACHE_SCHEMA_VERSION = "2"  # bumped in v1.10.0 — Violation gained suggestions[]
+_CACHE_SCHEMA_VERSION = "2"  # bumped in v1.8.0 — Violation gained suggestions[]
 
 
 def _dict_to_text_edit(d: dict[str, Any]) -> TextEdit:

@@ -223,7 +223,7 @@ def test_tainted_sink_self_cls_not_tainted():
 
 
 # ---------------------------------------------------------------------------
-# Taint flow through string formatting (1.9.0 — locking in the contract)
+# Taint flow through string formatting (1.8.0 — locking in the contract)
 # ---------------------------------------------------------------------------
 
 
@@ -258,7 +258,7 @@ def test_tainted_sink_via_percent_format():
 
 
 # ---------------------------------------------------------------------------
-# Splatted args (1.9.0)
+# Splatted args (1.8.0)
 # ---------------------------------------------------------------------------
 
 
@@ -283,7 +283,7 @@ def test_tainted_sink_via_dict_splat():
 
 
 # ---------------------------------------------------------------------------
-# assume_taint_preserving (1.9.0)
+# assume_taint_preserving (1.8.0)
 # ---------------------------------------------------------------------------
 
 
