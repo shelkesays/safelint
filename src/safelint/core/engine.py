@@ -153,14 +153,32 @@ def _unused_violations_for_line(
 
     Bare ``# nosafe`` (codes=None) emits one violation if no rule fired
     on that line. Coded ``# nosafe: A, B`` emits one violation per
-    individual code that didn't catch anything. ``# nosafe: SAFE004`` is
-    skipped to avoid self-referential reports.
+    individual code that didn't catch anything.
+
+    Self-referential directives are skipped to avoid recursive
+    reports. Inline suppressions accept either the SAFE-code or the
+    rule-name (see :func:`_check_suppressed_marking_used`), so we
+    skip *both* representations of SAFE004 here:
+
+    * ``# nosafe: SAFE004`` (any case)
+    * ``# nosafe: unused_suppression`` (the rule name)
     """
     if codes is None:
         if (lineno_, None) in used:
             return []
         return [_make_unused_suppression(filepath, lineno_, "this `# nosafe` directive did not suppress any violation")]
-    return [_make_unused_suppression(filepath, lineno_, f"`# nosafe: {code}` did not suppress any violation") for code in codes if code != "SAFE004" and (lineno_, code) not in used]
+    return [_make_unused_suppression(filepath, lineno_, f"`# nosafe: {code}` did not suppress any violation") for code in codes if not _is_safe004_self_reference(code) and (lineno_, code) not in used]
+
+
+def _is_safe004_self_reference(code: str) -> bool:
+    """Return True when *code* refers to SAFE004 by either its code or rule name.
+
+    Inline suppressions accept either form. Comparison on the code is
+    case-insensitive (matching the engine's other code-comparison sites)
+    so ``# nosafe: safe004`` is also recognised; the rule name comparison
+    is exact since rule names are lower-snake-case by convention.
+    """
+    return code.upper() == "SAFE004" or code == "unused_suppression"
 
 
 @dataclass

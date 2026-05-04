@@ -399,11 +399,22 @@ def _merge_extend_ignore(merged: dict[str, Any], extend_ignore: object) -> None:
 
 
 def _merge_extend_per_file_ignores(merged: dict[str, Any], extend_pfi: object) -> None:
-    """Merge ``extend_per_file_ignores`` into ``merged["per_file_ignores"]`` per glob pattern."""
+    """Merge ``extend_per_file_ignores`` into ``merged["per_file_ignores"]`` per glob pattern.
+
+    Both the base ``per_file_ignores`` and the new ``extend_per_file_ignores``
+    are validated as ``dict`` before merging. Without checking the base,
+    a misconfigured ``per_file_ignores = "tests/**"`` (string) would fall
+    through to ``_merge_one_pfi_pattern`` and raise a confusing
+    AttributeError on ``.get()`` instead of a clear TypeError.
+    """
     if not isinstance(extend_pfi, dict):
         msg = f"extend_per_file_ignores must be a mapping, got {type(extend_pfi).__name__}"
         raise TypeError(msg)
-    existing_pfi: dict[str, list[str]] = merged.get("per_file_ignores", {})
+    existing_raw = merged.get("per_file_ignores", {})
+    if not isinstance(existing_raw, dict):
+        msg = f"per_file_ignores must be a mapping, got {type(existing_raw).__name__}"
+        raise TypeError(msg)
+    existing_pfi: dict[str, list[str]] = existing_raw
     # Iteration over a runtime-validated dict[Any, Any]; the type checker
     # can't infer per-key/value types so we annotate explicitly inside the
     # loop body for the call site to type-check.

@@ -912,9 +912,11 @@ def _run_skill(args: argparse.Namespace) -> int:
 # safelint mirrors ruff's help layout deliberately so users moving between the
 # two tools get a familiar experience: a one-line tagline, ``Usage:`` line,
 # ``Commands:``, ``Options:``, and ``Global options:`` sections with bold
-# section headers and cyan command/flag names. Activated via ``safelint help``,
-# ``safelint -h``, ``safelint --help``, or as a side effect of running with no
-# args at all (where it would otherwise enter hook mode silently).
+# section headers and cyan command/flag names. Activated *only* via
+# ``safelint help``, ``safelint -h``, or ``safelint --help``. A bare
+# ``safelint`` invocation does NOT show this top-level help — it continues
+# through the normal hook-mode routing (silent on success when no .py files
+# are passed) so pre-commit's contract is preserved.
 
 
 _HELP_COMMANDS: tuple[tuple[str, str], ...] = (
