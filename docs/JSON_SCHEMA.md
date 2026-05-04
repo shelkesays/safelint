@@ -86,11 +86,16 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 The four position fields together specify a fully-resolved half-open range, matching LSP / VSCode `Range` and SARIF `region` semantics:
 
 ```typescript
-// VSCode mapping (subtract 1 for 0-based)
-new vscode.Range(
-  v.lineno - 1, v.column_start - 1,
-  v.end_lineno - 1, v.column_end - 1
-)
+// VSCode mapping. Subtract 1 for 0-based, but only after normalising
+// every nullable field — naive ``v.column_start - 1`` produces NaN
+// when the field is null. Synthetic violations (test_existence,
+// missing-file SAFE000) carry null columns / null end_lineno; the
+// fallbacks below render them as a whole-line marker on ``lineno``.
+const startLine = Math.max(0, v.lineno - 1);
+const endLine = Math.max(startLine, (v.end_lineno ?? v.lineno) - 1);
+const startCol = v.column_start !== null ? v.column_start - 1 : 0;
+const endCol = v.column_end !== null ? v.column_end - 1 : Number.MAX_SAFE_INTEGER;
+new vscode.Range(startLine, startCol, endLine, endCol);
 ```
 
 Earlier 1.7.0 drafts shipped `column_start` / `column_end` without `end_lineno`, which forced editors to assume `column_end` referred to `lineno`. That worked for single-line violations but mis-positioned multi-line ones (function definitions, except clauses, while loops). The 1.7.0 final adds `end_lineno` so the range is unambiguous.
@@ -149,6 +154,12 @@ interface Violation {
   severity: "error" | "warning";
   filepath: string;
   lineno: number;
+  // Position fields added in 1.7.0. ``null`` for synthetic violations
+  // (test_existence, missing-file SAFE000) where no Tree-sitter node
+  // was available to position against.
+  end_lineno: number | null;
+  column_start: number | null;
+  column_end: number | null;
   message: string;
 }
 
