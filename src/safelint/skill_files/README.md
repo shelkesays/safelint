@@ -1,8 +1,13 @@
-# SafeLint Claude Code skill
+# SafeLint AI-client skill
 
-A Claude Code skill that runs `safelint` against the current project and presents the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
+A bundled skill / project-rule that lets AI clients (Claude Code, Cursor) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
 
-Once installed, ask Claude Code things like:
+Two clients are supported today; both follow the *same* workflow because safelint's CLI surface is the same:
+
+- **Claude Code** — installs as a directory skill at `~/.claude/skills/safelint/` containing `SKILL.md` + `languages/`.
+- **Cursor** — installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
+
+Once installed, ask the agent things like:
 
 - "run safelint"
 - "lint my changes with safelint"
@@ -15,28 +20,35 @@ Once installed, ask Claude Code things like:
 
 ```bash
 pip install safelint              # or: uv add safelint
-safelint skill install            # copies the skill to ~/.claude/skills/safelint/
+
+# Claude Code (default)
+safelint skill install            # ~/.claude/skills/safelint/ (user)
+safelint skill install --project  # <cwd>/.claude/skills/safelint/
+
+# Cursor
+safelint skill install --client cursor             # ~/.cursor/rules/safelint.mdc (user)
+safelint skill install --client cursor --project   # <cwd>/.cursor/rules/safelint.mdc
 ```
 
-Restart Claude Code (or open a new session) to pick up the skill.
+Restart the AI client (or reload its window) to pick up the new skill / rule.
 
 ### Options
 
 | Flag | Effect |
 |---|---|
-| (no flags) | Copy the bundled skill into `~/.claude/skills/safelint/`. Default. Stable across `pip upgrade safelint` runs — re-run `safelint skill install --force` to pick up newer skill content. |
-| `--project` | Install into `<cwd>/.claude/skills/safelint/` instead of the user-global location. Activates the skill only inside this project — useful for team-shared overrides. |
-| `--symlink` | Symlink to the bundled location instead of copying. `pip upgrade safelint` then immediately changes what Claude Code sees. Requires symlink support (POSIX, or Windows developer mode). |
-| `--force` | Replace any existing `safelint/` skill at the target. Use this when re-installing after an upgrade. |
+| `--client` | Target AI client: `claude` (default — Claude Code skill directory) or `cursor` (single MDC project rule). |
+| `--project` | Install into the current project (`<cwd>/.claude/skills/safelint` or `<cwd>/.cursor/rules/safelint.mdc`) instead of the user-global location. Useful for team-shared overrides committed to the repo. |
+| `--symlink` | Symlink to the bundled location instead of copying. `pip upgrade safelint` then immediately changes what the AI client sees. Requires symlink support (POSIX, or Windows developer mode). |
+| `--force` | Replace any existing safelint skill / rule at the target. Use this when re-installing after an upgrade. |
 
 ### Examples
 
 ```bash
-# User-global (most common)
+# User-global Claude install (most common)
 safelint skill install
 
-# Project-local override (e.g. with project-specific guidance baked into SKILL.md)
-safelint skill install --project
+# Cursor install committed into a team project (recommended for Cursor)
+safelint skill install --client cursor --project
 
 # Re-install after upgrading safelint itself
 safelint skill install --force
@@ -48,10 +60,11 @@ safelint skill install --symlink --force
 ### Where are the bundled files?
 
 ```bash
-safelint skill path
+safelint skill path                  # Claude skill directory (default)
+safelint skill path --client cursor  # Cursor MDC file path
 ```
 
-Prints the on-disk location of the skill files inside your active safelint install. Useful for inspecting `SKILL.md` directly, or for debugging install issues.
+Prints the on-disk location of the skill files inside your active safelint install. Useful for inspecting `SKILL.md` / `safelint.mdc` directly, or for debugging install issues.
 
 ## Layout
 
@@ -59,11 +72,15 @@ The skill ships *inside* the safelint Python package, under `safelint/skill_file
 
 ```
 src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill path`
-├── SKILL.md                 # Language-agnostic core (the entry point Claude reads)
+├── SKILL.md                 # Language-agnostic core (the entry point Claude Code reads)
 ├── README.md                # This file
+├── cursor/
+│   └── safelint.mdc         # Cursor's native project-rule format (installed to .cursor/rules/)
 └── languages/               # One addendum per supported language
     └── python.md            # Python-specific install / rationale / idiomatic fixes
 ```
+
+The Claude install copies `SKILL.md` + `languages/` (the `cursor/` subdirectory is excluded — peer-client bundle). The Cursor install copies just `cursor/safelint.mdc`. Both clients can locate the language addendums via `safelint skill path` if they need them.
 
 The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint source tree. Each language safelint can lint has a corresponding addendum file here.
 

@@ -54,7 +54,7 @@ package-dir = {"" = "src"}
 where = ["src"]
 
 [tool.setuptools.package-data]
-safelint = ["py.typed", "skill_files/**/*.md"]
+safelint = ["py.typed", "skill_files/**/*.md", "skill_files/**/*.mdc"]
 
 # ---------------------------------------------------------------------------
 # pytest

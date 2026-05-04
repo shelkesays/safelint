@@ -244,14 +244,19 @@ Ready-to-copy samples:
 
 ## Editor / agent integrations
 
-### Claude Code skill (one-line install)
+### AI-client skills (Claude Code and Cursor)
 
 ```bash
 pip install safelint
+
+# Claude Code (default) — installs to ~/.claude/skills/safelint/
 safelint skill install
+
+# Cursor — installs the MDC project rule to .cursor/rules/safelint.mdc
+safelint skill install --client cursor --project
 ```
 
-After restarting Claude Code, ask things like *"run safelint"*, *"lint my changes with safelint"*, or *"do a Power-of-Ten review on src/api/auth.py"*. The skill invokes safelint with structured output, groups violations by file, and offers to walk through fixes. Use `--project` to install only for the current project, `--symlink` for skill-development workflows, or `--force` to re-install after upgrades. See [`src/safelint/skill_files/README.md`](src/safelint/skill_files/README.md) for the full reference.
+After restarting the AI client (or reloading its window), ask things like *"run safelint"*, *"lint my changes with safelint"*, or *"do a Power-of-Ten review on src/api/auth.py"*. The skill / rule invokes safelint with structured output, groups violations by file, and offers to walk through fixes. Use `--project` to install only for the current project, `--symlink` for skill-development workflows, or `--force` to re-install after upgrades. See [`src/safelint/skill_files/README.md`](src/safelint/skill_files/README.md) for the full reference.
 
 ### Other integration points
 
