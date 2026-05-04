@@ -814,40 +814,57 @@ def _build_hook_parser() -> argparse.ArgumentParser:
 def _build_skill_parser() -> argparse.ArgumentParser:
     """Build the ``skill`` subcommand parser.
 
-    Two actions today: ``install`` (materialises the bundled skill into
-    ``~/.claude/skills/safelint/`` or a project-local equivalent) and
-    ``path`` (prints the bundled-files location for debugging).
+    Two actions today: ``install`` (materialises the bundled skill or
+    Cursor rule into the chosen client's directory) and ``path``
+    (prints the bundled-files location for debugging).
+
+    The ``--client`` option selects which AI client to install for:
+    ``claude`` (default — the directory-tree Claude Code skill at
+    ``~/.claude/skills/safelint/``) or ``cursor`` (the single MDC
+    project rule at ``~/.cursor/rules/safelint.mdc``).
     """
     parser = argparse.ArgumentParser(
         prog="safelint skill",
-        description="Manage the bundled Claude Code skill for safelint",
+        description="Manage the bundled safelint skill / project rule for AI clients (Claude Code, Cursor)",
     )
     sub = parser.add_subparsers(dest="skill_action", required=True, metavar="ACTION")
 
     install = sub.add_parser(
         "install",
-        help="Install the bundled skill into Claude Code (default: ~/.claude/skills/safelint)",
+        help="Install the bundled skill / rule into the chosen AI client (default: Claude Code at ~/.claude/skills/safelint)",
+    )
+    install.add_argument(
+        "--client",
+        choices=("claude", "cursor"),
+        default="claude",
+        help="Target AI client: ``claude`` (default — Claude Code skill directory) or ``cursor`` (single MDC project rule)",
     )
     install.add_argument(
         "--project",
         action="store_true",
         default=False,
-        help="Install into <cwd>/.claude/skills/safelint instead of the user-global location",
+        help="Install into the current project (<cwd>/.claude/skills/safelint or <cwd>/.cursor/rules/safelint.mdc) instead of the user-global location",
     )
     install.add_argument(
         "--symlink",
         action="store_true",
         default=False,
-        help="Symlink to the bundled files instead of copying. Lets ``pip upgrade safelint`` automatically update the skill, but requires symlink support (POSIX, or Windows developer mode)",
+        help="Symlink to the bundled files instead of copying. Lets ``pip upgrade safelint`` automatically update the skill / rule, but requires symlink support (POSIX, or Windows developer mode)",
     )
     install.add_argument(
         "--force",
         action="store_true",
         default=False,
-        help="Replace any existing safelint skill at the target location",
+        help="Replace any existing safelint skill / rule at the target location",
     )
 
-    sub.add_parser("path", help="Print the on-disk location of the bundled skill files")
+    path_parser = sub.add_parser("path", help="Print the on-disk location of the bundled skill or Cursor rule")
+    path_parser.add_argument(
+        "--client",
+        choices=("claude", "cursor"),
+        default="claude",
+        help="Which bundled artefact's path to print: ``claude`` (default — skill_files root) or ``cursor`` (MDC file path)",
+    )
 
     return parser
 

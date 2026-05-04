@@ -1,27 +1,32 @@
-"""``safelint skill install`` subcommand — copy/symlink the bundled skill into the user's Claude Code skills directory.
+"""``safelint skill install`` subcommand — copy/symlink the bundled skill into the user's AI-client directory.
 
-The skill's source files (``SKILL.md`` + ``languages/*.md``) ship inside
-the wheel under ``safelint/skill_files/``. This module locates them
-via :func:`importlib.resources.files` and materialises them at the
-target install location.
+The skill's source files (``SKILL.md`` + ``languages/*.md`` + the
+Cursor ``cursor/safelint.mdc`` rule) ship inside the wheel under
+``safelint/skill_files/``. This module locates them via
+:func:`importlib.resources.files` and materialises them at the target
+install location.
 
-Two flavours of install:
+Two AI clients are supported:
 
-* **Copy** (default) — snapshot the bundled files. Stable across
+* **Claude Code** (default, ``--client claude``) — installs the
+  full skill bundle (``SKILL.md`` + ``languages/*.md`` + ``README.md``)
+  as a directory at ``~/.claude/skills/safelint/`` (user) or
+  ``<cwd>/.claude/skills/safelint/`` (project, with ``--project``).
+* **Cursor** (``--client cursor``) — installs the single MDC project
+  rule at ``~/.cursor/rules/safelint.mdc`` (user) or
+  ``<cwd>/.cursor/rules/safelint.mdc`` (project). The bundled
+  language addendums stay accessible via ``safelint skill path``;
+  the MDC tells the agent how to find them when needed.
+
+Two install flavours apply to both clients:
+
+* **Copy** (default) — snapshot the bundled file(s). Stable across
   ``pip upgrade safelint`` runs; the user re-runs ``skill install``
-  to pick up newer skill content. Works on every platform, including
+  to pick up newer content. Works on every platform, including
   Windows where symlink creation needs developer-mode or admin.
 * **Symlink** (``--symlink``) — link to the live bundled location.
-  ``pip upgrade safelint`` immediately changes what Claude Code sees.
+  ``pip upgrade safelint`` immediately changes what the agent sees.
   Useful for skill development; relies on POSIX-style symlinks.
-
-Two install scopes:
-
-* **User** (default) — ``~/.claude/skills/safelint/``. Active for every
-  Claude Code session.
-* **Project** (``--project``) — ``<cwd>/.claude/skills/safelint/``.
-  Active only inside the current project. Useful when you want
-  team-shared skill overrides without affecting personal sessions.
 """
 
 from __future__ import annotations
@@ -39,6 +44,13 @@ if TYPE_CHECKING:
 
 
 _SKILL_DIR_NAME = "safelint"
+_CURSOR_RULE_FILENAME = "safelint.mdc"
+
+# Subdirectory under ``skill_files/`` that holds peer-client bundles.
+# Excluded from the Claude install so the copy at ``~/.claude/skills/
+# safelint/`` doesn't carry an irrelevant ``cursor/`` sibling that
+# Claude Code would never read.
+_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor"})
 
 
 def _bundled_skill_root() -> Traversable:
@@ -71,11 +83,26 @@ def bundled_skill_path() -> Path:
         return Path(path)
 
 
-def _resolve_target(*, project: bool) -> Path:
-    """Return the install target directory based on scope."""
-    if project:
-        return Path.cwd() / ".claude" / "skills" / _SKILL_DIR_NAME
-    return Path.home() / ".claude" / "skills" / _SKILL_DIR_NAME
+def _bundled_source(client: str) -> Path:
+    """Return the bundled source path for *client*.
+
+    Claude install copies the whole ``skill_files/`` tree (minus the
+    cursor/ subdirectory). Cursor install copies just the single
+    ``cursor/safelint.mdc`` file.
+    """
+    root = bundled_skill_path()
+    if client == "cursor":
+        return root / "cursor" / _CURSOR_RULE_FILENAME
+    return root
+
+
+def _resolve_target(*, client: str, project: bool) -> Path:
+    """Return the install target path based on *client* and scope."""
+    if client == "cursor":
+        base = Path.cwd() if project else Path.home()
+        return base / ".cursor" / "rules" / _CURSOR_RULE_FILENAME
+    base = Path.cwd() if project else Path.home()
+    return base / ".claude" / "skills" / _SKILL_DIR_NAME
 
 
 def _remove_existing(target: Path) -> None:
@@ -90,15 +117,35 @@ def _remove_existing(target: Path) -> None:
 
 
 def _install_symlink(source: Path, target: Path) -> None:
-    """Create *target* as a symlink to *source*."""
+    """Create *target* as a symlink to *source*.
+
+    Works for both file (Cursor MDC) and directory (Claude skill)
+    sources — :meth:`Path.symlink_to` infers the target type from the
+    source unless we pass ``target_is_directory`` explicitly.
+    """
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.symlink_to(source, target_is_directory=True)
+    target.symlink_to(source, target_is_directory=source.is_dir())
 
 
 def _install_copy(source: Path, target: Path) -> None:
-    """Copy *source* tree to *target*."""
+    """Copy *source* (file or directory tree) to *target*.
+
+    For the Claude directory install, peer-client bundles (the
+    ``cursor/`` subdirectory) are excluded so users don't see an
+    irrelevant ``cursor/`` sibling inside their Claude skill folder.
+    """
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copytree(source, target)
+    if source.is_file():
+        shutil.copyfile(source, target)
+        return
+    shutil.copytree(source, target, ignore=shutil.ignore_patterns(*_PEER_CLIENT_DIRS))
+
+
+def _restart_hint(client: str) -> str:
+    """Return the per-client restart instruction printed after a successful install."""
+    if client == "cursor":
+        return "Restart Cursor (or reload the window) to pick up the new project rule."
+    return "Restart Claude Code (or open a new session) to pick up the skill."
 
 
 def run_install(args: argparse.Namespace) -> int:
@@ -108,14 +155,16 @@ def run_install(args: argparse.Namespace) -> int:
     exists without ``--force``). Unexpected errors (filesystem fault,
     bundled files missing) propagate.
     """
-    source = bundled_skill_path()
-    target = _resolve_target(project=args.project)
+    client = getattr(args, "client", "claude")
+    source = _bundled_source(client)
+    target = _resolve_target(client=client, project=args.project)
 
     if target.exists() or target.is_symlink():
         if not args.force:
             # Errors go to stderr so a wrapper script's `safelint skill install
             # || handle-error` flow can capture stderr without polluting stdout.
-            # nosafe: SAFE304 — explicit user-facing diagnostic by design.
+            # The inline suppression on the print line below is the explicit
+            # user-facing-diagnostic exemption from SAFE304.
             print(f"safelint: error: {target} already exists. Use --force to replace it.", file=sys.stderr)  # nosafe: SAFE304
             return 1
         _remove_existing(target)
@@ -129,21 +178,26 @@ def run_install(args: argparse.Namespace) -> int:
 
     scope = "project" if args.project else "user"
     # Success notices on stdout — pipe-friendly for scripted installs that
-    # want to log "what got installed where". nosafe: SAFE304 — these are
-    # the subcommand's whole purpose; printing IS their job.
-    print(f"safelint: skill {kind} to {target} ({scope} scope)")  # nosafe: SAFE304
-    print("Restart Claude Code (or open a new session) to pick up the skill.")  # nosafe: SAFE304
+    # want to log "what got installed where". SAFE304 already fires once
+    # per function on the first I/O call (the stderr print above), so
+    # these stdout prints don't need further suppressions.
+    print(f"safelint: {client} skill {kind} to {target} ({scope} scope)")
+    print(_restart_hint(client))
     return 0
 
 
-def run_path(_args: argparse.Namespace) -> int:
+def run_path(args: argparse.Namespace) -> int:
     """Execute ``safelint skill path`` — print the bundled-files location.
 
-    Useful for debugging install issues or for users who want to
-    inspect the bundled SKILL.md without installing.
+    Default prints the skill_files/ root (the Claude bundle); with
+    ``--client cursor`` prints the path to the bundled
+    ``cursor/safelint.mdc``. Useful for debugging install issues or
+    for users who want to inspect bundled content without installing.
     """
+    client = getattr(args, "client", "claude")
     # The whole point of this subcommand is to print the path to stdout
     # so it's pipeable (e.g. ``cat $(safelint skill path)/SKILL.md``).
-    # nosafe: SAFE304 — printing IS the subcommand's purpose.
-    print(bundled_skill_path())  # nosafe: SAFE304
+    # The inline SAFE304 suppression on the print line is the side-effects
+    # exemption — this is the subcommand's purpose.
+    print(_bundled_source(client))  # nosafe: SAFE304
     return 0
