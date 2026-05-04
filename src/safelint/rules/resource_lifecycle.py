@@ -60,8 +60,15 @@ class ResourceLifecycleRule(BaseRule):
         return guarded
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Flag unguarded calls to tracked resource-acquisition functions."""
-        tracked: frozenset[str] = frozenset(self.config.get("tracked_functions", ["open"]))
+        """Flag unguarded calls to tracked resource-acquisition functions.
+
+        ``tracked_functions`` defines the base set; ``extend_tracked_functions``
+        appends to it without forcing the user to redeclare the defaults
+        (mirrors ruff's ``extend-select`` ergonomics).
+        """
+        base_tracked = list(self.config.get("tracked_functions", ["open"]))
+        extra_tracked = list(self.config.get("extend_tracked_functions", []))
+        tracked: frozenset[str] = frozenset(base_tracked + extra_tracked)
         cleanup: frozenset[str] = frozenset(self.config.get("cleanup_patterns", ["close"]))
         guarded = self._collect_guarded(tree, tracked)
         cleanup_str = " / ".join(sorted(cleanup))

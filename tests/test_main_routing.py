@@ -259,6 +259,33 @@ def test_print_status_writes_to_stdout_in_pretty_mode(capsys: pytest.CaptureFixt
     assert captured.err == ""
 
 
+def test_print_statistics_emits_per_rule_table(capsys: pytest.CaptureFixture[str]) -> None:
+    """``--statistics`` prints a CODE / RULE / ACTIVE / SUPPRESSED breakdown."""
+    from safelint.rules.base import Violation  # noqa: PLC0415
+
+    active = [
+        Violation(rule="function_length", code="SAFE101", filepath="a.py", lineno=1, message="m", severity="error"),
+        Violation(rule="function_length", code="SAFE101", filepath="b.py", lineno=1, message="m", severity="error"),
+        Violation(rule="bare_except", code="SAFE201", filepath="c.py", lineno=1, message="m", severity="error"),
+    ]
+    suppressed = [Violation(rule="side_effects", code="SAFE304", filepath="d.py", lineno=1, message="m", severity="warning")]
+    cli._print_statistics(active, suppressed)
+    out = capsys.readouterr().out
+    assert "SAFE101" in out
+    assert "SAFE201" in out
+    assert "SAFE304" in out
+    assert "ACTIVE" in out
+    assert "SUPPRESSED" in out
+
+
+def test_print_statistics_silent_when_no_violations(capsys: pytest.CaptureFixture[str]) -> None:
+    """Empty input prints nothing — no header, no table, no blank lines."""
+    cli._print_statistics([], [])
+    captured = capsys.readouterr()
+    assert captured.out == ""
+    assert captured.err == ""
+
+
 def test_run_check_json_emits_empty_doc_when_no_modified_files(
     tmp_path: pytest.TempPathFactory,
     mocker: MockerFixture,

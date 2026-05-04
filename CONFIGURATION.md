@@ -19,6 +19,9 @@ These are passed on the command line and are not part of the config file.
 | `--mode` | from config | `local` (only errors block) or `ci` (warnings block too). |
 | `--config` | auto-discovered | Path to a config file (`pyproject.toml` or `safelint.toml`) or a directory to use as the config search root. |
 | `--ignore` | none | Repeatable flag to suppress a rule for this run only, e.g. `--ignore SAFE101 --ignore function_length`. Stacks on top of the `ignore` list in the config file. |
+| `--format` | `pretty` | Output format: `pretty` (ruff/ty-style coloured), `json` (stable schema documented in `docs/JSON_SCHEMA.md`), or `sarif` (SARIF 2.1.0 for GitHub code scanning). |
+| `--statistics` | off | After the run, print a per-rule violation-count table (active + suppressed). Pretty mode only. Useful for CI snapshots and finding the most-fired rules. |
+| `--no-cache` | off | Disable the per-file lint-result cache. By default safelint memoises rule output keyed on `sha256(source + engine config + filepath)` in `.safelint_cache/` next to your config. |
 
 **When to use `--all-files`:**
 - CI pipelines (clean checkout, no modified files in git terms)
@@ -185,6 +188,30 @@ ignore = ["SAFE203", "SAFE304", "side_effects_hidden"]
 
 Rules in the `ignore` list are skipped entirely — they produce no violations and add no overhead.
 
+### `extend_ignore` — grow the list without redeclaring it (1.8.0)
+
+When you only want to *add* to the project's existing ignore list (rather than replace it), use `extend_ignore`. SafeLint folds it into `ignore` at config-load time — downstream consumers only see the merged result.
+
+```toml
+[tool.safelint]
+ignore = ["SAFE701"]               # baseline ignores
+extend_ignore = ["SAFE702", "SAFE801"]   # appended to the above
+# Resolved at runtime → ignore = ["SAFE701", "SAFE702", "SAFE801"]
+```
+
+This is especially useful in layered configs (e.g. one `safelint.toml` for the project and a developer's local override) — you can extend without losing the baseline.
+
+The same pattern applies to per-file ignores: `extend_per_file_ignores` merges into `per_file_ignores` per glob pattern (entries for an existing pattern are concatenated and deduped; new patterns are added).
+
+```toml
+[per_file_ignores]
+"tests/**" = ["SAFE101"]
+
+[extend_per_file_ignores]
+"tests/**" = ["SAFE102"]      # tests/** ends up with SAFE101 + SAFE102
+"docs/**" = ["SAFE601"]       # new pattern added wholesale
+```
+
 ### `ignore` vs. per-rule `enabled: false`
 
 Both achieve the same result, but they serve different purposes:
@@ -275,6 +302,30 @@ Each rule has:
 
 ---
 
+### Engine-internal codes
+
+A few codes are emitted by the engine directly rather than by registered `BaseRule` subclasses. They follow the same `# nosafe: SAFE0xx` and global `ignore` semantics as ordinary rules but don't have their own config section.
+
+#### SAFE000 - `parse`
+
+**What it flags:** Tree-sitter parse errors (syntax errors, broken indentation, missing tokens). The violation carries the offending token's column as a zero-width caret so editors can mark the precise location.
+
+Always severity `error`. Cannot be configured. Disable globally via `ignore = ["SAFE000"]` if you genuinely don't want parse errors surfaced (rare).
+
+#### SAFE004 - `unused_suppression` *(added in 1.8.0)*
+
+**What it flags:** A `# nosafe` directive on a line where no violation actually fired — i.e. the suppression is stale (e.g. left over after a refactor that removed the offending code).
+
+```python
+def f():
+    x = 1   # nosafe: SAFE304   ← SAFE304 doesn't fire here; SAFE004 reports
+    return x
+```
+
+Severity is fixed at `warning`. Disable globally via `ignore = ["SAFE004"]` (or via per-file ignores) if your workflow involves many transient suppressions you'd rather not police. Self-referential `# nosafe: SAFE004` is special-cased — a directive that only mentions SAFE004 is always considered "used" to avoid recursion.
+
+---
+
 ### Structural rules
 
 These check the shape of your functions. They are cheap to run and always go first.
@@ -283,7 +334,7 @@ These check the shape of your functions. They are cheap to run and always go fir
 
 #### SAFE101 - `function_length`
 
-**What it flags:** Functions longer than `max_lines` lines.
+**What it flags:** Functions longer than `max_lines` (interpreted under the configured `count_mode`).
 
 Long functions are hard to read, test, and reason about. The Holzmann rule says a function should fit on one printed page.
 
@@ -291,14 +342,18 @@ Long functions are hard to read, test, and reason about. The Holzmann rule says 
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"error"` | `"error"` or `"warning"` |
-| `max_lines` | `60` | Maximum allowed function length in lines |
+| `max_lines` | `60` | Maximum allowed function size (units depend on `count_mode`) |
+| `count_mode` | `"lines"` | How to measure size: `"lines"` (raw source lines incl. blanks/comments — Holzmann's original framing), `"logical_lines"` (lines minus blanks and pure-comment lines — less game-able), or `"statements"` (count Python statement nodes — robust to formatting, equivalent to ruff's `PLR0915`). *Added in 1.8.0.* |
 
 ```toml
 [tool.safelint.rules.function_length]
 enabled = true
 severity = "error"
 max_lines = 60
+count_mode = "lines"      # default; alternatives: "logical_lines", "statements"
 ```
+
+When switching to `"statements"`, lower `max_lines` accordingly — a function with 60 source lines typically corresponds to ~25–35 statement nodes. Pick a value that matches the spirit of "function fits on a page" for your codebase.
 
 ---
 
@@ -408,9 +463,17 @@ except ConnectionError as exc:
 
 #### SAFE202 - `empty_except`
 
-**What it flags:** `except` blocks with no statements in the body (just `pass`).
+**What it flags:** `except` blocks whose body is effectively a no-op:
 
-An empty except block silently swallows the error. The caller has no idea something went wrong.
+- `except E: pass`
+- `except E: continue`
+- `except E: ...` (Ellipsis)
+- `except E: 0` / `None` / `True` / `False` (constant literals)
+- `except E: "TODO"` / `""` (string-as-comment idiom)
+
+An empty except block silently swallows the error. The caller has no idea something went wrong. *Broadened in 1.8.0* — earlier versions only matched a literally empty body which Tree-sitter doesn't actually produce for valid Python, so the rule was effectively dead code.
+
+Multi-statement bodies are not flagged even if every statement looks trivial — two consecutive no-ops suggest *some* intentional structure and would generate false positives.
 
 | Option | Default | Description |
 |---|---|---|
@@ -471,19 +534,21 @@ severity = "warning"
 
 #### SAFE302 - `global_mutation`
 
-**What it flags:** Functions that declare `global x` and then assign to `x`.
+**What it flags:** By default, functions that declare `global x` and then assign to `x`. With `strict = true`, *any* `global` declaration is flagged regardless of whether a write follows.
 
-This is stricter than `SAFE301`. A function that both declares a variable global *and* writes to it is mutating shared state - the most dangerous form of global use.
+This is stricter than `SAFE301`. A function that both declares a variable global *and* writes to it is mutating shared state — the most dangerous form of global use. The default behaviour is more nuanced than ruff's `PLW0603` (which fires on any `global`); set `strict = true` if your team's policy is to ban the keyword entirely.
 
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"error"` | `"error"` or `"warning"` |
+| `strict` | `false` | When `true`, fire on every `global` declaration even without a subsequent write — mirrors ruff's `PLW0603`. *Added in 1.8.0.* |
 
 ```toml
 [tool.safelint.rules.global_mutation]
 enabled = true
 severity = "error"
+strict = false   # set true to ban the `global` keyword outright
 ```
 
 ---
@@ -552,15 +617,31 @@ Resources that are opened must be closed. If an exception occurs between `open()
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"error"` | `"error"` or `"warning"` |
-| `tracked_functions` | `["open", "connect", "session"]` | Calls that must be inside a `with` block |
-| `cleanup_patterns` | `["close", "commit", "rollback"]` | Acceptable cleanup method names as an alternative |
+| `tracked_functions` | (see below) | Calls that must be inside a `with` block. Replaces the default list when set. |
+| `extend_tracked_functions` | `[]` | Appended to the default list — use this when you want to *add* custom functions without losing the defaults. *Added in 1.8.0.* |
+| `cleanup_patterns` | `["close", "commit", "rollback", "release", "shutdown"]` | Acceptable cleanup method names as an alternative |
+
+**Default `tracked_functions`** (expanded in 1.8.0):
 
 ```toml
+tracked_functions = [
+    "open", "connect", "session", "Session",          # files, DBs, HTTP
+    "Lock", "RLock", "Semaphore",                     # synchronisation
+    "Pool", "ThreadPoolExecutor", "ProcessPoolExecutor",  # work pools
+    "socket", "mmap",                                 # network / memory
+    "TemporaryFile", "NamedTemporaryFile", "TemporaryDirectory",
+    "ZipFile", "TarFile",                             # archives
+]
+```
+
+```toml
+# Add custom acquirers without losing the defaults
 [tool.safelint.rules.resource_lifecycle]
-enabled = true
-severity = "error"
-tracked_functions = ["open", "connect", "session", "cursor"]
-cleanup_patterns = ["close", "commit", "rollback"]
+extend_tracked_functions = ["acquire_widget", "rent_db_handle"]
+
+# Or replace the list entirely
+[tool.safelint.rules.resource_lifecycle]
+tracked_functions = ["open", "connect"]
 ```
 
 **Bad:**
@@ -693,6 +774,7 @@ The rule tracks data flow through assignments: if `x = user_data` then `x` is ta
 | `sinks` | see below | Call names considered dangerous |
 | `sanitizers` | see below | Call names that clear taint |
 | `sources` | see below | Call names that inject taint (in addition to parameters) |
+| `assume_taint_preserving` | `true` | How unknown calls (neither sanitizer nor source) propagate taint. *Added in 1.9.0.* |
 
 Default `sinks`: `eval`, `exec`, `compile`, `system`, `popen`, `Popen`, `run`, `call`, `check_output`, `execute`
 
@@ -707,7 +789,17 @@ severity = "error"
 sinks = ["eval", "exec", "system", "execute"]
 sanitizers = ["escape", "sanitize", "quote"]
 sources = ["input", "readline"]
+assume_taint_preserving = true   # default; set false for stricter mode
 ```
+
+##### `assume_taint_preserving` modes (1.9.0)
+
+Most real codebases pass tainted data through internal helper functions before it reaches a sink. This config flag controls how those *unknown* calls (i.e. calls whose name isn't in `sources` or `sanitizers`) are analysed:
+
+- **`true` (default)** — historical behaviour. An unknown call's result is tainted iff any of its arguments are tainted. Catches taint flow through arbitrary helpers (``eval(wrap(user_input))`` fires) at the cost of false positives when wrappers are obviously safe.
+- **`false`** — stricter analysis. Unknown calls always drop taint, so ``eval(wrap(user_input))`` does NOT fire (false negative). Direct flows like ``eval(user_input)`` and known-source flows still fire. Use when your codebase has many internal-only wrappers and you'd rather miss a flow than chase down false positives.
+
+The trade-off is fundamental to intra-procedural analysis — there's no way to know whether ``wrap`` actually preserves the taint without inlining it. Switch modes based on which failure mode hurts more in your codebase.
 
 **Bad:**
 ```python
