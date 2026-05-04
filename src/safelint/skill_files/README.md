@@ -1,4 +1,4 @@
-# safelint Claude Code skill
+# SafeLint Claude Code skill
 
 A Claude Code skill that runs `safelint` against the current project and presents the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
 
