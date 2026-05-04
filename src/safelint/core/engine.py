@@ -287,10 +287,11 @@ class SafetyEngine:
         """Build a LintResult carrying a single SAFE000 parse-error violation.
 
         *column* is the 1-based column of the offending token; when supplied
-        it becomes a zero-width caret (``column_start == column_end``) so
-        editors can render a precise marker rather than underlining the
-        whole line.
+        it becomes a zero-width caret (``column_start == column_end``) on
+        ``end_lineno == lineno`` so editors can render a precise marker
+        rather than underlining the whole line.
         """
+        end = lineno if column is not None else None
         return LintResult(
             path=filepath,
             violations=[
@@ -303,6 +304,7 @@ class SafetyEngine:
                     severity="error",
                     column_start=column,
                     column_end=column,
+                    end_lineno=end,
                 )
             ],
         )

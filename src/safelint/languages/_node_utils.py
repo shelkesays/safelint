@@ -80,17 +80,22 @@ def column_end(node: tree_sitter.Node) -> int:
     return node.end_point[1] + 1
 
 
-def node_range(node: tree_sitter.Node) -> tuple[int, int, int]:
-    """Return ``(lineno, column_start, column_end)`` for *node* — all 1-based.
+def node_range(node: tree_sitter.Node) -> tuple[int, int, int, int]:
+    """Return ``(start_line, end_line, column_start, column_end)`` for *node* — all 1-based.
 
     Convenience for rule code building :class:`~safelint.rules.base.Violation`
     objects: avoids the noisy ``node.start_point[0] + 1`` /
-    ``node.start_point[1] + 1`` triplets at every call site. Multi-line
-    nodes report only the start line — column_end refers to the end
-    column on whatever line that is, matching Tree-sitter's convention
-    of treating column_end as the column on the end_point's row.
+    ``node.start_point[1] + 1`` triplets at every call site.
+
+    For multi-line constructs (function definitions, ``while`` loops,
+    ``except`` clauses) ``end_line`` differs from ``start_line`` and
+    ``column_end`` is the column on ``end_line`` (not on
+    ``start_line``). Returning all four coordinates lets the caller
+    populate ``Violation.end_lineno`` so editor / SARIF consumers
+    can render the precise span instead of mis-applying
+    ``column_end`` to ``start_line``.
     """
-    return lineno(node), column_start(node), column_end(node)
+    return lineno(node), end_lineno(node), column_start(node), column_end(node)
 
 
 def node_text(node: tree_sitter.Node) -> str:
