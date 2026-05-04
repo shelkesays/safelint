@@ -10,6 +10,47 @@ All keys are optional - anything you leave out falls back to the built-in defaul
 
 These are passed on the command line and are not part of the config file.
 
+### Top-level commands and flags (1.10.0)
+
+SafeLint's top-level surface mirrors ruff's: every command can be invoked positionally (`safelint check ...`), and every flag has both a short and a long form where conventional. Help and version are intercepted before any command parsing so they always work, even when no subcommand is given.
+
+```text
+$ safelint --help
+SafeLint: Holzmann-inspired safety lint rules and pre-commit integration for Python.
+
+Usage: safelint [OPTIONS] <COMMAND>
+
+Commands:
+  check    Scan a file or directory for safety violations
+  skill    Manage the bundled Claude Code skill (install, path)
+  help     Print this message or the help of the given subcommand
+  version  Display SafeLint's version
+
+Options:
+  -h, --help     Print help (see a summary with -h)
+  -V, --version  Print version
+
+Global options:
+  --fail-on <LEVEL>        Minimum severity that blocks the run: error | warning
+  --mode <MODE>            Execution mode: local (only errors block) | ci (warnings block too)
+  --ignore <CODE>          Repeatable; suppress a rule for this run
+  --format <FORMAT>        Output format: pretty (default) | json | sarif
+  --statistics             Print a per-rule violation count summary
+  --no-cache               Disable the per-file lint-result cache
+  --stdin                  Read source from stdin (editor mode)
+  --stdin-filename <PATH>  Pseudo-filename for stdin input
+```
+
+Equivalent invocations:
+
+| Goal | Forms |
+|---|---|
+| Top-level help | `safelint help`, `safelint --help`, `safelint -h` |
+| Subcommand help | `safelint help check`, `safelint check --help` |
+| Version | `safelint version`, `safelint --version`, `safelint -V` |
+
+ANSI colour is auto-disabled when stdout is not a TTY (piping to a file produces clean text), matching the rest of safelint's output conventions.
+
 ### `safelint check` flags
 
 | Flag | Default | What it does |

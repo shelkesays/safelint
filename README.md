@@ -59,6 +59,14 @@ pip install safelint
 
 ## Usage
 
+**Discover the CLI surface** (ruff-style help and version):
+
+```bash
+safelint --help              # or: safelint help, safelint -h
+safelint help check          # subcommand-specific help
+safelint --version           # or: safelint version, safelint -V
+```
+
 **Check modified files** (default — only files changed since last commit):
 
 ```bash
