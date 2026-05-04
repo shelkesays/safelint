@@ -131,6 +131,92 @@ def test_main_routes_to_hook_when_first_positional_is_a_file(monkeypatch: pytest
     check_spy.assert_not_called()
 
 
+def test_main_prints_help_when_no_args(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """Wait — bare ``safelint`` does NOT print help; it routes to hook mode (silent on no .py args).
+
+    This documents the actual behaviour: top-level help is reached via
+    ``safelint help`` / ``safelint -h`` / ``safelint --help``, not by
+    running with no args (which is reserved for pre-commit hook mode).
+    """
+    monkeypatch.setattr("sys.argv", ["safelint"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    # Hook mode with empty file list returns 0.
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    # Should NOT show the help banner.
+    assert "Usage: safelint" not in out
+
+
+def test_main_prints_help_for_explicit_help_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint --help`` prints the ruff-style top-level help and exits 0."""
+    monkeypatch.setattr("sys.argv", ["safelint", "--help"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "Usage: safelint [OPTIONS] <COMMAND>" in out
+    assert "Commands:" in out
+    assert "Global options:" in out
+
+
+def test_main_prints_help_for_short_h_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint -h`` matches ``--help`` (also printed via the same path)."""
+    monkeypatch.setattr("sys.argv", ["safelint", "-h"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    assert "Usage: safelint" in capsys.readouterr().out
+
+
+def test_main_prints_help_for_help_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint help`` (no subcommand) matches ``--help``."""
+    monkeypatch.setattr("sys.argv", ["safelint", "help"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    assert "Usage: safelint" in capsys.readouterr().out
+
+
+def test_main_prints_version_for_short_v_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint -V`` prints the version on stdout and exits 0."""
+    monkeypatch.setattr("sys.argv", ["safelint", "-V"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    out = capsys.readouterr().out.strip()
+    assert out.startswith("safelint ")
+
+
+def test_main_prints_version_for_long_version_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint --version`` matches ``-V``."""
+    monkeypatch.setattr("sys.argv", ["safelint", "--version"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip().startswith("safelint ")
+
+
+def test_main_prints_version_for_version_command(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint version`` matches ``-V``."""
+    monkeypatch.setattr("sys.argv", ["safelint", "version"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip().startswith("safelint ")
+
+
+def test_help_for_unknown_subcommand_returns_nonzero(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint help bogus`` reports the unknown command on stderr and exits non-zero."""
+    monkeypatch.setattr("sys.argv", ["safelint", "help", "bogus"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert "unknown command" in err
+    assert "bogus" in err
+
+
 def test_first_positional_index_skips_value_taking_options() -> None:
     """``_first_positional_index`` returns the index of the first true positional."""
     assert cli._first_positional_index(["--format", "json", "check", "src"]) == 2

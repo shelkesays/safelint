@@ -908,10 +908,134 @@ def _run_skill(args: argparse.Namespace) -> int:
     return 1  # pragma: no cover — argparse rejects unknown actions before this
 
 
+# ── help / version (ruff-style top-level CLI surface) ───────────────────────
+# safelint mirrors ruff's help layout deliberately so users moving between the
+# two tools get a familiar experience: a one-line tagline, ``Usage:`` line,
+# ``Commands:``, ``Options:``, and ``Global options:`` sections with bold
+# section headers and cyan command/flag names. Activated via ``safelint help``,
+# ``safelint -h``, ``safelint --help``, or as a side effect of running with no
+# args at all (where it would otherwise enter hook mode silently).
+
+
+_HELP_COMMANDS: tuple[tuple[str, str], ...] = (
+    ("check", "Scan a file or directory for safety violations"),
+    ("skill", "Manage the bundled Claude Code skill (install, path)"),
+    ("help", "Print this message or the help of the given subcommand"),
+    ("version", "Display SafeLint's version"),
+)
+
+
+_HELP_OPTIONS: tuple[tuple[str, str], ...] = (
+    ("-h, --help", "Print help (see a summary with -h)"),
+    ("-V, --version", "Print version"),
+)
+
+
+_HELP_GLOBAL_OPTIONS: tuple[tuple[str, str], ...] = (
+    ("--fail-on <LEVEL>", "Minimum severity that blocks the run: ``error`` | ``warning``"),
+    ("--mode <MODE>", "Execution mode: ``local`` (only errors block) | ``ci`` (warnings block too)"),
+    ("--ignore <CODE>", "Repeatable; suppress a rule for this run (stacks on top of config ``ignore``)"),
+    ("--format <FORMAT>", "Output format: ``pretty`` (default) | ``json`` | ``sarif``"),
+    ("--statistics", "Print a per-rule violation count summary at the end of the run"),
+    ("--no-cache", "Disable the per-file lint-result cache"),
+    ("--stdin", "Read source from stdin (editor mode)"),
+    ("--stdin-filename <PATH>", "Pseudo-filename for stdin input; drives language detection by extension"),
+)
+
+
+def _print_main_help() -> None:
+    """Print the top-level help in a ruff-inspired format with ANSI colour.
+
+    The layout, typography, and section ordering deliberately mirror
+    ``ruff --help`` so users moving between tools get a familiar
+    experience. Colour is auto-disabled when stdout is not a TTY (see
+    ``_c``), so piping to a file produces clean text.
+    """
+    tagline = _c("SafeLint", _BOLD, _GREEN) + ": Holzmann-inspired safety lint rules and pre-commit integration for Python."
+    print(tagline)
+    print()
+    print(f"{_c('Usage:', _BOLD)} {_c('safelint', _CYAN)} [OPTIONS] <COMMAND>")
+    print()
+    print(_c("Commands:", _BOLD))
+    _print_help_table(_HELP_COMMANDS, name_colour=_CYAN)
+    print()
+    print(_c("Options:", _BOLD))
+    _print_help_table(_HELP_OPTIONS, name_colour=_CYAN)
+    print()
+    print(_c("Global options:", _BOLD))
+    _print_help_table(_HELP_GLOBAL_OPTIONS, name_colour=_CYAN)
+    print()
+    print(f"For help with a specific command, see: `{_c('safelint help <command>', _CYAN)}`.")
+
+
+def _print_help_table(rows: tuple[tuple[str, str], ...], *, name_colour: str) -> None:
+    """Render a two-column ``name  description`` table aligned to the widest name."""
+    width = max(len(name) for name, _ in rows)
+    for name, desc in rows:
+        padding = " " * (width - len(name) + 2)
+        print(f"  {_c(name, name_colour)}{padding}{desc}")
+
+
+def _print_version() -> None:
+    """Print the running safelint version in the conventional ``safelint X.Y.Z`` form."""
+    from safelint import __version__  # noqa: PLC0415
+
+    print(f"safelint {__version__}")
+
+
+def _print_subcommand_help(subcommand: str) -> int:
+    """Defer to the relevant argparse parser's --help for subcommand-specific help.
+
+    ``safelint help check`` should produce the same output as
+    ``safelint check --help``. Argparse's auto-generated help is good
+    enough at the subcommand level; only the top-level (where we have
+    multiple parsers) needs the hand-rolled formatter.
+    """
+    if subcommand == "check":
+        _build_check_parser().parse_args(["--help"])
+    elif subcommand == "skill":
+        _build_skill_parser().parse_args(["--help"])
+    elif subcommand in ("help", "version"):
+        _print_main_help()
+    else:
+        print(f"safelint: unknown command '{subcommand}'", file=sys.stderr)
+        print("Run `safelint help` to see the list of supported commands.", file=sys.stderr)
+        return 2
+    return 0
+
+
+def _is_top_level_help_request() -> tuple[bool, str | None]:
+    """Detect ``safelint help [<cmd>]`` / ``safelint -h`` / ``safelint --help``.
+
+    Returns ``(matched, sub)`` where *matched* is True when the invocation
+    is asking for top-level help, and *sub* is the subcommand to defer to
+    (or None for the unfiltered top-level help). The check runs *before*
+    argparse so we can intercept ``-h`` / ``--help`` even when no command
+    is supplied — argparse would otherwise produce its own less polished
+    output.
+    """
+    rest = sys.argv[1:]
+    if not rest:
+        return False, None
+    if rest[0] in ("-h", "--help"):
+        return True, None
+    if rest[0] == "help":
+        return True, rest[1] if len(rest) > 1 else None
+    return False, None
+
+
+def _is_version_request() -> bool:
+    """Detect ``safelint -V`` / ``safelint --version`` / ``safelint version``."""
+    rest = sys.argv[1:]
+    return bool(rest) and rest[0] in ("-V", "--version", "version")
+
+
 def main() -> None:
     """Entry point for direct CLI invocation, pre-commit hook, and stdin mode.
 
     Routing logic (in order):
+    - ``-h`` / ``--help`` / ``help`` (with optional subcommand) → print help.
+    - ``-V`` / ``--version`` / ``version`` → print version and exit.
     - ``--stdin`` anywhere in argv → read source from stdin (editor mode).
     - First true positional argument is ``check`` → ``check`` subcommand.
     - First true positional argument is ``skill`` → ``skill`` subcommand
@@ -923,6 +1047,16 @@ def main() -> None:
     the scanner skips their values so ``safelint --format json check src``
     is routed correctly.
     """
+    is_help, sub = _is_top_level_help_request()
+    if is_help:
+        if sub is None:
+            _print_main_help()
+            sys.exit(0)
+        sys.exit(_print_subcommand_help(sub))
+    if _is_version_request():
+        _print_version()
+        sys.exit(0)
+
     if "--stdin" in sys.argv[1:]:
         args = _build_stdin_parser().parse_args()
         sys.exit(_run_stdin(args))
