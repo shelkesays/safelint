@@ -139,7 +139,7 @@ def test_make_summary_suppressed_clean_run_breaks_down_by_code() -> None:
 def test_make_summary_suppressed_with_violations_surfaces_breakdown_in_fixes_line() -> None:
     """When violations exist, the suppression breakdown rides on the fixes line.
 
-    Updated in 1.10.0 — the line now reads "No suggestions available (safelint
+    Updated in 1.8.0 — the line now reads "No suggestions available (safelint
     does not auto-fix; …)" since "fixes" was renamed to "suggestions" to
     reflect the never-auto-apply policy. The suppression breakdown still
     rides at the end in the canonical "(… suppressed)" form.

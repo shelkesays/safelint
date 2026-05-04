@@ -62,7 +62,7 @@ def test_json_violation_structure() -> None:
     v = doc["violations"][0]
     # Position fields (end_lineno, column_start, column_end) default to None
     # for synthetic test Violations (added in 1.7.0). suggestions defaults to
-    # an empty list (added in 1.10.0). Real rules attach Tree-sitter positions
+    # an empty list (added in 1.8.0). Real rules attach Tree-sitter positions
     # and may attach suggestions.
     assert v == {
         "code": "SAFE101",
@@ -96,7 +96,7 @@ def test_json_violation_includes_full_range_when_present() -> None:
 
 
 def test_json_violation_includes_suggestions_when_present() -> None:
-    """Suggestions on a Violation round-trip through the JSON formatter (1.10.0)."""
+    """Suggestions on a Violation round-trip through the JSON formatter (1.8.0)."""
     from safelint.rules.base import Suggestion, TextEdit  # noqa: PLC0415
 
     edit = TextEdit(start_line=4, start_column=5, end_line=4, end_column=12, replacement="except Exception:")
@@ -121,7 +121,7 @@ def test_json_violation_includes_suggestions_when_present() -> None:
 
 
 def test_sarif_violation_with_suggestions_emits_fixes_block() -> None:
-    """SARIF ``fixes[]`` is populated from suggestions; native advisory by spec (1.10.0)."""
+    """SARIF ``fixes[]`` is populated from suggestions; native advisory by spec (1.8.0)."""
     from safelint.rules.base import Suggestion, TextEdit  # noqa: PLC0415
 
     edit = TextEdit(start_line=4, start_column=5, end_line=4, end_column=12, replacement="except Exception:")

@@ -72,7 +72,7 @@ def _violation_to_dict(v: Violation) -> dict[str, Any]:
     fields together specify a half-open ``[start, end)`` range that
     maps cleanly to LSP / VSCode ``Range`` semantics.
 
-    *Added in 1.10.0:* the ``suggestions`` array carries advisory
+    *Added in 1.8.0:* the ``suggestions`` array carries advisory
     fixes the rule offers. **Editors and CI tools must never apply
     these automatically** — every edit goes through user
     confirmation. Each suggestion has a one-line ``description`` and

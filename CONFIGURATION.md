@@ -10,7 +10,7 @@ All keys are optional - anything you leave out falls back to the built-in defaul
 
 These are passed on the command line and are not part of the config file.
 
-### Top-level commands and flags (1.10.0)
+### Top-level commands and flags (1.8.0)
 
 SafeLint's top-level surface mirrors ruff's: every command can be invoked positionally (`safelint check ...`), and every flag has both a short and a long form where conventional. Help and version are intercepted before any command parsing so they always work, even when no subcommand is given.
 
@@ -137,7 +137,7 @@ ties broken alphabetically.
 
 When there are still active violations, the breakdown rides on the
 post-summary line. The text varies depending on whether any rule
-emitted advisory suggestions for those violations (added in 1.10.0):
+emitted advisory suggestions for those violations (added in 1.8.0):
 
 ```text
 Found 2 errors, 1 warning. [--fail-on=error].
@@ -834,7 +834,7 @@ The rule tracks data flow through assignments: if `x = user_data` then `x` is ta
 | `sinks` | see below | Call names considered dangerous |
 | `sanitizers` | see below | Call names that clear taint |
 | `sources` | see below | Call names that inject taint (in addition to parameters) |
-| `assume_taint_preserving` | `true` | How unknown calls (neither sanitizer nor source) propagate taint. *Added in 1.9.0.* |
+| `assume_taint_preserving` | `true` | How unknown calls (neither sanitizer nor source) propagate taint. *Added in 1.8.0.* |
 
 Default `sinks`: `eval`, `exec`, `compile`, `system`, `popen`, `Popen`, `run`, `call`, `check_output`, `execute`
 
@@ -852,7 +852,7 @@ sources = ["input", "readline"]
 assume_taint_preserving = true   # default; set false for taint-dropping mode
 ```
 
-##### `assume_taint_preserving` modes (1.9.0)
+##### `assume_taint_preserving` modes (1.8.0)
 
 Most real codebases pass tainted data through internal helper functions before it reaches a sink. The `assume_taint_preserving` config flag controls how those *unknown* calls (i.e. calls whose name isn't in `sources` or `sanitizers`) are analysed.
 

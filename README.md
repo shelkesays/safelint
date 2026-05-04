@@ -135,7 +135,7 @@ Add this to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v1.10.0  # replace with the latest release tag
+    rev: v1.8.0  # replace with the latest release tag
     hooks:
       - id: safelint
         args: [--fail-on=error]  # use --fail-on=warning for stricter CI

@@ -2,13 +2,13 @@
 
 `safelint check --format json` and `safelint --stdin --format json` both emit a single JSON document on stdout describing the lint run. This page documents that contract so plugin authors (Claude Code skill, VSCode extension, CI scripts) can rely on a stable shape.
 
-The schema is **stable since v1.5.0**. Field additions are non-breaking (consumers ignore unknown keys); removals or type changes only happen in a major-version bump (none to date). Notable additions since baseline: position fields (`end_lineno`, `column_start`, `column_end`) in 1.7.0, advisory `suggestions[]` in 1.10.0.
+The schema is **stable since v1.5.0**. Field additions are non-breaking (consumers ignore unknown keys); removals or type changes only happen in a major-version bump (none to date). Notable additions since baseline: position fields (`end_lineno`, `column_start`, `column_end`) in 1.7.0, advisory `suggestions[]` in 1.8.0.
 
 ## Top-level shape
 
 ```json
 {
-  "version": "1.10.0",
+  "version": "1.8.0",
   "summary": {
     "files_checked": 12,
     "violations": 4,
@@ -88,7 +88,7 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 | `column_start` | int \| null | *Added in 1.7.0.* 1-based column on `lineno` where the construct starts. `null` when no Tree-sitter node / position was available. `column_start` and `column_end` are always either both set or both `null`. Editors should treat `null` as "underline the whole line". |
 | `column_end` | int \| null | *Added in 1.7.0.* 1-based column on `end_lineno` (not `lineno`!) where the construct ends. Half-open: the range is `[column_start, column_end)`. `null` when no Tree-sitter node / position was available (paired with a `null` `column_start`). For zero-width markers (parse-error carets), `column_start == column_end` and `end_lineno == lineno`. |
 | `message` | string | Human-readable description. May contain quotes and Unicode; safe for direct display. Don't parse — present verbatim. |
-| `suggestions` | Suggestion[] | *Added in 1.10.0.* Zero or more advisory fixes the rule offers. **NEVER apply automatically** — see the "Suggestions are advisory only" section below. Empty array when the rule has no fix to offer. |
+| `suggestions` | Suggestion[] | *Added in 1.8.0.* Zero or more advisory fixes the rule offers. **NEVER apply automatically** — see the "Suggestions are advisory only" section below. Empty array when the rule has no fix to offer. |
 
 ### Suggestion object
 
@@ -215,7 +215,7 @@ interface Violation {
   column_start: number | null;
   column_end: number | null;
   message: string;
-  // Advisory suggestions added in 1.10.0. Empty array when the rule
+  // Advisory suggestions added in 1.8.0. Empty array when the rule
   // has no fix to offer. Never auto-apply.
   suggestions: Suggestion[];
 }
