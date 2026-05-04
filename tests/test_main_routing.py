@@ -208,6 +208,94 @@ def test_main_prints_version_for_version_command(monkeypatch: pytest.MonkeyPatch
     assert capsys.readouterr().out.strip().startswith("safelint ")
 
 
+# ---------------------------------------------------------------------------
+# Help / version scanning is position-independent — global flags placed
+# *before* the help / version marker (``safelint --format json --version``)
+# must still reach the polished top-level renderer rather than falling
+# through to argparse. Locks the contract in so a future early-router
+# refactor can't silently regress to ``argv[1]``-only inspection.
+# ---------------------------------------------------------------------------
+
+
+def test_main_prints_version_after_value_taking_global_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint --format json --version`` reaches the polished version renderer."""
+    monkeypatch.setattr("sys.argv", ["safelint", "--format", "json", "--version"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip().startswith("safelint ")
+
+
+def test_main_prints_help_after_value_taking_global_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint --mode ci --help`` reaches the polished ruff-style top-level help."""
+    monkeypatch.setattr("sys.argv", ["safelint", "--mode", "ci", "--help"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    # Polished renderer emits ``Usage: safelint [OPTIONS] <COMMAND>`` and the
+    # ``Commands:`` / ``Global options:`` section headers — argparse's
+    # auto-generated help has neither.
+    assert "Usage: safelint [OPTIONS] <COMMAND>" in out
+    assert "Commands:" in out
+    assert "Global options:" in out
+
+
+def test_main_prints_help_with_short_v_after_global_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint --format pretty -V`` short form still reaches version renderer."""
+    monkeypatch.setattr("sys.argv", ["safelint", "--format", "pretty", "-V"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    assert capsys.readouterr().out.strip().startswith("safelint ")
+
+
+def test_main_routes_help_keyword_after_global_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint --format json help check`` finds ``help`` and forwards ``check`` as the sub.
+
+    The ``help`` keyword form supports per-subcommand help; the scan must
+    locate ``help`` past the value-taking flag and then locate the next
+    positional (``check``) past any further flags.
+    """
+    monkeypatch.setattr("sys.argv", ["safelint", "--format", "json", "help", "check"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    # Subcommand help renders the ``check`` parser's usage banner.
+    assert "check" in out.lower()
+
+
+def test_main_routes_help_keyword_with_flags_interleaved(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint help --format json check`` skips the value-taking flag and finds ``check``.
+
+    Exercises ``_next_positional``'s value-skipping when the user
+    interleaves a global flag *between* the ``help`` keyword and the
+    subcommand it's asking about.
+    """
+    monkeypatch.setattr("sys.argv", ["safelint", "help", "--format", "json", "check"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    out = capsys.readouterr().out
+    assert "check" in out.lower()
+
+
+def test_main_routes_to_normal_parser_when_subcommand_precedes_help(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint check --help`` does NOT match the early router — argparse owns subcommand help.
+
+    The early scan stops at the first non-``help`` positional (``check``
+    here), so ``--help`` after that point goes to argparse — matching
+    the design where each subcommand owns its own usage line.
+    """
+    monkeypatch.setattr("sys.argv", ["safelint", "check", "--help"])
+    # _print_main_help is the polished top-level renderer; it must NOT fire.
+    main_help_spy = mocker.patch.object(cli, "_print_main_help")
+    with pytest.raises(SystemExit):
+        cli.main()
+    main_help_spy.assert_not_called()
+
+
 def test_help_for_unknown_subcommand_returns_nonzero(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     """``safelint help bogus`` reports the unknown command on stderr and exits non-zero."""
     monkeypatch.setattr("sys.argv", ["safelint", "help", "bogus"])

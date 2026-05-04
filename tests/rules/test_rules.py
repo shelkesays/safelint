@@ -371,6 +371,15 @@ def test_bare_except_attaches_replace_with_exception_suggestion(tmp_path: Path) 
     # Range should cover the ``except:`` header on line 4.
     assert edit.start_line == 4
     assert edit.end_line == 4
+    # Column precision: the edit must cover *exactly* the ``except:`` token —
+    # not the indentation before it, not the trailing newline. Locked in
+    # to catch any regression in the suggestion's range computation
+    # (off-by-one on either side would break editor-applied edits).
+    # On the dedented source, line 4 is ``    except:``; the ``e`` of
+    # ``except`` is at 1-based column 5, and the half-open range ends
+    # one past the closing colon — i.e. start_column + len("except:").
+    assert edit.start_column == 5
+    assert edit.end_column == edit.start_column + len("except:")
 
 
 def test_side_effects_hidden_flags_pure_named_io_function(tmp_path: Path) -> None:
