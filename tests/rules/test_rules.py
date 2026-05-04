@@ -125,6 +125,142 @@ def test_resource_lifecycle_with_open_is_safe(tmp_path: Path) -> None:
     assert not any(v.rule == "resource_lifecycle" for v in violations)
 
 
+def test_resource_lifecycle_flags_socket_outside_with(tmp_path: Path) -> None:
+    """Expanded defaults catch ``socket.socket()`` calls outside a ``with`` (1.8.0)."""
+    source = textwrap.dedent("""\
+        import socket
+        s = socket.socket()
+        s.send(b"hi")
+    """)
+    sample = tmp_path / "sock.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.rule == "resource_lifecycle" and "socket" in v.message for v in violations)
+
+
+def test_resource_lifecycle_extend_tracked_functions(tmp_path: Path) -> None:
+    """``extend_tracked_functions`` adds custom acquirers without losing defaults (1.8.0)."""
+    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
+    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
+
+    source = textwrap.dedent("""\
+        from mylib import acquire_widget
+        w = acquire_widget()
+        w.use()
+    """)
+    sample = tmp_path / "ext.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(
+        DEFAULTS,
+        {"rules": {"resource_lifecycle": {"extend_tracked_functions": ["acquire_widget"]}}},
+    )
+    violations = SafetyEngine(config).check_file(str(sample)).violations
+    assert any(v.rule == "resource_lifecycle" and "acquire_widget" in v.message for v in violations)
+    # And the default ``open`` is still tracked — extension didn't displace it.
+    src2 = "f = open('x.txt')\nf.read()\n"
+    sample2 = tmp_path / "still_default.py"
+    sample2.write_text(src2, encoding="utf-8")
+    violations2 = SafetyEngine(config).check_file(str(sample2)).violations
+    assert any(v.rule == "resource_lifecycle" and "open" in v.message for v in violations2)
+
+
+def test_empty_except_flags_pass_body(tmp_path: Path) -> None:
+    """``except: pass`` is the canonical no-op handler — must fire SAFE202."""
+    source = textwrap.dedent("""\
+        def f():
+            try:
+                pass
+            except Exception:
+                pass
+    """)
+    sample = tmp_path / "ee_pass.py"
+    sample.write_text(source, encoding="utf-8")
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.code == "SAFE202" for v in violations)
+
+
+def test_empty_except_flags_ellipsis_body(tmp_path: Path) -> None:
+    """``except: ...`` is also a no-op (Ellipsis literal)."""
+    source = textwrap.dedent("""\
+        def f():
+            try:
+                pass
+            except Exception:
+                ...
+    """)
+    sample = tmp_path / "ee_ellipsis.py"
+    sample.write_text(source, encoding="utf-8")
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.code == "SAFE202" for v in violations)
+
+
+def test_empty_except_flags_string_literal_body(tmp_path: Path) -> None:
+    """``except: "TODO"`` — string-as-comment idiom is also a no-op."""
+    source = textwrap.dedent("""\
+        def f():
+            try:
+                pass
+            except Exception:
+                "TODO: handle this properly"
+    """)
+    sample = tmp_path / "ee_str.py"
+    sample.write_text(source, encoding="utf-8")
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.code == "SAFE202" for v in violations)
+
+
+def test_empty_except_flags_constant_literal_body(tmp_path: Path) -> None:
+    """``except: 0`` / ``except: None`` / ``except: True`` are all no-ops."""
+    for literal in ("0", "None", "True", "False"):
+        source = textwrap.dedent(f"""\
+            def f():
+                try:
+                    pass
+                except Exception:
+                    {literal}
+        """)
+        sample = tmp_path / f"ee_{literal}.py"
+        sample.write_text(source, encoding="utf-8")
+        violations = _engine().check_file(str(sample)).violations
+        assert any(v.code == "SAFE202" for v in violations), f"failed for literal: {literal}"
+
+
+def test_empty_except_does_not_flag_real_handler(tmp_path: Path) -> None:
+    """A genuine handler with a logging call or re-raise must NOT trigger SAFE202."""
+    source = textwrap.dedent("""\
+        import logging
+        def f():
+            try:
+                pass
+            except Exception as e:
+                logging.error("failed: %s", e)
+    """)
+    sample = tmp_path / "ee_real.py"
+    sample.write_text(source, encoding="utf-8")
+    violations = _engine().check_file(str(sample)).violations
+    assert not any(v.code == "SAFE202" for v in violations)
+
+
+def test_empty_except_does_not_flag_multi_statement_body(tmp_path: Path) -> None:
+    """Two statements in the body, even if both look trivial, isn't 'empty'."""
+    source = textwrap.dedent("""\
+        def f():
+            try:
+                pass
+            except Exception:
+                "log message"
+                pass
+    """)
+    sample = tmp_path / "ee_multi.py"
+    sample.write_text(source, encoding="utf-8")
+    violations = _engine().check_file(str(sample)).violations
+    # Multi-statement body — not flagged by SAFE202 (still flagged by SAFE203
+    # for missing logging call, but that's a separate rule).
+    assert not any(v.code == "SAFE202" for v in violations)
+
+
 def test_bare_except_is_flagged(tmp_path: Path) -> None:
     """bare_except fires on a bare except clause."""
     source = textwrap.dedent("""\
@@ -140,6 +276,33 @@ def test_bare_except_is_flagged(tmp_path: Path) -> None:
     violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "bare_except" for v in violations)
+
+
+def test_bare_except_attaches_replace_with_exception_suggestion(tmp_path: Path) -> None:
+    """SAFE201 attaches an advisory suggestion to replace ``except:`` with ``except Exception:`` (1.10.0)."""
+    source = textwrap.dedent("""\
+        def foo():
+            try:
+                pass
+            except:
+                pass
+    """)
+    sample = tmp_path / "bare_sug.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "bare_except"]
+    assert flagged
+    v = flagged[0]
+    assert len(v.suggestions) == 1
+    suggestion = v.suggestions[0]
+    assert "Exception" in suggestion.description
+    assert len(suggestion.edits) == 1
+    edit = suggestion.edits[0]
+    assert edit.replacement == "except Exception:"
+    # Range should cover the ``except:`` header on line 4.
+    assert edit.start_line == 4
+    assert edit.end_line == 4
 
 
 def test_side_effects_hidden_flags_pure_named_io_function(tmp_path: Path) -> None:
@@ -196,6 +359,41 @@ def test_global_mutation_flags_annotated_assignment(tmp_path: Path) -> None:
     violations = _engine().check_file(str(sample)).violations
 
     assert any(v.rule == "global_mutation" for v in violations)
+
+
+def test_global_mutation_default_does_not_flag_read_only_global(tmp_path: Path) -> None:
+    """Default mode allows ``global x; print(x)`` (read-only access)."""
+    source = textwrap.dedent("""\
+        VERSION = "1.0"
+        def show():
+            global VERSION
+            print(VERSION)
+    """)
+    sample = tmp_path / "gm_readonly.py"
+    sample.write_text(source, encoding="utf-8")
+    violations = _engine().check_file(str(sample)).violations
+    assert not any(v.rule == "global_mutation" for v in violations)
+
+
+def test_global_mutation_strict_flags_read_only_global(tmp_path: Path) -> None:
+    """``strict = true`` fires on the ``global`` declaration itself, mirroring PLW0603 (1.8.0)."""
+    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
+    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
+
+    source = textwrap.dedent("""\
+        VERSION = "1.0"
+        def show():
+            global VERSION
+            print(VERSION)
+    """)
+    sample = tmp_path / "gm_strict.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"rules": {"global_mutation": {"strict": True}}})
+    violations = SafetyEngine(config).check_file(str(sample)).violations
+    safe302 = [v for v in violations if v.rule == "global_mutation"]
+    assert safe302
+    assert "strict mode" in safe302[0].message
 
 
 def test_unbounded_loop_while_true_no_break(tmp_path: Path) -> None:
@@ -959,6 +1157,65 @@ def test_function_length_counts_inclusively(tmp_path: Path) -> None:
     flagged = [v for v in violations if v.rule == "function_length"]
     assert flagged
     assert "5 lines" in flagged[0].message
+
+
+def test_function_length_count_mode_logical_lines_excludes_blanks_and_comments(tmp_path: Path) -> None:
+    """``count_mode = "logical_lines"`` ignores blanks and pure-comment lines (1.8.0)."""
+    source = "def f():\n    # this is a comment\n    x = 1\n\n    # another comment\n    y = 2\n\n    return x + y\n"
+    sample = tmp_path / "len_logical.py"
+    sample.write_text(source, encoding="utf-8")
+
+    # Total source lines: 8 (would trip max_lines=6)
+    # Logical lines: 4 (def, x = 1, y = 2, return)
+    cfg_logical = deep_merge(
+        DEFAULTS,
+        {"rules": {"function_length": {"max_lines": 6, "count_mode": "logical_lines"}}},
+    )
+    violations = SafetyEngine(cfg_logical).check_file(str(sample)).violations
+    assert not any(v.rule == "function_length" for v in violations)
+
+    # Same source under "lines" mode should fire (max_lines=6, total=8)
+    cfg_lines = deep_merge(DEFAULTS, {"rules": {"function_length": {"max_lines": 6}}})
+    violations_lines = SafetyEngine(cfg_lines).check_file(str(sample)).violations
+    assert any(v.rule == "function_length" for v in violations_lines)
+
+
+def test_function_length_count_mode_statements_ignores_formatting(tmp_path: Path) -> None:
+    """``count_mode = "statements"`` is robust to formatting choices (1.8.0)."""
+    # 4 statement nodes regardless of whitespace.
+    source = "def f():\n\n    # blah\n    x = 1\n\n    y = (\n        x\n        + 1\n    )\n    if y > 0:\n        z = y\n    return z\n"
+    sample = tmp_path / "len_stmts.py"
+    sample.write_text(source, encoding="utf-8")
+
+    # Statements: x=1, y=..., if, z=y, return → 5 statement nodes
+    cfg_stmts = deep_merge(
+        DEFAULTS,
+        {"rules": {"function_length": {"max_lines": 4, "count_mode": "statements"}}},
+    )
+    violations = SafetyEngine(cfg_stmts).check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "function_length"]
+    assert flagged
+    assert "statements" in flagged[0].message
+
+
+def test_function_length_count_mode_statements_skips_nested_defs(tmp_path: Path) -> None:
+    """Nested function bodies don't inflate the outer function's statement count."""
+    source = "def outer():\n    def inner():\n        a = 1\n        b = 2\n        c = 3\n        d = 4\n        e = 5\n        return a + b + c + d + e\n    return inner()\n"
+    sample = tmp_path / "nested_stmts.py"
+    sample.write_text(source, encoding="utf-8")
+
+    # outer's own statement count: just the ``return`` (the def is not a stmt
+    # we count) → 1.
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"function_length": {"max_lines": 3, "count_mode": "statements"}}},
+    )
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    # outer should NOT fire (1 statement, max 3); inner should (8 stmts > 3).
+    flagged_for_outer = [v for v in violations if v.rule == "function_length" and "outer" in v.message]
+    flagged_for_inner = [v for v in violations if v.rule == "function_length" and "inner" in v.message]
+    assert not flagged_for_outer
+    assert flagged_for_inner
 
 
 def test_side_effects_io_keyword_match_is_case_insensitive(tmp_path: Path) -> None:

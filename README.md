@@ -220,6 +220,13 @@ See [CONFIGURATION.md — Inline suppression](CONFIGURATION.md#inline-suppressio
 
 SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` file at your project root. When both exist in the same directory, **`safelint.toml` wins** — its values override anything in `[tool.safelint]` — matching ruff's `ruff.toml` / `pyproject.toml` precedence. See [CONFIGURATION.md](CONFIGURATION.md) for all options, defaults, and examples.
 
+Highlights:
+
+- **Incremental ignore lists** — use `extend_ignore` / `extend_per_file_ignores` to grow the defaults instead of replacing them (mirrors ruff's `extend-select` ergonomics).
+- **`--statistics` flag** — print a per-rule violation-count table at the end of a run (`safelint check src/ --statistics`).
+- **`SAFE004 unused_suppression`** — automatically warns about stale `# nosafe` directives that no longer suppress anything. Disable globally via `ignore = ["SAFE004"]` if undesired.
+- **No `--fix` flag** — SafeLint is review-only by design. Editor integrations may surface suggestions as code actions, but every edit is user-confirmed.
+
 Ready-to-copy samples:
 
 - [examples/sample.pyproject.toml](examples/sample.pyproject.toml) — `[tool.safelint]` block for an existing pyproject.toml

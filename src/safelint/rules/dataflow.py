@@ -105,10 +105,12 @@ class TaintedSinkRule(BaseRule):
         sinks: frozenset[str],
         sanitizers: frozenset[str],
         sources: frozenset[str],
+        *,
+        assume_taint_preserving: bool,
     ) -> list[Violation]:
         """Run taint analysis on a single function and return violations."""
         params = _param_names(func_node)
-        tracker = TaintTracker(params, sinks, sanitizers, sources)
+        tracker = TaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume_taint_preserving)
         tracker.visit(func_node)
         return [
             self._make_violation_for_node(
@@ -124,10 +126,16 @@ class TaintedSinkRule(BaseRule):
         sinks = frozenset(self.config.get("sinks", self._DEFAULT_SINKS))
         sanitizers = frozenset(self.config.get("sanitizers", self._DEFAULT_SANITIZERS))
         sources = frozenset(self.config.get("sources", self._DEFAULT_SOURCES))
+        # Default ``True`` matches the historical behaviour — unknown calls
+        # propagate taint from any tainted argument. Set to ``False`` for a
+        # stricter analysis that drops taint at every unknown call (cleaner
+        # but generates false negatives in codebases with many wrapper
+        # functions). See CONFIGURATION.md for guidance.
+        assume_taint_preserving = bool(self.config.get("assume_taint_preserving", True))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
-                violations.extend(self._check_func(filepath, node, sinks, sanitizers, sources))
+                violations.extend(self._check_func(filepath, node, sinks, sanitizers, sources, assume_taint_preserving=assume_taint_preserving))
         return violations
 
 

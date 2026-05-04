@@ -27,6 +27,14 @@ if TYPE_CHECKING:
 
 _NOSAFE_PREFIX = "nosafe"
 
+# Codes / names emitted directly by the engine rather than by a registered
+# BaseRule. They're recognised in the user's ``ignore`` list (so e.g.
+# ``ignore = ["SAFE004"]`` disables unused-suppression warnings) without
+# triggering the typo-guard warning that fires for codes outside
+# ``ALL_RULES``.
+_ENGINE_INTERNAL_CODES = frozenset({"SAFE000", "SAFE004"})
+_ENGINE_INTERNAL_NAMES = frozenset({"parse", "unused_suppression"})
+
 
 def _nosafe_codes(comment: str, prefix: str = "#") -> set[str] | None | Literal[False]:
     """Parse a single comment string and return the nosafe payload.
@@ -89,9 +97,70 @@ def _is_suppressed(violation: Violation, suppressions: dict[int, set[str] | None
     return violation.code in codes or violation.rule in codes
 
 
+def _check_suppressed_marking_used(
+    violation: Violation,
+    suppressions: dict[int, set[str] | None],
+    used: set[tuple[int, str | None]],
+) -> bool:
+    """Match :func:`_is_suppressed` and record which directive caught *violation*.
+
+    *used* receives ``(lineno, None)`` for bare ``# nosafe`` hits, or
+    ``(lineno, code_or_rule_name)`` for ``# nosafe: <code>`` hits. After
+    all rules run, the entries in ``suppressions`` *not* present in
+    *used* are the directives that didn't actually silence anything —
+    the engine emits SAFE004 (``unused_suppression``) warnings for those.
+    """
+    if violation.lineno not in suppressions:
+        return False
+    codes = suppressions[violation.lineno]
+    if codes is None:
+        used.add((violation.lineno, None))
+        return True
+    if violation.code in codes:
+        used.add((violation.lineno, violation.code))
+        return True
+    if violation.rule in codes:
+        used.add((violation.lineno, violation.rule))
+        return True
+    return False
+
+
 def _is_per_file_ignored(violation: Violation, ignored_names: frozenset[str], ignored_codes: frozenset[str]) -> bool:
     """Return True when *violation* is suppressed by a per-file ignore pattern."""
     return violation.code.upper() in ignored_codes or violation.rule in ignored_names
+
+
+def _make_unused_suppression(filepath: str, lineno_: int, message: str) -> Violation:
+    """Build a ``SAFE004`` violation for an unused inline suppression directive."""
+    return Violation(
+        rule="unused_suppression",
+        code="SAFE004",
+        filepath=filepath,
+        lineno=lineno_,
+        message=message,
+        severity="warning",
+        end_lineno=lineno_,
+    )
+
+
+def _unused_violations_for_line(
+    filepath: str,
+    lineno_: int,
+    codes: set[str] | None,
+    used: set[tuple[int, str | None]],
+) -> list[Violation]:
+    """Return SAFE004 violations for the directive(s) on a single line.
+
+    Bare ``# nosafe`` (codes=None) emits one violation if no rule fired
+    on that line. Coded ``# nosafe: A, B`` emits one violation per
+    individual code that didn't catch anything. ``# nosafe: SAFE004`` is
+    skipped to avoid self-referential reports.
+    """
+    if codes is None:
+        if (lineno_, None) in used:
+            return []
+        return [_make_unused_suppression(filepath, lineno_, "this `# nosafe` directive did not suppress any violation")]
+    return [_make_unused_suppression(filepath, lineno_, f"`# nosafe: {code}` did not suppress any violation") for code in codes if code != "SAFE004" and (lineno_, code) not in used]
 
 
 @dataclass
@@ -145,8 +214,8 @@ class SafetyEngine:
             bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
             msg = f"ignore must contain only strings — got: {bad}"
             raise TypeError(msg)
-        known_names: frozenset[str] = frozenset(cls.name for cls in ALL_RULES)
-        known_codes_upper: frozenset[str] = frozenset(cls.code.upper() for cls in ALL_RULES)
+        known_names: frozenset[str] = frozenset(cls.name for cls in ALL_RULES) | _ENGINE_INTERNAL_NAMES
+        known_codes_upper: frozenset[str] = frozenset(cls.code.upper() for cls in ALL_RULES) | _ENGINE_INTERNAL_CODES
         unknown = frozenset(e for e in raw_ignore if e not in known_names and e.upper() not in known_codes_upper)
         if unknown:
             _diagnostics.print_warning(f"unknown entries in ignore list (typo or stale rule?): {', '.join(sorted(unknown))}")
@@ -156,6 +225,10 @@ class SafetyEngine:
         self.rules: list[BaseRule] = self._build_active_rules(rules_cfg, exec_cfg, ignored_names, ignored_codes_upper, changed_files)
         self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = self._parse_per_file_ignores(config.get("per_file_ignores", {}), known_names, known_codes_upper)
         self._cache = cache
+        # Capture the global ignore set so engine-internal codes (SAFE000,
+        # SAFE004) can honour ``ignore = ["SAFE004"]`` even though they
+        # don't go through the ``ALL_RULES`` rule-filtering path.
+        self._globally_ignored_codes: frozenset[str] = ignored_codes_upper
         # Lazy: only computed when the cache is non-trivial — saves the
         # JSON-encode + sha256 round-trip when ``--no-cache`` is in use.
         self._engine_fingerprint: str | None = None
@@ -343,12 +416,19 @@ class SafetyEngine:
         suppressions: dict[int, set[str] | None],
         ignored_names: frozenset[str],
         ignored_codes: frozenset[str],
+        used_suppressions: set[tuple[int, str | None]],
     ) -> tuple[list[Violation], list[Violation]]:
-        """Split a single rule's output into (active, suppressed) violation lists."""
+        """Split a single rule's output into (active, suppressed) violation lists.
+
+        *used_suppressions* is mutated in place: every inline-suppressed
+        violation contributes a ``(lineno, code_or_rule_or_None)`` entry,
+        which the engine inspects after the run to flag any directive
+        that didn't actually catch anything as ``SAFE004``.
+        """
         active: list[Violation] = []
         suppressed: list[Violation] = []
         for v in rule_violations:
-            if _is_suppressed(v, suppressions) or _is_per_file_ignored(v, ignored_names, ignored_codes):
+            if _check_suppressed_marking_used(v, suppressions, used_suppressions) or _is_per_file_ignored(v, ignored_names, ignored_codes):
                 suppressed.append(v)
             else:
                 active.append(v)
@@ -361,13 +441,14 @@ class SafetyEngine:
         suppressions: dict[int, set[str] | None],
         ignored_names: frozenset[str],
         ignored_codes: frozenset[str],
+        used_suppressions: set[tuple[int, str | None]],
     ) -> tuple[list[Violation], list[Violation]]:
         """Run active rules against *tree*, returning (active, suppressed) violation lists."""
         active: list[Violation] = []
         suppressed: list[Violation] = []
         for rule in self.rules:
             rule_violations = rule.check_file(filepath, tree)
-            rule_active, rule_suppressed = self._partition_rule_output(rule_violations, suppressions, ignored_names, ignored_codes)
+            rule_active, rule_suppressed = self._partition_rule_output(rule_violations, suppressions, ignored_names, ignored_codes, used_suppressions)
             active.extend(rule_active)
             suppressed.extend(rule_suppressed)
             if self.fail_fast and rule_active:
@@ -472,39 +553,81 @@ class SafetyEngine:
         entries automatically.
         """
         source_bytes = source.encode("utf-8")
-        cache_key: str | None = None
-        if self._cache is not None and self._cache.cache_dir is not None:
-            cache_key = _cache.compute_file_key(source_bytes, self._get_engine_fingerprint(), filepath)
+        cache_key = self._cache_key_for(filepath, source_bytes)
+        if cache_key is not None and self._cache is not None:
             cached = self._cache.get(cache_key)
             if cached is not None:
                 return self._apply_cached(filepath, cached)
 
         tree = lang.create_parser().parse(source_bytes)
         if tree.root_node.has_error:
-            location = self._first_parse_error(tree.root_node)
-            if location is None:  # pragma: no cover
-                msg = "Parse error: tree-sitter could not fully parse this file"
-                err_lineno = 0
-                err_column: int | None = None
-            else:
-                line, col, kind = location
-                # column is reported 1-based to match common editor convention.
-                msg = f"Parse error ({kind}) at line {line}, column {col + 1} - check syntax near this location"
-                err_lineno = line
-                err_column = col + 1
-            # Parse errors aren't cached: they're typically transient
-            # (a file mid-edit), and re-parsing a still-broken buffer
-            # is cheap — Tree-sitter bails on the first ERROR/MISSING
-            # node, so the cost saved by caching wouldn't be material
-            # against the extra read/JSON-parse round-trip.
-            return self._parse_error_result(filepath, msg, lineno=err_lineno, column=err_column)
+            return self._build_parse_error_result(filepath, tree.root_node)
 
         suppressions = _parse_suppressions(tree, lang.comment_node_type, lang.comment_prefix)
         ignored_names, ignored_codes = self._file_ignored_set(filepath)
-        active, suppressed = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes)
+        used_suppressions: set[tuple[int, str | None]] = set()
+        active, suppressed = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes, used_suppressions)
+        self._append_unused_suppressions(filepath, suppressions, used_suppressions, active, suppressed, ignored_names, ignored_codes)
         if cache_key is not None and self._cache is not None:
             self._cache.put(cache_key, active, suppressed)
         return LintResult(path=filepath, violations=active, suppressed=suppressed)
+
+    def _cache_key_for(self, filepath: str, source_bytes: bytes) -> str | None:
+        """Return the cache key for *filepath* / *source_bytes*, or None if cache is disabled."""
+        if self._cache is None or self._cache.cache_dir is None:
+            return None
+        return _cache.compute_file_key(source_bytes, self._get_engine_fingerprint(), filepath)
+
+    def _build_parse_error_result(self, filepath: str, root: tree_sitter.Node) -> LintResult:
+        """Construct the SAFE000 ``LintResult`` for a tree with parse errors.
+
+        Parse errors aren't cached: they're typically transient (a file
+        mid-edit), and re-parsing a still-broken buffer is cheap — Tree-sitter
+        bails on the first ERROR/MISSING node, so the cost saved by caching
+        wouldn't be material against the extra read/JSON-parse round-trip.
+        """
+        location = self._first_parse_error(root)
+        if location is None:  # pragma: no cover
+            return self._parse_error_result(filepath, "Parse error: tree-sitter could not fully parse this file", lineno=0, column=None)
+        line, col, kind = location
+        msg = f"Parse error ({kind}) at line {line}, column {col + 1} - check syntax near this location"
+        return self._parse_error_result(filepath, msg, lineno=line, column=col + 1)
+
+    def _append_unused_suppressions(
+        self,
+        filepath: str,
+        suppressions: dict[int, set[str] | None],
+        used_suppressions: set[tuple[int, str | None]],
+        active: list[Violation],
+        suppressed: list[Violation],
+        ignored_names: frozenset[str],
+        ignored_codes: frozenset[str],
+    ) -> None:
+        """Generate SAFE004 warnings for unused directives and route them to *active* / *suppressed*."""
+        if "SAFE004" in self._globally_ignored_codes:
+            return
+        for v in self._unused_suppression_violations(filepath, suppressions, used_suppressions):
+            target = suppressed if _is_per_file_ignored(v, ignored_names, ignored_codes) else active
+            target.append(v)
+
+    @staticmethod
+    def _unused_suppression_violations(
+        filepath: str,
+        suppressions: dict[int, set[str] | None],
+        used: set[tuple[int, str | None]],
+    ) -> list[Violation]:
+        """Return ``SAFE004`` violations for ``# nosafe`` directives that didn't fire.
+
+        For each declared directive, check whether *any* violation hit it. If
+        not, emit a warning so the user can clean up stale annotations after
+        a refactor. ``# nosafe: SAFE004`` is special-cased — a directive that
+        only mentions SAFE004 is always considered "used" to avoid recursive
+        self-reporting.
+        """
+        violations: list[Violation] = []
+        for lineno_, codes in suppressions.items():
+            violations.extend(_unused_violations_for_line(filepath, lineno_, codes, used))
+        return violations
 
     def _apply_cached(self, filepath: str, cached: tuple[list[Violation], list[Violation]]) -> LintResult:
         """Build a LintResult from a cache hit.

@@ -110,6 +110,54 @@ def _build_region(v: Violation) -> dict[str, Any]:
     return region
 
 
+def _build_artifact_changes(v: Violation) -> list[dict[str, Any]]:
+    """Build SARIF ``fixes[].artifactChanges`` from the violation's suggestions.
+
+    SARIF 2.1.0's ``fixes`` block is *advisory by spec* — the consumer
+    decides whether to apply replacements. That matches safelint's
+    review-only posture: editor integrations may render these as
+    "Quick Fix" code actions, but every edit goes through user
+    confirmation.
+
+    Each suggestion becomes one entry with:
+
+    * ``artifactLocation.uri`` — the violation's filepath (URI-normalised
+      via :func:`_artifact_uri`).
+    * ``replacements[]`` — one per ``TextEdit``, with a ``deletedRegion``
+      describing the range to replace and an ``insertedContent.text``
+      with the replacement string.
+    """
+    entries: list[dict[str, Any]] = []
+    artifact = {"uri": _artifact_uri(v.filepath)}
+    for suggestion in v.suggestions:
+        replacements = [_text_edit_to_replacement(e) for e in getattr(suggestion, "edits", ())]
+        entries.append(
+            {
+                "description": {"text": getattr(suggestion, "description", "")},
+                "artifactChanges": [
+                    {
+                        "artifactLocation": artifact,
+                        "replacements": replacements,
+                    }
+                ],
+            }
+        )
+    return entries
+
+
+def _text_edit_to_replacement(edit: object) -> dict[str, Any]:
+    """Render a :class:`TextEdit` as a SARIF ``replacements`` entry."""
+    return {
+        "deletedRegion": {
+            "startLine": getattr(edit, "start_line", 0),
+            "startColumn": getattr(edit, "start_column", 0),
+            "endLine": getattr(edit, "end_line", 0),
+            "endColumn": getattr(edit, "end_column", 0),
+        },
+        "insertedContent": {"text": getattr(edit, "replacement", "")},
+    }
+
+
 def _result_for_violation(v: Violation, *, suppressed: bool) -> dict[str, Any]:
     """Build a SARIF ``results`` entry for one violation."""
     entry: dict[str, Any] = {
@@ -130,6 +178,10 @@ def _result_for_violation(v: Violation, *, suppressed: bool) -> dict[str, Any]:
         # and per-file ignore patterns — the user-controlled mechanism is
         # close enough that one kind is faithful.
         entry["suppressions"] = [{"kind": "inSource"}]
+    if v.suggestions:
+        # SARIF ``fixes[]`` is advisory by spec — exactly matches
+        # safelint's "review-only, never auto-apply" contract.
+        entry["fixes"] = _build_artifact_changes(v)
     return entry
 
 
