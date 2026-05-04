@@ -55,13 +55,40 @@ repos:
         files: ^src/
 
   # ---------------------------------------------------------------------------
+  # Tab enforcement for non-Python files under src/
+  #
+  # ruff format handles .py files (rewrites tab indentation to spaces because
+  # [tool.ruff.format] sets indent-style = "space"), and mixed-line-ending
+  # above handles CRLF → LF for everything under ^src/. That covers two of
+  # the four Lucas-C/pre-commit-hooks behaviours (remove-tabs / forbid-tabs
+  # for Python; remove-crlf / forbid-crlf for everything), but leaves a gap:
+  # tabs in non-Python text under src/ — currently the skill_files/*.md
+  # files that ship in the wheel, and any future markdown / config we add.
+  # This local hook closes that gap with a portable Python one-liner — no
+  # external repo dependency, runs on the same Python pre-commit already
+  # requires.
+  # ---------------------------------------------------------------------------
+  - repo: local
+    hooks:
+      - id: forbid-tabs-non-python
+        name: forbid tabs in non-Python source files
+        language: system
+        entry: python
+        args:
+          - -c
+          - |
+            import sys
+            bad = [f for f in sys.argv[1:] if "\t" in open(f, encoding="utf-8", errors="replace").read()]
+            if bad:
+                for f in bad:
+                    print(f"tab character found in {f}", file=sys.stderr)
+                sys.exit(1)
+        files: ^src/
+        exclude: \.py$
+
+  # ---------------------------------------------------------------------------
   # Linting + formatting - replaces: flake8, pylint, black, pyupgrade, isort, bandit
   # Docstring presence (D1xx) - replaces: interrogate
-  # Tab → space indentation enforcement: ``ruff format`` rewrites tab
-  # indentation to spaces because [tool.ruff.format] sets indent-style="space".
-  # CRLF → LF normalisation: handled above by ``mixed-line-ending --fix=lf``.
-  # Together these replace Lucas-C/pre-commit-hooks (remove-crlf, forbid-crlf,
-  # remove-tabs, forbid-tabs) — no need for the extra repo dependency.
   # Config: [tool.ruff] / [tool.ruff.lint] in pyproject.toml
   # ---------------------------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
