@@ -280,12 +280,47 @@ def test_extend_per_file_ignores_merges_lists(tmp_path: Path) -> None:
 
 
 def test_extend_ignore_validates_input_type(tmp_path: Path) -> None:
-    """A non-list ``extend_ignore`` raises TypeError up front."""
+    """A non-list ``extend_ignore`` raises TypeError up front.
+
+    Bare strings are explicitly rejected: ``extend_ignore = "SAFE701"``
+    (missing brackets) would otherwise expand char-by-char during the
+    iterable-unpacking merge, silently corrupting the ignore list.
+    """
     (tmp_path / "safelint.toml").write_text(
         'extend_ignore = "SAFE701"\n',
         encoding="utf-8",
     )
     with pytest.raises(TypeError, match="extend_ignore"):
+        load_config(tmp_path)
+
+
+def test_extend_ignore_rejects_non_string_entries(tmp_path: Path) -> None:
+    """Non-string entries in ``extend_ignore`` (e.g. ``[123]``) raise TypeError.
+
+    Old behaviour silently coerced via ``str(...)`` which masked typos
+    like ``[101]`` (intent: ``["SAFE101"]``). The validator now requires
+    every entry to already be a str.
+    """
+    (tmp_path / "safelint.toml").write_text(
+        "extend_ignore = [101]\n",
+        encoding="utf-8",
+    )
+    with pytest.raises(TypeError, match="extend_ignore"):
+        load_config(tmp_path)
+
+
+def test_extend_ignore_rejects_corrupted_base_ignore(tmp_path: Path) -> None:
+    """A misconfigured ``ignore = "SAFE701"`` (string) is caught when extend_ignore is also set.
+
+    Without validating the base, ``[*existing, *extend_ignore]`` would
+    expand the string char-by-char and slip past the engine's later
+    type-guard (which only sees the resulting ``list[str]``).
+    """
+    (tmp_path / "safelint.toml").write_text(
+        'ignore = "SAFE701"\nextend_ignore = ["SAFE702"]\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(TypeError, match="ignore"):
         load_config(tmp_path)
 
 

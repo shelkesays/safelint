@@ -95,19 +95,25 @@ class TaintTracker:
 
         *assume_taint_preserving* controls how unknown function calls
         (i.e. calls whose name is in neither ``sources`` nor
-        ``sanitizers``) propagate taint:
+        ``sanitizers``) propagate taint. The flag-name is literal:
+        ``True`` is the more *conservative* posture (assume taint is
+        preserved through unknown calls); ``False`` is the *less
+        conservative* / weaker-detection posture (drop taint at every
+        unknown call). See CONFIGURATION.md for the full trade-off
+        discussion.
 
-        * ``True`` (default) — unknown calls propagate taint from any
-          tainted argument: ``f(tainted)`` is treated as tainted. This
-          matches the historical safelint behaviour and minimises
-          false negatives at the cost of potential false positives in
-          codebases with many "obviously safe" wrappers.
-        * ``False`` — unknown calls drop taint: ``f(tainted)`` is
-          treated as clean. Stricter analysis with fewer false
-          positives but new false negatives where helper functions
-          do flow tainted data through to a sink. Set this when your
-          codebase uses many internal wrappers and you'd rather miss
-          a taint flow than report a false positive.
+        * ``True`` (default) — conservative / taint-preserving.
+          Unknown calls propagate taint from any tainted argument:
+          ``f(tainted)`` is treated as tainted. Matches the historical
+          safelint behaviour and minimises false negatives at the cost
+          of potential false positives in codebases with many
+          "obviously safe" wrappers.
+        * ``False`` — less conservative / taint-dropping. Unknown
+          calls drop taint: ``f(tainted)`` is treated as clean. Fewer
+          false positives but new false negatives where helper
+          functions actually do flow tainted data through to a sink.
+          Set this when your codebase uses many internal wrappers and
+          you'd rather miss a taint flow than report a false positive.
         """
         self.tainted: set[str] = set(params)
         self.sinks = sinks

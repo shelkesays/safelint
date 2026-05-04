@@ -195,6 +195,23 @@ def test_resource_lifecycle_rejects_non_string_tracked_function_entries(tmp_path
         SafetyEngine(cfg).check_file(str(sample))
 
 
+def test_resource_lifecycle_rejects_string_cleanup_patterns(tmp_path: Path) -> None:
+    """``cleanup_patterns = "close"`` (no brackets) is a typo, not a single-element config.
+
+    Without explicit validation, ``frozenset("close")`` would coerce to
+    ``{'c', 'l', 'o', 's', 'e'}`` and the diagnostic text would render
+    as ``c / e / l / o / s``. Validation surfaces the typo as TypeError.
+    """
+    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
+    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
+
+    sample = tmp_path / "rl_cleanup_bad.py"
+    sample.write_text("f = open('x.txt')\nf.read()\n", encoding="utf-8")
+    cfg = deep_merge(DEFAULTS, {"rules": {"resource_lifecycle": {"cleanup_patterns": "close"}}})
+    with pytest.raises(TypeError, match="cleanup_patterns"):
+        SafetyEngine(cfg).check_file(str(sample))
+
+
 def test_empty_except_flags_pass_body(tmp_path: Path) -> None:
     """``except: pass`` is the canonical no-op handler — must fire SAFE202."""
     source = textwrap.dedent("""\

@@ -352,17 +352,50 @@ def find_config_root(search_from: Path | None = None) -> Path | None:
     return None
 
 
+def _validated_str_sequence(value: object, *, field_name: str) -> list[str]:
+    """Return *value* as ``list[str]`` or raise a clear :class:`TypeError`.
+
+    Two rejections matter equally:
+
+    * **Bare strings** — ``ignore = "SAFE701"`` (missing brackets) would
+      otherwise unpack into single-character entries via Python's
+      iterable-unpacking sugar, silently producing a corrupted list.
+      Tested explicitly because ``str`` *is* iterable; a plain
+      ``isinstance(value, Iterable)`` check would accept it.
+    * **Non-string elements** — coercing them via ``str(...)`` (the old
+      behaviour) was wrong: if the user wrote ``[101]`` instead of
+      ``["SAFE101"]``, silent coercion produced ``"101"`` and the
+      ignore matched nothing.
+
+    Used in both the ``extend_ignore`` and ``extend_per_file_ignores``
+    merge paths so the existing list, the extension list, and each
+    entry within them are all uniformly validated before any
+    iterable-unpacking happens.
+    """
+    if not isinstance(value, (list, tuple)):
+        msg = f"{field_name} must be a list of strings, got {type(value).__name__}"
+        raise TypeError(msg)
+    non_strings = [e for e in value if not isinstance(e, str)]
+    if non_strings:
+        bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
+        msg = f"{field_name} must contain only strings — got: {bad}"
+        raise TypeError(msg)
+    return [e for e in value if isinstance(e, str)]
+
+
 def _merge_extend_ignore(merged: dict[str, Any], extend_ignore: object) -> None:
     """Append ``extend_ignore`` entries onto ``merged["ignore"]`` (order-preserving dedupe).
 
-    *extend_ignore* is typed ``object`` because the value flows directly
-    from a TOML file — the type-narrowing happens via ``isinstance`` here.
+    Both the *existing* ``ignore`` list and the new *extend_ignore* are
+    validated as ``list[str]`` before merging. Without validating the
+    base list, a misconfigured ``ignore = "SAFE701"`` would expand
+    char-by-char during ``[*existing, *extend_ignore]`` and slip past
+    the engine's downstream type-guard (which only sees the resulting
+    ``list[str]``).
     """
-    if not isinstance(extend_ignore, (list, tuple)):
-        msg = f"extend_ignore must be a list of strings, got {type(extend_ignore).__name__}"
-        raise TypeError(msg)
-    existing = merged.get("ignore", [])
-    merged["ignore"] = list(dict.fromkeys([*existing, *extend_ignore]))
+    typed_existing = _validated_str_sequence(merged.get("ignore", []), field_name="ignore")
+    typed_extend = _validated_str_sequence(extend_ignore, field_name="extend_ignore")
+    merged["ignore"] = list(dict.fromkeys([*typed_existing, *typed_extend]))
 
 
 def _merge_extend_per_file_ignores(merged: dict[str, Any], extend_pfi: object) -> None:
@@ -383,18 +416,15 @@ def _merge_extend_per_file_ignores(merged: dict[str, Any], extend_pfi: object) -
 def _merge_one_pfi_pattern(existing_pfi: dict[str, list[str]], pattern: str, entries: object) -> None:
     """Merge *entries* into *existing_pfi*[*pattern*] with order-preserving dedupe.
 
-    *entries* is typed ``object`` because the value comes from a TOML
-    file; the runtime ``isinstance`` check below narrows it before use.
+    Validates both the existing entries (in case ``per_file_ignores`` was
+    misconfigured at base) and the new entries before unpacking. A
+    string-instead-of-list typo (``"SAFE101"`` instead of ``["SAFE101"]``)
+    raises a clear ``TypeError`` rather than silently expanding into
+    single-character codes.
     """
-    if not isinstance(entries, (list, tuple)):
-        msg = f"extend_per_file_ignores[{pattern!r}] must be a list of strings, got {type(entries).__name__}"
-        raise TypeError(msg)
-    # Cast the validated list elements to str — TOML strings come through
-    # as str at runtime; non-strings would fail the engine's downstream
-    # parse_per_file_ignores type-guard which has its own diagnostic.
-    typed_entries: list[str] = [str(e) for e in entries]
-    current = existing_pfi.get(pattern, [])
-    existing_pfi[pattern] = list(dict.fromkeys([*current, *typed_entries]))
+    typed_existing = _validated_str_sequence(existing_pfi.get(pattern, []), field_name=f"per_file_ignores[{pattern!r}]")
+    typed_entries = _validated_str_sequence(entries, field_name=f"extend_per_file_ignores[{pattern!r}]")
+    existing_pfi[pattern] = list(dict.fromkeys([*typed_existing, *typed_entries]))
 
 
 # Unique sentinel used by :func:`_apply_extend_keys` to distinguish
