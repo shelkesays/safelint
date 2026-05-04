@@ -23,13 +23,19 @@ from safelint.rules.base import BaseRule, Suggestion, TextEdit
 _NOOP_STATEMENT_TYPES = frozenset({"pass_statement", "continue_statement"})
 
 # Literal expression node types we treat as "comment-like" when they are the
-# *sole* statement in an except body (e.g. ``except: 0``, ``except: "TODO"``,
-# ``except: ...``). All produce no observable behaviour.
+# *sole* statement in an except body (e.g. ``except: 0``, ``except: ...``).
+# All produce no observable behaviour.
+#
+# String literals are deliberately *not* in this set: tree-sitter-python
+# parses both plain strings and interpolated f-strings as ``string`` nodes,
+# so a blanket membership check would mis-classify ``except: f"got {e!r}"``
+# (which evaluates ``e!r`` — a real side effect) as empty. ``string`` is
+# handled separately via :func:`_is_string_literal_expression` which inspects
+# the node's children for ``interpolation`` markers.
 _LITERAL_EXPR_TYPES = frozenset(
     {
         "integer",
         "float",
-        "string",
         "concatenated_string",
         "true",
         "false",

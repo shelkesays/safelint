@@ -54,7 +54,7 @@ from safelint import __version__
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from safelint.rules.base import Violation
+    from safelint.rules.base import Suggestion, TextEdit, Violation
 
 
 def _violation_to_dict(v: Violation) -> dict[str, Any]:
@@ -93,29 +93,36 @@ def _violation_to_dict(v: Violation) -> dict[str, Any]:
     }
 
 
-def _suggestion_to_dict(s: object) -> dict[str, Any]:
+def _suggestion_to_dict(s: Suggestion) -> dict[str, Any]:
     """Render a :class:`Suggestion` as a JSON-friendly dict.
 
-    Typed ``object`` because ``Violation.suggestions`` could in
-    principle hold a deserialised dict on a cache miss path; the
-    runtime structure is duck-typed.
+    Strict attribute access. ``Violation.suggestions`` is always a
+    ``tuple[Suggestion, ...]`` at runtime — the cache pipeline
+    reconstructs dataclasses on read (see ``core/_cache.py:
+    _dict_to_violation``), so by the time a violation reaches the
+    formatter, its suggestions are dataclass instances. A non-Suggestion
+    value here is a programming error worth surfacing as
+    :class:`AttributeError` rather than silently producing a partial
+    document.
     """
-    description = getattr(s, "description", None)
-    edits_attr = getattr(s, "edits", None)
     return {
-        "description": description,
-        "edits": [_edit_to_dict(e) for e in (edits_attr or [])],
+        "description": s.description,
+        "edits": [_edit_to_dict(e) for e in s.edits],
     }
 
 
-def _edit_to_dict(e: object) -> dict[str, Any]:
-    """Render a :class:`TextEdit` as a JSON-friendly dict."""
+def _edit_to_dict(e: TextEdit) -> dict[str, Any]:
+    """Render a :class:`TextEdit` as a JSON-friendly dict.
+
+    Strict attribute access — see :func:`_suggestion_to_dict` for the
+    rationale.
+    """
     return {
-        "start_line": getattr(e, "start_line", None),
-        "start_column": getattr(e, "start_column", None),
-        "end_line": getattr(e, "end_line", None),
-        "end_column": getattr(e, "end_column", None),
-        "replacement": getattr(e, "replacement", None),
+        "start_line": e.start_line,
+        "start_column": e.start_column,
+        "end_line": e.end_line,
+        "end_column": e.end_column,
+        "replacement": e.replacement,
     }
 
 

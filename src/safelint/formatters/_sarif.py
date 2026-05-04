@@ -36,7 +36,7 @@ from safelint import __version__
 
 
 if TYPE_CHECKING:
-    from safelint.rules.base import Violation
+    from safelint.rules.base import TextEdit, Violation
 
 
 _SARIF_SCHEMA = "https://docs.oasis-open.org/sarif/sarif/v2.1.0/cos02/schemas/sarif-schema-2.1.0.json"
@@ -126,35 +126,42 @@ def _build_artifact_changes(v: Violation) -> list[dict[str, Any]]:
     * ``replacements[]`` — one per ``TextEdit``, with a ``deletedRegion``
       describing the range to replace and an ``insertedContent.text``
       with the replacement string.
+
+    Direct attribute access (no ``getattr`` defaults) is intentional:
+    SARIF output must accurately reflect the structured violation, and
+    a missing field on a ``Suggestion`` / ``TextEdit`` is a programming
+    error worth surfacing as an :class:`AttributeError` rather than
+    silently producing a malformed-but-valid SARIF document.
     """
-    entries: list[dict[str, Any]] = []
     artifact = {"uri": _artifact_uri(v.filepath)}
-    for suggestion in v.suggestions:
-        replacements = [_text_edit_to_replacement(e) for e in getattr(suggestion, "edits", ())]
-        entries.append(
-            {
-                "description": {"text": getattr(suggestion, "description", "")},
-                "artifactChanges": [
-                    {
-                        "artifactLocation": artifact,
-                        "replacements": replacements,
-                    }
-                ],
-            }
-        )
-    return entries
+    return [
+        {
+            "description": {"text": suggestion.description},
+            "artifactChanges": [
+                {
+                    "artifactLocation": artifact,
+                    "replacements": [_text_edit_to_replacement(e) for e in suggestion.edits],
+                }
+            ],
+        }
+        for suggestion in v.suggestions
+    ]
 
 
-def _text_edit_to_replacement(edit: object) -> dict[str, Any]:
-    """Render a :class:`TextEdit` as a SARIF ``replacements`` entry."""
+def _text_edit_to_replacement(edit: TextEdit) -> dict[str, Any]:
+    """Render a :class:`TextEdit` as a SARIF ``replacements`` entry.
+
+    Strict attribute access — see :func:`_build_artifact_changes` for
+    the rationale. A malformed input fails fast.
+    """
     return {
         "deletedRegion": {
-            "startLine": getattr(edit, "start_line", 0),
-            "startColumn": getattr(edit, "start_column", 0),
-            "endLine": getattr(edit, "end_line", 0),
-            "endColumn": getattr(edit, "end_column", 0),
+            "startLine": edit.start_line,
+            "startColumn": edit.start_column,
+            "endLine": edit.end_line,
+            "endColumn": edit.end_column,
         },
-        "insertedContent": {"text": getattr(edit, "replacement", "")},
+        "insertedContent": {"text": edit.replacement},
     }
 
 

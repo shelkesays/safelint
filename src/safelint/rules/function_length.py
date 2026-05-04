@@ -19,6 +19,10 @@ if TYPE_CHECKING:
 # count_mode = "statements". Lined up with what Python's ``ast`` module
 # would call statement nodes (excluding the function_definition itself
 # and any nested function bodies).
+#
+# Note: ``yield`` deliberately omitted — Tree-sitter parses ``yield x``
+# as ``expression_statement`` containing a ``yield`` node, so counting
+# both would double-count every yield expression.
 _STATEMENT_TYPES = frozenset(
     {
         "expression_statement",
@@ -41,7 +45,6 @@ _STATEMENT_TYPES = frozenset(
         "pass_statement",
         "break_statement",
         "continue_statement",
-        "yield",
     }
 )
 
@@ -98,13 +101,22 @@ class FunctionLengthRule(BaseRule):
 
     @staticmethod
     def _function_size(func_node: tree_sitter.Node, count_mode: str) -> int:
-        """Return the function's size under the requested counting mode."""
+        """Return the function's size under the requested counting mode.
+
+        Validates *count_mode* explicitly — silently falling back on a
+        typo (e.g. ``"line"`` instead of ``"lines"``) would leave the
+        user wondering why their config didn't take effect. Raise
+        ``ValueError`` so misconfiguration surfaces at engine init
+        rather than as silently-different output.
+        """
         if count_mode == "statements":
             return FunctionLengthRule._count_statements(func_node)
         if count_mode == "logical_lines":
             return FunctionLengthRule._count_logical_lines(func_node)
-        # Default / unknown → treat as "lines" (inclusive source-line span).
-        return end_lineno(func_node) - lineno(func_node) + 1
+        if count_mode == "lines":
+            return end_lineno(func_node) - lineno(func_node) + 1
+        msg = f"function_length count_mode must be one of 'lines', 'logical_lines', 'statements' — got {count_mode!r}"
+        raise ValueError(msg)
 
     @staticmethod
     def _count_statements(func_node: tree_sitter.Node) -> int:

@@ -166,6 +166,35 @@ def test_resource_lifecycle_extend_tracked_functions(tmp_path: Path) -> None:
     assert any(v.rule == "resource_lifecycle" and "open" in v.message for v in violations2)
 
 
+def test_resource_lifecycle_rejects_string_tracked_functions(tmp_path: Path) -> None:
+    """``tracked_functions = "open"`` (no brackets) is a typo, not a single-element config.
+
+    Without explicit validation, ``list("open")`` would coerce to
+    ``['o', 'p', 'e', 'n']`` and silently track those one-character
+    function names. Validation surfaces the typo as a clear TypeError.
+    """
+    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
+    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
+
+    sample = tmp_path / "rl_bad.py"
+    sample.write_text("f = open('x.txt')\nf.read()\n", encoding="utf-8")
+    cfg = deep_merge(DEFAULTS, {"rules": {"resource_lifecycle": {"tracked_functions": "open"}}})
+    with pytest.raises(TypeError, match="tracked_functions"):
+        SafetyEngine(cfg).check_file(str(sample))
+
+
+def test_resource_lifecycle_rejects_non_string_tracked_function_entries(tmp_path: Path) -> None:
+    """Non-string entries in tracked_functions (e.g. ``[123]``) raise TypeError too."""
+    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
+    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
+
+    sample = tmp_path / "rl_bad2.py"
+    sample.write_text("f = open('x.txt')\nf.read()\n", encoding="utf-8")
+    cfg = deep_merge(DEFAULTS, {"rules": {"resource_lifecycle": {"tracked_functions": ["open", 123]}}})
+    with pytest.raises(TypeError, match="tracked_functions"):
+        SafetyEngine(cfg).check_file(str(sample))
+
+
 def test_empty_except_flags_pass_body(tmp_path: Path) -> None:
     """``except: pass`` is the canonical no-op handler — must fire SAFE202."""
     source = textwrap.dedent("""\
@@ -238,6 +267,28 @@ def test_empty_except_does_not_flag_real_handler(tmp_path: Path) -> None:
                 logging.error("failed: %s", e)
     """)
     sample = tmp_path / "ee_real.py"
+    sample.write_text(source, encoding="utf-8")
+    violations = _engine().check_file(str(sample)).violations
+    assert not any(v.code == "SAFE202" for v in violations)
+
+
+def test_empty_except_does_not_flag_interpolated_fstring_body(tmp_path: Path) -> None:
+    """``except E: f"got {e!r}"`` evaluates ``e!r`` — that's a real side effect.
+
+    Regression: an earlier version had ``"string"`` in the literal-types
+    set, which caused interpolated f-strings to short-circuit before the
+    interpolation-aware check could run. The fix is to handle string
+    nodes only via ``_is_string_literal_expression``, which inspects the
+    children for ``interpolation`` markers.
+    """
+    source = textwrap.dedent("""\
+        def f(e):
+            try:
+                pass
+            except Exception as err:
+                f"got {err!r}"
+    """)
+    sample = tmp_path / "ee_fstring.py"
     sample.write_text(source, encoding="utf-8")
     violations = _engine().check_file(str(sample)).violations
     assert not any(v.code == "SAFE202" for v in violations)
@@ -1196,6 +1247,20 @@ def test_function_length_count_mode_statements_ignores_formatting(tmp_path: Path
     flagged = [v for v in violations if v.rule == "function_length"]
     assert flagged
     assert "statements" in flagged[0].message
+
+
+def test_function_length_count_mode_unknown_raises_value_error(tmp_path: Path) -> None:
+    """An unknown ``count_mode`` (typo, etc.) raises ValueError on first lint.
+
+    Previous behaviour silently fell back to ``"lines"``, which left the
+    user wondering why their config didn't take effect. Surfacing as a
+    ValueError matches how the rule's other type errors are reported.
+    """
+    sample = tmp_path / "fl_bad_mode.py"
+    sample.write_text("def f():\n    pass\n", encoding="utf-8")
+    cfg = deep_merge(DEFAULTS, {"rules": {"function_length": {"max_lines": 1, "count_mode": "line"}}})
+    with pytest.raises(ValueError, match="count_mode"):
+        SafetyEngine(cfg).check_file(str(sample))
 
 
 def test_function_length_count_mode_statements_skips_nested_defs(tmp_path: Path) -> None:

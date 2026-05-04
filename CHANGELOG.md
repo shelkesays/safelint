@@ -22,7 +22,7 @@ This release adds **advisory suggestions** to the JSON and SARIF outputs — per
 - Pretty-mode summary text changed from "No fixes available (safelint does not auto-fix violations)" to "No suggestions available (safelint does not auto-fix; see --format json for any advisory edits)". Wording deliberately distinguishes "no auto-fix" (a permanent design choice) from "no suggestions available" (a per-run state). Test assertions updated accordingly.
 
 ### Notes
-- **The contract is permanent: SafeLint will never ship `--fix`.** This is documented as a project policy in the saved memory and in `docs/JSON_SCHEMA.md`. Editor integrations may render suggestions as Quick Fix code actions, but every edit goes through user confirmation.
+- **The contract is permanent: SafeLint will never ship `--fix`.** This is documented as a project policy in `docs/JSON_SCHEMA.md` ("Suggestions are advisory only" section). Editor integrations may render suggestions as Quick Fix code actions, but every edit goes through user confirmation.
 - The SARIF `fixes[]` block is natively advisory per the SARIF 2.1.0 spec — GitHub code scanning, IDE extensions, and other consumers already implement confirmation flows for it.
 
 ## [1.9.0] - 2026-05-04

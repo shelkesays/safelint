@@ -209,13 +209,26 @@ This is especially useful in layered configs (e.g. one `safelint.toml` for the p
 
 The same pattern applies to per-file ignores: `extend_per_file_ignores` merges into `per_file_ignores` per glob pattern (entries for an existing pattern are concatenated and deduped; new patterns are added).
 
+In `pyproject.toml`, both keys must live under the fully-qualified `[tool.safelint.*]` table — bare `[per_file_ignores]` would be parsed as a top-level table, not as a child of `[tool.safelint]`:
+
+```toml
+[tool.safelint.per_file_ignores]
+"tests/**" = ["SAFE101"]
+
+[tool.safelint.extend_per_file_ignores]
+"tests/**" = ["SAFE102"]      # tests/** ends up with SAFE101 + SAFE102
+"docs/**" = ["SAFE601"]       # new pattern added wholesale
+```
+
+In a standalone `safelint.toml` (no `[tool.safelint]` wrapper), drop the prefix:
+
 ```toml
 [per_file_ignores]
 "tests/**" = ["SAFE101"]
 
 [extend_per_file_ignores]
-"tests/**" = ["SAFE102"]      # tests/** ends up with SAFE101 + SAFE102
-"docs/**" = ["SAFE601"]       # new pattern added wholesale
+"tests/**" = ["SAFE102"]
+"docs/**" = ["SAFE601"]
 ```
 
 ### `ignore` vs. per-rule `enabled: false`
@@ -795,17 +808,19 @@ severity = "error"
 sinks = ["eval", "exec", "system", "execute"]
 sanitizers = ["escape", "sanitize", "quote"]
 sources = ["input", "readline"]
-assume_taint_preserving = true   # default; set false for stricter mode
+assume_taint_preserving = true   # default; set false for taint-dropping mode
 ```
 
 ##### `assume_taint_preserving` modes (1.9.0)
 
-Most real codebases pass tainted data through internal helper functions before it reaches a sink. This config flag controls how those *unknown* calls (i.e. calls whose name isn't in `sources` or `sanitizers`) are analysed:
+Most real codebases pass tainted data through internal helper functions before it reaches a sink. The `assume_taint_preserving` config flag controls how those *unknown* calls (i.e. calls whose name isn't in `sources` or `sanitizers`) are analysed.
 
-- **`true` (default)** — historical behaviour. An unknown call's result is tainted iff any of its arguments are tainted. Catches taint flow through arbitrary helpers (``eval(wrap(user_input))`` fires) at the cost of false positives when wrappers are obviously safe.
-- **`false`** — stricter analysis. Unknown calls always drop taint, so ``eval(wrap(user_input))`` does NOT fire (false negative). Direct flows like ``eval(user_input)`` and known-source flows still fire. Use when your codebase has many internal-only wrappers and you'd rather miss a flow than chase down false positives.
+The naming says it directly: when ``assume_taint_preserving = true``, the analyser assumes any unknown call preserves the taint of its arguments — the more **conservative** stance, fewer false negatives, more false positives:
 
-The trade-off is fundamental to intra-procedural analysis — there's no way to know whether ``wrap`` actually preserves the taint without inlining it. Switch modes based on which failure mode hurts more in your codebase.
+- **`true` (default)** — conservative / taint-preserving. An unknown call's result is tainted iff any of its arguments are tainted. ``eval(user_input)`` fires (direct flow). ``eval(wrap(user_input))`` *also* fires (taint flows through the unknown ``wrap``). Cost: false positives when ``wrap`` is in fact safe.
+- **`false`** — taint-dropping (less conservative — *weaker* detection). Unknown calls always drop taint. ``eval(user_input)`` still fires (direct flow). ``eval(wrap(user_input))`` does **not** fire — the unknown ``wrap`` resets taint, even if it does in fact pass user input through. Use when your codebase has many internal-only wrappers and you'd rather miss a flow than chase down false positives.
+
+Note the asymmetry: `false` is the *less* conservative setting (fewer reports, more chance of missing real issues), not "stricter". The trade-off is fundamental to intra-procedural analysis — there's no way to know whether ``wrap`` actually preserves the taint without inlining it. Switch modes based on which failure mode hurts more in your codebase.
 
 **Bad:**
 ```python

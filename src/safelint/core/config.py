@@ -397,6 +397,13 @@ def _merge_one_pfi_pattern(existing_pfi: dict[str, list[str]], pattern: str, ent
     existing_pfi[pattern] = list(dict.fromkeys([*current, *typed_entries]))
 
 
+# Unique sentinel used by :func:`_apply_extend_keys` to distinguish
+# *absent* from *explicitly-set-to-an-empty-or-falsy-value*. The dict
+# ``.pop(key, None)`` idiom can't tell those apart — an explicit
+# ``extend_ignore = 0`` would silently skip type validation otherwise.
+_MISSING_KEY = object()
+
+
 def _apply_extend_keys(merged: dict[str, Any]) -> dict[str, Any]:
     """Fold ``extend_ignore`` / ``extend_per_file_ignores`` into the resolved config.
 
@@ -408,12 +415,17 @@ def _apply_extend_keys(merged: dict[str, Any]) -> dict[str, Any]:
 
     Both keys are stripped from the returned dict so downstream consumers
     (engine, runner) only see the canonical ``ignore`` / ``per_file_ignores``.
+
+    Sentinel-based detection means an explicitly-set falsy value
+    (``extend_ignore = []`` or ``extend_ignore = 0``) is *not* skipped —
+    empty lists pass through validation cleanly, and bad types like ``0``
+    raise a clear :class:`TypeError` instead of being silently dropped.
     """
-    extend_ignore = merged.pop("extend_ignore", None)
-    if extend_ignore:
+    extend_ignore = merged.pop("extend_ignore", _MISSING_KEY)
+    if extend_ignore is not _MISSING_KEY:
         _merge_extend_ignore(merged, extend_ignore)
-    extend_pfi = merged.pop("extend_per_file_ignores", None)
-    if extend_pfi:
+    extend_pfi = merged.pop("extend_per_file_ignores", _MISSING_KEY)
+    if extend_pfi is not _MISSING_KEY:
         _merge_extend_per_file_ignores(merged, extend_pfi)
     return merged
 
