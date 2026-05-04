@@ -32,13 +32,17 @@ repos:
       - id: fix-byte-order-marker
       - id: end-of-file-fixer
         files: ^src/
-      # Project-wide CRLF → LF normalisation. Deliberately unscoped (no
-      # ``files:`` selector) so README.md, CHANGELOG.md, .pre-commit-config.yaml,
-      # workflows, examples — anything a Windows contributor might touch —
-      # stay LF. The original Lucas-C remove-crlf/forbid-crlf was scoped to
+      # Repo-wide CRLF → LF normalisation (except ``tests/fixtures/``,
+      # excluded globally at the top of this file — fixture files may
+      # carry intentionally weird line endings as test inputs).
+      # Deliberately unscoped at the hook level (no ``files:`` selector)
+      # so README.md, CHANGELOG.md, .pre-commit-config.yaml, workflows,
+      # examples — anything a Windows contributor might touch — stay LF.
+      # The original Lucas-C remove-crlf/forbid-crlf was scoped to
       # ^src/; we broaden here because the project has no .bat/.cmd/.ps1
-      # files (which would legitimately need CRLF) and there's no downside
-      # to enforcing one line-ending convention everywhere.
+      # files (which would legitimately need CRLF) and there's no
+      # downside to enforcing one line-ending convention everywhere
+      # outside the fixture directory.
       - id: mixed-line-ending
         args: [--fix=lf]
       - id: trailing-whitespace
@@ -84,19 +88,15 @@ repos:
   # ---------------------------------------------------------------------------
   - repo: local
     hooks:
+      # Uses pre-commit's built-in ``pygrep`` language: matches a Python
+      # regex against staged file contents and fails the hook on any match.
+      # Built into pre-commit itself, so there's no dependency on the host
+      # having ``python`` (vs ``python3``) on PATH and no virtualenv to
+      # provision. ``\t`` is the Python regex for a literal tab character.
       - id: forbid-tabs-non-python
         name: forbid tabs in non-Python source files
-        language: system
-        entry: python
-        args:
-          - -c
-          - |
-            import sys
-            bad = [f for f in sys.argv[1:] if "\t" in open(f, encoding="utf-8", errors="replace").read()]
-            if bad:
-                for f in bad:
-                    print(f"tab character found in {f}", file=sys.stderr)
-                sys.exit(1)
+        language: pygrep
+        entry: '\t'
         files: ^src/
         exclude: \.py$
 
