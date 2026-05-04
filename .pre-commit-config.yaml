@@ -33,6 +33,7 @@ repos:
       - id: end-of-file-fixer
         files: ^src/
       - id: mixed-line-ending
+        args: [--fix=lf]
         files: ^src/
       - id: trailing-whitespace
         files: ^src/
@@ -53,22 +54,14 @@ repos:
         args: ['--branch', 'master', '--branch', 'main', '--pattern', '.*-master$', '--pattern', '.*-main$']
         files: ^src/
 
-  - repo: https://github.com/Lucas-C/pre-commit-hooks
-    rev: v1.5.6
-    hooks:
-      - id: remove-crlf
-        files: ^src/
-      - id: forbid-crlf
-        files: ^src/
-      - id: remove-tabs
-        args: [--whitespaces-count, '4']
-        files: ^src/
-      - id: forbid-tabs
-        files: ^src/
-
   # ---------------------------------------------------------------------------
   # Linting + formatting - replaces: flake8, pylint, black, pyupgrade, isort, bandit
   # Docstring presence (D1xx) - replaces: interrogate
+  # Tab → space indentation enforcement: ``ruff format`` rewrites tab
+  # indentation to spaces because [tool.ruff.format] sets indent-style="space".
+  # CRLF → LF normalisation: handled above by ``mixed-line-ending --fix=lf``.
+  # Together these replace Lucas-C/pre-commit-hooks (remove-crlf, forbid-crlf,
+  # remove-tabs, forbid-tabs) — no need for the extra repo dependency.
   # Config: [tool.ruff] / [tool.ruff.lint] in pyproject.toml
   # ---------------------------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
