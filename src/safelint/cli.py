@@ -185,8 +185,25 @@ def _make_summary(
     found = f"Found {', '.join(parts)}."
     fail_note = f" [--fail-on={fail_on}]"
     found = f"{found} Advisory only{fail_note}." if not n_blocking else f"{found}{fail_note}."
-    fixes_line = f"No fixes available (safelint does not auto-fix violations).{suppressed_note}"
+    fixes_line = _make_fixes_line(all_violations, suppressed_note)
     return found, fixes_line
+
+
+def _make_fixes_line(violations: list[Violation], suppressed_note: str) -> str:
+    """Build the post-summary 'fixes' notice.
+
+    safelint never auto-applies fixes — that policy is final and
+    deliberate (it's a review tool, not a refactoring tool). What
+    *can* exist is *suggestions*: per-violation advisory edits that
+    editor integrations may surface as Quick Fix code actions, with
+    user confirmation always required. The notice text reflects
+    whichever situation applies.
+    """
+    suggestion_count = sum(len(v.suggestions) for v in violations)
+    if suggestion_count == 0:
+        return f"No suggestions available (safelint does not auto-fix; see --format json for any advisory edits).{suppressed_note}"
+    n = "1 advisory suggestion" if suggestion_count == 1 else f"{suggestion_count} advisory suggestions"
+    return f"{n} available — view via --format json (safelint does not auto-apply fixes).{suppressed_note}"
 
 
 def _file_summary_line(filepath: str, violations: list[Violation]) -> str:
