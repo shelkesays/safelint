@@ -380,3 +380,68 @@ def test_safe004_partial_unused_in_multi_code_directive(tmp_path: Path) -> None:
     safe004s = [v for v in result.violations if v.code == "SAFE004"]
     assert len(safe004s) == 1
     assert "SAFE304" in safe004s[0].message
+
+
+def test_safe004_multi_code_unused_directive_emits_in_sorted_order(tmp_path: Path) -> None:
+    """Multiple unused codes on one line are reported alphabetically.
+
+    ``set[str]`` iteration is hash-randomised across Python processes,
+    so without explicit sorting the JSON / SARIF output order would
+    drift between runs and break consumers that snapshot the result.
+    """
+    sample = tmp_path / "u6.py"
+    sample.write_text("x = 1  # nosafe: SAFE304, SAFE101, SAFE201\n", encoding="utf-8")
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    safe004s = [v for v in result.violations if v.code == "SAFE004"]
+    # All three codes are unused (the line has no function-length /
+    # bare-except / side-effects violation).
+    assert len(safe004s) == 3
+    # Messages embed the suppressed code; expect alphabetical order.
+    extracted = [v.message for v in safe004s]
+    assert "SAFE101" in extracted[0]
+    assert "SAFE201" in extracted[1]
+    assert "SAFE304" in extracted[2]
+
+
+def test_safe004_not_emitted_when_fail_fast_short_circuits_rule_loop(tmp_path: Path) -> None:
+    """fail_fast that breaks the rule loop must skip SAFE004 — used_suppressions is incomplete.
+
+    With fail_fast on, ``_run_rules`` exits as soon as the first rule
+    produces an active violation. Later rules never run, so
+    ``used_suppressions`` doesn't yet know about *their* directives.
+    Emitting SAFE004 in that state would falsely report directives
+    for un-run rules as unused.
+
+    Concrete shape: file triggers function_length (first rule, fires
+    early) AND has a ``# nosafe: SAFE401`` for resource_lifecycle
+    (later rule, never runs because fail_fast stops the loop). Without
+    the stopped-early guard, SAFE004 would warn about the SAFE401
+    directive — but resource_lifecycle didn't even get to evaluate it.
+    """
+    long_body = "    x = 1\n" * 65
+    source = "def foo():\n" + long_body + "    f = open('x.txt')  # nosafe: SAFE401\n"
+    sample = tmp_path / "ff_safe004.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"execution": {"fail_fast": True}})
+    result = SafetyEngine(config).check_file(str(sample))
+
+    # function_length (first rule) fires.
+    assert any(v.rule == "function_length" for v in result.violations)
+    # No SAFE004 — fail_fast made the SAFE401 directive's "usedness"
+    # unknowable, so the engine intentionally stays silent.
+    assert not any(v.code == "SAFE004" for v in result.violations)
+
+
+def test_safe004_still_emitted_without_fail_fast(tmp_path: Path) -> None:
+    """Without fail_fast, all rules run and SAFE004 fires normally on truly unused directives."""
+    source = "x = 1  # nosafe: SAFE401\n"
+    sample = tmp_path / "no_ff_safe004.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"execution": {"fail_fast": False}})
+    result = SafetyEngine(config).check_file(str(sample))
+
+    # SAFE401 didn't fire (no resource acquisition), so its directive
+    # is genuinely unused — SAFE004 must surface it.
+    assert any(v.code == "SAFE004" and "SAFE401" in v.message for v in result.violations)

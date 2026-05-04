@@ -167,16 +167,33 @@ def _unused_violations_for_line(
         if (lineno_, None) in used:
             return []
         return [_make_unused_suppression(filepath, lineno_, "this `# nosafe` directive did not suppress any violation")]
-    return [_make_unused_suppression(filepath, lineno_, f"`# nosafe: {code}` did not suppress any violation") for code in codes if not _is_safe004_self_reference(code) and (lineno_, code) not in used]
+    # Iterate in sorted order so multiple SAFE004 violations on the
+    # same line (e.g. ``# nosafe: SAFE101, SAFE102, SAFE103``) come out
+    # in stable alphabetical sequence — JSON/SARIF consumers rely on
+    # deterministic per-run ordering, and ``set[str]`` iteration is
+    # hash-randomised across processes.
+    return [
+        _make_unused_suppression(filepath, lineno_, f"`# nosafe: {code}` did not suppress any violation")
+        for code in sorted(codes)
+        if not _is_safe004_self_reference(code) and (lineno_, code) not in used
+    ]
 
 
 def _is_safe004_self_reference(code: str) -> bool:
     """Return True when *code* refers to SAFE004 by either its code or rule name.
 
-    Inline suppressions accept either form. Comparison on the code is
-    case-insensitive (matching the engine's other code-comparison sites)
-    so ``# nosafe: safe004`` is also recognised; the rule name comparison
-    is exact since rule names are lower-snake-case by convention.
+    A *deliberate* leniency, narrower than the rest of the engine: this
+    helper accepts either the canonical ``SAFE004`` (case-insensitive,
+    so ``safe004`` / ``Safe004`` are also recognised) or the
+    ``unused_suppression`` rule name. Inline ``# nosafe:`` matching at
+    :func:`_is_suppressed` and :func:`_check_suppressed_marking_used`
+    is otherwise *case-sensitive* on codes — the global ``ignore``
+    config list is normalised to upper-case at load time, but per-line
+    inline directives are matched verbatim. Treating the SAFE004
+    self-reference more leniently is intentional: a directive whose
+    only purpose is to silence the SAFE004 rule itself shouldn't
+    recursively trigger SAFE004 just because the user typed it
+    lowercase.
     """
     return code.upper() == "SAFE004" or code == "unused_suppression"
 
@@ -464,18 +481,27 @@ class SafetyEngine:
         ignored_names: frozenset[str],
         ignored_codes: frozenset[str],
         used_suppressions: set[tuple[int, str | None]],
-    ) -> tuple[list[Violation], list[Violation]]:
-        """Run active rules against *tree*, returning (active, suppressed) violation lists."""
+    ) -> tuple[list[Violation], list[Violation], bool]:
+        """Run active rules against *tree*, returning (active, suppressed, stopped_early).
+
+        *stopped_early* is True when ``fail_fast`` caused the rule loop
+        to short-circuit on a hit. The caller uses this to suppress the
+        SAFE004 (``unused_suppression``) pass: if later rules never
+        ran, we don't yet know whether their corresponding ``# nosafe``
+        directives were truly unused or just blocked from firing.
+        """
         active: list[Violation] = []
         suppressed: list[Violation] = []
+        stopped_early = False
         for rule in self.rules:
             rule_violations = rule.check_file(filepath, tree)
             rule_active, rule_suppressed = self._partition_rule_output(rule_violations, suppressions, ignored_names, ignored_codes, used_suppressions)
             active.extend(rule_active)
             suppressed.extend(rule_suppressed)
             if self.fail_fast and rule_active:
+                stopped_early = True
                 break
-        return active, suppressed
+        return active, suppressed, stopped_early
 
     def _pre_read_skip(self, filepath: str, path_obj: Path) -> LintResult | None:
         """Return an empty LintResult to skip *filepath*, or None to proceed.
@@ -593,8 +619,14 @@ class SafetyEngine:
         suppressions = _parse_suppressions(tree, lang.comment_node_type, lang.comment_prefix)
         ignored_names, ignored_codes = self._file_ignored_set(filepath)
         used_suppressions: set[tuple[int, str | None]] = set()
-        active, suppressed = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes, used_suppressions)
-        self._append_unused_suppressions(filepath, suppressions, used_suppressions, active, suppressed, ignored_names, ignored_codes)
+        active, suppressed, stopped_early = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes, used_suppressions)
+        # Skip the SAFE004 unused-suppression pass when ``fail_fast``
+        # short-circuited the rule loop: ``used_suppressions`` is
+        # incomplete in that case (later rules never got to mark their
+        # directives as used), so emitting SAFE004 would falsely report
+        # directives for un-run rules as "unused".
+        if not stopped_early:
+            self._append_unused_suppressions(filepath, suppressions, used_suppressions, active, suppressed, ignored_names, ignored_codes)
         if cache_key is not None and self._cache is not None:
             self._cache.put(cache_key, active, suppressed)
         return LintResult(path=filepath, violations=active, suppressed=suppressed)
