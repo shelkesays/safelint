@@ -95,15 +95,21 @@ is clear *which* rules were silenced. Codes are ordered by descending count,
 ties broken alphabetically.
 
 When there are still active violations, the breakdown rides on the
-"no fixes" line:
+post-summary line. The text varies depending on whether any rule
+emitted advisory suggestions for those violations (added in 1.10.0):
 
 ```text
 Found 2 errors, 1 warning. [--fail-on=error].
-No fixes available (safelint does not auto-fix violations). (2 SAFE501, 1 SAFE304 suppressed)
+No suggestions available (safelint does not auto-fix; see --format json for any advisory edits). (2 SAFE501, 1 SAFE304 suppressed)
 ```
 
+If at least one violation has a suggestion, the line reads
+`N advisory suggestion(s) available — view via --format json (safelint
+does not auto-apply fixes).` followed by the same suppression
+breakdown. SafeLint never auto-applies — the line is informational.
+
 When the run is otherwise clean (no active violations), only the all-clear
-line is printed — there is nothing to fix, so the "no fixes" line is omitted:
+line is printed — the suggestion / no-suggestion line is omitted:
 
 ```text
 All checks passed. (2 SAFE501, 1 SAFE304 suppressed)

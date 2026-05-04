@@ -127,7 +127,7 @@ Add this to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v1.0.0  # replace with the latest release tag
+    rev: v1.10.0  # replace with the latest release tag
     hooks:
       - id: safelint
         args: [--fail-on=error]  # use --fail-on=warning for stricter CI
@@ -249,6 +249,8 @@ After restarting Claude Code, ask things like *"run safelint"*, *"lint my change
 
 - **Stdin mode** — `safelint --stdin --stdin-filename PATH --format json` lints unsaved buffer contents fed via stdin. Designed for editor extensions (VSCode plugin, custom LSP wrappers).
 - **JSON / SARIF output** — `--format json` and `--format sarif` emit stable, machine-readable documents. The JSON schema is documented in [`docs/JSON_SCHEMA.md`](docs/JSON_SCHEMA.md). SARIF output is GitHub code-scanning compatible.
+- **Column-precise positions** — every violation carries `lineno`, `end_lineno`, `column_start`, `column_end` (1-based, half-open). Maps directly to LSP / VSCode `Range` and SARIF `region.endColumn`. Synthetic violations (e.g. `test_existence`) leave column fields `null`; editors should treat that as "underline the whole line".
+- **Advisory suggestions** — every violation may carry a `suggestions` array with one-line descriptions and `TextEdit` ranges. **Editor integrations must never apply these automatically** — every edit goes through user confirmation. SARIF output uses the spec's native `fixes[]` block for the same data. SafeLint will never ship a `--fix` flag.
 
 ---
 
