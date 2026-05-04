@@ -2,13 +2,13 @@
 
 `safelint check --format json` and `safelint --stdin --format json` both emit a single JSON document on stdout describing the lint run. This page documents that contract so plugin authors (Claude Code skill, VSCode extension, CI scripts) can rely on a stable shape.
 
-The schema is **stable since v1.5.0**. Additions are non-breaking; field removals or type changes will only happen in a major-version bump (and have not happened to date).
+The schema is **stable since v1.5.0**. Field additions are non-breaking (consumers ignore unknown keys); removals or type changes only happen in a major-version bump (none to date). Notable additions since baseline: position fields (`end_lineno`, `column_start`, `column_end`) in 1.7.0, advisory `suggestions[]` in 1.10.0.
 
 ## Top-level shape
 
 ```json
 {
-  "version": "1.5.0",
+  "version": "1.10.0",
   "summary": {
     "files_checked": 12,
     "violations": 4,
