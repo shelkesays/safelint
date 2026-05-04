@@ -131,8 +131,29 @@ DEFAULTS: dict[str, Any] = {
         "resource_lifecycle": {
             "enabled": True,
             "severity": "error",
-            "tracked_functions": ["open", "connect", "session"],
-            "cleanup_patterns": ["close", "commit", "rollback"],
+            # Default tracked functions cover the most common resource-acquisition
+            # primitives across Python's stdlib + popular libraries. Users can
+            # extend (without re-listing) via ``extend_tracked_functions``.
+            "tracked_functions": [
+                "open",  # builtins.open — files
+                "connect",  # sqlite3.connect, psycopg2.connect, mysql.connect, …
+                "session",  # requests.session(), sqlalchemy session factories
+                "Session",  # PEP-8-named session classes (requests.Session, sqlalchemy.Session)
+                "Lock",  # threading.Lock, asyncio.Lock, multiprocessing.Lock
+                "RLock",  # threading.RLock, asyncio.RLock
+                "Semaphore",  # threading.Semaphore, asyncio.Semaphore
+                "Pool",  # multiprocessing.Pool, concurrent.futures.*Pool
+                "ThreadPoolExecutor",  # concurrent.futures
+                "ProcessPoolExecutor",
+                "socket",  # socket.socket
+                "mmap",  # mmap.mmap
+                "TemporaryFile",  # tempfile.TemporaryFile / NamedTemporaryFile
+                "NamedTemporaryFile",
+                "TemporaryDirectory",
+                "ZipFile",  # zipfile.ZipFile
+                "TarFile",  # tarfile.TarFile / tarfile.open
+            ],
+            "cleanup_patterns": ["close", "commit", "rollback", "release", "shutdown"],
         },
         "unbounded_loops": {"enabled": True, "severity": "warning"},
         "missing_assertions": {"enabled": False, "severity": "warning"},
@@ -233,8 +254,8 @@ def _peek_toml_file(candidate: Path) -> dict[str, Any] | None:
     the authoritative reporter.
     """
     try:
-        # nosafe: SAFE304 — this *is* an I/O probe by design; the
-        # alternative names ("read", "load") would imply an authoritative
+        # SAFE304 suppression below: this *is* an I/O probe by design.
+        # Alternative names ("read", "load") would imply an authoritative
         # read, but this helper is deliberately a quiet peek.
         with candidate.open("rb") as fp:  # nosafe: SAFE304
             return tomllib.load(fp)
@@ -331,6 +352,72 @@ def find_config_root(search_from: Path | None = None) -> Path | None:
     return None
 
 
+def _merge_extend_ignore(merged: dict[str, Any], extend_ignore: object) -> None:
+    """Append ``extend_ignore`` entries onto ``merged["ignore"]`` (order-preserving dedupe).
+
+    *extend_ignore* is typed ``object`` because the value flows directly
+    from a TOML file — the type-narrowing happens via ``isinstance`` here.
+    """
+    if not isinstance(extend_ignore, (list, tuple)):
+        msg = f"extend_ignore must be a list of strings, got {type(extend_ignore).__name__}"
+        raise TypeError(msg)
+    existing = merged.get("ignore", [])
+    merged["ignore"] = list(dict.fromkeys([*existing, *extend_ignore]))
+
+
+def _merge_extend_per_file_ignores(merged: dict[str, Any], extend_pfi: object) -> None:
+    """Merge ``extend_per_file_ignores`` into ``merged["per_file_ignores"]`` per glob pattern."""
+    if not isinstance(extend_pfi, dict):
+        msg = f"extend_per_file_ignores must be a mapping, got {type(extend_pfi).__name__}"
+        raise TypeError(msg)
+    existing_pfi: dict[str, list[str]] = merged.get("per_file_ignores", {})
+    # Iteration over a runtime-validated dict[Any, Any]; the type checker
+    # can't infer per-key/value types so we annotate explicitly inside the
+    # loop body for the call site to type-check.
+    for raw_pattern, raw_entries in extend_pfi.items():
+        pattern = str(raw_pattern)
+        _merge_one_pfi_pattern(existing_pfi, pattern, raw_entries)
+    merged["per_file_ignores"] = existing_pfi
+
+
+def _merge_one_pfi_pattern(existing_pfi: dict[str, list[str]], pattern: str, entries: object) -> None:
+    """Merge *entries* into *existing_pfi*[*pattern*] with order-preserving dedupe.
+
+    *entries* is typed ``object`` because the value comes from a TOML
+    file; the runtime ``isinstance`` check below narrows it before use.
+    """
+    if not isinstance(entries, (list, tuple)):
+        msg = f"extend_per_file_ignores[{pattern!r}] must be a list of strings, got {type(entries).__name__}"
+        raise TypeError(msg)
+    # Cast the validated list elements to str — TOML strings come through
+    # as str at runtime; non-strings would fail the engine's downstream
+    # parse_per_file_ignores type-guard which has its own diagnostic.
+    typed_entries: list[str] = [str(e) for e in entries]
+    current = existing_pfi.get(pattern, [])
+    existing_pfi[pattern] = list(dict.fromkeys([*current, *typed_entries]))
+
+
+def _apply_extend_keys(merged: dict[str, Any]) -> dict[str, Any]:
+    """Fold ``extend_ignore`` / ``extend_per_file_ignores`` into the resolved config.
+
+    Modelled on ruff's ``extend-select`` / ``extend-ignore`` ergonomics: lets
+    users *grow* a list-typed config value instead of replacing it. Without
+    these keys, a project that wants to add ``"SAFE701"`` to the default
+    ``ignore = []`` while keeping anything else added by their config would
+    have to re-list every existing entry.
+
+    Both keys are stripped from the returned dict so downstream consumers
+    (engine, runner) only see the canonical ``ignore`` / ``per_file_ignores``.
+    """
+    extend_ignore = merged.pop("extend_ignore", None)
+    if extend_ignore:
+        _merge_extend_ignore(merged, extend_ignore)
+    extend_pfi = merged.pop("extend_per_file_ignores", None)
+    if extend_pfi:
+        _merge_extend_per_file_ignores(merged, extend_pfi)
+    return merged
+
+
 def load_config(search_from: Path | None = None) -> dict[str, Any]:
     """Locate and load safelint config, merging it with the built-in defaults.
 
@@ -344,6 +431,12 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
     result (e.g. appending to ``ignore``) without corrupting the module
     ``DEFAULTS`` or sharing nested lists across loads.
 
+    The user config may use ``extend_ignore`` / ``extend_per_file_ignores``
+    to *grow* the corresponding default lists rather than replace them
+    (mirrors ruff's ``extend-select`` / ``extend-ignore``). These keys
+    are folded into ``ignore`` / ``per_file_ignores`` and stripped from
+    the returned dict — downstream consumers only see the canonical keys.
+
     Returns a copy of ``DEFAULTS`` when no config file is found.
     """
     root = search_from or Path.cwd()
@@ -355,5 +448,5 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
         if cfg is None:
             cfg = _try_pyproject(parent)
         if cfg is not None:
-            return deep_merge(copy.deepcopy(DEFAULTS), cfg)
+            return _apply_extend_keys(deep_merge(copy.deepcopy(DEFAULTS), cfg))
     return copy.deepcopy(DEFAULTS)

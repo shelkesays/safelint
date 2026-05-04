@@ -25,6 +25,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
+from dataclasses import dataclass
 import functools
 from pathlib import Path
 import shutil
@@ -207,6 +208,62 @@ def _print_file_summary(filepath: str, violations: list[Violation]) -> None:
     print()
 
 
+def _stat_row(code: str, rule: str, active: int, supp: int, code_width: int, rule_width: int) -> str:
+    """Format one row of the ``--statistics`` table."""
+    active_col = _c(str(active).rjust(6), _BOLD, _RED) if active else "     -"
+    supp_col = _c(str(supp).rjust(10), _CYAN) if supp else "         -"
+    return f"{code.ljust(code_width)}  {rule.ljust(rule_width)}  {active_col}  {supp_col}"
+
+
+def _print_statistics(violations: list[Violation], suppressed: list[Violation]) -> None:
+    """Print a per-rule violation-count table.
+
+    Includes active *and* suppressed counts so users can see what was
+    silenced as well as what fired. Sorted by descending total count;
+    rules tied on count are sorted alphabetically by code for
+    deterministic output across runs. Emits nothing when both lists
+    are empty.
+    """
+    if not violations and not suppressed:
+        return
+    active_counts = Counter(v.code or v.rule for v in violations)
+    suppressed_counts = Counter(v.code or v.rule for v in suppressed)
+    all_codes = sorted(set(active_counts) | set(suppressed_counts), key=lambda c: (-(active_counts[c] + suppressed_counts[c]), c))
+    rule_for: dict[str, str] = {}
+    for v in [*violations, *suppressed]:
+        rule_for.setdefault(v.code or v.rule, v.rule)
+
+    code_width = max((len(c) for c in all_codes), default=0)
+    rule_width = max((len(rule_for[c]) for c in all_codes), default=0)
+
+    print()
+    header = f"{'CODE'.ljust(code_width)}  {'RULE'.ljust(rule_width)}  ACTIVE  SUPPRESSED"
+    print(_c(header, _BOLD))
+    print(_c("-" * len(header), _PURPLE))
+    for code in all_codes:
+        print(_stat_row(code, rule_for[code], active_counts[code], suppressed_counts[code], code_width, rule_width))
+    print()
+
+
+@dataclass(frozen=True)
+class _PrintOptions:
+    """Pretty-mode rendering knobs that don't fit the 'data' arguments.
+
+    Bundled into a dataclass so ``_print_results`` keeps its argument count
+    under the ``max_arguments`` rule's threshold while still being explicit
+    at call sites: ``options=_PrintOptions(silent_on_clean=True)``.
+    """
+
+    silent_on_clean: bool = False
+    statistics: bool = False
+
+
+# Module-level singleton for the default ``_print_results(options=...)`` arg —
+# avoids the ``B008`` lint that disallows calling a constructor in a default
+# argument expression. Frozen + immutable so accidental mutation is impossible.
+_DEFAULT_PRINT_OPTIONS = _PrintOptions()
+
+
 def _print_results(
     output_format: str,
     violations: list[Violation],
@@ -215,7 +272,7 @@ def _print_results(
     blocking_count: int,
     fail_on: str,
     files_checked: int,
-    silent_on_clean: bool = False,
+    options: _PrintOptions = _DEFAULT_PRINT_OPTIONS,
 ) -> None:
     """Emit accumulated lint results in the chosen format.
 
@@ -224,19 +281,26 @@ def _print_results(
     and ``sarif``, prints a single machine-readable document on stdout
     that contains both the violation list and the summary.
 
-    *silent_on_clean* — when True, pretty mode emits nothing on a clean
-    run (no violations and no suppressed entries). Hook mode and stdin
-    mode set this so a clean pre-commit run is silent (the long-standing
-    ruff/ty contract); ``safelint check`` leaves it False so the user
-    gets explicit ``All checks passed.`` confirmation.
+    *options* bundles the optional rendering knobs:
+
+    * ``silent_on_clean`` — when True, pretty mode emits nothing on a
+      clean run (no violations and no suppressed entries). Hook mode
+      and stdin mode set this so a clean pre-commit run is silent (the
+      long-standing ruff/ty contract); ``safelint check`` leaves it
+      False so the user gets explicit ``All checks passed.``.
+    * ``statistics`` — when True, append a per-rule violation-count
+      table after the summary. Pretty mode only; ignored in JSON / SARIF
+      where consumers can derive the same from ``violations[]``.
 
     Stderr diagnostics (configuration warnings, oversize-skip messages)
     are unaffected — they are always written as they are produced,
     regardless of format.
     """
     if output_format == "pretty":
-        if violations or suppressed or not silent_on_clean:
+        if violations or suppressed or not options.silent_on_clean:
             _print_summary(violations, blocking_count, fail_on, suppressed)
+        if options.statistics:
+            _print_statistics(violations, suppressed)
         return
     if output_format == "json":
         print(
@@ -307,7 +371,7 @@ def _run_stdin(args: argparse.Namespace) -> int:
         blocking_count=len(blocking),
         fail_on=fail_on,
         files_checked=1,
-        silent_on_clean=True,
+        options=_PrintOptions(silent_on_clean=True, statistics=getattr(args, "statistics", False)),
     )
     return 1 if blocking else 0
 
@@ -357,7 +421,7 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
         blocking_count=len(all_blocking),
         fail_on=fail_on,
         files_checked=len(files),
-        silent_on_clean=True,
+        options=_PrintOptions(silent_on_clean=True, statistics=getattr(args, "statistics", False)),
     )
     return 1 if all_blocking else 0
 
@@ -553,7 +617,7 @@ def _run_check(args: argparse.Namespace) -> int:
         # so downstream tools (CI uploaders, SARIF consumers) don't choke
         # on empty input. Pretty mode already emitted the human-readable
         # status above and exits 0 silently.
-        _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, silent_on_clean=True)
+        _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, options=_PrintOptions(silent_on_clean=True))
         return 0
 
     results = run(
@@ -580,7 +644,15 @@ def _run_check(args: argparse.Namespace) -> int:
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
 
-    _print_results(output_format, all_violations, all_suppressed, blocking_count=len(all_blocking), fail_on=fail_on, files_checked=len(results))
+    _print_results(
+        output_format,
+        all_violations,
+        all_suppressed,
+        blocking_count=len(all_blocking),
+        fail_on=fail_on,
+        files_checked=len(results),
+        options=_PrintOptions(statistics=getattr(args, "statistics", False)),
+    )
     return 1 if all_blocking else 0
 
 
@@ -616,6 +688,17 @@ def _add_output_args(parser: argparse.ArgumentParser) -> None:
             "memoises rule output keyed on sha256(source + engine config + filepath) "
             "in a ``.safelint_cache/`` directory next to the config file, "
             "so re-runs on unchanged files are essentially instant."
+        ),
+    )
+    parser.add_argument(
+        "--statistics",
+        dest="statistics",
+        action="store_true",
+        default=False,
+        help=(
+            "After the run, print a per-rule violation count summary to stdout (pretty mode only). "
+            "Useful for 'where do we stand?' snapshots in CI. Counts include both active and "
+            "suppressed violations so you can see the full picture."
         ),
     )
 

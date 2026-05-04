@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import pytest
 
 from safelint.core.config import (
     DEFAULTS,
@@ -235,3 +235,65 @@ def test_find_config_root_returns_none_when_no_config_anywhere(tmp_path: Path) -
     nested = tmp_path / "deep" / "deeper"
     nested.mkdir(parents=True)
     assert find_config_root(nested) is None
+
+
+# ---------------------------------------------------------------------------
+# extend_ignore / extend_per_file_ignores (1.8.0)
+# ---------------------------------------------------------------------------
+
+
+def test_extend_ignore_appends_to_existing_ignore_list(tmp_path: Path) -> None:
+    """``extend_ignore`` grows the ``ignore`` list instead of replacing it."""
+    (tmp_path / "safelint.toml").write_text(
+        'ignore = ["SAFE701"]\nextend_ignore = ["SAFE702", "SAFE801"]\n',
+        encoding="utf-8",
+    )
+    config = load_config(tmp_path)
+    assert "SAFE701" in config["ignore"]
+    assert "SAFE702" in config["ignore"]
+    assert "SAFE801" in config["ignore"]
+    # extend_ignore is consumed; downstream consumers only see ``ignore``.
+    assert "extend_ignore" not in config
+
+
+def test_extend_ignore_dedupes_when_overlapping(tmp_path: Path) -> None:
+    """Duplicate codes between ``ignore`` and ``extend_ignore`` collapse to one."""
+    (tmp_path / "safelint.toml").write_text(
+        'ignore = ["SAFE701"]\nextend_ignore = ["SAFE701", "SAFE702"]\n',
+        encoding="utf-8",
+    )
+    config = load_config(tmp_path)
+    assert config["ignore"].count("SAFE701") == 1
+    assert "SAFE702" in config["ignore"]
+
+
+def test_extend_per_file_ignores_merges_lists(tmp_path: Path) -> None:
+    """``extend_per_file_ignores`` concatenates entries for an existing pattern."""
+    (tmp_path / "safelint.toml").write_text(
+        '[per_file_ignores]\n"tests/**" = ["SAFE101"]\n[extend_per_file_ignores]\n"tests/**" = ["SAFE102"]\n"docs/**" = ["SAFE601"]\n',
+        encoding="utf-8",
+    )
+    config = load_config(tmp_path)
+    assert sorted(config["per_file_ignores"]["tests/**"]) == ["SAFE101", "SAFE102"]
+    assert config["per_file_ignores"]["docs/**"] == ["SAFE601"]
+    assert "extend_per_file_ignores" not in config
+
+
+def test_extend_ignore_validates_input_type(tmp_path: Path) -> None:
+    """A non-list ``extend_ignore`` raises TypeError up front."""
+    (tmp_path / "safelint.toml").write_text(
+        'extend_ignore = "SAFE701"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(TypeError, match="extend_ignore"):
+        load_config(tmp_path)
+
+
+def test_extend_per_file_ignores_validates_input_type(tmp_path: Path) -> None:
+    """A non-mapping ``extend_per_file_ignores`` raises TypeError."""
+    (tmp_path / "safelint.toml").write_text(
+        'extend_per_file_ignores = ["nope"]\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(TypeError, match="extend_per_file_ignores"):
+        load_config(tmp_path)

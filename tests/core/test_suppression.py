@@ -291,3 +291,57 @@ def test_fail_fast_stops_after_first_unsuppressed_rule(tmp_path: Path) -> None:
     # without fail_fast: both rules must have fired
     assert any(v.rule == "function_length" for v in result_no.violations), "Expected function_length violation without fail_fast"
     assert any(v.rule == "bare_except" for v in result_no.violations), "Expected bare_except violation without fail_fast"
+
+
+# ---------------------------------------------------------------------------
+# SAFE004 — unused_suppression (1.8.0)
+# ---------------------------------------------------------------------------
+
+
+def test_safe004_fires_for_unused_directive(tmp_path: Path) -> None:
+    """A `# nosafe: SAFE304` on a line with no SAFE304 violation triggers SAFE004."""
+    sample = tmp_path / "u.py"
+    sample.write_text("x = 1  # nosafe: SAFE304\n", encoding="utf-8")
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    assert any(v.code == "SAFE004" for v in result.violations)
+
+
+def test_safe004_silent_for_directive_that_caught_a_violation(tmp_path: Path) -> None:
+    """A `# nosafe: SAFE201` on a real bare-except line does NOT trigger SAFE004."""
+    sample = tmp_path / "u2.py"
+    sample.write_text(
+        "def f():\n    try:\n        pass\n    except:  # nosafe: SAFE201\n        pass\n",
+        encoding="utf-8",
+    )
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    assert not any(v.code == "SAFE004" for v in result.violations)
+
+
+def test_safe004_disabled_via_global_ignore(tmp_path: Path) -> None:
+    """Adding SAFE004 to ignore silences unused-suppression warnings."""
+    sample = tmp_path / "u3.py"
+    sample.write_text("x = 1  # nosafe: SAFE304\n", encoding="utf-8")
+    config = deep_merge(DEFAULTS, {"ignore": ["SAFE004"]})
+    result = SafetyEngine(config).check_file(str(sample))
+    assert not any(v.code == "SAFE004" for v in result.violations)
+
+
+def test_safe004_skips_self_referential_directive(tmp_path: Path) -> None:
+    """`# nosafe: SAFE004` alone on a line never produces SAFE004 about itself."""
+    sample = tmp_path / "u4.py"
+    sample.write_text("x = 1  # nosafe: SAFE004\n", encoding="utf-8")
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    assert not any(v.code == "SAFE004" for v in result.violations)
+
+
+def test_safe004_partial_unused_in_multi_code_directive(tmp_path: Path) -> None:
+    """`# nosafe: SAFE201, SAFE304` — if only SAFE201 fires, SAFE304 is flagged unused."""
+    sample = tmp_path / "u5.py"
+    sample.write_text(
+        "def f():\n    try:\n        pass\n    except:  # nosafe: SAFE201, SAFE304\n        pass\n",
+        encoding="utf-8",
+    )
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    safe004s = [v for v in result.violations if v.code == "SAFE004"]
+    assert len(safe004s) == 1
+    assert "SAFE304" in safe004s[0].message
