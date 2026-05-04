@@ -17,22 +17,36 @@ if TYPE_CHECKING:
 class Violation:
     """A single rule violation produced during static analysis.
 
-    *column_start* and *column_end* are 1-based column numbers (matching
-    safelint's 1-based ``lineno`` convention and most editor display
-    formats). Both default to ``None`` for two reasons:
+    Position fields form a fully-specified ``[start, end)`` range
+    matching LSP / VSCode ``Range`` and SARIF ``region`` semantics:
+
+    * ``lineno`` (1-based) — start line. Required, always set.
+    * ``end_lineno`` (1-based) — end line. ``None`` when the violation
+      has no meaningful span (parse errors with no node, file-level
+      violations like ``test_existence``). When set and equal to
+      ``lineno``, the construct is single-line.
+    * ``column_start`` (1-based) — start column on ``lineno``. ``None``
+      when no Tree-sitter node was available.
+    * ``column_end`` (1-based, exclusive) — end column on
+      ``end_lineno``. ``None`` mirrors ``column_start``.
+
+    All four position fields default to ``None`` for two reasons:
 
     * **Backwards-compatible cache replay** — Violations cached by an
       older safelint version don't carry these fields; deserialising
-      via ``Violation(**dict)`` works as long as the new fields have
+      via ``Violation(**dict)`` works as long as new fields have
       defaults.
-    * **Some violations have no meaningful column** — synthetic
-      ``SAFE000`` parse errors with ``lineno == 0`` fall back to
-      ``column_start = column_end = None``.
+    * **Some violations have no span** — synthetic ``SAFE000`` parse
+      errors with ``lineno == 0`` and missing-file violations have
+      no Tree-sitter node to position against.
 
-    Editor integrations (Claude Code skill, VSCode plugin) treat
-    ``None`` as "no column data, fall back to underlining the whole
-    line"; ``column_start == column_end`` denotes a zero-width caret
-    position (e.g. for "missing token" parse errors).
+    Editor integrations treat ``column_start == None`` as "no column
+    data, underline the whole line" and ``column_start == column_end``
+    as a zero-width caret (e.g. parse-error markers). For multi-line
+    constructs (``end_lineno > lineno``), ``column_end`` is the end
+    column on ``end_lineno``, not on ``lineno`` — earlier 1.7.0 work
+    omitted ``end_lineno`` and editors mistakenly assumed
+    ``column_end`` was on the start line, highlighting the wrong span.
     """
 
     rule: str
@@ -43,6 +57,7 @@ class Violation:
     severity: str  # "error" | "warning"
     column_start: int | None = None
     column_end: int | None = None
+    end_lineno: int | None = None
 
 
 class BaseRule(ABC):
@@ -68,6 +83,7 @@ class BaseRule(ABC):
         *,
         column_start: int | None = None,
         column_end: int | None = None,
+        end_lineno: int | None = None,
     ) -> Violation:
         """Construct a Violation tagged with this rule's name, code, and severity."""
         return Violation(
@@ -79,6 +95,7 @@ class BaseRule(ABC):
             severity=self.severity,
             column_start=column_start,
             column_end=column_end,
+            end_lineno=end_lineno,
         )
 
     def _make_violation_for_node(
@@ -87,19 +104,24 @@ class BaseRule(ABC):
         node: tree_sitter.Node,
         message: str,
     ) -> Violation:
-        """Construct a Violation positioned at *node* (lineno + column range).
+        """Construct a Violation positioned at *node*.
 
-        Convenience wrapper: rules that have a Tree-sitter node in hand can
-        skip the manual ``node.start_point[0] + 1`` plumbing and let this
-        helper extract lineno + 1-based start/end columns. Equivalent to::
-
-            line, col_s, col_e = node_range(node)
-            self._make_violation(path, line, msg, column_start=col_s, column_end=col_e)
+        Extracts the full 4-coordinate span — start line, end line, start
+        column, end column — so consumers can render the precise range
+        even for multi-line constructs (function definitions, except
+        clauses, while loops). All four are 1-based.
         """
         from safelint.languages._node_utils import node_range  # noqa: PLC0415
 
-        line, col_s, col_e = node_range(node)
-        return self._make_violation(filepath, line, message, column_start=col_s, column_end=col_e)
+        start_line, end_line, col_s, col_e = node_range(node)
+        return self._make_violation(
+            filepath,
+            start_line,
+            message,
+            column_start=col_s,
+            column_end=col_e,
+            end_lineno=end_line,
+        )
 
     @staticmethod
     def _call_name(call_node: tree_sitter.Node) -> str | None:  # pragma: no cover

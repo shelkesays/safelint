@@ -60,8 +60,9 @@ def test_json_violation_structure() -> None:
     assert doc["summary"]["errors"] == 1
     assert doc["summary"]["warnings"] == 0
     v = doc["violations"][0]
-    # column_start / column_end default to None for synthetic test
-    # Violations (added in 1.7.0). Real rules attach Tree-sitter positions.
+    # Position fields (end_lineno, column_start, column_end) default to None
+    # for synthetic test Violations (added in 1.7.0). Real rules attach
+    # Tree-sitter positions.
     assert v == {
         "code": "SAFE101",
         "rule": "function_length",
@@ -69,15 +70,16 @@ def test_json_violation_structure() -> None:
         "filepath": "src/foo.py",
         "lineno": 42,
         "message": "sample function_length message",
+        "end_lineno": None,
         "column_start": None,
         "column_end": None,
     }
 
 
-def test_json_violation_includes_column_range_when_present() -> None:
-    """Violations carrying Tree-sitter column data round-trip through JSON."""
+def test_json_violation_includes_full_range_when_present() -> None:
+    """Multi-line violations carry start/end lines + columns through JSON."""
     out = format_json(
-        [Violation(rule="function_length", code="SAFE101", filepath="src/foo.py", lineno=42, message="m", severity="error", column_start=5, column_end=18)],
+        [Violation(rule="function_length", code="SAFE101", filepath="src/foo.py", lineno=42, message="m", severity="error", column_start=1, column_end=9, end_lineno=68)],
         [],
         blocking_count=1,
         fail_on="error",
@@ -85,8 +87,10 @@ def test_json_violation_includes_column_range_when_present() -> None:
     )
     doc = json.loads(out)
     v = doc["violations"][0]
-    assert v["column_start"] == 5
-    assert v["column_end"] == 18
+    assert v["lineno"] == 42
+    assert v["end_lineno"] == 68
+    assert v["column_start"] == 1
+    assert v["column_end"] == 9
 
 
 def test_json_summary_counts_errors_and_warnings_separately() -> None:
@@ -197,16 +201,26 @@ def test_sarif_suppressed_violations_carry_in_source_marker() -> None:
 
 
 def test_sarif_region_includes_columns_when_present() -> None:
-    """Violations with column data emit SARIF startColumn / endColumn."""
-    v = Violation(rule="function_length", code="SAFE101", filepath="src/foo.py", lineno=42, message="m", severity="error", column_start=5, column_end=18)
+    """Single-line violations with column data emit startLine + columns; endLine is omitted (defaults to startLine per SARIF spec)."""
+    v = Violation(rule="function_length", code="SAFE101", filepath="src/foo.py", lineno=42, message="m", severity="error", column_start=5, column_end=18, end_lineno=42)
     out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
     doc = json.loads(out)
     region = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]
     assert region == {"startLine": 42, "startColumn": 5, "endColumn": 18}
+    assert "endLine" not in region
+
+
+def test_sarif_region_emits_end_line_for_multi_line_constructs() -> None:
+    """Multi-line violations emit region.endLine so endColumn is correctly anchored."""
+    v = Violation(rule="function_length", code="SAFE101", filepath="src/foo.py", lineno=42, message="m", severity="error", column_start=1, column_end=9, end_lineno=68)
+    out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
+    doc = json.loads(out)
+    region = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]
+    assert region == {"startLine": 42, "startColumn": 1, "endLine": 68, "endColumn": 9}
 
 
 def test_sarif_region_omits_columns_when_absent() -> None:
-    """Violations without column data emit only startLine (no startColumn / endColumn keys)."""
+    """Violations without column data emit only startLine."""
     v = Violation(rule="parse", code="SAFE000", filepath="src/foo.py", lineno=0, message="m", severity="error")
     out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
     doc = json.loads(out)

@@ -85,15 +85,26 @@ def _artifact_uri(filepath: str) -> str:
 def _build_region(v: Violation) -> dict[str, Any]:
     """Build the SARIF ``region`` block for *v*.
 
-    Always includes ``startLine``. ``startColumn`` / ``endColumn`` are
-    added only when the violation carries column data (rules with a
-    Tree-sitter node attach them; synthetic file-level violations like
-    ``test_existence`` don't). SARIF columns are 1-based, matching
-    safelint's convention.
+    Always includes ``startLine``. The optional ``endLine`` /
+    ``startColumn`` / ``endColumn`` fields are added only when the
+    violation carries the corresponding data (rules with a Tree-sitter
+    node attach all of them; synthetic file-level violations like
+    ``test_existence`` don't). All values are 1-based, matching
+    safelint's convention and SARIF 2.1.0's contract.
+
+    ``endLine`` is omitted when it equals ``startLine`` — per SARIF
+    spec, an absent ``endLine`` defaults to ``startLine``, so emitting
+    a redundant value just bloats the output. When emitted, it
+    correctly anchors ``endColumn`` to the end-line of multi-line
+    constructs (function definitions, except clauses, while loops),
+    instead of letting consumers mistakenly assume ``endColumn``
+    applied to ``startLine``.
     """
     region: dict[str, Any] = {"startLine": v.lineno}
     if v.column_start is not None:
         region["startColumn"] = v.column_start
+    if v.end_lineno is not None and v.end_lineno != v.lineno:
+        region["endLine"] = v.end_lineno
     if v.column_end is not None:
         region["endColumn"] = v.column_end
     return region
