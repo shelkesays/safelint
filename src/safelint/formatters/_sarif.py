@@ -82,6 +82,23 @@ def _artifact_uri(filepath: str) -> str:
     return quote(p.as_posix(), safe="/")
 
 
+def _build_region(v: Violation) -> dict[str, Any]:
+    """Build the SARIF ``region`` block for *v*.
+
+    Always includes ``startLine``. ``startColumn`` / ``endColumn`` are
+    added only when the violation carries column data (rules with a
+    Tree-sitter node attach them; synthetic file-level violations like
+    ``test_existence`` don't). SARIF columns are 1-based, matching
+    safelint's convention.
+    """
+    region: dict[str, Any] = {"startLine": v.lineno}
+    if v.column_start is not None:
+        region["startColumn"] = v.column_start
+    if v.column_end is not None:
+        region["endColumn"] = v.column_end
+    return region
+
+
 def _result_for_violation(v: Violation, *, suppressed: bool) -> dict[str, Any]:
     """Build a SARIF ``results`` entry for one violation."""
     entry: dict[str, Any] = {
@@ -92,7 +109,7 @@ def _result_for_violation(v: Violation, *, suppressed: bool) -> dict[str, Any]:
             {
                 "physicalLocation": {
                     "artifactLocation": {"uri": _artifact_uri(v.filepath)},
-                    "region": {"startLine": v.lineno},
+                    "region": _build_region(v),
                 }
             }
         ],

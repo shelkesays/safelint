@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import lineno, node_text, walk
+from safelint.languages._node_utils import node_text, walk
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     BOOLEAN_OPERATOR,
@@ -44,9 +44,9 @@ class ComplexityRule(BaseRule):
                 name_node = node.child_by_field_name("name")
                 func_name = node_text(name_node) if name_node else "<anonymous>"
                 violations.append(
-                    self._make_violation(
+                    self._make_violation_for_node(
                         filepath,
-                        lineno(node),
+                        node,
                         f'Function "{func_name}" has cyclomatic complexity {complexity} (max {max_cc}) - split into smaller functions',
                     )
                 )

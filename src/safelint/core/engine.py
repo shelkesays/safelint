@@ -278,8 +278,19 @@ class SafetyEngine:
         return frozenset(names), frozenset(codes_upper)
 
     @staticmethod
-    def _parse_error_result(filepath: str, message: str, lineno: int = 0) -> LintResult:
-        """Build a LintResult carrying a single SAFE000 parse-error violation."""
+    def _parse_error_result(
+        filepath: str,
+        message: str,
+        lineno: int = 0,
+        column: int | None = None,
+    ) -> LintResult:
+        """Build a LintResult carrying a single SAFE000 parse-error violation.
+
+        *column* is the 1-based column of the offending token; when supplied
+        it becomes a zero-width caret (``column_start == column_end``) so
+        editors can render a precise marker rather than underlining the
+        whole line.
+        """
         return LintResult(
             path=filepath,
             violations=[
@@ -290,6 +301,8 @@ class SafetyEngine:
                     lineno=lineno,
                     message=message,
                     severity="error",
+                    column_start=column,
+                    column_end=column,
                 )
             ],
         )
@@ -470,17 +483,19 @@ class SafetyEngine:
             if location is None:  # pragma: no cover
                 msg = "Parse error: tree-sitter could not fully parse this file"
                 err_lineno = 0
+                err_column: int | None = None
             else:
                 line, col, kind = location
                 # column is reported 1-based to match common editor convention.
                 msg = f"Parse error ({kind}) at line {line}, column {col + 1} - check syntax near this location"
                 err_lineno = line
+                err_column = col + 1
             # Parse errors aren't cached: they're typically transient
             # (a file mid-edit), and re-parsing a still-broken buffer
             # is cheap — Tree-sitter bails on the first ERROR/MISSING
             # node, so the cost saved by caching wouldn't be material
             # against the extra read/JSON-parse round-trip.
-            return self._parse_error_result(filepath, msg, lineno=err_lineno)
+            return self._parse_error_result(filepath, msg, lineno=err_lineno, column=err_column)
 
         suppressions = _parse_suppressions(tree, lang.comment_node_type, lang.comment_prefix)
         ignored_names, ignored_codes = self._file_ignored_set(filepath)

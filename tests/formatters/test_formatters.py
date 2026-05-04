@@ -60,6 +60,8 @@ def test_json_violation_structure() -> None:
     assert doc["summary"]["errors"] == 1
     assert doc["summary"]["warnings"] == 0
     v = doc["violations"][0]
+    # column_start / column_end default to None for synthetic test
+    # Violations (added in 1.7.0). Real rules attach Tree-sitter positions.
     assert v == {
         "code": "SAFE101",
         "rule": "function_length",
@@ -67,7 +69,24 @@ def test_json_violation_structure() -> None:
         "filepath": "src/foo.py",
         "lineno": 42,
         "message": "sample function_length message",
+        "column_start": None,
+        "column_end": None,
     }
+
+
+def test_json_violation_includes_column_range_when_present() -> None:
+    """Violations carrying Tree-sitter column data round-trip through JSON."""
+    out = format_json(
+        [Violation(rule="function_length", code="SAFE101", filepath="src/foo.py", lineno=42, message="m", severity="error", column_start=5, column_end=18)],
+        [],
+        blocking_count=1,
+        fail_on="error",
+        files_checked=1,
+    )
+    doc = json.loads(out)
+    v = doc["violations"][0]
+    assert v["column_start"] == 5
+    assert v["column_end"] == 18
 
 
 def test_json_summary_counts_errors_and_warnings_separately() -> None:
@@ -175,6 +194,24 @@ def test_sarif_suppressed_violations_carry_in_source_marker() -> None:
     results = doc["runs"][0]["results"]
     assert len(results) == 1
     assert results[0].get("suppressions") == [{"kind": "inSource"}]
+
+
+def test_sarif_region_includes_columns_when_present() -> None:
+    """Violations with column data emit SARIF startColumn / endColumn."""
+    v = Violation(rule="function_length", code="SAFE101", filepath="src/foo.py", lineno=42, message="m", severity="error", column_start=5, column_end=18)
+    out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
+    doc = json.loads(out)
+    region = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]
+    assert region == {"startLine": 42, "startColumn": 5, "endColumn": 18}
+
+
+def test_sarif_region_omits_columns_when_absent() -> None:
+    """Violations without column data emit only startLine (no startColumn / endColumn keys)."""
+    v = Violation(rule="parse", code="SAFE000", filepath="src/foo.py", lineno=0, message="m", severity="error")
+    out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
+    doc = json.loads(out)
+    region = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]
+    assert region == {"startLine": 0}
 
 
 def test_sarif_artifact_uri_normalises_windows_separators() -> None:

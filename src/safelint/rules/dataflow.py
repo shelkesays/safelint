@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.analysis.dataflow import TaintTracker
-from safelint.languages._node_utils import call_name, lineno, node_text, walk
+from safelint.languages._node_utils import call_name, node_text, walk
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     ATTRIBUTE,
@@ -111,12 +111,12 @@ class TaintedSinkRule(BaseRule):
         tracker = TaintTracker(params, sinks, sanitizers, sources)
         tracker.visit(func_node)
         return [
-            self._make_violation(
+            self._make_violation_for_node(
                 filepath,
-                line_num,
+                call_node,
                 f'Tainted variable "{var}" flows into dangerous sink "{sink}" - sanitize input before use',
             )
-            for line_num, var, sink in tracker.sink_hits
+            for call_node, var, sink in tracker.sink_hits
         ]
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
@@ -170,9 +170,9 @@ class ReturnValueIgnoredRule(BaseRule):
             name = call_name(call_node)
             if name and name in flagged:
                 violations.append(
-                    self._make_violation(
+                    self._make_violation_for_node(
                         filepath,
-                        lineno(node),
+                        node,
                         f'Return value of "{name}" is discarded - check the result or assign it to a named variable',
                     )
                 )
@@ -199,8 +199,13 @@ class NullDereferenceRule(BaseRule):
         }
     )
 
-    def _deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> tuple[int, str] | None:
-        """Return (lineno, method) if *node* is an unsafe chained dereference."""
+    def _deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
+        """Return the method name if *node* is an unsafe chained dereference, else None.
+
+        The caller already has the *node* in scope, so returning just the
+        method name is enough — the node carries its own position info
+        for column-precise diagnostics.
+        """
         if node.type not in (ATTRIBUTE, SUBSCRIPT):
             return None
         # attribute → field "object", subscript → field "value"
@@ -210,7 +215,7 @@ class NullDereferenceRule(BaseRule):
             return None
         name = call_name(obj)
         if name and name in nullable:
-            return lineno(node), name
+            return name
         return None
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
@@ -219,13 +224,12 @@ class NullDereferenceRule(BaseRule):
         nullable = self._DEFAULT_NULLABLE | extra
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            result = self._deref_hit(node, nullable)
-            if result:
-                line_num, method = result
+            method = self._deref_hit(node, nullable)
+            if method is not None:
                 violations.append(
-                    self._make_violation(
+                    self._make_violation_for_node(
                         filepath,
-                        line_num,
+                        node,
                         f'Result of "{method}()" is immediately dereferenced without a None check - guard with "if result is not None"',
                     )
                 )

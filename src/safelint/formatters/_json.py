@@ -58,13 +58,23 @@ if TYPE_CHECKING:
 
 
 def _violation_to_dict(v: Violation) -> dict[str, Any]:
-    """Render a Violation as a JSON-friendly dict."""
+    """Render a Violation as a JSON-friendly dict.
+
+    ``column_start`` and ``column_end`` are present in the output (added
+    in safelint 1.7.0) and may be ``null`` for synthetic violations
+    that don't have a Tree-sitter node to position against (e.g.
+    ``test_existence`` reports against a missing file with no source
+    span). Editor consumers should treat ``null`` as "underline the
+    whole line".
+    """
     return {
         "code": v.code,
         "rule": v.rule,
         "severity": v.severity,
         "filepath": v.filepath,
         "lineno": v.lineno,
+        "column_start": v.column_start,
+        "column_end": v.column_end,
         "message": v.message,
     }
 
