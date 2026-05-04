@@ -1309,6 +1309,54 @@ def test_function_length_count_mode_statements_skips_nested_defs(tmp_path: Path)
     assert flagged_for_inner
 
 
+def test_function_length_logical_lines_message_uses_logical_lines_unit(tmp_path: Path) -> None:
+    """``count_mode = "logical_lines"`` reports unit as "logical lines", not "lines".
+
+    Without the per-mode unit string, a small count under
+    ``logical_lines`` could be misread as raw source lines (where
+    blanks and comments would inflate the figure).
+    """
+    # 5 logical lines (blanks/comments would inflate raw line count past 5).
+    source = "def foo():\n\n    # blank above\n    a = 1\n    b = 2\n    c = 3\n    d = 4\n    return a + b + c + d\n"
+    sample = tmp_path / "logical_unit.py"
+    sample.write_text(source, encoding="utf-8")
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"function_length": {"max_lines": 3, "count_mode": "logical_lines"}}},
+    )
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "function_length"]
+    assert flagged
+    assert "logical lines" in flagged[0].message
+
+
+def test_function_length_statements_counts_nested_class_definition(tmp_path: Path) -> None:
+    """A function containing a ``class Inner: ...`` counts the class as a statement.
+
+    Without ``class_definition`` in ``_STATEMENT_TYPES``, a function
+    whose body is dominated by a nested class would silently undercount
+    — the rule could miss legitimately large functions in statement
+    mode. Adding it ensures the class itself contributes 1 (and its
+    body's statements also count, matching the complexity-proxy
+    intent of the statements mode).
+    """
+    # Function body has 1 class_definition + 1 return = 2 statements at the
+    # function level. Inside the class: 1 assignment + 1 (skipped) function_definition.
+    # With class_definition counted: outer's count = at least 3 (class itself
+    # + class body's assignment + return). Without: outer's count = 2
+    # (just assignment + return; class itself contributes 0).
+    source = "def outer():\n    class Inner:\n        x = 1\n        def m(self): pass\n    return Inner\n"
+    sample = tmp_path / "nested_class.py"
+    sample.write_text(source, encoding="utf-8")
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"function_length": {"max_lines": 2, "count_mode": "statements"}}},
+    )
+    violations = SafetyEngine(cfg).check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "function_length" and "outer" in v.message]
+    assert flagged, "outer() should exceed max_lines=2 once class_definition is counted"
+
+
 def test_side_effects_io_keyword_match_is_case_insensitive(tmp_path: Path) -> None:
     """A function whose name contains an io keyword in mixed case should be exempt.
 

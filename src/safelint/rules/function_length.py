@@ -23,6 +23,23 @@ if TYPE_CHECKING:
 # Note: ``yield`` deliberately omitted — Tree-sitter parses ``yield x``
 # as ``expression_statement`` containing a ``yield`` node, so counting
 # both would double-count every yield expression.
+#
+# ``class_definition`` is included: in Python's grammar a class
+# definition is a (compound) statement, so a function containing a
+# nested class should count the ``class Inner:`` line as 1 toward the
+# enclosing function's statement total. The class body's own
+# statements are walked too — they contribute to the enclosing
+# function's complexity-proxy count, which matches the rule's intent.
+# Per-mode unit string baked into the violation message. Surfacing
+# "logical lines" / "statements" instead of a generic "lines" for the
+# non-default modes prevents the user from misreading a small count as
+# raw source lines (where blanks/comments would inflate the figure).
+_UNIT_BY_MODE: dict[str, str] = {
+    "statements": "statements",
+    "logical_lines": "logical lines",
+}
+
+
 _STATEMENT_TYPES = frozenset(
     {
         "expression_statement",
@@ -45,6 +62,7 @@ _STATEMENT_TYPES = frozenset(
         "pass_statement",
         "break_statement",
         "continue_statement",
+        "class_definition",
     }
 )
 
@@ -89,7 +107,7 @@ class FunctionLengthRule(BaseRule):
             if length > max_lines:
                 name_node = node.child_by_field_name("name")
                 func_name = node_text(name_node) if name_node else "<anonymous>"
-                unit = "statements" if count_mode == "statements" else "lines"
+                unit = _UNIT_BY_MODE.get(count_mode, "lines")
                 violations.append(
                     self._make_violation_for_node(
                         filepath,
