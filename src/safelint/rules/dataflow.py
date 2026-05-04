@@ -128,9 +128,10 @@ class TaintedSinkRule(BaseRule):
         sources = frozenset(self.config.get("sources", self._DEFAULT_SOURCES))
         # Default ``True`` matches the historical behaviour — unknown calls
         # propagate taint from any tainted argument. Set to ``False`` for a
-        # stricter analysis that drops taint at every unknown call (cleaner
-        # but generates false negatives in codebases with many wrapper
-        # functions). See CONFIGURATION.md for guidance.
+        # less conservative analysis with weaker detection: taint is dropped
+        # at every unknown call, which can reduce false positives but
+        # generates false negatives in codebases with many wrapper functions.
+        # See CONFIGURATION.md for guidance.
         assume_taint_preserving = bool(self.config.get("assume_taint_preserving", True))
         violations: list[Violation] = []
         for node in walk(tree.root_node):

@@ -106,8 +106,12 @@ class FunctionLengthRule(BaseRule):
         Validates *count_mode* explicitly — silently falling back on a
         typo (e.g. ``"line"`` instead of ``"lines"``) would leave the
         user wondering why their config didn't take effect. Raise
-        ``ValueError`` so misconfiguration surfaces at engine init
-        rather than as silently-different output.
+        ``ValueError`` so misconfiguration fails clearly when this rule
+        evaluates the function (during ``check_file``), rather than
+        producing silently different output. (Engine construction
+        currently does not pre-validate per-rule config; per-rule
+        validation runs lazily when the rule first runs against a
+        file.)
         """
         if count_mode == "statements":
             return FunctionLengthRule._count_statements(func_node)
