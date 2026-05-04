@@ -15,7 +15,7 @@ from safelint.languages.python import (
     RAISE_STATEMENT,
     TUPLE,
 )
-from safelint.rules.base import BaseRule
+from safelint.rules.base import BaseRule, Suggestion, TextEdit
 
 
 # Statement-only no-op nodes: their presence means "developer wrote something
@@ -130,6 +130,30 @@ def _has_typed_exception(except_node: tree_sitter.Node) -> bool:
     return any(c.type in (IDENTIFIER, ATTRIBUTE, TUPLE, "as_pattern") for c in except_node.named_children)
 
 
+def _bare_except_suggestion(except_node: tree_sitter.Node) -> Suggestion | None:
+    """Build the "replace with ``except Exception:``" suggestion for a bare except clause.
+
+    Returns ``None`` when the AST shape doesn't expose the colon child
+    (defensive — Tree-sitter always produces it for valid Python).
+    """
+    # except_clause.children: ['except', ':', block, ...]. Find the ``:``
+    # child and use its end_point as the end of the header range.
+    colon = next((c for c in except_node.children if c.type == ":"), None)
+    if colon is None:  # pragma: no cover
+        return None
+    edit = TextEdit(
+        start_line=except_node.start_point[0] + 1,
+        start_column=except_node.start_point[1] + 1,
+        end_line=colon.end_point[0] + 1,
+        end_column=colon.end_point[1] + 1,
+        replacement="except Exception:",
+    )
+    return Suggestion(
+        description="Catch ``Exception`` instead of using a bare ``except:``",
+        edits=(edit,),
+    )
+
+
 class BareExceptRule(BaseRule):
     """Reject bare ``except:`` clauses that silently catch SystemExit and KeyboardInterrupt."""
 
@@ -138,15 +162,20 @@ class BareExceptRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every except handler with no exception type specified."""
-        return [
-            self._make_violation_for_node(
-                filepath,
-                clause,
-                "Bare except clause - specify the exception type(s)",
-            )
-            for clause in _iter_except_clauses(tree)
-            if not _has_typed_exception(clause)
-        ]
+        violations: list[Violation] = []
+        for clause in _iter_except_clauses(tree):
+            if _has_typed_exception(clause):
+                continue
+            base = self._make_violation_for_node(filepath, clause, "Bare except clause - specify the exception type(s)")
+            suggestion = _bare_except_suggestion(clause)
+            if suggestion is not None:
+                # Attach the advisory suggestion. ``Violation`` is frozen, so
+                # we rebuild via ``replace`` keeping the position fields intact.
+                from dataclasses import replace  # noqa: PLC0415
+
+                base = replace(base, suggestions=(suggestion,))
+            violations.append(base)
+        return violations
 
 
 class EmptyExceptRule(BaseRule):
