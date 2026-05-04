@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-05-04
+
+This release tightens the SAFE801 (``tainted_sink``) dataflow analysis: it gives users an opt-in stricter mode that drops taint at unknown calls, fixes a long-standing false-negative on splatted call arguments, and locks in the existing taint-through-formatting behaviour with explicit tests.
+
+### Added
+- **`assume_taint_preserving` config option on the `tainted_sink` rule** — controls how unknown function calls (those whose name is in neither ``sources`` nor ``sanitizers``) propagate taint. ``true`` (default — preserves the historical behaviour) means an unknown call's result is tainted iff any argument is tainted. ``false`` means unknown calls always drop taint, giving a stricter analysis with fewer false positives but new false negatives where an internal helper does flow tainted data through to a sink. Set to ``false`` when your codebase has many "obviously safe" wrappers and you'd rather miss a flow than report a false positive.
+- **Splatted-arg taint propagation** — ``foo(*tainted_list)`` and ``foo(**tainted_dict)`` now correctly flow the splat operand's taint into the call. Previously ``list_splat`` and ``dictionary_splat`` Tree-sitter nodes weren't matched in ``TaintTracker._is_tainted``, so calls like ``eval(*user_args)`` slipped through without a violation.
+
+### Changed
+- The taint-through-formatting paths (f-strings, ``"…".format(tainted)``, ``"… %s …" % tainted``) now have explicit regression tests covering each form. The behaviour itself was already in place since the original SAFE801 implementation; this release just locks the contract in so it can't silently regress.
+
+### Notes
+- Helper-function inlining (cross-function taint analysis) was considered for this release but deferred. Adding it would require a full call-graph walker bounded by depth limits and constitutes a larger rewrite of ``TaintTracker``. The current intra-procedural-only analysis remains the design contract; if a real-world need emerges for cross-function taint, it can be picked up in a future release.
+
 ## [1.8.0] - 2026-05-04
 
 This release closes the most-asked-about gaps versus ruff: incremental config (``extend_ignore``), unused-suppression detection (``SAFE004``), per-rule statistics, broader resource-lifecycle coverage, smarter empty-except detection, configurable global-mutation strictness, and configurable function-size counting. SafeLint stays *review-only* — there is no ``--fix`` flag now or planned.
@@ -167,7 +181,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/shelkesays/safelint/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/shelkesays/safelint/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/shelkesays/safelint/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/shelkesays/safelint/compare/v1.5.0...v1.6.0

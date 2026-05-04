@@ -63,6 +63,11 @@ _SPREADING_TYPES = frozenset(
 
 _CONTAINER_TYPES = frozenset({LIST, TUPLE, SET})
 
+# Splat operators in call argument lists — ``foo(*args, **kwargs)``.
+# Tree-sitter parses these as single-child wrapper nodes whose only
+# named child is the operand.
+_SPLAT_TYPES = frozenset({"list_splat", "dictionary_splat"})
+
 # Destructure shapes recognised on the LHS of an assignment.
 _PATTERN_TYPES = frozenset({PATTERN_LIST, TUPLE_PATTERN, LIST_PATTERN, LIST_SPLAT_PATTERN})
 
@@ -83,12 +88,32 @@ class TaintTracker:
         sinks: frozenset[str],
         sanitizers: frozenset[str],
         sources: frozenset[str],
+        *,
+        assume_taint_preserving: bool = True,
     ) -> None:
-        """Initialise tracker with tainted entry parameters and rule config."""
+        """Initialise tracker with tainted entry parameters and rule config.
+
+        *assume_taint_preserving* controls how unknown function calls
+        (i.e. calls whose name is in neither ``sources`` nor
+        ``sanitizers``) propagate taint:
+
+        * ``True`` (default) — unknown calls propagate taint from any
+          tainted argument: ``f(tainted)`` is treated as tainted. This
+          matches the historical safelint behaviour and minimises
+          false negatives at the cost of potential false positives in
+          codebases with many "obviously safe" wrappers.
+        * ``False`` — unknown calls drop taint: ``f(tainted)`` is
+          treated as clean. Stricter analysis with fewer false
+          positives but new false negatives where helper functions
+          do flow tainted data through to a sink. Set this when your
+          codebase uses many internal wrappers and you'd rather miss
+          a taint flow than report a false positive.
+        """
         self.tainted: set[str] = set(params)
         self.sinks = sinks
         self.sanitizers = sanitizers
         self.sources = sources
+        self.assume_taint_preserving = assume_taint_preserving
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -205,17 +230,30 @@ class TaintTracker:
             # foo(name=expr) — only the value carries data flow.
             value = node.child_by_field_name("value")
             return self._is_tainted(value) if value is not None else False
-        if node_type == CONCATENATED_STRING or node_type in _CONTAINER_TYPES or node_type in _SPREADING_TYPES:
+        # Splats (foo(*x, **y)) and spreading expressions (binary op,
+        # boolean op, list/tuple/set literals, f-string concat,
+        # conditional/comparison/unary) all carry taint if any
+        # named child is tainted. Group them so the function stays
+        # below the return-statement limit.
+        if node_type in _SPLAT_TYPES or node_type == CONCATENATED_STRING or node_type in _CONTAINER_TYPES or node_type in _SPREADING_TYPES:
             return any(self._is_tainted(child) for child in node.named_children)
         return False
 
     def _call_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if this call produces a tainted value."""
+        """Return True if this call produces a tainted value.
+
+        Unknown calls (neither sanitizer nor source) consult
+        ``assume_taint_preserving``: when True, the call's result is
+        tainted iff any argument is tainted; when False, the result is
+        always clean.
+        """
         name = call_name(node)
         if name in self.sanitizers:
             return False
         if name in self.sources:
             return True
+        if not self.assume_taint_preserving:
+            return False
         args_node = node.child_by_field_name("arguments")
         if not args_node:
             return False
