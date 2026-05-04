@@ -132,11 +132,32 @@ class GlobalMutationRule(BaseRule):
         return results
 
     def _violations_for_func(self, filepath: str, func: tree_sitter.Node) -> list[Violation]:
-        """Return violations for global writes inside *func*."""
+        """Return violations for global writes inside *func*.
+
+        Behaviour depends on the ``strict`` config flag:
+
+        * ``strict = false`` (default) — only flag *mutations* of declared
+          globals. Reading a global (e.g. ``global x; print(x)``) is fine.
+          This is the original Holzmann-aligned behaviour.
+        * ``strict = true`` — flag the ``global`` declaration itself, even
+          when no write follows. Mirrors ruff's ``PLW0603``. Use when your
+          team's policy is to ban the ``global`` keyword entirely.
+        """
         global_names = self._collect_global_names(func)
         if not global_names:
             return []
         func_name = _func_name(func)
+        if self.config.get("strict", False):
+            # strict mode: fire on the ``global`` statement itself,
+            # regardless of whether the name is later written to.
+            return [
+                self._make_violation_for_node(
+                    filepath,
+                    stmt,
+                    f'Function "{func_name}" declares global: {", ".join(node_text(c) for c in _global_identifiers(stmt))} - globals must not be used (strict mode)',
+                )
+                for stmt in _iter_global_statements(func)
+            ]
         return [
             self._make_violation_for_node(
                 filepath,
