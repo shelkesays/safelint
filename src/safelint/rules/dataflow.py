@@ -169,10 +169,13 @@ class ReturnValueIgnoredRule(BaseRule):
             call_node = named[0]
             name = call_name(call_node)
             if name and name in flagged:
+                # Anchor on call_node, not the wrapping expression_statement,
+                # so the range matches the call itself rather than including
+                # trailing newline / semicolon tokens that the parent picks up.
                 violations.append(
                     self._make_violation_for_node(
                         filepath,
-                        node,
+                        call_node,
                         f'Return value of "{name}" is discarded - check the result or assign it to a named variable',
                     )
                 )
