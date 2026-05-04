@@ -131,12 +131,14 @@ def test_main_routes_to_hook_when_first_positional_is_a_file(monkeypatch: pytest
     check_spy.assert_not_called()
 
 
-def test_main_prints_help_when_no_args(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    """Wait — bare ``safelint`` does NOT print help; it routes to hook mode (silent on no .py args).
+def test_main_does_not_print_help_when_no_args(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """Bare ``safelint`` (no args) routes to hook mode and stays silent — it does NOT print help.
 
-    This documents the actual behaviour: top-level help is reached via
-    ``safelint help`` / ``safelint -h`` / ``safelint --help``, not by
-    running with no args (which is reserved for pre-commit hook mode).
+    This documents the actual behaviour and locks it in: top-level
+    help is reached only via ``safelint help`` / ``safelint -h`` /
+    ``safelint --help``. A bare invocation is reserved for pre-commit
+    hook mode (which is silent on success when no ``.py`` files are
+    passed in).
     """
     monkeypatch.setattr("sys.argv", ["safelint"])
     with pytest.raises(SystemExit) as exc:
