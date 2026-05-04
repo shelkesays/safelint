@@ -223,6 +223,123 @@ def test_tainted_sink_self_cls_not_tainted():
 
 
 # ---------------------------------------------------------------------------
+# Taint flow through string formatting (1.9.0 — locking in the contract)
+# ---------------------------------------------------------------------------
+
+
+def test_tainted_sink_via_fstring():
+    """Tainted variables inside an f-string flow into the sink."""
+    src = """
+    def f(data):
+        eval(f"x = {data}")
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert vs
+
+
+def test_tainted_sink_via_str_format():
+    """``"…".format(tainted)`` propagates taint into the sink."""
+    src = """
+    def f(data):
+        eval("x = {}".format(data))
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert vs
+
+
+def test_tainted_sink_via_percent_format():
+    """``"… %s …" % tainted`` propagates taint into the sink."""
+    src = """
+    def f(data):
+        eval("x = %s" % data)
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert vs
+
+
+# ---------------------------------------------------------------------------
+# Splatted args (1.9.0)
+# ---------------------------------------------------------------------------
+
+
+def test_tainted_sink_via_list_splat():
+    """``foo(*tainted_list)`` propagates the splat operand's taint."""
+    src = """
+    def f(args):
+        eval(*args)
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert vs
+
+
+def test_tainted_sink_via_dict_splat():
+    """``foo(**tainted_dict)`` propagates the splat operand's taint."""
+    src = """
+    def f(kwargs):
+        eval(**kwargs)
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert vs
+
+
+# ---------------------------------------------------------------------------
+# assume_taint_preserving (1.9.0)
+# ---------------------------------------------------------------------------
+
+
+def test_tainted_sink_assume_taint_preserving_true_propagates_through_unknown_call():
+    """Default mode: ``eval(wrapper(tainted))`` fires because the unknown call propagates taint."""
+    src = """
+    def f(data):
+        eval(wrap(data))
+    """
+    vs = violations(TaintedSinkRule, src)  # default config: assume_taint_preserving omitted → True
+    assert vs
+
+
+def test_tainted_sink_assume_taint_preserving_false_drops_taint_at_unknown_call():
+    """Strict mode: unknown calls drop taint, so ``eval(wrap(tainted))`` does NOT fire (false negative trade-off)."""
+    src = """
+    def f(data):
+        eval(wrap(data))
+    """
+    vs = violations(
+        TaintedSinkRule,
+        src,
+        config={
+            "enabled": True,
+            "severity": "error",
+            "sinks": ["eval"],
+            "sources": [],
+            "sanitizers": [],
+            "assume_taint_preserving": False,
+        },
+    )
+    assert not vs
+
+
+def test_tainted_sink_assume_taint_preserving_false_still_fires_on_direct_taint():
+    """Strict mode still catches direct taint flow (no unknown call in between)."""
+    src = """
+    def f(data):
+        eval(data)
+    """
+    vs = violations(
+        TaintedSinkRule,
+        src,
+        config={
+            "enabled": True,
+            "severity": "error",
+            "sinks": ["eval"],
+            "sources": [],
+            "sanitizers": [],
+            "assume_taint_preserving": False,
+        },
+    )
+    assert vs
+
+
+# ---------------------------------------------------------------------------
 # ReturnValueIgnoredRule tests
 # ---------------------------------------------------------------------------
 
