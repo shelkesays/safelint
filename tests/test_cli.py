@@ -204,6 +204,9 @@ def test_run_hook_no_output_when_clean(tmp_path: Path, capsys: pytest.CaptureFix
 
     captured = capsys.readouterr()
     assert captured.out == ""
+    # A clean hook run shouldn't surface ANY output — including stray
+    # diagnostics on stderr. Pre-commit's contract is silence-on-success.
+    assert captured.err == ""
 
 
 def test_run_hook_prints_summary_when_suppressed(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:

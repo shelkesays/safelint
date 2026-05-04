@@ -326,6 +326,41 @@ def test_safe004_disabled_via_global_ignore(tmp_path: Path) -> None:
     assert not any(v.code == "SAFE004" for v in result.violations)
 
 
+def test_safe004_disabled_via_global_ignore_by_name(tmp_path: Path) -> None:
+    """``ignore = ["unused_suppression"]`` (rule name) also silences SAFE004.
+
+    Engine-internal codes are now honoured by both their SAFE-code and
+    their rule name, matching how BaseRule violations work.
+    """
+    sample = tmp_path / "u3_name.py"
+    sample.write_text("x = 1  # nosafe: SAFE304\n", encoding="utf-8")
+    config = deep_merge(DEFAULTS, {"ignore": ["unused_suppression"]})
+    result = SafetyEngine(config).check_file(str(sample))
+    assert not any(v.code == "SAFE004" for v in result.violations)
+
+
+def test_safe000_disabled_via_global_ignore_by_code(tmp_path: Path) -> None:
+    """``ignore = ["SAFE000"]`` suppresses parse-error violations from the engine."""
+    sample = tmp_path / "broken.py"
+    sample.write_text("def f(:\n    pass\n", encoding="utf-8")  # syntax error
+    # Default config: SAFE000 fires
+    default_result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    assert any(v.code == "SAFE000" for v in default_result.violations)
+    # With SAFE000 in ignore: silent
+    config = deep_merge(DEFAULTS, {"ignore": ["SAFE000"]})
+    result = SafetyEngine(config).check_file(str(sample))
+    assert not any(v.code == "SAFE000" for v in result.violations)
+
+
+def test_safe000_disabled_via_global_ignore_by_name(tmp_path: Path) -> None:
+    """``ignore = ["parse"]`` (rule name) also silences SAFE000."""
+    sample = tmp_path / "broken_name.py"
+    sample.write_text("def f(:\n    pass\n", encoding="utf-8")
+    config = deep_merge(DEFAULTS, {"ignore": ["parse"]})
+    result = SafetyEngine(config).check_file(str(sample))
+    assert not any(v.code == "SAFE000" for v in result.violations)
+
+
 def test_safe004_skips_self_referential_directive(tmp_path: Path) -> None:
     """`# nosafe: SAFE004` alone on a line never produces SAFE004 about itself."""
     sample = tmp_path / "u4.py"

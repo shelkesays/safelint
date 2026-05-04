@@ -225,10 +225,14 @@ class SafetyEngine:
         self.rules: list[BaseRule] = self._build_active_rules(rules_cfg, exec_cfg, ignored_names, ignored_codes_upper, changed_files)
         self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = self._parse_per_file_ignores(config.get("per_file_ignores", {}), known_names, known_codes_upper)
         self._cache = cache
-        # Capture the global ignore set so engine-internal codes (SAFE000,
-        # SAFE004) can honour ``ignore = ["SAFE004"]`` even though they
-        # don't go through the ``ALL_RULES`` rule-filtering path.
-        self._globally_ignored_codes: frozenset[str] = ignored_codes_upper
+        # Combined ignore-set for engine-internal violations (SAFE000 parse
+        # errors, SAFE004 unused-suppression). Includes both the upper-cased
+        # codes *and* the rule names from the ignore list, so users can write
+        # either ``ignore = ["SAFE004"]`` or ``ignore = ["unused_suppression"]``
+        # and have it work. Rule-based BaseRule violations go through their
+        # own filter at ``_build_active_rules``; this set is consulted only
+        # for the codes the engine emits directly.
+        self._globally_ignored_engine_internal: frozenset[str] = ignored_codes_upper | ignored_names
         # Lazy: only computed when the cache is non-trivial — saves the
         # JSON-encode + sha256 round-trip when ``--no-cache`` is in use.
         self._engine_fingerprint: str | None = None
@@ -561,6 +565,11 @@ class SafetyEngine:
 
         tree = lang.create_parser().parse(source_bytes)
         if tree.root_node.has_error:
+            # Honour ``ignore = ["SAFE000"]`` / ``ignore = ["parse"]``.
+            # Parse errors are emitted by the engine, not by a registered
+            # BaseRule, so their suppression is handled here directly.
+            if self._engine_internal_ignored("SAFE000", "parse"):
+                return LintResult(path=filepath, violations=[], suppressed=[])
             return self._build_parse_error_result(filepath, tree.root_node)
 
         suppressions = _parse_suppressions(tree, lang.comment_node_type, lang.comment_prefix)
@@ -604,11 +613,23 @@ class SafetyEngine:
         ignored_codes: frozenset[str],
     ) -> None:
         """Generate SAFE004 warnings for unused directives and route them to *active* / *suppressed*."""
-        if "SAFE004" in self._globally_ignored_codes:
+        if self._engine_internal_ignored("SAFE004", "unused_suppression"):
             return
         for v in self._unused_suppression_violations(filepath, suppressions, used_suppressions):
             target = suppressed if _is_per_file_ignored(v, ignored_names, ignored_codes) else active
             target.append(v)
+
+    def _engine_internal_ignored(self, code: str, name: str) -> bool:
+        """Return True when an engine-internal violation is ignored globally.
+
+        Engine-internal codes (SAFE000 parse, SAFE004 unused_suppression)
+        don't go through the rule-filter path, so the user's ``ignore``
+        list is consulted directly here. Both *code* (e.g. ``"SAFE000"``)
+        and *name* (e.g. ``"parse"``) are accepted — the comparison is
+        case-insensitive on the code and exact on the name, matching how
+        the BaseRule pipeline treats them.
+        """
+        return code.upper() in self._globally_ignored_engine_internal or name in self._globally_ignored_engine_internal
 
     @staticmethod
     def _unused_suppression_violations(
