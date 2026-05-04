@@ -1006,6 +1006,29 @@ def _print_subcommand_help(subcommand: str) -> int:
     return 0
 
 
+def _next_positional(argv: list[str], start: int) -> str | None:
+    """Return the first positional token at or after *start*, skipping flags.
+
+    Mirrors :func:`_first_positional_index`'s skip rules: value-taking
+    long options consume the following token, store-true flags are
+    just skipped. Used by :func:`_is_top_level_help_request` to find
+    the optional ``<sub>`` after the ``help`` keyword even when global
+    flags are interleaved (``safelint help --format json check`` →
+    ``check``).
+    """
+    skip_next = False
+    for arg in argv[start:]:
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in _VALUE_TAKING_OPTIONS:
+            skip_next = True
+            continue
+        if not arg.startswith("-"):
+            return arg
+    return None
+
+
 def _is_top_level_help_request() -> tuple[bool, str | None]:
     """Detect ``safelint help [<cmd>]`` / ``safelint -h`` / ``safelint --help``.
 
@@ -1015,21 +1038,56 @@ def _is_top_level_help_request() -> tuple[bool, str | None]:
     argparse so we can intercept ``-h`` / ``--help`` even when no command
     is supplied — argparse would otherwise produce its own less polished
     output.
+
+    The scan walks the full argv with the same value-skipping rules as
+    :func:`_first_positional_index`, so global flags placed before the
+    help marker (``safelint --format json --help``) don't shadow it.
+    The scan stops at the first non-``help`` positional, ceding
+    subcommand-specific help (``safelint check --help``) to argparse —
+    matching the layout where each subcommand owns its own usage line.
     """
     rest = sys.argv[1:]
-    if not rest:
+    skip_next = False
+    for i, arg in enumerate(rest):
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in _VALUE_TAKING_OPTIONS:
+            skip_next = True
+            continue
+        if arg in ("-h", "--help"):
+            return True, None
+        if arg.startswith("-"):
+            continue
+        if arg == "help":
+            return True, _next_positional(rest, i + 1)
         return False, None
-    if rest[0] in ("-h", "--help"):
-        return True, None
-    if rest[0] == "help":
-        return True, rest[1] if len(rest) > 1 else None
     return False, None
 
 
 def _is_version_request() -> bool:
-    """Detect ``safelint -V`` / ``safelint --version`` / ``safelint version``."""
+    """Detect ``safelint -V`` / ``safelint --version`` / ``safelint version``.
+
+    Mirrors :func:`_is_top_level_help_request`'s position-independent
+    scan, so ``safelint --format json --version`` reaches the polished
+    version renderer instead of falling through to a parser that would
+    reject ``--version`` as an unknown flag.
+    """
     rest = sys.argv[1:]
-    return bool(rest) and rest[0] in ("-V", "--version", "version")
+    skip_next = False
+    for arg in rest:
+        if skip_next:
+            skip_next = False
+            continue
+        if arg in _VALUE_TAKING_OPTIONS:
+            skip_next = True
+            continue
+        if arg in ("-V", "--version"):
+            return True
+        if arg.startswith("-"):
+            continue
+        return arg == "version"
+    return False
 
 
 def main() -> None:
