@@ -32,9 +32,15 @@ repos:
       - id: fix-byte-order-marker
       - id: end-of-file-fixer
         files: ^src/
+      # Project-wide CRLF → LF normalisation. Deliberately unscoped (no
+      # ``files:`` selector) so README.md, CHANGELOG.md, .pre-commit-config.yaml,
+      # workflows, examples — anything a Windows contributor might touch —
+      # stay LF. The original Lucas-C remove-crlf/forbid-crlf was scoped to
+      # ^src/; we broaden here because the project has no .bat/.cmd/.ps1
+      # files (which would legitimately need CRLF) and there's no downside
+      # to enforcing one line-ending convention everywhere.
       - id: mixed-line-ending
         args: [--fix=lf]
-        files: ^src/
       - id: trailing-whitespace
         files: ^src/
       - id: detect-private-key
@@ -57,16 +63,24 @@ repos:
   # ---------------------------------------------------------------------------
   # Tab enforcement for non-Python files under src/
   #
-  # ruff format handles .py files (rewrites tab indentation to spaces because
-  # [tool.ruff.format] sets indent-style = "space"), and mixed-line-ending
-  # above handles CRLF → LF for everything under ^src/. That covers two of
-  # the four Lucas-C/pre-commit-hooks behaviours (remove-tabs / forbid-tabs
-  # for Python; remove-crlf / forbid-crlf for everything), but leaves a gap:
-  # tabs in non-Python text under src/ — currently the skill_files/*.md
-  # files that ship in the wheel, and any future markdown / config we add.
-  # This local hook closes that gap with a portable Python one-liner — no
-  # external repo dependency, runs on the same Python pre-commit already
-  # requires.
+  # The four Lucas-C/pre-commit-hooks behaviours (remove-tabs, forbid-tabs,
+  # remove-crlf, forbid-crlf) are now covered by three separate layers:
+  #
+  #   * ``ruff format`` (below) — rewrites tab indentation to spaces in
+  #     .py files because [tool.ruff.format] sets indent-style = "space".
+  #     Replaces remove-tabs / forbid-tabs for Python sources.
+  #   * ``mixed-line-ending`` (above, with ``--fix=lf``, no ``files:``
+  #     selector) — normalises CRLF → LF across the whole repo, broader
+  #     than the original Lucas-C scope of ^src/. Replaces remove-crlf /
+  #     forbid-crlf.
+  #   * This hook — closes the remaining gap: tabs in *non-Python* text
+  #     under src/. Currently catches the skill_files/*.md files that
+  #     ship in the wheel, and any future markdown / config we add there.
+  #     Scoped to ^src/ on purpose so a future Makefile (which legitimately
+  #     uses tab syntax) at the repo root wouldn't trip it.
+  #
+  # No external repo dependency — runs the same Python pre-commit already
+  # requires, via a portable one-liner.
   # ---------------------------------------------------------------------------
   - repo: local
     hooks:
