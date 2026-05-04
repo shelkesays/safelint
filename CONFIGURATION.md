@@ -774,6 +774,7 @@ The rule tracks data flow through assignments: if `x = user_data` then `x` is ta
 | `sinks` | see below | Call names considered dangerous |
 | `sanitizers` | see below | Call names that clear taint |
 | `sources` | see below | Call names that inject taint (in addition to parameters) |
+| `assume_taint_preserving` | `true` | How unknown calls (neither sanitizer nor source) propagate taint. *Added in 1.9.0.* |
 
 Default `sinks`: `eval`, `exec`, `compile`, `system`, `popen`, `Popen`, `run`, `call`, `check_output`, `execute`
 
@@ -788,7 +789,17 @@ severity = "error"
 sinks = ["eval", "exec", "system", "execute"]
 sanitizers = ["escape", "sanitize", "quote"]
 sources = ["input", "readline"]
+assume_taint_preserving = true   # default; set false for stricter mode
 ```
+
+##### `assume_taint_preserving` modes (1.9.0)
+
+Most real codebases pass tainted data through internal helper functions before it reaches a sink. This config flag controls how those *unknown* calls (i.e. calls whose name isn't in `sources` or `sanitizers`) are analysed:
+
+- **`true` (default)** — historical behaviour. An unknown call's result is tainted iff any of its arguments are tainted. Catches taint flow through arbitrary helpers (``eval(wrap(user_input))`` fires) at the cost of false positives when wrappers are obviously safe.
+- **`false`** — stricter analysis. Unknown calls always drop taint, so ``eval(wrap(user_input))`` does NOT fire (false negative). Direct flows like ``eval(user_input)`` and known-source flows still fire. Use when your codebase has many internal-only wrappers and you'd rather miss a flow than chase down false positives.
+
+The trade-off is fundamental to intra-procedural analysis — there's no way to know whether ``wrap`` actually preserves the taint without inlining it. Switch modes based on which failure mode hurts more in your codebase.
 
 **Bad:**
 ```python
