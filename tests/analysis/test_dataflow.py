@@ -237,6 +237,27 @@ def test_return_value_ignored_flags_bare_run():
     assert "run" in vs[0].message
 
 
+def test_return_value_ignored_anchors_range_on_call_not_statement():
+    """The violation's column range must match the call, not the wrapping
+    expression_statement (which can include trailing newline/semicolon
+    tokens). Regression for an earlier bug where the rule passed the
+    parent expression_statement node into _make_violation_for_node.
+    """
+    src = "subprocess.run(['ls'])\n"
+    vs = violations(
+        ReturnValueIgnoredRule,
+        src,
+        config={"enabled": True, "severity": "error", "flagged_calls": ["run"]},
+    )
+    assert len(vs) == 1
+    v = vs[0]
+    # ``subprocess.run(['ls'])`` is 22 chars long, columns 1..23 (half-open).
+    # The wrapping expression_statement would include the trailing newline
+    # and report column_end == 24 or beyond.
+    assert v.column_start == 1
+    assert v.column_end == 23
+
+
 def test_return_value_ignored_ok_when_assigned():
     src = """
     import subprocess

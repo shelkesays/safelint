@@ -30,12 +30,14 @@ class Violation:
     * ``column_end`` (1-based, exclusive) — end column on
       ``end_lineno``. ``None`` mirrors ``column_start``.
 
-    All four position fields default to ``None`` for two reasons:
+    Only the additional position fields (``end_lineno``,
+    ``column_start``, ``column_end``) default to ``None``. ``lineno``
+    is required and always set. The defaults exist for two reasons:
 
     * **Backwards-compatible cache replay** — Violations cached by an
-      older safelint version don't carry these fields; deserialising
-      via ``Violation(**dict)`` works as long as new fields have
-      defaults.
+      older safelint version don't carry these additional fields;
+      deserialising via ``Violation(**dict)`` works as long as the
+      new fields have defaults.
     * **Some violations have no span** — synthetic ``SAFE000`` parse
       errors with ``lineno == 0`` and missing-file violations have
       no Tree-sitter node to position against.

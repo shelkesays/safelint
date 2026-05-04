@@ -77,8 +77,8 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 | `filepath` | string | Path as the user supplied it to the CLI (typically relative to cwd). Not a URI; not percent-encoded. For SARIF output, use `--format sarif` instead — it normalises to RFC 3986 URIs. |
 | `lineno` | int | 1-based start line. `0` for run-level errors with no specific location (rare; only `SAFE000` parse errors emit this). |
 | `end_lineno` | int \| null | *Added in 1.7.0.* 1-based end line. Equal to `lineno` for single-line constructs; greater for multi-line. `null` when no Tree-sitter node was available (synthetic file-level violations). |
-| `column_start` | int \| null | *Added in 1.7.0.* 1-based column on `lineno` where the construct starts. `null` mirrors `end_lineno`. Editors should treat `null` as "underline the whole line". |
-| `column_end` | int \| null | *Added in 1.7.0.* 1-based column on `end_lineno` (not `lineno`!) where the construct ends. Half-open: the range is `[column_start, column_end)`. For zero-width markers (parse-error carets), `column_start == column_end` and `end_lineno == lineno`. |
+| `column_start` | int \| null | *Added in 1.7.0.* 1-based column on `lineno` where the construct starts. `null` when no Tree-sitter node / position was available. `column_start` and `column_end` are always either both set or both `null`. Editors should treat `null` as "underline the whole line". |
+| `column_end` | int \| null | *Added in 1.7.0.* 1-based column on `end_lineno` (not `lineno`!) where the construct ends. Half-open: the range is `[column_start, column_end)`. `null` when no Tree-sitter node / position was available (paired with a `null` `column_start`). For zero-width markers (parse-error carets), `column_start == column_end` and `end_lineno == lineno`. |
 | `message` | string | Human-readable description. May contain quotes and Unicode; safe for direct display. Don't parse — present verbatim. |
 
 ### Range semantics
