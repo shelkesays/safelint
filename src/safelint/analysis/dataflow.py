@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import call_name, lineno, node_text, walk
+from safelint.languages._node_utils import call_name, node_text, walk
 from safelint.languages.python import (
     ANNOTATED_ASSIGNMENT,
     ASSIGNMENT,
@@ -72,7 +72,9 @@ class TaintTracker:
 
     Instantiate with the set of already-tainted parameter names, the sets of
     sink / sanitizer / source call names, then call ``visit(func_node)``.
-    Results are in :attr:`sink_hits` as ``(lineno, var_name, sink_name)`` triples.
+    Results are in :attr:`sink_hits` as ``(call_node, var_name, sink_name)``
+    triples — the call node is preserved (rather than just its line) so
+    callers can position violations precisely with column ranges.
     """
 
     def __init__(
@@ -87,7 +89,7 @@ class TaintTracker:
         self.sinks = sinks
         self.sanitizers = sanitizers
         self.sources = sources
-        self.sink_hits: list[tuple[int, str, str]] = []
+        self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
@@ -173,12 +175,12 @@ class TaintTracker:
             return
         for arg in args_node.named_children:
             if self._is_tainted(arg):
-                self._record_sink_hit(lineno(node), arg, name)
+                self._record_sink_hit(node, arg, name)
 
-    def _record_sink_hit(self, line_num: int, arg_node: tree_sitter.Node, sink: str) -> None:
+    def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
         arg_name = node_text(arg_node) if arg_node.type == IDENTIFIER else "<expr>"
-        self.sink_hits.append((line_num, arg_name, sink))
+        self.sink_hits.append((call_node, arg_name, sink))
 
     def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool) -> None:
         """Add or remove *target* from the tainted set if it is a bare identifier."""

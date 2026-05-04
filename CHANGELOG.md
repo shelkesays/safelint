@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.7.0] - 2026-05-04
+
+This release adds column-precise positioning to violations — the foundational change needed before a polished VSCode extension can underline the exact span of an offending construct rather than the whole line. No breaking changes; the new fields default to ``null`` for any consumer that doesn't read them.
+
+### Added
+- **`column_start` / `column_end` on every Violation** — 1-based column numbers (matching safelint's existing 1-based ``lineno`` convention). Half-open ``[start, end)`` ranges that map cleanly to LSP / VSCode ``Range`` semantics. ``None`` when no Tree-sitter node was available (e.g. synthetic ``test_existence`` violations against missing files), which editor consumers should treat as "underline the whole line".
+- **`node_range(node)` helper** in ``safelint.languages._node_utils`` — returns ``(lineno, column_start, column_end)`` tuples directly from a Tree-sitter node, so rule code stays free of inline ``start_point[0] + 1`` / ``start_point[1] + 1`` plumbing.
+- **`BaseRule._make_violation_for_node(filepath, node, message)`** — convenience wrapper around ``_make_violation`` that auto-extracts position info from a Tree-sitter node. Most rules now use this; the lower-level ``_make_violation`` accepts ``column_start`` / ``column_end`` kwargs for the few cases (e.g. parse errors) where the node isn't available.
+
+### Changed
+- All built-in rules with a Tree-sitter node in scope now populate columns: ``function_length``, ``nesting_depth``, ``max_arguments``, ``complexity``, ``bare_except``, ``empty_except``, ``logging_on_error``, ``side_effects``, ``side_effects_hidden``, ``resource_lifecycle``, ``unbounded_loops``, ``missing_assertions``, ``global_state``, ``global_mutation``, ``tainted_sink``, ``return_value_ignored``, ``null_dereference``. The ``test_existence`` / ``test_coupling`` rules continue to emit file-level violations with no column data (the violation is about the file, not a span).
+- ``TaintTracker.sink_hits`` now stores ``(call_node, var_name, sink_name)`` tuples instead of ``(lineno, var_name, sink_name)`` so the consuming rule can derive position info — including columns — from the node directly.
+- Parse-error violations (``SAFE000``) now carry the column of the offending token as a zero-width caret (``column_start == column_end``), so editors can render a precise marker.
+- JSON output (``--format json``) gains ``column_start`` and ``column_end`` keys on every violation. Existing consumers ignoring unknown keys are unaffected.
+- SARIF output (``--format sarif``) populates ``region.startColumn`` / ``region.endColumn`` when column data is present, omits them when not — matching SARIF 2.1.0's optional-field convention.
+
 ## [1.6.0] - 2026-05-02
 
 This release ships the Claude Code skill inside the wheel and adds a one-line install command, plus a batch of correctness fixes from the v1.5.0 review cycle (caching, argv routing, SARIF URIs, CLI strictness, clean-run UX).
@@ -127,7 +143,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.6.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.7.0...HEAD
+[1.7.0]: https://github.com/shelkesays/safelint/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/shelkesays/safelint/compare/v1.5.0...v1.6.0
 [1.5.0]: https://github.com/shelkesays/safelint/compare/v1.4.1...v1.5.0
 [1.4.1]: https://github.com/shelkesays/safelint/compare/v1.4.0...v1.4.1

@@ -62,6 +62,8 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
   "severity": "error",
   "filepath": "src/foo.py",
   "lineno": 42,
+  "column_start": 5,
+  "column_end": 18,
   "message": "Function \"verify_token\" is 78 lines (max 60)"
 }
 ```
@@ -73,7 +75,15 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 | `severity` | `"error"` \| `"warning"` | The per-rule severity. Compare against `summary.fail_on` to decide blocking. |
 | `filepath` | string | Path as the user supplied it to the CLI (typically relative to cwd). Not a URI; not percent-encoded. For SARIF output, use `--format sarif` instead — it normalises to RFC 3986 URIs. |
 | `lineno` | int | 1-based line number in the source file. `0` for run-level errors that have no specific location (rare; only `SAFE000` parse errors emit this). |
+| `column_start` | int \| null | *Added in 1.7.0.* 1-based column where the offending construct starts. `null` when no Tree-sitter node was available to position against (synthetic file-level violations like `test_existence`). Editors should treat `null` as "underline the whole line". |
+| `column_end` | int \| null | *Added in 1.7.0.* 1-based column where the offending construct ends. Half-open: the range is `[column_start, column_end)`. For zero-width markers (parse-error carets), `column_start == column_end`. |
 | `message` | string | Human-readable description. May contain quotes and Unicode; safe for direct display. Don't parse — present verbatim. |
+
+### Column ranges
+
+Columns are 1-based to match safelint's 1-based `lineno`. LSP-style consumers that need 0-based columns should subtract 1 themselves. The range is **half-open**: `column_start` is the first character of the construct, `column_end` is one past the last character. This maps cleanly to VSCode's `Range` (`new vscode.Range(line - 1, col_start - 1, line - 1, col_end - 1)`).
+
+Multi-line constructs (e.g. a function spanning lines 10-69) report only the start line in `lineno`; `column_end` refers to the column on the end-line, not the start-line. Most consumers treat this as "underline from `(lineno, column_start)` to end-of-line" since walking to the actual end position requires re-parsing. SARIF output (`--format sarif`) preserves the same semantics in its `region.endLine` / `region.endColumn` fields when available.
 
 ### Severities and thresholds
 

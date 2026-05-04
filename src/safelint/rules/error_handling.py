@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import call_name, lineno, walk
+from safelint.languages._node_utils import call_name, walk
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     ATTRIBUTE,
@@ -65,9 +65,9 @@ class BareExceptRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every except handler with no exception type specified."""
         return [
-            self._make_violation(
+            self._make_violation_for_node(
                 filepath,
-                lineno(clause),
+                clause,
                 "Bare except clause - specify the exception type(s)",
             )
             for clause in _iter_except_clauses(tree)
@@ -84,9 +84,9 @@ class EmptyExceptRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every except handler with an empty body."""
         return [
-            self._make_violation(
+            self._make_violation_for_node(
                 filepath,
-                lineno(clause),
+                clause,
                 "Empty except block - add error handling or a logging call",
             )
             for clause in _iter_except_clauses(tree)
@@ -140,9 +140,9 @@ class LoggingOnErrorRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag except blocks that handle an error without any logging call."""
         return [
-            self._make_violation(
+            self._make_violation_for_node(
                 filepath,
-                lineno(clause),
+                clause,
                 "Except block missing logging call - errors must be logged before being swallowed",
             )
             for clause in _iter_except_clauses(tree)

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import call_name, lineno, node_text, walk
+from safelint.languages._node_utils import call_name, node_text, walk
 from safelint.languages.python import ASYNC_FUNCTION_DEF, CALL, FUNCTION_DEF
 from safelint.rules.base import BaseRule
 
@@ -52,9 +52,9 @@ class SideEffectsHiddenRule(BaseRule):
             if io_call:
                 io_name = call_name(io_call) or "<unknown>"
                 violations.append(
-                    self._make_violation(
+                    self._make_violation_for_node(
                         filepath,
-                        lineno(io_call),
+                        io_call,
                         f'Function "{func_name}" looks pure but calls I/O primitive "{io_name}" - rename to signal intent or use dependency injection',
                     )
                 )
@@ -88,9 +88,9 @@ class SideEffectsRule(BaseRule):
             if io_call:
                 io_name = call_name(io_call) or "<unknown>"
                 violations.append(
-                    self._make_violation(
+                    self._make_violation_for_node(
                         filepath,
-                        lineno(io_call),
+                        io_call,
                         f'Function "{func_name}" calls I/O primitive "{io_name}" - rename to signal intent or use dependency injection',
                     )
                 )

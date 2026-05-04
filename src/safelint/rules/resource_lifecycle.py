@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import call_name, lineno, walk
+from safelint.languages._node_utils import call_name, walk
 from safelint.languages.python import CALL, WITH_ITEM
 from safelint.rules.base import BaseRule
 
@@ -74,9 +74,9 @@ class ResourceLifecycleRule(BaseRule):
             if not name or name not in tracked or node.start_byte in guarded:
                 continue
             violations.append(
-                self._make_violation(
+                self._make_violation_for_node(
                     filepath,
-                    lineno(node),
+                    node,
                     f'"{name}()" called outside a with block - use a context manager or ensure {cleanup_str} is called on all exit paths',
                 )
             )

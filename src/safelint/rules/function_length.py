@@ -34,9 +34,9 @@ class FunctionLengthRule(BaseRule):
                 name_node = node.child_by_field_name("name")
                 func_name = node_text(name_node) if name_node else "<anonymous>"
                 violations.append(
-                    self._make_violation(
+                    self._make_violation_for_node(
                         filepath,
-                        lineno(node),
+                        node,
                         f'Function "{func_name}" is {length} lines (max {max_lines})',
                     )
                 )

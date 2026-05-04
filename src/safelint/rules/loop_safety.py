@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import lineno, walk
+from safelint.languages._node_utils import walk
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     BREAK_STATEMENT,
@@ -52,17 +52,17 @@ class UnboundedLoopRule(BaseRule):
         if is_literal_true:
             has_break = any(c.type == BREAK_STATEMENT for c in walk(node, skip_types=self._BREAK_SCOPE_BOUNDARIES))
             if not has_break:
-                return self._make_violation(
+                return self._make_violation_for_node(
                     filepath,
-                    lineno(node),
+                    node,
                     "while True loop has no break - potential infinite loop",
                 )
             return None
 
         if condition.type != COMPARISON_OPERATOR:
-            return self._make_violation(
+            return self._make_violation_for_node(
                 filepath,
-                lineno(node),
+                node,
                 "while loop condition is not a comparison - verify the loop is bounded",
             )
         return None

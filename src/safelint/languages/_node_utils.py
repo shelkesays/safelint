@@ -59,6 +59,40 @@ def end_lineno(node: tree_sitter.Node) -> int:
     return node.end_point[0] + 1
 
 
+def column_start(node: tree_sitter.Node) -> int:
+    """Return the 1-based start column of *node*.
+
+    Tree-sitter reports 0-based columns; we add 1 to match safelint's
+    1-based ``lineno`` convention. Editor adapters that need 0-based
+    (e.g. LSP-style consumers) are expected to subtract 1 themselves.
+    """
+    return node.start_point[1] + 1
+
+
+def column_end(node: tree_sitter.Node) -> int:
+    """Return the 1-based end column of *node* (exclusive in Tree-sitter terms).
+
+    Tree-sitter's ``end_point`` is *exclusive* — it points one past the
+    last character of the node's span. Returning it as-is (after +1
+    normalisation) gives a half-open ``[start, end)`` range that maps
+    cleanly to LSP / VSCode ``Range`` semantics.
+    """
+    return node.end_point[1] + 1
+
+
+def node_range(node: tree_sitter.Node) -> tuple[int, int, int]:
+    """Return ``(lineno, column_start, column_end)`` for *node* — all 1-based.
+
+    Convenience for rule code building :class:`~safelint.rules.base.Violation`
+    objects: avoids the noisy ``node.start_point[0] + 1`` /
+    ``node.start_point[1] + 1`` triplets at every call site. Multi-line
+    nodes report only the start line — column_end refers to the end
+    column on whatever line that is, matching Tree-sitter's convention
+    of treating column_end as the column on the end_point's row.
+    """
+    return lineno(node), column_start(node), column_end(node)
+
+
 def node_text(node: tree_sitter.Node) -> str:
     """Return the source text covered by *node* as a string.
 

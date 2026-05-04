@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import lineno, node_text, walk
+from safelint.languages._node_utils import node_text, walk
 from safelint.languages.python import (
     ASSIGNMENT,
     ASYNC_FUNCTION_DEF,
@@ -85,9 +85,9 @@ class GlobalStateRule(BaseRule):
         """Return one violation per ``global`` statement inside *func*."""
         func_name = _func_name(func)
         return [
-            self._make_violation(
+            self._make_violation_for_node(
                 filepath,
-                lineno(stmt),
+                stmt,
                 f'Function "{func_name}" declares global: {", ".join(node_text(c) for c in _global_identifiers(stmt))} - use dependency injection instead',
             )
             for stmt in _iter_global_statements(func)
@@ -116,17 +116,19 @@ class GlobalMutationRule(BaseRule):
     def _mutating_assignments(
         func_node: tree_sitter.Node,
         global_names: set[str],
-    ) -> list[tuple[int, str]]:
-        """Return (lineno, name) for each write to a declared global in *func_node*.
+    ) -> list[tuple[tree_sitter.Node, str]]:
+        """Return (assignment_node, name) for each write to a declared global in *func_node*.
 
-        Stops at nested defs — assignments inside inner functions belong to
-        their own scope and must not be attributed to the outer function.
+        Returning the node (not just its line) lets callers position
+        violations precisely with column ranges. Stops at nested defs —
+        assignments inside inner functions belong to their own scope and
+        must not be attributed to the outer function.
         """
-        results: list[tuple[int, str]] = []
+        results: list[tuple[tree_sitter.Node, str]] = []
         for node in walk(func_node, skip_types=_NESTED_SCOPE_TYPES):
             target = _assignment_target(node)
             if target is not None and node_text(target) in global_names:
-                results.append((lineno(node), node_text(target)))
+                results.append((node, node_text(target)))
         return results
 
     def _violations_for_func(self, filepath: str, func: tree_sitter.Node) -> list[Violation]:
@@ -136,12 +138,12 @@ class GlobalMutationRule(BaseRule):
             return []
         func_name = _func_name(func)
         return [
-            self._make_violation(
+            self._make_violation_for_node(
                 filepath,
-                line_num,
+                assignment,
                 f'Function "{func_name}" writes to global "{name}" - globals must not be mutated',
             )
-            for line_num, name in self._mutating_assignments(func, global_names)
+            for assignment, name in self._mutating_assignments(func, global_names)
         ]
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
