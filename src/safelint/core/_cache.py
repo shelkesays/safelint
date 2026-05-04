@@ -42,7 +42,7 @@ import hashlib
 import json
 from typing import TYPE_CHECKING, Any
 
-from safelint.rules.base import Violation
+from safelint.rules.base import Suggestion, TextEdit, Violation
 
 
 if TYPE_CHECKING:
@@ -54,7 +54,44 @@ CACHE_DIR_NAME = ".safelint_cache"
 # Bump when the cache file schema changes in a way old entries can't
 # satisfy. Folded into the key, so old entries become unreachable
 # automatically — no migration code needed.
-_CACHE_SCHEMA_VERSION = "1"
+_CACHE_SCHEMA_VERSION = "2"  # bumped in v1.10.0 — Violation gained suggestions[]
+
+
+def _dict_to_text_edit(d: dict[str, Any]) -> TextEdit:
+    """Reconstruct a :class:`TextEdit` from its ``asdict`` JSON form."""
+    return TextEdit(
+        start_line=d["start_line"],
+        start_column=d["start_column"],
+        end_line=d["end_line"],
+        end_column=d["end_column"],
+        replacement=d["replacement"],
+    )
+
+
+def _dict_to_suggestion(d: dict[str, Any]) -> Suggestion:
+    """Reconstruct a :class:`Suggestion` (with nested edits) from its JSON form."""
+    edits_data = d.get("edits", []) or []
+    return Suggestion(
+        description=d["description"],
+        edits=tuple(_dict_to_text_edit(e) for e in edits_data),
+    )
+
+
+def _dict_to_violation(d: dict[str, Any]) -> Violation:
+    """Reconstruct a :class:`Violation` from its ``asdict`` JSON form.
+
+    Handles nested dataclasses (``suggestions`` / ``edits``) which
+    ``Violation(**d)`` alone would leave as plain dicts. The cache schema
+    version is folded into the key so a payload written by an older
+    safelint version is unreachable rather than mis-parsed — this code
+    path therefore only sees current-version payloads.
+    """
+    suggestions_data = d.get("suggestions", []) or []
+    suggestions = tuple(_dict_to_suggestion(s) for s in suggestions_data)
+    # Build the kwargs for Violation; pop nested fields we've already
+    # converted so ``Violation(**rest, suggestions=...)`` doesn't double-pass them.
+    rest = {k: v for k, v in d.items() if k != "suggestions"}
+    return Violation(**rest, suggestions=suggestions)
 
 
 def compute_engine_fingerprint(
@@ -143,8 +180,8 @@ class LintCache:
         except (OSError, ValueError):  # nosafe: SAFE203
             return None
         try:
-            violations = [Violation(**v) for v in data["violations"]]
-            suppressed = [Violation(**v) for v in data["suppressed"]]
+            violations = [_dict_to_violation(v) for v in data["violations"]]
+            suppressed = [_dict_to_violation(v) for v in data["suppressed"]]
         except (KeyError, TypeError):  # nosafe: SAFE203
             return None
         return violations, suppressed

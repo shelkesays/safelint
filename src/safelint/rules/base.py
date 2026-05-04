@@ -14,6 +14,48 @@ if TYPE_CHECKING:
 
 
 @dataclass(frozen=True)
+class TextEdit:
+    """An advisory single-range source-code edit.
+
+    Half-open ``[start_line:start_column, end_line:end_column)`` range
+    using safelint's 1-based line/column convention (matches
+    :class:`Violation` position fields). ``replacement`` is the literal
+    text that *would* go in place of the current range — but safelint
+    never applies it. Editors / Claude Code may surface it as a
+    "Quick Fix" code action subject to user confirmation.
+    """
+
+    start_line: int
+    start_column: int
+    end_line: int
+    end_column: int
+    replacement: str
+
+
+@dataclass(frozen=True)
+class Suggestion:
+    """An advisory fix the rule offers for a violation.
+
+    Suggestions are *never* applied automatically — safelint is a
+    review tool, not a refactoring tool. Editor integrations and CI
+    consumers may surface them as "Quick Fix" code actions, but every
+    edit goes through user confirmation.
+
+    * ``description`` — one-line human-readable label for the suggestion
+      (shown in editor "Quick Fix" menus). Should fit on one line; the
+      rule's ``message`` already explains the *what*, the description
+      explains the *fix*.
+    * ``edits`` — zero or more :class:`TextEdit` describing the minimal
+      change that would make the rule pass. Empty when the suggestion
+      is informational only (e.g. "extract a helper function" — too
+      ambiguous to render as a single edit).
+    """
+
+    description: str
+    edits: tuple[TextEdit, ...] = ()
+
+
+@dataclass(frozen=True)
 class Violation:
     """A single rule violation produced during static analysis.
 
@@ -60,6 +102,11 @@ class Violation:
     column_start: int | None = None
     column_end: int | None = None
     end_lineno: int | None = None
+    # Advisory fixes (never applied automatically — safelint is a review
+    # tool, not a refactoring tool). Editor integrations and CI consumers
+    # may surface these as "Quick Fix" code actions subject to user
+    # confirmation. Empty tuple = no suggestions for this violation.
+    suggestions: tuple[Suggestion, ...] = ()
 
 
 class BaseRule(ABC):

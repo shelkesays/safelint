@@ -71,6 +71,13 @@ def _violation_to_dict(v: Violation) -> dict[str, Any]:
     is the column on ``end_lineno``, not on ``lineno`` — the four
     fields together specify a half-open ``[start, end)`` range that
     maps cleanly to LSP / VSCode ``Range`` semantics.
+
+    *Added in 1.10.0:* the ``suggestions`` array carries advisory
+    fixes the rule offers. **Editors and CI tools must never apply
+    these automatically** — every edit goes through user
+    confirmation. Each suggestion has a one-line ``description`` and
+    zero or more ``edits`` (range + replacement text). Empty array
+    when the rule has no fix to offer.
     """
     return {
         "code": v.code,
@@ -82,6 +89,33 @@ def _violation_to_dict(v: Violation) -> dict[str, Any]:
         "column_start": v.column_start,
         "column_end": v.column_end,
         "message": v.message,
+        "suggestions": [_suggestion_to_dict(s) for s in v.suggestions],
+    }
+
+
+def _suggestion_to_dict(s: object) -> dict[str, Any]:
+    """Render a :class:`Suggestion` as a JSON-friendly dict.
+
+    Typed ``object`` because ``Violation.suggestions`` could in
+    principle hold a deserialised dict on a cache miss path; the
+    runtime structure is duck-typed.
+    """
+    description = getattr(s, "description", None)
+    edits_attr = getattr(s, "edits", None)
+    return {
+        "description": description,
+        "edits": [_edit_to_dict(e) for e in (edits_attr or [])],
+    }
+
+
+def _edit_to_dict(e: object) -> dict[str, Any]:
+    """Render a :class:`TextEdit` as a JSON-friendly dict."""
+    return {
+        "start_line": getattr(e, "start_line", None),
+        "start_column": getattr(e, "start_column", None),
+        "end_line": getattr(e, "end_line", None),
+        "end_column": getattr(e, "end_column", None),
+        "replacement": getattr(e, "replacement", None),
     }
 
 

@@ -61,8 +61,9 @@ def test_json_violation_structure() -> None:
     assert doc["summary"]["warnings"] == 0
     v = doc["violations"][0]
     # Position fields (end_lineno, column_start, column_end) default to None
-    # for synthetic test Violations (added in 1.7.0). Real rules attach
-    # Tree-sitter positions.
+    # for synthetic test Violations (added in 1.7.0). suggestions defaults to
+    # an empty list (added in 1.10.0). Real rules attach Tree-sitter positions
+    # and may attach suggestions.
     assert v == {
         "code": "SAFE101",
         "rule": "function_length",
@@ -73,6 +74,7 @@ def test_json_violation_structure() -> None:
         "end_lineno": None,
         "column_start": None,
         "column_end": None,
+        "suggestions": [],
     }
 
 
@@ -91,6 +93,63 @@ def test_json_violation_includes_full_range_when_present() -> None:
     assert v["end_lineno"] == 68
     assert v["column_start"] == 1
     assert v["column_end"] == 9
+
+
+def test_json_violation_includes_suggestions_when_present() -> None:
+    """Suggestions on a Violation round-trip through the JSON formatter (1.10.0)."""
+    from safelint.rules.base import Suggestion, TextEdit  # noqa: PLC0415
+
+    edit = TextEdit(start_line=4, start_column=5, end_line=4, end_column=12, replacement="except Exception:")
+    sug = Suggestion(description="Catch Exception", edits=(edit,))
+    v = Violation(
+        rule="bare_except",
+        code="SAFE201",
+        filepath="src/foo.py",
+        lineno=4,
+        message="m",
+        severity="error",
+        suggestions=(sug,),
+    )
+    doc = json.loads(format_json([v], [], blocking_count=1, fail_on="error", files_checked=1))
+    suggestions = doc["violations"][0]["suggestions"]
+    assert suggestions == [
+        {
+            "description": "Catch Exception",
+            "edits": [{"start_line": 4, "start_column": 5, "end_line": 4, "end_column": 12, "replacement": "except Exception:"}],
+        }
+    ]
+
+
+def test_sarif_violation_with_suggestions_emits_fixes_block() -> None:
+    """SARIF ``fixes[]`` is populated from suggestions; native advisory by spec (1.10.0)."""
+    from safelint.rules.base import Suggestion, TextEdit  # noqa: PLC0415
+
+    edit = TextEdit(start_line=4, start_column=5, end_line=4, end_column=12, replacement="except Exception:")
+    sug = Suggestion(description="Catch Exception", edits=(edit,))
+    v = Violation(
+        rule="bare_except",
+        code="SAFE201",
+        filepath="src/foo.py",
+        lineno=4,
+        message="m",
+        severity="error",
+        suggestions=(sug,),
+    )
+    doc = json.loads(format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1))
+    fixes = doc["runs"][0]["results"][0]["fixes"]
+    assert len(fixes) == 1
+    fix = fixes[0]
+    assert fix["description"]["text"] == "Catch Exception"
+    rep = fix["artifactChanges"][0]["replacements"][0]
+    assert rep["deletedRegion"] == {"startLine": 4, "startColumn": 5, "endLine": 4, "endColumn": 12}
+    assert rep["insertedContent"]["text"] == "except Exception:"
+
+
+def test_sarif_violation_without_suggestions_omits_fixes_block() -> None:
+    """No suggestions → no ``fixes`` key on the result (matches SARIF optional-field convention)."""
+    v = Violation(rule="r", code="SAFE001", filepath="f.py", lineno=1, message="m", severity="error")
+    doc = json.loads(format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1))
+    assert "fixes" not in doc["runs"][0]["results"][0]
 
 
 def test_json_summary_counts_errors_and_warnings_separately() -> None:

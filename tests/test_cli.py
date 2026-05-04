@@ -137,14 +137,19 @@ def test_make_summary_suppressed_clean_run_breaks_down_by_code() -> None:
 
 
 def test_make_summary_suppressed_with_violations_surfaces_breakdown_in_fixes_line() -> None:
-    """When violations exist, the suppression breakdown rides on the fixes line."""
+    """When violations exist, the suppression breakdown rides on the fixes line.
+
+    Updated in 1.10.0 — the line now reads "No suggestions available (safelint
+    does not auto-fix; …)" since "fixes" was renamed to "suggestions" to
+    reflect the never-auto-apply policy. The suppression breakdown still
+    rides at the end in the canonical "(… suppressed)" form.
+    """
     suppressed = [_v("warning", code="SAFE501"), _v("warning", code="SAFE304")]
     _, fixes = _make_summary([_v("error")], n_blocking=1, fail_on="error", suppressed=suppressed)
     assert fixes is not None
     fixes_text = _strip(fixes)
-    # The fixes line should still carry the no-fix preamble alongside the
-    # suppression breakdown, in the canonical "(... suppressed)" form.
-    assert fixes_text.startswith("No fixes available (safelint does not auto-fix violations).")
+    assert fixes_text.startswith("No suggestions available")
+    assert "does not auto-fix" in fixes_text
     assert "1 SAFE304" in fixes_text
     assert "1 SAFE501" in fixes_text
     assert "suppressed)" in fixes_text
@@ -216,5 +221,6 @@ def test_run_hook_prints_summary_when_suppressed(tmp_path: Path, capsys: pytest.
     assert "All checks passed." in out
     assert "1 SAFE501" in out
     assert "suppressed" in out
-    # Clean run should NOT print the no-fixes line.
+    # Clean run should NOT print the no-suggestions / no-fixes line.
+    assert "No suggestions available" not in out
     assert "No fixes available" not in out

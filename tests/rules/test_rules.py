@@ -278,6 +278,33 @@ def test_bare_except_is_flagged(tmp_path: Path) -> None:
     assert any(v.rule == "bare_except" for v in violations)
 
 
+def test_bare_except_attaches_replace_with_exception_suggestion(tmp_path: Path) -> None:
+    """SAFE201 attaches an advisory suggestion to replace ``except:`` with ``except Exception:`` (1.10.0)."""
+    source = textwrap.dedent("""\
+        def foo():
+            try:
+                pass
+            except:
+                pass
+    """)
+    sample = tmp_path / "bare_sug.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    flagged = [v for v in violations if v.rule == "bare_except"]
+    assert flagged
+    v = flagged[0]
+    assert len(v.suggestions) == 1
+    suggestion = v.suggestions[0]
+    assert "Exception" in suggestion.description
+    assert len(suggestion.edits) == 1
+    edit = suggestion.edits[0]
+    assert edit.replacement == "except Exception:"
+    # Range should cover the ``except:`` header on line 4.
+    assert edit.start_line == 4
+    assert edit.end_line == 4
+
+
 def test_side_effects_hidden_flags_pure_named_io_function(tmp_path: Path) -> None:
     """side_effects_hidden fires when a get_* function calls open()."""
     source = textwrap.dedent("""\

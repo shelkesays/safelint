@@ -57,15 +57,23 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 
 ```json
 {
-  "code": "SAFE101",
-  "rule": "function_length",
+  "code": "SAFE201",
+  "rule": "bare_except",
   "severity": "error",
   "filepath": "src/foo.py",
-  "lineno": 42,
-  "end_lineno": 119,
-  "column_start": 1,
-  "column_end": 9,
-  "message": "Function \"verify_token\" is 78 lines (max 60)"
+  "lineno": 4,
+  "end_lineno": 5,
+  "column_start": 5,
+  "column_end": 17,
+  "message": "Bare except clause - specify the exception type(s)",
+  "suggestions": [
+    {
+      "description": "Catch ``Exception`` instead of using a bare ``except:``",
+      "edits": [
+        {"start_line": 4, "start_column": 5, "end_line": 4, "end_column": 12, "replacement": "except Exception:"}
+      ]
+    }
+  ]
 }
 ```
 
@@ -80,6 +88,52 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 | `column_start` | int \| null | *Added in 1.7.0.* 1-based column on `lineno` where the construct starts. `null` when no Tree-sitter node / position was available. `column_start` and `column_end` are always either both set or both `null`. Editors should treat `null` as "underline the whole line". |
 | `column_end` | int \| null | *Added in 1.7.0.* 1-based column on `end_lineno` (not `lineno`!) where the construct ends. Half-open: the range is `[column_start, column_end)`. `null` when no Tree-sitter node / position was available (paired with a `null` `column_start`). For zero-width markers (parse-error carets), `column_start == column_end` and `end_lineno == lineno`. |
 | `message` | string | Human-readable description. May contain quotes and Unicode; safe for direct display. Don't parse — present verbatim. |
+| `suggestions` | Suggestion[] | *Added in 1.10.0.* Zero or more advisory fixes the rule offers. **NEVER apply automatically** — see the "Suggestions are advisory only" section below. Empty array when the rule has no fix to offer. |
+
+### Suggestion object
+
+```json
+{
+  "description": "Catch ``Exception`` instead of using a bare ``except:``",
+  "edits": [
+    {"start_line": 4, "start_column": 5, "end_line": 4, "end_column": 12, "replacement": "except Exception:"}
+  ]
+}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `description` | string | One-line human-readable label for the suggestion. Suitable as the title of a "Quick Fix" code action. |
+| `edits` | TextEdit[] | Zero or more text edits describing the minimal change that would make the rule pass. Empty when the suggestion is informational only (e.g. "extract a helper function" — too ambiguous to render as a single edit). |
+
+### TextEdit object
+
+```json
+{"start_line": 4, "start_column": 5, "end_line": 4, "end_column": 12, "replacement": "except Exception:"}
+```
+
+| Field | Type | Notes |
+|---|---|---|
+| `start_line` | int | 1-based start line of the range to replace. |
+| `start_column` | int | 1-based start column on `start_line`. |
+| `end_line` | int | 1-based end line of the range to replace. |
+| `end_column` | int | 1-based end column on `end_line` (exclusive — half-open `[start, end)`). |
+| `replacement` | string | The literal text that *would* replace the range. May span multiple lines. |
+
+### Suggestions are advisory only
+
+**SafeLint never auto-applies suggestions.** This is a deliberate design choice — the tool is for *review*, not refactoring. Many of safelint's rules (function decomposition, nesting reduction, side-effect rename) require human judgement on how to restructure; an auto-applied "fix" could make the code pass the rule while not addressing the underlying concern.
+
+Editor / CI integrations:
+
+- **MAY** render suggestions as Quick Fix code actions, hover hints, or "lightbulb" suggestions.
+- **MAY** show a preview diff before any change.
+- **MUST** require explicit user confirmation before applying any edit.
+- **MUST NOT** implement "fix on save", "fix all", or any automation that bypasses confirmation.
+
+The CLI **never** ships a `--fix` flag. The pretty-mode summary line uses the word "suggestions" (not "fixes") to reinforce this. SARIF output uses the spec's native `fixes[]` block — SARIF 2.1.0 itself defines this as advisory; consumers (GitHub code scanning, IDE extensions) already implement confirmation flows.
+
+The contract: a violation's `suggestions` array means "here's what I'd consider doing — your call." Nothing more.
 
 ### Range semantics
 
@@ -161,6 +215,22 @@ interface Violation {
   column_start: number | null;
   column_end: number | null;
   message: string;
+  // Advisory suggestions added in 1.10.0. Empty array when the rule
+  // has no fix to offer. Never auto-apply.
+  suggestions: Suggestion[];
+}
+
+interface Suggestion {
+  description: string;
+  edits: TextEdit[];
+}
+
+interface TextEdit {
+  start_line: number;
+  start_column: number;
+  end_line: number;
+  end_column: number;
+  replacement: string;
 }
 
 interface SafelintOutput {
