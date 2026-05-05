@@ -107,14 +107,49 @@ def test_install_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
 def test_install_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``--symlink`` creates a directory symlink to the bundled location."""
+    """``--symlink`` materialises a per-entry-symlinked directory at the target.
+
+    For the directory-source case (Claude install), the install
+    creates a real target directory and symlinks each allowed
+    top-level entry inside it. Symlinking the whole skill_files/
+    tree would expose the peer ``cursor/`` subdirectory in the
+    Claude install — see :func:`_install_symlink_directory_filtered`.
+    """
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
     rc = _skill_install.run_install(_make_args(symlink=True))
     assert rc == 0
     target = home / ".claude" / "skills" / "safelint"
-    assert target.is_symlink()
-    # Resolves to the bundled path.
-    assert target.resolve() == _skill_install.bundled_skill_path().resolve()
+    # Target itself is a real directory (not a symlink), populated
+    # with per-entry symlinks.
+    assert target.is_dir()
+    assert not target.is_symlink()
+    # The expected top-level entries are symlinks pointing into the
+    # bundled location, so ``pip upgrade safelint`` still reflects
+    # content changes underneath them.
+    skill_link = target / "SKILL.md"
+    assert skill_link.is_symlink()
+    bundled = _skill_install.bundled_skill_path()
+    assert skill_link.resolve() == (bundled / "SKILL.md").resolve()
+    languages_link = target / "languages"
+    assert languages_link.is_symlink()
+    assert languages_link.resolve() == (bundled / "languages").resolve()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_symlink_excludes_peer_client_bundles(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--symlink`` install must not expose the peer ``cursor/`` bundle inside the Claude install.
+
+    Mirrors the contract enforced by ``test_install_copy_user_scope``
+    (``cursor/`` is excluded from the materialised skill folder).
+    Symlink mode previously linked the whole skill_files/ directory
+    in one call, which transparently included ``cursor/`` — a leak.
+    The fixed install symlinks per-entry, skipping peer dirs.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(symlink=True))
+    assert rc == 0
+    target = home / ".claude" / "skills" / "safelint"
+    assert not (target / "cursor").exists()
 
 
 # ---------------------------------------------------------------------------

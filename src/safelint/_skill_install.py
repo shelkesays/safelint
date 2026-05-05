@@ -119,12 +119,42 @@ def _remove_existing(target: Path) -> None:
 def _install_symlink(source: Path, target: Path) -> None:
     """Create *target* as a symlink to *source*.
 
-    Works for both file (Cursor MDC) and directory (Claude skill)
-    sources — :meth:`Path.symlink_to` infers the target type from the
-    source unless we pass ``target_is_directory`` explicitly.
+    The single-file source case (Cursor MDC) creates one symlink and
+    is done.
+
+    The directory source case (Claude skill bundle) materialises an
+    empty target directory and symlinks each top-level entry inside,
+    skipping peer-client subdirectories (``cursor/``). Symlinking the
+    *whole* skill_files/ tree would expose ``cursor/`` inside the
+    Claude install — contradicting the same "no peer-client leakage"
+    contract the copy mode honours, and disagreeing with what
+    ``test_install_copy_user_scope`` already asserts. The per-entry
+    layout still gets the developer-loop benefit of symlink mode
+    (``pip upgrade safelint`` immediately reflects content changes
+    inside the linked entries) and only loses the rare case where a
+    new top-level entry is added to skill_files/ — the user re-runs
+    ``safelint skill install --symlink --force`` to pick that up.
     """
     target.parent.mkdir(parents=True, exist_ok=True)
-    target.symlink_to(source, target_is_directory=source.is_dir())
+    if source.is_file():
+        target.symlink_to(source, target_is_directory=False)
+        return
+    _install_symlink_directory_filtered(source, target)
+
+
+def _install_symlink_directory_filtered(source: Path, target: Path) -> None:
+    """Create *target* as a directory of symlinks to *source*'s entries.
+
+    Skips entries matching :data:`_PEER_CLIENT_DIRS`. Each remaining
+    top-level entry becomes its own symlink, so ``pip upgrade safelint``
+    still reflects content changes underneath the linked entries.
+    """
+    target.mkdir(parents=True, exist_ok=True)
+    for entry in source.iterdir():
+        if entry.name in _PEER_CLIENT_DIRS:
+            continue
+        link = target / entry.name
+        link.symlink_to(entry, target_is_directory=entry.is_dir())
 
 
 def _install_copy(source: Path, target: Path) -> None:

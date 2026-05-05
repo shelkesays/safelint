@@ -9,7 +9,7 @@ import tree_sitter
 import tree_sitter_python
 
 from safelint.core.config import DEFAULTS, deep_merge
-from safelint.core.engine import SafetyEngine, _is_suppressed, _parse_suppressions
+from safelint.core.engine import SafetyEngine, _check_suppressed_marking_used, _parse_suppressions
 from safelint.languages.python import PYTHON
 from safelint.rules.base import Violation
 
@@ -97,7 +97,13 @@ def test_parse_nosafe_only_on_annotated_line() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _is_suppressed — unit tests for the matching predicate
+# _check_suppressed_marking_used — unit tests for the matching predicate
+#
+# This is the single source of truth for inline-directive matching since
+# the prior ``_is_suppressed`` helper was removed (it had no remaining
+# production call sites). Tests pass a throwaway ``used = set()`` and
+# discard it; the bookkeeping side effect is exercised separately through
+# the SAFE004 integration tests later in this file.
 # ---------------------------------------------------------------------------
 
 
@@ -106,34 +112,39 @@ def _v(rule: str, code: str, lineno: int, severity: str = "error") -> Violation:
     return Violation(rule=rule, code=code, filepath="f.py", lineno=lineno, message="m", severity=severity)
 
 
+def _matches(violation: Violation, suppressions: dict[int, set[str] | None]) -> bool:
+    """Wrapper that returns just the bool — drops the bookkeeping side effect."""
+    return _check_suppressed_marking_used(violation, suppressions, set())
+
+
 def test_is_suppressed_bare_nosafe_matches_any_violation() -> None:
     """Bare # nosafe (None value) suppresses any violation on that line."""
     v = _v("function_length", "SAFE101", 3)
-    assert _is_suppressed(v, {3: None}) is True
+    assert _matches(v, {3: None}) is True
 
 
 def test_is_suppressed_by_code() -> None:
     """Selective suppression by code suppresses matching violations."""
     v = _v("function_length", "SAFE101", 5)
-    assert _is_suppressed(v, {5: {"SAFE101"}}) is True
+    assert _matches(v, {5: {"SAFE101"}}) is True
 
 
 def test_is_suppressed_by_rule_name() -> None:
     """Selective suppression by rule name suppresses matching violations."""
     v = _v("function_length", "SAFE101", 5)
-    assert _is_suppressed(v, {5: {"function_length"}}) is True
+    assert _matches(v, {5: {"function_length"}}) is True
 
 
 def test_is_suppressed_does_not_match_different_code() -> None:
     """Selective suppression by code does not suppress violations with a different code."""
     v = _v("nesting_depth", "SAFE102", 5)
-    assert _is_suppressed(v, {5: {"SAFE101"}}) is False
+    assert _matches(v, {5: {"SAFE101"}}) is False
 
 
 def test_is_suppressed_does_not_match_different_line() -> None:
     """Suppression on one line does not affect violations on other lines."""
     v = _v("function_length", "SAFE101", 7)
-    assert _is_suppressed(v, {5: None}) is False
+    assert _matches(v, {5: None}) is False
 
 
 # ---------------------------------------------------------------------------
