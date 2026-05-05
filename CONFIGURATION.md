@@ -393,7 +393,7 @@ def f():
     return x
 ```
 
-Severity is fixed at `warning`. Disable globally via `ignore = ["SAFE004"]` (or via per-file ignores) if your workflow involves many transient suppressions you'd rather not police. Self-referential `# nosafe: SAFE004` is special-cased — a directive that only mentions SAFE004 is always considered "used" to avoid recursion.
+Severity is fixed at `warning`. Disable globally via `ignore = ["SAFE004"]` if your workflow involves many transient suppressions you'd rather not police. **Per-file ignores do not apply to SAFE004** — like SAFE000, it's an engine-internal code gated solely on the global `ignore` list (configuring it inside `per_file_ignores` will surface a typo-guard warning and otherwise do nothing). Self-referential `# nosafe: SAFE004` is special-cased — a directive that only mentions SAFE004 is always considered "used" to avoid recursion.
 
 ---
 

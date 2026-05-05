@@ -666,15 +666,25 @@ class SafetyEngine:
         used_suppressions: set[tuple[int, str | None]],
         active: list[Violation],
         suppressed: list[Violation],
-        ignored_names: frozenset[str],
-        ignored_codes: frozenset[str],
+        _ignored_names: frozenset[str],
+        _ignored_codes: frozenset[str],
     ) -> None:
-        """Generate SAFE004 warnings for unused directives and route them to *active* / *suppressed*."""
+        """Generate SAFE004 warnings for unused directives and append them to *active*.
+
+        SAFE004 is gated solely on the global ``ignore`` list — per-file
+        ignores deliberately don't apply here. Engine-internal codes
+        live in a different layer from ``BaseRule`` violations, and
+        ``_parse_per_file_ignores`` validates them out with a typo-guard
+        warning anyway. Both ``ignored_names`` / ``ignored_codes`` are
+        kept on the signature (prefixed with ``_`` to mark them unused
+        but reserved) so future hooks (e.g. per-file SAFE000 if it ever
+        becomes feasible) can plug in without churning every caller.
+        """
         if self._engine_internal_ignored("SAFE004", "unused_suppression"):
             return
-        for v in self._unused_suppression_violations(filepath, suppressions, used_suppressions):
-            target = suppressed if _is_per_file_ignored(v, ignored_names, ignored_codes) else active
-            target.append(v)
+        active.extend(self._unused_suppression_violations(filepath, suppressions, used_suppressions))
+        # The suppressed list is intentionally untouched here.
+        _ = suppressed
 
     def _engine_internal_ignored(self, code: str, name: str) -> bool:
         """Return True when an engine-internal violation is ignored globally.

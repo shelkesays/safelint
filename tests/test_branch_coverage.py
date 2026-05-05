@@ -331,6 +331,37 @@ def test_per_file_ignores_warns_on_engine_internal_rule_name(capsys: pytest.Capt
     assert "parse" in err
 
 
+def test_per_file_ignore_safe004_does_not_actually_suppress(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``per_file_ignores`` listing SAFE004 must not silence the violation.
+
+    Locks the documented contract in: SAFE004 is gated solely on the
+    *global* ``ignore`` list. The earlier engine routed SAFE004
+    through ``_is_per_file_ignored`` at append time — that's been
+    removed because it contradicted the documented intent and
+    surfaced only as accidental behaviour.
+
+    The companion warning regression
+    (``test_per_file_ignores_warns_on_engine_internal_safe004``) covers
+    the typo-guard message; this test covers the runtime semantics.
+    """
+    sample = tmp_path / "u.py"
+    sample.write_text("x = 1  # nosafe: SAFE304\n", encoding="utf-8")
+
+    # ``per_file_ignores`` can't disable SAFE004 — even with a glob
+    # that matches the file under test.
+    cfg = deep_merge(DEFAULTS, {"per_file_ignores": {"**": ["SAFE004"]}})
+    capsys.readouterr()  # drop the typo-guard warning surfaced at engine init
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert any(v.code == "SAFE004" for v in result.violations), "per-file SAFE004 must NOT suppress; contract is global ignore only"
+
+    # Sanity: global ``ignore = ["SAFE004"]`` still does suppress
+    # (regression — must not accidentally narrow the global path).
+    cfg_global = deep_merge(DEFAULTS, {"ignore": ["SAFE004"]})
+    capsys.readouterr()
+    result_global = SafetyEngine(cfg_global).check_file(str(sample))
+    assert not any(v.code == "SAFE004" for v in result_global.violations)
+
+
 def test_global_ignore_still_accepts_engine_internal_codes_silently(capsys: pytest.CaptureFixture[str]) -> None:
     """The global ``ignore`` list continues to accept SAFE000 / SAFE004 — they DO work there.
 
