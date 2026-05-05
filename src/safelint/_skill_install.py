@@ -483,16 +483,46 @@ def _tree_hash(root: Path) -> str:
     return digest.hexdigest()
 
 
+def _is_symlink_managed_directory(target: Path) -> bool:
+    """Return True if *target* is a Claude-style symlink install.
+
+    Claude ``--symlink`` installs are NOT symlinks at the target path
+    itself — :func:`_install_symlink_directory_filtered` materialises
+    *target* as a real directory and creates per-entry symlinks inside
+    it (one for ``SKILL.md``, one for ``languages/``, etc.). For drift
+    detection those installs should behave like a single symlink:
+    always fresh, because the symlinks resolve straight back to the
+    bundled location that ``pip upgrade safelint`` mutates in place.
+
+    A directory qualifies when (a) it actually exists as a directory
+    and (b) every relevant top-level entry (peer-client dirs excluded)
+    is a working symlink. A broken inner symlink disqualifies the
+    install — same fail-fast posture as the outer broken-symlink check
+    in :func:`_install_status`.
+    """
+    if not target.is_dir():
+        return False
+    relevant_entries = [entry for entry in target.iterdir() if entry.name not in _PEER_CLIENT_DIRS]
+    return bool(relevant_entries) and all(entry.is_symlink() and entry.exists() for entry in relevant_entries)
+
+
 def _install_status(spec: ClientSpec, *, project: bool) -> str:
     """Return one of :data:`INSTALL_STATUS_MISSING` / ``_FRESH`` / ``_DIFFERS`` for *spec* at *scope*.
 
-    A symlink target is always reported as fresh — symlinks point at
-    the live bundled location, so ``pip upgrade safelint`` reflects
-    immediately. For copy installs (the default), the bundled artefact
-    and the on-disk install are content-hashed and compared.
+    A symlink install is reported as fresh only when its target exists
+    — symlinks point at the live bundled location, so ``pip upgrade
+    safelint`` reflects immediately. Two shapes of symlink install
+    qualify: (a) the target itself is a symlink (Cursor's single-file
+    install), or (b) the target is a real directory whose top-level
+    entries are all working symlinks (Claude's per-entry install via
+    :func:`_install_symlink_directory_filtered`). **Broken** symlinks
+    don't qualify — a dangling install is unusable, not "current".
+
+    For copy installs (the default), the bundled artefact and the
+    on-disk install are content-hashed and compared.
     """
     target = _spec_target(spec, project=project)
-    if target.is_symlink():
+    if (target.is_symlink() and target.exists()) or _is_symlink_managed_directory(target):
         return INSTALL_STATUS_FRESH
     if not target.exists():
         return INSTALL_STATUS_MISSING
