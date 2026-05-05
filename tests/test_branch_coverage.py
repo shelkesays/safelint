@@ -287,6 +287,64 @@ def test_per_file_ignores_warns_on_unknown_entries(capsys: pytest.CaptureFixture
     assert "SAFFE101" in captured.err
 
 
+def test_per_file_ignores_warns_on_engine_internal_safe000(capsys: pytest.CaptureFixture[str]) -> None:
+    """``per_file_ignores = {"vendor/**" = ["SAFE000"]}`` warns — engine-internal codes can't be per-file-suppressed.
+
+    SAFE000 (parse) is raised from the parse-error early-return in
+    ``_lint_parsed_source`` *before* per-file ignore matching ever
+    runs, so the entry would silently do nothing. Only the global
+    ``ignore`` list works for engine-internal codes. Surfacing this
+    via the existing typo-guard warning channel matches how all
+    other unknown entries are reported and prevents the user from
+    relying on a config that has no effect.
+    """
+    cfg = deep_merge(DEFAULTS, {"per_file_ignores": {"vendor/**": ["SAFE000"]}})
+    SafetyEngine(cfg)
+    err = capsys.readouterr().err
+    assert "safelint: warning:" in err
+    assert "SAFE000" in err
+
+
+def test_per_file_ignores_warns_on_engine_internal_safe004(capsys: pytest.CaptureFixture[str]) -> None:
+    """``per_file_ignores = {"tests/**" = ["SAFE004"]}`` warns — same logic as SAFE000.
+
+    SAFE004 is gated solely on the global ``ignore`` list (via
+    ``_engine_internal_ignored``); per-file matching never sees
+    it. The warning surfaces the misconfiguration before it
+    silently lets stale ``# nosafe`` directives in those files go
+    unreported.
+    """
+    cfg = deep_merge(DEFAULTS, {"per_file_ignores": {"tests/**": ["SAFE004"]}})
+    SafetyEngine(cfg)
+    err = capsys.readouterr().err
+    assert "safelint: warning:" in err
+    assert "SAFE004" in err
+
+
+def test_per_file_ignores_warns_on_engine_internal_rule_name(capsys: pytest.CaptureFixture[str]) -> None:
+    """The rule-name aliases (``parse``, ``unused_suppression``) are also rejected."""
+    cfg = deep_merge(DEFAULTS, {"per_file_ignores": {"tests/**": ["unused_suppression", "parse"]}})
+    SafetyEngine(cfg)
+    err = capsys.readouterr().err
+    assert "safelint: warning:" in err
+    assert "unused_suppression" in err
+    assert "parse" in err
+
+
+def test_global_ignore_still_accepts_engine_internal_codes_silently(capsys: pytest.CaptureFixture[str]) -> None:
+    """The global ``ignore`` list continues to accept SAFE000 / SAFE004 — they DO work there.
+
+    Important — only the per-file path narrowed; the global path
+    still treats engine-internal codes as known and silences them
+    correctly via ``_engine_internal_ignored``.
+    """
+    cfg = deep_merge(DEFAULTS, {"ignore": ["SAFE000", "SAFE004", "parse", "unused_suppression"]})
+    SafetyEngine(cfg)
+    err = capsys.readouterr().err
+    # No "unknown entries" warning for the engine-internal codes.
+    assert "unknown entries" not in err
+
+
 def test_test_coverage_rule_no_op_when_no_changed_files(tmp_path: Path) -> None:
     """``test_coupling`` returns no violations when ``changed_files`` is empty —
     ensures the early-return branch in the rule's check_file is hit."""
