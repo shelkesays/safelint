@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.9.0] - 2026-05-05
+
+A focused follow-on to v1.8.0 covering one practical question users asked: **how do I know my installed AI-client skill is up to date after `pip install --upgrade safelint`?** Two new surfaces answer it. Also lands a build-time drift-detection test pair that prevents bundled-doc rot for every registered AI client (and every future one — the tests parametrise over the registry).
+
 ### Added
 - **`safelint skill status`** — new subcommand that compares every detected installed AI-client skill (Claude Code at `~/.claude/skills/safelint/`, Cursor at `~/.cursor/rules/safelint.mdc`, project-scoped equivalents) against the bundled artefact in the active wheel. Reports per-location *fresh* / *differs from bundled*, exit 0 when every detected install matches, exit 1 when any differs. Pipe-friendly: `safelint skill status || safelint skill install --force` is the canonical "refresh after upgrade" idiom. Symlink installs always report fresh by construction. Documented in `AI_CLIENTS.md` "Updating after a safelint upgrade" → "Checking whether your installed skill is current".
 - **`safelint check --check-skill-freshness`** — opt-in flag that folds the same drift check into a normal lint run. Stale installs surface as `safelint: warning: …` lines on stderr through the diagnostics channel. Informational only — doesn't fail the lint. Off by default so day-to-day `safelint check` invocations stay fast (no extra FS scan).
@@ -15,6 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 - Top-level `safelint --help` "Commands" entry for `skill` now lists `status` alongside `install` and `path`. Same change in the `CONFIGURATION.md` embedded help example.
+- Documentation fan-out: the new commands and `--check-skill-freshness` flag are now mentioned in the top-level `README.md`, the bundled-in-wheel `src/safelint/skill_files/README.md`, and the `CONFIGURATION.md` `safelint check` flag table — not only in `AI_CLIENTS.md`.
 
 ## [1.8.0] - 2026-05-04
 
@@ -202,7 +207,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.8.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.9.0...HEAD
+[1.9.0]: https://github.com/shelkesays/safelint/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/shelkesays/safelint/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/shelkesays/safelint/compare/v1.6.0...v1.7.0
 [1.6.0]: https://github.com/shelkesays/safelint/compare/v1.5.0...v1.6.0
