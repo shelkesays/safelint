@@ -124,9 +124,10 @@ The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint 
 
 ## Requirements
 
-- `safelint` 1.8.0 or later on `PATH`. Notable history:
+- `safelint` 1.9.0 or later on `PATH`. Notable history:
   - `safelint skill install` and the bundled skill files were added in **v1.6.0**.
   - `--client cursor` (Cursor support) and the auto-detection default for `--client` arrived in **v1.8.0**.
+  - `safelint skill status` and `safelint check --check-skill-freshness` (drift detection between bundled and installed skills) arrived in **v1.9.0**.
 - A project with at least one source file in a language safelint supports (currently Python).
 
 ## What the skill does
