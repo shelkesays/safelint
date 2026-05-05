@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- **`safelint skill status`** — new subcommand that compares every detected installed AI-client skill (Claude Code at `~/.claude/skills/safelint/`, Cursor at `~/.cursor/rules/safelint.mdc`, project-scoped equivalents) against the bundled artefact in the active wheel. Reports per-location *fresh* / *differs from bundled*, exit 0 when every detected install matches, exit 1 when any differs. Pipe-friendly: `safelint skill status || safelint skill install --force` is the canonical "refresh after upgrade" idiom. Symlink installs always report fresh by construction. Documented in `AI_CLIENTS.md` "Updating after a safelint upgrade" → "Checking whether your installed skill is current".
+- **`safelint check --check-skill-freshness`** — opt-in flag that folds the same drift check into a normal lint run. Stale installs surface as `safelint: warning: …` lines on stderr through the diagnostics channel. Informational only — doesn't fail the lint. Off by default so day-to-day `safelint check` invocations stay fast (no extra FS scan).
+- **`ClientSpec.documentation_relpaths`** + parametrised drift-detection tests. Each registered AI client declares which files under `skill_files/` collectively must mention every rule code/name in `ALL_RULES` and every extension in `supported_extensions()`. Two parametrised tests (`test_skill_documents_every_active_rule[<client>]`, `test_skill_documents_every_supported_extension[<client>]`) fail CI the moment a contributor adds a rule or language without updating each registered client's bundled docs. New clients added to `_CLIENT_SPECS` automatically inherit both checks.
+- Bundled skill crib-sheets (`SKILL.md`, `cursor/safelint.mdc`) backfilled with the eight rules previously absent from their rationale tables: SAFE203, SAFE401, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803. The drift test now passes at 100% rule coverage.
+
+### Changed
+- Top-level `safelint --help` "Commands" entry for `skill` now lists `status` alongside `install` and `path`. Same change in the `CONFIGURATION.md` embedded help example.
+
 ## [1.8.0] - 2026-05-04
 
 This release bundles three internal milestones (originally tracked as 1.8.0 / 1.9.0 / 1.10.0 during development; only 1.7.0 was published to PyPI) into a single user-visible release. It closes the most-asked-about gaps versus ruff — incremental config, unused-suppression detection, per-rule statistics, broader resource-lifecycle coverage, smarter empty-except detection, configurable global-mutation strictness, configurable function-size counting — *and* tightens the SAFE801 (``tainted_sink``) dataflow analysis *and* introduces advisory suggestions on JSON / SARIF outputs alongside a ruff-style top-level CLI surface. SafeLint stays *review-only* — there is no ``--fix`` flag now or planned.

@@ -84,6 +84,26 @@ safelint skill path --client cursor  # Cursor MDC file path
 
 Prints the on-disk location of the skill files inside your active safelint install. Useful for inspecting `SKILL.md` / `safelint.mdc` directly, or for debugging install issues.
 
+### Is my installed skill up to date?
+
+After `pip install --upgrade safelint`, the bundled files inside the wheel update but your installed skill stays at whatever version was last installed. Two ways to check:
+
+```bash
+# Dedicated subcommand — exits 1 if any install differs from the bundled version
+safelint skill status
+
+# Or, fold the check into a normal lint run (informational stderr warning, doesn't fail the run)
+safelint check --check-skill-freshness --all-files .
+```
+
+Pipe-friendly idiom for CI / upgrade scripts:
+
+```bash
+safelint skill status || safelint skill install --force
+```
+
+`safelint skill status` is silent on a clean run (exit 0). When something drifts it prints which install location differs and points at `safelint skill install --force`. If you've customised your skill on purpose, ignore the diff — the diagnostic explicitly mentions that case.
+
 ## Layout
 
 The skill ships *inside* the safelint Python package, under `safelint/skill_files/`:
