@@ -187,11 +187,12 @@ def _is_safe004_self_reference(code: str) -> bool:
     A *deliberate* leniency, narrower than the rest of the engine: this
     helper accepts either the canonical ``SAFE004`` (case-insensitive,
     so ``safe004`` / ``Safe004`` are also recognised) or the
-    ``unused_suppression`` rule name. Inline ``# nosafe:`` matching at
-    :func:`_is_suppressed` and :func:`_check_suppressed_marking_used`
-    is otherwise *case-sensitive* on codes — the global ``ignore``
-    config list is normalised to upper-case at load time, but per-line
-    inline directives are matched verbatim. Treating the SAFE004
+    ``unused_suppression`` rule name. Inline ``# nosafe:`` matching,
+    including the usage tracking in
+    :func:`_check_suppressed_marking_used`, is otherwise
+    *case-sensitive* on codes — the global ``ignore`` config list is
+    normalised to upper-case at load time, but per-line inline
+    directives are matched verbatim. Treating the SAFE004
     self-reference more leniently is intentional: a directive whose
     only purpose is to silence the SAFE004 rule itself shouldn't
     recursively trigger SAFE004 just because the user typed it
@@ -260,7 +261,13 @@ class SafetyEngine:
         ignored_codes_upper: frozenset[str] = frozenset(e.upper() for e in raw_ignore)
 
         self.rules: list[BaseRule] = self._build_active_rules(rules_cfg, exec_cfg, ignored_names, ignored_codes_upper, changed_files)
-        self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = self._parse_per_file_ignores(config.get("per_file_ignores", {}), known_names, known_codes_upper)
+        # Per-file ignores can't suppress engine-internal codes (SAFE000
+        # fires before per-file matching; SAFE004 only honours the
+        # global ``ignore`` list), so validate against the narrower set
+        # — silent acceptance of stale entries is worse than a typo guard.
+        per_file_known_names = known_names - _ENGINE_INTERNAL_NAMES
+        per_file_known_codes_upper = known_codes_upper - _ENGINE_INTERNAL_CODES
+        self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = self._parse_per_file_ignores(config.get("per_file_ignores", {}), per_file_known_names, per_file_known_codes_upper)
         self._cache = cache
         # Ignore-set for engine-internal violations only (SAFE000 / SAFE004,
         # by code or rule name). Filtered to engine-internal entries so the
