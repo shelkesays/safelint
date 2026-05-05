@@ -818,39 +818,19 @@ def _build_hook_parser() -> argparse.ArgumentParser:
     return parser
 
 
-def _build_skill_parser() -> argparse.ArgumentParser:
-    """Build the ``skill`` subcommand parser.
-
-    Two actions today: ``install`` (materialises the bundled skill or
-    Cursor rule into the chosen client's directory) and ``path``
-    (prints the bundled-files location for debugging).
-
-    The ``--client`` option selects which AI client to install for:
-    ``claude`` (default — the directory-tree Claude Code skill at
-    ``~/.claude/skills/safelint/``) or ``cursor`` (the single MDC
-    project rule at ``~/.cursor/rules/safelint.mdc``).
-    """
-    parser = argparse.ArgumentParser(
-        prog="safelint skill",
-        description="Manage the bundled safelint skill / project rule for AI clients (Claude Code, Cursor)",
-    )
-    sub = parser.add_subparsers(dest="skill_action", required=True, metavar="ACTION")
-
-    install = sub.add_parser(
-        "install",
-        help="Install the bundled skill / rule into the chosen AI client (default: Claude Code at ~/.claude/skills/safelint)",
-    )
+def _add_skill_install_arguments(install: argparse.ArgumentParser, install_choices: tuple[str, ...]) -> None:
+    """Attach ``--client`` / ``--project`` / ``--symlink`` / ``--force`` to the install subparser."""
     install.add_argument(
         "--client",
-        choices=("claude", "cursor"),
-        default="claude",
-        help="Target AI client: ``claude`` (default — Claude Code skill directory) or ``cursor`` (single MDC project rule)",
+        choices=install_choices,
+        default="auto",
+        help="Target AI client: ``auto`` (default — detect from markers in cwd, then home) or one of: " + ", ".join(c for c in install_choices if c != "auto"),
     )
     install.add_argument(
         "--project",
         action="store_true",
         default=False,
-        help="Install into the current project (<cwd>/.claude/skills/safelint or <cwd>/.cursor/rules/safelint.mdc) instead of the user-global location",
+        help="Force project scope (<cwd>/.<client>/...). With ``--client auto``, restricts detection to cwd and refuses to fall back to home",
     )
     install.add_argument(
         "--symlink",
@@ -865,12 +845,44 @@ def _build_skill_parser() -> argparse.ArgumentParser:
         help="Replace any existing safelint skill / rule at the target location",
     )
 
+
+def _build_skill_parser() -> argparse.ArgumentParser:
+    """Build the ``skill`` subcommand parser.
+
+    Two actions: ``install`` (materialises the bundled skill / project
+    rule into the chosen AI client's directory) and ``path`` (prints
+    the bundled-files location for debugging).
+
+    The ``--client`` option on ``install`` defaults to ``auto``, which
+    detects which AI client(s) the user is using by scanning for
+    marker paths (``CLAUDE.md`` / ``.claude/`` / ``.cursor/`` / etc.)
+    in cwd first and home second. Pass an explicit client name to
+    skip detection. Choices are derived from the registry in
+    :mod:`safelint._skill_install` so adding a new client there
+    automatically extends what argparse accepts here.
+    """
+    # Local import keeps ``importlib.resources`` off the cli import
+    # hot path; pulled in only when the user invokes ``skill``.
+    from safelint._skill_install import INSTALL_CLIENT_CHOICES, PATH_CLIENT_CHOICES  # noqa: PLC0415
+
+    parser = argparse.ArgumentParser(
+        prog="safelint skill",
+        description="Manage the bundled safelint skill / project rule for AI clients (Claude Code, Cursor; more to come)",
+    )
+    sub = parser.add_subparsers(dest="skill_action", required=True, metavar="ACTION")
+
+    install = sub.add_parser(
+        "install",
+        help="Install the bundled skill / rule into the AI client(s) detected for this project (default: --client auto)",
+    )
+    _add_skill_install_arguments(install, INSTALL_CLIENT_CHOICES)
+
     path_parser = sub.add_parser("path", help="Print the on-disk location of the bundled skill or Cursor rule")
     path_parser.add_argument(
         "--client",
-        choices=("claude", "cursor"),
+        choices=PATH_CLIENT_CHOICES,
         default="claude",
-        help="Which bundled artefact's path to print: ``claude`` (default — skill_files root) or ``cursor`` (MDC file path)",
+        help="Which bundled artefact's path to print (default: ``claude`` — skill_files root)",
     )
 
     return parser

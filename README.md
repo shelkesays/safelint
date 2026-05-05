@@ -244,19 +244,18 @@ Ready-to-copy samples:
 
 ## Editor / agent integrations
 
-### AI-client skills (Claude Code and Cursor)
+### AI-client skills (Claude Code, Cursor; more on the way)
 
 ```bash
 pip install safelint
-
-# Claude Code (default) — installs to ~/.claude/skills/safelint/
-safelint skill install
-
-# Cursor — installs the MDC project rule to .cursor/rules/safelint.mdc
-safelint skill install --client cursor --project
+safelint skill install          # auto-detects which AI client(s) you use
 ```
 
-After restarting the AI client (or reloading its window), ask things like *"run safelint"*, *"lint my changes with safelint"*, or *"do a Power-of-Ten review on src/api/auth.py"*. The skill / rule invokes safelint with structured output, groups violations by file, and offers to walk through fixes. Use `--project` to install only for the current project, `--symlink` for skill-development workflows, or `--force` to re-install after upgrades. See [`src/safelint/skill_files/README.md`](src/safelint/skill_files/README.md) for the full reference.
+The bare command is `--client auto` under the hood: it scans the current directory for client markers (`CLAUDE.md`, `.cursor/`, …), falls back to your home directory, and installs the relevant skill / project rule for every AI client it finds. Multiple clients in the same project? It installs for both.
+
+After restarting the AI client (or reloading its window), ask things like *"run safelint"*, *"lint my changes with safelint"*, or *"do a Power-of-Ten review on src/api/auth.py"*. The skill / rule invokes safelint with structured output, groups violations by file, and offers to walk through fixes.
+
+For explicit control (`--client claude` / `--client cursor`), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, troubleshooting, and adding a new client (the registry is open-ended — GitHub Copilot, codex, windsurf, etc. are all candidates), see the comprehensive guide: [`AI_CLIENTS.md`](AI_CLIENTS.md).
 
 ### Other integration points
 
