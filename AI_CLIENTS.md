@@ -168,6 +168,28 @@ safelint skill install --client cursor --force   # or specific client
 
 Symlink mode picks up changes automatically; no re-install needed unless you want to re-run detection (e.g. after adding a new client to the project).
 
+### Checking whether your installed skill is current
+
+Two ways to verify:
+
+```bash
+# Dedicated subcommand — pipe-friendly, exits 1 if any install differs
+safelint skill status
+
+# Or, opt in to a single-shot check at the start of a normal lint run
+safelint check --check-skill-freshness --all-files .
+```
+
+`safelint skill status` iterates every registered AI client and both scopes (user / project), reports each detected install location as **fresh** or **differs from bundled**, and exits 0 only when every detected install matches the current bundle. Useful in CI:
+
+```bash
+safelint skill status || safelint skill install --force
+```
+
+`safelint check --check-skill-freshness` is the same check folded into a normal lint run — it prints a stderr warning per stale install but **does not** fail the lint (informational only). The flag is opt-in so day-to-day `safelint check` invocations stay fast (no extra FS scan).
+
+Note: customising your installed skill (the bundled `README.md` explicitly invites it) will surface as **differs from bundled** until you re-install. That's expected — the diagnostic message includes "or ignore if you've customised it".
+
 ## Troubleshooting
 
 ### "could not auto-detect an AI client"

@@ -721,6 +721,176 @@ def test_skill_documents_every_active_rule(spec: _skill_install.ClientSpec) -> N
     assert not missing_names, f"{spec.name}: rule names missing from skill docs ({spec.documentation_relpaths}): {missing_names}"
 
 
+# ---------------------------------------------------------------------------
+# Freshness / drift detection — ``safelint skill status`` and the
+# ``safelint check --check-skill-freshness`` opt-in flag both delegate
+# to ``_install_status`` / ``stale_install_warnings`` in _skill_install.
+# ---------------------------------------------------------------------------
+
+
+def test_install_status_missing_when_target_does_not_exist(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """No install at the scope → MISSING (not "differs", not an error)."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    status = _skill_install._install_status(_skill_install._CLAUDE_SPEC, project=False)
+    assert status == _skill_install.INSTALL_STATUS_MISSING
+
+
+def test_install_status_fresh_immediately_after_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A just-installed copy must report FRESH (content matches the bundle)."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    status = _skill_install._install_status(_skill_install._CLAUDE_SPEC, project=False)
+    assert status == _skill_install.INSTALL_STATUS_FRESH
+
+
+def test_install_status_differs_when_install_is_modified(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A locally-modified install reports DIFFERS so the status command can flag it."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    # Customise the installed copy — the docs explicitly invite this.
+    skill_md = home / ".claude" / "skills" / "safelint" / "SKILL.md"
+    skill_md.write_text("# locally customised\n", encoding="utf-8")
+    status = _skill_install._install_status(_skill_install._CLAUDE_SPEC, project=False)
+    assert status == _skill_install.INSTALL_STATUS_DIFFERS
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_status_symlink_is_always_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Symlinked installs are live by construction — always reported as FRESH.
+
+    A symlink points at the bundled location, so ``pip upgrade safelint``
+    is reflected immediately. The status check shouldn't complain.
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor", symlink=True)) == 0
+    status = _skill_install._install_status(_skill_install._CURSOR_SPEC, project=False)
+    assert status == _skill_install.INSTALL_STATUS_FRESH
+
+
+def test_run_status_returns_zero_when_no_installs_exist(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Empty home + cwd → status exits 0 with a "no installs detected" notice."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_status(argparse.Namespace())
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "no AI-client skill installs detected" in out
+
+
+def test_run_status_returns_zero_when_install_is_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A just-installed skill yields status 0 + a "fresh" line."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    capsys.readouterr()  # drop install output
+    rc = _skill_install.run_status(argparse.Namespace())
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "fresh" in out
+    assert "all detected installs match" in out
+
+
+def test_run_status_returns_one_when_install_differs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A locally-modified install yields status 1 + a refresh hint."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    target = home / ".cursor" / "rules" / "safelint.mdc"
+    target.write_text("# customised\n", encoding="utf-8")
+    capsys.readouterr()  # drop install output
+    rc = _skill_install.run_status(argparse.Namespace())
+    assert rc == 1
+    out = capsys.readouterr().out
+    assert "differs from bundled" in out
+    assert "safelint skill install --force" in out
+
+
+def test_cli_routes_skill_status(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill status`` routes to ``_skill_install.run_status``."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "status"])
+    spy = mocker.patch.object(_skill_install, "run_status", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    spy.assert_called_once()
+
+
+def test_check_with_skill_freshness_flag_calls_stale_check(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mocker: MockerFixture) -> None:
+    """``safelint check --check-skill-freshness`` consults ``stale_install_warnings``."""
+    sample = tmp_path / "ok.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr("sys.argv", ["safelint", "check", "--check-skill-freshness", "--all-files", str(sample)])
+    spy = mocker.patch.object(_skill_install, "stale_install_warnings", return_value=[])
+    with pytest.raises(SystemExit):
+        cli.main()
+    spy.assert_called_once()
+
+
+def test_check_without_freshness_flag_skips_stale_check(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mocker: MockerFixture) -> None:
+    """Default ``safelint check`` (no flag) does NOT pay the freshness-check cost.
+
+    Locks the contract that the freshness check is opt-in only —
+    a regression that made it run by default would slow down every
+    ``safelint check`` invocation by an FS scan.
+    """
+    sample = tmp_path / "ok.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr("sys.argv", ["safelint", "check", "--all-files", str(sample)])
+    spy = mocker.patch.object(_skill_install, "stale_install_warnings", return_value=[])
+    with pytest.raises(SystemExit):
+        cli.main()
+    spy.assert_not_called()
+
+
+def test_check_with_freshness_flag_emits_stderr_warnings_when_stale(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """End-to-end: stale install + ``--check-skill-freshness`` produces a stderr warning.
+
+    Drives the full ``safelint check`` path through the CLI and
+    confirms the diagnostics-channel warning fires. Doesn't assert
+    the lint exit code — the freshness check is informational only,
+    so a clean lint run still exits 0 even if a stale install is
+    detected.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Plant a stale Cursor install.
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    (home / ".cursor" / "rules" / "safelint.mdc").write_text("# customised\n", encoding="utf-8")
+
+    sample = tmp_path / "ok.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr("sys.argv", ["safelint", "check", "--check-skill-freshness", "--all-files", str(sample)])
+    capsys.readouterr()  # drop install output
+    with pytest.raises(SystemExit):
+        cli.main()
+    err = capsys.readouterr().err
+    assert "safelint: warning:" in err
+    assert "Cursor rule" in err
+    assert "differs from bundled" in err
+
+
+def test_stale_install_warnings_returns_one_per_stale_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The public ``stale_install_warnings`` helper returns one string per stale location.
+
+    This is the primitive consumed by ``safelint check --check-skill-freshness``
+    — keeping it exercised in isolation makes the freshness flag's behaviour
+    easy to reason about.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Install Cursor user-scoped, then customise it.
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    target = home / ".cursor" / "rules" / "safelint.mdc"
+    target.write_text("# customised\n", encoding="utf-8")
+
+    warnings = _skill_install.stale_install_warnings()
+    assert len(warnings) == 1
+    assert "Cursor rule" in warnings[0]
+    assert "differs from bundled" in warnings[0]
+    assert "safelint skill install --force" in warnings[0]
+
+
+def test_stale_install_warnings_empty_when_all_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """No installs → empty list (not an error) — matches the ``--check-skill-freshness`` "silent on clean" contract."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.stale_install_warnings() == []
+
+
 @pytest.mark.parametrize("spec", _skill_install._CLIENT_SPECS, ids=lambda s: s.name)
 def test_skill_documents_every_supported_extension(spec: _skill_install.ClientSpec) -> None:
     """Every extension from ``supported_extensions()`` appears in the bundled documentation.
