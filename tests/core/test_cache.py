@@ -289,6 +289,49 @@ def test_engine_cache_invalidates_when_safe004_is_ignored_by_rule_name(tmp_path:
     assert not any(v.code == "SAFE004" for v in result.violations)
 
 
+def test_globally_ignored_engine_internal_is_filtered_to_engine_codes() -> None:
+    """``_globally_ignored_engine_internal`` only contains engine-internal entries.
+
+    The field is what feeds the cache fingerprint via
+    ``engine_internal_ignored``. Without filtering, adding an unrelated
+    ``ignore = ["SAFE101"]`` would shift the engine-internal portion
+    of the fingerprint too — burning the cache for no semantic reason
+    (``active_rules`` already invalidates correctly). And typos like
+    ``ignore = ["SAFETYP01"]`` (which surface as a stderr warning and
+    otherwise do nothing) would invalidate the whole cache pointlessly.
+    Lock the filtering invariant in.
+    """
+    cfg = {
+        **DEFAULTS,
+        "ignore": [
+            "SAFE004",  # engine-internal — should be in the set (upper-case)
+            "unused_suppression",  # engine-internal — should be in the set
+            "SAFE101",  # normal rule — should NOT be in the set
+            "function_length",  # normal rule by name — should NOT be in the set
+            "SAFETYP01",  # typo — should NOT be in the set
+        ],
+    }
+    engine = SafetyEngine(cfg)
+    expected = frozenset({"SAFE004", "unused_suppression"})
+    assert engine._globally_ignored_engine_internal == expected
+
+
+def test_engine_cache_does_not_invalidate_on_unrelated_typo_ignore(tmp_path: Path) -> None:
+    """Adding a typo entry like ``ignore = ["SAFETYP01"]`` must not invalidate the cache.
+
+    Typo entries surface as a stderr warning and otherwise do nothing
+    — they're not a valid rule, not engine-internal, change no rule
+    behaviour. The cache fingerprint should be identical to the
+    no-ignore baseline.
+    """
+    engine_baseline = SafetyEngine(DEFAULTS, cache=LintCache(tmp_path / "c1"))
+    engine_typo = SafetyEngine({**DEFAULTS, "ignore": ["SAFETYP01"]}, cache=LintCache(tmp_path / "c2"))
+    # Same fingerprint → cache entries written by one would be served
+    # by the other. The typo doesn't change rule behaviour, so it
+    # mustn't change the cache key.
+    assert engine_baseline._get_engine_fingerprint() == engine_typo._get_engine_fingerprint()
+
+
 def test_engine_cache_isolates_by_filepath(tmp_path: Path) -> None:
     """Two files with identical contents under different paths must not share cache entries.
 
