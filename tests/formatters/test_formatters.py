@@ -152,6 +152,66 @@ def test_sarif_violation_without_suggestions_omits_fixes_block() -> None:
     assert "fixes" not in doc["runs"][0]["results"][0]
 
 
+def test_sarif_skips_description_only_suggestions() -> None:
+    """Suggestions with empty ``edits`` are filtered out of SARIF ``fixes[]``.
+
+    SARIF 2.1.0 spec: ``fix.artifactChanges[].replacements`` SHALL
+    contain at least one element. A description-only suggestion
+    (a hint without a mechanical recipe) would produce an empty
+    ``replacements`` array, violating the spec — so it must be
+    skipped. The same suggestion stays in the JSON output where
+    description-only is documented as valid.
+    """
+    from safelint.rules.base import Suggestion, TextEdit  # noqa: PLC0415
+
+    description_only = Suggestion(description="Consider extracting a helper", edits=())
+    actionable_edit = TextEdit(start_line=4, start_column=5, end_line=4, end_column=12, replacement="except Exception:")
+    actionable = Suggestion(description="Catch Exception", edits=(actionable_edit,))
+    v = Violation(
+        rule="bare_except",
+        code="SAFE201",
+        filepath="src/foo.py",
+        lineno=4,
+        message="m",
+        severity="error",
+        suggestions=(description_only, actionable),
+    )
+    doc = json.loads(format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1))
+    fixes = doc["runs"][0]["results"][0]["fixes"]
+    # Only the actionable suggestion makes it through; the
+    # description-only one is silently filtered (it lives in the
+    # JSON output for consumers that want hints).
+    assert len(fixes) == 1
+    assert fixes[0]["description"]["text"] == "Catch Exception"
+    # Spec-conformance check: replacements is non-empty.
+    assert fixes[0]["artifactChanges"][0]["replacements"]
+
+
+def test_sarif_omits_fixes_when_only_description_only_suggestions_present() -> None:
+    """A violation with only description-only suggestions emits no ``fixes`` key.
+
+    Filtering each suggestion individually leaves nothing to emit;
+    the caller checks ``if fixes:`` and omits the key, avoiding a
+    ``fixes: []`` array on the result (SARIF allows omitting
+    optional fields, prefers that to empty arrays).
+    """
+    from safelint.rules.base import Suggestion  # noqa: PLC0415
+
+    sug = Suggestion(description="Consider refactoring", edits=())
+    v = Violation(
+        rule="r",
+        code="SAFE001",
+        filepath="f.py",
+        lineno=1,
+        message="m",
+        severity="error",
+        suggestions=(sug,),
+    )
+    doc = json.loads(format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1))
+    result = doc["runs"][0]["results"][0]
+    assert "fixes" not in result
+
+
 def test_json_summary_counts_errors_and_warnings_separately() -> None:
     """Mixed-severity input produces separate error / warning counts."""
     violations = [
