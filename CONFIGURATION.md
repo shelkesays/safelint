@@ -141,13 +141,15 @@ emitted advisory suggestions for those violations (added in 1.8.0):
 
 ```text
 Found 2 errors, 1 warning. [--fail-on=error].
-No suggestions available (safelint does not auto-fix; see --format json for any advisory edits). (2 SAFE501, 1 SAFE304 suppressed)
+No suggestions available (safelint does not auto-fix). (2 SAFE501, 1 SAFE304 suppressed)
 ```
 
 If at least one violation has a suggestion, the line reads
-`N advisory suggestion(s) available — view via --format json (safelint
-does not auto-apply fixes).` followed by the same suppression
-breakdown. SafeLint never auto-applies — the line is informational.
+`N advisory suggestion(s) available — view via --format json or --format sarif
+(safelint does not auto-apply fixes).` followed by the same suppression
+breakdown. Suggestions are emitted in both JSON output and the SARIF
+``fixes[]`` block (advisory by spec). SafeLint never auto-applies —
+the line is informational.
 
 When the run is otherwise clean (no active violations), only the all-clear
 line is printed — the suggestion / no-suggestion line is omitted:
