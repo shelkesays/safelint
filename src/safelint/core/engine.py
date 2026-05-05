@@ -260,14 +260,12 @@ class SafetyEngine:
         self.rules: list[BaseRule] = self._build_active_rules(rules_cfg, exec_cfg, ignored_names, ignored_codes_upper, changed_files)
         self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = self._parse_per_file_ignores(config.get("per_file_ignores", {}), known_names, known_codes_upper)
         self._cache = cache
-        # Combined ignore-set for engine-internal violations (SAFE000 parse
-        # errors, SAFE004 unused-suppression). Includes both the upper-cased
-        # codes *and* the rule names from the ignore list, so users can write
-        # either ``ignore = ["SAFE004"]`` or ``ignore = ["unused_suppression"]``
-        # and have it work. Rule-based BaseRule violations go through their
-        # own filter at ``_build_active_rules``; this set is consulted only
-        # for the codes the engine emits directly.
-        self._globally_ignored_engine_internal: frozenset[str] = ignored_codes_upper | ignored_names
+        # Ignore-set for engine-internal violations only (SAFE000 / SAFE004,
+        # by code or rule name). Filtered to engine-internal entries so the
+        # cache fingerprint (which hashes this in) doesn't churn on
+        # unrelated ``ignore`` edits or typos that surface as stderr
+        # warnings. Rule-based filtering happens in ``_build_active_rules``.
+        self._globally_ignored_engine_internal: frozenset[str] = (ignored_codes_upper & _ENGINE_INTERNAL_CODES) | (ignored_names & _ENGINE_INTERNAL_NAMES)
         # Lazy: only computed when the cache is non-trivial — saves the
         # JSON-encode + sha256 round-trip when ``--no-cache`` is in use.
         self._engine_fingerprint: str | None = None
