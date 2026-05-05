@@ -63,7 +63,7 @@ safelint skill status
 safelint check --check-skill-freshness --all-files .
 ```
 
-`safelint skill status` walks every registered AI client × both scopes (user / project) and reports per-location *fresh* / *differs from bundled*. Symlink installs always report fresh by construction (live link to bundled). Exit 0 when every detected install matches; exit 1 when any differs. Canonical CI / upgrade-script idiom:
+`safelint skill status` walks every registered AI client × both scopes (user / project) and reports per-location *fresh* / *differs from bundled*. Symlink installs typically report fresh — the symlinks resolve straight back to the bundled location, so `pip upgrade safelint` reflects immediately. Note that the check compares the materialised install (a single symlink for Cursor, a directory of per-entry symlinks for Claude) against the bundle, so a symlink install can still report *differs* after local tampering (a real file added to the directory, a symlink replaced with a copy) or after the bundle adds a new top-level entry that the existing per-entry layout hasn't picked up yet. Exit 0 when every detected install matches; exit 1 when any differs. Canonical CI / upgrade-script idiom (run `--force` to refresh, including any added top-level entries):
 
 ```bash
 safelint skill status || safelint skill install --force
