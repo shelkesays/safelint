@@ -697,6 +697,21 @@ def _read_skill_docs(spec: _skill_install.ClientSpec) -> str:
     return "\n".join(parts)
 
 
+def _appears_as_token(text: str, token: str) -> bool:
+    """Return True if *token* appears in *text* as a standalone token.
+
+    Plain ``token in text`` would falsely match ``side_effects`` inside
+    ``side_effects_hidden`` and ``.py`` inside ``.pyw`` — so a doc with
+    only the longer name / extension would silently pass the drift test
+    that's meant to catch the missing shorter one. The boundary check
+    rejects matches whose neighbours are identifier characters
+    (alphanumeric or underscore).
+    """
+    import re  # noqa: PLC0415 — keep the import local to the helper
+
+    return re.search(rf"(?<!\w){re.escape(token)}(?!\w)", text) is not None
+
+
 @pytest.mark.parametrize("spec", _skill_install._CLIENT_SPECS, ids=lambda s: s.name)
 def test_skill_documents_every_active_rule(spec: _skill_install.ClientSpec) -> None:
     """Every code AND name in ``ALL_RULES`` appears in the bundled documentation.
@@ -715,8 +730,8 @@ def test_skill_documents_every_active_rule(spec: _skill_install.ClientSpec) -> N
     from safelint.rules import ALL_RULES  # noqa: PLC0415 — local to keep test imports tight
 
     text = _read_skill_docs(spec)
-    missing_codes = [cls.code for cls in ALL_RULES if cls.code not in text]
-    missing_names = [cls.name for cls in ALL_RULES if cls.name not in text]
+    missing_codes = [cls.code for cls in ALL_RULES if not _appears_as_token(text, cls.code)]
+    missing_names = [cls.name for cls in ALL_RULES if not _appears_as_token(text, cls.name)]
     assert not missing_codes, f"{spec.name}: rule codes missing from skill docs ({spec.documentation_relpaths}): {missing_codes}"
     assert not missing_names, f"{spec.name}: rule names missing from skill docs ({spec.documentation_relpaths}): {missing_names}"
 
@@ -765,6 +780,109 @@ def test_install_status_symlink_is_always_fresh(monkeypatch: pytest.MonkeyPatch,
     assert _skill_install.run_install(_make_args(client="cursor", symlink=True)) == 0
     status = _skill_install._install_status(_skill_install._CURSOR_SPEC, project=False)
     assert status == _skill_install.INSTALL_STATUS_FRESH
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_status_claude_symlink_directory_is_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A Claude ``--symlink`` install is reported FRESH despite being a real directory.
+
+    Claude symlink installs aren't symlinks at the target path — they're
+    real directories whose top-level entries are symlinks back to
+    bundled. ``target.is_symlink()`` returns False. Without explicit
+    handling, the code falls through to tree-hashing and reports DIFFERS
+    if the bundle adds a new top-level file (the install dir doesn't
+    yet have a symlink for it). That's both noisy in the common case
+    and contradicts the documented "symlink installs are live"
+    contract. ``_is_symlink_managed_directory`` catches this shape.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude", symlink=True)) == 0
+    target = home / ".claude" / "skills" / "safelint"
+    # Sanity: target itself is a directory, but its entries are symlinks.
+    assert target.is_dir()
+    assert not target.is_symlink()
+    assert (target / "SKILL.md").is_symlink()
+    # The drift check must still report fresh.
+    status = _skill_install._install_status(_skill_install._CLAUDE_SPEC, project=False)
+    assert status == _skill_install.INSTALL_STATUS_FRESH
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_status_broken_symlink_is_not_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A broken symlink (target removed) must NOT be reported FRESH.
+
+    ``Path.is_symlink()`` returns True even for dangling symlinks.
+    Without an additional ``exists()`` check, ``safelint skill status``
+    would incorrectly say the install is current even though following
+    the link fails. Test plants a Cursor symlink install, removes the
+    bundled target out from under it, and asserts the status check
+    catches the broken-link condition instead of returning FRESH.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    target = home / ".cursor" / "rules" / "safelint.mdc"
+    target.parent.mkdir(parents=True)
+    # Plant a symlink whose target doesn't exist (broken from creation).
+    target.symlink_to(tmp_path / "nonexistent.mdc")
+    assert target.is_symlink()
+    assert not target.exists()  # broken symlink
+
+    status = _skill_install._install_status(_skill_install._CURSOR_SPEC, project=False)
+    # FRESH would mean "installed and current". A dangling install is neither.
+    assert status != _skill_install.INSTALL_STATUS_FRESH
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_status_claude_symlink_with_broken_inner_link_is_not_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A Claude symlink install with one broken inner symlink must NOT be reported FRESH.
+
+    Same fail-fast posture as the outer broken-symlink check: a
+    dangling install is not "current". Builds a Claude symlink install,
+    breaks one of the per-entry links by re-pointing it at a removed
+    path, and asserts the status check rejects the install.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude", symlink=True)) == 0
+    target_dir = home / ".claude" / "skills" / "safelint"
+    skill_md_link = target_dir / "SKILL.md"
+    # Repoint the SKILL.md symlink at a removed path → broken link.
+    skill_md_link.unlink()
+    skill_md_link.symlink_to(tmp_path / "vanished.md")
+    assert skill_md_link.is_symlink()
+    assert not skill_md_link.exists()  # broken
+
+    status = _skill_install._install_status(_skill_install._CLAUDE_SPEC, project=False)
+    assert status != _skill_install.INSTALL_STATUS_FRESH
+
+
+def test_drift_token_match_rejects_substring_false_positives() -> None:
+    """The drift-test helper distinguishes ``side_effects`` from ``side_effects_hidden``.
+
+    Direct ``in`` membership would falsely accept SAFE304's name as
+    "documented" merely because SAFE303's longer name appears.
+    ``_appears_as_token`` uses identifier-character lookbehind /
+    lookahead so the shorter name needs to appear standalone.
+    """
+    text_with_only_long = "| SAFE303 | side_effects_hidden | … |"
+    text_with_short = "| SAFE304 | side_effects | … |"
+    text_with_both = "| SAFE303 | side_effects_hidden | … |\n| SAFE304 | side_effects | … |"
+    assert not _appears_as_token(text_with_only_long, "side_effects")
+    assert _appears_as_token(text_with_short, "side_effects")
+    assert _appears_as_token(text_with_both, "side_effects")
+    # And the longer name still matches when present.
+    assert _appears_as_token(text_with_only_long, "side_effects_hidden")
+    assert _appears_as_token(text_with_both, "side_effects_hidden")
+
+
+def test_drift_token_match_rejects_extension_substring_false_positives() -> None:
+    """``.py`` is not falsely matched inside ``.pyw``.
+
+    Same identifier-boundary semantics work for dotted extensions:
+    ``.py`` inside ``.pyw`` has a word char (``w``) immediately after,
+    so the negative lookahead fails.
+    """
+    assert not _appears_as_token("supports .pyw extension", ".py")
+    assert _appears_as_token("supports .py and .pyw", ".py")
+    assert _appears_as_token("supports .pyw extension", ".pyw")
 
 
 def test_run_status_returns_zero_when_no_installs_exist(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
@@ -906,5 +1024,5 @@ def test_skill_documents_every_supported_extension(spec: _skill_install.ClientSp
     from safelint.languages import supported_extensions  # noqa: PLC0415
 
     text = _read_skill_docs(spec)
-    missing = sorted(ext for ext in supported_extensions() if ext not in text)
+    missing = sorted(ext for ext in supported_extensions() if not _appears_as_token(text, ext))
     assert not missing, f"{spec.name}: supported extensions missing from skill docs ({spec.documentation_relpaths}): {missing}"
