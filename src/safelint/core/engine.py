@@ -87,28 +87,22 @@ def _parse_suppressions(
     return suppressions
 
 
-def _is_suppressed(violation: Violation, suppressions: dict[int, set[str] | None]) -> bool:
-    """Return True when *violation* is covered by a nosafe comment on its line."""
-    if violation.lineno not in suppressions:
-        return False
-    codes = suppressions[violation.lineno]
-    if codes is None:
-        return True
-    return violation.code in codes or violation.rule in codes
-
-
 def _check_suppressed_marking_used(
     violation: Violation,
     suppressions: dict[int, set[str] | None],
     used: set[tuple[int, str | None]],
 ) -> bool:
-    """Match :func:`_is_suppressed` and record which directive caught *violation*.
+    """Return True when *violation* is covered by a ``# nosafe`` directive on its line.
 
     *used* receives ``(lineno, None)`` for bare ``# nosafe`` hits, or
     ``(lineno, code_or_rule_name)`` for ``# nosafe: <code>`` hits. After
     all rules run, the entries in ``suppressions`` *not* present in
     *used* are the directives that didn't actually silence anything —
     the engine emits SAFE004 (``unused_suppression``) warnings for those.
+
+    This is the single source of truth for inline-directive matching;
+    callers that just need the bool answer can pass a throwaway ``set()``
+    and discard it afterwards.
     """
     if violation.lineno not in suppressions:
         return False
