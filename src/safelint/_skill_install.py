@@ -6,31 +6,32 @@ Cursor ``cursor/safelint.mdc`` rule) ship inside the wheel under
 :func:`importlib.resources.files` and materialises them at the target
 install location.
 
-Two AI clients are supported:
+Two AI clients ship today (Claude Code and Cursor) but the registry
+in ``_CLIENT_SPECS`` is open-ended — adding GitHub Copilot, codex,
+windsurf, antigravity, etc. is a matter of appending one
+:class:`ClientSpec` entry. No control flow needs to know about the
+new client; install / detection / output all read from the spec.
 
-* **Claude Code** (default, ``--client claude``) — installs the
-  full skill bundle (``SKILL.md`` + ``languages/*.md`` + ``README.md``)
-  as a directory at ``~/.claude/skills/safelint/`` (user) or
-  ``<cwd>/.claude/skills/safelint/`` (project, with ``--project``).
-* **Cursor** (``--client cursor``) — installs the single MDC project
-  rule at ``~/.cursor/rules/safelint.mdc`` (user) or
-  ``<cwd>/.cursor/rules/safelint.mdc`` (project). The bundled
-  language addendums stay accessible via ``safelint skill path``;
-  the MDC tells the agent how to find them when needed.
+``safelint skill install`` (no ``--client``) auto-detects which AI
+client(s) are in use:
 
-Two install flavours apply to both clients:
+* If markers for any client(s) exist in the current working
+  directory (e.g. ``CLAUDE.md`` or ``.cursor/``), install each
+  detected client's skill **project-scoped**.
+* Otherwise, if markers exist in the user's home directory
+  (e.g. ``~/.claude/`` or ``~/.cursor/``), install each detected
+  client's skill **user-scoped**.
+* Otherwise, fail with an error listing the explicit ``--client``
+  commands the user can run.
 
-* **Copy** (default) — snapshot the bundled file(s). Stable across
-  ``pip upgrade safelint`` runs; the user re-runs ``skill install``
-  to pick up newer content. Works on every platform, including
-  Windows where symlink creation needs developer-mode or admin.
-* **Symlink** (``--symlink``) — link to the live bundled location.
-  ``pip upgrade safelint`` immediately changes what the agent sees.
-  Useful for skill development; relies on POSIX-style symlinks.
+Pass ``--client <name>`` to skip auto-detection and target a single
+client, or ``--client auto --project`` to auto-detect but force
+project scope (no home fallback).
 """
 
 from __future__ import annotations
 
+from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
 import shutil
@@ -43,14 +44,82 @@ if TYPE_CHECKING:
     from importlib.abc import Traversable
 
 
-_SKILL_DIR_NAME = "safelint"
-_CURSOR_RULE_FILENAME = "safelint.mdc"
+# ---------------------------------------------------------------------------
+# Client registry
+# ---------------------------------------------------------------------------
 
-# Subdirectory under ``skill_files/`` that holds peer-client bundles.
-# Excluded from the Claude install so the copy at ``~/.claude/skills/
-# safelint/`` doesn't carry an irrelevant ``cursor/`` sibling that
-# Claude Code would never read.
+
+@dataclass(frozen=True)
+class ClientSpec:
+    """A single AI client's install profile.
+
+    Adding a new client (Copilot, codex, windsurf, antigravity, …)
+    means appending one :class:`ClientSpec` to ``_CLIENT_SPECS`` —
+    no control-flow changes elsewhere.
+    """
+
+    name: str  # CLI-facing value: ``claude``, ``cursor``
+    display_name: str  # User-facing label: ``Claude Code``, ``Cursor``
+    artefact_label: str  # Output noun: ``skill`` (directory) / ``rule`` (single file)
+    cwd_markers: tuple[str, ...]  # Relative paths under cwd that signal "this client used here"
+    home_markers: tuple[str, ...]  # Relative paths under home that signal "this client installed"
+    install_relpath: tuple[str, ...]  # Path components, relative to scope root (cwd or home)
+    bundled_relpath: tuple[str, ...]  # Path components under skill_files/ (empty = whole tree)
+    restart_hint: str
+    usage_hint: str
+
+
+_CLAUDE_SPEC = ClientSpec(
+    name="claude",
+    display_name="Claude Code",
+    artefact_label="skill",
+    cwd_markers=("CLAUDE.md", ".claude"),
+    home_markers=(".claude",),
+    install_relpath=(".claude", "skills", "safelint"),
+    bundled_relpath=(),  # whole skill_files/ tree (minus peer-client dirs)
+    restart_hint="Restart Claude Code (or open a new session) to pick up the skill.",
+    usage_hint='Then ask Claude Code "run safelint" or "lint with safelint".',
+)
+
+
+_CURSOR_SPEC = ClientSpec(
+    name="cursor",
+    display_name="Cursor",
+    artefact_label="rule",
+    cwd_markers=(".cursor", ".cursorrules"),
+    home_markers=(".cursor",),
+    install_relpath=(".cursor", "rules", "safelint.mdc"),
+    bundled_relpath=("cursor", "safelint.mdc"),
+    restart_hint="Restart Cursor (or reload the window) to pick up the new rule.",
+    usage_hint='Then ask Cursor "run safelint" or "lint with safelint".',
+)
+
+
+# Registry — append to extend. Order matters: detection / multi-install
+# output follows registry order so users see results in a stable sequence.
+_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC)
+
+_CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
+
+# CLI ``--client`` choices for the install subcommand: ``auto`` (default)
+# plus every registered client by name.
+INSTALL_CLIENT_CHOICES: tuple[str, ...] = ("auto", *_CLIENT_NAMES)
+
+# CLI ``--client`` choices for the path subcommand: registered clients
+# only. ``auto`` doesn't apply to ``path`` because the cat-friendly
+# single-line output convention (e.g. ``cat $(safelint skill path)/SKILL.md``)
+# expects exactly one path.
+PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
+
+# Subdirectories under ``skill_files/`` that hold peer-client bundles.
+# Excluded from a Claude install (copy or symlink) so the materialised
+# skill folder doesn't carry irrelevant peer artefacts.
 _PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor"})
+
+
+# ---------------------------------------------------------------------------
+# Bundled-files lookup
+# ---------------------------------------------------------------------------
 
 
 def _bundled_skill_root() -> Traversable:
@@ -73,9 +142,6 @@ def bundled_skill_path() -> Path:
 
     """
     root = _bundled_skill_root()
-    # ``files()`` returns a Traversable; for filesystem-backed installs
-    # we can resolve to a concrete Path. PEP 706 / 711 wheel installs
-    # are filesystem-backed, so this works for ``pip install`` and ``uv``.
     with resources.as_file(root) as path:
         if not path.exists():
             msg = f"bundled skill files not found at {path} — reinstall safelint"
@@ -83,26 +149,158 @@ def bundled_skill_path() -> Path:
         return Path(path)
 
 
-def _bundled_source(client: str) -> Path:
-    """Return the bundled source path for *client*.
+# ---------------------------------------------------------------------------
+# Spec resolution
+# ---------------------------------------------------------------------------
 
-    Claude install copies the whole ``skill_files/`` tree (minus the
-    cursor/ subdirectory). Cursor install copies just the single
+
+def _spec_by_name(name: str) -> ClientSpec:
+    """Return the registered :class:`ClientSpec` whose name is *name*.
+
+    Raises:
+        KeyError: if no client with that name is registered. argparse
+            ``choices=`` should have prevented this; the explicit raise
+            documents the contract for library callers.
+
+    """
+    for spec in _CLIENT_SPECS:
+        if spec.name == name:
+            return spec
+    msg = f"unknown client {name!r}; registered: {', '.join(_CLIENT_NAMES)}"
+    raise KeyError(msg)
+
+
+def _spec_target(spec: ClientSpec, *, project: bool) -> Path:
+    """Return the install target path for *spec* under the chosen scope."""
+    base = Path.cwd() if project else Path.home()
+    return base.joinpath(*spec.install_relpath)
+
+
+def _spec_bundled_source(spec: ClientSpec) -> Path:
+    """Return the bundled source path that gets copied/linked for *spec*.
+
+    For Claude (``bundled_relpath = ()``) this is the whole
+    ``skill_files/`` directory; the install primitives prune
+    :data:`_PEER_CLIENT_DIRS` from it. For Cursor it's the single
     ``cursor/safelint.mdc`` file.
     """
-    root = bundled_skill_path()
-    if client == "cursor":
-        return root / "cursor" / _CURSOR_RULE_FILENAME
-    return root
+    return bundled_skill_path().joinpath(*spec.bundled_relpath)
 
 
-def _resolve_target(*, client: str, project: bool) -> Path:
-    """Return the install target path based on *client* and scope."""
-    if client == "cursor":
-        base = Path.cwd() if project else Path.home()
-        return base / ".cursor" / "rules" / _CURSOR_RULE_FILENAME
-    base = Path.cwd() if project else Path.home()
-    return base / ".claude" / "skills" / _SKILL_DIR_NAME
+# ---------------------------------------------------------------------------
+# Auto-detection
+# ---------------------------------------------------------------------------
+
+
+def _first_existing_marker(directory: Path, markers: tuple[str, ...]) -> str | None:
+    """Return the first entry in *markers* that exists under *directory*, or None."""
+    for m in markers:
+        if (directory / m).exists():
+            return m
+    return None
+
+
+def _detected_clients(directory: Path, marker_attr: str) -> list[tuple[ClientSpec, str]]:
+    """Return [(spec, matched_marker), ...] for each spec with at least one marker under *directory*.
+
+    *marker_attr* is ``"cwd_markers"`` or ``"home_markers"``. The first
+    matching marker per spec is the one we report — sufficient for
+    user-facing detection notices.
+    """
+    detected: list[tuple[ClientSpec, str]] = []
+    for spec in _CLIENT_SPECS:
+        markers: tuple[str, ...] = getattr(spec, marker_attr)
+        marker = _first_existing_marker(directory, markers)
+        if marker is not None:
+            detected.append((spec, marker))
+    return detected
+
+
+def _resolve_install_plan(args: argparse.Namespace) -> tuple[str, list[tuple[ClientSpec, bool]]] | None:
+    """Return ``(notice, [(spec, project_scope), ...])`` or None on auto-detect failure.
+
+    *notice* is a one-line string to print before installing (or "" if
+    no notice is appropriate, e.g. for explicit ``--client``). On
+    auto-detect failure, prints a helpful error to stderr and returns
+    None — the caller maps that to exit code 1.
+    """
+    client = getattr(args, "client", "auto")
+    project_flag = bool(getattr(args, "project", False))
+
+    if client != "auto":
+        return "", [(_spec_by_name(client), project_flag)]
+
+    cwd_specs = _detected_clients(Path.cwd(), "cwd_markers")
+    if cwd_specs:
+        return _format_detection_notice(cwd_specs, "current directory"), [(s, True) for s, _ in cwd_specs]
+
+    if project_flag:
+        # ``--project`` + auto with empty cwd: don't fall back to home —
+        # the user explicitly asked for project scope.
+        _print_no_clients_error(scope_description="current directory (--project specified)")
+        return None
+
+    home_specs = _detected_clients(Path.home(), "home_markers")
+    if home_specs:
+        return _format_detection_notice(home_specs, "home directory"), [(s, False) for s, _ in home_specs]
+
+    _print_no_clients_error(scope_description="current directory or home directory")
+    return None
+
+
+def _format_detection_notice(detected: list[tuple[ClientSpec, str]], where: str) -> str:
+    """Render the one-line "safelint: detected X (marker) in <where>" notice."""
+    parts = [f"{spec.display_name} ({marker})" for spec, marker in detected]
+    clients = parts[0] if len(parts) == 1 else ", ".join(parts[:-1]) + f" and {parts[-1]}"
+    return f"safelint: detected {clients} in {where}"
+
+
+# ---------------------------------------------------------------------------
+# Print helpers — names start with ``_print_`` so SAFE304 (side_effects)
+# auto-exempts them. The actual printing is the whole point of these
+# helpers, not an incidental side effect.
+# ---------------------------------------------------------------------------
+
+
+def _print_detection_notice(notice: str) -> None:
+    """Print a detection notice to stdout (only when non-empty)."""
+    if notice:
+        print(notice)
+
+
+def _print_install_success(spec: ClientSpec, *, target: Path, kind: str, scope: str) -> None:
+    """Print the per-install success block: header, restart hint, usage hint."""
+    print(f"safelint: {spec.display_name} {spec.artefact_label} {kind} to {target} ({scope} scope)")
+    print(f"  → {spec.restart_hint}")
+    print(f"  → {spec.usage_hint}")
+
+
+def _print_target_exists_error(target: Path) -> None:
+    """Print the "target already exists" error to stderr."""
+    print(f"safelint: error: {target} already exists. Use --force to replace it.", file=sys.stderr)
+
+
+def _print_no_clients_error(*, scope_description: str) -> None:
+    """Print the auto-detect-failure error to stderr with explicit ``--client`` examples."""
+    seen_markers = sorted({m for spec in _CLIENT_SPECS for m in (*spec.cwd_markers, *spec.home_markers)})
+    print("safelint: error: could not auto-detect an AI client.", file=sys.stderr)
+    print(f"  Looked for: {', '.join(seen_markers)} in {scope_description}", file=sys.stderr)
+    print("  Specify the client explicitly:", file=sys.stderr)
+    for spec in _CLIENT_SPECS:
+        user_target = Path.home().joinpath(*spec.install_relpath)
+        print(f"    safelint skill install --client {spec.name}            # {spec.display_name} ({user_target})", file=sys.stderr)
+        print(f"    safelint skill install --client {spec.name} --project  # Project-scoped {spec.display_name}", file=sys.stderr)
+    print("  Run `safelint skill install --help` to see all options.", file=sys.stderr)
+
+
+def _print_bundled_path(path: Path) -> None:
+    """Print the bundled-files path to stdout (used by ``safelint skill path``)."""
+    print(path)
+
+
+# ---------------------------------------------------------------------------
+# Install primitives
+# ---------------------------------------------------------------------------
 
 
 def _remove_existing(target: Path) -> None:
@@ -119,21 +317,10 @@ def _remove_existing(target: Path) -> None:
 def _install_symlink(source: Path, target: Path) -> None:
     """Create *target* as a symlink to *source*.
 
-    The single-file source case (Cursor MDC) creates one symlink and
-    is done.
-
-    The directory source case (Claude skill bundle) materialises an
-    empty target directory and symlinks each top-level entry inside,
-    skipping peer-client subdirectories (``cursor/``). Symlinking the
-    *whole* skill_files/ tree would expose ``cursor/`` inside the
-    Claude install — contradicting the same "no peer-client leakage"
-    contract the copy mode honours, and disagreeing with what
-    ``test_install_copy_user_scope`` already asserts. The per-entry
-    layout still gets the developer-loop benefit of symlink mode
-    (``pip upgrade safelint`` immediately reflects content changes
-    inside the linked entries) and only loses the rare case where a
-    new top-level entry is added to skill_files/ — the user re-runs
-    ``safelint skill install --symlink --force`` to pick that up.
+    Single-file source (e.g. Cursor MDC) → one symlink. Directory source
+    (e.g. Claude skill bundle) → per-entry symlinks via
+    :func:`_install_symlink_directory_filtered` so peer-client
+    subdirectories don't leak into the install.
     """
     target.parent.mkdir(parents=True, exist_ok=True)
     if source.is_file():
@@ -143,11 +330,12 @@ def _install_symlink(source: Path, target: Path) -> None:
 
 
 def _install_symlink_directory_filtered(source: Path, target: Path) -> None:
-    """Create *target* as a directory of symlinks to *source*'s entries.
+    """Materialise *target* as a directory and symlink each non-peer entry inside.
 
-    Skips entries matching :data:`_PEER_CLIENT_DIRS`. Each remaining
-    top-level entry becomes its own symlink, so ``pip upgrade safelint``
-    still reflects content changes underneath the linked entries.
+    Skips entries matching :data:`_PEER_CLIENT_DIRS`. ``pip upgrade
+    safelint`` still reflects content changes underneath the linked
+    entries; only newly-added top-level entries require re-running
+    ``safelint skill install --symlink --force``.
     """
     target.mkdir(parents=True, exist_ok=True)
     for entry in source.iterdir():
@@ -160,9 +348,8 @@ def _install_symlink_directory_filtered(source: Path, target: Path) -> None:
 def _install_copy(source: Path, target: Path) -> None:
     """Copy *source* (file or directory tree) to *target*.
 
-    For the Claude directory install, peer-client bundles (the
-    ``cursor/`` subdirectory) are excluded so users don't see an
-    irrelevant ``cursor/`` sibling inside their Claude skill folder.
+    Directory copies exclude :data:`_PEER_CLIENT_DIRS` so a Claude
+    install doesn't carry an irrelevant ``cursor/`` sibling.
     """
     target.parent.mkdir(parents=True, exist_ok=True)
     if source.is_file():
@@ -171,31 +358,19 @@ def _install_copy(source: Path, target: Path) -> None:
     shutil.copytree(source, target, ignore=shutil.ignore_patterns(*_PEER_CLIENT_DIRS))
 
 
-def _restart_hint(client: str) -> str:
-    """Return the per-client restart instruction printed after a successful install."""
-    if client == "cursor":
-        return "Restart Cursor (or reload the window) to pick up the new project rule."
-    return "Restart Claude Code (or open a new session) to pick up the skill."
+# ---------------------------------------------------------------------------
+# Single-install orchestration
+# ---------------------------------------------------------------------------
 
 
-def run_install(args: argparse.Namespace) -> int:
-    """Execute ``safelint skill install`` and return the exit code.
-
-    Returns 0 on success, 1 on a known failure (e.g. target already
-    exists without ``--force``). Unexpected errors (filesystem fault,
-    bundled files missing) propagate.
-    """
-    client = getattr(args, "client", "claude")
-    source = _bundled_source(client)
-    target = _resolve_target(client=client, project=args.project)
+def _install_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) -> int:
+    """Install *spec* at the chosen scope. Returns 0 on success, 1 on a known failure."""
+    source = _spec_bundled_source(spec)
+    target = _spec_target(spec, project=project)
 
     if target.exists() or target.is_symlink():
         if not args.force:
-            # Errors go to stderr so a wrapper script's `safelint skill install
-            # || handle-error` flow can capture stderr without polluting stdout.
-            # The inline suppression on the print line below is the explicit
-            # user-facing-diagnostic exemption from SAFE304.
-            print(f"safelint: error: {target} already exists. Use --force to replace it.", file=sys.stderr)  # nosafe: SAFE304
+            _print_target_exists_error(target)
             return 1
         _remove_existing(target)
 
@@ -206,28 +381,46 @@ def run_install(args: argparse.Namespace) -> int:
         _install_copy(source, target)
         kind = "copied"
 
-    scope = "project" if args.project else "user"
-    # Success notices on stdout — pipe-friendly for scripted installs that
-    # want to log "what got installed where". SAFE304 already fires once
-    # per function on the first I/O call (the stderr print above), so
-    # these stdout prints don't need further suppressions.
-    print(f"safelint: {client} skill {kind} to {target} ({scope} scope)")
-    print(_restart_hint(client))
+    scope = "project" if project else "user"
+    _print_install_success(spec, target=target, kind=kind, scope=scope)
     return 0
+
+
+# ---------------------------------------------------------------------------
+# Public entry points
+# ---------------------------------------------------------------------------
+
+
+def run_install(args: argparse.Namespace) -> int:
+    """Execute ``safelint skill install`` and return the aggregate exit code.
+
+    Returns 0 on success across all installs, 1 if any install hits a
+    known failure (e.g. target already exists without ``--force``) or
+    if auto-detection finds no clients. Unexpected errors propagate.
+    """
+    plan = _resolve_install_plan(args)
+    if plan is None:
+        return 1
+    notice, install_targets = plan
+    _print_detection_notice(notice)
+
+    overall_rc = 0
+    for spec, project in install_targets:
+        rc = _install_one(spec, project=project, args=args)
+        if rc != 0:
+            overall_rc = rc
+    return overall_rc
 
 
 def run_path(args: argparse.Namespace) -> int:
     """Execute ``safelint skill path`` — print the bundled-files location.
 
-    Default prints the skill_files/ root (the Claude bundle); with
-    ``--client cursor`` prints the path to the bundled
-    ``cursor/safelint.mdc``. Useful for debugging install issues or
-    for users who want to inspect bundled content without installing.
+    Default prints the Claude skill bundle root (the cat-friendly
+    single-line form). ``--client cursor`` prints the bundled MDC
+    file path instead. ``auto`` is intentionally not a choice here —
+    a single path is what callers expect from this command.
     """
     client = getattr(args, "client", "claude")
-    # The whole point of this subcommand is to print the path to stdout
-    # so it's pipeable (e.g. ``cat $(safelint skill path)/SKILL.md``).
-    # The inline SAFE304 suppression on the print line is the side-effects
-    # exemption — this is the subcommand's purpose.
-    print(_bundled_source(client))  # nosafe: SAFE304
+    spec = _spec_by_name(client)
+    _print_bundled_path(_spec_bundled_source(spec))
     return 0

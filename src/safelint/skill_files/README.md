@@ -1,8 +1,10 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets AI clients (Claude Code, Cursor) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
+A bundled skill / project-rule that lets AI clients (Claude Code, Cursor; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
 
-Two clients are supported today; both follow the *same* workflow because safelint's CLI surface is the same:
+> **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](../../AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
+
+Two clients ship today; both follow the *same* workflow because safelint's CLI surface is the same:
 
 - **Claude Code** — installs as a directory skill at `~/.claude/skills/safelint/` containing `SKILL.md` + `languages/`.
 - **Cursor** — installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
@@ -19,35 +21,51 @@ Once installed, ask the agent things like:
 ## Install
 
 ```bash
-pip install safelint              # or: uv add safelint
-
-# Claude Code (default)
-safelint skill install            # ~/.claude/skills/safelint/ (user)
-safelint skill install --project  # <cwd>/.claude/skills/safelint/
-
-# Cursor
-safelint skill install --client cursor             # ~/.cursor/rules/safelint.mdc (user)
-safelint skill install --client cursor --project   # <cwd>/.cursor/rules/safelint.mdc
+pip install safelint            # or: uv add safelint
+safelint skill install          # auto-detects which AI client(s) you use
 ```
 
+By default, `safelint skill install` runs in `--client auto` mode:
+
+1. If your current directory has client markers (e.g. `CLAUDE.md`, `.cursor/`), it installs each detected client's skill **project-scoped**.
+2. Otherwise it looks in your home directory and, if found, installs each detected client's skill **user-scoped**.
+3. If nothing is found anywhere, it errors out with the exact `--client` commands you can run instead.
+
 Restart the AI client (or reload its window) to pick up the new skill / rule.
+
+### Manual install
+
+Skip auto-detection:
+
+```bash
+# Claude Code, user-scoped
+safelint skill install --client claude
+safelint skill install --client claude --project    # <cwd>/.claude/skills/safelint/
+
+# Cursor
+safelint skill install --client cursor              # ~/.cursor/rules/safelint.mdc (user)
+safelint skill install --client cursor --project    # <cwd>/.cursor/rules/safelint.mdc
+```
 
 ### Options
 
 | Flag | Effect |
 |---|---|
-| `--client` | Target AI client: `claude` (default — Claude Code skill directory) or `cursor` (single MDC project rule). |
-| `--project` | Install into the current project (`<cwd>/.claude/skills/safelint` or `<cwd>/.cursor/rules/safelint.mdc`) instead of the user-global location. Useful for team-shared overrides committed to the repo. |
+| `--client` | Target AI client: `auto` (default — detect from cwd, then home), `claude`, or `cursor`. New clients added to the registry extend this list automatically. |
+| `--project` | Force project scope (`<cwd>/.<client>/...`). With `--client auto`, restricts detection to cwd and refuses to fall back to home. |
 | `--symlink` | Symlink to the bundled location instead of copying. `pip upgrade safelint` then immediately changes what the AI client sees. Requires symlink support (POSIX, or Windows developer mode). |
 | `--force` | Replace any existing safelint skill / rule at the target. Use this when re-installing after an upgrade. |
 
 ### Examples
 
 ```bash
-# User-global Claude install (most common)
+# Auto-detect — install for every AI client this project / user uses
 safelint skill install
 
-# Cursor install committed into a team project (recommended for Cursor)
+# Auto-detect, but only inside this project (no home fallback)
+safelint skill install --project
+
+# Cursor install committed into a team project
 safelint skill install --client cursor --project
 
 # Re-install after upgrading safelint itself
@@ -86,7 +104,9 @@ The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint 
 
 ## Requirements
 
-- `safelint` 1.8.0 or later on `PATH`. The `safelint skill install` subcommand and bundled skill files arrived in v1.6.0; the `--client cursor` flag for installing into Cursor (and the `safelint skill path --client cursor` form) was added in v1.8.0, so this README's full instructions assume 1.8.0+.
+- `safelint` 1.8.0 or later on `PATH`. Notable history:
+  - `safelint skill install` and the bundled skill files were added in **v1.6.0**.
+  - `--client cursor` (Cursor support) and the auto-detection default for `--client` arrived in **v1.8.0**.
 - A project with at least one source file in a language safelint supports (currently Python).
 
 ## What the skill does
@@ -128,6 +148,7 @@ The skill is just Markdown. Edit `SKILL.md` to tune wording, swap the suggested 
 
 ## See also
 
+- **AI client integrations guide:** [`AI_CLIENTS.md`](../../AI_CLIENTS.md) — the comprehensive user-and-extender doc (auto-detection, per-client setup, troubleshooting, adding a new client)
 - The main safelint docs: [`README.md`](../../README.md), [`CONFIGURATION.md`](../../CONFIGURATION.md)
 - JSON output schema: [`docs/JSON_SCHEMA.md`](../../docs/JSON_SCHEMA.md)
 - Adding a new language to safelint: [`ADDING_A_LANGUAGE.md`](../../ADDING_A_LANGUAGE.md)

@@ -281,7 +281,9 @@ def test_install_cursor_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_pat
     assert head.startswith("---\n")
     assert "description:" in head
     out = capsys.readouterr().out
-    assert "cursor skill" in out
+    # Output uses the per-client display_name + artefact_label
+    # (``Cursor rule`` for the .mdc, distinct from ``Claude Code skill``).
+    assert "Cursor rule" in out
     assert "copied" in out
     assert "user scope" in out
     # Claude skill location must NOT be touched when --client cursor.
@@ -365,15 +367,22 @@ def test_cli_routes_skill_install_with_cursor_client(monkeypatch: pytest.MonkeyP
     assert args.project is True
 
 
-def test_cli_routes_skill_install_default_client_is_claude(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
-    """``safelint skill install`` (no --client) defaults client to ``claude``."""
+def test_cli_routes_skill_install_default_client_is_auto(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill install`` (no --client) defaults client to ``auto``.
+
+    The auto default replaced the prior ``claude`` default so a fresh
+    ``safelint skill install`` detects whichever AI client(s) the
+    current project / user is using and installs each one's skill.
+    Explicit ``--client claude`` still works for users who want the
+    pre-auto-default behaviour.
+    """
     monkeypatch.setattr("sys.argv", ["safelint", "skill", "install"])
     spy = mocker.patch.object(_skill_install, "run_install", return_value=0)
     with pytest.raises(SystemExit) as exc:
         cli.main()
     assert exc.value.code == 0
     args = spy.call_args.args[0]
-    assert args.client == "claude"
+    assert args.client == "auto"
 
 
 def test_cli_skill_install_rejects_unknown_client(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
@@ -385,6 +394,227 @@ def test_cli_skill_install_rejects_unknown_client(monkeypatch: pytest.MonkeyPatc
     err = capsys.readouterr().err
     assert "client" in err
     assert "cline" in err
+
+
+# ---------------------------------------------------------------------------
+# --client auto: detection-driven install
+# ---------------------------------------------------------------------------
+
+
+def test_install_auto_detects_claude_in_cwd_via_claude_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client auto`` with ``CLAUDE.md`` in cwd installs Claude project-scoped."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / "CLAUDE.md").write_text("# project guide", encoding="utf-8")
+
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    # Project-scoped install (cwd-detected → cwd-scoped).
+    assert (cwd / ".claude" / "skills" / "safelint" / "SKILL.md").is_file()
+    # User-global location was NOT touched.
+    assert not (home / ".claude").exists()
+    out = capsys.readouterr().out
+    assert "detected Claude Code (CLAUDE.md) in current directory" in out
+    assert "Claude Code skill copied" in out
+    assert "(project scope)" in out
+
+
+def test_install_auto_detects_claude_in_cwd_via_dot_claude_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client auto`` with ``.claude/`` in cwd also triggers Claude project-scoped install."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".claude").mkdir()  # marker without CLAUDE.md
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".claude" / "skills" / "safelint" / "SKILL.md").is_file()
+    assert not (home / ".claude").exists()
+
+
+def test_install_auto_detects_cursor_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client auto`` with ``.cursor/`` in cwd installs Cursor project-scoped."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".cursor").mkdir()
+
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".cursor" / "rules" / "safelint.mdc").is_file()
+    assert not (home / ".cursor").exists()
+    out = capsys.readouterr().out
+    assert "detected Cursor (.cursor) in current directory" in out
+    assert "Cursor rule copied" in out
+
+
+def test_install_auto_detects_both_clients_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client auto`` with both markers in cwd installs both, in registry order."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / "CLAUDE.md").write_text("guide", encoding="utf-8")
+    (cwd / ".cursor").mkdir()
+
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    # Both installed, both project-scoped.
+    assert (cwd / ".claude" / "skills" / "safelint" / "SKILL.md").is_file()
+    assert (cwd / ".cursor" / "rules" / "safelint.mdc").is_file()
+    # User-global locations were NOT touched.
+    assert not (home / ".claude").exists()
+    assert not (home / ".cursor").exists()
+    out = capsys.readouterr().out
+    # Detection notice mentions both.
+    assert "Claude Code (CLAUDE.md) and Cursor (.cursor) in current directory" in out
+    # Registry order: claude appears before cursor in the success messages.
+    claude_pos = out.index("Claude Code skill copied")
+    cursor_pos = out.index("Cursor rule copied")
+    assert claude_pos < cursor_pos
+
+
+def test_install_auto_falls_back_to_home_when_cwd_empty(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client auto`` with empty cwd but Claude marker in home installs user-scoped."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # cwd has nothing; home has the .claude marker (e.g. user already
+    # has Claude Code installed globally).
+    (home / ".claude").mkdir()
+
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    # User-scoped install (home-detected → home-scoped).
+    assert (home / ".claude" / "skills" / "safelint" / "SKILL.md").is_file()
+    # Project location was NOT touched.
+    assert not (cwd / ".claude").exists()
+    out = capsys.readouterr().out
+    assert "in home directory" in out
+    assert "(user scope)" in out
+
+
+def test_install_auto_home_fallback_picks_cursor_when_only_cursor_present(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Home fallback works for Cursor too — ``~/.cursor/`` triggers a user-scoped Cursor install."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (home / ".cursor").mkdir()
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (home / ".cursor" / "rules" / "safelint.mdc").is_file()
+    assert not (cwd / ".cursor").exists()
+
+
+def test_install_auto_errors_when_no_clients_detected_anywhere(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client auto`` with empty cwd and empty home prints a helpful error."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 1
+    err = capsys.readouterr().err
+    # Diagnostic + the exact commands the user can run instead.
+    assert "could not auto-detect an AI client" in err
+    assert "--client claude" in err
+    assert "--client cursor" in err
+    assert "current directory or home directory" in err
+    # Nothing was installed.
+    assert not (cwd / ".claude").exists()
+    assert not (home / ".claude").exists()
+
+
+def test_install_auto_with_project_flag_does_not_fall_back_to_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client auto --project`` only inspects cwd — refuses the home fallback.
+
+    The ``--project`` flag is the user telling us "I want project
+    scope, period". If cwd has no markers, error out rather than
+    surprising the user with a user-scope install they didn't ask for.
+    """
+    home, _cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Home HAS a Claude marker, so without --project this would
+    # install at user scope. With --project, we must not fall back.
+    (home / ".claude").mkdir()
+
+    rc = _skill_install.run_install(_make_args(client="auto", project=True))
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "could not auto-detect an AI client" in err
+    assert "current directory (--project specified)" in err
+    # Crucially: home install was NOT triggered.
+    assert not (home / ".claude" / "skills" / "safelint").exists()
+
+
+def test_install_auto_with_project_flag_installs_when_cwd_has_markers(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client auto --project`` happily proceeds when cwd has markers."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".cursor").mkdir()
+
+    rc = _skill_install.run_install(_make_args(client="auto", project=True))
+    assert rc == 0
+    assert (cwd / ".cursor" / "rules" / "safelint.mdc").is_file()
+    assert not (home / ".cursor").exists()
+
+
+def test_install_auto_explicit_client_skips_detection(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Explicit ``--client claude`` ignores cwd markers (no detection notice)."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".cursor").mkdir()  # Cursor marker present, but user said claude.
+
+    rc = _skill_install.run_install(_make_args(client="claude"))
+    assert rc == 0
+    # Claude installed at user scope (no --project), not at cwd, even
+    # though cwd has a Cursor marker — explicit beats auto.
+    assert (home / ".claude" / "skills" / "safelint" / "SKILL.md").is_file()
+    assert not (cwd / ".cursor" / "rules" / "safelint.mdc").exists()
+    out = capsys.readouterr().out
+    # No "detected ... in current directory" notice — that's
+    # auto-mode-only output.
+    assert "detected" not in out
+
+
+def test_install_auto_via_cli_routes_with_default(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """End-to-end: bare ``safelint skill install`` (no --client) goes through auto detection.
+
+    Uses the real CLI parser (not a mocked Namespace) to verify the
+    argparse default of ``auto`` makes it through to ``run_install``.
+    """
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / "CLAUDE.md").write_text("guide", encoding="utf-8")
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install"])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    # Auto detected Claude in cwd → project-scoped install.
+    assert (cwd / ".claude" / "skills" / "safelint" / "SKILL.md").is_file()
+    assert not (home / ".claude").exists()
+
+
+def test_install_auto_does_not_emit_detection_notice_for_explicit_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Even when the explicit-client target happens to be installed, no detection notice fires."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="cursor"))
+    assert rc == 0
+    out = capsys.readouterr().out
+    # The detection notice ("safelint: detected ...") is auto-mode only.
+    assert "detected" not in out
+
+
+# ---------------------------------------------------------------------------
+# Registry / scalability
+# ---------------------------------------------------------------------------
+
+
+def test_client_registry_choices_derive_from_specs() -> None:
+    """``INSTALL_CLIENT_CHOICES`` and ``PATH_CLIENT_CHOICES`` mirror the registry.
+
+    Adding a new ``ClientSpec`` to ``_CLIENT_SPECS`` should automatically
+    extend both choice tuples. Locks that contract in so a future
+    addition can't accidentally land without surfacing in the CLI.
+    """
+    spec_names = tuple(spec.name for spec in _skill_install._CLIENT_SPECS)
+    # Install accepts ``auto`` plus every registered client.
+    assert ("auto", *spec_names) == _skill_install.INSTALL_CLIENT_CHOICES
+    # Path accepts every registered client (no auto — single-path
+    # convention, see the ``run_path`` docstring).
+    assert spec_names == _skill_install.PATH_CLIENT_CHOICES
+
+
+def test_cli_skill_install_rejects_auto_when_args_lack_default(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
+    """An unknown client name still fails loudly under the new auto default."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "windsurf"])
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    # argparse rejects on choices=.
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert "windsurf" in err
 
 
 def test_cli_skill_rejects_unknown_flag_before_subcommand(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
