@@ -107,7 +107,7 @@ classes = []
 constants = []
 extra-standard-library = []
 force-to-top = []
-known-third-party = ["fastapi", "pydantic", "starlette"]
+known-first-party = ["safelint"]
 
 [lint.pycodestyle]
 max-doc-length = 200
