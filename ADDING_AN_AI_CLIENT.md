@@ -78,6 +78,7 @@ Field reference:
 | `bundled_relpath` | Where the source artefact lives under `skill_files/`. Tuple of path components. Use `()` (empty tuple) for the whole `skill_files/` root (Claude pattern). |
 | `restart_hint` | Printed after a successful install — tells the user how to make the AI client pick up the new artefact. |
 | `usage_hint` | Printed after `restart_hint` — tells the user what to say to the agent next. |
+| `documentation_relpaths` | Tuple of relpaths under `skill_files/` whose combined text *must* mention every rule code/name in `ALL_RULES` and every extension in `supported_extensions()`. Drift-detection tests parametrised over `_CLIENT_SPECS` enforce this — a new rule or language without corresponding bundled-doc updates fails CI. For a single-file client this is `((bundled_relpath,))`; for a directory-tree client it usually points at `(("SKILL.md",),)`. |
 
 ### 4. (Optional) Update peer-client exclusion
 
@@ -109,7 +110,14 @@ Without this, the file won't be included in the wheel — `safelint skill instal
 
 ### 6. Add tests
 
-In `tests/test_skill_install.py`, mirror the structure of the Cursor tests:
+The drift-detection tests in `tests/test_skill_install.py` are parametrised over `_CLIENT_SPECS`, so the moment your spec lands the test runner generates two new test instances for it:
+
+* `test_skill_documents_every_active_rule[<your-name>]` — fails until your bundled docs mention every code + name in `ALL_RULES`.
+* `test_skill_documents_every_supported_extension[<your-name>]` — fails until your docs mention every extension in `supported_extensions()`.
+
+Run them targeted while iterating: `uv run pytest -k "<your-name>"`. No per-client test boilerplate to write.
+
+For client-specific install behaviour, mirror the structure of the Cursor tests:
 
 ```python
 def test_bundled_windsurf_artefact_exists_in_wheel() -> None:

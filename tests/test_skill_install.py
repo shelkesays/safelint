@@ -669,3 +669,72 @@ def test_cli_skill_rejects_unknown_flag_before_subcommand(monkeypatch: pytest.Mo
     assert exc.value.code == 2
     err = capsys.readouterr().err
     assert "formta" in err or "unrecognized" in err.lower()
+
+
+# ---------------------------------------------------------------------------
+# Documentation drift detection — every registered AI client's bundled
+# skill must mention every rule and every supported language. Parametrised
+# over ``_CLIENT_SPECS`` so adding a new client (Copilot, codex, windsurf,
+# antigravity, …) automatically inherits these checks.
+#
+# The tests scan the union of each spec's ``documentation_relpaths`` files
+# for membership tokens. They don't enforce a specific format — only that
+# the code / name / extension appears somewhere — so a contributor who
+# adds a new rule has flexibility about *where* in the doc to put it,
+# without skipping it entirely.
+# ---------------------------------------------------------------------------
+
+
+def _read_skill_docs(spec: _skill_install.ClientSpec) -> str:
+    """Concatenate every bundled doc file declared on *spec*.
+
+    Each spec lists the relpaths under ``skill_files/`` whose combined
+    text *must* mention every rule and every supported extension —
+    that's the drift contract enforced by the tests below.
+    """
+    root = _skill_install.bundled_skill_path()
+    parts = [root.joinpath(*relpath).read_text(encoding="utf-8") for relpath in spec.documentation_relpaths]
+    return "\n".join(parts)
+
+
+@pytest.mark.parametrize("spec", _skill_install._CLIENT_SPECS, ids=lambda s: s.name)
+def test_skill_documents_every_active_rule(spec: _skill_install.ClientSpec) -> None:
+    """Every code AND name in ``ALL_RULES`` appears in the bundled documentation.
+
+    Drift safety net: when someone adds a new rule, they must update
+    each registered AI client's bundled docs. Because the test is
+    parametrised over ``_CLIENT_SPECS``, adding a new client to the
+    registry automatically inherits this contract — no per-client
+    test boilerplate.
+
+    Engine-internal codes (``SAFE000`` parse, ``SAFE004``
+    unused_suppression) are deliberately excluded because they live
+    outside ``ALL_RULES`` — they're emitted by the engine directly,
+    not registered as ``BaseRule`` subclasses.
+    """
+    from safelint.rules import ALL_RULES  # noqa: PLC0415 — local to keep test imports tight
+
+    text = _read_skill_docs(spec)
+    missing_codes = [cls.code for cls in ALL_RULES if cls.code not in text]
+    missing_names = [cls.name for cls in ALL_RULES if cls.name not in text]
+    assert not missing_codes, f"{spec.name}: rule codes missing from skill docs ({spec.documentation_relpaths}): {missing_codes}"
+    assert not missing_names, f"{spec.name}: rule names missing from skill docs ({spec.documentation_relpaths}): {missing_names}"
+
+
+@pytest.mark.parametrize("spec", _skill_install._CLIENT_SPECS, ids=lambda s: s.name)
+def test_skill_documents_every_supported_extension(spec: _skill_install.ClientSpec) -> None:
+    """Every extension from ``supported_extensions()`` appears in the bundled documentation.
+
+    Adding a new language to ``safelint.languages._REGISTRY`` (e.g.
+    TypeScript via ``.ts`` / ``.tsx``) requires updating the language
+    registry table inside each registered AI client's skill so the
+    agent knows which files safelint can lint. This test fails the
+    moment the registry adds an extension that the bundled docs don't
+    mention. New clients added to ``_CLIENT_SPECS`` inherit the
+    constraint automatically.
+    """
+    from safelint.languages import supported_extensions  # noqa: PLC0415
+
+    text = _read_skill_docs(spec)
+    missing = sorted(ext for ext in supported_extensions() if ext not in text)
+    assert not missing, f"{spec.name}: supported extensions missing from skill docs ({spec.documentation_relpaths}): {missing}"

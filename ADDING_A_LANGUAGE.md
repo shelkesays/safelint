@@ -5,6 +5,9 @@ This guide is the cheat sheet for adding support for a new programming language 
 > [!NOTE]
 > Today only Python is registered. The plumbing exists for additional languages but each one needs (a) a Tree-sitter grammar binding, (b) a per-language module exposing node-type constants, and (c) a per-rule audit to check which rules are language-portable vs. Python-specific.
 
+> [!IMPORTANT]
+> Adding a new language also requires updating the bundled AI-client skills (`SKILL.md` and `cursor/safelint.mdc`) to list the new language and its file extensions in their **Step 2** registry tables. The drift-detection test `test_skill_documents_every_supported_extension` fails the moment a new extension lands in `supported_extensions()` without the corresponding bundled-doc update — and the test is parametrised over every registered AI client, so you only need to make the additions once per skill file.
+
 ## The architecture, in five sentences
 
 1. `safelint.languages.LanguageDefinition` is a frozen dataclass holding everything the engine needs about a language: file extensions, parser factory, comment node type, comment prefix.
