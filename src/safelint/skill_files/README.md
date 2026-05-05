@@ -102,7 +102,7 @@ Pipe-friendly idiom for CI / upgrade scripts:
 safelint skill status || safelint skill install --force
 ```
 
-`safelint skill status` is silent on a clean run (exit 0). When something drifts it prints which install location differs and points at `safelint skill install --force`. If you've customised your skill on purpose, ignore the diff — the diagnostic explicitly mentions that case.
+`safelint skill status` exits 0 on a clean run and still prints output: one `safelint: <client> <artefact> at <path> (<scope> scope) — fresh` line per detected install plus a final `all detected installs match the bundled version` summary. When something drifts it prints `differs from bundled` for the affected install and a per-install scope-aware refresh command (e.g. `safelint skill install --client cursor --force --project`); the per-installation hint matters because bare `safelint skill install --force` only refreshes the cwd's auto-detected scope. If you've customised your skill on purpose, ignore the diff — the diagnostic explicitly mentions that case.
 
 ## Layout
 

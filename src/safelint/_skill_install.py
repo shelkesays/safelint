@@ -516,17 +516,34 @@ def _install_status(spec: ClientSpec, *, project: bool) -> str:
     install), or (b) the target is a real directory whose top-level
     entries are all working symlinks (Claude's per-entry install via
     :func:`_install_symlink_directory_filtered`). **Broken** symlinks
-    don't qualify — a dangling install is unusable, not "current".
+    don't qualify — a dangling install is unusable, not "current", and
+    is reported as DIFFERS rather than MISSING so the status command
+    surfaces it (MISSING is silently skipped). The single-file shape
+    short-circuits to that handling explicitly; broken inner symlinks
+    in the directory shape fall through to tree-hash comparison and
+    naturally diverge from the bundle, also producing DIFFERS.
 
     For copy installs (the default), the bundled artefact and the
     on-disk install are content-hashed and compared.
     """
     target = _spec_target(spec, project=project)
-    if (target.is_symlink() and target.exists()) or _is_symlink_managed_directory(target):
+    if target.is_symlink():
+        return INSTALL_STATUS_FRESH if target.exists() else INSTALL_STATUS_DIFFERS
+    if _is_symlink_managed_directory(target):
         return INSTALL_STATUS_FRESH
     if not target.exists():
         return INSTALL_STATUS_MISSING
-    source = _spec_bundled_source(spec)
+    return _content_status(_spec_bundled_source(spec), target)
+
+
+def _content_status(source: Path, target: Path) -> str:
+    """Compare *source* and *target* by content; return FRESH or DIFFERS.
+
+    Helper for :func:`_install_status`. Single-file sources are SHA-256
+    compared; directory sources go through :func:`_tree_hash`. Caller
+    has already confirmed *target* exists; this routine just verifies
+    the shape matches and the bytes line up.
+    """
     if source.is_file():
         if not target.is_file():
             return INSTALL_STATUS_DIFFERS
@@ -536,14 +553,36 @@ def _install_status(spec: ClientSpec, *, project: bool) -> str:
     return INSTALL_STATUS_FRESH if _tree_hash(source) == _tree_hash(target) else INSTALL_STATUS_DIFFERS
 
 
+def _refresh_command_for(spec: ClientSpec, *, project: bool) -> str:
+    """Return the exact ``safelint skill install`` invocation that refreshes *spec* at *scope*.
+
+    Auto-detect (``safelint skill install --force`` with no ``--client``)
+    only refreshes the install corresponding to the cwd's auto-detected
+    scope, so suggesting it for a multi-scope or non-detected drift
+    leaves other stale installs untouched. The explicit form below
+    pins both the client and the scope, regardless of cwd context:
+
+    * project scope → ``safelint skill install --client <name> --force --project``
+    * user scope    → ``safelint skill install --client <name> --force``
+
+    Used both in the per-install line printed by ``run_status`` and in
+    the per-warning string returned by :func:`stale_install_warnings`,
+    so the remediation text is always actionable for the specific
+    install that drifted.
+    """
+    base = f"safelint skill install --client {spec.name} --force"
+    return f"{base} --project" if project else base
+
+
 def _print_status_fresh(spec: ClientSpec, target: Path, scope: str) -> None:
     """Print a single "fresh" line to stdout."""
     print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) — fresh")
 
 
-def _print_status_differs(spec: ClientSpec, target: Path, scope: str) -> None:
-    """Print a single "differs" line to stdout."""
+def _print_status_differs(spec: ClientSpec, target: Path, scope: str, refresh_cmd: str) -> None:
+    """Print a single "differs" line plus its scope-specific refresh hint."""
     print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) — differs from bundled")
+    print(f"  Refresh: {refresh_cmd}")
 
 
 def _print_status_summary(*, any_drift: bool, any_install: bool) -> None:
@@ -553,8 +592,8 @@ def _print_status_summary(*, any_drift: bool, any_install: bool) -> None:
         return
     if any_drift:
         print("safelint: one or more installs differ from the bundled version.")
-        print("  Run `safelint skill install --force` to refresh.")
-        print("  (If you've customised the file deliberately, ignore this.)")
+        print("  Run the per-install refresh command above for each affected location.")
+        print("  (If you've customised the file deliberately, ignore the diff.)")
         return
     print("safelint: all detected installs match the bundled version.")
 
@@ -580,7 +619,7 @@ def run_status(_args: argparse.Namespace) -> int:
         scope = "project" if project else "user"
         if status == INSTALL_STATUS_DIFFERS:
             any_drift = True
-            _print_status_differs(spec, target, scope)
+            _print_status_differs(spec, target, scope, _refresh_command_for(spec, project=project))
         else:
             _print_status_fresh(spec, target, scope)
     _print_status_summary(any_drift=any_drift, any_install=any_install)
@@ -614,7 +653,6 @@ def stale_install_warnings() -> list[str]:
             continue
         target = _spec_target(spec, project=project)
         scope = "project" if project else "user"
-        warnings.append(
-            f"{spec.display_name} {spec.artefact_label} at {target} ({scope} scope) differs from bundled — run `safelint skill install --force` to refresh (or ignore if you've customised it)"
-        )
+        refresh_cmd = _refresh_command_for(spec, project=project)
+        warnings.append(f"{spec.display_name} {spec.artefact_label} at {target} ({scope} scope) differs from bundled — run `{refresh_cmd}` to refresh (or ignore if you've customised it)")
     return warnings

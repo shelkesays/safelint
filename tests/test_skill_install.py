@@ -827,8 +827,10 @@ def test_install_status_broken_symlink_is_not_fresh(monkeypatch: pytest.MonkeyPa
     assert not target.exists()  # broken symlink
 
     status = _skill_install._install_status(_skill_install._CURSOR_SPEC, project=False)
-    # FRESH would mean "installed and current". A dangling install is neither.
-    assert status != _skill_install.INSTALL_STATUS_FRESH
+    # A dangling install is neither installed nor current — it must be
+    # surfaced as DIFFERS, not silently classified as MISSING (which
+    # ``run_status`` and ``stale_install_warnings`` would skip).
+    assert status == _skill_install.INSTALL_STATUS_DIFFERS
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
@@ -851,7 +853,82 @@ def test_install_status_claude_symlink_with_broken_inner_link_is_not_fresh(monke
     assert not skill_md_link.exists()  # broken
 
     status = _skill_install._install_status(_skill_install._CLAUDE_SPEC, project=False)
-    assert status != _skill_install.INSTALL_STATUS_FRESH
+    # ``_is_symlink_managed_directory`` rejects the install (broken
+    # inner symlink fails the working-symlink check), so we fall
+    # through to tree-hash. The broken symlink doesn't contribute to
+    # the install hash, so it diverges from the bundle → DIFFERS.
+    assert status == _skill_install.INSTALL_STATUS_DIFFERS
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_run_status_surfaces_broken_symlink_install_with_exit_one(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill status`` must surface (not silently skip) a broken symlink install.
+
+    A dangling symlink would previously classify as MISSING — and
+    ``run_status`` skips MISSING locations — leaving a broken install
+    unreported and exit 0. Locks the contract that broken symlinks
+    propagate as DIFFERS through to the user-facing exit code and
+    output.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    target = home / ".cursor" / "rules" / "safelint.mdc"
+    target.parent.mkdir(parents=True)
+    target.symlink_to(tmp_path / "vanished.mdc")
+    assert target.is_symlink()
+    assert not target.exists()
+
+    rc = _skill_install.run_status(argparse.Namespace())
+    assert rc == 1
+    out = capsys.readouterr().out
+    assert "differs from bundled" in out
+    # Path appears in the output so the user can fix it.
+    assert str(target) in out
+
+
+def test_run_status_emits_scope_aware_refresh_hint_per_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Per-install lines carry the precise ``--client X --force [--project]`` command for that scope.
+
+    The previous blanket ``Run safelint skill install --force`` hint
+    was wrong for multi-scope drift: bare ``--force`` only refreshes
+    the auto-detected scope, so a stale user-scope install would keep
+    failing after the user runs the suggested command on the
+    project-scope install. Each detected drift now gets its own
+    explicit command.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Plant a stale Cursor user-scoped install.
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    (home / ".cursor" / "rules" / "safelint.mdc").write_text("# customised\n", encoding="utf-8")
+    capsys.readouterr()
+
+    rc = _skill_install.run_status(argparse.Namespace())
+    assert rc == 1
+    out = capsys.readouterr().out
+    # The exact refresh command — explicit client, explicit scope (no --project for user).
+    assert "Refresh: safelint skill install --client cursor --force" in out
+
+
+def test_stale_install_warnings_carry_scope_aware_refresh_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``stale_install_warnings`` returns the per-scope refresh command, not the bare ``--force``.
+
+    Same correctness concern as ``run_status``: the warning text is
+    consumed verbatim by ``--check-skill-freshness``; if it suggested
+    bare ``--force``, the user would mis-refresh their other scope.
+    """
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Plant TWO stale installs, one user-scoped and one project-scoped.
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    assert _skill_install.run_install(_make_args(client="cursor", project=True)) == 0
+    (home / ".cursor" / "rules" / "safelint.mdc").write_text("# user customised\n", encoding="utf-8")
+    (cwd / ".cursor" / "rules" / "safelint.mdc").write_text("# project customised\n", encoding="utf-8")
+
+    warnings = _skill_install.stale_install_warnings()
+    assert len(warnings) == 2
+    # Each warning lists its own scope-specific refresh command.
+    user_warning = next(w for w in warnings if "user scope" in w)
+    project_warning = next(w for w in warnings if "project scope" in w)
+    assert "safelint skill install --client cursor --force`" in user_warning  # no --project
+    assert "safelint skill install --client cursor --force --project`" in project_warning
 
 
 def test_drift_token_match_rejects_substring_false_positives() -> None:
@@ -917,7 +994,9 @@ def test_run_status_returns_one_when_install_differs(monkeypatch: pytest.MonkeyP
     assert rc == 1
     out = capsys.readouterr().out
     assert "differs from bundled" in out
-    assert "safelint skill install --force" in out
+    # Scope-aware refresh command — the per-install hint includes
+    # ``--client cursor`` so the user refreshes the right scope.
+    assert "safelint skill install --client cursor --force" in out
 
 
 def test_cli_routes_skill_status(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
@@ -1000,7 +1079,10 @@ def test_stale_install_warnings_returns_one_per_stale_install(monkeypatch: pytes
     assert len(warnings) == 1
     assert "Cursor rule" in warnings[0]
     assert "differs from bundled" in warnings[0]
-    assert "safelint skill install --force" in warnings[0]
+    # Scope-aware refresh command — see the dedicated regression
+    # ``test_stale_install_warnings_carry_scope_aware_refresh_command``
+    # for the user-vs-project differentiation.
+    assert "safelint skill install --client cursor --force" in warnings[0]
 
 
 def test_stale_install_warnings_empty_when_all_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
