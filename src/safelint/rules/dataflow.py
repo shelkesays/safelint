@@ -132,7 +132,18 @@ class TaintedSinkRule(BaseRule):
         # at every unknown call, which can reduce false positives but
         # generates false negatives in codebases with many wrapper functions.
         # See CONFIGURATION.md for guidance.
-        assume_taint_preserving = bool(self.config.get("assume_taint_preserving", True))
+        #
+        # Strict isinstance check (not ``bool(...)``): the latter would
+        # treat a TOML typo like ``assume_taint_preserving = "false"``
+        # (string instead of bool) as truthy and silently flip the rule
+        # into the opposite mode the user wanted. Match the validation
+        # style used for other config footguns (tracked_functions /
+        # cleanup_patterns / extend_ignore) and surface the typo as a
+        # clear TypeError when the rule first runs against a file.
+        assume_taint_preserving = self.config.get("assume_taint_preserving", True)
+        if not isinstance(assume_taint_preserving, bool):
+            msg = f"tainted_sink.assume_taint_preserving must be a bool, got {type(assume_taint_preserving).__name__}"
+            raise TypeError(msg)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
