@@ -198,72 +198,17 @@ safelint skill path --client cursor  # Cursor MDC file path
 
 Useful for `cat $(safelint skill path)/SKILL.md` to see what the agent is reading.
 
-## Adding a new AI client (developer guide)
+## Adding a new AI client
 
-The supported-clients list is a tuple of `ClientSpec` entries in `src/safelint/_skill_install.py`. Adding a new client is a four-step change:
+The supported-clients list is a tuple of `ClientSpec` entries in `src/safelint/_skill_install.py`. Adding a client is a one-spec change plus a bundled artefact and tests — full step-by-step walkthrough (with a worked example, field reference, marker-choosing guidance, test checklist, and submission protocol) lives in **[`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md)**.
 
-### 1. Define the bundled artefact(s)
+In short:
 
-Decide what the new client reads. Two shapes are supported today:
-
-- **Single file** (like Cursor's `.mdc`) — bundle one file under `src/safelint/skill_files/<client>/<filename>`.
-- **Directory tree** (like Claude's skill folder) — bundle a directory under `src/safelint/skill_files/`.
-
-Adapt the existing SKILL.md content into the new client's native format — the workflow is the same; only frontmatter / file shape differs. Keep language addendums (`languages/python.md`, etc.) shared rather than duplicated when the client doesn't need its own copy.
-
-### 2. Append a `ClientSpec` to the registry
-
-Add an entry to `_CLIENT_SPECS` in `_skill_install.py`:
-
-```python
-_COPILOTX_SPEC = ClientSpec(
-    name="copilotx",                # CLI value: --client copilotx
-    display_name="GitHub Copilot",   # User-facing label in messages
-    artefact_label="instructions",   # Output noun (e.g. "skill", "rule", "instructions")
-    cwd_markers=(".github/copilot-instructions.md",),  # rel paths in cwd that signal "this client is used here"
-    home_markers=(".config/copilot",),                 # rel paths in home that signal "this client is installed"
-    install_relpath=(".github", "copilot-instructions.md"),  # path components from scope root
-    bundled_relpath=("copilotx", "instructions.md"),         # path components under skill_files/
-    restart_hint="Reload your editor to pick up the new instructions.",
-    usage_hint='Then ask Copilot "run safelint" or "lint with safelint".',
-)
-
-_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOTX_SPEC)
-```
-
-The CLI's `--client` choices are derived from this tuple, so `INSTALL_CLIENT_CHOICES` and `PATH_CLIENT_CHOICES` extend automatically. No control flow elsewhere needs to know about the new client — install / detection / output all read from the spec.
-
-### 3. (Optional) Update peer-client exclusion
-
-If the new client's bundle lives under `skill_files/<client>/` and it's a per-client peer (i.e. not part of the Claude skill bundle), add its directory name to `_PEER_CLIENT_DIRS` so it's excluded from the Claude directory-tree install:
-
-```python
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilotx"})
-```
-
-### 4. Add tests
-
-In `tests/test_skill_install.py`:
-
-- Bundled-file existence test (`test_bundled_<client>_artefact_exists_in_wheel`).
-- Copy install at user / project scope.
-- Symlink install (skip on Windows).
-- `--force` replace existing.
-- CLI routing through `cli.main` with `--client <new>`.
-- Auto-detection for the new client's marker files.
-
-The existing Cursor tests are a good template.
-
-### File extensions to wire up
-
-If the new client needs a marker file extension that `pyproject.toml` doesn't already package, extend the `package-data` glob:
-
-```toml
-[tool.setuptools.package-data]
-safelint = ["py.typed", "skill_files/**/*.md", "skill_files/**/*.mdc", "skill_files/**/*.txt"]
-```
-
-The bundled-source resolver (`_spec_bundled_source`) reads the file via `importlib.resources`, so any extension is fine — it just needs to be in the wheel.
+1. Bundle the artefact under `src/safelint/skill_files/<client>/`.
+2. Append a `ClientSpec` to `_CLIENT_SPECS` (CLI choices auto-derive from the registry).
+3. Update `_PEER_CLIENT_DIRS` if the bundle is a peer of the Claude tree.
+4. Add tests mirroring the Cursor / Claude patterns.
+5. Update [`AI_CLIENTS.md`](AI_CLIENTS.md) (this file) and [`CHANGELOG.md`](CHANGELOG.md).
 
 ## Roadmap
 
@@ -278,8 +223,9 @@ If you'd find one of these useful, file a feature request with the marker conven
 
 ## See also
 
+- [`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md) — contributor guide for adding a new AI client to the registry
 - [`README.md`](README.md) — overall safelint documentation
 - [`CONFIGURATION.md`](CONFIGURATION.md) — `safelint check` flags and config-file format
 - [`docs/JSON_SCHEMA.md`](docs/JSON_SCHEMA.md) — the JSON output schema both bundled skills tell the agent to parse
 - [`src/safelint/skill_files/README.md`](src/safelint/skill_files/README.md) — the README that ships *inside* the wheel (shorter, install-focused reference)
-- [`ADDING_A_LANGUAGE.md`](ADDING_A_LANGUAGE.md) — adding a new language to safelint itself (not an AI client)
+- [`ADDING_A_LANGUAGE.md`](ADDING_A_LANGUAGE.md) — adding a new language to safelint itself (a different kind of extension)

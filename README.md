@@ -255,7 +255,7 @@ The bare command is `--client auto` under the hood: it scans the current directo
 
 After restarting the AI client (or reloading its window), ask things like *"run safelint"*, *"lint my changes with safelint"*, or *"do a Power-of-Ten review on src/api/auth.py"*. The skill / rule invokes safelint with structured output, groups violations by file, and offers to walk through fixes.
 
-For explicit control (`--client claude` / `--client cursor`), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, troubleshooting, and adding a new client (the registry is open-ended — GitHub Copilot, codex, windsurf, etc. are all candidates), see the comprehensive guide: [`AI_CLIENTS.md`](AI_CLIENTS.md).
+For explicit control (`--client claude` / `--client cursor`), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, and troubleshooting, see [`AI_CLIENTS.md`](AI_CLIENTS.md). To add support for a new AI client (GitHub Copilot, codex, windsurf, antigravity, etc. — the registry is open-ended), follow the contributor walkthrough in [`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md).
 
 ### Other integration points
 
