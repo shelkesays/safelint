@@ -705,12 +705,16 @@ tracked_functions = [
 ]
 ```
 
+Add custom acquirers without losing the defaults:
+
 ```toml
-# Add custom acquirers without losing the defaults
 [tool.safelint.rules.resource_lifecycle]
 extend_tracked_functions = ["acquire_widget", "rent_db_handle"]
+```
 
-# Or replace the list entirely
+Or replace the list entirely (overrides the built-in defaults):
+
+```toml
 [tool.safelint.rules.resource_lifecycle]
 tracked_functions = ["open", "connect"]
 ```
