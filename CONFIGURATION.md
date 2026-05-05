@@ -51,6 +51,28 @@ Equivalent invocations:
 
 ANSI colour is auto-disabled when stdout is not a TTY (piping to a file produces clean text), matching the rest of safelint's output conventions.
 
+### Skill freshness commands (1.9.0)
+
+After `pip install --upgrade safelint`, the bundled skill files in the wheel update but copy-mode installs at `~/.claude/skills/safelint/` and `~/.cursor/rules/safelint.mdc` stay frozen at whatever version was last installed. Two commands answer "is my installed skill up to date?":
+
+```bash
+# Dedicated subcommand — pipe-friendly, exits 1 if any install differs from bundled
+safelint skill status
+
+# Or fold the same check into a normal lint run (opt-in stderr warning, doesn't fail the run)
+safelint check --check-skill-freshness --all-files .
+```
+
+`safelint skill status` walks every registered AI client × both scopes (user / project) and reports per-location *fresh* / *differs from bundled*. Symlink installs always report fresh by construction (live link to bundled). Exit 0 when every detected install matches; exit 1 when any differs. Canonical CI / upgrade-script idiom:
+
+```bash
+safelint skill status || safelint skill install --force
+```
+
+`safelint check --check-skill-freshness` is the same drift check folded into a normal lint run — emits one `safelint: warning:` line per stale install but doesn't change the lint exit code. Off by default so day-to-day `safelint check` invocations stay fast (no extra FS scan).
+
+A locally-customised install will surface as *differs from bundled*; the diagnostic message explicitly mentions that case so customisers can ignore it. See [`AI_CLIENTS.md`](AI_CLIENTS.md) "Updating after a safelint upgrade" for the full workflow.
+
 ### `safelint check` flags
 
 | Flag | Default | What it does |
