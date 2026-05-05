@@ -996,7 +996,7 @@ def _run_skill(args: argparse.Namespace) -> int:
 
 _HELP_COMMANDS: tuple[tuple[str, str], ...] = (
     ("check", "Scan a file or directory for safety violations"),
-    ("skill", "Manage the bundled AI-client skill / project rule for Claude Code or Cursor (install, path)"),
+    ("skill", "Manage the bundled AI-client skill / project rule for Claude Code or Cursor (install, path, status)"),
     ("help", "Print this message or the help of the given subcommand"),
     ("version", "Display SafeLint's version"),
 )

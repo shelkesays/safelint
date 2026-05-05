@@ -22,7 +22,7 @@ Usage: safelint [OPTIONS] <COMMAND>
 
 Commands:
   check    Scan a file or directory for safety violations
-  skill    Manage the bundled AI-client skill / project rule for Claude Code or Cursor (install, path)
+  skill    Manage the bundled AI-client skill / project rule for Claude Code or Cursor (install, path, status)
   help     Print this message or the help of the given subcommand
   version  Display SafeLint's version
 
@@ -63,6 +63,9 @@ ANSI colour is auto-disabled when stdout is not a TTY (piping to a file produces
 | `--format` | `pretty` | Output format: `pretty` (ruff/ty-style coloured), `json` (stable schema documented in `docs/JSON_SCHEMA.md`), or `sarif` (SARIF 2.1.0 for GitHub code scanning). |
 | `--statistics` | off | After the run, print a per-rule violation-count table (active + suppressed). Pretty mode only. Useful for CI snapshots and finding the most-fired rules. |
 | `--no-cache` | off | Disable the per-file lint-result cache. By default safelint memoises rule output keyed on `sha256(source + engine config + filepath)` in `.safelint_cache/` next to your config. |
+| `--check-skill-freshness` | off | Before linting, verify each installed AI-client skill (Claude Code at `~/.claude/skills/safelint/`, Cursor at `~/.cursor/rules/safelint.mdc`, project-scoped equivalents) matches the bundled version in the active wheel. Stale installs surface as `safelint: warning: …` lines on stderr. Informational only — doesn't fail the lint. Use `safelint skill status` (exit 1 if stale) for the dedicated CI-friendly check. |
+| `--stdin` | off | Read source from stdin instead of from disk. Designed for editor extensions linting un-saved buffers. Pair with `--stdin-filename`. |
+| `--stdin-filename` | (none) | Pseudo-filename for `--stdin` input — drives language detection by extension and is shown as the violation file path. Required when `--stdin` is set. |
 
 **When to use `--all-files`:**
 - CI pipelines (clean checkout, no modified files in git terms)
