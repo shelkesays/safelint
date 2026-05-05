@@ -110,8 +110,25 @@ def _build_region(v: Violation) -> dict[str, Any]:
     return region
 
 
-def _build_artifact_changes(v: Violation) -> list[dict[str, Any]]:
-    """Build SARIF ``fixes[].artifactChanges`` from the violation's suggestions.
+def _build_fixes(v: Violation) -> list[dict[str, Any]]:
+    """Build SARIF ``fixes[]`` entries from the violation's suggestions.
+
+    Each returned item is a SARIF fix object containing both a
+    ``description`` and an ``artifactChanges`` array — the function's
+    output goes straight into a ``result.fixes`` array, one fix per
+    *actionable* :class:`Suggestion` on the violation.
+
+    Description-only suggestions (those with ``edits == ()``) are
+    skipped: SARIF 2.1.0 spec says ``fix.artifactChanges[].replacements``
+    *SHALL* contain at least one element, so emitting a fix with no
+    replacements would produce a non-conformant document. The
+    description-only form is still a valid :class:`Suggestion` — a
+    hint without a mechanical recipe — and remains in the JSON
+    output (see :mod:`safelint.formatters._json`); it just doesn't
+    translate cleanly to SARIF's "apply this to fix it" model. If
+    every suggestion on a violation is description-only, this
+    function returns ``[]`` and the caller omits the ``fixes`` key
+    entirely (avoiding an empty ``fixes: []`` array on the result).
 
     SARIF 2.1.0's ``fixes`` block is *advisory by spec* — the consumer
     decides whether to apply replacements. That matches safelint's
@@ -119,13 +136,16 @@ def _build_artifact_changes(v: Violation) -> list[dict[str, Any]]:
     "Quick Fix" code actions, but every edit goes through user
     confirmation.
 
-    Each suggestion becomes one entry with:
+    Each actionable suggestion becomes one ``fixes[]`` entry with:
 
-    * ``artifactLocation.uri`` — the violation's filepath (URI-normalised
-      via :func:`_artifact_uri`).
-    * ``replacements[]`` — one per ``TextEdit``, with a ``deletedRegion``
-      describing the range to replace and an ``insertedContent.text``
-      with the replacement string.
+    * ``description.text`` — the suggestion's human-readable summary.
+    * ``artifactChanges[]`` — a single artifact-change entry targeting
+      the violation's filepath.
+    * ``artifactChanges[].artifactLocation.uri`` — the violation's
+      filepath (URI-normalised via :func:`_artifact_uri`).
+    * ``artifactChanges[].replacements[]`` — one per ``TextEdit``, with
+      a ``deletedRegion`` describing the range to replace and an
+      ``insertedContent.text`` with the replacement string.
 
     Direct attribute access (no ``getattr`` defaults) is intentional:
     SARIF output must accurately reflect the structured violation, and
@@ -145,13 +165,14 @@ def _build_artifact_changes(v: Violation) -> list[dict[str, Any]]:
             ],
         }
         for suggestion in v.suggestions
+        if suggestion.edits  # skip description-only suggestions (SARIF requires ≥1 replacement)
     ]
 
 
 def _text_edit_to_replacement(edit: TextEdit) -> dict[str, Any]:
     """Render a :class:`TextEdit` as a SARIF ``replacements`` entry.
 
-    Strict attribute access — see :func:`_build_artifact_changes` for
+    Strict attribute access — see :func:`_build_fixes` for
     the rationale. A malformed input fails fast.
     """
     return {
@@ -188,7 +209,14 @@ def _result_for_violation(v: Violation, *, suppressed: bool) -> dict[str, Any]:
     if v.suggestions:
         # SARIF ``fixes[]`` is advisory by spec — exactly matches
         # safelint's "review-only, never auto-apply" contract.
-        entry["fixes"] = _build_artifact_changes(v)
+        # ``_build_fixes`` skips description-only suggestions (those
+        # with empty ``edits``) because SARIF requires ≥1 replacement
+        # per fix; the result may therefore be empty even when
+        # ``v.suggestions`` is not. Omit the key entirely in that
+        # case rather than emitting a ``fixes: []`` array.
+        fixes = _build_fixes(v)
+        if fixes:
+            entry["fixes"] = fixes
     return entry
 
 
