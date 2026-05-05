@@ -67,6 +67,14 @@ class ClientSpec:
     bundled_relpath: tuple[str, ...]  # Path components under skill_files/ (empty = whole tree)
     restart_hint: str
     usage_hint: str
+    # Drift-detection inputs. Each tuple is a relpath under
+    # ``skill_files/`` whose text must collectively mention every
+    # registered rule code / name (``ALL_RULES``) and every supported
+    # extension (``supported_extensions()``). Tests parametrised over
+    # ``_CLIENT_SPECS`` enforce this — when a contributor adds a new
+    # rule or language, the test fails until the bundled docs for
+    # *every* registered client are updated.
+    documentation_relpaths: tuple[tuple[str, ...], ...]
 
 
 _CLAUDE_SPEC = ClientSpec(
@@ -84,6 +92,7 @@ _CLAUDE_SPEC = ClientSpec(
     bundled_relpath=(),  # whole skill_files/ tree (minus peer-client dirs)
     restart_hint="Restart Claude Code (or open a new session) to pick up the skill.",
     usage_hint='Then ask Claude Code "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("SKILL.md",),),
 )
 
 
@@ -97,6 +106,7 @@ _CURSOR_SPEC = ClientSpec(
     bundled_relpath=("cursor", "safelint.mdc"),
     restart_hint="Restart Cursor (or reload the window) to pick up the new rule.",
     usage_hint='Then ask Cursor "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("cursor", "safelint.mdc"),),
 )
 
 
