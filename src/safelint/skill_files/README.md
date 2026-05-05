@@ -70,7 +70,7 @@ Prints the on-disk location of the skill files inside your active safelint insta
 
 The skill ships *inside* the safelint Python package, under `safelint/skill_files/`:
 
-```
+```text
 src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill path`
 ├── SKILL.md                 # Language-agnostic core (the entry point Claude Code reads)
 ├── README.md                # This file
@@ -86,12 +86,12 @@ The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint 
 
 ## Requirements
 
-- `safelint` 1.6.0 or later on `PATH`. The `safelint skill install` subcommand and bundled skill files were added in v1.6.0.
+- `safelint` 1.8.0 or later on `PATH`. The `safelint skill install` subcommand and bundled skill files arrived in v1.6.0; the `--client cursor` flag for installing into Cursor (and the `safelint skill path --client cursor` form) was added in v1.8.0, so this README's full instructions assume 1.8.0+.
 - A project with at least one source file in a language safelint supports (currently Python).
 
 ## What the skill does
 
-1. Verifies `safelint` is installed (`command -v safelint`).
+1. Verifies `safelint` is installed (cross-platform: `safelint --version`, falling back to a `shutil.which` Python check).
 2. Identifies the language(s) in the project against the registry in `SKILL.md` Step 2.
 3. Picks a target based on what you said (modified files / all files / a specific path).
 4. Runs `safelint check <target> --format json` and parses the result.

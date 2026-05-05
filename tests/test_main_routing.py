@@ -250,6 +250,21 @@ def test_main_prints_help_with_short_v_after_global_flag(monkeypatch: pytest.Mon
     assert capsys.readouterr().out.strip().startswith("safelint ")
 
 
+def _assert_check_subcommand_help(out: str) -> None:
+    """Assert *out* is the ``check`` subcommand's argparse usage banner.
+
+    Tighter than ``"check" in out`` (which the top-level help — which
+    *lists* ``check`` as a command — would also satisfy). The check
+    parser's auto-generated help starts with ``usage: safelint
+    check`` on its first non-empty line, which the top-level
+    polished help (``Usage: safelint [OPTIONS] <COMMAND>``) does not.
+    """
+    first_line = next((line for line in out.splitlines() if line.strip()), "")
+    lowered = first_line.lower().lstrip()
+    assert lowered.startswith("usage:"), f"expected a usage banner, got: {first_line!r}"
+    assert "safelint check" in lowered, f"expected the ``check`` subcommand banner, got: {first_line!r}"
+
+
 def test_main_routes_help_keyword_after_global_flag(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     """``safelint --format json help check`` finds ``help`` and forwards ``check`` as the sub.
 
@@ -261,9 +276,7 @@ def test_main_routes_help_keyword_after_global_flag(monkeypatch: pytest.MonkeyPa
     with pytest.raises(SystemExit) as exc:
         cli.main()
     assert exc.value.code == 0
-    out = capsys.readouterr().out
-    # Subcommand help renders the ``check`` parser's usage banner.
-    assert "check" in out.lower()
+    _assert_check_subcommand_help(capsys.readouterr().out)
 
 
 def test_main_routes_help_keyword_with_flags_interleaved(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
@@ -277,8 +290,7 @@ def test_main_routes_help_keyword_with_flags_interleaved(monkeypatch: pytest.Mon
     with pytest.raises(SystemExit) as exc:
         cli.main()
     assert exc.value.code == 0
-    out = capsys.readouterr().out
-    assert "check" in out.lower()
+    _assert_check_subcommand_help(capsys.readouterr().out)
 
 
 def test_main_routes_to_normal_parser_when_subcommand_precedes_help(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:

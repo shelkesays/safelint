@@ -71,6 +71,28 @@ def test_engine_fingerprint_independent_of_per_file_ignores_order() -> None:
     assert compute_engine_fingerprint("1.5.0", [], per_file_ignores=pfi_a) == compute_engine_fingerprint("1.5.0", [], per_file_ignores=pfi_b)
 
 
+def test_engine_fingerprint_changes_with_engine_internal_ignored() -> None:
+    """Toggling ``ignore = ["SAFE004"]`` (engine-internal) shifts the fingerprint.
+
+    Engine-internal codes (SAFE000 parse, SAFE004 unused_suppression)
+    aren't part of ``self.rules`` — they're emitted by the engine
+    itself. Without folding the engine-internal-ignore set into the
+    fingerprint, toggling them on/off would silently reuse stale
+    cache entries that still carry (or lack) those engine-emitted
+    violations.
+    """
+    fp_empty = compute_engine_fingerprint("1.5.0", [], engine_internal_ignored=())
+    fp_safe004 = compute_engine_fingerprint("1.5.0", [], engine_internal_ignored=("SAFE004",))
+    fp_unused = compute_engine_fingerprint("1.5.0", [], engine_internal_ignored=("unused_suppression",))
+    fp_both = compute_engine_fingerprint("1.5.0", [], engine_internal_ignored=("SAFE004", "unused_suppression"))
+    assert fp_empty != fp_safe004
+    assert fp_safe004 != fp_unused
+    assert fp_unused != fp_both
+    # Stable across iteration order.
+    fp_both_reordered = compute_engine_fingerprint("1.5.0", [], engine_internal_ignored=("unused_suppression", "SAFE004"))
+    assert fp_both == fp_both_reordered
+
+
 def test_file_key_changes_with_source() -> None:
     """Editing the source produces a different key, even with the same engine."""
     fp = compute_engine_fingerprint("1.5.0", [])
@@ -219,6 +241,52 @@ def test_engine_cache_invalidates_on_engine_config_change(tmp_path: Path) -> Non
     loose_result = loose_engine.check_file(str(sample))
     # A different engine config must not pull A's cached violation forward.
     assert not any(v.rule == "function_length" for v in loose_result.violations)
+
+
+def test_engine_cache_invalidates_when_safe004_is_globally_ignored(tmp_path: Path) -> None:
+    """Toggling ``ignore = ["SAFE004"]`` between runs invalidates cache entries.
+
+    SAFE004 (``unused_suppression``) is engine-internal, not a
+    ``BaseRule``, so it never appears in ``self.rules`` and toggling
+    it in ``ignore`` doesn't change the rule set. Without folding
+    the engine-internal-ignore set into the cache fingerprint, the
+    second run would serve the first run's cached SAFE004 violation
+    even though the user asked for it to be silenced.
+
+    Concrete shape: file has ``# nosafe: SAFE304`` on a line with no
+    side-effect violation, so SAFE004 fires. First engine has the
+    default config (SAFE004 enabled); second engine adds it to
+    ``ignore``. Both share the same on-disk cache directory.
+    """
+    sample = tmp_path / "unused_dir.py"
+    sample.write_text("x = 1  # nosafe: SAFE304\n", encoding="utf-8")
+    cache_dir = tmp_path / "cache"
+
+    cfg_default = DEFAULTS
+    engine_default = SafetyEngine(cfg_default, cache=LintCache(cache_dir))
+    result_default = engine_default.check_file(str(sample))
+    assert any(v.code == "SAFE004" for v in result_default.violations), "first run must have emitted SAFE004"
+
+    cfg_ignored = {**DEFAULTS, "ignore": ["SAFE004"]}
+    engine_ignored = SafetyEngine(cfg_ignored, cache=LintCache(cache_dir))
+    result_ignored = engine_ignored.check_file(str(sample))
+    # The engine-internal-ignore toggle must have invalidated the cache;
+    # SAFE004 must NOT come back from the prior cached entry.
+    assert not any(v.code == "SAFE004" for v in result_ignored.violations)
+
+
+def test_engine_cache_invalidates_when_safe004_is_ignored_by_rule_name(tmp_path: Path) -> None:
+    """Same as above, but ``ignore = ["unused_suppression"]`` (rule name form)."""
+    sample = tmp_path / "unused_dir_name.py"
+    sample.write_text("x = 1  # nosafe: SAFE304\n", encoding="utf-8")
+    cache_dir = tmp_path / "cache"
+
+    engine_default = SafetyEngine(DEFAULTS, cache=LintCache(cache_dir))
+    assert any(v.code == "SAFE004" for v in engine_default.check_file(str(sample)).violations)
+
+    cfg_ignored = {**DEFAULTS, "ignore": ["unused_suppression"]}
+    result = SafetyEngine(cfg_ignored, cache=LintCache(cache_dir)).check_file(str(sample))
+    assert not any(v.code == "SAFE004" for v in result.violations)
 
 
 def test_engine_cache_isolates_by_filepath(tmp_path: Path) -> None:

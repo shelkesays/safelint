@@ -14,7 +14,9 @@ Follow the steps below in order.
 
 ## Step 1 — Verify safelint is installed
 
-Run `command -v safelint` in a terminal task. If it returns non-zero:
+Run `safelint --version` in a terminal task. This is portable across macOS, Linux, and Windows shells (cmd / PowerShell / git-bash) and returns non-zero whenever safelint isn't on `PATH`. If you specifically need a "is the binary findable?" check without invoking it, fall back to `python -c "import shutil, sys; sys.exit(0 if shutil.which('safelint') else 1)"`.
+
+If either check returns non-zero (or the shell reports "command not found" / "is not recognized"):
 
 - safelint is a Python package, regardless of which language is being linted. Suggest:
   - `uv add safelint` (if the project uses `uv`)
@@ -76,13 +78,25 @@ The schema is documented in [`docs/JSON_SCHEMA.md`](https://github.com/shelkesay
   },
   "violations": [
     {"code": "SAFE101", "rule": "function_length", "severity": "error",
-     "filepath": "src/foo.py", "lineno": 42, "message": "Function ..."}
+     "filepath": "src/foo.py", "lineno": 42,
+     "end_lineno": 42, "column_start": 5, "column_end": 17,
+     "message": "Function ...",
+     "suggestions": [
+       {"description": "Replace `except:` with `except Exception:`",
+        "edits": [
+          {"start_line": 42, "start_column": 5,
+           "end_line": 42, "end_column": 12,
+           "replacement": "except Exception:"}
+        ]}
+     ]}
   ],
   "suppressed": [ /* same shape */ ]
 }
 ```
 
 Violation objects are language-agnostic. The `filepath` field tells you which language each violation came from (via extension); use that if you want to group results by language.
+
+The `suggestions[]` array (added in v1.8.0) is **advisory only**. Each `Suggestion` carries a one-line `description` and zero or more `TextEdit` entries (half-open `[start, end)` ranges plus the literal `replacement` text). Surface them to the user as offered quick-fixes, but **never apply them automatically** — safelint is a review tool, not a refactoring tool, and the user must confirm every edit. Empty `edits` arrays are valid: a description-only suggestion is a hint, not a fix recipe.
 
 ## Step 6 — Present results
 

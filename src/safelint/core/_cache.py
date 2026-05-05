@@ -98,6 +98,7 @@ def compute_engine_fingerprint(
     safelint_version: str,
     active_rules: Iterable[tuple[str, str, str, dict[str, Any]]],
     per_file_ignores: Iterable[tuple[str, Iterable[str], Iterable[str]]] = (),
+    engine_internal_ignored: Iterable[str] = (),
 ) -> str:
     """Return a hex digest summarising the engine state that affects rule output.
 
@@ -118,6 +119,17 @@ def compute_engine_fingerprint(
     means any add/remove/edit invalidates every entry that mentions
     the affected pattern. (Cache regeneration on a per-file-ignores
     edit is cheap; correctness wins over a one-time cache rebuild.)
+
+    *engine_internal_ignored* is the merged set (codes upper-cased and
+    rule names) of engine-internal codes / names the user has globally
+    suppressed via ``ignore`` — typically ``{"SAFE000", "parse"}`` or
+    ``{"SAFE004", "unused_suppression"}`` in some combination.
+    Engine-internal violations (parse errors, unused suppressions) are
+    emitted by the engine itself, not by a registered ``BaseRule``, so
+    toggling them on or off doesn't change ``active_rules`` and would
+    otherwise let stale cache entries serve previously emitted SAFE000
+    / SAFE004 violations even after the user has ignored them. Folding
+    the set in invalidates by construction whenever the toggle changes.
     """
     payload: dict[str, Any] = {
         "schema_version": _CACHE_SCHEMA_VERSION,
@@ -130,6 +142,7 @@ def compute_engine_fingerprint(
             [{"pattern": pattern, "names": sorted(names), "codes": sorted(codes)} for pattern, names, codes in per_file_ignores],
             key=lambda r: r["pattern"],
         ),
+        "engine_internal_ignored": sorted(engine_internal_ignored),
     }
     blob = json.dumps(payload, sort_keys=True, default=str).encode("utf-8")
     return hashlib.sha256(blob).hexdigest()
