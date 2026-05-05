@@ -148,7 +148,8 @@ The skill is just Markdown. Edit `SKILL.md` to tune wording, swap the suggested 
 
 ## See also
 
-- **AI client integrations guide:** [`AI_CLIENTS.md`](../../AI_CLIENTS.md) — the comprehensive user-and-extender doc (auto-detection, per-client setup, troubleshooting, adding a new client)
+- **AI client integrations guide:** [`AI_CLIENTS.md`](../../AI_CLIENTS.md) — the comprehensive user doc (auto-detection, per-client setup, troubleshooting)
+- **Adding a new AI client:** [`ADDING_AN_AI_CLIENT.md`](../../ADDING_AN_AI_CLIENT.md) — contributor walkthrough for shipping a new client integration
 - The main safelint docs: [`README.md`](../../README.md), [`CONFIGURATION.md`](../../CONFIGURATION.md)
 - JSON output schema: [`docs/JSON_SCHEMA.md`](../../docs/JSON_SCHEMA.md)
 - Adding a new language to safelint: [`ADDING_A_LANGUAGE.md`](../../ADDING_A_LANGUAGE.md)
