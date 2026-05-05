@@ -8,7 +8,7 @@ The schema is **stable since v1.5.0**. Field additions are non-breaking (consume
 
 ```json
 {
-  "version": "1.8.0",
+  "version": "1.9.0",
   "summary": {
     "files_checked": 12,
     "violations": 4,
