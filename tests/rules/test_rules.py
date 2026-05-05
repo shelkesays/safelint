@@ -141,9 +141,6 @@ def test_resource_lifecycle_flags_socket_outside_with(tmp_path: Path) -> None:
 
 def test_resource_lifecycle_extend_tracked_functions(tmp_path: Path) -> None:
     """``extend_tracked_functions`` adds custom acquirers without losing defaults (1.8.0)."""
-    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
-    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
-
     source = textwrap.dedent("""\
         from mylib import acquire_widget
         w = acquire_widget()
@@ -173,9 +170,6 @@ def test_resource_lifecycle_rejects_string_tracked_functions(tmp_path: Path) -> 
     ``['o', 'p', 'e', 'n']`` and silently track those one-character
     function names. Validation surfaces the typo as a clear TypeError.
     """
-    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
-    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
-
     sample = tmp_path / "rl_bad.py"
     sample.write_text("f = open('x.txt')\nf.read()\n", encoding="utf-8")
     cfg = deep_merge(DEFAULTS, {"rules": {"resource_lifecycle": {"tracked_functions": "open"}}})
@@ -185,9 +179,6 @@ def test_resource_lifecycle_rejects_string_tracked_functions(tmp_path: Path) -> 
 
 def test_resource_lifecycle_rejects_non_string_tracked_function_entries(tmp_path: Path) -> None:
     """Non-string entries in tracked_functions (e.g. ``[123]``) raise TypeError too."""
-    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
-    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
-
     sample = tmp_path / "rl_bad2.py"
     sample.write_text("f = open('x.txt')\nf.read()\n", encoding="utf-8")
     cfg = deep_merge(DEFAULTS, {"rules": {"resource_lifecycle": {"tracked_functions": ["open", 123]}}})
@@ -202,9 +193,6 @@ def test_resource_lifecycle_rejects_string_cleanup_patterns(tmp_path: Path) -> N
     ``{'c', 'l', 'o', 's', 'e'}`` and the diagnostic text would render
     as ``c / e / l / o / s``. Validation surfaces the typo as TypeError.
     """
-    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
-    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
-
     sample = tmp_path / "rl_cleanup_bad.py"
     sample.write_text("f = open('x.txt')\nf.read()\n", encoding="utf-8")
     cfg = deep_merge(DEFAULTS, {"rules": {"resource_lifecycle": {"cleanup_patterns": "close"}}})
@@ -454,9 +442,6 @@ def test_global_mutation_default_does_not_flag_read_only_global(tmp_path: Path) 
 
 def test_global_mutation_strict_flags_read_only_global(tmp_path: Path) -> None:
     """``strict = true`` fires on the ``global`` declaration itself, mirroring PLW0603 (1.8.0)."""
-    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
-    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
-
     source = textwrap.dedent("""\
         VERSION = "1.0"
         def show():
@@ -1290,7 +1275,16 @@ def test_function_length_count_mode_unknown_raises_value_error(tmp_path: Path) -
 
 
 def test_function_length_count_mode_statements_skips_nested_defs(tmp_path: Path) -> None:
-    """Nested function bodies don't inflate the outer function's statement count."""
+    """Nested function bodies don't inflate the outer function's statement count.
+
+    Note the deliberate asymmetry with
+    :func:`test_function_length_statements_counts_nested_class_definition`:
+    a nested ``def`` is *not* recursed into (its body is the inner
+    function's own concern), but a nested ``class`` *is* counted (the
+    class itself is a statement under Python's grammar, and its body
+    contributes to the enclosing function's complexity-proxy total).
+    The two tests together pin down both halves of that contract.
+    """
     source = "def outer():\n    def inner():\n        a = 1\n        b = 2\n        c = 3\n        d = 4\n        e = 5\n        return a + b + c + d + e\n    return inner()\n"
     sample = tmp_path / "nested_stmts.py"
     sample.write_text(source, encoding="utf-8")
@@ -1307,6 +1301,24 @@ def test_function_length_count_mode_statements_skips_nested_defs(tmp_path: Path)
     flagged_for_inner = [v for v in violations if v.rule == "function_length" and "inner" in v.message]
     assert not flagged_for_outer
     assert flagged_for_inner
+
+
+def test_function_length_statement_types_invariant() -> None:
+    """``_STATEMENT_TYPES`` includes ``class_definition`` but excludes ``function_definition``.
+
+    Locks in the asymmetry exercised by the two behavioural tests
+    above. A future change that accidentally adds ``function_definition``
+    (or removes ``class_definition``) would slip past the behavioural
+    tests in subtle cases — e.g. a nested ``def`` adding 1 to the
+    outer count would still leave outer under the test's max=3
+    threshold. A direct membership assertion on the constant fails
+    fast on either parity break.
+    """
+    from safelint.rules.function_length import _STATEMENT_TYPES  # noqa: PLC0415
+
+    assert "class_definition" in _STATEMENT_TYPES
+    assert "function_definition" not in _STATEMENT_TYPES
+    assert "async_function_definition" not in _STATEMENT_TYPES
 
 
 def test_function_length_logical_lines_message_uses_logical_lines_unit(tmp_path: Path) -> None:

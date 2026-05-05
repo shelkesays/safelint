@@ -741,6 +741,12 @@ class SafetyEngine:
                 __version__,
                 ((r.name, r.code, r.severity, r.config) for r in self.rules),
                 per_file_ignores=((p, sorted(names), sorted(codes)) for p, names, codes in self.per_file_ignores),
+                # Engine-internal codes (SAFE000 parse, SAFE004 unused
+                # suppression) aren't part of ``self.rules``, so without
+                # this the cache wouldn't notice when the user toggles
+                # ``ignore = ["SAFE004"]`` between runs and would
+                # re-serve the previously emitted SAFE004 violations.
+                engine_internal_ignored=self._globally_ignored_engine_internal,
             )
         return self._engine_fingerprint
 
