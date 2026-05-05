@@ -140,15 +140,6 @@ possibly-missing-attribute = "warn"
 unresolved-import = "warn"
 unresolved-attribute = "warn"
 
-# ---------------------------------------------------------------------------
-# safelint - configured in ``safelint.toml`` at the repo root (single
-# source of truth). When both ``safelint.toml`` and ``[tool.safelint]``
-# in ``pyproject.toml`` exist, the loader at ``core/config.py`` reads
-# the standalone file first and ignores the pyproject block, so a stub
-# here would be dead config that drifts from the active rules.
-# Mirrors the pattern used for ruff (``ruff.toml`` at repo root).
-# ---------------------------------------------------------------------------
-
 [tool.uv.sources]
 safelint = { workspace = true }
 
@@ -156,4 +147,3 @@ safelint = { workspace = true }
 dev = [
     "safelint",
 ]
-
