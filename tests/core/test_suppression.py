@@ -393,6 +393,31 @@ def test_safe004_partial_unused_in_multi_code_directive(tmp_path: Path) -> None:
     assert "SAFE304" in safe004s[0].message
 
 
+def test_safe004_silent_when_directive_lists_both_code_and_rule_name_aliases(tmp_path: Path) -> None:
+    """``# nosafe: SAFE201, bare_except`` consumes BOTH aliases when one violation matches.
+
+    The directive uses both the SAFE-code and the rule-name forms of
+    the same rule. When a SAFE201 violation fires on that line, the
+    matcher must record both aliases as "used" — otherwise the
+    alias that didn't trigger the early-return surfaces a false
+    SAFE004. Regression for an early-return bug in
+    ``_check_suppressed_marking_used`` that only marked the first
+    matching alias.
+    """
+    sample = tmp_path / "alias_pair.py"
+    sample.write_text(
+        "def f():\n    try:\n        pass\n    except:  # nosafe: SAFE201, bare_except\n        pass\n",
+        encoding="utf-8",
+    )
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    # bare_except violation is suppressed (so absent from active).
+    assert not any(v.rule == "bare_except" for v in result.violations)
+    # And no SAFE004 fires on either alias — both were consumed by
+    # the matching violation.
+    safe004s = [v for v in result.violations if v.code == "SAFE004"]
+    assert not safe004s, f"unexpected SAFE004 emission(s): {[v.message for v in safe004s]}"
+
+
 def test_safe004_multi_code_unused_directive_emits_in_sorted_order(tmp_path: Path) -> None:
     """Multiple unused codes on one line are reported alphabetically.
 
