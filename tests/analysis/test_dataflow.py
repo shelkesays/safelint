@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import textwrap
 
+import pytest
 import tree_sitter
 import tree_sitter_python
 
@@ -337,6 +338,62 @@ def test_tainted_sink_assume_taint_preserving_false_still_fires_on_direct_taint(
         },
     )
     assert vs
+
+
+def test_tainted_sink_assume_taint_preserving_rejects_string_value():
+    """``assume_taint_preserving = "false"`` (string, e.g. TOML quote typo) raises TypeError.
+
+    Without strict isinstance validation, ``bool("false")`` is ``True``
+    in Python — a non-empty string is truthy — so the user's
+    misconfiguration would silently flip the rule into the *opposite*
+    mode they intended (taint-preserving instead of taint-dropping).
+    The validation catches the typo as a clear TypeError when the
+    rule first runs against a file, matching the validation style
+    used elsewhere (tracked_functions / cleanup_patterns / extend_ignore).
+    """
+    src = """
+    def f(data):
+        eval(data)
+    """
+    with pytest.raises(TypeError, match="assume_taint_preserving"):
+        violations(
+            TaintedSinkRule,
+            src,
+            config={
+                "enabled": True,
+                "severity": "error",
+                "sinks": ["eval"],
+                "sources": [],
+                "sanitizers": [],
+                "assume_taint_preserving": "false",
+            },
+        )
+
+
+def test_tainted_sink_assume_taint_preserving_rejects_int_value():
+    """``assume_taint_preserving = 0`` (int, near-bool typo) also raises TypeError.
+
+    Python's ``isinstance(True, int)`` is True (bool subclasses int),
+    so the check uses ``isinstance(..., bool)`` to allow bool but
+    reject int. This locks in the bool-only contract.
+    """
+    src = """
+    def f(data):
+        eval(data)
+    """
+    with pytest.raises(TypeError, match="assume_taint_preserving"):
+        violations(
+            TaintedSinkRule,
+            src,
+            config={
+                "enabled": True,
+                "severity": "error",
+                "sinks": ["eval"],
+                "sources": [],
+                "sanitizers": [],
+                "assume_taint_preserving": 0,
+            },
+        )
 
 
 # ---------------------------------------------------------------------------
