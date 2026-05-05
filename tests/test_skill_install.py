@@ -27,8 +27,14 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def _make_args(*, project: bool = False, symlink: bool = False, force: bool = False, client: str = "claude") -> argparse.Namespace:
-    """Return a Namespace shaped like the install argparser produces."""
+def _make_args(*, project: bool = False, symlink: bool = False, force: bool = False, client: str = "auto") -> argparse.Namespace:
+    """Return a Namespace shaped like the install argparser produces.
+
+    The default ``client="auto"`` matches the CLI default — call
+    sites that need a specific client should pass it explicitly so
+    intent is obvious and so changes to auto-detection don't
+    accidentally hide regressions in single-client tests.
+    """
     return argparse.Namespace(skill_action="install", project=project, symlink=symlink, force=force, client=client)
 
 
@@ -73,9 +79,9 @@ def test_bundled_cursor_rule_exists_in_wheel() -> None:
 
 
 def test_install_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """Default install copies SKILL.md + languages/ into ~/.claude/skills/safelint/."""
+    """Explicit ``--client claude`` install copies SKILL.md + languages/ into ~/.claude/skills/safelint/."""
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
-    rc = _skill_install.run_install(_make_args())
+    rc = _skill_install.run_install(_make_args(client="claude"))
     assert rc == 0
     target = home / ".claude" / "skills" / "safelint"
     assert target.is_dir()
@@ -91,9 +97,9 @@ def test_install_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 
 
 def test_install_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``--project`` lands under <cwd>/.claude/skills/safelint/ instead of home."""
+    """``--client claude --project`` lands under <cwd>/.claude/skills/safelint/ instead of home."""
     home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
-    rc = _skill_install.run_install(_make_args(project=True))
+    rc = _skill_install.run_install(_make_args(client="claude", project=True))
     assert rc == 0
     assert (cwd / ".claude" / "skills" / "safelint" / "SKILL.md").is_file()
     # User-global location was NOT touched.
@@ -116,7 +122,7 @@ def test_install_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     Claude install — see :func:`_install_symlink_directory_filtered`.
     """
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
-    rc = _skill_install.run_install(_make_args(symlink=True))
+    rc = _skill_install.run_install(_make_args(client="claude", symlink=True))
     assert rc == 0
     target = home / ".claude" / "skills" / "safelint"
     # Target itself is a real directory (not a symlink), populated
@@ -146,7 +152,7 @@ def test_install_symlink_excludes_peer_client_bundles(monkeypatch: pytest.Monkey
     The fixed install symlinks per-entry, skipping peer dirs.
     """
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
-    rc = _skill_install.run_install(_make_args(symlink=True))
+    rc = _skill_install.run_install(_make_args(client="claude", symlink=True))
     assert rc == 0
     target = home / ".claude" / "skills" / "safelint"
     assert not (target / "cursor").exists()
@@ -158,10 +164,10 @@ def test_install_symlink_excludes_peer_client_bundles(monkeypatch: pytest.Monkey
 
 
 def test_install_refuses_to_overwrite_existing_without_force(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """Installing twice without ``--force`` exits 1 with the error on stderr."""
+    """Installing the Claude skill twice without ``--force`` exits 1 with the error on stderr."""
     _redirect_home_and_cwd(monkeypatch, tmp_path)
-    assert _skill_install.run_install(_make_args()) == 0
-    rc = _skill_install.run_install(_make_args())
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    rc = _skill_install.run_install(_make_args(client="claude"))
     assert rc == 1
     captured = capsys.readouterr()
     # Errors go to stderr so wrapper scripts can capture them without
@@ -178,7 +184,7 @@ def test_install_with_force_replaces_existing_directory(monkeypatch: pytest.Monk
     target.mkdir(parents=True)
     (target / "stale.md").write_text("old", encoding="utf-8")
 
-    assert _skill_install.run_install(_make_args(force=True)) == 0
+    assert _skill_install.run_install(_make_args(client="claude", force=True)) == 0
     assert (target / "SKILL.md").is_file()
     assert not (target / "stale.md").exists()
 
@@ -190,7 +196,7 @@ def test_install_with_force_replaces_existing_file(monkeypatch: pytest.MonkeyPat
     target.parent.mkdir(parents=True)
     target.write_text("not a directory", encoding="utf-8")
 
-    assert _skill_install.run_install(_make_args(force=True)) == 0
+    assert _skill_install.run_install(_make_args(client="claude", force=True)) == 0
     assert target.is_dir()
     assert (target / "SKILL.md").is_file()
 
@@ -205,7 +211,7 @@ def test_install_with_force_replaces_existing_symlink(monkeypatch: pytest.Monkey
     decoy.mkdir()
     target.symlink_to(decoy, target_is_directory=True)
 
-    assert _skill_install.run_install(_make_args(force=True)) == 0
+    assert _skill_install.run_install(_make_args(client="claude", force=True)) == 0
     assert target.is_dir()
     assert not target.is_symlink()
 

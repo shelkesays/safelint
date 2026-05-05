@@ -1,6 +1,6 @@
-# Adding a new AI client to safelint
+# Adding a new AI client to SafeLint
 
-This guide is the cheat sheet for adding support for a new AI coding client (GitHub Copilot, codex, windsurf, antigravity, etc.) to safelint's `safelint skill install` command. The architecture was built for this — the moving parts you need to understand and the steps you need to follow are below.
+This guide is the cheat sheet for adding support for a new AI coding client (GitHub Copilot, codex, windsurf, antigravity, etc.) to SafeLint's `safelint skill install` command. The architecture was built for this — the moving parts you need to understand and the steps you need to follow are below.
 
 > [!NOTE]
 > Today Claude Code and Cursor are registered. Adding a new client is a one-`ClientSpec` change plus a bundled artefact and tests. No control-flow changes elsewhere — install / detection / CLI choices / output all read from the registry.
