@@ -10,7 +10,7 @@ All keys are optional - anything you leave out falls back to the built-in defaul
 
 These are passed on the command line and are not part of the config file.
 
-### Top-level commands and flags (1.8.0)
+### Top-level commands and flags
 
 SafeLint's top-level surface mirrors ruff's: every command can be invoked positionally (`safelint check ...`), and every flag has both a short and a long form where conventional. Help and version are intercepted before any command parsing so they always work, even when no subcommand is given.
 
