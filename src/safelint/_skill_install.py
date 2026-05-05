@@ -32,6 +32,7 @@ project scope (no home fallback).
 from __future__ import annotations
 
 from dataclasses import dataclass
+import hashlib
 from importlib import resources
 from pathlib import Path
 import shutil
@@ -41,6 +42,7 @@ from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     import argparse
+    from collections.abc import Iterator
     from importlib.abc import Traversable
 
 
@@ -439,3 +441,150 @@ def run_path(args: argparse.Namespace) -> int:
     spec = _spec_by_name(client)
     _print_bundled_path(_spec_bundled_source(spec))
     return 0
+
+
+# ---------------------------------------------------------------------------
+# Freshness / drift detection — compares bundled vs installed
+# ---------------------------------------------------------------------------
+
+
+# Status values returned by :func:`_install_status`.
+INSTALL_STATUS_MISSING = "missing"  # target doesn't exist at this scope
+INSTALL_STATUS_FRESH = "fresh"  # installed content matches bundle (or is a symlink)
+INSTALL_STATUS_DIFFERS = "differs"  # installed content differs from current bundle
+
+
+def _file_sha256(path: Path) -> str:
+    """Return the SHA-256 hex digest of *path*'s bytes."""
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def _tree_hash(root: Path) -> str:
+    """Stable content hash of a directory tree, excluding peer-client subdirs.
+
+    Walks ``root`` recursively in sorted order so the digest is
+    deterministic across filesystems. Each contributing file's
+    relative path is hashed alongside its content, so renames and
+    same-name moves both invalidate. Entries under
+    :data:`_PEER_CLIENT_DIRS` (e.g. ``cursor/``) are skipped — they
+    don't ship in a Claude install and shouldn't influence its
+    freshness verdict.
+    """
+    digest = hashlib.sha256()
+    for entry in sorted(root.rglob("*"), key=lambda p: p.as_posix()):
+        rel = entry.relative_to(root)
+        if rel.parts and rel.parts[0] in _PEER_CLIENT_DIRS:
+            continue
+        if entry.is_file():
+            digest.update(rel.as_posix().encode("utf-8"))
+            digest.update(b"\0")
+            digest.update(entry.read_bytes())
+            digest.update(b"\0")
+    return digest.hexdigest()
+
+
+def _install_status(spec: ClientSpec, *, project: bool) -> str:
+    """Return one of :data:`INSTALL_STATUS_MISSING` / ``_FRESH`` / ``_DIFFERS`` for *spec* at *scope*.
+
+    A symlink target is always reported as fresh — symlinks point at
+    the live bundled location, so ``pip upgrade safelint`` reflects
+    immediately. For copy installs (the default), the bundled artefact
+    and the on-disk install are content-hashed and compared.
+    """
+    target = _spec_target(spec, project=project)
+    if target.is_symlink():
+        return INSTALL_STATUS_FRESH
+    if not target.exists():
+        return INSTALL_STATUS_MISSING
+    source = _spec_bundled_source(spec)
+    if source.is_file():
+        if not target.is_file():
+            return INSTALL_STATUS_DIFFERS
+        return INSTALL_STATUS_FRESH if _file_sha256(source) == _file_sha256(target) else INSTALL_STATUS_DIFFERS
+    if not target.is_dir():
+        return INSTALL_STATUS_DIFFERS
+    return INSTALL_STATUS_FRESH if _tree_hash(source) == _tree_hash(target) else INSTALL_STATUS_DIFFERS
+
+
+def _print_status_fresh(spec: ClientSpec, target: Path, scope: str) -> None:
+    """Print a single "fresh" line to stdout."""
+    print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) — fresh")
+
+
+def _print_status_differs(spec: ClientSpec, target: Path, scope: str) -> None:
+    """Print a single "differs" line to stdout."""
+    print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) — differs from bundled")
+
+
+def _print_status_summary(*, any_drift: bool, any_install: bool) -> None:
+    """Print the trailing summary line for ``safelint skill status``."""
+    if not any_install:
+        print("safelint: no AI-client skill installs detected. Run `safelint skill install` to install.")
+        return
+    if any_drift:
+        print("safelint: one or more installs differ from the bundled version.")
+        print("  Run `safelint skill install --force` to refresh.")
+        print("  (If you've customised the file deliberately, ignore this.)")
+        return
+    print("safelint: all detected installs match the bundled version.")
+
+
+def run_status(_args: argparse.Namespace) -> int:
+    """Execute ``safelint skill status`` — report drift between bundled and installed skills.
+
+    Iterates every registered :class:`ClientSpec` and both scopes
+    (user, project). For each install location that exists, reports
+    one of "fresh" or "differs" alongside the path. Returns 0 when
+    every detected install is fresh (or no installs exist), 1 when
+    any install differs from the bundled artefact. Pipe-friendly:
+    use as ``safelint skill status || safelint skill install --force``.
+    """
+    any_drift = False
+    any_install = False
+    for spec, project in _iter_install_locations():
+        status = _install_status(spec, project=project)
+        if status == INSTALL_STATUS_MISSING:
+            continue
+        any_install = True
+        target = _spec_target(spec, project=project)
+        scope = "project" if project else "user"
+        if status == INSTALL_STATUS_DIFFERS:
+            any_drift = True
+            _print_status_differs(spec, target, scope)
+        else:
+            _print_status_fresh(spec, target, scope)
+    _print_status_summary(any_drift=any_drift, any_install=any_install)
+    return 1 if any_drift else 0
+
+
+def _iter_install_locations() -> Iterator[tuple[ClientSpec, bool]]:
+    """Yield ``(spec, project)`` for every registered client xboth scopes.
+
+    Centralises the nested loop so freshness / status helpers stay
+    flat (one for-loop instead of two). Order: registry order with
+    user-scope first, project-scope second.
+    """
+    for spec in _CLIENT_SPECS:
+        for project in (False, True):
+            yield spec, project
+
+
+def stale_install_warnings() -> list[str]:
+    """Return a list of human-readable warning strings, one per stale install location.
+
+    Public helper — used by ``safelint check --check-skill-freshness``
+    to surface drift via the diagnostics channel without changing the
+    lint exit code. An empty list means every detected install is
+    fresh (or no installs exist). Symlinks are always fresh by
+    construction; missing locations don't produce a warning.
+    """
+    warnings: list[str] = []
+    for spec, project in _iter_install_locations():
+        if _install_status(spec, project=project) != INSTALL_STATUS_DIFFERS:
+            continue
+        target = _spec_target(spec, project=project)
+        scope = "project" if project else "user"
+        warnings.append(
+            f"{spec.display_name} {spec.artefact_label} at {target} ({scope} scope) differs from bundled — run `safelint skill install --force` to refresh (or ignore if you've customised it)"
+        )
+    return warnings

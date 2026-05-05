@@ -33,6 +33,7 @@ import subprocess
 import sys
 from typing import TYPE_CHECKING
 
+from safelint.core import _diagnostics
 from safelint.core._cache import LintCache
 from safelint.core.config import MODE_FAIL_ON, SEVERITY_ORDER, load_config
 from safelint.core.engine import SafetyEngine
@@ -626,8 +627,28 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
     return changed_files, files, False
 
 
+def _emit_skill_freshness_warnings() -> None:
+    """Emit a stderr warning for each stale AI-client skill install.
+
+    Called from ``_run_check`` only when the user passes
+    ``--check-skill-freshness``. The function delegates the
+    drift detection to ``_skill_install.stale_install_warnings``
+    and routes each result through the diagnostics channel
+    (``safelint: warning: …`` on stderr). Doesn't fail the run —
+    informational only. Local import avoids paying the
+    ``importlib.resources`` cost on the hot path of normal
+    ``safelint check`` invocations.
+    """
+    from safelint import _skill_install  # noqa: PLC0415
+
+    for warning in _skill_install.stale_install_warnings():
+        _diagnostics.print_warning(warning)
+
+
 def _run_check(args: argparse.Namespace) -> int:
     """Execute directory/file scan mode."""
+    if getattr(args, "check_skill_freshness", False):
+        _emit_skill_freshness_warnings()
     config_path = getattr(args, "config", None)
     target = Path(args.target)
     output_format: str = getattr(args, "output_format", "pretty")
@@ -796,6 +817,17 @@ def _build_check_parser() -> argparse.ArgumentParser:
         default=False,
         help="Scan all Python files under target (default: git-modified files only)",
     )
+    parser.add_argument(
+        "--check-skill-freshness",
+        dest="check_skill_freshness",
+        action="store_true",
+        default=False,
+        help=(
+            "Before linting, verify the installed AI-client skill(s) match the bundled version and "
+            "emit a stderr warning per stale install. Informational only — doesn't fail the run. "
+            "Use ``safelint skill status`` for the dedicated check."
+        ),
+    )
     _build_common_args(parser)
     return parser
 
@@ -885,6 +917,11 @@ def _build_skill_parser() -> argparse.ArgumentParser:
         help="Which bundled artefact's path to print (default: ``claude`` — skill_files root)",
     )
 
+    sub.add_parser(
+        "status",
+        help="Compare every detected installed skill against the bundled version (exit 1 if any differ)",
+    )
+
     return parser
 
 
@@ -941,6 +978,8 @@ def _run_skill(args: argparse.Namespace) -> int:
         return _skill_install.run_install(args)
     if args.skill_action == "path":
         return _skill_install.run_path(args)
+    if args.skill_action == "status":
+        return _skill_install.run_status(args)
     return 1  # pragma: no cover — argparse rejects unknown actions before this
 
 
