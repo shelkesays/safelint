@@ -110,13 +110,21 @@ def _check_suppressed_marking_used(
     if codes is None:
         used.add((violation.lineno, None))
         return True
-    if violation.code in codes:
+    # Mark *every* alias of the matching rule that the directive used.
+    # A directive like ``# nosafe: SAFE101, function_length`` lists
+    # the same rule under both its code and its rule-name aliases —
+    # both are intentionally consumed by the matching violation.
+    # Without this, an early-return after the first match would leave
+    # the second alias marked "unused" and surface a false SAFE004.
+    matched_code = violation.code in codes
+    matched_rule = violation.rule in codes
+    if not (matched_code or matched_rule):
+        return False
+    if matched_code:
         used.add((violation.lineno, violation.code))
-        return True
-    if violation.rule in codes:
+    if matched_rule:
         used.add((violation.lineno, violation.rule))
-        return True
-    return False
+    return True
 
 
 def _is_per_file_ignored(violation: Violation, ignored_names: frozenset[str], ignored_codes: frozenset[str]) -> bool:

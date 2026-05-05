@@ -11,7 +11,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 - [Symlink mode (developer loop)](#symlink-mode-developer-loop)
 - [Updating after a safelint upgrade](#updating-after-a-safelint-upgrade)
 - [Troubleshooting](#troubleshooting)
-- [Adding a new AI client (developer guide)](#adding-a-new-ai-client-developer-guide)
+- [Adding a new AI client (developer guide)](#adding-a-new-ai-client)
 - [Roadmap](#roadmap)
 
 ## Supported clients
@@ -21,7 +21,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **Claude Code** | Skill directory (`SKILL.md` + `languages/`) | `~/.claude/skills/safelint/` (user) or `<cwd>/.claude/skills/safelint/` (project) | `CLAUDE.md`, `.claude/`, or `.claude.json` in cwd; `~/.claude/` or `~/.claude.json` for user-scope |
 | **Cursor** | Project Rule (`.mdc` file) | `~/.cursor/rules/safelint.mdc` (user) or `<cwd>/.cursor/rules/safelint.mdc` (project) | `.cursor/` or `.cursorrules` in cwd; `~/.cursor/` for user-scope |
 
-More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client-developer-guide)).
+More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
 
 ## Quick start
 

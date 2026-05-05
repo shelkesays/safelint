@@ -366,13 +366,22 @@ Each rule has:
 
 ### Engine-internal codes
 
-A few codes are emitted by the engine directly rather than by registered `BaseRule` subclasses. They follow the same `# nosafe: SAFE0xx` and global `ignore` semantics as ordinary rules but don't have their own config section.
+A few codes are emitted by the engine directly rather than by registered `BaseRule` subclasses. They don't have their own config section and follow the global `ignore` list. Inline `# nosafe: SAFE0xx` works for codes emitted *after* parsing (such as SAFE004 — see below) but **not** for SAFE000, because parse errors are raised before the engine has a chance to read suppression directives off the tree.
 
 #### SAFE000 - `parse`
 
 **What it flags:** Tree-sitter parse errors (syntax errors, broken indentation, missing tokens). The violation carries the offending token's column as a zero-width caret so editors can mark the precise location.
 
-Always severity `error`. Cannot be configured. Disable globally via `ignore = ["SAFE000"]` if you genuinely don't want parse errors surfaced (rare).
+Always severity `error`. Cannot be configured per-rule.
+
+**Inline `# nosafe: SAFE000` does *not* work.** Parse errors are raised by `SafetyEngine._lint_parsed_source` *before* it parses inline suppression directives off the Tree-sitter tree (see the early-return at the parse-error check). The only way to silence SAFE000 is the global `ignore` list, which is read at engine init from your config file:
+
+```toml
+[tool.safelint]
+ignore = ["SAFE000"]   # or ignore = ["parse"] — rule name also accepted
+```
+
+Use this when you genuinely don't want parse errors surfaced (rare — usually you *do* want to know when a file failed to parse).
 
 #### SAFE004 - `unused_suppression` *(added in 1.8.0)*
 
