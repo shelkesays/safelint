@@ -22,7 +22,7 @@ Usage: safelint [OPTIONS] <COMMAND>
 
 Commands:
   check    Scan a file or directory for safety violations
-  skill    Manage the bundled Claude Code skill (install, path)
+  skill    Manage the bundled AI-client skill / project rule for Claude Code or Cursor (install, path)
   help     Print this message or the help of the given subcommand
   version  Display SafeLint's version
 

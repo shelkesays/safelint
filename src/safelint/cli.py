@@ -201,9 +201,16 @@ def _make_fixes_line(violations: list[Violation], suppressed_note: str) -> str:
     """
     suggestion_count = sum(len(v.suggestions) for v in violations)
     if suggestion_count == 0:
-        return f"No suggestions available (safelint does not auto-fix; see --format json for any advisory edits).{suppressed_note}"
+        # No "see --format json" tail when zero suggestions — there's
+        # nothing for that flag to surface in this run, and dangling
+        # the pointer would falsely imply otherwise.
+        return f"No suggestions available (safelint does not auto-fix).{suppressed_note}"
     n = "1 advisory suggestion" if suggestion_count == 1 else f"{suggestion_count} advisory suggestions"
-    return f"{n} available — view via --format json (safelint does not auto-apply fixes).{suppressed_note}"
+    # Suggestions are emitted in both JSON and SARIF (the SARIF
+    # ``fixes[]`` block, advisory by spec) — point at both so users
+    # picking a format don't have to discover SARIF support
+    # separately.
+    return f"{n} available — view via --format json or --format sarif (safelint does not auto-apply fixes).{suppressed_note}"
 
 
 def _file_summary_line(filepath: str, violations: list[Violation]) -> str:
