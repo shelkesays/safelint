@@ -18,7 +18,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 
 | Client | Native format | Install destination | Detection markers |
 |---|---|---|---|
-| **Claude Code** | Skill directory (`SKILL.md` + `languages/`) | `~/.claude/skills/safelint/` (user) or `<cwd>/.claude/skills/safelint/` (project) | `CLAUDE.md` or `.claude/` in cwd; `~/.claude/` for user-scope |
+| **Claude Code** | Skill directory (`SKILL.md` + `languages/`) | `~/.claude/skills/safelint/` (user) or `<cwd>/.claude/skills/safelint/` (project) | `CLAUDE.md`, `.claude/`, or `.claude.json` in cwd; `~/.claude/` or `~/.claude.json` for user-scope |
 | **Cursor** | Project Rule (`.mdc` file) | `~/.cursor/rules/safelint.mdc` (user) or `<cwd>/.cursor/rules/safelint.mdc` (project) | `.cursor/` or `.cursorrules` in cwd; `~/.cursor/` for user-scope |
 
 More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client-developer-guide)).
@@ -81,7 +81,7 @@ safelint: Cursor rule copied to /repo/.cursor/rules/safelint.mdc (project scope)
 
 ### Claude Code
 
-**Markers:** `CLAUDE.md` or `.claude/` in the project root for project-scope; `~/.claude/` for user-scope.
+**Markers:** `CLAUDE.md`, `.claude/`, or `.claude.json` in the project root for project-scope; `~/.claude/` or `~/.claude.json` for user-scope. Any one marker is enough — detection picks the first one it finds.
 
 **Install location:**
 

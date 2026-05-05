@@ -73,8 +73,13 @@ _CLAUDE_SPEC = ClientSpec(
     name="claude",
     display_name="Claude Code",
     artefact_label="skill",
-    cwd_markers=("CLAUDE.md", ".claude"),
-    home_markers=(".claude",),
+    # Detection markers, in priority order — the first one that exists
+    # is the one we report in the detection notice. ``CLAUDE.md`` and
+    # ``.claude/`` are the most common; ``.claude.json`` is the
+    # Claude Code settings file (per-user at ``~/.claude.json``,
+    # per-project when committed alongside repo config).
+    cwd_markers=("CLAUDE.md", ".claude", ".claude.json"),
+    home_markers=(".claude", ".claude.json"),
     install_relpath=(".claude", "skills", "safelint"),
     bundled_relpath=(),  # whole skill_files/ tree (minus peer-client dirs)
     restart_hint="Restart Claude Code (or open a new session) to pick up the skill.",

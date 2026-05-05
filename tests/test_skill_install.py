@@ -428,6 +428,35 @@ def test_install_auto_detects_claude_in_cwd_via_dot_claude_dir(monkeypatch: pyte
     assert not (home / ".claude").exists()
 
 
+def test_install_auto_detects_claude_in_cwd_via_claude_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client auto`` with only ``.claude.json`` in cwd also triggers Claude project-scoped install.
+
+    ``.claude.json`` is the Claude Code settings file; some projects
+    commit a project-scoped one without an accompanying ``.claude/``
+    directory or ``CLAUDE.md``. The detection covers all three forms
+    independently — any one is enough.
+    """
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".claude.json").write_text('{"mcp": {}}', encoding="utf-8")
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".claude" / "skills" / "safelint" / "SKILL.md").is_file()
+    assert not (home / ".claude").exists()
+    out = capsys.readouterr().out
+    # Detection notice surfaces the actual matched marker.
+    assert "Claude Code (.claude.json)" in out
+
+
+def test_install_auto_falls_back_to_home_via_claude_json(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Home fallback also covers ``~/.claude.json`` (the user-global Claude Code settings file)."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (home / ".claude.json").write_text('{"mcp": {}}', encoding="utf-8")
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (home / ".claude" / "skills" / "safelint" / "SKILL.md").is_file()
+    assert not (cwd / ".claude").exists()
+
+
 def test_install_auto_detects_cursor_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--client auto`` with ``.cursor/`` in cwd installs Cursor project-scoped."""
     home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
