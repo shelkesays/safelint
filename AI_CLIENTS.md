@@ -169,6 +169,8 @@ safelint skill update --force
 
 `safelint skill update` runs a drift check first and only re-installs the installs that have actually drifted. With `--force`, it re-installs every detected install regardless. Inherits the same `--client` / `--project` / `--symlink` flags as `install`; the only behavioural difference is that **`--client auto` for update detects via install paths, not marker files** — "what's installed?" rather than "what client is the user using?".
 
+**Shape preservation:** `update` (with or without `--force`) does **not** convert install modes silently. A symlink-mode install stays a symlink after refresh; a copy-mode install stays a copy. Pass `--symlink` explicitly if you want to *switch* a copy install to symlink mode mid-flight (the only direction that requires opt-in; symlink → copy must go through `remove` + `install` to be unambiguous).
+
 For one-shot manual control:
 
 ```bash
@@ -182,15 +184,45 @@ Symlink mode picks up changes automatically; no re-install needed unless you wan
 
 ```bash
 safelint skill remove                     # auto-detect and remove every install
-safelint skill remove --client cursor     # only Cursor installs
+safelint skill remove --client cursor     # only Cursor installs (both shapes)
 safelint skill remove --symlink           # only symlink-shape installs (keep copies)
+safelint skill remove --project           # only project-scope installs (keep user-scope)
 safelint skill remove --path /unusual/place/safelint.mdc   # one specific location
 safelint skill remove --dry-run           # preview without deleting
 ```
 
-`safelint skill remove` mirrors install's auto-detect *for install paths* (not marker files): it scans `~/.claude/skills/safelint/`, `<cwd>/.claude/skills/safelint/`, `~/.cursor/rules/safelint.mdc`, `<cwd>/.cursor/rules/safelint.mdc` and removes whatever exists. Use `--client X` / `--project` to restrict the scope and `--symlink` to filter to symlink-shape installs (handy when you want to keep your copy-mode installs but tear down the symlink ones).
+`safelint skill remove` mirrors install's auto-detect *for install paths* (not marker files): it scans `~/.claude/skills/safelint/`, `<cwd>/.claude/skills/safelint/`, `~/.cursor/rules/safelint.mdc`, `<cwd>/.cursor/rules/safelint.mdc` and removes whatever exists.
 
-`--path PATH` is the escape hatch for unusual install locations — overrides every other flag, removes exactly that one path, errors on stderr if the path doesn't exist. `--dry-run` previews what would be removed without touching anything; useful for documentation / CI sanity checks before commit.
+#### What gets removed under each combination
+
+The flags compose orthogonally — `--client` filters to one client, `--project` restricts to project scope, `--symlink` filters to symlink-shape installs. **The absence of a flag means "no filter"**, *not* "only the opposite":
+
+| Invocation | What gets removed |
+|---|---|
+| `remove` (no flags) | Every detected install — copy + symlink, every client, both scopes |
+| `remove --symlink` | Only symlink-shape installs (copy installs survive) |
+| `remove --client cursor` | All detected Cursor installs (both shapes, both scopes) |
+| `remove --client cursor --symlink` | Only symlink-shape Cursor installs |
+| `remove --project` | All detected project-scope installs (user-scope survives) |
+| `remove --client cursor --project --symlink` | Only project-scope, symlink-shape Cursor installs |
+| `remove --path PATH` | Exactly one location, regardless of every other flag |
+
+In particular, `safelint skill remove` **without `--symlink` removes both shapes** — it's not a "remove copies only" command. The `--symlink` flag is a filter you can opt into when you want to be selective; without it, cleanup is comprehensive.
+
+#### Filesystem-level safety
+
+`remove` only deletes from the install location. The bundled files inside `site-packages/` are never touched, regardless of install mode:
+
+- **Copy install (single file)** — `target.unlink()` deletes the file.
+- **Copy install (directory tree)** — `shutil.rmtree(target)` walks and deletes the materialised tree.
+- **Symlink install (single file)** — `target.unlink()` deletes the **symlink**, not its bundled target.
+- **Symlink install (per-entry directory layout, Claude `--symlink`)** — `shutil.rmtree(target)` removes the directory; inner symlinks are deleted but their targets in the bundled package stay intact.
+
+So you can run `remove` freely without worrying about damaging the wheel — the worst case is "I have to re-run `install` to get the skill back".
+
+#### Other flags
+
+`--path PATH` is the escape hatch for unusual install locations — overrides every other flag, removes exactly that one path, errors on stderr if the path doesn't exist. `--dry-run` previews what would be removed without touching anything; useful for documentation / CI sanity checks before commit. Each line of `--dry-run` output includes the install shape (`copy` or `symlink`) so you know what `remove` would do at that location.
 
 ### Checking whether your installed skill is current
 
