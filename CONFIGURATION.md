@@ -90,7 +90,21 @@ Both commands inherit `--client {auto, claude, cursor}` and `--project` from `in
 
 **`update` flag semantics:** `--force` here means "refresh every matching install regardless of drift status" (different from `install`'s `--force` which means "replace existing"). Without `--force`, `update` is idempotent — running it on fresh installs leaves them unchanged, though the command may still print "already fresh" / "already up to date" status messages, making it suitable for cron / CI / pre-commit scripts when informational stdout is acceptable.
 
-**`remove` flag semantics:** `--symlink` is a *filter* (only remove installs whose on-disk shape is symlink), not a creation-mode toggle like in `install`. `--path PATH` overrides every other flag and removes exactly the specified location; useful for unusual / forgotten installs that auto-detect won't see.
+`update` also **preserves install shape**: a symlink install stays symlink after refresh, a copy install stays copy. Pass `--symlink` explicitly to switch a copy install to symlink mode (the only mode change that requires opt-in; symlink → copy must go through `remove` + `install`).
+
+**`remove` flag semantics:** flags compose orthogonally — the absence of a flag means "no filter", *not* "only the opposite":
+
+| Invocation | What gets removed |
+|---|---|
+| `remove` (no flags) | Every detected install — copy + symlink, every client, both scopes |
+| `remove --symlink` | Only symlink-shape installs (copies survive) |
+| `remove --client cursor` | All detected Cursor installs (both shapes, both scopes) |
+| `remove --project` | All detected project-scope installs (user-scope survives) |
+| `remove --path PATH` | Exactly one location, regardless of every other flag |
+
+In particular, `safelint skill remove` without `--symlink` removes **both** copy and symlink installs — it's not a "remove copies only" command. `--symlink` is a *filter* you can opt into when you want to be selective, not a creation-mode toggle like in `install`.
+
+`remove` only deletes the install location. Bundled files inside `site-packages/` are never touched (`shutil.rmtree` doesn't follow symlinks for deletion, and `unlink` removes the symlink itself, not its bundled target). The worst case for a misfired `remove` is "re-run `install` to get the skill back". See [`AI_CLIENTS.md`](AI_CLIENTS.md) "Removing an installed skill" for the full filesystem-level breakdown.
 
 ### `safelint check` flags
 
