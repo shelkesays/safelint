@@ -1221,6 +1221,101 @@ def test_update_explicit_client_without_project_targets_both_scopes(monkeypatch:
     assert "project customised" not in project_target.read_text(encoding="utf-8")
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_update_force_preserves_symlink_install_shape(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``update --force`` on a symlink install keeps it as a symlink (doesn't convert to copy).
+
+    Without explicit ``--symlink``, the user hasn't asked to change
+    the install mode — only to refresh content. Silently flipping a
+    symlink install to copy on every force-refresh would strip the
+    user's deliberate live-link guarantee. The fix derives the mode
+    from the existing install's shape when ``--symlink`` isn't
+    explicit. Passing ``--symlink`` still wins, so users can switch
+    a copy install to symlink mode mid-flight.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Plant a Cursor symlink install.
+    assert _skill_install.run_install(_make_args(client="cursor", symlink=True)) == 0
+    target = home / ".cursor" / "rules" / "safelint.mdc"
+    assert target.is_symlink()  # baseline
+
+    # Force-refresh without --symlink. Old behaviour: would replace with
+    # a copy. Fixed behaviour: preserves the symlink shape.
+    rc = _skill_install.run_update(_make_update_args(force=True))
+    assert rc == 0
+    assert target.is_symlink(), "force-refresh must preserve symlink shape"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_update_force_with_explicit_symlink_switches_copy_to_symlink(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``update --force --symlink`` on a copy install converts it to symlink.
+
+    Explicit ``--symlink`` is the user's opt-in to switch modes —
+    must override the shape-preservation default. Symmetric to
+    ``install --symlink --force``.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    target = home / ".cursor" / "rules" / "safelint.mdc"
+    assert target.is_file()
+    assert not target.is_symlink()  # copy-mode baseline
+
+    rc = _skill_install.run_update(_make_update_args(force=True, symlink=True))
+    assert rc == 0
+    assert target.is_symlink(), "explicit --symlink must convert copy → symlink"
+
+
+def test_is_symlink_directory_shape_returns_false_on_oserror(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_is_symlink_directory_shape`` fails closed when iterdir raises OSError.
+
+    An unreadable install directory (permission denied, transient
+    I/O) shouldn't crash ``update`` / ``remove --symlink``. Without
+    the OSError catch, the cleanup paths would propagate the
+    exception up to the user. Patches ``iterdir`` on a real
+    directory to raise OSError and asserts the predicate returns
+    False (treating "can't tell" as "not symlink-shape").
+    """
+    real_dir = tmp_path / "claude_install"
+    real_dir.mkdir()
+    # Use monkeypatch on the Path class so the iterdir call inside
+    # the helper hits our patched method.
+    original_iterdir = Path.iterdir
+
+    def _raise_oserror(self: Path) -> object:
+        if self == real_dir:
+            msg = "permission denied (simulated)"
+            raise OSError(msg)
+        return original_iterdir(self)
+
+    monkeypatch.setattr(Path, "iterdir", _raise_oserror)
+    assert _skill_install._is_symlink_directory_shape(real_dir) is False
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_remove_path_dry_run_labels_broken_symlink_directory_as_symlink(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``remove --path`` shape label uses shape-only predicate, not freshness.
+
+    A Claude-style symlink directory with a broken inner symlink is
+    still symlink-shape; its ``--dry-run`` output should say
+    "symlink", not "copy". The previous implementation used
+    ``_is_symlink_managed_directory`` (working-symlinks-required)
+    for the shape label, mislabelling broken installs as copy.
+    """
+    odd_dir = tmp_path / "stray_claude_install"
+    odd_dir.mkdir()
+    # Build a Claude-style symlink directory with a broken inner symlink.
+    bundled = _skill_install.bundled_skill_path()
+    (odd_dir / "languages").symlink_to(bundled / "languages", target_is_directory=True)
+    # Plus a broken inner symlink to trigger the freshness predicate's
+    # working-symlink rejection.
+    (odd_dir / "SKILL.md").symlink_to(tmp_path / "vanished.md")
+
+    rc = _skill_install.run_remove(_make_remove_args(path=odd_dir, dry_run=True))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "(symlink)" in out, "broken Claude-style directory should label as symlink"
+
+
 def test_update_one_handles_namespace_without_force_attribute() -> None:
     """``_update_one`` reads ``force`` defensively via ``getattr``.
 
