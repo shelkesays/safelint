@@ -673,10 +673,23 @@ def _is_symlink_directory_shape(target: Path) -> bool:
     symlinks even when their targets are missing. Freshness / validity
     is handled separately by :func:`_is_symlink_managed_directory`,
     which requires the inner symlinks to actually resolve.
+
+    Wraps the ``iterdir`` call in ``try/except OSError`` so that an
+    unreadable install directory (permissions / transient I/O errors)
+    fails closed rather than crashing ``update`` / ``remove``. Treats
+    such directories as "not symlink-shape" — the cleanup paths fall
+    back to the directory-tree branch (which has its own error
+    handling) instead of propagating the OSError up to the user.
     """
     if not target.is_dir():
         return False
-    entries = list(target.iterdir())
+    # Fail-closed on iterdir errors: callers (update / remove --symlink)
+    # treat "not symlink-shape" as "skip", so a permission error degrades
+    # gracefully instead of propagating up to the user.
+    try:
+        entries = list(target.iterdir())
+    except OSError:  # nosafe: SAFE203
+        return False
     if not entries:
         return False
     return all(entry.is_symlink() for entry in entries)
@@ -759,19 +772,30 @@ def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) ->
     that construct a partial ``Namespace`` (e.g. tests, programmatic
     invocations) don't trip ``AttributeError`` — matches the defensive
     pattern used by every other arg-reading helper in this module.
+
+    **Shape preservation:** when ``--symlink`` is not explicitly set,
+    the refresh inherits the existing install's shape (symlink stays
+    symlink, copy stays copy). Without this, ``update --force`` on a
+    symlink-mode install would silently convert it to copy — the user
+    would lose the live-link guarantee they originally opted into.
+    Passing ``--symlink`` explicitly still wins, so users can switch
+    a copy install to symlink mode mid-flight (the only direction
+    that requires opt-in; symlink → copy must go through
+    ``remove`` + ``install`` to be unambiguous).
     """
     force = bool(getattr(args, "force", False))
-    symlink = bool(getattr(args, "symlink", False))
+    explicit_symlink = bool(getattr(args, "symlink", False))
     target = _spec_target(spec, project=project)
     scope = "project" if project else "user"
     status = _install_status(spec, project=project)
     if status == INSTALL_STATUS_FRESH and not force:
         _print_update_skipped_fresh(spec, target, scope)
         return 0
+    use_symlink = explicit_symlink or _install_is_symlink_shape(spec, project=project)
     install_args = argparse.Namespace(
         client=spec.name,
         project=project,
-        symlink=symlink,
+        symlink=use_symlink,
         force=True,
     )
     return _install_one(spec, project=project, args=install_args)
@@ -876,7 +900,7 @@ def _remove_path(path: Path, *, dry_run: bool) -> int:
     if not path.exists() and not path.is_symlink():
         _print_remove_path_missing(path)
         return 1
-    shape = "symlink" if path.is_symlink() or _is_symlink_managed_directory(path) else "copy"
+    shape = "symlink" if path.is_symlink() or (path.is_dir() and _is_symlink_directory_shape(path)) else "copy"
     if dry_run:
         _print_remove_dry_run(None, path, None, shape=shape)
         return 0
