@@ -88,7 +88,7 @@ safelint skill remove --dry-run                # preview without deleting
 
 Both commands inherit `--client {auto, claude, cursor}` and `--project` from `install`, but `--client auto` resolves differently: install scans **marker files** (`CLAUDE.md`, `.cursor/`) to figure out *which client the user is using*; update / remove scan **actual install paths** to figure out *what's currently installed*. This matters when a user has client markers but no install yet, or vice-versa.
 
-**`update` flag semantics:** `--force` here means "refresh every matching install regardless of drift status" (different from `install`'s `--force` which means "replace existing"). Without `--force`, `update` is idempotent — running it on fresh installs is a silent no-op suitable for cron / CI / pre-commit scripts.
+**`update` flag semantics:** `--force` here means "refresh every matching install regardless of drift status" (different from `install`'s `--force` which means "replace existing"). Without `--force`, `update` is idempotent — running it on fresh installs leaves them unchanged, though the command may still print "already fresh" / "already up to date" status messages, making it suitable for cron / CI / pre-commit scripts when informational stdout is acceptable.
 
 **`remove` flag semantics:** `--symlink` is a *filter* (only remove installs whose on-disk shape is symlink), not a creation-mode toggle like in `install`. `--path PATH` overrides every other flag and removes exactly the specified location; useful for unusual / forgotten installs that auto-detect won't see.
 

@@ -680,7 +680,7 @@ def _install_is_symlink_shape(spec: ClientSpec, *, project: bool) -> bool:
     return _is_symlink_managed_directory(target)
 
 
-def _detected_installed_clients(*, only_symlink: bool = False) -> list[tuple[ClientSpec, bool]]:
+def _detected_installed_clients(*, only_symlink: bool = False, project_only: bool = False) -> list[tuple[ClientSpec, bool]]:
     """Return [(spec, project)] for every existing install across the registry.
 
     Used by ``update`` / ``remove`` to answer "what's currently
@@ -692,9 +692,18 @@ def _detected_installed_clients(*, only_symlink: bool = False) -> list[tuple[Cli
     *only_symlink* (default False): when True, filter to installs whose
     on-disk shape is symlink (used by ``remove --symlink`` to leave
     copy installs untouched).
+
+    *project_only* (default False): when True, restrict to project-scope
+    installs and skip user-scope ones. Used by ``update --project`` /
+    ``remove --project`` so the ``--project`` flag's scope-restriction
+    semantics apply equally to the auto-detect path. Without this,
+    ``safelint skill update --project`` would silently process
+    user-scope installs too, contradicting the CLI help.
     """
     detected: list[tuple[ClientSpec, bool]] = []
     for spec, project in _iter_install_locations():
+        if project_only and not project:
+            continue
         if _install_status(spec, project=project) == INSTALL_STATUS_MISSING:
             continue
         if only_symlink and not _install_is_symlink_shape(spec, project=project):
@@ -756,7 +765,7 @@ def run_update(args: argparse.Namespace) -> int:
         targets: list[tuple[ClientSpec, bool]] = [(_spec_by_name(explicit_client), project_flag)]
         targets = [(s, p) for s, p in targets if _install_status(s, project=p) != INSTALL_STATUS_MISSING]
     else:
-        targets = _detected_installed_clients()
+        targets = _detected_installed_clients(project_only=project_flag)
     if not targets:
         _print_update_no_installs()
         return 0
@@ -842,7 +851,7 @@ def _resolve_remove_candidates(args: argparse.Namespace) -> list[tuple[ClientSpe
     project_flag = bool(getattr(args, "project", False))
     only_symlink = bool(getattr(args, "symlink", False))
     if explicit_client == "auto":
-        return _detected_installed_clients(only_symlink=only_symlink)
+        return _detected_installed_clients(only_symlink=only_symlink, project_only=project_flag)
     spec = _spec_by_name(explicit_client)
     if _install_status(spec, project=project_flag) == INSTALL_STATUS_MISSING:
         return []

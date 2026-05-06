@@ -2,8 +2,10 @@
 #
 # This file is the standalone safelint config (top-level keys, no
 # ``[tool.safelint]`` wrapper). It takes precedence over ``[tool.safelint]``
-# in ``pyproject.toml`` per ``CLAUDE.md`` "Layers" → config.py: standalone
-# safelint.toml → [tool.safelint] in pyproject.toml → built-in defaults.
+# in ``pyproject.toml``; see the authoritative docstring in
+# ``src/safelint/core/config.py`` for the precedence order:
+# standalone ``safelint.toml`` → ``[tool.safelint]`` in ``pyproject.toml``
+# → built-in defaults.
 #
 # All keys are optional; unset keys fall back to built-in defaults.
 
