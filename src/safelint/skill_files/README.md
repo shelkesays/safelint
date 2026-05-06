@@ -73,6 +73,24 @@ safelint skill install --force
 
 # Skill development (changes to bundled files take effect immediately)
 safelint skill install --symlink --force
+
+# Refresh installed skills after pip upgrade (idempotent — no-op when fresh)
+safelint skill update
+
+# Force-refresh every install regardless of drift (revert customisations)
+safelint skill update --force
+
+# Remove every detected install
+safelint skill remove
+
+# Remove only symlink-shape installs, keep copy installs intact
+safelint skill remove --symlink
+
+# Preview removal without deleting
+safelint skill remove --dry-run
+
+# Remove an unusual install location auto-detect won't see
+safelint skill remove --path /unusual/place/safelint.mdc
 ```
 
 ### Where are the bundled files?

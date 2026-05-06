@@ -922,7 +922,87 @@ def _build_skill_parser() -> argparse.ArgumentParser:
         help="Compare every detected installed skill against the bundled version (exit 1 if any differ)",
     )
 
+    update = sub.add_parser(
+        "update",
+        help="Refresh installed skills whose content has drifted from the bundled wheel (no-op when fresh, --force overrides)",
+    )
+    _add_skill_update_arguments(update, INSTALL_CLIENT_CHOICES)
+
+    remove = sub.add_parser(
+        "remove",
+        help="Delete detected installed skills (auto-detects from install paths; --symlink filters to symlink-shape; --path overrides)",
+    )
+    _add_skill_remove_arguments(remove, INSTALL_CLIENT_CHOICES)
+
     return parser
+
+
+def _add_skill_update_arguments(update: argparse.ArgumentParser, install_choices: tuple[str, ...]) -> None:
+    """Attach ``--client`` / ``--project`` / ``--symlink`` / ``--force`` to the update subparser.
+
+    Same flags as ``install`` but ``--client auto`` resolves via install
+    paths (not marker files). ``--force`` here means "refresh even when
+    status says fresh" rather than "replace existing".
+    """
+    update.add_argument(
+        "--client",
+        choices=install_choices,
+        default="auto",
+        help="Target AI client: ``auto`` (default — detect from existing install paths, NOT marker files like ``install``) or one of: " + ", ".join(c for c in install_choices if c != "auto"),
+    )
+    update.add_argument(
+        "--project",
+        action="store_true",
+        default=False,
+        help="Restrict to project-scope installs (<cwd>/.<client>/...)",
+    )
+    update.add_argument(
+        "--symlink",
+        action="store_true",
+        default=False,
+        help="Re-create the install in symlink mode (mirrors install's --symlink)",
+    )
+    update.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Refresh every matching install regardless of drift status (useful for reverting customisations to bundled)",
+    )
+
+
+def _add_skill_remove_arguments(remove: argparse.ArgumentParser, install_choices: tuple[str, ...]) -> None:
+    """Attach ``--client`` / ``--project`` / ``--symlink`` / ``--path`` / ``--dry-run`` to the remove subparser."""
+    remove.add_argument(
+        "--client",
+        choices=install_choices,
+        default="auto",
+        help="Target AI client: ``auto`` (default — detect from existing install paths) or one of: " + ", ".join(c for c in install_choices if c != "auto"),
+    )
+    remove.add_argument(
+        "--project",
+        action="store_true",
+        default=False,
+        help="Restrict to project-scope installs (<cwd>/.<client>/...)",
+    )
+    remove.add_argument(
+        "--symlink",
+        action="store_true",
+        default=False,
+        help="Filter to symlink-shape installs only — keep copy-mode installs intact (composes with ``--client`` and ``--project``)",
+    )
+    remove.add_argument(
+        "--path",
+        type=Path,
+        default=None,
+        help="Remove one specific install at PATH (overrides every other flag, including auto-detect)",
+    )
+    remove.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        default=False,
+        help="Preview what would be removed without deleting anything",
+    )
 
 
 # Long options that consume the *following* argv token as their value
@@ -980,6 +1060,10 @@ def _run_skill(args: argparse.Namespace) -> int:
         return _skill_install.run_path(args)
     if args.skill_action == "status":
         return _skill_install.run_status(args)
+    if args.skill_action == "update":
+        return _skill_install.run_update(args)
+    if args.skill_action == "remove":
+        return _skill_install.run_remove(args)
     return 1  # pragma: no cover — argparse rejects unknown actions before this
 
 
@@ -996,7 +1080,7 @@ def _run_skill(args: argparse.Namespace) -> int:
 
 _HELP_COMMANDS: tuple[tuple[str, str], ...] = (
     ("check", "Scan a file or directory for safety violations"),
-    ("skill", "Manage the bundled AI-client skill / project rule for Claude Code or Cursor (install, path, status)"),
+    ("skill", "Manage the bundled AI-client skill / project rule for Claude Code or Cursor (install, update, remove, path, status)"),
     ("help", "Print this message or the help of the given subcommand"),
     ("version", "Display SafeLint's version"),
 )
