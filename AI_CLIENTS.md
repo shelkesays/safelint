@@ -158,15 +158,39 @@ Caveat: symlink mode requires symlink support — POSIX shells, or Windows with 
 
 ## Updating after a safelint upgrade
 
-Copy mode (default) is a snapshot — `pip upgrade safelint` doesn't touch the installed skill until you re-run the install:
+Copy mode (default) is a snapshot — `pip upgrade safelint` doesn't touch the installed skill until you re-run the install. Two ways to refresh:
 
 ```bash
 pip install --upgrade safelint
-safelint skill install --force            # auto-detected clients
+safelint skill update                     # idempotent — no-op if everything is fresh
+# or, if you want to force-refresh customised installs back to bundled:
+safelint skill update --force
+```
+
+`safelint skill update` runs a drift check first and only re-installs the installs that have actually drifted. With `--force`, it re-installs every detected install regardless. Inherits the same `--client` / `--project` / `--symlink` flags as `install`; the only behavioural difference is that **`--client auto` for update detects via install paths, not marker files** — "what's installed?" rather than "what client is the user using?".
+
+For one-shot manual control:
+
+```bash
+safelint skill install --force            # auto-detected clients (marker-file detection)
 safelint skill install --client cursor --force   # or specific client
 ```
 
 Symlink mode picks up changes automatically; no re-install needed unless you want to re-run detection (e.g. after adding a new client to the project).
+
+### Removing an installed skill
+
+```bash
+safelint skill remove                     # auto-detect and remove every install
+safelint skill remove --client cursor     # only Cursor installs
+safelint skill remove --symlink           # only symlink-shape installs (keep copies)
+safelint skill remove --path /unusual/place/safelint.mdc   # one specific location
+safelint skill remove --dry-run           # preview without deleting
+```
+
+`safelint skill remove` mirrors install's auto-detect *for install paths* (not marker files): it scans `~/.claude/skills/safelint/`, `<cwd>/.claude/skills/safelint/`, `~/.cursor/rules/safelint.mdc`, `<cwd>/.cursor/rules/safelint.mdc` and removes whatever exists. Use `--client X` / `--project` to restrict the scope and `--symlink` to filter to symlink-shape installs (handy when you want to keep your copy-mode installs but tear down the symlink ones).
+
+`--path PATH` is the escape hatch for unusual install locations — overrides every other flag, removes exactly that one path, errors on stderr if the path doesn't exist. `--dry-run` previews what would be removed without touching anything; useful for documentation / CI sanity checks before commit.
 
 ### Checking whether your installed skill is current
 

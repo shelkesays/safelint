@@ -1108,3 +1108,280 @@ def test_skill_documents_every_supported_extension(spec: _skill_install.ClientSp
     text = _read_skill_docs(spec)
     missing = sorted(ext for ext in supported_extensions() if not _appears_as_token(text, ext))
     assert not missing, f"{spec.name}: supported extensions missing from skill docs ({spec.documentation_relpaths}): {missing}"
+
+
+# ---------------------------------------------------------------------------
+# safelint skill update — refresh stale installs (no-op when fresh)
+# ---------------------------------------------------------------------------
+
+
+def _make_update_args(*, project: bool = False, symlink: bool = False, force: bool = False, client: str = "auto") -> argparse.Namespace:
+    """Namespace shaped like the update argparser produces."""
+    return argparse.Namespace(skill_action="update", project=project, symlink=symlink, force=force, client=client)
+
+
+def test_update_is_noop_when_install_is_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill update`` on a fresh install exits 0 and reports skipped."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    capsys.readouterr()  # drop install output
+
+    rc = _skill_install.run_update(_make_update_args())
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "already fresh, skipped" in out
+
+
+def test_update_refreshes_drifted_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill update`` re-installs when the on-disk content has drifted."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    target = home / ".cursor" / "rules" / "safelint.mdc"
+    target.write_text("# customised — diverges from bundled\n", encoding="utf-8")
+    capsys.readouterr()
+
+    rc = _skill_install.run_update(_make_update_args())
+    assert rc == 0
+    # Content was restored from bundled.
+    assert "customised" not in target.read_text(encoding="utf-8")
+    # Status now fresh.
+    assert _skill_install._install_status(_skill_install._CURSOR_SPEC, project=False) == _skill_install.INSTALL_STATUS_FRESH
+
+
+def test_update_force_refreshes_even_fresh_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--force`` re-installs even when the install is already fresh.
+
+    Useful for reverting a customised install — the customisation
+    would normally pass status as drift, but ``--force`` also covers
+    the case where the user wants to reset a fresh install (e.g.
+    after manually editing then deciding to revert).
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    capsys.readouterr()
+
+    rc = _skill_install.run_update(_make_update_args(force=True))
+    assert rc == 0
+    out = capsys.readouterr().out
+    # Force path goes through install_one's success print.
+    assert "copied" in out
+    # And NOT the skipped notice.
+    assert "already fresh, skipped" not in out
+
+
+def test_update_returns_zero_when_no_installs_exist(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``update`` with no detected installs is informational, not an error."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_update(_make_update_args())
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "no AI-client skill installs detected" in out
+
+
+def test_update_auto_uses_install_paths_not_marker_files(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client auto`` for update scans installed paths, NOT marker files.
+
+    A user can have ``.cursor/`` markers in cwd without a Cursor
+    install (just installed Cursor today, hasn't run safelint skill
+    install yet) — update auto must report nothing to do, not silently
+    re-trigger an install.
+    """
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Plant cwd Cursor markers but no actual install.
+    (cwd / ".cursor").mkdir()
+    capsys.readouterr()
+
+    rc = _skill_install.run_update(_make_update_args())
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "no AI-client skill installs detected" in out
+
+
+def test_update_explicit_client_at_missing_scope_is_noop(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``update --client claude`` when no Claude install exists is a clean no-op."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_update(_make_update_args(client="claude"))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "no AI-client skill installs detected" in out
+
+
+def test_cli_routes_skill_update(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill update`` routes to ``_skill_install.run_update``."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "update"])
+    spy = mocker.patch.object(_skill_install, "run_update", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    spy.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# safelint skill remove — delete detected installs
+# ---------------------------------------------------------------------------
+
+
+def _make_remove_args(*, project: bool = False, symlink: bool = False, dry_run: bool = False, client: str = "auto", path: Path | None = None) -> argparse.Namespace:
+    """Namespace shaped like the remove argparser produces."""
+    return argparse.Namespace(skill_action="remove", project=project, symlink=symlink, dry_run=dry_run, client=client, path=path)
+
+
+def test_remove_deletes_detected_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Bare ``safelint skill remove`` deletes the auto-detected install."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    target = home / ".cursor" / "rules" / "safelint.mdc"
+    assert target.exists()
+    capsys.readouterr()
+
+    rc = _skill_install.run_remove(_make_remove_args())
+    assert rc == 0
+    assert not target.exists()
+    out = capsys.readouterr().out
+    assert "Cursor rule removed from" in out
+
+
+def test_remove_returns_zero_with_helpful_note_when_nothing_installed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``remove`` with nothing installed exits 0 with a hint about ``--path``."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_remove(_make_remove_args())
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "no installed skill detected" in out
+    assert "--path PATH" in out
+
+
+def test_remove_dry_run_does_not_delete(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--dry-run`` previews without deleting anything."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    target = home / ".cursor" / "rules" / "safelint.mdc"
+    capsys.readouterr()
+
+    rc = _skill_install.run_remove(_make_remove_args(dry_run=True))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "would remove" in out
+    # Crucially: target is untouched.
+    assert target.exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_remove_symlink_filter_skips_copy_installs(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--symlink`` removes only symlink-shape installs; copy installs survive.
+
+    The user's specific use case: "delete only the symlinks, keep my
+    copies". Plant a copy-mode Cursor install user-scoped and a
+    symlink-mode Claude install user-scoped; assert remove --symlink
+    deletes only Claude.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Cursor in copy mode (default).
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    cursor_target = home / ".cursor" / "rules" / "safelint.mdc"
+    assert cursor_target.exists()
+    assert not cursor_target.is_symlink()
+    # Claude in symlink mode.
+    assert _skill_install.run_install(_make_args(client="claude", symlink=True)) == 0
+    claude_target = home / ".claude" / "skills" / "safelint"
+    assert (claude_target / "SKILL.md").is_symlink()
+    capsys.readouterr()
+
+    rc = _skill_install.run_remove(_make_remove_args(symlink=True))
+    assert rc == 0
+    # Claude (symlink) is gone.
+    assert not claude_target.exists()
+    # Cursor (copy) is intact.
+    assert cursor_target.exists()
+
+
+def test_remove_path_deletes_explicit_location(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--path PATH`` removes one specific location, bypassing detection."""
+    odd_location = tmp_path / "weird" / "place" / "safelint.mdc"
+    odd_location.parent.mkdir(parents=True)
+    odd_location.write_text("# stray install\n", encoding="utf-8")
+
+    rc = _skill_install.run_remove(_make_remove_args(path=odd_location))
+    assert rc == 0
+    assert not odd_location.exists()
+    out = capsys.readouterr().out
+    assert "removed install at" in out
+    assert "(--path)" in out
+
+
+def test_remove_path_missing_returns_one_with_stderr_error(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--path PATH`` to a non-existent location is an error, not a silent no-op."""
+    nonexistent = tmp_path / "not" / "here.mdc"
+    rc = _skill_install.run_remove(_make_remove_args(path=nonexistent))
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "nothing to remove at" in err
+    assert str(nonexistent) in err
+
+
+def test_remove_path_dry_run_previews_without_deleting(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--path PATH --dry-run`` previews; the file must remain on disk."""
+    odd_location = tmp_path / "weird" / "place" / "safelint.mdc"
+    odd_location.parent.mkdir(parents=True)
+    odd_location.write_text("# stray\n", encoding="utf-8")
+
+    rc = _skill_install.run_remove(_make_remove_args(path=odd_location, dry_run=True))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "would remove" in out
+    assert "(--path)" in out
+    # File still exists.
+    assert odd_location.exists()
+
+
+def test_remove_explicit_client_at_missing_scope_is_noop(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``remove --client claude`` with no Claude install reports nothing-installed cleanly."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_remove(_make_remove_args(client="claude"))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "no installed skill detected" in out
+
+
+def test_remove_explicit_client_with_symlink_filter_skips_copy_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client cursor --symlink`` skips a Cursor install that's in copy mode.
+
+    Composes the explicit-client path with the symlink filter — the
+    install exists, but its shape doesn't match the filter, so
+    ``remove`` reports nothing-installed (and leaves the install
+    untouched).
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0  # copy mode
+    target = home / ".cursor" / "rules" / "safelint.mdc"
+    capsys.readouterr()
+
+    rc = _skill_install.run_remove(_make_remove_args(client="cursor", symlink=True))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "no installed skill detected" in out
+    # Copy install untouched.
+    assert target.exists()
+
+
+def test_remove_explicit_client_filters_to_one(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client claude`` removes only the Claude install, leaves Cursor alone."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+
+    rc = _skill_install.run_remove(_make_remove_args(client="claude"))
+    assert rc == 0
+    # Claude gone, Cursor intact.
+    assert not (home / ".claude" / "skills" / "safelint").exists()
+    assert (home / ".cursor" / "rules" / "safelint.mdc").exists()
+
+
+def test_cli_routes_skill_remove(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill remove`` routes to ``_skill_install.run_remove``."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "remove"])
+    spy = mocker.patch.object(_skill_install, "run_remove", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    spy.assert_called_once()

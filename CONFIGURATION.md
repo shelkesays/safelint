@@ -22,7 +22,7 @@ Usage: safelint [OPTIONS] <COMMAND>
 
 Commands:
   check    Scan a file or directory for safety violations
-  skill    Manage the bundled AI-client skill / project rule for Claude Code or Cursor (install, path, status)
+  skill    Manage the bundled AI-client skill / project rule for Claude Code or Cursor (install, update, remove, path, status)
   help     Print this message or the help of the given subcommand
   version  Display SafeLint's version
 
@@ -72,6 +72,25 @@ safelint skill status || safelint skill install --force
 `safelint check --check-skill-freshness` is the same drift check folded into a normal lint run — emits one `safelint: warning:` line per stale install but doesn't change the lint exit code. Off by default so day-to-day `safelint check` invocations stay fast (no extra FS scan).
 
 A locally-customised install will surface as *differs from bundled*; the diagnostic message explicitly mentions that case so customisers can ignore it. See [`AI_CLIENTS.md`](AI_CLIENTS.md) "Updating after a safelint upgrade" for the full workflow.
+
+### Skill update + remove commands (1.10.0)
+
+Two follow-on commands to round out the install lifecycle:
+
+```bash
+safelint skill update                          # idempotent refresh — no-op when fresh
+safelint skill update --force                  # re-install every detected install
+safelint skill remove                          # delete every detected install
+safelint skill remove --symlink                # delete only symlink-shape installs (keep copies)
+safelint skill remove --path /unusual/place    # delete one specific location
+safelint skill remove --dry-run                # preview without deleting
+```
+
+Both commands inherit `--client {auto, claude, cursor}` and `--project` from `install`, but `--client auto` resolves differently: install scans **marker files** (`CLAUDE.md`, `.cursor/`) to figure out *which client the user is using*; update / remove scan **actual install paths** to figure out *what's currently installed*. This matters when a user has client markers but no install yet, or vice-versa.
+
+**`update` flag semantics:** `--force` here means "refresh every matching install regardless of drift status" (different from `install`'s `--force` which means "replace existing"). Without `--force`, `update` is idempotent — running it on fresh installs is a silent no-op suitable for cron / CI / pre-commit scripts.
+
+**`remove` flag semantics:** `--symlink` is a *filter* (only remove installs whose on-disk shape is symlink), not a creation-mode toggle like in `install`. `--path PATH` overrides every other flag and removes exactly the specified location; useful for unusual / forgotten installs that auto-detect won't see.
 
 ### `safelint check` flags
 

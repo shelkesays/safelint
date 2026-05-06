@@ -31,6 +31,7 @@ project scope (no home fallback).
 
 from __future__ import annotations
 
+import argparse
 from dataclasses import dataclass
 import hashlib
 from importlib import resources
@@ -41,7 +42,6 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    import argparse
     from collections.abc import Iterator
     from importlib.abc import Traversable
 
@@ -656,3 +656,222 @@ def stale_install_warnings() -> list[str]:
         refresh_cmd = _refresh_command_for(spec, project=project)
         warnings.append(f"{spec.display_name} {spec.artefact_label} at {target} ({scope} scope) differs from bundled — run `{refresh_cmd}` to refresh (or ignore if you've customised it)")
     return warnings
+
+
+# ---------------------------------------------------------------------------
+# Update / remove — share install-path-based auto-detection (distinct from
+# install's marker-file auto-detection: ``install`` asks "what AI client is
+# the user using?", ``update`` / ``remove`` ask "what's actually installed?").
+# ---------------------------------------------------------------------------
+
+
+def _install_is_symlink_shape(spec: ClientSpec, *, project: bool) -> bool:
+    """Return True when the install at this scope was created in symlink mode.
+
+    Two qualifying shapes (mirrors :func:`_install_status`'s symlink
+    detection): the target itself is a symlink (Cursor's single-file
+    install), or the target is a real directory whose top-level entries
+    are working symlinks (Claude's per-entry install via
+    :func:`_install_symlink_directory_filtered`).
+    """
+    target = _spec_target(spec, project=project)
+    if target.is_symlink():
+        return True
+    return _is_symlink_managed_directory(target)
+
+
+def _detected_installed_clients(*, only_symlink: bool = False) -> list[tuple[ClientSpec, bool]]:
+    """Return [(spec, project)] for every existing install across the registry.
+
+    Used by ``update`` / ``remove`` to answer "what's currently
+    installed?" — distinct from :func:`_detected_clients` which scans
+    marker files for "what AI client is the user using?". Iterates
+    every spec across both scopes, includes locations whose
+    ``_install_status`` is anything other than MISSING.
+
+    *only_symlink* (default False): when True, filter to installs whose
+    on-disk shape is symlink (used by ``remove --symlink`` to leave
+    copy installs untouched).
+    """
+    detected: list[tuple[ClientSpec, bool]] = []
+    for spec, project in _iter_install_locations():
+        if _install_status(spec, project=project) == INSTALL_STATUS_MISSING:
+            continue
+        if only_symlink and not _install_is_symlink_shape(spec, project=project):
+            continue
+        detected.append((spec, project))
+    return detected
+
+
+# ---------------------------------------------------------------------------
+# update — refresh stale installs (no-op when fresh, --force overrides)
+# ---------------------------------------------------------------------------
+
+
+def _print_update_no_installs() -> None:
+    """No detected installs → tell the user how to install."""
+    print("safelint: no AI-client skill installs detected. Run `safelint skill install` to install.")
+
+
+def _print_update_all_fresh() -> None:
+    """All detected installs are fresh → silent-friendly summary."""
+    print("safelint: all detected installs are already up to date. Nothing to update.")
+
+
+def _print_update_skipped_fresh(spec: ClientSpec, target: Path, scope: str) -> None:
+    """Print the "skipped fresh install" notice emitted by ``update`` without ``--force``."""
+    print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) — already fresh, skipped")
+
+
+def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) -> int:
+    """Refresh one install. No-op when fresh unless ``args.force``."""
+    target = _spec_target(spec, project=project)
+    scope = "project" if project else "user"
+    status = _install_status(spec, project=project)
+    if status == INSTALL_STATUS_FRESH and not args.force:
+        _print_update_skipped_fresh(spec, target, scope)
+        return 0
+    install_args = argparse.Namespace(
+        client=spec.name,
+        project=project,
+        symlink=getattr(args, "symlink", False),
+        force=True,
+    )
+    return _install_one(spec, project=project, args=install_args)
+
+
+def run_update(args: argparse.Namespace) -> int:
+    """Refresh installs whose content has drifted from the bundled wheel.
+
+    Without ``--force``: idempotent — fresh installs are a silent
+    no-op (skipped notice). With ``--force``: re-creates every detected
+    install regardless of drift, useful for reverting customised
+    installs back to bundled. Inherits ``--client``, ``--project``,
+    and ``--symlink`` from install semantics; ``--client auto`` here
+    detects via install paths (not marker files like ``install``).
+    """
+    explicit_client = getattr(args, "client", "auto")
+    project_flag = bool(getattr(args, "project", False))
+    if explicit_client != "auto":
+        targets: list[tuple[ClientSpec, bool]] = [(_spec_by_name(explicit_client), project_flag)]
+        targets = [(s, p) for s, p in targets if _install_status(s, project=p) != INSTALL_STATUS_MISSING]
+    else:
+        targets = _detected_installed_clients()
+    if not targets:
+        _print_update_no_installs()
+        return 0
+    overall_rc = 0
+    any_refreshed = False
+    for spec, project in targets:
+        if _install_status(spec, project=project) != INSTALL_STATUS_FRESH or args.force:
+            any_refreshed = True
+        rc = _update_one(spec, project=project, args=args)
+        if rc != 0:
+            overall_rc = rc
+    if not any_refreshed and overall_rc == 0:
+        _print_update_all_fresh()
+    return overall_rc
+
+
+# ---------------------------------------------------------------------------
+# remove — delete detected installs (filterable by client / scope / shape)
+# ---------------------------------------------------------------------------
+
+
+def _print_remove_no_installs() -> None:
+    """No installs match the filter → exit 0 with a helpful note."""
+    print("safelint: no installed skill detected. Use `--path PATH` to specify an unusual install location.")
+
+
+def _print_remove_path_missing(path: Path) -> None:
+    """Print the "explicit path doesn't exist" error to stderr."""
+    print(f"safelint: error: nothing to remove at {path}.", file=sys.stderr)
+
+
+def _print_remove_dry_run(spec: ClientSpec | None, target: Path, scope: str | None, *, shape: str) -> None:
+    """Print what *would* be removed under ``--dry-run``."""
+    if spec is None:
+        print(f"safelint: would remove ({shape}) at {target} (--path)")
+        return
+    print(f"safelint: would remove {spec.display_name} {spec.artefact_label} at {target} ({scope} scope; {shape})")
+
+
+def _print_remove_success(spec: ClientSpec | None, target: Path, scope: str | None) -> None:
+    """Print the "removed X" confirmation."""
+    if spec is None:
+        print(f"safelint: removed install at {target} (--path)")
+        return
+    print(f"safelint: {spec.display_name} {spec.artefact_label} removed from {target} ({scope} scope)")
+
+
+def _shape_label(spec: ClientSpec, *, project: bool) -> str:
+    """Return ``symlink`` or ``copy`` describing the install shape at this scope."""
+    return "symlink" if _install_is_symlink_shape(spec, project=project) else "copy"
+
+
+def _remove_one(spec: ClientSpec, *, project: bool, dry_run: bool) -> int:
+    """Remove one detected install. Returns 0 on success."""
+    target = _spec_target(spec, project=project)
+    scope = "project" if project else "user"
+    shape = _shape_label(spec, project=project)
+    if dry_run:
+        _print_remove_dry_run(spec, target, scope, shape=shape)
+        return 0
+    _remove_existing(target)
+    _print_remove_success(spec, target, scope)
+    return 0
+
+
+def _remove_path(path: Path, *, dry_run: bool) -> int:
+    """Remove an explicit ``--path`` target. Returns 0 on success, 1 if missing."""
+    if not path.exists() and not path.is_symlink():
+        _print_remove_path_missing(path)
+        return 1
+    shape = "symlink" if path.is_symlink() or _is_symlink_managed_directory(path) else "copy"
+    if dry_run:
+        _print_remove_dry_run(None, path, None, shape=shape)
+        return 0
+    _remove_existing(path)
+    _print_remove_success(None, path, None)
+    return 0
+
+
+def _resolve_remove_candidates(args: argparse.Namespace) -> list[tuple[ClientSpec, bool]]:
+    """Resolve which (spec, project) pairs ``run_remove`` should target."""
+    explicit_client = getattr(args, "client", "auto")
+    project_flag = bool(getattr(args, "project", False))
+    only_symlink = bool(getattr(args, "symlink", False))
+    if explicit_client == "auto":
+        return _detected_installed_clients(only_symlink=only_symlink)
+    spec = _spec_by_name(explicit_client)
+    if _install_status(spec, project=project_flag) == INSTALL_STATUS_MISSING:
+        return []
+    if only_symlink and not _install_is_symlink_shape(spec, project=project_flag):
+        return []
+    return [(spec, project_flag)]
+
+
+def run_remove(args: argparse.Namespace) -> int:
+    """Remove detected installs (or one explicit ``--path`` location).
+
+    Auto-detect (``--client auto``, default) scans actual install
+    paths — a different question from ``install``'s marker-based
+    auto-detect. ``--symlink`` filters to symlink-shape installs only,
+    leaving copy installs untouched. ``--path`` overrides every other
+    flag and removes one specific location. ``--dry-run`` previews
+    without deleting.
+    """
+    dry_run = bool(getattr(args, "dry_run", False))
+    explicit_path = getattr(args, "path", None)
+    if explicit_path is not None:
+        return _remove_path(Path(explicit_path), dry_run=dry_run)
+    candidates = _resolve_remove_candidates(args)
+    if not candidates:
+        _print_remove_no_installs()
+        return 0
+    overall_rc = 0
+    for spec, project in candidates:
+        rc = _remove_one(spec, project=project, dry_run=dry_run)
+        if rc != 0:
+            overall_rc = rc
+    return overall_rc

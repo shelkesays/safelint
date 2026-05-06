@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.10.0] - 2026-05-06
+
+Round-out release for the skill-install lifecycle: `update` and `remove` complete the install / status / update / remove quartet so users have a full set of maintenance commands without falling back to manual `rm` / re-install cycles.
+
+### Added
+- **`safelint skill update`** — refresh installed skills whose content has drifted from the bundled wheel. Idempotent by default (no-op when fresh), with `--force` to re-install regardless of drift status (useful for reverting customised installs back to bundled). Inherits `--client` / `--project` / `--symlink` / `--force` from install. `--client auto` here resolves via existing install paths, NOT marker files like install does — "what's installed?" vs "what client is the user using?" are separate questions.
+- **`safelint skill remove`** — delete detected installs. Inherits `--client` / `--project` from install, plus three remove-specific flags:
+  - **`--symlink`** — filter to symlink-shape installs only, leaving copy-mode installs intact ("delete only my symlink installs").
+  - **`--path PATH`** — remove one specific location, bypassing every other flag (useful for unusual / forgotten install locations).
+  - **`--dry-run`** — preview what would be removed without deleting anything.
+- **Shared install-path auto-detection** between `update` and `remove` via new `_detected_installed_clients(*, only_symlink)` helper. Distinct from install's `_detected_clients(directory, marker_attr)` (marker-file scan).
+
 ## [1.9.0] - 2026-05-05
 
 A focused follow-on to v1.8.0 covering one practical question users asked: **how do I know my installed AI-client skill is up to date after `pip install --upgrade safelint`?** Two new surfaces answer it. Also lands a build-time drift-detection test pair that prevents bundled-doc rot for every registered AI client (and every future one — the tests parametrise over the registry).
@@ -207,7 +219,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.9.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.10.0...HEAD
+[1.10.0]: https://github.com/shelkesays/safelint/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/shelkesays/safelint/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/shelkesays/safelint/compare/v1.7.0...v1.8.0
 [1.7.0]: https://github.com/shelkesays/safelint/compare/v1.6.0...v1.7.0
