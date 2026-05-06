@@ -665,19 +665,39 @@ def stale_install_warnings() -> list[str]:
 # ---------------------------------------------------------------------------
 
 
+def _is_symlink_directory_shape(target: Path) -> bool:
+    """Return True when *target* has the on-disk shape of a symlink install.
+
+    This is intentionally a shape-only check for cleanup / filtering
+    paths such as ``remove --symlink``: top-level entries count as
+    symlinks even when their targets are missing. Freshness / validity
+    is handled separately by :func:`_is_symlink_managed_directory`,
+    which requires the inner symlinks to actually resolve.
+    """
+    if not target.is_dir():
+        return False
+    entries = list(target.iterdir())
+    if not entries:
+        return False
+    return all(entry.is_symlink() for entry in entries)
+
+
 def _install_is_symlink_shape(spec: ClientSpec, *, project: bool) -> bool:
     """Return True when the install at this scope was created in symlink mode.
 
-    Two qualifying shapes (mirrors :func:`_install_status`'s symlink
-    detection): the target itself is a symlink (Cursor's single-file
-    install), or the target is a real directory whose top-level entries
-    are working symlinks (Claude's per-entry install via
-    :func:`_install_symlink_directory_filtered`).
+    Two qualifying shapes: the target itself is a symlink (Cursor's
+    single-file install), or the target is a real directory whose
+    top-level entries are symlinks (Claude's per-entry install via
+    :func:`_install_symlink_directory_filtered`). Broken symlinks still
+    qualify here because this predicate is used for cleanup filtering,
+    not freshness checks — ``remove --symlink`` must be able to clean
+    up a Claude install whose bundled targets have moved or been
+    deleted.
     """
     target = _spec_target(spec, project=project)
     if target.is_symlink():
         return True
-    return _is_symlink_managed_directory(target)
+    return _is_symlink_directory_shape(target)
 
 
 def _detected_installed_clients(*, only_symlink: bool = False, project_only: bool = False) -> list[tuple[ClientSpec, bool]]:
@@ -733,20 +753,45 @@ def _print_update_skipped_fresh(spec: ClientSpec, target: Path, scope: str) -> N
 
 
 def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) -> int:
-    """Refresh one install. No-op when fresh unless ``args.force``."""
+    """Refresh one install. No-op when fresh unless ``args.force``.
+
+    Reads ``force`` and ``symlink`` via ``getattr`` so library callers
+    that construct a partial ``Namespace`` (e.g. tests, programmatic
+    invocations) don't trip ``AttributeError`` — matches the defensive
+    pattern used by every other arg-reading helper in this module.
+    """
+    force = bool(getattr(args, "force", False))
+    symlink = bool(getattr(args, "symlink", False))
     target = _spec_target(spec, project=project)
     scope = "project" if project else "user"
     status = _install_status(spec, project=project)
-    if status == INSTALL_STATUS_FRESH and not args.force:
+    if status == INSTALL_STATUS_FRESH and not force:
         _print_update_skipped_fresh(spec, target, scope)
         return 0
     install_args = argparse.Namespace(
         client=spec.name,
         project=project,
-        symlink=getattr(args, "symlink", False),
+        symlink=symlink,
         force=True,
     )
     return _install_one(spec, project=project, args=install_args)
+
+
+def _resolve_update_targets(args: argparse.Namespace) -> list[tuple[ClientSpec, bool]]:
+    """Resolve which (spec, project) pairs ``run_update`` should refresh.
+
+    Mirrors ``_resolve_remove_candidates``: ``--client auto`` consults
+    install paths via ``_detected_installed_clients``; explicit
+    ``--client X`` iterates both scopes by default and uses
+    ``--project`` as an orthogonal restriction filter.
+    """
+    explicit_client = getattr(args, "client", "auto")
+    project_flag = bool(getattr(args, "project", False))
+    if explicit_client == "auto":
+        return _detected_installed_clients(project_only=project_flag)
+    spec = _spec_by_name(explicit_client)
+    scopes = [True] if project_flag else [False, True]
+    return [(spec, scope) for scope in scopes if _install_status(spec, project=scope) != INSTALL_STATUS_MISSING]
 
 
 def run_update(args: argparse.Namespace) -> int:
@@ -759,20 +804,15 @@ def run_update(args: argparse.Namespace) -> int:
     and ``--symlink`` from install semantics; ``--client auto`` here
     detects via install paths (not marker files like ``install``).
     """
-    explicit_client = getattr(args, "client", "auto")
-    project_flag = bool(getattr(args, "project", False))
-    if explicit_client != "auto":
-        targets: list[tuple[ClientSpec, bool]] = [(_spec_by_name(explicit_client), project_flag)]
-        targets = [(s, p) for s, p in targets if _install_status(s, project=p) != INSTALL_STATUS_MISSING]
-    else:
-        targets = _detected_installed_clients(project_only=project_flag)
+    force = bool(getattr(args, "force", False))
+    targets = _resolve_update_targets(args)
     if not targets:
         _print_update_no_installs()
         return 0
     overall_rc = 0
     any_refreshed = False
     for spec, project in targets:
-        if _install_status(spec, project=project) != INSTALL_STATUS_FRESH or args.force:
+        if _install_status(spec, project=project) != INSTALL_STATUS_FRESH or force:
             any_refreshed = True
         rc = _update_one(spec, project=project, args=args)
         if rc != 0:
@@ -852,12 +892,20 @@ def _resolve_remove_candidates(args: argparse.Namespace) -> list[tuple[ClientSpe
     only_symlink = bool(getattr(args, "symlink", False))
     if explicit_client == "auto":
         return _detected_installed_clients(only_symlink=only_symlink, project_only=project_flag)
+    # Symmetric with auto-detect: ``--client X`` (no ``--project``)
+    # considers every scope where X is installed; ``--project`` is
+    # the orthogonal scope-restriction filter. The shape-and-existence
+    # filter applies per-scope.
     spec = _spec_by_name(explicit_client)
-    if _install_status(spec, project=project_flag) == INSTALL_STATUS_MISSING:
-        return []
-    if only_symlink and not _install_is_symlink_shape(spec, project=project_flag):
-        return []
-    return [(spec, project_flag)]
+    scopes = [True] if project_flag else [False, True]
+    candidates: list[tuple[ClientSpec, bool]] = []
+    for scope in scopes:
+        if _install_status(spec, project=scope) == INSTALL_STATUS_MISSING:
+            continue
+        if only_symlink and not _install_is_symlink_shape(spec, project=scope):
+            continue
+        candidates.append((spec, scope))
+    return candidates
 
 
 def run_remove(args: argparse.Namespace) -> int:

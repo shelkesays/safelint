@@ -1197,6 +1197,53 @@ def test_update_auto_uses_install_paths_not_marker_files(monkeypatch: pytest.Mon
     assert "no AI-client skill installs detected" in out
 
 
+def test_update_explicit_client_without_project_targets_both_scopes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``update --client cursor`` (no ``--project``) refreshes BOTH user and project installs.
+
+    Symmetric with ``--client auto``: the ``--project`` flag is the
+    orthogonal scope-restriction filter. Without this, the explicit-
+    client path silently skipped project-scope installs, contradicting
+    the auto-detect path's behaviour.
+    """
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    assert _skill_install.run_install(_make_args(client="cursor", project=True)) == 0
+    user_target = home / ".cursor" / "rules" / "safelint.mdc"
+    project_target = cwd / ".cursor" / "rules" / "safelint.mdc"
+    user_target.write_text("# user customised\n", encoding="utf-8")
+    project_target.write_text("# project customised\n", encoding="utf-8")
+    capsys.readouterr()
+
+    rc = _skill_install.run_update(_make_update_args(client="cursor"))
+    assert rc == 0
+    # BOTH installs were refreshed, not just user.
+    assert "user customised" not in user_target.read_text(encoding="utf-8")
+    assert "project customised" not in project_target.read_text(encoding="utf-8")
+
+
+def test_update_one_handles_namespace_without_force_attribute() -> None:
+    """``_update_one`` reads ``force`` defensively via ``getattr``.
+
+    Library callers / tests that construct a partial Namespace
+    shouldn't trip ``AttributeError``. Matches the defensive pattern
+    used elsewhere in the module.
+    """
+    # Argparse-Namespace-like object with NO ``force`` attribute.
+    args = argparse.Namespace()  # empty
+    # Use a mocker-free, in-process path: just verify the helper
+    # doesn't raise. It might fail on later steps (no install exists)
+    # but it must not raise AttributeError on the ``force`` lookup.
+    spec = _skill_install._CURSOR_SPEC
+    try:
+        _skill_install._update_one(spec, project=False, args=args)
+    except AttributeError as e:
+        pytest.fail(f"_update_one raised AttributeError on partial Namespace: {e}")
+    # No assertion on rc — partial Namespace may legitimately fail
+    # downstream (e.g. when reading ``symlink``); the contract is
+    # simply that the missing-attribute case doesn't blow up at
+    # the ``force`` read.
+
+
 def test_update_project_flag_filters_auto_detect_to_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``update --project`` (with auto-detect) skips user-scope installs.
 
@@ -1368,6 +1415,79 @@ def test_remove_explicit_client_at_missing_scope_is_noop(monkeypatch: pytest.Mon
     assert rc == 0
     out = capsys.readouterr().out
     assert "no installed skill detected" in out
+
+
+def test_remove_explicit_client_without_project_targets_both_scopes(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``remove --client cursor`` (no ``--project``) deletes BOTH user and project installs.
+
+    Symmetric with ``--client auto``: ``--project`` is the orthogonal
+    scope-restriction filter. The destructive nature of remove makes
+    the asymmetric behaviour particularly footgun-y — silently
+    leaving a project-scope install alive after the user thought
+    they'd cleaned up the client.
+    """
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    assert _skill_install.run_install(_make_args(client="cursor", project=True)) == 0
+    user_target = home / ".cursor" / "rules" / "safelint.mdc"
+    project_target = cwd / ".cursor" / "rules" / "safelint.mdc"
+
+    rc = _skill_install.run_remove(_make_remove_args(client="cursor"))
+    assert rc == 0
+    # BOTH installs gone.
+    assert not user_target.exists()
+    assert not project_target.exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_is_symlink_shape_returns_true_for_broken_inner_symlinks(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_install_is_symlink_shape`` recognises a Claude install whose inner symlinks broke.
+
+    Shape detection (used by ``remove --symlink`` filter) is distinct
+    from freshness detection: a Claude install with dangling inner
+    symlinks is still symlink-shape (``--symlink`` cleanup must reach
+    it), even though it's not "fresh" any more (the bundled targets
+    moved). Without this, ``remove --symlink`` would skip a broken
+    symlink install and leave it on disk forever.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude", symlink=True)) == 0
+    target_dir = home / ".claude" / "skills" / "safelint"
+    # Break one inner symlink by repointing it at a removed path.
+    skill_md_link = target_dir / "SKILL.md"
+    skill_md_link.unlink()
+    skill_md_link.symlink_to(tmp_path / "vanished.md")
+    assert skill_md_link.is_symlink()
+    assert not skill_md_link.exists()  # broken
+
+    # Shape predicate still recognises this as symlink-shape.
+    assert _skill_install._install_is_symlink_shape(_skill_install._CLAUDE_SPEC, project=False) is True
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_remove_symlink_filter_cleans_up_broken_claude_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``remove --symlink`` removes a Claude install with broken inner symlinks.
+
+    The user-facing scenario for the shape-vs-freshness split: the
+    bundled source moved (e.g. virtualenv rebuilt, wheel cache cleared),
+    leaving the Claude symlink install dangling. ``remove --symlink``
+    must still reach and clean it up — anything else strands the user
+    with an unusable install they can't easily wipe.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude", symlink=True)) == 0
+    target_dir = home / ".claude" / "skills" / "safelint"
+    # Break one inner symlink to simulate the moved-bundle case.
+    skill_md_link = target_dir / "SKILL.md"
+    skill_md_link.unlink()
+    skill_md_link.symlink_to(tmp_path / "moved.md")
+    capsys.readouterr()
+
+    rc = _skill_install.run_remove(_make_remove_args(symlink=True))
+    assert rc == 0
+    # Install directory is gone — user can run ``install`` from a
+    # clean state without manually rm'ing the dangling layout.
+    assert not target_dir.exists()
 
 
 def test_remove_project_flag_filters_auto_detect_to_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
