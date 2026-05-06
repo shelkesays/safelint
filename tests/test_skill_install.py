@@ -1197,6 +1197,33 @@ def test_update_auto_uses_install_paths_not_marker_files(monkeypatch: pytest.Mon
     assert "no AI-client skill installs detected" in out
 
 
+def test_update_project_flag_filters_auto_detect_to_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``update --project`` (with auto-detect) skips user-scope installs.
+
+    Plant both a user-scope and a project-scope install for the
+    same client, drift both, and run ``update --project``. Only the
+    project-scope install should be refreshed; the user-scope drift
+    must remain visible (status would still report it as differs).
+    Regression for ``--project`` being silently dropped on the
+    ``--client auto`` path.
+    """
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    assert _skill_install.run_install(_make_args(client="cursor", project=True)) == 0
+    user_target = home / ".cursor" / "rules" / "safelint.mdc"
+    project_target = cwd / ".cursor" / "rules" / "safelint.mdc"
+    user_target.write_text("# user customised\n", encoding="utf-8")
+    project_target.write_text("# project customised\n", encoding="utf-8")
+    capsys.readouterr()
+
+    rc = _skill_install.run_update(_make_update_args(project=True))
+    assert rc == 0
+    # Project-scope install was refreshed (customisation gone).
+    assert "project customised" not in project_target.read_text(encoding="utf-8")
+    # User-scope install was NOT touched — customisation survives.
+    assert "user customised" in user_target.read_text(encoding="utf-8")
+
+
 def test_update_explicit_client_at_missing_scope_is_noop(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``update --client claude`` when no Claude install exists is a clean no-op."""
     _redirect_home_and_cwd(monkeypatch, tmp_path)
@@ -1341,6 +1368,30 @@ def test_remove_explicit_client_at_missing_scope_is_noop(monkeypatch: pytest.Mon
     assert rc == 0
     out = capsys.readouterr().out
     assert "no installed skill detected" in out
+
+
+def test_remove_project_flag_filters_auto_detect_to_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``remove --project`` (with auto-detect) skips user-scope installs.
+
+    Mirror of the update regression: plant both scopes, run
+    ``remove --project``, assert only the project-scope install is
+    deleted. Without the scope filter, the user-scope install would
+    be silently nuked too — that's a real footgun on ``remove``
+    because it's destructive.
+    """
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    assert _skill_install.run_install(_make_args(client="cursor", project=True)) == 0
+    user_target = home / ".cursor" / "rules" / "safelint.mdc"
+    project_target = cwd / ".cursor" / "rules" / "safelint.mdc"
+    capsys.readouterr()
+
+    rc = _skill_install.run_remove(_make_remove_args(project=True))
+    assert rc == 0
+    # Project-scope install removed.
+    assert not project_target.exists()
+    # User-scope install untouched.
+    assert user_target.exists()
 
 
 def test_remove_explicit_client_with_symlink_filter_skips_copy_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
