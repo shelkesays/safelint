@@ -210,7 +210,7 @@ def test_call_name_returns_none_for_unresolvable_function() -> None:
         def child_by_field_name(self, _name: str) -> None:
             return None
 
-    assert _call_name(_FakeNode()) is None  # type: ignore[arg-type]
+    assert _call_name(_FakeNode()) is None  # type: ignore
 
 
 def test_state_purity_skips_annotated_assignment_with_non_identifier_target(tmp_path: Path) -> None:

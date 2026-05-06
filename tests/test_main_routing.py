@@ -18,6 +18,9 @@ from safelint import cli
 
 
 if TYPE_CHECKING:
+    from pathlib import Path
+    from typing import Any
+
     from pytest_mock import MockerFixture
 
 
@@ -32,7 +35,7 @@ def test_main_routes_to_stdin_when_flag_present(monkeypatch: pytest.MonkeyPatch,
     spy.assert_called_once()
 
 
-def test_main_routes_to_check_subcommand(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: object) -> None:
+def test_main_routes_to_check_subcommand(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path) -> None:
     """First non-flag arg ``check`` selects the directory-scan runner."""
     monkeypatch.setattr("sys.argv", ["safelint", "check", str(tmp_path)])
     spy = mocker.patch.object(cli, "_run_check", return_value=0)
@@ -72,7 +75,7 @@ def test_main_propagates_nonzero_exit_from_runner(monkeypatch: pytest.MonkeyPatc
     assert exc.value.code == 1
 
 
-def test_main_routes_to_check_when_global_flag_precedes_subcommand(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: object) -> None:
+def test_main_routes_to_check_when_global_flag_precedes_subcommand(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path) -> None:
     """``safelint --format json check src`` routes to check, not hook.
 
     Regression for an argv-routing bug: the scanner used to take the first
@@ -93,7 +96,7 @@ def test_main_routes_to_check_when_global_flag_precedes_subcommand(monkeypatch: 
     assert args.output_format == "json"
 
 
-def test_main_routes_to_check_with_multiple_value_taking_flags(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: object) -> None:
+def test_main_routes_to_check_with_multiple_value_taking_flags(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path) -> None:
     """Several global flags before ``check`` all have their values skipped."""
     monkeypatch.setattr(
         "sys.argv",
@@ -109,7 +112,7 @@ def test_main_routes_to_check_with_multiple_value_taking_flags(monkeypatch: pyte
     assert args.ignore == ["SAFE101"]
 
 
-def test_main_routes_to_check_with_equals_form_flag(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: object) -> None:
+def test_main_routes_to_check_with_equals_form_flag(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture, tmp_path: Path) -> None:
     """``--format=json`` (equals form) is one token, so routing still works."""
     monkeypatch.setattr("sys.argv", ["safelint", "--format=json", "check", str(tmp_path)])
     spy = mocker.patch.object(cli, "_run_check", return_value=0)
@@ -340,7 +343,7 @@ def test_run_hook_returns_zero_for_empty_files_list() -> None:
     assert cli._run_hook(args, []) == 0
 
 
-def test_run_hook_threads_cli_ignore_into_engine_config(tmp_path: pytest.TempPathFactory, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+def test_run_hook_threads_cli_ignore_into_engine_config(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
     """``--ignore`` from the hook-mode CLI augments the config's ignore list.
 
     Patches the ``SafetyEngine`` constructor used by ``cli._run_hook`` to
@@ -351,11 +354,11 @@ def test_run_hook_threads_cli_ignore_into_engine_config(tmp_path: pytest.TempPat
     """
     sample = tmp_path / "f.py"
     sample.write_text("x = 1\n", encoding="utf-8")
-    captured: dict[str, object] = {}
+    captured: dict[str, Any] = {}
 
     real_engine_init = cli.SafetyEngine.__init__
 
-    def _capture_init(self: cli.SafetyEngine, config: dict, *args_: object, **kwargs: object) -> None:
+    def _capture_init(self: cli.SafetyEngine, config: dict[str, Any], *args_: Any, **kwargs: Any) -> None:
         captured["config"] = config
         real_engine_init(self, config, *args_, **kwargs)
 
@@ -391,14 +394,14 @@ def test_c_returns_ansi_when_stdout_is_a_tty(monkeypatch: pytest.MonkeyPatch) ->
     assert "hello" in out
 
 
-def test_is_under_target_returns_true_for_file_match(tmp_path: pytest.TempPathFactory) -> None:
+def test_is_under_target_returns_true_for_file_match(tmp_path: Path) -> None:
     """``_is_under_target`` returns True for an exact file path match."""
     f = tmp_path / "a.py"
     f.write_text("", encoding="utf-8")
     assert cli._is_under_target(f, f) is True
 
 
-def test_is_under_target_returns_false_for_unrelated_path(tmp_path: pytest.TempPathFactory) -> None:
+def test_is_under_target_returns_false_for_unrelated_path(tmp_path: Path) -> None:
     """An absolute path outside the target file/dir returns False."""
     a = tmp_path / "a.py"
     b = tmp_path / "elsewhere.py"
@@ -407,7 +410,7 @@ def test_is_under_target_returns_false_for_unrelated_path(tmp_path: pytest.TempP
     assert cli._is_under_target(a, b) is False
 
 
-def test_normalize_path_falls_back_to_absolute_for_paths_outside_cwd(tmp_path: pytest.TempPathFactory, monkeypatch: pytest.MonkeyPatch) -> None:
+def test_normalize_path_falls_back_to_absolute_for_paths_outside_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """``_normalize_path`` returns the absolute string when the path is
     outside the cwd (the ``relative_to`` fallback path)."""
     monkeypatch.chdir(tmp_path)
@@ -416,13 +419,13 @@ def test_normalize_path_falls_back_to_absolute_for_paths_outside_cwd(tmp_path: p
     assert out == str(elsewhere)
 
 
-def test_config_dir_uses_supplied_directory(tmp_path: pytest.TempPathFactory) -> None:
+def test_config_dir_uses_supplied_directory(tmp_path: Path) -> None:
     """When ``--config`` points at a directory, ``_config_dir`` returns it."""
     out = cli._config_dir(tmp_path, tmp_path / "irrelevant.py")
     assert out == tmp_path
 
 
-def test_config_dir_uses_parent_when_supplied_path_is_file(tmp_path: pytest.TempPathFactory) -> None:
+def test_config_dir_uses_parent_when_supplied_path_is_file(tmp_path: Path) -> None:
     """When ``--config`` points at a file, the parent is the search root."""
     cfg_file = tmp_path / "pyproject.toml"
     cfg_file.write_text("", encoding="utf-8")
@@ -475,7 +478,7 @@ def test_print_statistics_silent_when_no_violations(capsys: pytest.CaptureFixtur
 
 
 def test_run_check_json_emits_empty_doc_when_no_modified_files(
-    tmp_path: pytest.TempPathFactory,
+    tmp_path: Path,
     mocker: MockerFixture,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -506,7 +509,7 @@ def test_run_check_json_emits_empty_doc_when_no_modified_files(
 
 
 def test_run_check_pretty_prints_all_clear_on_clean_run(
-    tmp_path: pytest.TempPathFactory,
+    tmp_path: Path,
     mocker: MockerFixture,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
@@ -536,7 +539,7 @@ def test_run_check_pretty_prints_all_clear_on_clean_run(
 
 
 def test_run_check_json_emits_doc_with_violations(
-    tmp_path: pytest.TempPathFactory,
+    tmp_path: Path,
     mocker: MockerFixture,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
