@@ -66,7 +66,7 @@ safelint check --check-skill-freshness --all-files .
 `safelint skill status` walks every registered AI client × both scopes (user / project) and reports per-location *fresh* / *differs from bundled*. Symlink installs typically report fresh — the symlinks resolve straight back to the bundled location, so `pip upgrade safelint` reflects immediately. In particular, Claude-style per-entry symlink installs continue to report *fresh* as long as the existing top-level entries are still valid symlinks. A symlink install can still report *differs* after local tampering that leaves divergent content on disk — for example adding extra real files alongside the symlinked entries, or replacing a symlink with a copy whose content diverges from the bundled version. **Byte-identical replacements are not detected** — the freshness check compares content, not install mode, so a symlink swapped for an exact-copy file shows up as fresh today even though future ``pip upgrade safelint`` runs would no longer reach it. Use ``--symlink --force`` if you want to re-establish the live-link guarantee. Exit 0 when every detected install matches; exit 1 when any differs. Canonical CI / upgrade-script idiom (run `--force` to refresh copy-mode installs or re-materialise the install layout if needed):
 
 ```bash
-safelint skill status || safelint skill install --force
+safelint skill status || safelint skill update
 ```
 
 `safelint check --check-skill-freshness` is the same drift check folded into a normal lint run — emits one `safelint: warning:` line per stale install but doesn't change the lint exit code. Off by default so day-to-day `safelint check` invocations stay fast (no extra FS scan).
@@ -90,7 +90,7 @@ Both commands inherit `--client {auto, claude, cursor}` and `--project` from `in
 
 **`update` flag semantics:** `--force` here means "refresh every matching install regardless of drift status" (different from `install`'s `--force` which means "replace existing"). Without `--force`, `update` is idempotent — running it on fresh installs leaves them unchanged, though the command may still print "already fresh" / "already up to date" status messages, making it suitable for cron / CI / pre-commit scripts when informational stdout is acceptable.
 
-`update` also **preserves install shape**: a symlink install stays symlink after refresh, a copy install stays copy. Pass `--symlink` explicitly to switch a copy install to symlink mode (the only mode change that requires opt-in; symlink → copy must go through `remove` + `install`).
+`update` also **preserves install shape**: a symlink install stays symlink after refresh, a copy install stays copy. Pass `--symlink` explicitly to request copy → symlink on installs that are being refreshed/reinstalled; if the copy install is already fresh, that mode switch requires `--force` because plain `update` is otherwise a no-op. (This is the only mode change that requires opt-in; symlink → copy must go through `remove` + `install`.)
 
 **`remove` flag semantics:** flags compose orthogonally — the absence of a flag means "no filter", *not* "only the opposite":
 
