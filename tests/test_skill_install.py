@@ -893,7 +893,8 @@ def test_run_status_emits_scope_aware_refresh_hint_per_install(monkeypatch: pyte
     the auto-detected scope, so a stale user-scope install would keep
     failing after the user runs the suggested command on the
     project-scope install. Each detected drift now gets its own
-    explicit command.
+    explicit ``skill update`` command (the canonical shape-preserving
+    refresh path).
     """
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
     # Plant a stale Cursor user-scoped install.
@@ -904,8 +905,9 @@ def test_run_status_emits_scope_aware_refresh_hint_per_install(monkeypatch: pyte
     rc = _skill_install.run_status(argparse.Namespace())
     assert rc == 1
     out = capsys.readouterr().out
-    # The exact refresh command — explicit client, explicit scope (no --project for user).
-    assert "Refresh: safelint skill install --client cursor --force" in out
+    # The exact refresh command — ``skill update``, explicit client,
+    # explicit scope (no --project for user).
+    assert "Refresh: safelint skill update --client cursor" in out
 
 
 def test_stale_install_warnings_carry_scope_aware_refresh_command(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -927,8 +929,8 @@ def test_stale_install_warnings_carry_scope_aware_refresh_command(monkeypatch: p
     # Each warning lists its own scope-specific refresh command.
     user_warning = next(w for w in warnings if "user scope" in w)
     project_warning = next(w for w in warnings if "project scope" in w)
-    assert "safelint skill install --client cursor --force`" in user_warning  # no --project
-    assert "safelint skill install --client cursor --force --project`" in project_warning
+    assert "safelint skill update --client cursor`" in user_warning  # no --project
+    assert "safelint skill update --client cursor --project`" in project_warning
 
 
 def test_drift_token_match_rejects_substring_false_positives() -> None:
@@ -994,9 +996,10 @@ def test_run_status_returns_one_when_install_differs(monkeypatch: pytest.MonkeyP
     assert rc == 1
     out = capsys.readouterr().out
     assert "differs from bundled" in out
-    # Scope-aware refresh command — the per-install hint includes
-    # ``--client cursor`` so the user refreshes the right scope.
-    assert "safelint skill install --client cursor --force" in out
+    # Scope-aware refresh command — uses ``skill update`` (the canonical
+    # shape-preserving refresh) with ``--client cursor`` so the user
+    # refreshes the right scope.
+    assert "safelint skill update --client cursor" in out
 
 
 def test_cli_routes_skill_status(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
@@ -1082,7 +1085,7 @@ def test_stale_install_warnings_returns_one_per_stale_install(monkeypatch: pytes
     # Scope-aware refresh command — see the dedicated regression
     # ``test_stale_install_warnings_carry_scope_aware_refresh_command``
     # for the user-vs-project differentiation.
-    assert "safelint skill install --client cursor --force" in warnings[0]
+    assert "safelint skill update --client cursor" in warnings[0]
 
 
 def test_stale_install_warnings_empty_when_all_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -1263,6 +1266,56 @@ def test_update_force_with_explicit_symlink_switches_copy_to_symlink(monkeypatch
     rc = _skill_install.run_update(_make_update_args(force=True, symlink=True))
     assert rc == 0
     assert target.is_symlink(), "explicit --symlink must convert copy → symlink"
+
+
+def test_install_status_or_none_returns_none_on_oserror(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_install_status_or_none`` returns None instead of crashing on transient I/O errors.
+
+    Used by ``_detected_installed_clients`` so auto-discovery doesn't
+    abort the whole walk if one install location is unreadable.
+    Callers treat None the same as MISSING (skip). The user can still
+    target the install via ``--client X`` + ``--project`` or
+    ``--path PATH`` if they need to act on it.
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Plant a Cursor install so the location exists.
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+    # Patch _install_status to raise OSError as if the FS reported a
+    # permission denied / transient IO error during status detection.
+    real_install_status = _skill_install._install_status
+
+    def _raise_oserror(spec: _skill_install.ClientSpec, *, project: bool) -> str:
+        msg = "permission denied (simulated)"
+        raise OSError(msg)
+
+    monkeypatch.setattr(_skill_install, "_install_status", _raise_oserror)
+    result = _skill_install._install_status_or_none(_skill_install._CURSOR_SPEC, project=False)
+    assert result is None
+
+    # Restore so other tests aren't affected (monkeypatch handles
+    # this on teardown but the assertion below sanity-checks it).
+    monkeypatch.setattr(_skill_install, "_install_status", real_install_status)
+
+
+def test_detected_installed_clients_skips_oserror_locations(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Auto-discovery skips installs whose ``_install_status`` raises, doesn't propagate.
+
+    End-to-end test for the OSError-skip path: plant a Cursor install,
+    patch ``_install_status`` to raise OSError, run
+    ``_detected_installed_clients`` and confirm the iteration
+    completes (returns an empty list rather than raising).
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+
+    def _raise_oserror(spec: _skill_install.ClientSpec, *, project: bool) -> str:
+        msg = "permission denied (simulated)"
+        raise OSError(msg)
+
+    monkeypatch.setattr(_skill_install, "_install_status", _raise_oserror)
+    # Should NOT raise.
+    detected = _skill_install._detected_installed_clients()
+    assert detected == []
 
 
 def test_is_symlink_directory_shape_returns_false_on_oserror(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

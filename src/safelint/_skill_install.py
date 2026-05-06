@@ -554,23 +554,25 @@ def _content_status(source: Path, target: Path) -> str:
 
 
 def _refresh_command_for(spec: ClientSpec, *, project: bool) -> str:
-    """Return the exact ``safelint skill install`` invocation that refreshes *spec* at *scope*.
+    """Return the exact ``safelint skill update`` invocation that refreshes *spec* at *scope*.
 
-    Auto-detect (``safelint skill install --force`` with no ``--client``)
-    only refreshes the install corresponding to the cwd's auto-detected
-    scope, so suggesting it for a multi-scope or non-detected drift
-    leaves other stale installs untouched. The explicit form below
-    pins both the client and the scope, regardless of cwd context:
+    ``safelint skill update`` is the canonical refresh path because it
+    preserves install shape (symlink stays symlink, copy stays copy)
+    and is idempotent — no-op when fresh, refreshes when drifted.
+    The explicit ``--client`` / ``--project`` form below pins both
+    the client and the scope, regardless of cwd context, so a
+    multi-scope drift can be remediated one targeted command at a
+    time:
 
-    * project scope → ``safelint skill install --client <name> --force --project``
-    * user scope    → ``safelint skill install --client <name> --force``
+    * project scope → ``safelint skill update --client <name> --project``
+    * user scope    → ``safelint skill update --client <name>``
 
     Used both in the per-install line printed by ``run_status`` and in
     the per-warning string returned by :func:`stale_install_warnings`,
     so the remediation text is always actionable for the specific
     install that drifted.
     """
-    base = f"safelint skill install --client {spec.name} --force"
+    base = f"safelint skill update --client {spec.name}"
     return f"{base} --project" if project else base
 
 
@@ -606,7 +608,7 @@ def run_status(_args: argparse.Namespace) -> int:
     one of "fresh" or "differs" alongside the path. Returns 0 when
     every detected install is fresh (or no installs exist), 1 when
     any install differs from the bundled artefact. Pipe-friendly:
-    use as ``safelint skill status || safelint skill install --force``.
+    use as ``safelint skill status || safelint skill update``.
     """
     any_drift = False
     any_install = False
@@ -676,10 +678,9 @@ def _is_symlink_directory_shape(target: Path) -> bool:
 
     Wraps the ``iterdir`` call in ``try/except OSError`` so that an
     unreadable install directory (permissions / transient I/O errors)
-    fails closed rather than crashing ``update`` / ``remove``. Treats
-    such directories as "not symlink-shape" — the cleanup paths fall
-    back to the directory-tree branch (which has its own error
-    handling) instead of propagating the OSError up to the user.
+    fails closed rather than crashing this shape check itself. Treats
+    such directories as "not symlink-shape", leaving any subsequent
+    cleanup-path behaviour and error handling to the caller.
     """
     if not target.is_dir():
         return False
@@ -737,12 +738,38 @@ def _detected_installed_clients(*, only_symlink: bool = False, project_only: boo
     for spec, project in _iter_install_locations():
         if project_only and not project:
             continue
-        if _install_status(spec, project=project) == INSTALL_STATUS_MISSING:
-            continue
+        # Apply the cheap symlink-shape filter *before* the I/O-heavy
+        # status check: an unreadable install dir would otherwise
+        # surface inside ``_install_status`` (tree-hash walks the
+        # directory), so symlink-only callers (e.g. ``remove
+        # --symlink``) shouldn't pay that cost for installs that
+        # wouldn't pass the filter anyway. The status call goes
+        # through ``_install_status_or_none`` so auto-discovery
+        # degrades gracefully on transient I/O errors instead of
+        # propagating up to the user.
         if only_symlink and not _install_is_symlink_shape(spec, project=project):
+            continue
+        status = _install_status_or_none(spec, project=project)
+        if status is None or status == INSTALL_STATUS_MISSING:
             continue
         detected.append((spec, project))
     return detected
+
+
+def _install_status_or_none(spec: ClientSpec, *, project: bool) -> str | None:
+    """Like :func:`_install_status` but returns None on transient I/O errors.
+
+    Used by auto-discovery paths (``_detected_installed_clients``) so
+    a single unreadable install location doesn't abort the whole
+    walk. Callers treat None the same as MISSING — skip and continue.
+    Permission-denied / transient-IO failures end up as "skip"; the
+    user can still target the install explicitly via ``--client X``
+    + ``--project`` or ``--path PATH`` if needed.
+    """
+    try:
+        return _install_status(spec, project=project)
+    except OSError:  # nosafe: SAFE203
+        return None
 
 
 # ---------------------------------------------------------------------------

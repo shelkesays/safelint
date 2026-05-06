@@ -169,7 +169,7 @@ safelint skill update --force
 
 `safelint skill update` runs a drift check first and only re-installs the installs that have actually drifted. With `--force`, it re-installs every detected install regardless. Inherits the same `--client` / `--project` / `--symlink` flags as `install`; the only behavioural difference is that **`--client auto` for update detects via install paths, not marker files** — "what's installed?" rather than "what client is the user using?".
 
-**Shape preservation:** `update` (with or without `--force`) does **not** convert install modes silently. A symlink-mode install stays a symlink after refresh; a copy-mode install stays a copy. Pass `--symlink` explicitly if you want to *switch* a copy install to symlink mode mid-flight (the only direction that requires opt-in; symlink → copy must go through `remove` + `install` to be unambiguous).
+**Shape preservation:** `update` (with or without `--force`) does **not** convert install modes silently. A symlink-mode install stays a symlink after refresh; a copy-mode install stays a copy. Pass `--symlink` explicitly if you want to *switch* a copy install to symlink mode mid-flight, but note that `--symlink` only takes effect for installs that `update` actually re-installs. If the install is already fresh, use `safelint skill update --force --symlink` to convert copy → symlink; symlink → copy must go through `remove` + `install` to be unambiguous.
 
 For one-shot manual control:
 
@@ -239,7 +239,7 @@ safelint check --check-skill-freshness --all-files .
 `safelint skill status` iterates every registered AI client and both scopes (user / project), reports each detected install location as **fresh** or **differs from bundled**, and exits 0 only when every detected install matches the current bundle. Useful in CI:
 
 ```bash
-safelint skill status || safelint skill install --force
+safelint skill status || safelint skill update
 ```
 
 `safelint check --check-skill-freshness` is the same check folded into a normal lint run — it prints a stderr warning per stale install but **does not** fail the lint (informational only). The flag is opt-in so day-to-day `safelint check` invocations stay fast (no extra FS scan).
