@@ -169,6 +169,8 @@ safelint skill update --force
 
 `safelint skill update` runs a drift check first and only re-installs the installs that have actually drifted. With `--force`, it re-installs every detected install regardless. Inherits the same `--client` / `--project` / `--symlink` flags as `install`; the only behavioural difference is that **`--client auto` for update detects via install paths, not marker files** — "what's installed?" rather than "what client is the user using?".
 
+Explicit `--client <name>` (e.g. `safelint skill update --client cursor`) is **cross-scope by default** — it refreshes matching installs in *both* the user scope (`~/.cursor/...`, `~/.claude/...`) and the project scope (`<cwd>/.cursor/...`, `<cwd>/.claude/...`). To restrict an explicit-client update to project scope only, pass `--project` as the orthogonal filter (`safelint skill update --client cursor --project`). This mirrors how `skill remove` resolves targets — `--client` selects *which* client, `--project` decides *where to look*.
+
 **Shape preservation:** `update` (with or without `--force`) does **not** convert install modes silently. A symlink-mode install stays a symlink after refresh; a copy-mode install stays a copy. Pass `--symlink` explicitly if you want to *switch* a copy install to symlink mode mid-flight, but note that `--symlink` only takes effect for installs that `update` actually re-installs. If the install is already fresh, use `safelint skill update --force --symlink` to convert copy → symlink; symlink → copy must go through `remove` + `install` to be unambiguous.
 
 For one-shot manual control:

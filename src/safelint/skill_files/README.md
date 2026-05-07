@@ -120,7 +120,7 @@ Pipe-friendly idiom for CI / upgrade scripts:
 safelint skill status || safelint skill update
 ```
 
-`safelint skill status` exits 0 on a clean run and still prints output: one `safelint: <client> <artefact> at <path> (<scope> scope) — fresh` line per detected install plus a final `all detected installs match the bundled version` summary. When something drifts it prints `differs from bundled` for the affected install and a per-install scope-aware refresh command (e.g. `safelint skill update --client cursor --project`); the per-installation hint matters because bare `safelint skill update` (with no `--client`) only refreshes the auto-detected installs from the current directory. If you've customised your skill on purpose, ignore the diff — the diagnostic explicitly mentions that case.
+`safelint skill status` exits 0 on a clean run and still prints output: one `safelint: <client> <artefact> at <path> (<scope> scope) — fresh` line per detected install plus a final `all detected installs match the bundled version` summary. When something drifts it prints `differs from bundled` for the affected install and a per-install scope-aware refresh command (e.g. `safelint skill update --client cursor --project`); the per-installation hint matters so each diagnostic points at the *exact* install that drifted, even though bare `safelint skill update` will refresh every auto-detected install (project- and user-scope alike) on its own. If you've customised your skill on purpose, ignore the diff — the diagnostic explicitly mentions that case.
 
 ## Layout
 
