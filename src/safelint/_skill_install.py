@@ -826,7 +826,13 @@ def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) ->
     explicit_symlink = bool(getattr(args, "symlink", False))
     target = _spec_target(spec, project=project)
     scope = "project" if project else "user"
-    status = _install_status(spec, project=project)
+    # OSError-tolerant: an unreadable install (permissions / transient
+    # I/O) is silently skipped, matching ``run_status`` and
+    # ``_detected_installed_clients``. Returning rc=0 keeps a single
+    # bad location from poisoning the rest of the update walk.
+    status = _install_status_or_none(spec, project=project)
+    if status is None:
+        return 0
     if status == INSTALL_STATUS_FRESH and not force:
         _print_update_skipped_fresh(spec, target, scope)
         return 0
@@ -854,7 +860,10 @@ def _resolve_update_targets(args: argparse.Namespace) -> list[tuple[ClientSpec, 
         return _detected_installed_clients(project_only=project_flag)
     spec = _spec_by_name(explicit_client)
     scopes = [True] if project_flag else [False, True]
-    return [(spec, scope) for scope in scopes if _install_status(spec, project=scope) != INSTALL_STATUS_MISSING]
+    # ``_install_status_or_none`` keeps the explicit-client path
+    # OSError-tolerant: None (unreadable) is filtered out alongside
+    # MISSING, mirroring the auto-detect path.
+    return [(spec, scope) for scope in scopes if (status := _install_status_or_none(spec, project=scope)) is not None and status != INSTALL_STATUS_MISSING]
 
 
 def run_update(args: argparse.Namespace) -> int:
@@ -875,7 +884,11 @@ def run_update(args: argparse.Namespace) -> int:
     overall_rc = 0
     any_refreshed = False
     for spec, project in targets:
-        if _install_status(spec, project=project) != INSTALL_STATUS_FRESH or force:
+        # OSError-tolerant: a None status (transient I/O between
+        # resolve and refresh) is treated as "no refresh attempted",
+        # so it doesn't flip ``any_refreshed`` falsely.
+        status = _install_status_or_none(spec, project=project)
+        if status is not None and (status != INSTALL_STATUS_FRESH or force):
             any_refreshed = True
         rc = _update_one(spec, project=project, args=args)
         if rc != 0:
@@ -963,7 +976,11 @@ def _resolve_remove_candidates(args: argparse.Namespace) -> list[tuple[ClientSpe
     scopes = [True] if project_flag else [False, True]
     candidates: list[tuple[ClientSpec, bool]] = []
     for scope in scopes:
-        if _install_status(spec, project=scope) == INSTALL_STATUS_MISSING:
+        # OSError-tolerant: an unreadable install (None) is treated
+        # the same as MISSING, mirroring auto-detect's behaviour. A
+        # transient permission issue shouldn't crash ``remove``.
+        status = _install_status_or_none(spec, project=scope)
+        if status is None or status == INSTALL_STATUS_MISSING:
             continue
         if only_symlink and not _install_is_symlink_shape(spec, project=scope):
             continue

@@ -173,11 +173,11 @@ Explicit `--client <name>` (e.g. `safelint skill update --client cursor`) is **c
 
 **Shape preservation:** `update` (with or without `--force`) does **not** convert install modes silently. A symlink-mode install stays a symlink after refresh; a copy-mode install stays a copy. Pass `--symlink` explicitly if you want to *switch* a copy install to symlink mode mid-flight, but note that `--symlink` only takes effect for installs that `update` actually re-installs. If the install is already fresh, use `safelint skill update --force --symlink` to convert copy → symlink; symlink → copy must go through `remove` + `install` to be unambiguous.
 
-For one-shot manual control:
+For one-shot manual control, prefer the canonical, shape-preserving `skill update` form (this is what `skill update` was added for in v1.10 — the legacy `skill install --force` still works, but it ignores existing-install shape and silently overwrites it, which is rarely what you want for an in-place refresh):
 
 ```bash
-safelint skill install --force            # auto-detected clients (marker-file detection)
-safelint skill install --client cursor --force   # or specific client
+safelint skill update --force                    # auto-detected clients (install-path detection)
+safelint skill update --client cursor --force    # or specific client (cross-scope)
 ```
 
 Symlink mode picks up changes automatically; no re-install needed unless you want to re-run detection (e.g. after adding a new client to the project).
