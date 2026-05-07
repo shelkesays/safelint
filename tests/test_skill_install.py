@@ -1117,6 +1117,69 @@ def test_run_status_skips_oserror_install(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert "no AI-client skill installs detected" in captured.out
 
 
+def test_update_one_skips_oserror_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_update_one`` returns rc=0 silently when ``_install_status`` raises OSError.
+
+    Mirrors the OSError-tolerance pattern in ``run_status`` and
+    ``_detected_installed_clients``: an unreadable install location
+    (permission denied, transient I/O) is skipped rather than
+    crashing the whole update walk.
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+
+    def _raise_oserror(spec: _skill_install.ClientSpec, *, project: bool) -> str:
+        msg = "permission denied (simulated)"
+        raise OSError(msg)
+
+    monkeypatch.setattr(_skill_install, "_install_status", _raise_oserror)
+    rc = _skill_install._update_one(
+        _skill_install._CURSOR_SPEC,
+        project=False,
+        args=argparse.Namespace(force=False, symlink=False),
+    )
+    assert rc == 0
+
+
+def test_resolve_update_targets_skips_oserror_explicit_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Explicit-client update filtering treats OSError installs as MISSING (skipped).
+
+    Without OSError-tolerance, ``safelint skill update --client X``
+    would crash if any candidate scope was unreadable.
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+
+    def _raise_oserror(spec: _skill_install.ClientSpec, *, project: bool) -> str:
+        msg = "permission denied (simulated)"
+        raise OSError(msg)
+
+    monkeypatch.setattr(_skill_install, "_install_status", _raise_oserror)
+    targets = _skill_install._resolve_update_targets(argparse.Namespace(client="cursor", project=False))
+    assert targets == []
+
+
+def test_resolve_remove_candidates_skips_oserror_explicit_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_resolve_remove_candidates`` skips OSError installs for explicit-client remove.
+
+    Same OSError-tolerance contract as the update path — a transient
+    I/O error in one scope shouldn't crash ``safelint skill remove
+    --client X``.
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+
+    def _raise_oserror(spec: _skill_install.ClientSpec, *, project: bool) -> str:
+        msg = "permission denied (simulated)"
+        raise OSError(msg)
+
+    monkeypatch.setattr(_skill_install, "_install_status", _raise_oserror)
+    candidates = _skill_install._resolve_remove_candidates(
+        argparse.Namespace(client="cursor", project=False, symlink=False),
+    )
+    assert candidates == []
+
+
 def test_stale_install_warnings_skips_oserror_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """``stale_install_warnings`` swallows per-install OSErrors instead of aborting the walk.
 
@@ -1433,13 +1496,19 @@ def test_remove_path_dry_run_labels_broken_symlink_directory_as_symlink(tmp_path
     assert "(symlink)" in out, "broken Claude-style directory should label as symlink"
 
 
-def test_update_one_handles_namespace_without_force_attribute() -> None:
+def test_update_one_handles_namespace_without_force_attribute(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """``_update_one`` reads ``force`` defensively via ``getattr``.
 
     Library callers / tests that construct a partial Namespace
     shouldn't trip ``AttributeError``. Matches the defensive pattern
     used elsewhere in the module.
+
+    Redirects home/cwd via ``_redirect_home_and_cwd`` so the
+    downstream ``_install_one`` (reached because no install exists
+    yet → MISSING → re-install) writes into ``tmp_path``, not the
+    developer's real ``~/.cursor/...``.
     """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
     # Argparse-Namespace-like object with NO ``force`` attribute.
     args = argparse.Namespace()  # empty
     # Use a mocker-free, in-process path: just verify the helper
