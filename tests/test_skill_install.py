@@ -1094,6 +1094,49 @@ def test_stale_install_warnings_empty_when_all_fresh(monkeypatch: pytest.MonkeyP
     assert _skill_install.stale_install_warnings() == []
 
 
+def test_run_status_skips_oserror_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``run_status`` treats an OSError-raising install location as missing rather than crashing.
+
+    Plant a Cursor install, patch ``_install_status`` to raise OSError
+    so the status walk would otherwise propagate, and confirm
+    ``run_status`` completes (matching the auto-discovery
+    OSError-tolerance pattern enforced by ``_detected_installed_clients``).
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+
+    def _raise_oserror(spec: _skill_install.ClientSpec, *, project: bool) -> str:
+        msg = "permission denied (simulated)"
+        raise OSError(msg)
+
+    monkeypatch.setattr(_skill_install, "_install_status", _raise_oserror)
+    # Should NOT raise — the OSError install is treated as missing.
+    rc = _skill_install.run_status(argparse.Namespace())
+    captured = capsys.readouterr()
+    assert rc == 0
+    assert "no AI-client skill installs detected" in captured.out
+
+
+def test_stale_install_warnings_skips_oserror_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``stale_install_warnings`` swallows per-install OSErrors instead of aborting the walk.
+
+    The freshness diagnostic feeds ``--check-skill-freshness``; a
+    single unreadable install location must not crash an unrelated
+    lint run.
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+
+    def _raise_oserror(spec: _skill_install.ClientSpec, *, project: bool) -> str:
+        msg = "permission denied (simulated)"
+        raise OSError(msg)
+
+    monkeypatch.setattr(_skill_install, "_install_status", _raise_oserror)
+    # Should NOT raise — returns an empty list because the OSError
+    # install is treated as not-DIFFERS.
+    assert _skill_install.stale_install_warnings() == []
+
+
 @pytest.mark.parametrize("spec", _skill_install._CLIENT_SPECS, ids=lambda s: s.name)
 def test_skill_documents_every_supported_extension(spec: _skill_install.ClientSpec) -> None:
     """Every extension from ``supported_extensions()`` appears in the bundled documentation.
@@ -1342,6 +1385,27 @@ def test_is_symlink_directory_shape_returns_false_on_oserror(monkeypatch: pytest
 
     monkeypatch.setattr(Path, "iterdir", _raise_oserror)
     assert _skill_install._is_symlink_directory_shape(real_dir) is False
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_is_symlink_directory_shape_true_for_mixed_install(tmp_path: Path) -> None:
+    """An install with at least one symlink entry counts as symlink-shape.
+
+    Originally implemented with ``all(...)``, which meant a single
+    user-added real file (e.g. a notes file dropped alongside the
+    bundled symlinks) silently demoted the install to "not symlink"
+    and made ``remove --symlink`` skip it. The intent is shape-only:
+    *any* symlink at the top level qualifies, so cleanup can still
+    reach a customised install.
+    """
+    install_dir = tmp_path / "claude_skills_safelint"
+    install_dir.mkdir()
+    bundled = _skill_install.bundled_skill_path()
+    (install_dir / "languages").symlink_to(bundled / "languages", target_is_directory=True)
+    # User-added real file alongside the bundled symlink.
+    (install_dir / "NOTES.md").write_text("personal customisation\n", encoding="utf-8")
+
+    assert _skill_install._is_symlink_directory_shape(install_dir) is True
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")

@@ -613,8 +613,11 @@ def run_status(_args: argparse.Namespace) -> int:
     any_drift = False
     any_install = False
     for spec, project in _iter_install_locations():
-        status = _install_status(spec, project=project)
-        if status == INSTALL_STATUS_MISSING:
+        # OSError-tolerant: a single unreadable install location
+        # shouldn't crash the whole status walk. None is treated the
+        # same as MISSING — skip and move on.
+        status = _install_status_or_none(spec, project=project)
+        if status is None or status == INSTALL_STATUS_MISSING:
             continue
         any_install = True
         target = _spec_target(spec, project=project)
@@ -651,7 +654,8 @@ def stale_install_warnings() -> list[str]:
     """
     warnings: list[str] = []
     for spec, project in _iter_install_locations():
-        if _install_status(spec, project=project) != INSTALL_STATUS_DIFFERS:
+        # OSError-tolerant — same fail-safe pattern as ``run_status``.
+        if _install_status_or_none(spec, project=project) != INSTALL_STATUS_DIFFERS:
             continue
         target = _spec_target(spec, project=project)
         scope = "project" if project else "user"
@@ -676,6 +680,14 @@ def _is_symlink_directory_shape(target: Path) -> bool:
     is handled separately by :func:`_is_symlink_managed_directory`,
     which requires the inner symlinks to actually resolve.
 
+    A directory qualifies when **at least one** top-level entry is a
+    symlink — using ``any`` rather than ``all`` so an install that's
+    drifted extra real files (e.g. user-added customisation files
+    sitting alongside the original symlinked entries) is still
+    recognised as symlink-shape. ``--symlink`` cleanup needs to reach
+    those mixed installs; otherwise a single stray file would silently
+    immunise an originally-symlink install against the filter.
+
     Wraps the ``iterdir`` call in ``try/except OSError`` so that an
     unreadable install directory (permissions / transient I/O errors)
     fails closed rather than crashing this shape check itself. Treats
@@ -693,7 +705,7 @@ def _is_symlink_directory_shape(target: Path) -> bool:
         return False
     if not entries:
         return False
-    return all(entry.is_symlink() for entry in entries)
+    return any(entry.is_symlink() for entry in entries)
 
 
 def _install_is_symlink_shape(spec: ClientSpec, *, project: bool) -> bool:
