@@ -1,0 +1,20 @@
+cff-version: 1.2.0
+message: "If you use safelint in your work, please cite it using the metadata below."
+title: "safelint"
+abstract: "A static-analysis tool that enforces Holzmann \"Power of Ten\" safety rules adapted for modern Python codebases. Ships as a CLI, pre-commit hook, and AI-client skill (twelve clients supported)."
+type: software
+authors:
+  - family-names: "Shelke"
+    given-names: "Rahul"
+repository-code: "https://github.com/shelkesays/safelint"
+url: "https://github.com/shelkesays/safelint"
+license: MIT
+keywords:
+  - lint
+  - pre-commit
+  - static-analysis
+  - safety
+  - python
+  - power-of-ten
+version: "1.11.0"
+date-released: "2026-05-08"

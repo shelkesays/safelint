@@ -335,4 +335,8 @@ Pushing the version tag triggers `.github/workflows/publish.yml`, which builds a
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on bug reports, adding new rules, and opening pull requests.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on bug reports, adding new rules, AI clients, or languages, and opening pull requests. By participating in this project you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md).
+
+## Citing
+
+If you use safelint in academic work, see [CITATION.cff](CITATION.cff) for the canonical citation metadata. GitHub renders this file as a "Cite this repository" button on the repo home page.
