@@ -180,6 +180,8 @@ Reload Windsurf (or restart the editor). The rules are auto-loaded from `.windsu
 - `status` — reports DIFFERS when the section content has drifted from bundled, even if the primary file is fresh.
 - `remove` — strips just the section from `AGENTS.md`. Other content is preserved. If `AGENTS.md` ends up empty (only safelint content was ever there), the empty file is removed too.
 
+**Symlink safety:** safelint refuses to follow a symlink at the `AGENTS.md` destination. If your `AGENTS.md` is a symlink (intentional or accidental), `install` / `update` / `remove` skip the secondary write entirely and print a `safelint: warning: refusing to install/remove safelint section through symlink at ...` line on stderr. The primary `.codex/instructions.md` install is unaffected. Replace the symlink with a real file if you want safelint to manage that location directly.
+
 **How to invoke after install:**
 
 Restart codex (or your codex-aware editor). The primary `.codex/instructions.md` is auto-discovered. Then ask codex *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
@@ -407,11 +409,15 @@ safelint skill remove                     # auto-detect and remove every install
 safelint skill remove --client cursor     # only Cursor installs (both shapes)
 safelint skill remove --symlink           # only symlink-shape installs (keep copies)
 safelint skill remove --project           # only project-scope installs (keep user-scope)
-safelint skill remove --path /unusual/place/safelint.mdc   # one specific location
+safelint skill remove --path /unusual/place/.cursor/rules/safelint.mdc   # one specific location (must match a registered install shape)
 safelint skill remove --dry-run           # preview without deleting
 ```
 
 `safelint skill remove` mirrors install's auto-detect *for install paths* (not marker files): it scans `~/.claude/skills/safelint/`, `<cwd>/.claude/skills/safelint/`, `~/.cursor/rules/safelint.mdc`, `<cwd>/.cursor/rules/safelint.mdc` and removes whatever exists.
+
+> **Security note on `--path PATH`:** the path you pass must match a registered install shape — i.e. its tail must equal one of the canonical install relpaths (`.cursor/rules/safelint.mdc`, `.codex/instructions.md`, `.continue/rules/safelint.md`, `.clinerules/safelint.md`, `.trae/rules/safelint.md`, `.antigravity/rules/safelint.md`, `.windsurfrules`, `GEMINI.md`, `.rules`, `CONVENTIONS.md`, `.claude/skills/safelint`, `.github/copilot-instructions.md`). This guard prevents typos and shell-expansion accidents (e.g. `--path ~/.config` instead of `~/.cursor/...`) from triggering `shutil.rmtree` on the wrong directory. If you have a truly unrecognisable install location, remove it manually with `rm` after inspecting its contents.
+
+> **codex secondary install (`AGENTS.md`):** when `AGENTS.md` exists at the install scope root, codex's secondary install writes a delimited section into it (and `remove` strips that section back out). For security, safelint **refuses to follow symlinks** at the secondary destination — if `AGENTS.md` is a symlink, install/update/remove all skip it and print a `safelint: warning: refusing to install/remove safelint section through symlink at ...` line on stderr. Replace the symlink with a real file before re-running if you want safelint to manage that location directly.
 
 #### What gets removed under each combination
 
