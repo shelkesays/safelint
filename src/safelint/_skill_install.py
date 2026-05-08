@@ -804,7 +804,7 @@ def _print_update_skipped_fresh(spec: ClientSpec, target: Path, scope: str) -> N
     print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) — already fresh, skipped")
 
 
-def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) -> int:
+def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace, status: str | None = None) -> int:
     """Refresh one install. No-op when fresh unless ``args.force``.
 
     Reads ``force`` and ``symlink`` via ``getattr`` so library callers
@@ -821,6 +821,15 @@ def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) ->
     a copy install to symlink mode mid-flight (the only direction
     that requires opt-in; symlink → copy must go through
     ``remove`` + ``install`` to be unambiguous).
+
+    *status*: optional precomputed install status. Callers that
+    already invoked ``_install_status_or_none`` (notably
+    :func:`run_update`) pass it through so the directory walk / hash
+    runs at most once per install per run. Default ``None`` means
+    "compute it yourself" — keeps the function standalone for direct
+    callers and tests. After the optional compute, a still-``None``
+    status means the location was unreadable (OSError) and we silently
+    skip with rc=0, matching ``run_status``.
     """
     force = bool(getattr(args, "force", False))
     explicit_symlink = bool(getattr(args, "symlink", False))
@@ -830,7 +839,8 @@ def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) ->
     # I/O) is silently skipped, matching ``run_status`` and
     # ``_detected_installed_clients``. Returning rc=0 keeps a single
     # bad location from poisoning the rest of the update walk.
-    status = _install_status_or_none(spec, project=project)
+    if status is None:
+        status = _install_status_or_none(spec, project=project)
     if status is None:
         return 0
     if status == INSTALL_STATUS_FRESH and not force:
@@ -866,6 +876,28 @@ def _resolve_update_targets(args: argparse.Namespace) -> list[tuple[ClientSpec, 
     return [(spec, scope) for scope in scopes if (status := _install_status_or_none(spec, project=scope)) is not None and status != INSTALL_STATUS_MISSING]
 
 
+def _process_update_target(spec: ClientSpec, *, project: bool, args: argparse.Namespace, force: bool) -> tuple[int, bool, bool]:
+    """Inspect and (maybe) refresh one update target.
+
+    Returns ``(rc, refreshed, processed)``: *rc* is the per-target
+    install return code (0 when skipped); *refreshed* is True when an
+    actual re-install happened; *processed* is True when the target
+    was readable (status compute did not OSError). Status is computed
+    once and threaded into :func:`_update_one` so the hash/walk runs
+    at most once per install per run.
+    """
+    status = _install_status_or_none(spec, project=project)
+    if status is None:
+        return 0, False, False
+    if status == INSTALL_STATUS_FRESH and not force:
+        target = _spec_target(spec, project=project)
+        scope = "project" if project else "user"
+        _print_update_skipped_fresh(spec, target, scope)
+        return 0, False, True
+    rc = _update_one(spec, project=project, args=args, status=status)
+    return rc, True, True
+
+
 def run_update(args: argparse.Namespace) -> int:
     """Refresh installs whose content has drifted from the bundled wheel.
 
@@ -883,28 +915,19 @@ def run_update(args: argparse.Namespace) -> int:
         return 0
     overall_rc = 0
     any_refreshed = False
+    # ``any_processed`` distinguishes "all targets were inspected and
+    # found fresh" (legitimate "all up to date" message) from "every
+    # target OSError'd" (silent skip, no inspection happened). Without
+    # this flag the latter would falsely print the all-fresh summary,
+    # masking a real I/O failure as a clean run.
+    any_processed = False
     for spec, project in targets:
-        # Compute status once per target. ``_install_status`` walks
-        # the install directory and hashes its files (Claude installs
-        # have many of both), so calling it again inside
-        # ``_update_one`` doubles that work. Short-circuit the FRESH
-        # and OSError paths here so the hash/walk runs at most once
-        # per install per run; only the actual re-install path falls
-        # through to ``_update_one`` (which still recomputes for
-        # direct callers, but they pay that cost once).
-        status = _install_status_or_none(spec, project=project)
-        if status is None:
-            continue  # OSError — silent skip, matches run_status
-        if status == INSTALL_STATUS_FRESH and not force:
-            target = _spec_target(spec, project=project)
-            scope = "project" if project else "user"
-            _print_update_skipped_fresh(spec, target, scope)
-            continue
-        any_refreshed = True
-        rc = _update_one(spec, project=project, args=args)
+        rc, refreshed, processed = _process_update_target(spec, project=project, args=args, force=force)
+        any_processed = any_processed or processed
+        any_refreshed = any_refreshed or refreshed
         if rc != 0:
             overall_rc = rc
-    if not any_refreshed and overall_rc == 0:
+    if not any_refreshed and overall_rc == 0 and any_processed:
         _print_update_all_fresh()
     return overall_rc
 
