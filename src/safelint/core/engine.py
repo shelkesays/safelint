@@ -26,6 +26,7 @@ if TYPE_CHECKING:
 
 
 _NOSAFE_PREFIX = "nosafe"
+_FILE_IGNORE_PREFIX = "safelint: ignore"
 
 # Codes / names emitted directly by the engine rather than by a registered
 # BaseRule. They're recognised in the user's ``ignore`` list (so e.g.
@@ -60,6 +61,78 @@ def _nosafe_codes(comment: str, prefix: str = "#") -> set[str] | None | Literal[
             return False
         return codes
     return False
+
+
+def _file_ignore_codes(comment_text: str, prefix: str = "#") -> set[str] | None | Literal[False]:
+    """Parse a comment for ``# safelint: ignore[: codes]`` file-level directives.
+
+    Returns:
+        ``None``           — bare ``# safelint: ignore`` (suppress all rules in this file)
+        ``set[str]``       — explicit codes / rule names to suppress file-wide
+        ``Literal[False]`` — not a file-level ignore directive
+
+    Mirrors the shape of :func:`_nosafe_codes` but uses the longer
+    ``safelint: ignore`` form to distinguish file scope from line scope.
+
+    """
+    body = comment_text[len(prefix) :].strip()
+    if not body.lower().startswith(_FILE_IGNORE_PREFIX):
+        return False
+    remainder = body[len(_FILE_IGNORE_PREFIX) :].lstrip()
+    if remainder == "":
+        return None
+    if remainder.startswith(":"):
+        codes_str = remainder[1:].strip()
+        if not codes_str:
+            return False
+        codes = {tok.strip() for tok in codes_str.split(",") if tok.strip()}
+        return codes or False
+    return False
+
+
+def _parse_file_level_ignores(
+    tree: tree_sitter.Tree,
+    comment_node_type: str,
+    comment_prefix: str,
+    source_lines: list[str],
+) -> tuple[bool, set[str]]:
+    """Walk Tree-sitter comment nodes for ``# safelint: ignore`` directives.
+
+    Returns ``(bare, codes)`` where *bare* is True when the file has a
+    bare ``# safelint: ignore`` (suppress all rules) and *codes* is the
+    set of explicit codes / names listed across all keyed
+    ``# safelint: ignore: A, B`` directives in the file.
+
+    Only comments that appear *alone on their line* (no preceding code)
+    are honoured. This intentionally rules out trailing comments after
+    code — the line-level ``# nosafe`` form handles those, and a
+    file-level directive accidentally placed as a trailing comment
+    would otherwise silently extend its scope to the whole file.
+
+    Tree-sitter is used (not a raw line scan) so a ``# safelint: ignore``
+    inside a string literal or docstring is correctly ignored.
+    """
+    bare = False
+    codes: set[str] = set()
+    for node in walk(tree.root_node):
+        if node.type != comment_node_type:
+            continue
+        line_idx = node_lineno(node) - 1  # convert 1-based lineno to 0-based index
+        if line_idx < 0 or line_idx >= len(source_lines):
+            continue
+        line = source_lines[line_idx]
+        if not line.lstrip().startswith(comment_prefix):
+            # Comment is not the first non-whitespace content on the line —
+            # i.e. it's a trailing comment after code. Skip.
+            continue
+        payload = _file_ignore_codes(node_text(node), prefix=comment_prefix)
+        if payload is False:
+            continue
+        if payload is None:
+            bare = True
+        else:
+            codes |= payload
+    return bare, codes
 
 
 def _parse_suppressions(
@@ -128,7 +201,15 @@ def _check_suppressed_marking_used(
 
 
 def _is_per_file_ignored(violation: Violation, ignored_names: frozenset[str], ignored_codes: frozenset[str]) -> bool:
-    """Return True when *violation* is suppressed by a per-file ignore pattern."""
+    """Return True when *violation* is suppressed by a per-file ignore pattern.
+
+    The ``"*"`` wildcard in *ignored_codes* matches every violation —
+    used by the bare ``# safelint: ignore`` file-level directive and by
+    ``per_file_ignores`` entries that want to silence everything for a
+    given path pattern.
+    """
+    if "*" in ignored_codes:
+        return True
     return violation.code.upper() in ignored_codes or violation.rule in ignored_names
 
 
@@ -268,6 +349,10 @@ class SafetyEngine:
         per_file_known_names = known_names - _ENGINE_INTERNAL_NAMES
         per_file_known_codes_upper = known_codes_upper - _ENGINE_INTERNAL_CODES
         self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = self._parse_per_file_ignores(config.get("per_file_ignores", {}), per_file_known_names, per_file_known_codes_upper)
+        # Stored for in-file ``# safelint: ignore`` directive validation
+        # (typo-guard against unknown codes/names, same as the toml form).
+        self._per_file_known_names: frozenset[str] = per_file_known_names
+        self._per_file_known_codes_upper: frozenset[str] = per_file_known_codes_upper
         self._cache = cache
         # Ignore-set for engine-internal violations only (SAFE000 / SAFE004,
         # by code or rule name). Filtered to engine-internal entries so the
@@ -384,6 +469,39 @@ class SafetyEngine:
         bare = dir_path.as_posix().rstrip("/")
         with_slash = bare + "/"
         return any(fnmatch.fnmatchcase(bare, pattern) or fnmatch.fnmatchcase(with_slash, pattern) for pattern in self.exclude_paths)
+
+    def _merge_in_file_directives(
+        self,
+        filepath: str,
+        tree: tree_sitter.Tree,
+        lang: LanguageDefinition,
+        source: str,
+        ignored_names: frozenset[str],
+        ignored_codes: frozenset[str],
+    ) -> tuple[frozenset[str], frozenset[str]]:
+        """Merge any in-file ``# safelint: ignore`` directives into the per-file ignore sets.
+
+        The directive form is the file-level analogue of the line-level
+        ``# nosafe``: ``# safelint: ignore`` (suppress everything in
+        this file) or ``# safelint: ignore: SAFE101, SAFE102``
+        (suppress specific codes / names). Only comments alone on
+        their line are honoured; trailing comments after code are
+        scope-local and use ``# nosafe`` instead.
+
+        Unknown codes/names trigger a typo-guard warning on stderr,
+        matching the validation behaviour for ``per_file_ignores`` in
+        the toml config.
+        """
+        bare, file_codes = _parse_file_level_ignores(tree, lang.comment_node_type, lang.comment_prefix, source.splitlines())
+        if bare:
+            ignored_codes = ignored_codes | frozenset({"*"})
+        if file_codes:
+            unknown = frozenset(c for c in file_codes if c not in self._per_file_known_names and c.upper() not in self._per_file_known_codes_upper)
+            if unknown:
+                _diagnostics.print_warning(f"unknown entries in `# safelint: ignore` directive in {filepath} (typo or stale rule?): {', '.join(sorted(unknown))}")
+            ignored_names = ignored_names | frozenset(file_codes)
+            ignored_codes = ignored_codes | frozenset(c.upper() for c in file_codes)
+        return ignored_names, ignored_codes
 
     def _file_ignored_set(self, filepath: str) -> tuple[frozenset[str], frozenset[str]]:
         """Return (names, codes_upper) accumulated from all per-file patterns matching *filepath*."""
@@ -625,6 +743,7 @@ class SafetyEngine:
 
         suppressions = _parse_suppressions(tree, lang.comment_node_type, lang.comment_prefix)
         ignored_names, ignored_codes = self._file_ignored_set(filepath)
+        ignored_names, ignored_codes = self._merge_in_file_directives(filepath, tree, lang, source, ignored_names, ignored_codes)
         used_suppressions: set[tuple[int, str | None]] = set()
         active, suppressed, stopped_early = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes, used_suppressions)
         # Skip the SAFE004 unused-suppression pass when ``fail_fast``

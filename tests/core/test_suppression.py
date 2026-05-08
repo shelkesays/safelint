@@ -17,6 +17,8 @@ from safelint.rules.base import Violation
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
+
 _PYTHON_LANGUAGE = tree_sitter.Language(tree_sitter_python.language())
 
 
@@ -481,3 +483,136 @@ def test_safe004_still_emitted_without_fail_fast(tmp_path: Path) -> None:
     # SAFE401 didn't fire (no resource acquisition), so its directive
     # is genuinely unused — SAFE004 must surface it.
     assert any(v.code == "SAFE004" and "SAFE401" in v.message for v in result.violations)
+
+
+# ---------------------------------------------------------------------------
+# In-file ``# safelint: ignore`` directive (file-level suppression)
+# ---------------------------------------------------------------------------
+
+
+def test_file_level_bare_directive_suppresses_all_rules(tmp_path: Path) -> None:
+    """A bare ``# safelint: ignore`` at the top of a file silences every rule for that file."""
+    long_body = "    x = 1\n" * 65
+    source = (
+        "# safelint: ignore\ndef too_long():\n" + long_body + "    f = open('x.txt')\n"  # would normally fire SAFE401
+    )
+    sample = tmp_path / "all_ignored.py"
+    sample.write_text(source, encoding="utf-8")
+
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    assert result.violations == []
+    suppressed_codes = {v.code for v in result.suppressed}
+    assert "SAFE101" in suppressed_codes  # function_length
+    assert "SAFE401" in suppressed_codes  # resource_lifecycle
+
+
+def test_file_level_keyed_directive_suppresses_named_codes_only(tmp_path: Path) -> None:
+    """``# safelint: ignore: SAFE101`` silences only function_length, not other rules."""
+    long_body = "    x = 1\n" * 65
+    source = (
+        "# safelint: ignore: SAFE101\ndef too_long():\n" + long_body + "    f = open('x.txt')\n"  # SAFE401 still fires
+    )
+    sample = tmp_path / "selective_ignore.py"
+    sample.write_text(source, encoding="utf-8")
+
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    active_codes = {v.code for v in result.violations}
+    suppressed_codes = {v.code for v in result.suppressed}
+    assert "SAFE101" not in active_codes
+    assert "SAFE101" in suppressed_codes
+    assert "SAFE401" in active_codes
+
+
+def test_file_level_directive_accepts_rule_name(tmp_path: Path) -> None:
+    """``# safelint: ignore: function_length`` (by rule name) works as well as by code."""
+    long_body = "    x = 1\n" * 65
+    source = "# safelint: ignore: function_length\ndef too_long():\n" + long_body
+    sample = tmp_path / "by_name.py"
+    sample.write_text(source, encoding="utf-8")
+
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    assert not any(v.rule == "function_length" for v in result.violations)
+    assert any(v.rule == "function_length" for v in result.suppressed)
+
+
+def test_file_level_directive_ignored_when_trailing_after_code(tmp_path: Path) -> None:
+    """A ``# safelint: ignore`` placed as a trailing comment after code is NOT honoured.
+
+    Trailing comments are scope-local; the ``# nosafe`` form covers
+    them. Honouring trailing-form file-level directives would let a
+    user accidentally extend a per-line suppression to the whole file.
+    """
+    long_body = "    x = 1\n" * 65
+    source = "x = 1  # safelint: ignore: SAFE101\ndef too_long():\n" + long_body
+    sample = tmp_path / "trailing_ignored.py"
+    sample.write_text(source, encoding="utf-8")
+
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    assert any(v.code == "SAFE101" for v in result.violations)
+
+
+def test_file_level_directive_inside_string_is_ignored(tmp_path: Path) -> None:
+    """A ``# safelint: ignore`` literal inside a string / docstring is NOT honoured.
+
+    Tree-sitter parses comments as first-class nodes, so directives
+    embedded in string content never reach the parser as comment
+    tokens.
+    """
+    long_body = "    x = 1\n" * 65
+    source = '"""Module docstring.\n# safelint: ignore\nIntentional: this looks like a directive but is inside a docstring."""\ndef too_long():\n' + long_body
+    sample = tmp_path / "string_literal_directive.py"
+    sample.write_text(source, encoding="utf-8")
+
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    assert any(v.code == "SAFE101" for v in result.violations)
+
+
+def test_file_level_directive_unknown_code_emits_typo_warning(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """An unknown code in ``# safelint: ignore: ...`` triggers a stderr typo warning, doesn't fail the run."""
+    source = "# safelint: ignore: SAFE999\nx = 1\n"
+    sample = tmp_path / "typo.py"
+    sample.write_text(source, encoding="utf-8")
+
+    SafetyEngine(DEFAULTS).check_file(str(sample))
+    err = capsys.readouterr().err
+    assert "unknown entries in `# safelint: ignore`" in err
+    assert "SAFE999" in err
+
+
+def test_file_level_directive_bare_via_wildcard_in_per_file_ignores(tmp_path: Path) -> None:
+    """The same wildcard ``"*"`` mechanism backs both file-level bare directive and toml ``per_file_ignores`` blanket entries."""
+    long_body = "    x = 1\n" * 65
+    source = "def too_long():\n" + long_body
+    sample = tmp_path / "wildcard.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"per_file_ignores": {"**/wildcard.py": ["*"]}})
+    result = SafetyEngine(config).check_file(str(sample))
+    assert result.violations == []
+    assert any(v.code == "SAFE101" for v in result.suppressed)
+
+
+def test_file_level_directive_combined_codes(tmp_path: Path) -> None:
+    """Multiple codes in one directive: ``# safelint: ignore: SAFE101, SAFE401``."""
+    long_body = "    x = 1\n" * 65
+    source = "# safelint: ignore: SAFE101, SAFE401\ndef too_long():\n" + long_body + "    f = open('x.txt')\n"
+    sample = tmp_path / "combined.py"
+    sample.write_text(source, encoding="utf-8")
+
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    suppressed_codes = {v.code for v in result.suppressed}
+    assert "SAFE101" in suppressed_codes
+    assert "SAFE401" in suppressed_codes
+    assert not any(v.code in {"SAFE101", "SAFE401"} for v in result.violations)
+
+
+def test_file_level_directive_after_module_docstring(tmp_path: Path) -> None:
+    """``# safelint: ignore`` placed after a module docstring still works (need not be line 1)."""
+    long_body = "    x = 1\n" * 65
+    source = '"""Module docstring."""\n# safelint: ignore: SAFE101\ndef too_long():\n' + long_body
+    sample = tmp_path / "after_docstring.py"
+    sample.write_text(source, encoding="utf-8")
+
+    result = SafetyEngine(DEFAULTS).check_file(str(sample))
+    assert not any(v.code == "SAFE101" for v in result.violations)
+    assert any(v.code == "SAFE101" for v in result.suppressed)

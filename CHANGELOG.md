@@ -7,6 +7,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.0] - 2026-05-08
+
+A focused feature release on top of v1.11.0. The suppression model grows from three layers to four with a new in-file `# safelint: ignore` directive that lets users silence rules for a whole file from inside the file itself — matching the established pattern from ruff (`# ruff: noqa`), flake8 (`# flake8: noqa`), pylint (`# pylint: disable=`), and mypy (`# type: ignore`).
+
+### Added
+
+- **In-file `# safelint: ignore` directive** — file-scope suppression placed as a top-of-file (or anywhere alone-on-its-line) comment. Three forms:
+  ```python
+  # safelint: ignore                        # suppress every rule for this file
+  # safelint: ignore: SAFE101               # suppress one code
+  # safelint: ignore: SAFE101, SAFE304      # suppress multiple
+  # safelint: ignore: function_length       # by rule name (equivalent to the code form)
+  ```
+  Best for the case "this whole file is intentionally violating" — auto-generated code, fixtures, vendor adapters — where toml's `per_file_ignores` is overkill (no glob pattern needed) and inline `# nosafe` is wrong (the violation isn't on a single line).
+
+  - **Tree-sitter parsed**, so `# safelint: ignore` *literals* inside docstrings or string content are correctly ignored.
+  - **Comment must be alone on its line.** Trailing comments after code are skipped — those are scope-local and use `# nosafe` instead. This prevents a per-line directive that's typed with the wrong prefix from silently extending to the whole file.
+  - **Typo-guarded.** Unknown codes / rule names emit a `safelint: warning:` line on stderr (matching the toml typo guard); the run continues.
+  - **Auditable.** Suppressed violations still land in `LintResult.suppressed` and surface in the CLI's per-code breakdown at the end of a run.
+
+- **`"*"` wildcard support in `per_file_ignores`** — falls out of the same machinery the bare file-level directive uses. You can now write `[tool.safelint.per_file_ignores]` with `"some/path/**" = ["*"]` to skip every rule for a path pattern, instead of having to enumerate every code.
+
+### Changed
+
+- **Suppression model is now four layers**, narrowest to widest. They compose — a violation is suppressed if *any* layer matches:
+  1. **`# nosafe`** (line scope) — same as before.
+  2. **`# safelint: ignore`** (file scope) — new in 1.12.0.
+  3. **`per_file_ignores`** (glob scope) — same as before, plus `"*"` wildcard support.
+  4. **`ignore`** (project scope) — same as before.
+
+### Documentation
+
+- **CONFIGURATION.md** — new *File-level suppression* section with form table, placement rule, typo-guard behaviour, and a four-mechanism comparison table mapping each scope to its right use case.
+- **CLAUDE.md** — *Suppression model* section updated from 3 layers to 4 with implementation pointers (`_parse_file_level_ignores`, `_merge_in_file_directives`, `_is_per_file_ignored`'s wildcard short-circuit).
+
+### Behaviour changes (heads-up)
+
+- **None for existing files.** Files without a `# safelint: ignore` directive behave identically to v1.11.0 — the new code path is purely additive. The only observable difference is the new wildcard `"*"` interpretation in `per_file_ignores`; if any user was previously writing literal `"*"` as a rule code (would have been a no-op since no rule matches), they'll now find that entry blanket-suppresses every rule. We're not aware of any such usage in the wild.
+
 ## [1.11.0] - 2026-05-08
 
 Multi-client expansion — the AI-client skill registry grows from 2 supported clients to 12. The architecture from v1.6.0–v1.10.0 was built for this; each new client is one `ClientSpec` append plus a bundled artefact (and 10 install/lifecycle regression tests). Top-level `safelint help` gains dedicated *Skill subcommands* and *Skill flags* sections so the install / update / remove / status / path surface is discoverable without a second `safelint help skill` round-trip.
@@ -258,7 +297,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.11.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.12.0...HEAD
+[1.12.0]: https://github.com/shelkesays/safelint/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/shelkesays/safelint/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/shelkesays/safelint/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/shelkesays/safelint/compare/v1.8.0...v1.9.0
