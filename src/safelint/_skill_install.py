@@ -196,6 +196,23 @@ _WINDSURF_SPEC = ClientSpec(
 )
 
 
+_CONTINUE_SPEC = ClientSpec(
+    name="continue",
+    display_name="Continue.dev",
+    artefact_label="rule",
+    # Continue.dev's config dir ``.continue/`` is the conventional
+    # signal — a populated workspace has it. Per-rule files live
+    # under ``rules/``; we install ``safelint.md`` there.
+    cwd_markers=(".continue", ".continuerc", ".continuerc.json"),
+    home_markers=(".continue",),
+    install_relpath=(".continue", "rules", "safelint.md"),
+    bundled_relpath=("continue", "safelint.md"),
+    restart_hint="Reload your IDE (or restart Continue.dev) to pick up the new rule.",
+    usage_hint='Then ask Continue "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("continue", "safelint.md"),),
+)
+
+
 _CODEX_SPEC = ClientSpec(
     name="codex",
     display_name="codex",
@@ -224,7 +241,7 @@ _CODEX_SPEC = ClientSpec(
 
 # Registry — append to extend. Order matters: detection / multi-install
 # output follows registry order so users see results in a stable sequence.
-_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC, _CODEX_SPEC)
+_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC, _CODEX_SPEC, _CONTINUE_SPEC)
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
 
@@ -241,7 +258,7 @@ PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
 # Subdirectories under ``skill_files/`` that hold peer-client bundles.
 # Excluded from a Claude install (copy or symlink) so the materialised
 # skill folder doesn't carry irrelevant peer artefacts.
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex"})
+_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex", "continue"})
 
 
 # ---------------------------------------------------------------------------
