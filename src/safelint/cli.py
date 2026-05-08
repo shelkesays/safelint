@@ -899,7 +899,9 @@ def _build_skill_parser() -> argparse.ArgumentParser:
 
     parser = argparse.ArgumentParser(
         prog="safelint skill",
-        description="Manage the bundled safelint skill / project rule for AI clients (Claude Code, Cursor; more to come)",
+        description=(
+            "Manage the bundled safelint skill / project rule for AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed)"
+        ),
     )
     sub = parser.add_subparsers(dest="skill_action", required=True, metavar="ACTION")
 

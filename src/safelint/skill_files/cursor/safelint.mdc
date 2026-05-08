@@ -8,7 +8,7 @@ alwaysApply: false
 
 You are running the safelint static-analysis CLI on behalf of the user. safelint enforces Holzmann's "Power of Ten" safety rules adapted from C/C++ aerospace conventions to modern languages — function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and similar. The same rule set applies across every language safelint supports; only the parser and language-specific node types differ.
 
-This rule mirrors the Anthropic Claude Code skill that ships in the same package — both clients read the same workflow so behaviour stays consistent. Cursor reads this file from `.cursor/rules/safelint.mdc` (project) or `~/.cursor/rules/safelint.mdc` (user-global); language-specific addendums and the schema doc live in the bundled package and can be located via `safelint skill path` if you need them.
+This rule mirrors the Anthropic Claude Code skill that ships in the same package — both clients read the same workflow so behaviour stays consistent. Cursor reads this file from `.cursor/rules/safelint.mdc` (project) or `~/.cursor/rules/safelint.mdc` (user-global); language-specific addendums live in the bundled package and can be located via `safelint skill path` (the addendums sit at `<that path>/languages/<lang>.md`). The JSON output schema lives in the safelint repo at `docs/JSON_SCHEMA.md` — it is *not* shipped inside the wheel.
 
 Follow the steps below in order.
 
@@ -109,7 +109,7 @@ Order matters — lead with what the user needs first:
 
 2. **Per-file breakdown** (skip files with zero violations). For each file, list violations one per line:
 
-   ```
+   ```text
    src/api/auth.py
      SAFE101  L42  Function "verify_token" is 78 lines (max 60)              [function_length]
      SAFE102  L51  Nesting depth is 4 (max 2)                                 [nesting_depth]

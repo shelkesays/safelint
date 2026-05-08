@@ -125,7 +125,8 @@ For each rule that ports, the work is:
    print(p.parse(b"function foo() {}").root_node)
    ```
    Output (truncated for clarity):
-   ```
+
+   ```text
    (program (function_declaration name: (identifier) parameters: (formal_parameters) body: (statement_block)))
    ```
    The node type for "function" in this grammar is `function_declaration` (Python's grammar calls it `function_definition`). Use that string in step 2.

@@ -103,7 +103,7 @@ Order matters — lead with what the user needs first:
 
 2. **Per-file breakdown** (skip files with zero violations). For each file, list violations one per line:
 
-   ```
+   ```text
    src/api/auth.py
      SAFE101  L42  Function "verify_token" is 78 lines (max 60)              [function_length]
      SAFE102  L51  Nesting depth is 4 (max 2)                                 [nesting_depth]

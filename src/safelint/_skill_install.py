@@ -730,26 +730,79 @@ def _print_secondary_symlink_refused(target: Path) -> None:
     )
 
 
+def _print_secondary_non_file_refused(target: Path) -> None:
+    """Stderr warning emitted when the secondary destination exists but is not a regular file.
+
+    Covers directories, FIFOs, sockets, device files, etc. — anything
+    where ``read_text`` / ``write_text`` would raise rather than work
+    on the byte stream. We refuse so ``skill install`` / ``update`` /
+    ``remove`` don't crash; the user can clear the unexpected entry
+    and re-run.
+    """
+    print(
+        f"safelint: warning: refusing to install/remove safelint section at {target} — "
+        "path exists but is not a regular file (directory, FIFO, device, etc.). "
+        "Replace it with a regular file (or remove it) if you want safelint to manage this location.",
+        file=sys.stderr,
+    )
+
+
+def _secondary_target_writable_or_warn(spec: ClientSpec, *, project: bool) -> Path | None:
+    """Return the secondary target only if it's a regular file we can read+write safely.
+
+    Returns ``None`` (and the caller should treat as no-op) when:
+
+    - The spec has no secondary destination configured.
+    - The destination doesn't exist (we never auto-create the shared file).
+    - The destination is a symlink — refused via
+      :func:`_print_secondary_symlink_refused` to avoid following it.
+    - The destination exists but isn't a regular file (directory, FIFO,
+      socket, device) — refused via :func:`_print_secondary_non_file_refused`
+      so ``read_text`` / ``write_text`` don't blow up later in the flow.
+
+    Three lifecycle helpers (:func:`_install_secondary`,
+    :func:`_remove_secondary`, :func:`_secondary_status`) all run this
+    same set of checks; consolidating them here keeps the policy in
+    one place and avoids having three near-duplicate guards drift
+    apart.
+    """
+    target = _secondary_target(spec, project=project)
+    if target is None or not target.exists():
+        return None
+    if target.is_symlink():
+        _print_secondary_symlink_refused(target)
+        return None
+    if not target.is_file():
+        _print_secondary_non_file_refused(target)
+        return None
+    return target
+
+
 def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
     """Write the safelint section into *spec*'s secondary file when it already exists.
 
     Returns True when the secondary file was modified. False when the
     secondary destination is unset, the file doesn't exist (we don't
-    auto-create), the file is a symlink (refused — see security note),
-    or the file's section already matches the bundle.
+    auto-create), the file is a symlink or non-regular file (refused —
+    see security notes), or the file's section already matches the
+    bundle.
 
-    **Security note:** if the secondary destination is a symlink, we
-    refuse to follow it. Reading/writing through a symlink would let a
-    malicious or accidental setup (e.g. ``AGENTS.md → /etc/passwd``)
-    redirect our section write into an arbitrary file. The refusal is
-    surfaced via :func:`_print_secondary_symlink_refused` so the user
-    can investigate.
+    **Security and safety notes:**
+
+    - **Symlinks are refused.** Reading/writing through a symlink at
+      the secondary destination would let a malicious or accidental
+      setup (``AGENTS.md → /etc/passwd``) redirect our section write
+      into an arbitrary file.
+    - **Non-regular files are refused.** A directory, FIFO, socket, or
+      device named ``AGENTS.md`` would crash ``read_text`` /
+      ``write_text``; we refuse and surface a warning so the install
+      doesn't abort and the user knows what happened.
+
+    Both refusals use :func:`_secondary_target_writable_or_warn`, which
+    funnels the checks through one place.
     """
-    target = _secondary_target(spec, project=project)
-    if target is None or not target.exists():
-        return False
-    if target.is_symlink():
-        _print_secondary_symlink_refused(target)
+    target = _secondary_target_writable_or_warn(spec, project=project)
+    if target is None:
         return False
     bundled = _spec_bundled_source(spec).read_text(encoding="utf-8")
     existing = target.read_text(encoding="utf-8")
@@ -763,14 +816,12 @@ def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
 def _remove_secondary(spec: ClientSpec, *, project: bool) -> bool:
     """Strip the safelint section from *spec*'s secondary file. Returns True when modified.
 
-    Same symlink refusal as :func:`_install_secondary` — we never
-    follow a symlink at the secondary destination.
+    Same refusal contract as :func:`_install_secondary` — we never
+    follow a symlink at the secondary destination, and we refuse if
+    the path is a non-regular file (directory, FIFO, etc.).
     """
-    target = _secondary_target(spec, project=project)
-    if target is None or not target.exists():
-        return False
-    if target.is_symlink():
-        _print_secondary_symlink_refused(target)
+    target = _secondary_target_writable_or_warn(spec, project=project)
+    if target is None:
         return False
     existing = target.read_text(encoding="utf-8")
     stripped = _strip_section(existing, spec)
@@ -789,13 +840,14 @@ def _secondary_status(spec: ClientSpec, *, project: bool) -> str:
     """Return INSTALL_STATUS_* for *spec*'s secondary install.
 
     MISSING: secondary file doesn't exist, is a symlink (refused —
-    see security note in :func:`_install_secondary`), or has no
+    see security note in :func:`_install_secondary`), is not a
+    regular file (directory / FIFO / device — refused), or has no
     safelint section.
     FRESH: section body matches bundled content (whitespace-stripped).
     DIFFERS: section present but body has drifted.
     """
     target = _secondary_target(spec, project=project)
-    if target is None or not target.exists() or target.is_symlink():
+    if target is None or not target.exists() or target.is_symlink() or not target.is_file():
         return INSTALL_STATUS_MISSING
     if spec.secondary_install_section_markers is None:  # pragma: no cover
         return INSTALL_STATUS_MISSING
@@ -1085,7 +1137,7 @@ def run_status(_args: argparse.Namespace) -> int:
 
 
 def _iter_install_locations() -> Iterator[tuple[ClientSpec, bool]]:
-    """Yield ``(spec, project)`` for every registered client xboth scopes.
+    """Yield ``(spec, project)`` for every registered client across both scopes.
 
     Centralises the nested loop so freshness / status helpers stay
     flat (one for-loop instead of two). Order: registry order with
@@ -1446,10 +1498,12 @@ def _remove_one(spec: ClientSpec, *, project: bool, dry_run: bool) -> int:
 def _emit_secondary_remove_notice(spec: ClientSpec, *, project: bool, dry_run: bool) -> None:
     """Print the appropriate secondary-destination notice during ``remove``.
 
-    Three cases:
+    Four cases:
     - **Active section** (file present, valid section): print "would
       strip" / "stripped" depending on *dry_run*.
     - **Symlink** (security: refused): warn that we won't follow.
+    - **Non-regular file** (directory / FIFO / device — refused): warn
+      that we won't touch it.
     - **Missing / no section**: silent.
 
     Pulled out of :func:`_remove_one` to keep that function within the
@@ -1460,6 +1514,9 @@ def _emit_secondary_remove_notice(spec: ClientSpec, *, project: bool, dry_run: b
         return
     if secondary.is_symlink():
         _print_secondary_symlink_refused(secondary)
+        return
+    if secondary.exists() and not secondary.is_file():
+        _print_secondary_non_file_refused(secondary)
         return
     if _secondary_status(spec, project=project) == INSTALL_STATUS_MISSING:
         return

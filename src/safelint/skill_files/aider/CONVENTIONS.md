@@ -10,7 +10,7 @@ read:
   - CONVENTIONS.md
 ```
 
-Then `aider` (with no flags) loads this file as part of its system context. Language-specific addendums and the schema doc live in the bundled package and can be located via `safelint skill path` if you need them.
+Then `aider` (with no flags) loads this file as part of its system context. Language-specific addendums live in the bundled package and can be located via `safelint skill path` (the addendums sit at `<that path>/languages/<lang>.md`). The JSON output schema lives in the safelint repo at `docs/JSON_SCHEMA.md` — it is *not* shipped inside the wheel.
 
 When the user asks for a "safelint check", "lint with safelint", "safety review", "Power-of-Ten review", or similar request for safelint's specific rule set, follow the steps below in order. For generic linting use the project's configured tools (ruff, eslint, etc.) instead — safelint is the safety-rule layer on top.
 
@@ -111,7 +111,7 @@ Order matters — lead with what the user needs first:
 
 2. **Per-file breakdown** (skip files with zero violations). For each file, list violations one per line:
 
-   ```
+   ```text
    src/api/auth.py
      SAFE101  L42  Function "verify_token" is 78 lines (max 60)              [function_length]
      SAFE102  L51  Nesting depth is 4 (max 2)                                 [nesting_depth]
