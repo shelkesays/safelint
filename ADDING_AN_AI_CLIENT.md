@@ -99,6 +99,46 @@ For a typical new client (single bundled file under `skill_files/<client>/`), al
 
 Neither of those applies to any client shipped today, so when in doubt: add it.
 
+### 4b. (Optional) Cross-agent shared file (the "secondary install")
+
+Some clients read instructions from a *shared* file used by multiple AI tools — codex's `AGENTS.md` is the canonical example. If your client follows this pattern (the file is read by other agents too, so we can't simply overwrite it), use the **secondary-install** mechanism: safelint writes a delimited HTML-comment section into the shared file, leaving any other content the user has authored intact.
+
+Two extra `ClientSpec` fields opt your client into this:
+
+```python
+_YOUR_SPEC = ClientSpec(
+    # ... usual fields ...
+    install_relpath=(".yourclient", "instructions.md"),  # primary destination — fully owned
+    bundled_relpath=("yourclient", "instructions.md"),
+    documentation_relpaths=(("yourclient", "instructions.md"),),
+    # Cross-agent shared file:
+    secondary_install_relpath=("AGENTS.md",),
+    secondary_install_section_markers=(
+        "<!-- safelint:begin -->",
+        "<!-- safelint:end -->",
+    ),
+)
+```
+
+When set:
+
+- **`install`** writes the primary destination as usual *and*, if the secondary file already exists at the scope root, edits a delimited section into it. The shared file is **never auto-created** — its existence is the user's signal that they want the cross-agent integration.
+- **`update`** re-renders the section if it has drifted from the bundle.
+- **`status`** escalates the overall verdict to *differs* when the section drifts (even if the primary is fresh).
+- **`remove`** strips just the section. Other content in the shared file is preserved. If the file ends up empty after stripping, it is removed too.
+
+All of this is generic — you don't write any of the lifecycle code. The install primitives in `_skill_install.py` handle every step from your two `ClientSpec` fields.
+
+**Marker requirements:** pick markers that won't appear in your bundled instructions text or in typical user prose. The HTML-comment form (`<!-- safelint:begin -->` / `<!-- safelint:end -->`) is what codex uses; it's invisible in rendered Markdown and unlikely to collide. **Don't quote your literal markers in the bundled instructions text** — that would create a self-referential collision when the section is parsed.
+
+### 4c. Security guards you inherit for free
+
+The install / update / remove paths apply several guards that protect against accidental damage. You don't need to implement these in your `ClientSpec` — they apply to every client automatically:
+
+- **Symlink refusal at the secondary destination.** If `AGENTS.md` (or whatever your secondary file is) is a symlink, `_install_secondary` / `_remove_secondary` / `_secondary_status` all refuse to follow it and print a stderr warning. This prevents an attacker (or a careless user setup) from redirecting the safelint section into an arbitrary file via a `AGENTS.md → /etc/passwd` symlink.
+- **Non-regular-file refusal at the secondary destination.** If the secondary path exists but is a directory / FIFO / socket / device, the lifecycle paths refuse with a warning rather than crash on `read_text` / `write_text`.
+- **`skill remove --path PATH` install-shape validation.** When the user invokes `safelint skill remove --path SOME_PATH`, the path's tail must match a registered `install_relpath`. New clients added to `_CLIENT_SPECS` extend the allow-list automatically, so your client's canonical destination is recognised the moment your spec lands.
+
 ### 5. Wire up file extensions in `pyproject.toml`
 
 If your bundled artefact uses a file extension that isn't already in the package-data glob, extend it. Example for a `.txt` artefact:
