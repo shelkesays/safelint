@@ -630,11 +630,17 @@ def _render_section_body(spec: ClientSpec, bundled_text: str) -> str:
 
 
 def _extract_section_body(text: str, markers: tuple[str, str]) -> str | None:
-    """Return the body between *markers* in *text*, or None when absent.
+    r"""Return the body between *markers* in *text*, or None when absent.
 
     The body is the literal substring between the begin and end marker
-    lines, with a single trailing newline stripped if present (so it
-    round-trips cleanly with :func:`_render_section_body`).
+    lines, with **all leading and trailing newlines stripped**
+    (``str.strip("\n")``). This round-trips cleanly with
+    :func:`_render_section_body`, which produces
+    ``"{begin}\n{body}\n{end}\n"`` — the wrapping ``\n`` characters
+    are removed on extraction and re-added on render. Note that
+    leading whitespace at the start of an inner line is preserved;
+    only newline characters at the very edges of the body are
+    stripped.
     """
     begin, end = markers
     begin_idx = text.find(begin)
@@ -760,11 +766,15 @@ def _secondary_target_writable_or_warn(spec: ClientSpec, *, project: bool) -> Pa
       socket, device) — refused via :func:`_print_secondary_non_file_refused`
       so ``read_text`` / ``write_text`` don't blow up later in the flow.
 
-    Three lifecycle helpers (:func:`_install_secondary`,
-    :func:`_remove_secondary`, :func:`_secondary_status`) all run this
-    same set of checks; consolidating them here keeps the policy in
-    one place and avoids having three near-duplicate guards drift
-    apart.
+    Two lifecycle helpers (:func:`_install_secondary`,
+    :func:`_remove_secondary`) route through this helper to share the
+    refusal policy and warning text. :func:`_secondary_status`
+    deliberately inlines the same checks rather than calling this
+    helper — status is invoked frequently (every ``skill status``
+    run, every ``check --check-skill-freshness``), so it filters
+    silently to ``INSTALL_STATUS_MISSING`` on symlink / non-file
+    targets instead of printing a warning each time. Keep both code
+    paths in sync if the policy ever changes.
     """
     target = _secondary_target(spec, project=project)
     if target is None or not target.exists():
