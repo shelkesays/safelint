@@ -437,7 +437,12 @@ class SafetyEngine:
                 bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
                 msg = f"per_file_ignores[{pattern!r}] must contain only strings — got: {bad}"
                 raise TypeError(msg)
-            unknown_entries = frozenset(e for e in entries if e not in known_names and e.upper() not in known_codes_upper)
+            # ``"*"`` is a documented wildcard meaning "suppress every
+            # rule for this path pattern" — short-circuited by
+            # :func:`_is_per_file_ignored`. Exempt it from the unknown-
+            # entry typo guard so users don't get a warning for the
+            # exact value the docs tell them to use.
+            unknown_entries = frozenset(e for e in entries if e != "*" and e not in known_names and e.upper() not in known_codes_upper)
             if unknown_entries:
                 _diagnostics.print_warning(f"unknown entries in per_file_ignores[{pattern!r}] (typo or stale rule?): {', '.join(sorted(unknown_entries))}")
             result.append((pattern, frozenset(entries), frozenset(e.upper() for e in entries)))
