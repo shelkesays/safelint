@@ -618,6 +618,127 @@ def test_install_copy_excludes_peer_gemini_dir(monkeypatch: pytest.MonkeyPatch, 
     assert not (target / "gemini").exists(), "peer gemini/ leaked into Claude skill"
 
 
+# ---------------------------------------------------------------------------
+# Windsurf client install
+# ---------------------------------------------------------------------------
+
+
+def test_bundled_windsurf_rules_exist_in_wheel() -> None:
+    """The Windsurf rules ship under ``skill_files/windsurf/safelint-rules.md``."""
+    path = _skill_install.bundled_skill_path() / "windsurf" / "safelint-rules.md"
+    assert path.is_file()
+    head = path.read_text(encoding="utf-8")[:200]
+    assert head.startswith("# safelint")
+
+
+def test_install_windsurf_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client windsurf`` copies the bundled rules into ~/.windsurfrules (renames during copy)."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="windsurf"))
+    assert rc == 0
+    target = home / ".windsurfrules"
+    assert target.is_file()
+    assert not target.is_symlink()
+    # Content matches the bundled file (basename differs but contents
+    # are byte-equal — copy operation is content-preserving).
+    bundled = _skill_install.bundled_skill_path() / "windsurf" / "safelint-rules.md"
+    assert target.read_text(encoding="utf-8") == bundled.read_text(encoding="utf-8")
+    out = capsys.readouterr().out
+    assert "Windsurf rules" in out
+    assert "user scope" in out
+    # Sibling clients must NOT be touched.
+    assert not (home / ".claude").exists()
+    assert not (home / ".cursor").exists()
+
+
+def test_install_windsurf_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client windsurf --project`` lands at <cwd>/.windsurfrules (the canonical Windsurf location)."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="windsurf", project=True))
+    assert rc == 0
+    assert (cwd / ".windsurfrules").is_file()
+    # User-global location was NOT touched.
+    assert not (home / ".windsurfrules").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_windsurf_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client windsurf --symlink`` creates a file symlink to the bundled rules."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="windsurf", symlink=True))
+    assert rc == 0
+    target = home / ".windsurfrules"
+    assert target.is_symlink()
+    bundled = _skill_install.bundled_skill_path() / "windsurf" / "safelint-rules.md"
+    assert target.resolve() == bundled.resolve()
+
+
+def test_install_windsurf_with_force_replaces_existing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--force`` replaces a stale .windsurfrules at the target."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    target = home / ".windsurfrules"
+    target.write_text("stale windsurf rules\n", encoding="utf-8")
+
+    assert _skill_install.run_install(_make_args(client="windsurf", force=True)) == 0
+    assert "stale windsurf rules" not in target.read_text(encoding="utf-8")
+
+
+def test_install_windsurf_refuses_overwrite_without_force(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A second windsurf install without ``--force`` exits 1 with the error on stderr."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="windsurf")) == 0
+    rc = _skill_install.run_install(_make_args(client="windsurf"))
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "already exists" in captured.err
+    assert "--force" in captured.err
+
+
+def test_install_auto_detects_windsurf_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A ``.codeium/`` directory in cwd triggers project-scope Windsurf install on auto-detect."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".codeium").mkdir()
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".windsurfrules").is_file()
+    out = capsys.readouterr().out
+    assert "Windsurf" in out
+    # Sibling clients aren't installed unless their markers also exist.
+    assert not (home / ".claude").exists()
+    assert not (home / ".cursor").exists()
+
+
+def test_run_path_with_client_windsurf_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill path --client windsurf`` prints the bundled rules file path."""
+    rc = _skill_install.run_path(argparse.Namespace(client="windsurf"))
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    p = Path(out)
+    assert p.is_file()
+    assert p.name == "safelint-rules.md"
+
+
+def test_cli_routes_skill_install_with_windsurf_client(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill install --client windsurf --project`` forwards both flags to run_install."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "windsurf", "--project"])
+    spy = mocker.patch.object(_skill_install, "run_install", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    args = spy.call_args.args[0]
+    assert args.client == "windsurf"
+    assert args.project is True
+
+
+def test_install_copy_excludes_peer_windsurf_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The materialised Claude skill folder must NOT contain the peer ``windsurf/`` subdirectory."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    target = home / ".claude" / "skills" / "safelint"
+    assert target.is_dir()
+    assert not (target / "windsurf").exists(), "peer windsurf/ leaked into Claude skill"
+
+
 def test_cli_routes_skill_install_default_client_is_auto(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
     """``safelint skill install`` (no --client) defaults client to ``auto``.
 
@@ -888,13 +1009,13 @@ def test_client_registry_choices_derive_from_specs() -> None:
 
 def test_cli_skill_install_rejects_auto_when_args_lack_default(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     """An unknown client name still fails loudly under the new auto default."""
-    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "windsurf"])
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "totally-not-a-client"])
     with pytest.raises(SystemExit) as exc:
         cli.main()
     # argparse rejects on choices=.
     assert exc.value.code == 2
     err = capsys.readouterr().err
-    assert "windsurf" in err
+    assert "totally-not-a-client" in err
 
 
 def test_cli_skill_rejects_unknown_flag_before_subcommand(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:

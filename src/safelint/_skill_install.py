@@ -157,9 +157,31 @@ _GEMINI_SPEC = ClientSpec(
 )
 
 
+_WINDSURF_SPEC = ClientSpec(
+    name="windsurf",
+    display_name="Windsurf",
+    artefact_label="rules",
+    # Windsurf reads ``.windsurfrules`` (single Markdown-ish file) at
+    # the repo root — its native project-rules convention. ``.codeium``
+    # is the parent product's config dir; its presence signals an
+    # active Codeium / Windsurf user even before a project rules file
+    # is committed.
+    cwd_markers=(".windsurfrules", ".codeium"),
+    home_markers=(".codeium",),
+    # Project-scope canonical: ``<cwd>/.windsurfrules`` (auto-loaded).
+    # User-scope: ``~/.windsurfrules`` (user-global rules; loaded by
+    # Windsurf when reading per-workspace rules and merging up).
+    install_relpath=(".windsurfrules",),
+    bundled_relpath=("windsurf", "safelint-rules.md"),
+    restart_hint="Reload Windsurf (or restart the editor) to pick up the new rules.",
+    usage_hint='Then ask Windsurf "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("windsurf", "safelint-rules.md"),),
+)
+
+
 # Registry — append to extend. Order matters: detection / multi-install
 # output follows registry order so users see results in a stable sequence.
-_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC)
+_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC)
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
 
@@ -176,7 +198,7 @@ PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
 # Subdirectories under ``skill_files/`` that hold peer-client bundles.
 # Excluded from a Claude install (copy or symlink) so the materialised
 # skill folder doesn't carry irrelevant peer artefacts.
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini"})
+_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf"})
 
 
 # ---------------------------------------------------------------------------

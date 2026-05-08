@@ -22,6 +22,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **Cursor** | Project Rule (`.mdc` file) | `~/.cursor/rules/safelint.mdc` (user) or `<cwd>/.cursor/rules/safelint.mdc` (project) | `.cursor/` or `.cursorrules` in cwd; `~/.cursor/` for user-scope |
 | **GitHub Copilot** | Instructions Markdown | `~/.github/copilot-instructions.md` (user-global) or `<cwd>/.github/copilot-instructions.md` (project — canonical) | `.github/copilot-instructions.md`, `.github/copilot/`, or `.github/instructions/` in cwd; `~/.github/copilot-instructions.md` for user-scope |
 | **Gemini** | Instructions Markdown (`GEMINI.md`) | `~/GEMINI.md` (user-global) or `<cwd>/GEMINI.md` (project — canonical, auto-discovered by Gemini CLI) | `GEMINI.md` or `.gemini/` in cwd; `~/.gemini/` for user-scope |
+| **Windsurf** | Project rules (`.windsurfrules`) | `~/.windsurfrules` (user-global) or `<cwd>/.windsurfrules` (project — canonical, auto-loaded by Windsurf) | `.windsurfrules` or `.codeium/` in cwd; `~/.codeium/` for user-scope |
 
 More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
 
@@ -144,6 +145,19 @@ Reload VS Code (or restart Copilot Chat). The instructions file is auto-loaded f
 
 Restart Gemini CLI (or your IDE's Gemini integration). The `GEMINI.md` file is auto-discovered for the workspace. Then ask Gemini *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
 
+### Windsurf
+
+**Markers:** `.windsurfrules` or `.codeium/` in the project root for project-scope; `~/.codeium/` for user-scope.
+
+**Install location:**
+
+- User-scoped: `~/.windsurfrules` — Windsurf merges user-global rules with workspace rules when both exist.
+- Project-scoped: `<cwd>/.windsurfrules` — Windsurf's canonical workspace rules file, auto-loaded. **Recommended for team-shared repos — commit the file.**
+
+**How to invoke after install:**
+
+Reload Windsurf (or restart the editor). The rules are auto-loaded from `.windsurfrules`. Then ask Windsurf *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+
 ## Manual install (`--client`)
 
 Skip auto-detection by passing an explicit client name:
@@ -172,6 +186,12 @@ safelint skill install --client gemini --project
 
 # Gemini, user-global (requires Gemini CLI configuration to point at ~/GEMINI.md)
 safelint skill install --client gemini
+
+# Windsurf, project-scoped (canonical — auto-loaded by Windsurf)
+safelint skill install --client windsurf --project
+
+# Windsurf, user-global rules (merged with project rules at runtime)
+safelint skill install --client windsurf
 ```
 
 When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd).
