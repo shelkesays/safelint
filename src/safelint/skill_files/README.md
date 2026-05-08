@@ -1,15 +1,16 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets AI clients (Claude Code, Cursor, GitHub Copilot, Gemini; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
+A bundled skill / project-rule that lets AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
 
 > **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](../../AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
 
-Four clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
+Five clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
 
 - **Claude Code** — installs as a directory skill at `~/.claude/skills/safelint/` containing `SKILL.md` + `languages/`.
 - **Cursor** — installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
 - **GitHub Copilot** — installs as a Markdown instructions file at `.github/copilot-instructions.md` (or `~/.github/copilot-instructions.md` for user-global).
 - **Gemini** — installs as a Markdown instructions file at `<cwd>/GEMINI.md` (canonical, auto-discovered by Gemini CLI) or `~/GEMINI.md` (user-global; requires Gemini CLI config).
+- **Windsurf** — installs as a project rules file at `<cwd>/.windsurfrules` (canonical, auto-loaded by Windsurf) or `~/.windsurfrules` (user-global; merged with project rules at runtime).
 
 Once installed, ask the agent things like:
 
@@ -55,6 +56,10 @@ safelint skill install --client copilot --project   # <cwd>/.github/copilot-inst
 # Gemini
 safelint skill install --client gemini --project    # <cwd>/GEMINI.md (canonical — auto-discovered by Gemini CLI)
 safelint skill install --client gemini              # ~/GEMINI.md (user-global; requires Gemini CLI config)
+
+# Windsurf
+safelint skill install --client windsurf --project  # <cwd>/.windsurfrules (canonical — auto-loaded)
+safelint skill install --client windsurf            # ~/.windsurfrules (user-global; merged with project rules)
 ```
 
 ### Options
@@ -146,11 +151,13 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 │   └── copilot-instructions.md  # GitHub Copilot's instructions file (installed to .github/)
 ├── gemini/
 │   └── GEMINI.md            # Gemini CLI's instructions file (installed to repo root)
+├── windsurf/
+│   └── safelint-rules.md    # Windsurf's project rules (installed to .windsurfrules at scope root)
 └── languages/               # One addendum per supported language
     └── python.md            # Python-specific install / rationale / idiomatic fixes
 ```
 
-The Claude install copies `SKILL.md` + `languages/` (the `cursor/`, `copilot/`, and `gemini/` subdirectories are excluded — peer-client bundles). The Cursor install copies just `cursor/safelint.mdc`. The Copilot install copies just `copilot/copilot-instructions.md`. The Gemini install copies just `gemini/GEMINI.md`. All clients can locate the language addendums via `safelint skill path` if they need them.
+The Claude install copies `SKILL.md` + `languages/` (the `cursor/`, `copilot/`, `gemini/`, and `windsurf/` subdirectories are excluded — peer-client bundles). The Cursor install copies just `cursor/safelint.mdc`. The Copilot install copies just `copilot/copilot-instructions.md`. The Gemini install copies just `gemini/GEMINI.md`. The Windsurf install copies just `windsurf/safelint-rules.md` (renamed to `.windsurfrules` at the destination). All clients can locate the language addendums via `safelint skill path` if they need them.
 
 The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint source tree. Each language safelint can lint has a corresponding addendum file here.
 
