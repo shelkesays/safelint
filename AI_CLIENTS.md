@@ -12,7 +12,6 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 - [Updating after a safelint upgrade](#updating-after-a-safelint-upgrade)
 - [Troubleshooting](#troubleshooting)
 - [Adding a new AI client (developer guide)](#adding-a-new-ai-client)
-- [Roadmap](#roadmap)
 
 ## Supported clients
 
@@ -31,7 +30,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **Antigravity** | Markdown rule (`.antigravity/rules/<name>.md`) | `~/.antigravity/rules/safelint.md` (user) or `<cwd>/.antigravity/rules/safelint.md` (project) | `.antigravity/` in cwd; `~/.antigravity/` for user-scope |
 | **Zed** | Workspace rules (`.rules`) | `~/.rules` (user) or `<cwd>/.rules` (project) | `.rules` or `.zed/` in cwd; `~/.rules` or `~/.zed/` for user-scope |
 
-More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
+The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)). If you'd find another client supported, file a feature request with the marker convention you've seen in the wild.
 
 ## Quick start
 
@@ -508,17 +507,6 @@ In short:
 3. Update `_PEER_CLIENT_DIRS` if the bundle is a peer of the Claude tree.
 4. Add tests mirroring the Cursor / Claude patterns.
 5. Update [`AI_CLIENTS.md`](AI_CLIENTS.md) (this file) and [`CHANGELOG.md`](CHANGELOG.md).
-
-## Roadmap
-
-Candidates being tracked for future client support (each adds one `ClientSpec`):
-
-- **GitHub Copilot** — `.github/copilot-instructions.md` style instructions
-- **codex** — OpenAI's codex agent, file format TBD
-- **windsurf** — `.windsurfrules` / `.codeium/` markers
-- **antigravity** — TBD
-
-If you'd find one of these useful, file a feature request with the marker convention you've seen in the wild. The `ClientSpec` design accommodates whatever conventions each tool settles on — we just need a stable description of how the agent finds its rules / skill.
 
 ## See also
 

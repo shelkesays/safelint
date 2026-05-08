@@ -244,20 +244,20 @@ Ready-to-copy samples:
 
 ## Editor / agent integrations
 
-### AI-client skills (Claude Code, Cursor; more on the way)
+### AI-client skills (12 clients supported)
 
 ```bash
 pip install safelint
 safelint skill install          # auto-detects which AI client(s) you use
 ```
 
-The bare command is `--client auto` under the hood: it scans the current directory for client markers (`CLAUDE.md`, `.cursor/`, …), falls back to your home directory, and installs the relevant skill / project rule for every AI client it finds. Multiple clients in the same project? It installs for both.
+Twelve AI clients are supported today: **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini**, **Windsurf**, **codex**, **Continue.dev**, **Cline**, **aider**, **Trae**, **Antigravity**, and **Zed**. The bare command is `--client auto` under the hood: it scans the current directory for client markers (`CLAUDE.md`, `.cursor/`, `.github/copilot-instructions.md`, `GEMINI.md`, `.windsurfrules`, `AGENTS.md`, `.continue/`, `.clinerules/`, `.aider.conf.yml`, `.trae/`, `.antigravity/`, `.rules`, …), falls back to your home directory, and installs the relevant skill / project rule for every detected client. Multiple clients in the same project? It installs for all of them.
 
 After restarting the AI client (or reloading its window), ask things like *"run safelint"*, *"lint my changes with safelint"*, or *"do a Power-of-Ten review on src/api/auth.py"*. The skill / rule invokes safelint with structured output, groups violations by file, and offers to walk through fixes.
 
 After `pip install --upgrade safelint`, refresh the installed skill with `safelint skill update` (idempotent — no-op when fresh) or check first via `safelint skill status`. To uninstall, `safelint skill remove` (with `--symlink` to filter to symlink-shape installs only, `--path PATH` for unusual locations, `--dry-run` to preview). Use `safelint check --check-skill-freshness ...` to fold the freshness check into a normal lint run as an opt-in stderr warning.
 
-For explicit control (`--client claude` / `--client cursor`), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, post-upgrade workflow, and troubleshooting, see [`AI_CLIENTS.md`](AI_CLIENTS.md). To add support for a new AI client (GitHub Copilot, codex, windsurf, antigravity, etc. — the registry is open-ended), follow the contributor walkthrough in [`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md).
+For explicit control (`--client <name>` for any of the twelve), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, post-upgrade workflow, and troubleshooting, see [`AI_CLIENTS.md`](AI_CLIENTS.md). To add support for a new AI client (the registry is open-ended), follow the contributor walkthrough in [`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md).
 
 ### Other integration points
 

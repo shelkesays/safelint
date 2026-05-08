@@ -7,6 +7,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-05-08
+
+Multi-client expansion — the AI-client skill registry grows from 2 supported clients to 12. The architecture from v1.6.0–v1.10.0 was built for this; each new client is one `ClientSpec` append plus a bundled artefact (and 10 install/lifecycle regression tests). Top-level `safelint help` gains dedicated *Skill subcommands* and *Skill flags* sections so the install / update / remove / status / path surface is discoverable without a second `safelint help skill` round-trip.
+
+### Added
+
+- **Ten new AI-client integrations:** GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed. Every client follows the same install / update / remove / status / path surface and the same project-vs-user-scope semantics, with auto-detection wired into the existing `--client auto` flow. Per-client install destinations:
+  - **GitHub Copilot** — `.github/copilot-instructions.md` (auto-loaded by VS Code Copilot Chat)
+  - **Gemini** — `GEMINI.md` at repo root (auto-discovered by Gemini CLI)
+  - **Windsurf** — `.windsurfrules` at repo root
+  - **codex** — `.codex/instructions.md` (primary) **plus** a delimited section in `AGENTS.md` when that file exists (preserves user content; see *Secondary install* below)
+  - **Continue.dev** — `.continue/rules/safelint.md`
+  - **Cline** — `.clinerules/safelint.md`
+  - **aider** — `CONVENTIONS.md` (project or user); requires a one-line `read: [CONVENTIONS.md]` entry in `aider.conf.yml` since aider doesn't auto-load conventions files. The post-install message reminds users.
+  - **Trae** — `.trae/rules/safelint.md`
+  - **Antigravity** — `.antigravity/rules/safelint.md`
+  - **Zed** — `.rules` at repo root
+- **`ClientSpec` secondary-install architecture.** New optional fields `secondary_install_relpath` and `secondary_install_section_markers` let a client write a *delimited HTML-comment section* into a shared cross-agent file (e.g. `AGENTS.md`) when that file already exists at the scope root. Used by codex; the architecture generalises to any future cross-agent shared file. **Lifecycle parity:** install writes the section, update re-renders on drift, status escalates to DIFFERS when section content drifts (even if the primary install is fresh), remove strips just the section (preserving other content; deletes the file only if it becomes empty after stripping). Section-based edits are *always* the contract for the secondary destination — never a full-file overwrite — so user content in shared files is safe.
+- **Top-level `safelint help` gains *Skill subcommands* and *Skill flags* sections.** All five lifecycle actions (`install`, `update`, `remove`, `status`, `path`) and the common flags (`--client`, `--project`, `--symlink`, `--force`, plus `--path` and `--dry-run` for `remove`) are now visible at the top level — no second `safelint help skill` round-trip needed to find `--force` etc. `--force` is intentionally placed under *Skill flags* (not *Global options*) since it doesn't apply to `check`.
+- **`run_update` performance: hash/walk runs at most once per install per run.** Previously `run_update` and `_update_one` each invoked `_install_status` independently per target, doubling the directory walk and content hash for Claude installs (the most file-heavy bundle). `_update_one` now accepts an optional `status` parameter; `run_update` threads its precomputed value through. Direct callers and tests are unaffected (default `None` means "compute internally").
+- **`run_update` no longer falsely prints "all up to date" when every target was OSError-skipped.** New `any_processed` flag gates `_print_update_all_fresh` on at least one target having a readable status. Without the gate, an all-permission-denied run would silently report success.
+
+### Changed
+
+- **`io_functions` in the bundled `safelint.toml` (`[rules.side_effects_hidden]`)** — removed the unmatchable `"subprocess"` entry (the rule walks bare callable names — `subprocess.run(...)` resolves to `"run"`) and replaced it with the actual subprocess callable names (`run`, `Popen`, `call`, `check_call`, `check_output`).
+- **Documentation fan-out for the multi-client expansion:** `AI_CLIENTS.md` (Supported clients table + Per-client guides + manual install examples), `src/safelint/skill_files/README.md` (clients list + layout tree + manual install examples), `README.md` (top-level integration block), and `ADDING_AN_AI_CLIENT.md` all enumerate the 12 supported clients. The Roadmap section in `AI_CLIENTS.md` was retired since the previously listed candidates (Copilot, codex, windsurf, antigravity) all shipped.
+- **Test coverage threshold remains 97%; current coverage 97.24% across 628 tests.** The 10 new client integrations add 100+ install/symlink/force/overwrite/auto-detect/CLI-routing/path-print/peer-exclusion tests plus 24 codex-specific tests for the secondary-install lifecycle and section helpers.
+
+### Behaviour changes (heads-up)
+
+- **`safelint help` output changed shape** — *Skill subcommands* and *Skill flags* sections now appear between *Commands* and *Options*. Existing users see a longer (more discoverable) help; no commands or flags removed.
+- **Auto-detection now scans for 12 client markers, not 2.** A project with markers for several clients gets installs for all of them in registry order. To install for a single client, pass `--client <name>` explicitly.
+- **codex's secondary install touches `AGENTS.md` when present.** If you have an existing `AGENTS.md` with content for other agents, `safelint skill install --client codex --project` will *append* a delimited safelint section to it (your other content is preserved). The section sits between `<!-- safelint:begin -->` and `<!-- safelint:end -->` markers; `safelint skill remove --client codex` strips it cleanly. If you don't want any AGENTS.md modification, install codex without `--project` so it lands at user-scope only, or remove the AGENTS.md file before installing.
+
 ## [1.10.0] - 2026-05-06
 
 Round-out release for the skill-install lifecycle: `update` and `remove` complete the install / status / update / remove quartet so users have a full set of maintenance commands without falling back to manual `rm` / re-install cycles.

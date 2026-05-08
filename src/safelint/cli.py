@@ -909,7 +909,7 @@ def _build_skill_parser() -> argparse.ArgumentParser:
     )
     _add_skill_install_arguments(install, INSTALL_CLIENT_CHOICES)
 
-    path_parser = sub.add_parser("path", help="Print the on-disk location of the bundled skill or Cursor rule")
+    path_parser = sub.add_parser("path", help="Print the on-disk location of a bundled skill / rule / instructions file (use --client to pick which)")
     path_parser.add_argument(
         "--client",
         choices=PATH_CLIENT_CHOICES,
@@ -1095,7 +1095,7 @@ _HELP_SKILL_SUBCOMMANDS: tuple[tuple[str, str], ...] = (
     ("skill update", "Refresh installed skills whose content has drifted from the bundled wheel"),
     ("skill remove", "Delete detected installed skills (filterable by client / scope / shape)"),
     ("skill status", "Compare every detected installed skill against the bundled version"),
-    ("skill path", "Print the on-disk location of the bundled skill or Cursor rule"),
+    ("skill path", "Print the on-disk location of a bundled skill / rule / instructions file (use --client to pick which)"),
 )
 
 
