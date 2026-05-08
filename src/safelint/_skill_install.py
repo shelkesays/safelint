@@ -230,6 +230,25 @@ _CLINE_SPEC = ClientSpec(
 )
 
 
+_AIDER_SPEC = ClientSpec(
+    name="aider",
+    display_name="aider",
+    artefact_label="conventions",
+    # aider's per-project config is ``.aider.conf.yml`` (project) and
+    # ``~/.aider.conf.yml`` (user-global). aider does NOT auto-load
+    # the conventions file — users must add a ``read:`` entry to
+    # ``aider.conf.yml`` pointing at the installed CONVENTIONS.md.
+    # The post-install ``usage_hint`` reminds them.
+    cwd_markers=(".aider.conf.yml", ".aider.conf.yaml", "CONVENTIONS.md"),
+    home_markers=(".aider.conf.yml", ".aider.conf.yaml"),
+    install_relpath=("CONVENTIONS.md",),
+    bundled_relpath=("aider", "CONVENTIONS.md"),
+    restart_hint="Add ``read: [CONVENTIONS.md]`` to your aider.conf.yml so aider loads this file (it isn't auto-discovered).",
+    usage_hint='Then ask aider "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("aider", "CONVENTIONS.md"),),
+)
+
+
 _CODEX_SPEC = ClientSpec(
     name="codex",
     display_name="codex",
@@ -258,7 +277,7 @@ _CODEX_SPEC = ClientSpec(
 
 # Registry — append to extend. Order matters: detection / multi-install
 # output follows registry order so users see results in a stable sequence.
-_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC, _CODEX_SPEC, _CONTINUE_SPEC, _CLINE_SPEC)
+_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC, _CODEX_SPEC, _CONTINUE_SPEC, _CLINE_SPEC, _AIDER_SPEC)
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
 
@@ -275,7 +294,7 @@ PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
 # Subdirectories under ``skill_files/`` that hold peer-client bundles.
 # Excluded from a Claude install (copy or symlink) so the materialised
 # skill folder doesn't carry irrelevant peer artefacts.
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex", "continue", "cline"})
+_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex", "continue", "cline", "aider"})
 
 
 # ---------------------------------------------------------------------------
