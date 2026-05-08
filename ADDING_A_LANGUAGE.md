@@ -142,15 +142,38 @@ Alternative: a `language` field on `BaseRule` indicating which language the rule
 * `README.md` should list the supported languages prominently.
 * `CHANGELOG.md` gets an entry under **Added**.
 
-### 7. Update the Claude Code skill
+### 7. Update the bundled AI-client skills
 
-The skill at `src/safelint/skill_files/` mirrors the `languages/` package: each language safelint can lint has a corresponding addendum file in `src/safelint/skill_files/languages/`. Add yours:
+The bundle at `src/safelint/skill_files/` ships one Markdown artefact per registered AI client (12 today: Claude Code's `SKILL.md`, plus a per-client file under each of `cursor/`, `copilot/`, `gemini/`, `windsurf/`, `codex/`, `continue/`, `cline/`, `aider/`, `trae/`, `antigravity/`, `zed/`). Every one of them has a **Step 2 — Identify the language(s) involved** section with a registry table listing the languages safelint can lint. When you add a new language, all twelve files need a new row in that table.
 
-* Create `src/safelint/skill_files/languages/<lang>.md` modelled on `languages/python.md`. Cover install nuance (if any), file extensions, language-specific phrasing for the universal rule rationales, and idiomatic fix patterns for the rules most likely to fire.
-* Add a row to the **Step 2** registry table in `src/safelint/skill_files/SKILL.md` pointing at your new addendum.
-* Keep the skill core (`SKILL.md`) language-neutral — per-language detail belongs in the addendum, not the entry point.
+You also need to ship a new shared addendum file describing the language. The `languages/` subdirectory at the bundle root mirrors the `safelint/languages/` package one-to-one and is *shared* across every client — there's only one copy of the addendum, and every client references it via `safelint skill path`.
 
-The skill is just Markdown — no test harness needed. A quick smoke test ("ask Claude Code to /safelint a sample <lang> project after `safelint skill install --force`") is enough. Bundling is automatic via `[tool.setuptools.package-data]` in `pyproject.toml` (`skill_files/**/*.md`), so new addendum files ship in the next wheel without further config.
+Concretely:
+
+1. **Create the shared addendum** at `src/safelint/skill_files/languages/<lang>.md` modelled on `languages/python.md`. Cover install nuance (if any — e.g. ecosystem-specific packaging), the file extensions safelint will pick up, language-specific phrasing for the universal rule rationales, and idiomatic fix patterns for the rules most likely to fire on that language.
+
+2. **Update every client's Step 2 registry table** with a row pointing at the new addendum. The 12 files to touch:
+
+   ```text
+   src/safelint/skill_files/SKILL.md
+   src/safelint/skill_files/cursor/safelint.mdc
+   src/safelint/skill_files/copilot/copilot-instructions.md
+   src/safelint/skill_files/gemini/GEMINI.md
+   src/safelint/skill_files/windsurf/safelint-rules.md
+   src/safelint/skill_files/codex/instructions.md
+   src/safelint/skill_files/continue/safelint.md
+   src/safelint/skill_files/cline/safelint.md
+   src/safelint/skill_files/aider/CONVENTIONS.md
+   src/safelint/skill_files/trae/safelint.md
+   src/safelint/skill_files/antigravity/safelint.md
+   src/safelint/skill_files/zed/safelint.md
+   ```
+
+3. **Keep each client's *core* language-neutral** — the Step 2 table is the only language-specific part. Per-language detail belongs in the shared `languages/<lang>.md` addendum, not in any client's entry-point file. Every client tells its agent "for deeper language-specific guidance, read `languages/<lang>.md` from the bundled skill directory" — so you only write the deep guidance once.
+
+**The drift-detection test catches you if you miss any.** `test_skill_documents_every_supported_extension` is parametrised over `_CLIENT_SPECS` and fails CI for every client whose bundled doc doesn't mention every extension in `supported_extensions()`. So the moment you add the new extension to `safelint.languages` but forget to update one of the 12 client files, that client's parametrised test fails with a clear error.
+
+**Smoke testing:** the bundled docs are just Markdown; no test harness needed beyond the parametrised drift tests. After `safelint skill install --client <name> --force`, ask the relevant agent to "run safelint" on a sample `<lang>` project and confirm it picks up the new file extensions and produces sensible output. Bundling is automatic via `[tool.setuptools.package-data]` in `pyproject.toml` (`skill_files/**/*.md`), so new addendum files ship in the next wheel without further config.
 
 ## Things to leave alone
 
