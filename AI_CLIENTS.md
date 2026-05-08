@@ -387,9 +387,21 @@ safelint skill update                     # idempotent — no-op if everything i
 safelint skill update --force
 ```
 
-`safelint skill update` runs a drift check first and only re-installs the installs that have actually drifted. With `--force`, it re-installs every detected install regardless. Inherits the same `--client` / `--project` / `--symlink` flags as `install`; the only behavioural difference is that **`--client auto` for update detects via install paths, not marker files** — "what's installed?" rather than "what client is the user using?".
+`safelint skill update` runs a drift check first and only re-installs the locations whose content has actually changed. With `--force`, it re-installs every detected install regardless of drift. The `--client`, `--project`, and `--symlink` flags work the same way as on `install`. The one meaningful difference is `--client auto`'s scope:
 
-Explicit `--client <name>` (e.g. `safelint skill update --client cursor`) is **cross-scope by default** — it refreshes matching installs in *both* the user scope (`~/.cursor/...`, `~/.claude/...`) and the project scope (`<cwd>/.cursor/...`, `<cwd>/.claude/...`). To restrict an explicit-client update to project scope only, pass `--project` as the orthogonal filter (`safelint skill update --client cursor --project`). This mirrors how `skill remove` resolves targets — `--client` selects *which* client, `--project` decides *where to look*.
+- **`install --client auto`** asks *"which AI client(s) is this user using?"* — by scanning marker files like `CLAUDE.md` or `.cursor/`.
+- **`update --client auto`** asks *"what's already installed?"* — by scanning the actual install paths.
+
+So the `update`-side answer is empty for a user who has marker files but hasn't installed anything yet (use plain `install` for that). Conversely, `update`/`remove` will still target installs whose markers have since been deleted.
+
+**Targeting one client across both scopes:** `safelint skill update --client cursor` (without `--project`) refreshes matching Cursor installs in *both* the user scope (`~/.cursor/...`) and the project scope (`<cwd>/.cursor/...`) — explicit `--client` is cross-scope by default. To narrow it down to just the project scope, add `--project`:
+
+```bash
+safelint skill update --client cursor             # both scopes
+safelint skill update --client cursor --project   # project scope only
+```
+
+`--client` and `--project` are independent filters — `--client` picks the client; `--project` picks the scope. `skill remove` follows the same rule.
 
 **Shape preservation:** `update` (with or without `--force`) does **not** convert install modes silently. A symlink-mode install stays a symlink after refresh; a copy-mode install stays a copy. Pass `--symlink` explicitly if you want to *switch* a copy install to symlink mode mid-flight, but note that `--symlink` only takes effect for installs that `update` actually re-installs. If the install is already fresh, use `safelint skill update --force --symlink` to convert copy → symlink; symlink → copy must go through `remove` + `install` to be unambiguous.
 

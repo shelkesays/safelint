@@ -80,19 +80,24 @@ Field reference:
 | `bundled_relpath` | Where the source artefact lives under `skill_files/`. Tuple of path components. Use `()` (empty tuple) for the whole `skill_files/` root (Claude pattern). |
 | `restart_hint` | Printed after a successful install — tells the user how to make the AI client pick up the new artefact. |
 | `usage_hint` | Printed after `restart_hint` — tells the user what to say to the agent next. |
-| `documentation_relpaths` | Tuple of relpaths under `skill_files/` whose combined text *must* mention every rule code/name in `ALL_RULES` and every extension in `supported_extensions()`. Drift-detection tests parametrised over `_CLIENT_SPECS` enforce this — a new rule or language without corresponding bundled-doc updates fails CI. For a single-file client this is `((bundled_relpath,))`; for a directory-tree client it usually points at `(("SKILL.md",),)`. |
+| `documentation_relpaths` | Tuple of relpaths under `skill_files/` whose combined text *must* mention every rule code/name in `ALL_RULES` and every extension in `supported_extensions()`. Drift-detection tests parametrised over `_CLIENT_SPECS` enforce this — a new rule or language without corresponding bundled-doc updates fails CI. For a single-file client whose bundled artefact lives at `skill_files/windsurf/safelint-rules.md`, set this to `(("windsurf", "safelint-rules.md"),)`. For a directory-tree client like Claude, it points at the entry-point file: `(("SKILL.md",),)`. The outer tuple is a *list* of files; if a client splits its docs across multiple bundled files, list them all and the test treats the union of their text as the searchable surface. |
 
 ### 4. (Optional) Update peer-client exclusion
 
-If your bundle lives under `skill_files/<client>/` and is *not* part of the Claude skill bundle (i.e. it's a per-client peer like Cursor's MDC), add the directory name to `_PEER_CLIENT_DIRS`:
+**Background:** Claude Code is the one client that installs as a *whole directory tree* (it copies all of `skill_files/` minus a few subdirectories). Every other client installs just one file from a per-client subdirectory like `skill_files/cursor/`, `skill_files/windsurf/`, etc. Those per-client subdirectories are called *peer-client bundles* — they sit alongside Claude's tree but aren't part of it.
+
+To stop those peer subdirectories from leaking into the materialised Claude install (so `~/.claude/skills/safelint/` doesn't end up containing `cursor/`, `windsurf/`, etc.), each one must be listed in `_PEER_CLIENT_DIRS`:
 
 ```python
 _PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "windsurf"})
 ```
 
-This excludes your bundle from the Claude directory-tree install (both copy and symlink modes) so it doesn't leak into `~/.claude/skills/safelint/` where it doesn't belong.
+For a typical new client (single bundled file under `skill_files/<client>/`), always add `<client>` here. You only skip this step in two unusual cases:
 
-You only skip this step when the new client is single-file at the `skill_files/` root, or when it shares the Claude bundle. For typical "single-file under `skill_files/<client>/`" additions, always add to `_PEER_CLIENT_DIRS`.
+1. The bundled file lives at the `skill_files/` *root* (e.g. as a standalone Markdown file), not under a subdirectory.
+2. The new client shares the Claude bundle and shouldn't be excluded from it.
+
+Neither of those applies to any client shipped today, so when in doubt: add it.
 
 ### 5. Wire up file extensions in `pyproject.toml`
 

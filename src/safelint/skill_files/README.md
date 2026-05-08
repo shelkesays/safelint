@@ -1,6 +1,6 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
+A bundled skill / project-rule that lets twelve AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/` (currently just Python — mirrors safelint's `src/safelint/languages/` package layout).
 
 > **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](../../AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
 
@@ -101,7 +101,7 @@ safelint skill install --client zed                 # ~/.rules (user-global)
 
 | Flag | Effect |
 |---|---|
-| `--client` | Target AI client: `auto` (default — detect from cwd, then home), `claude`, or `cursor`. New clients added to the registry extend this list automatically. |
+| `--client` | Target AI client: `auto` (default — detect from cwd, then home), or one of: `claude`, `cursor`, `copilot`, `gemini`, `windsurf`, `codex`, `continue`, `cline`, `aider`, `trae`, `antigravity`, `zed`. New clients added to the registry extend this list automatically. |
 | `--project` | Force project scope (`<cwd>/.<client>/...`). With `--client auto`, restricts detection to cwd and refuses to fall back to home. |
 | `--symlink` | Symlink to the bundled location instead of copying. `pip upgrade safelint` then immediately changes what the AI client sees. Requires symlink support (POSIX, or Windows developer mode). |
 | `--force` | Replace any existing safelint skill / rule at the target. Use this when re-installing after an upgrade. |
@@ -208,7 +208,13 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
     └── python.md            # Python-specific install / rationale / idiomatic fixes
 ```
 
-The Claude install copies `SKILL.md` + `languages/` (the `cursor/`, `copilot/`, `gemini/`, `windsurf/`, and `codex/` subdirectories are excluded — peer-client bundles). The Cursor install copies just `cursor/safelint.mdc`. The Copilot install copies just `copilot/copilot-instructions.md`. The Gemini install copies just `gemini/GEMINI.md`. The Windsurf install copies just `windsurf/safelint-rules.md` (renamed to `.windsurfrules` at the destination). The codex install copies `codex/instructions.md` to `.codex/instructions.md` and additionally writes a delimited section into `AGENTS.md` when that file already exists. All clients can locate the language addendums via `safelint skill path` if they need them.
+**What ends up where after install:**
+
+- Claude install copies `SKILL.md` + `languages/`. All eleven peer-client subdirectories (`cursor/`, `copilot/`, `gemini/`, `windsurf/`, `codex/`, `continue/`, `cline/`, `aider/`, `trae/`, `antigravity/`, `zed/`) are excluded so the materialised Claude skill folder doesn't carry artefacts that don't apply to it.
+- Each non-Claude client copies just its own bundled file to the install destination — e.g. Cursor copies `cursor/safelint.mdc` to `.cursor/rules/safelint.mdc`; Windsurf copies `windsurf/safelint-rules.md` to `.windsurfrules` (renamed at the destination); Zed copies `zed/safelint.md` to `.rules` (renamed); the rest follow the same one-file-in, one-file-out pattern.
+- codex is the one client that touches *two* destinations: the primary `.codex/instructions.md` and a delimited section inside `AGENTS.md` when that file already exists at the scope root.
+
+All clients can locate the bundled language addendums via `safelint skill path` if they need them at runtime.
 
 The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint source tree. Each language safelint can lint has a corresponding addendum file here.
 
