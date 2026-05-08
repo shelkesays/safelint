@@ -1,6 +1,8 @@
 # Contributing to SafeLint
 
-Contributions are welcome - bug fixes, new rules, documentation improvements, or ideas.
+Contributions are welcome - bug fixes, new rules, new AI clients, new languages, documentation improvements, or ideas.
+
+By participating in this project you agree to abide by our [Code of Conduct](CODE_OF_CONDUCT.md). If you use safelint in academic or scientific work, see [CITATION.cff](CITATION.cff) for canonical citation metadata.
 
 ---
 
