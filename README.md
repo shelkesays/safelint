@@ -333,6 +333,10 @@ Pushing the version tag triggers `.github/workflows/publish.yml`, which builds a
 
 ---
 
+## Getting help
+
+If you hit a bug, want a feature, or just don't know which flag to reach for, see [SUPPORT.md](SUPPORT.md) — it lists where to ask each kind of question and what to include in a bug report so we can help quickly.
+
 ## Contributing
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on bug reports, adding new rules, AI clients, or languages, and opening pull requests. By participating in this project you agree to abide by the [Code of Conduct](CODE_OF_CONDUCT.md).
