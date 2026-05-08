@@ -1350,6 +1350,114 @@ def test_install_copy_excludes_peer_trae_dir(monkeypatch: pytest.MonkeyPatch, tm
     assert not (target / "trae").exists(), "peer trae/ leaked into Claude skill"
 
 
+# ---------------------------------------------------------------------------
+# Antigravity client install
+# ---------------------------------------------------------------------------
+
+
+def test_bundled_antigravity_rule_exists_in_wheel() -> None:
+    """The Antigravity rule ships under ``skill_files/antigravity/safelint.md``."""
+    path = _skill_install.bundled_skill_path() / "antigravity" / "safelint.md"
+    assert path.is_file()
+    head = path.read_text(encoding="utf-8")[:200]
+    assert head.startswith("# safelint")
+
+
+def test_install_antigravity_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client antigravity`` copies the bundled rule to ~/.antigravity/rules/safelint.md."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="antigravity"))
+    assert rc == 0
+    target = home / ".antigravity" / "rules" / "safelint.md"
+    assert target.is_file()
+    out = capsys.readouterr().out
+    assert "Antigravity rule" in out
+    assert "user scope" in out
+
+
+def test_install_antigravity_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client antigravity --project`` lands at <cwd>/.antigravity/rules/safelint.md."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="antigravity", project=True))
+    assert rc == 0
+    assert (cwd / ".antigravity" / "rules" / "safelint.md").is_file()
+    assert not (home / ".antigravity").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_antigravity_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client antigravity --symlink`` creates a file symlink to the bundled rule."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="antigravity", symlink=True))
+    assert rc == 0
+    target = home / ".antigravity" / "rules" / "safelint.md"
+    assert target.is_symlink()
+    bundled = _skill_install.bundled_skill_path() / "antigravity" / "safelint.md"
+    assert target.resolve() == bundled.resolve()
+
+
+def test_install_antigravity_with_force_replaces_existing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--force`` replaces a stale Antigravity rule at the target."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    target = home / ".antigravity" / "rules" / "safelint.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("stale rule\n", encoding="utf-8")
+    assert _skill_install.run_install(_make_args(client="antigravity", force=True)) == 0
+    assert "stale rule" not in target.read_text(encoding="utf-8")
+
+
+def test_install_antigravity_refuses_overwrite_without_force(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A second antigravity install without ``--force`` exits 1 with the error on stderr."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="antigravity")) == 0
+    rc = _skill_install.run_install(_make_args(client="antigravity"))
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "already exists" in captured.err
+
+
+def test_install_auto_detects_antigravity_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A ``.antigravity/`` directory in cwd triggers project-scope Antigravity install on auto-detect."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".antigravity").mkdir()
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".antigravity" / "rules" / "safelint.md").is_file()
+    out = capsys.readouterr().out
+    assert "Antigravity" in out
+
+
+def test_run_path_with_client_antigravity_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill path --client antigravity`` prints the bundled rule file path."""
+    rc = _skill_install.run_path(argparse.Namespace(client="antigravity"))
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    p = Path(out)
+    assert p.is_file()
+    assert p.name == "safelint.md"
+
+
+def test_cli_routes_skill_install_with_antigravity_client(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill install --client antigravity --project`` forwards both flags to run_install."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "antigravity", "--project"])
+    spy = mocker.patch.object(_skill_install, "run_install", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    args = spy.call_args.args[0]
+    assert args.client == "antigravity"
+    assert args.project is True
+
+
+def test_install_copy_excludes_peer_antigravity_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The materialised Claude skill folder must NOT contain the peer ``antigravity/`` subdirectory."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    target = home / ".claude" / "skills" / "safelint"
+    assert target.is_dir()
+    assert not (target / "antigravity").exists(), "peer antigravity/ leaked into Claude skill"
+
+
 def test_section_body_extraction_round_trips() -> None:
     """``_render_section_body`` and ``_extract_section_body`` round-trip identically (no content mutation)."""
     spec = _skill_install._CODEX_SPEC
