@@ -25,6 +25,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **Windsurf** | Project rules (`.windsurfrules`) | `~/.windsurfrules` (user-global) or `<cwd>/.windsurfrules` (project — canonical, auto-loaded by Windsurf) | `.windsurfrules` or `.codeium/` in cwd; `~/.codeium/` for user-scope |
 | **codex** | Markdown instructions (`.codex/instructions.md`); also writes a delimited section into `AGENTS.md` when present | `~/.codex/instructions.md` (user) or `<cwd>/.codex/instructions.md` (project) — plus `<scope>/AGENTS.md` (section-only edit) when that file already exists | `.codex/` or `AGENTS.md` in cwd; `~/.codex/` for user-scope |
 | **Continue.dev** | Markdown rule (`.continue/rules/<name>.md`) | `~/.continue/rules/safelint.md` (user) or `<cwd>/.continue/rules/safelint.md` (project) | `.continue/`, `.continuerc`, or `.continuerc.json` in cwd; `~/.continue/` for user-scope |
+| **Cline** | Markdown rule (`.clinerules/<name>.md`) | `~/.clinerules/safelint.md` (user) or `<cwd>/.clinerules/safelint.md` (project) | `.clinerules/` in cwd; `~/.clinerules/` for user-scope |
 
 More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
 
@@ -193,6 +194,19 @@ Restart codex (or your codex-aware editor). The primary `.codex/instructions.md`
 
 Reload your IDE (or restart Continue.dev). The rule is auto-loaded from `.continue/rules/`. Then ask Continue *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
 
+### Cline
+
+**Markers:** `.clinerules/` in the project root for project-scope; `~/.clinerules/` for user-scope.
+
+**Install location:**
+
+- User-scoped: `~/.clinerules/safelint.md` — Cline auto-loads user-global rules across workspaces.
+- Project-scoped: `<cwd>/.clinerules/safelint.md` — Cline auto-loads any `.md` under `.clinerules/`. **Recommended for team-shared repos — commit the file.**
+
+**How to invoke after install:**
+
+Reload your IDE (or restart Cline). The rule is auto-loaded. Then ask Cline *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+
 ## Manual install (`--client`)
 
 Skip auto-detection by passing an explicit client name:
@@ -239,6 +253,12 @@ safelint skill install --client continue --project
 
 # Continue.dev, user-global (loaded across all workspaces)
 safelint skill install --client continue
+
+# Cline, project-scoped (recommended for team-shared repos)
+safelint skill install --client cline --project
+
+# Cline, user-global
+safelint skill install --client cline
 ```
 
 When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd).
