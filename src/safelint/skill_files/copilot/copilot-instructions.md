@@ -2,7 +2,7 @@
 
 These instructions tell GitHub Copilot how to run the `safelint` static-analysis CLI on this project and present its violations. safelint enforces Holzmann's "Power of Ten" safety rules adapted from C/C++ aerospace conventions to modern languages — function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and similar. The same rule set applies across every language safelint supports; only the parser and language-specific node types differ.
 
-This file is a sibling to the Anthropic Claude Code skill (`SKILL.md`) and the Cursor project rule (`cursor/safelint.mdc`) that ship in the same package — every supported AI client reads the same workflow so behaviour stays consistent. Copilot reads this file from `.github/copilot-instructions.md` (project) or `~/.github/copilot-instructions.md` (user-global, when configured); language-specific addendums and the schema doc live in the bundled package and can be located via `safelint skill path` if you need them.
+This file is a sibling to the Anthropic Claude Code skill (`SKILL.md`) and the Cursor project rule (`cursor/safelint.mdc`) that ship in the same package — every supported AI client reads the same workflow so behaviour stays consistent. Copilot reads this file from `.github/copilot-instructions.md` (project) or `~/.github/copilot-instructions.md` (user-global, when configured); language-specific addendums live in the bundled package and can be located via `safelint skill path` (the addendums sit at `<that path>/languages/<lang>.md`). The JSON output schema lives in the safelint repo at `docs/JSON_SCHEMA.md` — it is *not* shipped inside the wheel.
 
 When the user asks for a "safelint check", "lint with safelint", "safety review", "Power-of-Ten review", or similar request for safelint's specific rule set, follow the steps below in order. For generic linting use the project's configured tools (ruff, eslint, etc.) instead — safelint is the safety-rule layer on top.
 
@@ -103,7 +103,7 @@ Order matters — lead with what the user needs first:
 
 2. **Per-file breakdown** (skip files with zero violations). For each file, list violations one per line:
 
-   ```
+   ```text
    src/api/auth.py
      SAFE101  L42  Function "verify_token" is 78 lines (max 60)              [function_length]
      SAFE102  L51  Nesting depth is 4 (max 2)                                 [nesting_depth]

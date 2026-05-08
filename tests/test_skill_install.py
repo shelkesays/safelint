@@ -1662,6 +1662,66 @@ def test_secondary_status_missing_when_no_section_in_agents_md(monkeypatch: pyte
     assert status == _skill_install.INSTALL_STATUS_MISSING
 
 
+def test_install_codex_refuses_directory_at_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``_install_secondary`` MUST NOT crash when ``AGENTS.md`` exists as a directory.
+
+    Without the guard, ``read_text``/``write_text`` would raise
+    ``IsADirectoryError`` and abort the whole ``skill install`` flow.
+    With the guard, the install completes the primary copy, prints a
+    stderr warning about the directory, and leaves the directory
+    untouched.
+    """
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Create AGENTS.md as a directory containing a file the install
+    # must NOT touch.
+    agents_dir = cwd / "AGENTS.md"
+    agents_dir.mkdir()
+    (agents_dir / "untouched.txt").write_text("DO NOT MODIFY\n", encoding="utf-8")
+
+    rc = _skill_install.run_install(_make_args(client="codex", project=True))
+    # Primary install still succeeds.
+    assert rc == 0
+    assert (cwd / ".codex" / "instructions.md").is_file()
+    # Directory and its contents UNCHANGED — refused.
+    assert agents_dir.is_dir()
+    assert (agents_dir / "untouched.txt").read_text(encoding="utf-8") == "DO NOT MODIFY\n"
+    err = capsys.readouterr().err
+    assert "refusing" in err.lower()
+    assert "not a regular file" in err.lower()
+
+
+def test_remove_codex_refuses_directory_at_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``_remove_secondary`` MUST NOT crash when ``AGENTS.md`` exists as a directory."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Plant a real AGENTS.md, install codex normally so primary exists.
+    (cwd / "AGENTS.md").write_text("user content\n", encoding="utf-8")
+    assert _skill_install.run_install(_make_args(client="codex", project=True)) == 0
+    capsys.readouterr()
+    # Now replace AGENTS.md with a directory.
+    (cwd / "AGENTS.md").unlink()
+    agents_dir = cwd / "AGENTS.md"
+    agents_dir.mkdir()
+    (agents_dir / "untouched.txt").write_text("DO NOT MODIFY\n", encoding="utf-8")
+
+    rc = _skill_install.run_remove(_make_remove_args(client="codex", project=True))
+    assert rc == 0
+    # Primary removed; directory and its contents untouched; warning surfaced.
+    assert not (cwd / ".codex" / "instructions.md").exists()
+    assert agents_dir.is_dir()
+    assert (agents_dir / "untouched.txt").read_text(encoding="utf-8") == "DO NOT MODIFY\n"
+    err = capsys.readouterr().err
+    assert "refusing" in err.lower()
+    assert "not a regular file" in err.lower()
+
+
+def test_secondary_status_treats_directory_as_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_secondary_status`` reports MISSING when ``AGENTS.md`` is a directory (not a regular file)."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / "AGENTS.md").mkdir()
+    status = _skill_install._secondary_status(_skill_install._CODEX_SPEC, project=True)
+    assert status == _skill_install.INSTALL_STATUS_MISSING
+
+
 def test_remove_codex_dry_run_mentions_secondary(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``skill remove --client codex --dry-run`` mentions the AGENTS.md section will also be stripped."""
     _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
