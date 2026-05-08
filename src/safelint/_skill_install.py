@@ -134,9 +134,32 @@ _COPILOT_SPEC = ClientSpec(
 )
 
 
+_GEMINI_SPEC = ClientSpec(
+    name="gemini",
+    display_name="Gemini",
+    artefact_label="instructions",
+    # Gemini CLI auto-discovers ``GEMINI.md`` at the repo root and
+    # walks up. ``.gemini/`` is the conventional config dir (settings,
+    # auth) — its presence signals a Gemini user. We list both as cwd
+    # markers; ``GEMINI.md`` itself only matches when an install
+    # already exists.
+    cwd_markers=("GEMINI.md", ".gemini"),
+    home_markers=(".gemini",),
+    # Project-scope canonical: ``<cwd>/GEMINI.md`` (auto-discovered).
+    # User-scope: ``~/GEMINI.md`` — Gemini CLI doesn't auto-discover
+    # this; users wanting global instructions configure it explicitly
+    # via Gemini CLI settings or symlink it where the CLI looks.
+    install_relpath=("GEMINI.md",),
+    bundled_relpath=("gemini", "GEMINI.md"),
+    restart_hint="Restart Gemini CLI (or your IDE's Gemini integration) to pick up the new instructions.",
+    usage_hint='Then ask Gemini "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("gemini", "GEMINI.md"),),
+)
+
+
 # Registry — append to extend. Order matters: detection / multi-install
 # output follows registry order so users see results in a stable sequence.
-_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC)
+_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC)
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
 
@@ -153,7 +176,7 @@ PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
 # Subdirectories under ``skill_files/`` that hold peer-client bundles.
 # Excluded from a Claude install (copy or symlink) so the materialised
 # skill folder doesn't carry irrelevant peer artefacts.
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot"})
+_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini"})
 
 
 # ---------------------------------------------------------------------------

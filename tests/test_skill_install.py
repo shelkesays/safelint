@@ -497,6 +497,127 @@ def test_install_copy_excludes_peer_copilot_dir(monkeypatch: pytest.MonkeyPatch,
     assert not (target / "copilot").exists(), "peer copilot/ leaked into Claude skill"
 
 
+# ---------------------------------------------------------------------------
+# Gemini client install
+# ---------------------------------------------------------------------------
+
+
+def test_bundled_gemini_instructions_exist_in_wheel() -> None:
+    """The Gemini instructions ship under ``skill_files/gemini/`` as ``GEMINI.md``."""
+    path = _skill_install.bundled_skill_path() / "gemini" / "GEMINI.md"
+    assert path.is_file()
+    head = path.read_text(encoding="utf-8")[:200]
+    # Plain Markdown — Gemini CLI reads ``GEMINI.md`` as raw Markdown.
+    assert head.startswith("# safelint")
+
+
+def test_install_gemini_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client gemini`` copies the bundled instructions into ~/GEMINI.md."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="gemini"))
+    assert rc == 0
+    target = home / "GEMINI.md"
+    assert target.is_file()
+    assert not target.is_symlink()
+    out = capsys.readouterr().out
+    assert "Gemini instructions" in out
+    assert "user scope" in out
+    # Sibling clients must NOT be touched.
+    assert not (home / ".claude").exists()
+    assert not (home / ".cursor").exists()
+
+
+def test_install_gemini_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client gemini --project`` lands at <cwd>/GEMINI.md (the canonical Gemini CLI location)."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="gemini", project=True))
+    assert rc == 0
+    assert (cwd / "GEMINI.md").is_file()
+    # User-global location was NOT touched.
+    assert not (home / "GEMINI.md").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_gemini_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client gemini --symlink`` creates a file symlink to the bundled GEMINI.md."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="gemini", symlink=True))
+    assert rc == 0
+    target = home / "GEMINI.md"
+    assert target.is_symlink()
+    bundled = _skill_install.bundled_skill_path() / "gemini" / "GEMINI.md"
+    assert target.resolve() == bundled.resolve()
+
+
+def test_install_gemini_with_force_replaces_existing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--force`` replaces a stale GEMINI.md at the target."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    target = home / "GEMINI.md"
+    target.write_text("stale gemini instructions\n", encoding="utf-8")
+
+    assert _skill_install.run_install(_make_args(client="gemini", force=True)) == 0
+    assert "stale gemini instructions" not in target.read_text(encoding="utf-8")
+
+
+def test_install_gemini_refuses_overwrite_without_force(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A second gemini install without ``--force`` exits 1 with the error on stderr."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="gemini")) == 0
+    rc = _skill_install.run_install(_make_args(client="gemini"))
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "already exists" in captured.err
+    assert "--force" in captured.err
+
+
+def test_install_auto_detects_gemini_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A ``.gemini/`` directory in cwd triggers project-scope Gemini install on auto-detect."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Plant a Gemini config dir as the marker (avoids clashing with
+    # the install destination ``GEMINI.md`` so the install can proceed
+    # to write a fresh file).
+    (cwd / ".gemini").mkdir()
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / "GEMINI.md").is_file()
+    out = capsys.readouterr().out
+    assert "Gemini" in out
+    # Sibling clients aren't installed unless their markers also exist.
+    assert not (home / ".claude").exists()
+    assert not (home / ".cursor").exists()
+
+
+def test_run_path_with_client_gemini_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill path --client gemini`` prints the bundled GEMINI.md path."""
+    rc = _skill_install.run_path(argparse.Namespace(client="gemini"))
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    p = Path(out)
+    assert p.is_file()
+    assert p.name == "GEMINI.md"
+
+
+def test_cli_routes_skill_install_with_gemini_client(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill install --client gemini --project`` forwards both flags to run_install."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "gemini", "--project"])
+    spy = mocker.patch.object(_skill_install, "run_install", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    args = spy.call_args.args[0]
+    assert args.client == "gemini"
+    assert args.project is True
+
+
+def test_install_copy_excludes_peer_gemini_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The materialised Claude skill folder must NOT contain the peer ``gemini/`` subdirectory."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    target = home / ".claude" / "skills" / "safelint"
+    assert target.is_dir()
+    assert not (target / "gemini").exists(), "peer gemini/ leaked into Claude skill"
+
+
 def test_cli_routes_skill_install_default_client_is_auto(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
     """``safelint skill install`` (no --client) defaults client to ``auto``.
 
