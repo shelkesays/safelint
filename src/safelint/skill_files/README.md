@@ -1,10 +1,10 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
+A bundled skill / project-rule that lets AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
 
 > **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](../../AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
 
-Eleven clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
+Twelve clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
 
 - **Claude Code** — installs as a directory skill at `~/.claude/skills/safelint/` containing `SKILL.md` + `languages/`.
 - **Cursor** — installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
@@ -17,6 +17,7 @@ Eleven clients ship today; all follow the *same* workflow because safelint's CLI
 - **aider** — installs as `<cwd>/CONVENTIONS.md` or `~/CONVENTIONS.md`. **Not auto-loaded** — wire it in by adding `read: [CONVENTIONS.md]` to your `aider.conf.yml`.
 - **Trae** — installs as a Markdown rule at `<cwd>/.trae/rules/safelint.md` (canonical, auto-loaded) or `~/.trae/rules/safelint.md` (user-global).
 - **Antigravity** — installs as a Markdown rule at `<cwd>/.antigravity/rules/safelint.md` (canonical, auto-loaded) or `~/.antigravity/rules/safelint.md` (user-global).
+- **Zed** — installs as workspace rules at `<cwd>/.rules` (canonical, auto-loaded) or `~/.rules` (user-global).
 
 Once installed, ask the agent things like:
 
@@ -90,6 +91,10 @@ safelint skill install --client trae                # ~/.trae/rules/safelint.md 
 # Antigravity
 safelint skill install --client antigravity --project  # <cwd>/.antigravity/rules/safelint.md (auto-loaded)
 safelint skill install --client antigravity            # ~/.antigravity/rules/safelint.md (user-global)
+
+# Zed
+safelint skill install --client zed --project       # <cwd>/.rules (auto-loaded)
+safelint skill install --client zed                 # ~/.rules (user-global)
 ```
 
 ### Options
@@ -195,6 +200,8 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 │   └── safelint.md          # Trae's rule (installed to .trae/rules/safelint.md)
 ├── antigravity/
 │   └── safelint.md          # Antigravity's rule (installed to .antigravity/rules/safelint.md)
+├── zed/
+│   └── safelint.md          # Zed's workspace rules (installed to .rules at scope root)
 └── languages/               # One addendum per supported language
     └── python.md            # Python-specific install / rationale / idiomatic fixes
 ```

@@ -261,6 +261,23 @@ _ANTIGRAVITY_SPEC = ClientSpec(
 )
 
 
+_ZED_SPEC = ClientSpec(
+    name="zed",
+    display_name="Zed",
+    artefact_label="rules",
+    # Zed reads ``.rules`` at the workspace root as agent-context input.
+    # ``.zed/`` is Zed's editor-config directory; its presence signals an
+    # active Zed user even without ``.rules`` yet committed.
+    cwd_markers=(".rules", ".zed"),
+    home_markers=(".rules", ".zed"),
+    install_relpath=(".rules",),
+    bundled_relpath=("zed", "safelint.md"),
+    restart_hint="Reload Zed (or restart the editor) to pick up the new rules.",
+    usage_hint='Then ask Zed\'s assistant "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("zed", "safelint.md"),),
+)
+
+
 _AIDER_SPEC = ClientSpec(
     name="aider",
     display_name="aider",
@@ -308,7 +325,20 @@ _CODEX_SPEC = ClientSpec(
 
 # Registry — append to extend. Order matters: detection / multi-install
 # output follows registry order so users see results in a stable sequence.
-_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC, _CODEX_SPEC, _CONTINUE_SPEC, _CLINE_SPEC, _AIDER_SPEC, _TRAE_SPEC, _ANTIGRAVITY_SPEC)
+_CLIENT_SPECS: tuple[ClientSpec, ...] = (
+    _CLAUDE_SPEC,
+    _CURSOR_SPEC,
+    _COPILOT_SPEC,
+    _GEMINI_SPEC,
+    _WINDSURF_SPEC,
+    _CODEX_SPEC,
+    _CONTINUE_SPEC,
+    _CLINE_SPEC,
+    _AIDER_SPEC,
+    _TRAE_SPEC,
+    _ANTIGRAVITY_SPEC,
+    _ZED_SPEC,
+)
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
 
@@ -325,7 +355,7 @@ PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
 # Subdirectories under ``skill_files/`` that hold peer-client bundles.
 # Excluded from a Claude install (copy or symlink) so the materialised
 # skill folder doesn't carry irrelevant peer artefacts.
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex", "continue", "cline", "aider", "trae", "antigravity"})
+_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex", "continue", "cline", "aider", "trae", "antigravity", "zed"})
 
 
 # ---------------------------------------------------------------------------
