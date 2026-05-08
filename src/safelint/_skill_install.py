@@ -112,9 +112,31 @@ _CURSOR_SPEC = ClientSpec(
 )
 
 
+_COPILOT_SPEC = ClientSpec(
+    name="copilot",
+    display_name="GitHub Copilot",
+    artefact_label="instructions",
+    # Copilot's canonical project signal is a populated ``.github/``
+    # with at least one Copilot-instructions / custom-prompts file. We
+    # avoid bare ``.github/`` (it shows up in nearly every repo for
+    # GitHub Actions) and instead key off the Copilot-specific files
+    # / directories. ``.github/copilot-instructions.md`` is the install
+    # destination, so it only matches an existing install — for the
+    # first-time bootstrap users pass ``--client copilot --project``
+    # explicitly.
+    cwd_markers=(".github/copilot-instructions.md", ".github/copilot", ".github/instructions"),
+    home_markers=(".github/copilot-instructions.md",),
+    install_relpath=(".github", "copilot-instructions.md"),
+    bundled_relpath=("copilot", "copilot-instructions.md"),
+    restart_hint="Reload VS Code (or restart Copilot Chat) to pick up the new instructions.",
+    usage_hint='Then ask Copilot Chat "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("copilot", "copilot-instructions.md"),),
+)
+
+
 # Registry — append to extend. Order matters: detection / multi-install
 # output follows registry order so users see results in a stable sequence.
-_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC)
+_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC)
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
 
@@ -131,7 +153,7 @@ PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
 # Subdirectories under ``skill_files/`` that hold peer-client bundles.
 # Excluded from a Claude install (copy or symlink) so the materialised
 # skill folder doesn't carry irrelevant peer artefacts.
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor"})
+_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot"})
 
 
 # ---------------------------------------------------------------------------

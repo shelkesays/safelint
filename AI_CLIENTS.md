@@ -20,6 +20,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 |---|---|---|---|
 | **Claude Code** | Skill directory (`SKILL.md` + `languages/`) | `~/.claude/skills/safelint/` (user) or `<cwd>/.claude/skills/safelint/` (project) | `CLAUDE.md`, `.claude/`, or `.claude.json` in cwd; `~/.claude/` or `~/.claude.json` for user-scope |
 | **Cursor** | Project Rule (`.mdc` file) | `~/.cursor/rules/safelint.mdc` (user) or `<cwd>/.cursor/rules/safelint.mdc` (project) | `.cursor/` or `.cursorrules` in cwd; `~/.cursor/` for user-scope |
+| **GitHub Copilot** | Instructions Markdown | `~/.github/copilot-instructions.md` (user-global) or `<cwd>/.github/copilot-instructions.md` (project — canonical) | `.github/copilot-instructions.md`, `.github/copilot/`, or `.github/instructions/` in cwd; `~/.github/copilot-instructions.md` for user-scope |
 
 More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
 
@@ -114,6 +115,21 @@ Restart Cursor (or reload the window). The MDC rule is auto-loaded as a Project 
 
 The MDC bundles the same step-by-step workflow as the Claude SKILL.md. Both clients run `safelint check ... --format json` and present the result the same way; only the file format differs.
 
+### GitHub Copilot
+
+**Markers:** `.github/copilot-instructions.md`, `.github/copilot/`, or `.github/instructions/` in the project root for project-scope; `~/.github/copilot-instructions.md` for user-scope. Bare `.github/` alone is **not** a marker — it appears in nearly every repo for GitHub Actions.
+
+**Install location:**
+
+- User-scoped: `~/.github/copilot-instructions.md` — VS Code can be configured to read this via the `github.copilot.chat.codeGeneration.instructions` setting (it isn't auto-discovered like the project file is).
+- Project-scoped: `<cwd>/.github/copilot-instructions.md` — Copilot's canonical instructions location, auto-loaded by VS Code's Copilot Chat. **Recommended for team-shared repos — commit the file.**
+
+**How to invoke after install:**
+
+Reload VS Code (or restart Copilot Chat). The instructions file is auto-loaded for the workspace. Then ask Copilot Chat *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+
+**First-time bootstrap note:** Copilot's auto-detection signals (`.github/copilot-instructions.md`, `.github/copilot/`, `.github/instructions/`) only match an *existing* Copilot setup. For first-time installs on a fresh project, pass `--client copilot --project` explicitly.
+
 ## Manual install (`--client`)
 
 Skip auto-detection by passing an explicit client name:
@@ -130,6 +146,12 @@ safelint skill install --client cursor
 
 # Cursor, project-scoped (recommended for team-shared repos)
 safelint skill install --client cursor --project
+
+# GitHub Copilot, project-scoped (canonical — auto-loaded by VS Code)
+safelint skill install --client copilot --project
+
+# GitHub Copilot, user-global (requires VS Code settings to point at ~/.github/copilot-instructions.md)
+safelint skill install --client copilot
 ```
 
 When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd).

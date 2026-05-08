@@ -1,13 +1,14 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets AI clients (Claude Code, Cursor; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
+A bundled skill / project-rule that lets AI clients (Claude Code, Cursor, GitHub Copilot; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
 
 > **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](../../AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
 
-Two clients ship today; both follow the *same* workflow because safelint's CLI surface is the same:
+Three clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
 
 - **Claude Code** — installs as a directory skill at `~/.claude/skills/safelint/` containing `SKILL.md` + `languages/`.
 - **Cursor** — installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
+- **GitHub Copilot** — installs as a Markdown instructions file at `.github/copilot-instructions.md` (or `~/.github/copilot-instructions.md` for user-global).
 
 Once installed, ask the agent things like:
 
@@ -27,7 +28,7 @@ safelint skill install          # auto-detects which AI client(s) you use
 
 By default, `safelint skill install` runs in `--client auto` mode:
 
-1. If your current directory has client markers (e.g. `CLAUDE.md`, `.cursor/`), it installs each detected client's skill **project-scoped**.
+1. If your current directory has client markers (e.g. `CLAUDE.md`, `.cursor/`, `.github/copilot-instructions.md`), it installs each detected client's skill **project-scoped**.
 2. Otherwise it looks in your home directory and, if found, installs each detected client's skill **user-scoped**.
 3. If nothing is found anywhere, it errors out with the exact `--client` commands you can run instead.
 
@@ -45,6 +46,10 @@ safelint skill install --client claude --project    # <cwd>/.claude/skills/safel
 # Cursor
 safelint skill install --client cursor              # ~/.cursor/rules/safelint.mdc (user)
 safelint skill install --client cursor --project    # <cwd>/.cursor/rules/safelint.mdc
+
+# GitHub Copilot
+safelint skill install --client copilot             # ~/.github/copilot-instructions.md (user-global; requires VS Code config to be auto-read)
+safelint skill install --client copilot --project   # <cwd>/.github/copilot-instructions.md (canonical Copilot location)
 ```
 
 ### Options
@@ -132,11 +137,13 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 ├── README.md                # This file
 ├── cursor/
 │   └── safelint.mdc         # Cursor's native project-rule format (installed to .cursor/rules/)
+├── copilot/
+│   └── copilot-instructions.md  # GitHub Copilot's instructions file (installed to .github/)
 └── languages/               # One addendum per supported language
     └── python.md            # Python-specific install / rationale / idiomatic fixes
 ```
 
-The Claude install copies `SKILL.md` + `languages/` (the `cursor/` subdirectory is excluded — peer-client bundle). The Cursor install copies just `cursor/safelint.mdc`. Both clients can locate the language addendums via `safelint skill path` if they need them.
+The Claude install copies `SKILL.md` + `languages/` (the `cursor/` and `copilot/` subdirectories are excluded — peer-client bundles). The Cursor install copies just `cursor/safelint.mdc`. The Copilot install copies just `copilot/copilot-instructions.md`. All three clients can locate the language addendums via `safelint skill path` if they need them.
 
 The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint source tree. Each language safelint can lint has a corresponding addendum file here.
 
