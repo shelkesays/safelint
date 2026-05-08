@@ -251,11 +251,36 @@ pip install safelint
 safelint skill install          # auto-detects which AI client(s) you use
 ```
 
-Twelve AI clients are supported today: **Claude Code**, **Cursor**, **GitHub Copilot**, **Gemini**, **Windsurf**, **codex**, **Continue.dev**, **Cline**, **aider**, **Trae**, **Antigravity**, and **Zed**. The bare command is `--client auto` under the hood: it scans the current directory for client markers (`CLAUDE.md`, `.cursor/`, `.github/copilot-instructions.md`, `GEMINI.md`, `.windsurfrules`, `AGENTS.md`, `.continue/`, `.clinerules/`, `.aider.conf.yml`, `.trae/`, `.antigravity/`, `.rules`, …), falls back to your home directory, and installs the relevant skill / project rule for every detected client. Multiple clients in the same project? It installs for all of them.
+**Twelve AI clients are supported today** — every one of them runs through the same `safelint skill` command surface, so you only need to learn one workflow:
 
-After restarting the AI client (or reloading its window), ask things like *"run safelint"*, *"lint my changes with safelint"*, or *"do a Power-of-Ten review on src/api/auth.py"*. The skill / rule invokes safelint with structured output, groups violations by file, and offers to walk through fixes.
+| Client | Marker safelint looks for | Where the skill lands |
+|---|---|---|
+| Claude Code | `CLAUDE.md`, `.claude/`, `.claude.json` | `~/.claude/skills/safelint/` (or `<cwd>/...`) |
+| Cursor | `.cursor/`, `.cursorrules` | `~/.cursor/rules/safelint.mdc` (or `<cwd>/...`) |
+| GitHub Copilot | `.github/copilot-instructions.md`, `.github/copilot/`, `.github/instructions/` | `.github/copilot-instructions.md` |
+| Gemini | `GEMINI.md`, `.gemini/` | `GEMINI.md` at repo root |
+| Windsurf | `.windsurfrules`, `.codeium/` | `.windsurfrules` at repo root |
+| codex | `.codex/`, `AGENTS.md` | `.codex/instructions.md` (and a section in `AGENTS.md` if present) |
+| Continue.dev | `.continue/`, `.continuerc`, `.continuerc.json` | `.continue/rules/safelint.md` |
+| Cline | `.clinerules/` | `.clinerules/safelint.md` |
+| aider | `.aider.conf.yml`, `CONVENTIONS.md` | `CONVENTIONS.md` (you wire it in via `read:` in `aider.conf.yml`) |
+| Trae | `.trae/` | `.trae/rules/safelint.md` |
+| Antigravity | `.antigravity/` | `.antigravity/rules/safelint.md` |
+| Zed | `.rules`, `.zed/` | `.rules` at repo root |
 
-After `pip install --upgrade safelint`, refresh the installed skill with `safelint skill update` (idempotent — no-op when fresh) or check first via `safelint skill status`. To uninstall, `safelint skill remove` (with `--symlink` to filter to symlink-shape installs only, `--path PATH` for unusual locations, `--dry-run` to preview). Use `safelint check --check-skill-freshness ...` to fold the freshness check into a normal lint run as an opt-in stderr warning.
+`safelint skill install` (with no flags) is `--client auto` under the hood: it looks for any of the markers above in your current directory, falls back to your home directory if cwd has none, and installs whatever it finds. If your project uses two clients (e.g. Claude *and* Cursor), it installs both — no flag needed.
+
+**After install,** restart the AI client (or reload its window) and ask things like *"run safelint"*, *"lint my changes with safelint"*, or *"do a Power-of-Ten review on src/api/auth.py"*. The skill takes care of the rest: it invokes safelint with structured JSON output, groups violations by file, and offers to walk through fixes.
+
+**After `pip install --upgrade safelint`**, your installed skill files are still the *old* version — the wheel's bundled files moved on without them. To catch up:
+
+```bash
+safelint skill status        # shows fresh / differs per detected install (exit 1 if anything differs)
+safelint skill update        # re-installs only the ones that drifted (no-op if everything is fresh)
+safelint skill remove        # auto-detects and removes every install
+```
+
+`safelint skill remove` accepts a few filter flags: `--symlink` keeps copy installs and only removes the ones created with `--symlink` (i.e., the skill file is a symlink pointing back at the bundled wheel — handy for skill developers); `--path PATH` removes one specific install location safelint's auto-detect didn't find; `--dry-run` previews everything without touching disk.
 
 For explicit control (`--client <name>` for any of the twelve), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, post-upgrade workflow, and troubleshooting, see [`AI_CLIENTS.md`](AI_CLIENTS.md). To add support for a new AI client (the registry is open-ended), follow the contributor walkthrough in [`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md).
 

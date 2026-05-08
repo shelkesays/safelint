@@ -3,7 +3,7 @@
 This guide is the cheat sheet for adding support for a new programming language (TypeScript, Go, Rust, etc.) to safelint. The architecture was prepared with multi-language in mind; the moving parts you need to understand and the steps you need to follow are below.
 
 > [!NOTE]
-> Today only Python is registered. The plumbing exists for additional languages but each one needs (a) a Tree-sitter grammar binding, (b) a per-language module exposing node-type constants, and (c) a per-rule audit to check which rules are language-portable vs. Python-specific.
+> Today only Python is registered. The supporting structure (parser hookup, file-discovery loop, suppression parser) is already language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants, and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.
 
 > [!IMPORTANT]
 > Adding a new language also requires updating the bundled AI-client skills (`SKILL.md` and `cursor/safelint.mdc`) to list the new language and its file extensions in their **Step 2** registry tables. The drift-detection test `test_skill_documents_every_supported_extension` fails the moment a new extension lands in `supported_extensions()` without the corresponding bundled-doc update — and the test is parametrised over every registered AI client, so you only need to make the additions once per skill file.
@@ -117,9 +117,20 @@ Rule-by-rule guide:
 
 For each rule that ports, the work is:
 
-1. Identify the matching node types in the new grammar (use the parser dump trick: `tree_sitter.Parser(LANG).parse(b"def ...").root_node.sexp()`).
-2. Add per-language constants in the language module (e.g. `typescript.FUNCTION_DEF = "function_declaration"`).
-3. Update the rule to dispatch on the file's language. Today rules import directly from `safelint.languages.python`. The cleanest path forward is **per-language rule classes** (e.g. `FunctionLengthRulePython`, `FunctionLengthRuleTypeScript`) — same logic, different node-type imports.
+1. Identify the matching node types in the new grammar. The parser-dump trick is the fastest way to find them — feed a small snippet to the new grammar and inspect the resulting tree:
+   ```python
+   import tree_sitter_typescript
+   from tree_sitter import Parser, Language
+   p = Parser(Language(tree_sitter_typescript.language_typescript()))
+   print(p.parse(b"function foo() {}").root_node)
+   ```
+   Output (truncated for clarity):
+   ```
+   (program (function_declaration name: (identifier) parameters: (formal_parameters) body: (statement_block)))
+   ```
+   The node type for "function" in this grammar is `function_declaration` (Python's grammar calls it `function_definition`). Use that string in step 2.
+2. Add per-language constants in the language module (e.g. `typescript.FUNCTION_DEF = "function_declaration"`). One constant per node type the rules need.
+3. Update the rule to dispatch on the file's language. Today rules import constants directly from `safelint.languages.python` because Python is the only registered language. When a second language lands, the cleanest path is **per-language rule classes** (e.g. `FunctionLengthRulePython`, `FunctionLengthRuleTypeScript`) — same logic, different constants imported. Direct imports were chosen over a runtime dispatch table because they keep each rule's node-type assumptions explicit at the import site, which makes auditing easier.
 
 Alternative: a `language` field on `BaseRule` indicating which language the rule supports (default: `("python",)`), and the engine filters rules by file's language. Add this when a 2nd language actually exists.
 

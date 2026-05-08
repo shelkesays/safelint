@@ -63,7 +63,15 @@ safelint skill status
 safelint check --check-skill-freshness --all-files .
 ```
 
-`safelint skill status` walks every registered AI client × both scopes (user / project) and reports per-location *fresh* / *differs from bundled*. Symlink installs typically report fresh — the symlinks resolve straight back to the bundled location, so `pip upgrade safelint` reflects immediately. In particular, Claude-style per-entry symlink installs continue to report *fresh* as long as the existing top-level entries are still valid symlinks. A symlink install can still report *differs* after local tampering that leaves divergent content on disk — for example adding extra real files alongside the symlinked entries, or replacing a symlink with a copy whose content diverges from the bundled version. **Byte-identical replacements are not detected** — the freshness check compares content, not install mode, so a symlink swapped for an exact-copy file shows up as fresh today even though future ``pip upgrade safelint`` runs would no longer reach it. Use ``--symlink --force`` if you want to re-establish the live-link guarantee. Exit 0 when every detected install matches; exit 1 when any differs. Canonical CI / upgrade-script idiom (run `--force` to refresh copy-mode installs or re-materialise the install layout if needed):
+`safelint skill status` walks every registered AI client × both scopes (user / project) and prints one line per detected install showing whether it's *fresh* (matches the bundled version) or *differs from bundled*. Exit code is 0 when everything matches, 1 when anything differs.
+
+A few details worth knowing:
+
+- **Symlink installs** (those created with `safelint skill install --symlink`) always show as fresh, because the installed file is a symlink pointing back at the bundled location inside the wheel. After `pip upgrade safelint`, the upgrade is visible immediately — no `skill update` needed.
+- **Copy installs** are content-compared against the bundled file. If they match byte-for-byte, fresh; otherwise, differs.
+- **Edge case — a symlink install hand-replaced with an identical copy** is reported as fresh (the freshness check compares content, not install mode). The user-visible behaviour is fine *today* because the content matches, but the next `pip upgrade safelint` won't propagate to that location anymore. If you want to re-establish the live link, run `safelint skill update --symlink --force`.
+
+The canonical CI / upgrade-script idiom is:
 
 ```bash
 safelint skill status || safelint skill update
@@ -86,11 +94,16 @@ safelint skill remove --path /unusual/place    # delete one specific location
 safelint skill remove --dry-run                # preview without deleting
 ```
 
-Both commands inherit `--client {auto, claude, cursor}` and `--project` from `install`, but `--client auto` resolves differently: install scans **marker files** (`CLAUDE.md`, `.cursor/`) to figure out *which client the user is using*; update / remove scan **actual install paths** to figure out *what's currently installed*. This matters when a user has client markers but no install yet, or vice-versa.
+Both commands inherit `--client` and `--project` from `install`, but the meaning of `--client auto` is *different* from install's:
 
-**`update` flag semantics:** `--force` here means "refresh every matching install regardless of drift status" (different from `install`'s `--force` which means "replace existing"). Without `--force`, `update` is idempotent — running it on fresh installs leaves them unchanged, though the command may still print "already fresh" / "already up to date" status messages, making it suitable for cron / CI / pre-commit scripts when informational stdout is acceptable.
+- **`install --client auto`** asks: *"which AI client(s) does this user use?"* — and answers that by scanning the cwd for marker files (`CLAUDE.md`, `.cursor/`, etc.).
+- **`update --client auto`** and **`remove --client auto`** ask: *"what's already installed?"* — and answer that by scanning the actual install paths (`~/.claude/skills/safelint/`, etc.).
 
-`update` also **preserves install shape**: a symlink install stays symlink after refresh, a copy install stays copy. Pass `--symlink` explicitly to request copy → symlink on installs that are being refreshed/reinstalled; if the copy install is already fresh, that mode switch requires `--force` because plain `update` is otherwise a no-op. (This is the only mode change that requires opt-in; symlink → copy must go through `remove` + `install`.)
+This distinction matters when the user has marker files but no install yet (only `install` will fire) or has an install but the marker file has been deleted (only `update`/`remove` will fire).
+
+**`update` flag semantics — `--force`:** without `--force`, `update` only re-installs the locations that have actually drifted from the bundle. Running it when everything is fresh is a no-op: it just prints "already fresh" lines and exits 0. That's what makes it safe to run from cron, CI, or pre-commit hooks — calling `update` repeatedly does nothing extra. With `--force`, it re-installs every detected location regardless of drift; useful for reverting a customised install back to the bundled content.
+
+**`update` flag semantics — `--symlink` and shape preservation:** by default, `update` preserves the existing install's shape. A copy install stays copy after refresh; a symlink install stays symlink. To *switch* a copy install to symlink mode, pass `--symlink` explicitly. There's one wrinkle: if the copy install is already fresh, `update` is normally a no-op — so converting copy → symlink in that case requires `update --force --symlink` to force the re-install. Switching the other way (symlink → copy) isn't supported via `update`; do `remove` followed by `install` (without `--symlink`) instead, so the intent is unambiguous.
 
 **`remove` flag semantics:** flags compose orthogonally — the absence of a flag means "no filter", *not* "only the opposite":
 

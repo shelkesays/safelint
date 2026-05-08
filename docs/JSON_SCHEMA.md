@@ -2,7 +2,9 @@
 
 `safelint check --format json` and `safelint --stdin --format json` both emit a single JSON document on stdout describing the lint run. This page documents that contract so plugin authors (Claude Code skill, VSCode extension, CI scripts) can rely on a stable shape.
 
-The schema is **stable since v1.5.0**. Field additions are non-breaking (consumers ignore unknown keys); removals or type changes only happen in a major-version bump (none to date). Notable additions since baseline: position fields (`end_lineno`, `column_start`, `column_end`) in 1.7.0, advisory `suggestions[]` in 1.8.0.
+The schema is **stable since v1.5.0**. Field additions are non-breaking (consumers ignore unknown keys); removals or type changes only happen in a major-version bump (none to date). Notable additions since baseline: position fields (`end_lineno`, `column_start`, `column_end`) in 1.7.0, `suggestions[]` in 1.8.0.
+
+> **About "advisory" suggestions:** the `suggestions[]` array carries optional fix candidates the rule offers, but **safelint never auto-applies them**, and consumers (editors, plugins, CI scripts) must not auto-apply them either. Display them as user-confirmable quick-fixes; the user always presses "accept" before any byte is written. This is a permanent design contract — safelint is a review tool, not a refactor tool, and a `--fix` flag will not ship. See the *"Suggestions are advisory only"* section near the end of this page for the full rationale.
 
 ## Top-level shape
 
@@ -80,7 +82,7 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 | Field | Type | Notes |
 |---|---|---|
 | `code` | string | The SAFE-code, e.g. `"SAFE101"`. May be empty for synthetic violations (rare); fall back to `rule` when displaying. |
-| `rule` | string | The snake-case rule name, e.g. `"function_length"`. Stable identifier for config (e.g. `[tool.safelint.rules.function_length]`). |
+| `rule` | string | The snake-case rule name, e.g. `"function_length"`. This is the same key users put in their config file to tune the rule — e.g. `[tool.safelint.rules.function_length]` in `pyproject.toml` or `[rules.function_length]` in a standalone `safelint.toml`. The full list of rule names is in [`CONFIGURATION.md`](../CONFIGURATION.md). |
 | `severity` | `"error"` \| `"warning"` | The per-rule severity. Compare against `summary.fail_on` to decide blocking. |
 | `filepath` | string | Path as the user supplied it to the CLI (typically relative to cwd). Not a URI; not percent-encoded. For SARIF output, use `--format sarif` instead — it normalises to RFC 3986 URIs. |
 | `lineno` | int | 1-based start line. `0` for run-level errors with no specific location (rare; only `SAFE000` parse errors emit this). |
