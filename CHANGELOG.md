@@ -20,7 +20,7 @@ Multi-client expansion — the AI-client skill registry grows from 2 supported c
   - **codex** — `.codex/instructions.md` (primary) **plus** a delimited section in `AGENTS.md` when that file exists (preserves user content; see *Secondary install* below)
   - **Continue.dev** — `.continue/rules/safelint.md`
   - **Cline** — `.clinerules/safelint.md`
-  - **aider** — `CONVENTIONS.md` (project or user); requires a one-line `read: [CONVENTIONS.md]` entry in `aider.conf.yml` since aider doesn't auto-load conventions files. The post-install message reminds users.
+  - **aider** — `CONVENTIONS.md` (project or user); requires a one-line `read: [CONVENTIONS.md]` entry in `.aider.conf.yml` since aider doesn't auto-load conventions files. The post-install message reminds users.
   - **Trae** — `.trae/rules/safelint.md`
   - **Antigravity** — `.antigravity/rules/safelint.md`
   - **Zed** — `.rules` at repo root

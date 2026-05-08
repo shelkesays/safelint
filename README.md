@@ -263,7 +263,7 @@ safelint skill install          # auto-detects which AI client(s) you use
 | codex | `.codex/`, `AGENTS.md` | `.codex/instructions.md` (and a section in `AGENTS.md` if present) |
 | Continue.dev | `.continue/`, `.continuerc`, `.continuerc.json` | `.continue/rules/safelint.md` |
 | Cline | `.clinerules/` | `.clinerules/safelint.md` |
-| aider | `.aider.conf.yml`, `CONVENTIONS.md` | `CONVENTIONS.md` (you wire it in via `read:` in `aider.conf.yml`) |
+| aider | `.aider.conf.yml`, `CONVENTIONS.md` | `CONVENTIONS.md` (you wire it in via `read:` in `.aider.conf.yml`) |
 | Trae | `.trae/` | `.trae/rules/safelint.md` |
 | Antigravity | `.antigravity/` | `.antigravity/rules/safelint.md` |
 | Zed | `.rules`, `.zed/` | `.rules` at repo root |
