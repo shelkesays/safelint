@@ -90,49 +90,63 @@ def _file_ignore_codes(comment_text: str, prefix: str = "#") -> set[str] | None 
     return False
 
 
-def _parse_file_level_ignores(
+def _parse_directives(
     tree: tree_sitter.Tree,
     comment_node_type: str,
     comment_prefix: str,
     source_lines: list[str],
-) -> tuple[bool, set[str]]:
-    """Walk Tree-sitter comment nodes for ``# safelint: ignore`` directives.
+) -> tuple[dict[int, set[str] | None], bool, set[str]]:
+    """Single-pass walk of Tree-sitter comments returning *both* directive types.
 
-    Returns ``(bare, codes)`` where *bare* is True when the file has a
-    bare ``# safelint: ignore`` (suppress all rules) and *codes* is the
-    set of explicit codes / names listed across all keyed
-    ``# safelint: ignore: A, B`` directives in the file.
+    Production callers (``_lint_parsed_source``) need both the
+    line-level ``# nosafe`` map and the file-level ``# safelint: ignore``
+    payload. Walking the tree twice — once per directive type — was
+    measurable on large generated files (a primary use case for
+    file-level ignores). This helper folds both into one O(N) pass.
 
-    Only comments that appear *alone on their line* (no preceding code)
-    are honoured. This intentionally rules out trailing comments after
-    code — the line-level ``# nosafe`` form handles those, and a
-    file-level directive accidentally placed as a trailing comment
-    would otherwise silently extend its scope to the whole file.
+    Returns ``(suppressions, file_bare, file_codes)``:
 
-    Tree-sitter is used (not a raw line scan) so a ``# safelint: ignore``
-    inside a string literal or docstring is correctly ignored.
+    * ``suppressions`` — ``{lineno: codes_or_None}`` map of every
+      ``# nosafe`` / ``# nosafe: …`` directive found.
+    * ``file_bare`` — True when at least one bare ``# safelint: ignore``
+      directive (no codes) was seen alone on its line.
+    * ``file_codes`` — union of all codes / names listed in
+      ``# safelint: ignore: A, B`` directives, considering only
+      directives that appear alone on their line.
+
+    Pass an empty ``source_lines`` (e.g. ``[]``) when only line-level
+    ``# nosafe`` parsing is needed — the file-level branch then
+    short-circuits per comment because every line-bounds check fails.
+    The thin :func:`_parse_suppressions` and :func:`_parse_file_level_ignores`
+    wrappers below use that pattern.
     """
-    bare = False
-    codes: set[str] = set()
+    suppressions: dict[int, set[str] | None] = {}
+    file_bare = False
+    file_codes: set[str] = set()
     for node in walk(tree.root_node):
         if node.type != comment_node_type:
             continue
-        line_idx = node_lineno(node) - 1  # convert 1-based lineno to 0-based index
-        if line_idx < 0 or line_idx >= len(source_lines):
+        comment_text = node_text(node)
+        # Line-level: every comment is eligible (matches existing
+        # ``# nosafe`` semantics — including trailing comments after
+        # code, which is the typical placement for line directives).
+        nosafe_payload = _nosafe_codes(comment_text, prefix=comment_prefix)
+        if nosafe_payload is not False:
+            suppressions[node_lineno(node)] = nosafe_payload
+        # File-level: only comments alone on their line. The line-bounds
+        # check also short-circuits the file-level branch when callers
+        # pass an empty ``source_lines``.
+        line_idx = node_lineno(node) - 1
+        if not (0 <= line_idx < len(source_lines)):
             continue
-        line = source_lines[line_idx]
-        if not line.lstrip().startswith(comment_prefix):
-            # Comment is not the first non-whitespace content on the line —
-            # i.e. it's a trailing comment after code. Skip.
+        if not source_lines[line_idx].lstrip().startswith(comment_prefix):
             continue
-        payload = _file_ignore_codes(node_text(node), prefix=comment_prefix)
-        if payload is False:
-            continue
-        if payload is None:
-            bare = True
-        else:
-            codes |= payload
-    return bare, codes
+        file_payload = _file_ignore_codes(comment_text, prefix=comment_prefix)
+        if file_payload is None:
+            file_bare = True
+        elif file_payload is not False:
+            file_codes |= file_payload
+    return suppressions, file_bare, file_codes
 
 
 def _parse_suppressions(
@@ -140,24 +154,38 @@ def _parse_suppressions(
     comment_node_type: str,
     comment_prefix: str,
 ) -> dict[int, set[str] | None]:
-    """Return a {lineno: codes} suppression map by querying comment nodes in the Tree-sitter tree.
+    """Return a {lineno: codes} suppression map for ``# nosafe`` directives.
 
-    This replaces the old tokenize-based implementation. Because Tree-sitter
-    parses comment nodes as first-class tree nodes, there is no risk of
-    confusing a nosafe directive inside a string literal with a real one.
-
-    ``comment_node_type`` and ``comment_prefix`` come from the LanguageDefinition,
-    so this function works for any language without modification.
+    Thin wrapper over :func:`_parse_directives` — kept as a standalone
+    entry point for the unit tests in ``tests/core/test_suppression.py``
+    that focus only on the line-level directive parser. Production
+    callers should invoke ``_parse_directives`` directly to also get
+    the file-level result without a second tree walk.
     """
-    suppressions: dict[int, set[str] | None] = {}
-    for node in walk(tree.root_node):
-        if node.type != comment_node_type:
-            continue
-        comment_text = node_text(node)
-        payload = _nosafe_codes(comment_text, prefix=comment_prefix)
-        if payload is not False:
-            suppressions[node_lineno(node)] = payload
+    suppressions, _, _ = _parse_directives(tree, comment_node_type, comment_prefix, source_lines=[])
     return suppressions
+
+
+def _parse_file_level_ignores(
+    tree: tree_sitter.Tree,
+    comment_node_type: str,
+    comment_prefix: str,
+    source_lines: list[str],
+) -> tuple[bool, set[str]]:
+    """Return ``(bare, codes)`` for ``# safelint: ignore`` directives in *tree*.
+
+    Thin wrapper over :func:`_parse_directives` — kept as a standalone
+    entry point for callers that only need the file-level result.
+    Production code uses ``_parse_directives`` directly to also get
+    the inline-suppression map without a second tree walk.
+
+    Only comments that appear *alone on their line* (no preceding code)
+    are honoured — trailing comments after code are scope-local and
+    use ``# nosafe`` instead. Tree-sitter ensures ``# safelint: ignore``
+    literals inside string content are correctly ignored.
+    """
+    _, bare, codes = _parse_directives(tree, comment_node_type, comment_prefix, source_lines)
+    return bare, codes
 
 
 def _check_suppressed_marking_used(
@@ -478,26 +506,27 @@ class SafetyEngine:
     def _merge_in_file_directives(
         self,
         filepath: str,
-        tree: tree_sitter.Tree,
-        lang: LanguageDefinition,
-        source: str,
+        *,
+        bare: bool,
+        file_codes: set[str],
         ignored_names: frozenset[str],
         ignored_codes: frozenset[str],
     ) -> tuple[frozenset[str], frozenset[str]]:
-        """Merge any in-file ``# safelint: ignore`` directives into the per-file ignore sets.
+        """Merge a pre-parsed in-file ``# safelint: ignore`` payload into the per-file ignore sets.
 
         The directive form is the file-level analogue of the line-level
         ``# nosafe``: ``# safelint: ignore`` (suppress everything in
-        this file) or ``# safelint: ignore: SAFE101, SAFE102``
-        (suppress specific codes / names). Only comments alone on
-        their line are honoured; trailing comments after code are
-        scope-local and use ``# nosafe`` instead.
+        this file, encoded as the ``"*"`` wildcard) or
+        ``# safelint: ignore: SAFE101, SAFE102`` (suppress specific
+        codes / names).
 
-        Unknown codes/names trigger a typo-guard warning on stderr,
-        matching the validation behaviour for ``per_file_ignores`` in
-        the toml config.
+        *bare* and *file_codes* are produced upstream by
+        :func:`_parse_directives` in the same single tree walk that
+        builds the line-level ``# nosafe`` map — taking pre-parsed
+        input here means the engine never walks the tree twice for
+        directives. Unknown codes/names trigger a typo-guard warning
+        on stderr, matching the toml ``per_file_ignores`` validation.
         """
-        bare, file_codes = _parse_file_level_ignores(tree, lang.comment_node_type, lang.comment_prefix, source.splitlines())
         if bare:
             ignored_codes = ignored_codes | frozenset({"*"})
         if file_codes:
@@ -746,9 +775,14 @@ class SafetyEngine:
                 return LintResult(path=filepath, violations=[], suppressed=[])
             return self._build_parse_error_result(filepath, tree.root_node)
 
-        suppressions = _parse_suppressions(tree, lang.comment_node_type, lang.comment_prefix)
+        # Single tree walk — produces both line-level ``# nosafe``
+        # suppressions and file-level ``# safelint: ignore`` payload.
+        # Walking twice (separate _parse_suppressions + _parse_file_level_ignores
+        # calls) was measurable on large generated files where file-
+        # level ignores are common.
+        suppressions, file_bare, file_codes = _parse_directives(tree, lang.comment_node_type, lang.comment_prefix, source.splitlines())
         ignored_names, ignored_codes = self._file_ignored_set(filepath)
-        ignored_names, ignored_codes = self._merge_in_file_directives(filepath, tree, lang, source, ignored_names, ignored_codes)
+        ignored_names, ignored_codes = self._merge_in_file_directives(filepath, bare=file_bare, file_codes=file_codes, ignored_names=ignored_names, ignored_codes=ignored_codes)
         used_suppressions: set[tuple[int, str | None]] = set()
         active, suppressed, stopped_early = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes, used_suppressions)
         # Skip the SAFE004 unused-suppression pass when ``fail_fast``
