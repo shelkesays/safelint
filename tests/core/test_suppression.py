@@ -579,8 +579,15 @@ def test_file_level_directive_unknown_code_emits_typo_warning(tmp_path: Path, ca
     assert "SAFE999" in err
 
 
-def test_file_level_directive_bare_via_wildcard_in_per_file_ignores(tmp_path: Path) -> None:
-    """The same wildcard ``"*"`` mechanism backs both file-level bare directive and toml ``per_file_ignores`` blanket entries."""
+def test_file_level_directive_bare_via_wildcard_in_per_file_ignores(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """The same wildcard ``"*"`` mechanism backs both file-level bare directive and toml ``per_file_ignores`` blanket entries.
+
+    Also asserts the typo-guard does NOT fire on the documented
+    wildcard. ``"*"`` is the supported way to express
+    "suppress every rule for this path pattern"; emitting an
+    ``unknown entries in per_file_ignores`` warning for it would
+    surface a spurious diagnostic on a valid config.
+    """
     long_body = "    x = 1\n" * 65
     source = "def too_long():\n" + long_body
     sample = tmp_path / "wildcard.py"
@@ -588,8 +595,10 @@ def test_file_level_directive_bare_via_wildcard_in_per_file_ignores(tmp_path: Pa
 
     config = deep_merge(DEFAULTS, {"per_file_ignores": {"**/wildcard.py": ["*"]}})
     result = SafetyEngine(config).check_file(str(sample))
+    captured = capsys.readouterr()
     assert result.violations == []
     assert any(v.code == "SAFE101" for v in result.suppressed)
+    assert "unknown entries in per_file_ignores" not in captured.err, f"wildcard '*' should not trigger the typo guard; got stderr: {captured.err!r}"
 
 
 def test_file_level_directive_combined_codes(tmp_path: Path) -> None:
