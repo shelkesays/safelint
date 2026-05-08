@@ -25,12 +25,12 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **codex** | Markdown instructions (`.codex/instructions.md`); also writes a delimited section into `AGENTS.md` when present | `~/.codex/instructions.md` (user) or `<cwd>/.codex/instructions.md` (project) — plus `<scope>/AGENTS.md` (section-only edit) when that file already exists | `.codex/` or `AGENTS.md` in cwd; `~/.codex/` for user-scope |
 | **Continue.dev** | Markdown rule (`.continue/rules/<name>.md`) | `~/.continue/rules/safelint.md` (user) or `<cwd>/.continue/rules/safelint.md` (project) | `.continue/`, `.continuerc`, or `.continuerc.json` in cwd; `~/.continue/` for user-scope |
 | **Cline** | Markdown rule (`.clinerules/<name>.md`) | `~/.clinerules/safelint.md` (user) or `<cwd>/.clinerules/safelint.md` (project) | `.clinerules/` in cwd; `~/.clinerules/` for user-scope |
-| **aider** | Markdown conventions (`CONVENTIONS.md`) — **not auto-loaded**; wire via `read:` in `aider.conf.yml` | `~/CONVENTIONS.md` (user) or `<cwd>/CONVENTIONS.md` (project) | `.aider.conf.yml`, `.aider.conf.yaml`, or `CONVENTIONS.md` in cwd; `~/.aider.conf.{yml,yaml}` for user-scope |
+| **aider** | Markdown conventions (`CONVENTIONS.md`) — **not auto-loaded**; wire via `read:` in `.aider.conf.yml` | `~/CONVENTIONS.md` (user) or `<cwd>/CONVENTIONS.md` (project) | `.aider.conf.yml`, `.aider.conf.yaml`, or `CONVENTIONS.md` in cwd; `~/.aider.conf.{yml,yaml}` for user-scope |
 | **Trae** | Markdown rule (`.trae/rules/<name>.md`) | `~/.trae/rules/safelint.md` (user) or `<cwd>/.trae/rules/safelint.md` (project) | `.trae/` in cwd; `~/.trae/` for user-scope |
 | **Antigravity** | Markdown rule (`.antigravity/rules/<name>.md`) | `~/.antigravity/rules/safelint.md` (user) or `<cwd>/.antigravity/rules/safelint.md` (project) | `.antigravity/` in cwd; `~/.antigravity/` for user-scope |
 | **Zed** | Workspace rules (`.rules`) | `~/.rules` (user) or `<cwd>/.rules` (project) | `.rules` or `.zed/` in cwd; `~/.rules` or `~/.zed/` for user-scope |
 
-The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)). If you'd find another client supported, file a feature request with the marker convention you've seen in the wild.
+The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)). If you'd like to see another client supported, file a feature request with the marker convention you've seen in the wild.
 
 ## Quick start
 
@@ -221,7 +221,7 @@ Reload your IDE (or restart Cline). The rule is auto-loaded. Then ask Cline *"ru
 - User-scoped: `~/CONVENTIONS.md`
 - Project-scoped: `<cwd>/CONVENTIONS.md` — **Recommended for team-shared repos — commit the file.**
 
-**One-time setup (mandatory):** aider does **not** auto-load `CONVENTIONS.md`. Wire it in by adding a `read:` entry to your `aider.conf.yml`:
+**One-time setup (mandatory):** aider does **not** auto-load `CONVENTIONS.md`. Wire it in by adding a `read:` entry to your `.aider.conf.yml`:
 
 ```yaml
 # .aider.conf.yml (project) or ~/.aider.conf.yml (user-global)

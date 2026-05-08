@@ -14,7 +14,7 @@ Twelve clients ship today; all follow the *same* workflow because safelint's CLI
 - **codex** — installs the primary instructions at `.codex/instructions.md` and *also* writes a delimited HTML-comment section into `AGENTS.md` when that cross-agent shared file already exists at the scope root. Other content in `AGENTS.md` is preserved.
 - **Continue.dev** — installs as a Markdown rule at `<cwd>/.continue/rules/safelint.md` (canonical, auto-loaded) or `~/.continue/rules/safelint.md` (user-global; loaded across workspaces).
 - **Cline** — installs as a Markdown rule at `<cwd>/.clinerules/safelint.md` (canonical, auto-loaded) or `~/.clinerules/safelint.md` (user-global).
-- **aider** — installs as `<cwd>/CONVENTIONS.md` or `~/CONVENTIONS.md`. **Not auto-loaded** — wire it in by adding `read: [CONVENTIONS.md]` to your `aider.conf.yml`.
+- **aider** — installs as `<cwd>/CONVENTIONS.md` or `~/CONVENTIONS.md`. **Not auto-loaded** — wire it in by adding `read: [CONVENTIONS.md]` to your `.aider.conf.yml`.
 - **Trae** — installs as a Markdown rule at `<cwd>/.trae/rules/safelint.md` (canonical, auto-loaded) or `~/.trae/rules/safelint.md` (user-global).
 - **Antigravity** — installs as a Markdown rule at `<cwd>/.antigravity/rules/safelint.md` (canonical, auto-loaded) or `~/.antigravity/rules/safelint.md` (user-global).
 - **Zed** — installs as workspace rules at `<cwd>/.rules` (canonical, auto-loaded) or `~/.rules` (user-global).
@@ -197,7 +197,7 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 ├── cline/
 │   └── safelint.md          # Cline's rule (installed to .clinerules/safelint.md)
 ├── aider/
-│   └── CONVENTIONS.md       # aider's conventions (installed to CONVENTIONS.md; wire via read: in aider.conf.yml)
+│   └── CONVENTIONS.md       # aider's conventions (installed to CONVENTIONS.md; wire via read: in .aider.conf.yml)
 ├── trae/
 │   └── safelint.md          # Trae's rule (installed to .trae/rules/safelint.md)
 ├── antigravity/
