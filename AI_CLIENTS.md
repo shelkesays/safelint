@@ -26,6 +26,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **codex** | Markdown instructions (`.codex/instructions.md`); also writes a delimited section into `AGENTS.md` when present | `~/.codex/instructions.md` (user) or `<cwd>/.codex/instructions.md` (project) — plus `<scope>/AGENTS.md` (section-only edit) when that file already exists | `.codex/` or `AGENTS.md` in cwd; `~/.codex/` for user-scope |
 | **Continue.dev** | Markdown rule (`.continue/rules/<name>.md`) | `~/.continue/rules/safelint.md` (user) or `<cwd>/.continue/rules/safelint.md` (project) | `.continue/`, `.continuerc`, or `.continuerc.json` in cwd; `~/.continue/` for user-scope |
 | **Cline** | Markdown rule (`.clinerules/<name>.md`) | `~/.clinerules/safelint.md` (user) or `<cwd>/.clinerules/safelint.md` (project) | `.clinerules/` in cwd; `~/.clinerules/` for user-scope |
+| **aider** | Markdown conventions (`CONVENTIONS.md`) — **not auto-loaded**; wire via `read:` in `aider.conf.yml` | `~/CONVENTIONS.md` (user) or `<cwd>/CONVENTIONS.md` (project) | `.aider.conf.yml`, `.aider.conf.yaml`, or `CONVENTIONS.md` in cwd; `~/.aider.conf.{yml,yaml}` for user-scope |
 
 More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
 
@@ -207,6 +208,29 @@ Reload your IDE (or restart Continue.dev). The rule is auto-loaded from `.contin
 
 Reload your IDE (or restart Cline). The rule is auto-loaded. Then ask Cline *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
 
+### aider
+
+**Markers:** `.aider.conf.yml`, `.aider.conf.yaml`, or `CONVENTIONS.md` in the project root for project-scope; `~/.aider.conf.{yml,yaml}` for user-scope.
+
+**Install location:**
+
+- User-scoped: `~/CONVENTIONS.md`
+- Project-scoped: `<cwd>/CONVENTIONS.md` — **Recommended for team-shared repos — commit the file.**
+
+**One-time setup (mandatory):** aider does **not** auto-load `CONVENTIONS.md`. Wire it in by adding a `read:` entry to your `aider.conf.yml`:
+
+```yaml
+# .aider.conf.yml (project) or ~/.aider.conf.yml (user-global)
+read:
+  - CONVENTIONS.md
+```
+
+The post-install message reminds you of this — without the `read:` entry, aider won't see safelint's conventions.
+
+**How to invoke after install:**
+
+Once `read:` is wired up, run `aider` (no flags). The conventions are loaded as part of aider's system context. Then ask aider *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+
 ## Manual install (`--client`)
 
 Skip auto-detection by passing an explicit client name:
@@ -259,6 +283,12 @@ safelint skill install --client cline --project
 
 # Cline, user-global
 safelint skill install --client cline
+
+# aider, project-scoped (then wire `read: [CONVENTIONS.md]` into .aider.conf.yml)
+safelint skill install --client aider --project
+
+# aider, user-global
+safelint skill install --client aider
 ```
 
 When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd).
