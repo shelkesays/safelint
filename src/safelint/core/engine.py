@@ -506,11 +506,11 @@ class SafetyEngine:
     def _merge_in_file_directives(
         self,
         filepath: str,
-        *,
-        bare: bool,
         file_codes: set[str],
         ignored_names: frozenset[str],
         ignored_codes: frozenset[str],
+        *,
+        bare: bool,
     ) -> tuple[frozenset[str], frozenset[str]]:
         """Merge a pre-parsed in-file ``# safelint: ignore`` payload into the per-file ignore sets.
 
@@ -782,7 +782,7 @@ class SafetyEngine:
         # level ignores are common.
         suppressions, file_bare, file_codes = _parse_directives(tree, lang.comment_node_type, lang.comment_prefix, source.splitlines())
         ignored_names, ignored_codes = self._file_ignored_set(filepath)
-        ignored_names, ignored_codes = self._merge_in_file_directives(filepath, bare=file_bare, file_codes=file_codes, ignored_names=ignored_names, ignored_codes=ignored_codes)
+        ignored_names, ignored_codes = self._merge_in_file_directives(filepath, file_codes, ignored_names, ignored_codes, bare=file_bare)
         used_suppressions: set[tuple[int, str | None]] = set()
         active, suppressed, stopped_early = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes, used_suppressions)
         # Skip the SAFE004 unused-suppression pass when ``fail_fast``
