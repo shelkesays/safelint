@@ -1141,6 +1141,55 @@ def test_update_one_skips_oserror_install(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert rc == 0
 
 
+def test_update_one_uses_precomputed_status_skipping_compute(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """When *status* is provided, ``_update_one`` does not invoke ``_install_status_or_none``.
+
+    Regression test for the optimisation that lets ``run_update``
+    compute status once per target and pass it through, so the hash/walk
+    runs at most once per install per run.
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+
+    call_count = {"n": 0}
+
+    def _counted(spec: _skill_install.ClientSpec, *, project: bool) -> str | None:
+        call_count["n"] += 1
+        return _skill_install.INSTALL_STATUS_FRESH
+
+    monkeypatch.setattr(_skill_install, "_install_status_or_none", _counted)
+    rc = _skill_install._update_one(
+        _skill_install._CURSOR_SPEC,
+        project=False,
+        args=argparse.Namespace(force=False, symlink=False),
+        status=_skill_install.INSTALL_STATUS_FRESH,
+    )
+    assert rc == 0
+    assert call_count["n"] == 0, "precomputed status should bypass internal compute"
+
+
+def test_run_update_silent_when_all_targets_oserror(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``run_update`` does not print the all-fresh summary when every target OSError'd.
+
+    Without the ``any_processed`` gate, a run where every target was
+    silently skipped due to permission errors would falsely report
+    "all detected installs are already up to date" — masking a real
+    I/O failure as a clean run.
+    """
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cursor")) == 0
+
+    def _raise_oserror(spec: _skill_install.ClientSpec, *, project: bool) -> str:
+        msg = "permission denied (simulated)"
+        raise OSError(msg)
+
+    monkeypatch.setattr(_skill_install, "_install_status", _raise_oserror)
+    rc = _skill_install.run_update(_make_update_args())
+    out = capsys.readouterr().out
+    assert rc == 0
+    assert "already up to date" not in out, "must not claim freshness when targets were skipped"
+
+
 def test_resolve_update_targets_skips_oserror_explicit_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Explicit-client update filtering treats OSError installs as MISSING (skipped).
 
