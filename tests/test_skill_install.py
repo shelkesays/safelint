@@ -449,7 +449,14 @@ def test_install_copilot_refuses_overwrite_without_force(monkeypatch: pytest.Mon
 
 
 def test_install_auto_detects_copilot_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """An existing ``.github/copilot-instructions.md`` triggers project-scope Copilot install on auto-detect."""
+    """An existing ``.github/copilot/`` directory triggers project-scope Copilot install on auto-detect.
+
+    We plant the ``.github/copilot/`` custom-prompts directory rather
+    than the install destination ``.github/copilot-instructions.md``
+    itself, so auto-detect still fires (``.github/copilot`` is one of
+    the registered cwd markers) but the install can write the
+    instructions file fresh without colliding with an existing one.
+    """
     home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
     # Plant a Copilot marker at cwd. Use ``.github/copilot/`` (a custom
     # prompts directory) rather than the install destination itself, so
