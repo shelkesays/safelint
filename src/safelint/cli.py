@@ -1080,9 +1080,36 @@ def _run_skill(args: argparse.Namespace) -> int:
 
 _HELP_COMMANDS: tuple[tuple[str, str], ...] = (
     ("check", "Scan a file or directory for safety violations"),
-    ("skill", "Manage the bundled AI-client skill / project rule for Claude Code or Cursor (install, update, remove, path, status)"),
+    ("skill", "Manage the bundled AI-client skill / project rule for Claude Code or Cursor"),
     ("help", "Print this message or the help of the given subcommand"),
     ("version", "Display SafeLint's version"),
+)
+
+
+# Mirrors the per-subcommand ``help=`` strings on the ``skill`` subparsers
+# in ``_build_skill_parser``. Listed at the top level for discoverability —
+# ``safelint help`` should make the full lifecycle visible without
+# requiring a second ``safelint help skill`` round-trip.
+_HELP_SKILL_SUBCOMMANDS: tuple[tuple[str, str], ...] = (
+    ("skill install", "Install the bundled skill / rule into the AI client(s) detected for this project"),
+    ("skill update", "Refresh installed skills whose content has drifted from the bundled wheel"),
+    ("skill remove", "Delete detected installed skills (filterable by client / scope / shape)"),
+    ("skill status", "Compare every detected installed skill against the bundled version"),
+    ("skill path", "Print the on-disk location of the bundled skill or Cursor rule"),
+)
+
+
+# Common flags shared across the skill subcommands. Each subcommand has
+# its own subset (e.g. ``--dry-run`` is ``remove`` only) — the per-action
+# parser is the source of truth. Listed here so users see ``--force``
+# and friends without first running ``safelint help skill <action>``.
+_HELP_SKILL_FLAGS: tuple[tuple[str, str], ...] = (
+    ("--client <NAME>", "Target AI client: ``auto`` (default — detect from project / home) | ``claude`` | ``cursor``"),
+    ("--project", "Restrict to project-scope installs (``<cwd>/.<client>/...``)"),
+    ("--symlink", "Use symlink mode instead of copying — ``pip upgrade safelint`` then auto-updates the artefact"),
+    ("--force", "``install``: replace existing artefact. ``update``: refresh even when status reports fresh"),
+    ("--path <PATH>", "(``remove`` only) Override auto-detect with an explicit install path"),
+    ("--dry-run", "(``remove`` only) Preview removals without touching the filesystem"),
 )
 
 
@@ -1119,6 +1146,12 @@ def _print_main_help() -> None:
     print()
     print(_c("Commands:", _BOLD))
     _print_help_table(_HELP_COMMANDS, name_colour=_CYAN)
+    print()
+    print(_c("Skill subcommands:", _BOLD))
+    _print_help_table(_HELP_SKILL_SUBCOMMANDS, name_colour=_CYAN)
+    print()
+    print(_c("Skill flags:", _BOLD))
+    _print_help_table(_HELP_SKILL_FLAGS, name_colour=_CYAN)
     print()
     print(_c("Options:", _BOLD))
     _print_help_table(_HELP_OPTIONS, name_colour=_CYAN)
