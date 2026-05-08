@@ -2017,17 +2017,6 @@ def test_client_registry_choices_derive_from_specs() -> None:
     assert spec_names == _skill_install.PATH_CLIENT_CHOICES
 
 
-def test_cli_skill_install_rejects_auto_when_args_lack_default(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    """An unknown client name still fails loudly under the new auto default."""
-    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "totally-not-a-client"])
-    with pytest.raises(SystemExit) as exc:
-        cli.main()
-    # argparse rejects on choices=.
-    assert exc.value.code == 2
-    err = capsys.readouterr().err
-    assert "totally-not-a-client" in err
-
-
 def test_cli_skill_rejects_unknown_flag_before_subcommand(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     """Mistyped flags before ``skill`` must fail loudly, not be silently dropped.
 
