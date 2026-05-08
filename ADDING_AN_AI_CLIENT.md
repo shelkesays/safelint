@@ -3,7 +3,7 @@
 This guide is the cheat sheet for adding support for a new AI coding client (GitHub Copilot, codex, windsurf, antigravity, etc.) to SafeLint's `safelint skill install` command. The architecture was built for this — the moving parts you need to understand and the steps you need to follow are below.
 
 > [!NOTE]
-> Today Claude Code and Cursor are registered. Adding a new client is a one-`ClientSpec` change plus a bundled artefact and tests. No control-flow changes elsewhere — install / detection / CLI choices / output all read from the registry.
+> Twelve clients are registered today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is a one-`ClientSpec` change plus a bundled artefact and tests. No control-flow changes elsewhere — install / detection / CLI choices / output all read from the registry.
 
 For the user-facing surface (auto-detection logic, how each client is invoked after install, troubleshooting), see [`AI_CLIENTS.md`](AI_CLIENTS.md). This file is for contributors *adding* a new entry to the registry.
 
@@ -15,7 +15,9 @@ For the user-facing surface (auto-detection logic, how each client is invoked af
 4. The install primitives (`_install_copy`, `_install_symlink`, `_install_symlink_directory_filtered`) are client-agnostic — they handle file vs. directory sources from the spec's `bundled_relpath` without caring which client it's for.
 5. CLI `--client` choices on both `install` and `path` subcommands are derived from the registry, so argparse stays in sync automatically the moment a new spec lands.
 
-## Step-by-step: adding hypothetical "Windsurf" support
+## Step-by-step: adding a new client
+
+> The walkthrough below uses *Windsurf* as a worked example because it has a clean, single-file rules convention. Windsurf is now actually shipped (since v1.11.0) — feel free to compare this guide against the real implementation in `_skill_install.py` (`_WINDSURF_SPEC`) for cross-reference.
 
 ### 1. Decide on the bundled artefact shape
 

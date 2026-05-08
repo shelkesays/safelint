@@ -6,11 +6,13 @@ Cursor ``cursor/safelint.mdc`` rule) ship inside the wheel under
 :func:`importlib.resources.files` and materialises them at the target
 install location.
 
-Two AI clients ship today (Claude Code and Cursor) but the registry
-in ``_CLIENT_SPECS`` is open-ended — adding GitHub Copilot, codex,
-windsurf, antigravity, etc. is a matter of appending one
-:class:`ClientSpec` entry. No control flow needs to know about the
-new client; install / detection / output all read from the spec.
+Twelve AI clients ship today (Claude Code, Cursor, GitHub Copilot,
+Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity,
+Zed) and the registry in ``_CLIENT_SPECS`` stays open-ended — adding
+the next client (JetBrains AI Assistant, etc.) is a matter of
+appending one :class:`ClientSpec` entry. No control flow needs to know
+about the new client; install / detection / output all read from the
+spec.
 
 ``safelint skill install`` (no ``--client``) auto-detects which AI
 client(s) are in use:
