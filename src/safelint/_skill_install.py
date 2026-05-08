@@ -78,6 +78,23 @@ class ClientSpec:
     # *every* registered client are updated.
     documentation_relpaths: tuple[tuple[str, ...], ...]
 
+    # ----- Optional secondary install (cross-agent shared file) -----
+    # Codex / similar agents read instructions from a *shared* file
+    # like ``AGENTS.md`` that may contain content for multiple tools.
+    # When ``secondary_install_relpath`` is set AND the file already
+    # exists at the scope root, install also writes a delimited section
+    # there using ``secondary_install_section_markers`` so other content
+    # in the file is preserved. Remove strips the section; status
+    # reports section drift; update re-renders the section.
+    #
+    # *Always* a section-based edit, never full-file overwrite — that's
+    # the contract that makes it safe to share AGENTS.md with other
+    # agents. If the secondary file does not exist, the secondary install
+    # is a no-op (we never auto-create AGENTS.md just to put a section
+    # in it; that's the user's call).
+    secondary_install_relpath: tuple[str, ...] | None = None
+    secondary_install_section_markers: tuple[str, str] | None = None
+
 
 _CLAUDE_SPEC = ClientSpec(
     name="claude",
@@ -179,9 +196,35 @@ _WINDSURF_SPEC = ClientSpec(
 )
 
 
+_CODEX_SPEC = ClientSpec(
+    name="codex",
+    display_name="codex",
+    artefact_label="instructions",
+    # codex reads from ``.codex/`` (project) or ``~/.codex/`` (user).
+    # ``AGENTS.md`` is the cross-agent shared file convention — its
+    # presence is also a strong signal for codex usage and triggers
+    # the secondary section install (see below).
+    cwd_markers=(".codex", "AGENTS.md"),
+    home_markers=(".codex",),
+    install_relpath=(".codex", "instructions.md"),
+    bundled_relpath=("codex", "instructions.md"),
+    restart_hint="Restart codex (or your codex-aware editor) to pick up the new instructions.",
+    usage_hint='Then ask codex "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("codex", "instructions.md"),),
+    # Secondary install: when AGENTS.md already exists at the scope
+    # root, also write a delimited section there. AGENTS.md is the
+    # cross-agent shared file (codex, Cursor fallback, others) — using
+    # HTML-comment markers means user-authored content for *other*
+    # agents stays untouched. We never auto-create AGENTS.md; the
+    # secondary install is opt-in via "the user already has the file".
+    secondary_install_relpath=("AGENTS.md",),
+    secondary_install_section_markers=("<!-- safelint:begin -->", "<!-- safelint:end -->"),
+)
+
+
 # Registry — append to extend. Order matters: detection / multi-install
 # output follows registry order so users see results in a stable sequence.
-_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC)
+_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC, _CODEX_SPEC)
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
 
@@ -198,7 +241,7 @@ PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
 # Subdirectories under ``skill_files/`` that hold peer-client bundles.
 # Excluded from a Claude install (copy or symlink) so the materialised
 # skill folder doesn't carry irrelevant peer artefacts.
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf"})
+_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex"})
 
 
 # ---------------------------------------------------------------------------
@@ -443,6 +486,180 @@ def _install_copy(source: Path, target: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Secondary install — section-delimited writes into a shared file like
+# AGENTS.md. The section-marker pattern preserves *user* content in the
+# shared file: install/update edit only the bytes between the markers,
+# remove strips just the section, and status compares only the section
+# body. The shared file is never auto-created (we don't want to spawn
+# AGENTS.md just to drop a section in it — it has to already exist as
+# a signal the user is using a cross-agent workflow).
+# ---------------------------------------------------------------------------
+
+
+def _secondary_target(spec: ClientSpec, *, project: bool) -> Path | None:
+    """Return the absolute path to *spec*'s secondary install destination, or None when unset."""
+    if spec.secondary_install_relpath is None:
+        return None
+    scope_root = Path.cwd() if project else Path.home()
+    return scope_root.joinpath(*spec.secondary_install_relpath)
+
+
+def _render_section_body(spec: ClientSpec, bundled_text: str) -> str:
+    """Format *bundled_text* between *spec*'s section markers, including a newline cushion."""
+    if spec.secondary_install_section_markers is None:  # pragma: no cover - guarded by callers
+        msg = f"{spec.name} has no secondary section markers"
+        raise ValueError(msg)
+    begin, end = spec.secondary_install_section_markers
+    return f"{begin}\n{bundled_text.rstrip()}\n{end}\n"
+
+
+def _extract_section_body(text: str, markers: tuple[str, str]) -> str | None:
+    """Return the body between *markers* in *text*, or None when absent.
+
+    The body is the literal substring between the begin and end marker
+    lines, with a single trailing newline stripped if present (so it
+    round-trips cleanly with :func:`_render_section_body`).
+    """
+    begin, end = markers
+    begin_idx = text.find(begin)
+    if begin_idx == -1:
+        return None
+    body_start = begin_idx + len(begin)
+    end_idx = text.find(end, body_start)
+    if end_idx == -1:
+        return None
+    body = text[body_start:end_idx]
+    return body.strip("\n")
+
+
+def _append_section(existing_text: str, new_section: str) -> str:
+    """Append *new_section* to *existing_text* with a single blank-line separator."""
+    if existing_text == "" or existing_text.endswith("\n\n"):
+        sep = ""
+    elif existing_text.endswith("\n"):
+        sep = "\n"
+    else:
+        sep = "\n\n"
+    return existing_text + sep + new_section
+
+
+def _replace_or_append_section(existing_text: str, spec: ClientSpec, bundled_text: str) -> str:
+    """Replace the safelint section in *existing_text* if present, else append it."""
+    if spec.secondary_install_section_markers is None:  # pragma: no cover
+        msg = f"{spec.name} has no secondary section markers"
+        raise ValueError(msg)
+    begin, end = spec.secondary_install_section_markers
+    new_section = _render_section_body(spec, bundled_text)
+    begin_idx = existing_text.find(begin)
+    if begin_idx == -1:
+        return _append_section(existing_text, new_section)
+    end_idx = existing_text.find(end, begin_idx + len(begin))
+    if end_idx == -1:
+        # Begin marker present but no end marker — treat as malformed,
+        # don't try to repair it. Append a fresh section instead.
+        return _append_section(existing_text, new_section)
+    after_end = end_idx + len(end)
+    # Consume one trailing newline after the end marker so removal /
+    # re-render keep the file's blank-line layout consistent.
+    if after_end < len(existing_text) and existing_text[after_end] == "\n":
+        after_end += 1
+    return existing_text[:begin_idx] + new_section + existing_text[after_end:]
+
+
+def _strip_section(existing_text: str, spec: ClientSpec) -> str:
+    """Remove the safelint section (markers + body) from *existing_text*. No-op when absent."""
+    if spec.secondary_install_section_markers is None:  # pragma: no cover
+        return existing_text
+    begin, end = spec.secondary_install_section_markers
+    begin_idx = existing_text.find(begin)
+    if begin_idx == -1:
+        return existing_text
+    end_idx = existing_text.find(end, begin_idx + len(begin))
+    if end_idx == -1:
+        return existing_text  # malformed — don't damage the file
+    after_end = end_idx + len(end)
+    if after_end < len(existing_text) and existing_text[after_end] == "\n":
+        after_end += 1
+    # Trim one preceding newline if we removed a section that wasn't
+    # at the very start, to avoid leaving a double-blank gap.
+    cut_from = begin_idx
+    if cut_from > 0 and existing_text[cut_from - 1] == "\n" and (cut_from < 2 or existing_text[cut_from - 2] == "\n"):
+        cut_from -= 1
+    return existing_text[:cut_from] + existing_text[after_end:]
+
+
+def _print_secondary_install_notice(target: Path) -> None:
+    """Print the post-install confirmation that the secondary section was written."""
+    print(f"safelint: also wrote section into {target} (preserves existing content)")
+
+
+def _print_secondary_remove_dry_run(target: Path) -> None:
+    """Print the dry-run notice for the secondary section strip."""
+    print(f"safelint: would also strip safelint section from {target}")
+
+
+def _print_secondary_remove_done(target: Path) -> None:
+    """Print the post-remove confirmation that the secondary section was stripped."""
+    print(f"safelint: stripped safelint section from {target} (other content preserved)")
+
+
+def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
+    """Write the safelint section into *spec*'s secondary file when it already exists.
+
+    Returns True when the secondary file was modified. False when the
+    secondary destination is unset, the file doesn't exist (we don't
+    auto-create), or the file's section already matches the bundle.
+    """
+    target = _secondary_target(spec, project=project)
+    if target is None or not target.exists():
+        return False
+    bundled = _spec_bundled_source(spec).read_text(encoding="utf-8")
+    existing = target.read_text(encoding="utf-8")
+    new_text = _replace_or_append_section(existing, spec, bundled)
+    if new_text == existing:
+        return False
+    target.write_text(new_text, encoding="utf-8")
+    return True
+
+
+def _remove_secondary(spec: ClientSpec, *, project: bool) -> bool:
+    """Strip the safelint section from *spec*'s secondary file. Returns True when modified."""
+    target = _secondary_target(spec, project=project)
+    if target is None or not target.exists():
+        return False
+    existing = target.read_text(encoding="utf-8")
+    stripped = _strip_section(existing, spec)
+    if stripped == existing:
+        return False
+    if stripped.strip() == "":
+        # We owned the entire file (only safelint content was there).
+        # Remove it rather than leaving an empty AGENTS.md behind.
+        target.unlink()
+        return True
+    target.write_text(stripped, encoding="utf-8")
+    return True
+
+
+def _secondary_status(spec: ClientSpec, *, project: bool) -> str:
+    """Return INSTALL_STATUS_* for *spec*'s secondary install.
+
+    MISSING: secondary file doesn't exist OR has no safelint section.
+    FRESH: section body matches bundled content (whitespace-stripped).
+    DIFFERS: section present but body has drifted.
+    """
+    target = _secondary_target(spec, project=project)
+    if target is None or not target.exists():
+        return INSTALL_STATUS_MISSING
+    if spec.secondary_install_section_markers is None:  # pragma: no cover
+        return INSTALL_STATUS_MISSING
+    body = _extract_section_body(target.read_text(encoding="utf-8"), spec.secondary_install_section_markers)
+    if body is None:
+        return INSTALL_STATUS_MISSING
+    bundled = _spec_bundled_source(spec).read_text(encoding="utf-8").strip()
+    return INSTALL_STATUS_FRESH if body.strip() == bundled else INSTALL_STATUS_DIFFERS
+
+
+# ---------------------------------------------------------------------------
 # Single-install orchestration
 # ---------------------------------------------------------------------------
 
@@ -467,6 +684,12 @@ def _install_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) -
 
     scope = "project" if project else "user"
     _print_install_success(spec, target=target, kind=kind, scope=scope)
+    # Secondary install: only fires when the spec opts in AND the
+    # secondary file already exists at the scope root. Section-based
+    # so user content in the shared file (e.g. AGENTS.md) is preserved.
+    secondary = _secondary_target(spec, project=project)
+    if secondary is not None and _install_secondary(spec, project=project):
+        _print_secondary_install_notice(secondary)
     return 0
 
 
@@ -594,6 +817,22 @@ def _install_status(spec: ClientSpec, *, project: bool) -> str:
     on-disk install are content-hashed and compared.
     """
     target = _spec_target(spec, project=project)
+    primary = _primary_install_status(spec, target)
+    # When the spec opts into a secondary install AND that secondary
+    # has actually been written (section present in AGENTS.md or
+    # similar), let drift in the section escalate the overall verdict
+    # to DIFFERS. A MISSING secondary doesn't degrade FRESH — secondary
+    # is opt-in based on the user's shared file existing, not a
+    # required install component.
+    if primary == INSTALL_STATUS_FRESH and spec.secondary_install_relpath is not None:
+        secondary = _secondary_status(spec, project=project)
+        if secondary == INSTALL_STATUS_DIFFERS:
+            return INSTALL_STATUS_DIFFERS
+    return primary
+
+
+def _primary_install_status(spec: ClientSpec, target: Path) -> str:
+    """Return the primary install's status (no secondary aggregation)."""
     if target.is_symlink():
         return INSTALL_STATUS_FRESH if target.exists() else INSTALL_STATUS_DIFFERS
     if _is_symlink_managed_directory(target):
@@ -1036,15 +1275,28 @@ def _shape_label(spec: ClientSpec, *, project: bool) -> str:
 
 
 def _remove_one(spec: ClientSpec, *, project: bool, dry_run: bool) -> int:
-    """Remove one detected install. Returns 0 on success."""
+    """Remove one detected install. Returns 0 on success.
+
+    Also strips the safelint section from the spec's secondary file
+    (e.g. ``AGENTS.md``) when one is configured and present —
+    ``_remove_secondary`` is content-preserving (only the delimited
+    safelint section is removed) so the user's other agent
+    instructions in the same file stay intact.
+    """
     target = _spec_target(spec, project=project)
     scope = "project" if project else "user"
     shape = _shape_label(spec, project=project)
+    secondary = _secondary_target(spec, project=project)
+    secondary_active = secondary is not None and _secondary_status(spec, project=project) != INSTALL_STATUS_MISSING
     if dry_run:
         _print_remove_dry_run(spec, target, scope, shape=shape)
+        if secondary_active and secondary is not None:
+            _print_secondary_remove_dry_run(secondary)
         return 0
     _remove_existing(target)
     _print_remove_success(spec, target, scope)
+    if secondary_active and secondary is not None and _remove_secondary(spec, project=project):
+        _print_secondary_remove_done(secondary)
     return 0
 
 

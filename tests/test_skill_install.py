@@ -739,6 +739,295 @@ def test_install_copy_excludes_peer_windsurf_dir(monkeypatch: pytest.MonkeyPatch
     assert not (target / "windsurf").exists(), "peer windsurf/ leaked into Claude skill"
 
 
+# ---------------------------------------------------------------------------
+# codex client install — primary at .codex/instructions.md, secondary
+# section in AGENTS.md when present
+# ---------------------------------------------------------------------------
+
+
+def test_bundled_codex_instructions_exist_in_wheel() -> None:
+    """The codex instructions ship under ``skill_files/codex/instructions.md``."""
+    path = _skill_install.bundled_skill_path() / "codex" / "instructions.md"
+    assert path.is_file()
+    head = path.read_text(encoding="utf-8")[:200]
+    assert head.startswith("# safelint")
+
+
+def test_install_codex_copy_user_scope_no_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client codex`` installs the primary instructions; without AGENTS.md the secondary is a no-op."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="codex"))
+    assert rc == 0
+    assert (home / ".codex" / "instructions.md").is_file()
+    # No AGENTS.md — secondary did not fire.
+    assert not (home / "AGENTS.md").exists()
+    out = capsys.readouterr().out
+    assert "codex instructions" in out
+    assert "user scope" in out
+
+
+def test_install_codex_writes_section_when_agents_md_exists(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """When AGENTS.md already exists, codex install also writes a delimited section into it.
+
+    User content in the file is preserved — only bytes between the
+    safelint markers change.
+    """
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    user_content = "# Project AGENTS\n\nMy own instructions for other agents.\n"
+    (cwd / "AGENTS.md").write_text(user_content, encoding="utf-8")
+
+    rc = _skill_install.run_install(_make_args(client="codex", project=True))
+    assert rc == 0
+    primary = cwd / ".codex" / "instructions.md"
+    assert primary.is_file()
+
+    agents_text = (cwd / "AGENTS.md").read_text(encoding="utf-8")
+    # User content preserved.
+    assert "My own instructions for other agents." in agents_text
+    # Section markers present.
+    assert "<!-- safelint:begin -->" in agents_text
+    assert "<!-- safelint:end -->" in agents_text
+    # Section body matches bundled (whitespace-stripped equality).
+    bundled = (_skill_install.bundled_skill_path() / "codex" / "instructions.md").read_text(encoding="utf-8")
+    body = _skill_install._extract_section_body(agents_text, ("<!-- safelint:begin -->", "<!-- safelint:end -->"))
+    assert body is not None
+    assert body.strip() == bundled.strip()
+
+    out = capsys.readouterr().out
+    assert "also wrote section into" in out
+    assert "AGENTS.md" in out
+
+
+def test_install_codex_does_not_create_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """codex must NOT auto-create AGENTS.md — secondary only fires when the file exists."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="codex", project=True))
+    assert rc == 0
+    assert not (cwd / "AGENTS.md").exists(), "codex must not auto-create AGENTS.md"
+
+
+def test_install_codex_replaces_stale_section_in_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Re-installing codex with --force refreshes a stale safelint section in AGENTS.md."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    agents_path = cwd / "AGENTS.md"
+    stale = "# AGENTS\n\n<!-- safelint:begin -->\nOLD STALE SAFELINT INSTRUCTIONS\n<!-- safelint:end -->\n\nOther agent notes follow.\n"
+    agents_path.write_text(stale, encoding="utf-8")
+
+    assert _skill_install.run_install(_make_args(client="codex", project=True, force=True)) == 0
+    agents_text = agents_path.read_text(encoding="utf-8")
+    assert "OLD STALE SAFELINT INSTRUCTIONS" not in agents_text
+    assert "# AGENTS" in agents_text  # user header preserved
+    assert "Other agent notes follow." in agents_text
+
+
+def test_install_codex_status_reports_secondary_drift(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_install_status`` returns DIFFERS when the AGENTS.md section drifts even though the primary is FRESH."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / "AGENTS.md").write_text("# AGENTS\n\nuser content\n", encoding="utf-8")
+    assert _skill_install.run_install(_make_args(client="codex", project=True)) == 0
+    # Tamper with the AGENTS.md section.
+    agents_path = cwd / "AGENTS.md"
+    agents_path.write_text(
+        agents_path.read_text(encoding="utf-8").replace("# safelint", "# tampered safelint"),
+        encoding="utf-8",
+    )
+    status = _skill_install._install_status(_skill_install._CODEX_SPEC, project=True)
+    assert status == _skill_install.INSTALL_STATUS_DIFFERS
+
+
+def test_remove_codex_strips_section_preserves_other_content(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``skill remove --client codex`` deletes the primary AND strips the AGENTS.md section, preserving user content."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    user_content = "# AGENTS\n\nMy own notes for other agents.\n"
+    (cwd / "AGENTS.md").write_text(user_content, encoding="utf-8")
+
+    assert _skill_install.run_install(_make_args(client="codex", project=True)) == 0
+    primary = cwd / ".codex" / "instructions.md"
+    agents_path = cwd / "AGENTS.md"
+    assert primary.is_file()
+    assert "<!-- safelint:begin -->" in agents_path.read_text(encoding="utf-8")
+
+    rc = _skill_install.run_remove(_make_remove_args(client="codex", project=True))
+    assert rc == 0
+    assert not primary.exists(), "primary instructions should be removed"
+    # AGENTS.md still exists; user content preserved; section stripped.
+    assert agents_path.is_file()
+    agents_text = agents_path.read_text(encoding="utf-8")
+    assert "<!-- safelint:begin -->" not in agents_text
+    assert "<!-- safelint:end -->" not in agents_text
+    assert "My own notes for other agents." in agents_text
+
+
+def test_remove_codex_deletes_agents_md_when_only_safelint_content(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """When AGENTS.md contains *only* the safelint section, remove deletes the file rather than leaving it empty."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Create a minimal AGENTS.md so the secondary install fires.
+    (cwd / "AGENTS.md").write_text("", encoding="utf-8")
+    assert _skill_install.run_install(_make_args(client="codex", project=True)) == 0
+    agents_path = cwd / "AGENTS.md"
+    assert agents_path.is_file()
+
+    rc = _skill_install.run_remove(_make_remove_args(client="codex", project=True))
+    assert rc == 0
+    # File removed because nothing user-authored remained.
+    assert not agents_path.exists()
+
+
+def test_install_auto_detects_codex_via_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """An existing AGENTS.md in cwd triggers project-scope codex install on auto-detect."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / "AGENTS.md").write_text("user agent notes\n", encoding="utf-8")
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".codex" / "instructions.md").is_file()
+    out = capsys.readouterr().out
+    assert "codex" in out
+
+
+def test_run_path_with_client_codex_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill path --client codex`` prints the bundled instructions file path."""
+    rc = _skill_install.run_path(argparse.Namespace(client="codex"))
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    p = Path(out)
+    assert p.is_file()
+    assert p.name == "instructions.md"
+
+
+def test_cli_routes_skill_install_with_codex_client(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill install --client codex --project`` forwards both flags to run_install."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "codex", "--project"])
+    spy = mocker.patch.object(_skill_install, "run_install", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    args = spy.call_args.args[0]
+    assert args.client == "codex"
+    assert args.project is True
+
+
+def test_install_copy_excludes_peer_codex_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The materialised Claude skill folder must NOT contain the peer ``codex/`` subdirectory."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    target = home / ".claude" / "skills" / "safelint"
+    assert target.is_dir()
+    assert not (target / "codex").exists(), "peer codex/ leaked into Claude skill"
+
+
+def test_section_body_extraction_round_trips() -> None:
+    """``_render_section_body`` and ``_extract_section_body`` round-trip identically (no content mutation)."""
+    spec = _skill_install._CODEX_SPEC
+    bundled = "line one\nline two with `code`\n"
+    rendered = _skill_install._render_section_body(spec, bundled)
+    body = _skill_install._extract_section_body(rendered, spec.secondary_install_section_markers)
+    assert body is not None
+    assert body.strip() == bundled.strip()
+
+
+def test_append_section_handles_empty_file() -> None:
+    """Appending into an empty file produces just the section (no leading separator)."""
+    out = _skill_install._append_section("", "<!-- s:b -->\nbody\n<!-- s:e -->\n")
+    assert out == "<!-- s:b -->\nbody\n<!-- s:e -->\n"
+
+
+def test_append_section_handles_file_without_trailing_newline() -> None:
+    """Appending after a non-newline-terminated file inserts a blank-line gap."""
+    out = _skill_install._append_section("body without newline", "[SECTION]")
+    assert out == "body without newline\n\n[SECTION]"
+
+
+def test_append_section_handles_file_with_double_trailing_newline() -> None:
+    """Appending after a file that already ends with a blank line uses no extra separator."""
+    out = _skill_install._append_section("body\n\n", "[SECTION]")
+    assert out == "body\n\n[SECTION]"
+
+
+def test_replace_or_append_handles_malformed_section_with_only_begin_marker() -> None:
+    """A file with only the begin marker (no end) is treated as malformed — section appended instead of repaired."""
+    spec = _skill_install._CODEX_SPEC
+    existing = "user content\n<!-- safelint:begin -->\noops, no end marker\n"
+    out = _skill_install._replace_or_append_section(existing, spec, "fresh body")
+    # Original (malformed) text preserved verbatim, with a well-formed
+    # fresh section appended after.
+    assert out.startswith(existing)
+    assert "<!-- safelint:end -->" in out
+
+
+def test_strip_section_no_op_when_section_absent() -> None:
+    """``_strip_section`` returns input unchanged when no safelint markers are present."""
+    spec = _skill_install._CODEX_SPEC
+    text = "# AGENTS\n\nuser content only\n"
+    assert _skill_install._strip_section(text, spec) == text
+
+
+def test_strip_section_no_op_on_malformed_only_begin_marker() -> None:
+    """A malformed file (begin without end) is left alone — never damaged."""
+    spec = _skill_install._CODEX_SPEC
+    text = "<!-- safelint:begin -->\nbody but no end\n"
+    assert _skill_install._strip_section(text, spec) == text
+
+
+def test_install_secondary_no_op_when_target_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_install_secondary`` returns False when AGENTS.md doesn't exist (it doesn't auto-create)."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install._install_secondary(_skill_install._CODEX_SPEC, project=True) is False
+
+
+def test_install_secondary_no_op_when_section_already_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_install_secondary`` returns False on the second call — section already matches bundle."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / "AGENTS.md").write_text("user content\n", encoding="utf-8")
+    # First install writes the section.
+    assert _skill_install._install_secondary(_skill_install._CODEX_SPEC, project=True) is True
+    # Second call is a no-op.
+    assert _skill_install._install_secondary(_skill_install._CODEX_SPEC, project=True) is False
+
+
+def test_remove_secondary_no_op_when_target_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_remove_secondary`` returns False when AGENTS.md doesn't exist."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install._remove_secondary(_skill_install._CODEX_SPEC, project=True) is False
+
+
+def test_remove_secondary_no_op_when_no_section_to_strip(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_remove_secondary`` returns False when AGENTS.md exists but has no safelint section."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / "AGENTS.md").write_text("just user content\n", encoding="utf-8")
+    assert _skill_install._remove_secondary(_skill_install._CODEX_SPEC, project=True) is False
+
+
+def test_secondary_status_missing_when_agents_md_absent(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_secondary_status`` reports MISSING when AGENTS.md doesn't exist."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    status = _skill_install._secondary_status(_skill_install._CODEX_SPEC, project=True)
+    assert status == _skill_install.INSTALL_STATUS_MISSING
+
+
+def test_secondary_status_missing_when_no_section_in_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_secondary_status`` reports MISSING when AGENTS.md has no safelint section."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / "AGENTS.md").write_text("just user content\n", encoding="utf-8")
+    status = _skill_install._secondary_status(_skill_install._CODEX_SPEC, project=True)
+    assert status == _skill_install.INSTALL_STATUS_MISSING
+
+
+def test_remove_codex_dry_run_mentions_secondary(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``skill remove --client codex --dry-run`` mentions the AGENTS.md section will also be stripped."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / "AGENTS.md").write_text("user notes\n", encoding="utf-8")
+    assert _skill_install.run_install(_make_args(client="codex", project=True)) == 0
+    capsys.readouterr()  # discard install output
+
+    rc = _skill_install.run_remove(_make_remove_args(client="codex", project=True, dry_run=True))
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "would also strip safelint section" in out
+    # Files NOT actually changed.
+    assert (cwd / ".codex" / "instructions.md").is_file()
+    assert "<!-- safelint:begin -->" in (cwd / "AGENTS.md").read_text(encoding="utf-8")
+
+
 def test_cli_routes_skill_install_default_client_is_auto(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
     """``safelint skill install`` (no --client) defaults client to ``auto``.
 
