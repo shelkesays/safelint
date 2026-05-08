@@ -24,6 +24,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **Gemini** | Instructions Markdown (`GEMINI.md`) | `~/GEMINI.md` (user-global) or `<cwd>/GEMINI.md` (project — canonical, auto-discovered by Gemini CLI) | `GEMINI.md` or `.gemini/` in cwd; `~/.gemini/` for user-scope |
 | **Windsurf** | Project rules (`.windsurfrules`) | `~/.windsurfrules` (user-global) or `<cwd>/.windsurfrules` (project — canonical, auto-loaded by Windsurf) | `.windsurfrules` or `.codeium/` in cwd; `~/.codeium/` for user-scope |
 | **codex** | Markdown instructions (`.codex/instructions.md`); also writes a delimited section into `AGENTS.md` when present | `~/.codex/instructions.md` (user) or `<cwd>/.codex/instructions.md` (project) — plus `<scope>/AGENTS.md` (section-only edit) when that file already exists | `.codex/` or `AGENTS.md` in cwd; `~/.codex/` for user-scope |
+| **Continue.dev** | Markdown rule (`.continue/rules/<name>.md`) | `~/.continue/rules/safelint.md` (user) or `<cwd>/.continue/rules/safelint.md` (project) | `.continue/`, `.continuerc`, or `.continuerc.json` in cwd; `~/.continue/` for user-scope |
 
 More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
 
@@ -179,6 +180,19 @@ Reload Windsurf (or restart the editor). The rules are auto-loaded from `.windsu
 
 Restart codex (or your codex-aware editor). The primary `.codex/instructions.md` is auto-discovered. Then ask codex *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
 
+### Continue.dev
+
+**Markers:** `.continue/`, `.continuerc`, or `.continuerc.json` in the project root for project-scope; `~/.continue/` for user-scope.
+
+**Install location:**
+
+- User-scoped: `~/.continue/rules/safelint.md` — Continue.dev auto-loads user-global rules across workspaces.
+- Project-scoped: `<cwd>/.continue/rules/safelint.md` — Continue.dev auto-loads workspace rules. **Recommended for team-shared repos — commit the file.**
+
+**How to invoke after install:**
+
+Reload your IDE (or restart Continue.dev). The rule is auto-loaded from `.continue/rules/`. Then ask Continue *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+
 ## Manual install (`--client`)
 
 Skip auto-detection by passing an explicit client name:
@@ -219,6 +233,12 @@ safelint skill install --client codex --project
 
 # codex, user-global
 safelint skill install --client codex
+
+# Continue.dev, project-scoped (recommended for team-shared repos)
+safelint skill install --client continue --project
+
+# Continue.dev, user-global (loaded across all workspaces)
+safelint skill install --client continue
 ```
 
 When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd).

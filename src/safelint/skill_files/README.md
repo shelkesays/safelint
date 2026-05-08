@@ -1,10 +1,10 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
+A bundled skill / project-rule that lets AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
 
 > **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](../../AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
 
-Six clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
+Seven clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
 
 - **Claude Code** — installs as a directory skill at `~/.claude/skills/safelint/` containing `SKILL.md` + `languages/`.
 - **Cursor** — installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
@@ -12,6 +12,7 @@ Six clients ship today; all follow the *same* workflow because safelint's CLI su
 - **Gemini** — installs as a Markdown instructions file at `<cwd>/GEMINI.md` (canonical, auto-discovered by Gemini CLI) or `~/GEMINI.md` (user-global; requires Gemini CLI config).
 - **Windsurf** — installs as a project rules file at `<cwd>/.windsurfrules` (canonical, auto-loaded by Windsurf) or `~/.windsurfrules` (user-global; merged with project rules at runtime).
 - **codex** — installs the primary instructions at `.codex/instructions.md` and *also* writes a delimited HTML-comment section into `AGENTS.md` when that cross-agent shared file already exists at the scope root. Other content in `AGENTS.md` is preserved.
+- **Continue.dev** — installs as a Markdown rule at `<cwd>/.continue/rules/safelint.md` (canonical, auto-loaded) or `~/.continue/rules/safelint.md` (user-global; loaded across workspaces).
 
 Once installed, ask the agent things like:
 
@@ -65,6 +66,10 @@ safelint skill install --client windsurf            # ~/.windsurfrules (user-glo
 # codex (also injects section into AGENTS.md when present)
 safelint skill install --client codex --project     # <cwd>/.codex/instructions.md + AGENTS.md section if AGENTS.md exists
 safelint skill install --client codex               # ~/.codex/instructions.md
+
+# Continue.dev
+safelint skill install --client continue --project  # <cwd>/.continue/rules/safelint.md (auto-loaded)
+safelint skill install --client continue            # ~/.continue/rules/safelint.md (user-global)
 ```
 
 ### Options
@@ -160,6 +165,8 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 │   └── safelint-rules.md    # Windsurf's project rules (installed to .windsurfrules at scope root)
 ├── codex/
 │   └── instructions.md      # codex's instructions (installed to .codex/instructions.md; also AGENTS.md when present)
+├── continue/
+│   └── safelint.md          # Continue.dev's rule (installed to .continue/rules/safelint.md)
 └── languages/               # One addendum per supported language
     └── python.md            # Python-specific install / rationale / idiomatic fixes
 ```

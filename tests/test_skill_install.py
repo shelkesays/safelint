@@ -915,6 +915,115 @@ def test_install_copy_excludes_peer_codex_dir(monkeypatch: pytest.MonkeyPatch, t
     assert not (target / "codex").exists(), "peer codex/ leaked into Claude skill"
 
 
+# ---------------------------------------------------------------------------
+# Continue.dev client install
+# ---------------------------------------------------------------------------
+
+
+def test_bundled_continue_rule_exists_in_wheel() -> None:
+    """The Continue.dev rule ships under ``skill_files/continue/safelint.md``."""
+    path = _skill_install.bundled_skill_path() / "continue" / "safelint.md"
+    assert path.is_file()
+    head = path.read_text(encoding="utf-8")[:200]
+    assert head.startswith("# safelint")
+
+
+def test_install_continue_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client continue`` copies the bundled rule to ~/.continue/rules/safelint.md."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="continue"))
+    assert rc == 0
+    target = home / ".continue" / "rules" / "safelint.md"
+    assert target.is_file()
+    assert not target.is_symlink()
+    out = capsys.readouterr().out
+    assert "Continue.dev rule" in out
+    assert "user scope" in out
+
+
+def test_install_continue_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client continue --project`` lands at <cwd>/.continue/rules/safelint.md."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="continue", project=True))
+    assert rc == 0
+    assert (cwd / ".continue" / "rules" / "safelint.md").is_file()
+    assert not (home / ".continue").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_continue_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client continue --symlink`` creates a file symlink to the bundled rule."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="continue", symlink=True))
+    assert rc == 0
+    target = home / ".continue" / "rules" / "safelint.md"
+    assert target.is_symlink()
+    bundled = _skill_install.bundled_skill_path() / "continue" / "safelint.md"
+    assert target.resolve() == bundled.resolve()
+
+
+def test_install_continue_with_force_replaces_existing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--force`` replaces a stale Continue.dev rule at the target."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    target = home / ".continue" / "rules" / "safelint.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("stale rule\n", encoding="utf-8")
+    assert _skill_install.run_install(_make_args(client="continue", force=True)) == 0
+    assert "stale rule" not in target.read_text(encoding="utf-8")
+
+
+def test_install_continue_refuses_overwrite_without_force(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A second continue install without ``--force`` exits 1 with the error on stderr."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="continue")) == 0
+    rc = _skill_install.run_install(_make_args(client="continue"))
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "already exists" in captured.err
+
+
+def test_install_auto_detects_continue_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A ``.continue/`` directory in cwd triggers project-scope Continue.dev install on auto-detect."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".continue").mkdir()
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".continue" / "rules" / "safelint.md").is_file()
+    out = capsys.readouterr().out
+    assert "Continue.dev" in out
+
+
+def test_run_path_with_client_continue_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill path --client continue`` prints the bundled rule file path."""
+    rc = _skill_install.run_path(argparse.Namespace(client="continue"))
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    p = Path(out)
+    assert p.is_file()
+    assert p.name == "safelint.md"
+
+
+def test_cli_routes_skill_install_with_continue_client(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill install --client continue --project`` forwards both flags to run_install."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "continue", "--project"])
+    spy = mocker.patch.object(_skill_install, "run_install", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    args = spy.call_args.args[0]
+    assert args.client == "continue"
+    assert args.project is True
+
+
+def test_install_copy_excludes_peer_continue_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The materialised Claude skill folder must NOT contain the peer ``continue/`` subdirectory."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    target = home / ".claude" / "skills" / "safelint"
+    assert target.is_dir()
+    assert not (target / "continue").exists(), "peer continue/ leaked into Claude skill"
+
+
 def test_section_body_extraction_round_trips() -> None:
     """``_render_section_body`` and ``_extract_section_body`` round-trip identically (no content mutation)."""
     spec = _skill_install._CODEX_SPEC
