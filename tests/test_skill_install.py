@@ -1575,9 +1575,13 @@ def test_install_copy_excludes_peer_zed_dir(monkeypatch: pytest.MonkeyPatch, tmp
 def test_section_body_extraction_round_trips() -> None:
     """``_render_section_body`` and ``_extract_section_body`` round-trip identically (no content mutation)."""
     spec = _skill_install._CODEX_SPEC
+    # Narrow the optional ``secondary_install_section_markers`` for the
+    # type checker — codex always sets it (verified by the assert).
+    markers = spec.secondary_install_section_markers
+    assert markers is not None, "codex spec must have section markers configured"
     bundled = "line one\nline two with `code`\n"
     rendered = _skill_install._render_section_body(spec, bundled)
-    body = _skill_install._extract_section_body(rendered, spec.secondary_install_section_markers)
+    body = _skill_install._extract_section_body(rendered, markers)
     assert body is not None
     assert body.strip() == bundled.strip()
 
