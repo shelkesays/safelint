@@ -21,6 +21,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **Claude Code** | Skill directory (`SKILL.md` + `languages/`) | `~/.claude/skills/safelint/` (user) or `<cwd>/.claude/skills/safelint/` (project) | `CLAUDE.md`, `.claude/`, or `.claude.json` in cwd; `~/.claude/` or `~/.claude.json` for user-scope |
 | **Cursor** | Project Rule (`.mdc` file) | `~/.cursor/rules/safelint.mdc` (user) or `<cwd>/.cursor/rules/safelint.mdc` (project) | `.cursor/` or `.cursorrules` in cwd; `~/.cursor/` for user-scope |
 | **GitHub Copilot** | Instructions Markdown | `~/.github/copilot-instructions.md` (user-global) or `<cwd>/.github/copilot-instructions.md` (project — canonical) | `.github/copilot-instructions.md`, `.github/copilot/`, or `.github/instructions/` in cwd; `~/.github/copilot-instructions.md` for user-scope |
+| **Gemini** | Instructions Markdown (`GEMINI.md`) | `~/GEMINI.md` (user-global) or `<cwd>/GEMINI.md` (project — canonical, auto-discovered by Gemini CLI) | `GEMINI.md` or `.gemini/` in cwd; `~/.gemini/` for user-scope |
 
 More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
 
@@ -130,6 +131,19 @@ Reload VS Code (or restart Copilot Chat). The instructions file is auto-loaded f
 
 **First-time bootstrap note:** Copilot's auto-detection signals (`.github/copilot-instructions.md`, `.github/copilot/`, `.github/instructions/`) only match an *existing* Copilot setup. For first-time installs on a fresh project, pass `--client copilot --project` explicitly.
 
+### Gemini
+
+**Markers:** `GEMINI.md` or `.gemini/` in the project root for project-scope; `~/.gemini/` for user-scope.
+
+**Install location:**
+
+- User-scoped: `~/GEMINI.md` — Gemini CLI does not auto-discover this. Users wanting a global file configure Gemini CLI to read it explicitly (or symlink it where the CLI looks).
+- Project-scoped: `<cwd>/GEMINI.md` — Gemini CLI's canonical instructions file, auto-discovered when invoked from the repo. **Recommended for team-shared repos — commit the file.**
+
+**How to invoke after install:**
+
+Restart Gemini CLI (or your IDE's Gemini integration). The `GEMINI.md` file is auto-discovered for the workspace. Then ask Gemini *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+
 ## Manual install (`--client`)
 
 Skip auto-detection by passing an explicit client name:
@@ -152,6 +166,12 @@ safelint skill install --client copilot --project
 
 # GitHub Copilot, user-global (requires VS Code settings to point at ~/.github/copilot-instructions.md)
 safelint skill install --client copilot
+
+# Gemini, project-scoped (canonical — auto-discovered by Gemini CLI)
+safelint skill install --client gemini --project
+
+# Gemini, user-global (requires Gemini CLI configuration to point at ~/GEMINI.md)
+safelint skill install --client gemini
 ```
 
 When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd).
