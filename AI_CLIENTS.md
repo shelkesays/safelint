@@ -29,6 +29,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **aider** | Markdown conventions (`CONVENTIONS.md`) — **not auto-loaded**; wire via `read:` in `aider.conf.yml` | `~/CONVENTIONS.md` (user) or `<cwd>/CONVENTIONS.md` (project) | `.aider.conf.yml`, `.aider.conf.yaml`, or `CONVENTIONS.md` in cwd; `~/.aider.conf.{yml,yaml}` for user-scope |
 | **Trae** | Markdown rule (`.trae/rules/<name>.md`) | `~/.trae/rules/safelint.md` (user) or `<cwd>/.trae/rules/safelint.md` (project) | `.trae/` in cwd; `~/.trae/` for user-scope |
 | **Antigravity** | Markdown rule (`.antigravity/rules/<name>.md`) | `~/.antigravity/rules/safelint.md` (user) or `<cwd>/.antigravity/rules/safelint.md` (project) | `.antigravity/` in cwd; `~/.antigravity/` for user-scope |
+| **Zed** | Workspace rules (`.rules`) | `~/.rules` (user) or `<cwd>/.rules` (project) | `.rules` or `.zed/` in cwd; `~/.rules` or `~/.zed/` for user-scope |
 
 More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
 
@@ -259,6 +260,19 @@ Reload Trae (or restart the IDE). The rule is auto-loaded from `.trae/rules/`. T
 
 Reload Antigravity (or restart the IDE). The rule is auto-loaded from `.antigravity/rules/`. Then ask Antigravity *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
 
+### Zed
+
+**Markers:** `.rules` or `.zed/` in the project root for project-scope; `~/.rules` or `~/.zed/` for user-scope.
+
+**Install location:**
+
+- User-scoped: `~/.rules` — Zed loads user-global agent rules.
+- Project-scoped: `<cwd>/.rules` — Zed's canonical workspace rules file. **Recommended for team-shared repos — commit the file.**
+
+**How to invoke after install:**
+
+Reload Zed (or restart the editor). The rules are auto-loaded from `.rules`. Then ask Zed's assistant *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+
 ## Manual install (`--client`)
 
 Skip auto-detection by passing an explicit client name:
@@ -329,6 +343,12 @@ safelint skill install --client antigravity --project
 
 # Antigravity, user-global
 safelint skill install --client antigravity
+
+# Zed, project-scoped (recommended for team-shared repos)
+safelint skill install --client zed --project
+
+# Zed, user-global
+safelint skill install --client zed
 ```
 
 When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd).
