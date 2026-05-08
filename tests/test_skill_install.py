@@ -1242,6 +1242,114 @@ def test_install_copy_excludes_peer_aider_dir(monkeypatch: pytest.MonkeyPatch, t
     assert not (target / "aider").exists(), "peer aider/ leaked into Claude skill"
 
 
+# ---------------------------------------------------------------------------
+# Trae client install
+# ---------------------------------------------------------------------------
+
+
+def test_bundled_trae_rule_exists_in_wheel() -> None:
+    """The Trae rule ships under ``skill_files/trae/safelint.md``."""
+    path = _skill_install.bundled_skill_path() / "trae" / "safelint.md"
+    assert path.is_file()
+    head = path.read_text(encoding="utf-8")[:200]
+    assert head.startswith("# safelint")
+
+
+def test_install_trae_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client trae`` copies the bundled rule to ~/.trae/rules/safelint.md."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="trae"))
+    assert rc == 0
+    target = home / ".trae" / "rules" / "safelint.md"
+    assert target.is_file()
+    out = capsys.readouterr().out
+    assert "Trae rule" in out
+    assert "user scope" in out
+
+
+def test_install_trae_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client trae --project`` lands at <cwd>/.trae/rules/safelint.md."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="trae", project=True))
+    assert rc == 0
+    assert (cwd / ".trae" / "rules" / "safelint.md").is_file()
+    assert not (home / ".trae").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_trae_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client trae --symlink`` creates a file symlink to the bundled rule."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="trae", symlink=True))
+    assert rc == 0
+    target = home / ".trae" / "rules" / "safelint.md"
+    assert target.is_symlink()
+    bundled = _skill_install.bundled_skill_path() / "trae" / "safelint.md"
+    assert target.resolve() == bundled.resolve()
+
+
+def test_install_trae_with_force_replaces_existing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--force`` replaces a stale Trae rule at the target."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    target = home / ".trae" / "rules" / "safelint.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("stale rule\n", encoding="utf-8")
+    assert _skill_install.run_install(_make_args(client="trae", force=True)) == 0
+    assert "stale rule" not in target.read_text(encoding="utf-8")
+
+
+def test_install_trae_refuses_overwrite_without_force(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A second trae install without ``--force`` exits 1 with the error on stderr."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="trae")) == 0
+    rc = _skill_install.run_install(_make_args(client="trae"))
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "already exists" in captured.err
+
+
+def test_install_auto_detects_trae_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A ``.trae/`` directory in cwd triggers project-scope Trae install on auto-detect."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".trae").mkdir()
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".trae" / "rules" / "safelint.md").is_file()
+    out = capsys.readouterr().out
+    assert "Trae" in out
+
+
+def test_run_path_with_client_trae_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill path --client trae`` prints the bundled rule file path."""
+    rc = _skill_install.run_path(argparse.Namespace(client="trae"))
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    p = Path(out)
+    assert p.is_file()
+    assert p.name == "safelint.md"
+
+
+def test_cli_routes_skill_install_with_trae_client(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill install --client trae --project`` forwards both flags to run_install."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "trae", "--project"])
+    spy = mocker.patch.object(_skill_install, "run_install", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    args = spy.call_args.args[0]
+    assert args.client == "trae"
+    assert args.project is True
+
+
+def test_install_copy_excludes_peer_trae_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The materialised Claude skill folder must NOT contain the peer ``trae/`` subdirectory."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    target = home / ".claude" / "skills" / "safelint"
+    assert target.is_dir()
+    assert not (target / "trae").exists(), "peer trae/ leaked into Claude skill"
+
+
 def test_section_body_extraction_round_trips() -> None:
     """``_render_section_body`` and ``_extract_section_body`` round-trip identically (no content mutation)."""
     spec = _skill_install._CODEX_SPEC
