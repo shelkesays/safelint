@@ -884,12 +884,23 @@ def run_update(args: argparse.Namespace) -> int:
     overall_rc = 0
     any_refreshed = False
     for spec, project in targets:
-        # OSError-tolerant: a None status (transient I/O between
-        # resolve and refresh) is treated as "no refresh attempted",
-        # so it doesn't flip ``any_refreshed`` falsely.
+        # Compute status once per target. ``_install_status`` walks
+        # the install directory and hashes its files (Claude installs
+        # have many of both), so calling it again inside
+        # ``_update_one`` doubles that work. Short-circuit the FRESH
+        # and OSError paths here so the hash/walk runs at most once
+        # per install per run; only the actual re-install path falls
+        # through to ``_update_one`` (which still recomputes for
+        # direct callers, but they pay that cost once).
         status = _install_status_or_none(spec, project=project)
-        if status is not None and (status != INSTALL_STATUS_FRESH or force):
-            any_refreshed = True
+        if status is None:
+            continue  # OSError — silent skip, matches run_status
+        if status == INSTALL_STATUS_FRESH and not force:
+            target = _spec_target(spec, project=project)
+            scope = "project" if project else "user"
+            _print_update_skipped_fresh(spec, target, scope)
+            continue
+        any_refreshed = True
         rc = _update_one(spec, project=project, args=args)
         if rc != 0:
             overall_rc = rc

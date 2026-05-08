@@ -83,7 +83,7 @@ severity = "error"
 [rules.side_effects_hidden]
 enabled = true
 severity = "error"
-io_functions = ["open", "print", "input", "subprocess"]
+io_functions = ["open", "print", "input", "run", "Popen", "call", "check_call", "check_output"]
 pure_prefixes = [
     "calculate", "compute", "get", "check", "validate",
     "is", "has", "find", "parse", "transform", "convert",
