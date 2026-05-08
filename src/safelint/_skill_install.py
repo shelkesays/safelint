@@ -213,6 +213,23 @@ _CONTINUE_SPEC = ClientSpec(
 )
 
 
+_CLINE_SPEC = ClientSpec(
+    name="cline",
+    display_name="Cline",
+    artefact_label="rule",
+    # Cline reads any ``.md`` under ``.clinerules/`` (project) or
+    # ``~/.clinerules/`` (user-global). The directory's existence is
+    # the primary signal.
+    cwd_markers=(".clinerules",),
+    home_markers=(".clinerules",),
+    install_relpath=(".clinerules", "safelint.md"),
+    bundled_relpath=("cline", "safelint.md"),
+    restart_hint="Reload your IDE (or restart Cline) to pick up the new rule.",
+    usage_hint='Then ask Cline "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("cline", "safelint.md"),),
+)
+
+
 _CODEX_SPEC = ClientSpec(
     name="codex",
     display_name="codex",
@@ -241,7 +258,7 @@ _CODEX_SPEC = ClientSpec(
 
 # Registry — append to extend. Order matters: detection / multi-install
 # output follows registry order so users see results in a stable sequence.
-_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC, _CODEX_SPEC, _CONTINUE_SPEC)
+_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC, _CODEX_SPEC, _CONTINUE_SPEC, _CLINE_SPEC)
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
 
@@ -258,7 +275,7 @@ PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
 # Subdirectories under ``skill_files/`` that hold peer-client bundles.
 # Excluded from a Claude install (copy or symlink) so the materialised
 # skill folder doesn't carry irrelevant peer artefacts.
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex", "continue"})
+_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex", "continue", "cline"})
 
 
 # ---------------------------------------------------------------------------

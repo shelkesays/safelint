@@ -1024,6 +1024,115 @@ def test_install_copy_excludes_peer_continue_dir(monkeypatch: pytest.MonkeyPatch
     assert not (target / "continue").exists(), "peer continue/ leaked into Claude skill"
 
 
+# ---------------------------------------------------------------------------
+# Cline client install
+# ---------------------------------------------------------------------------
+
+
+def test_bundled_cline_rule_exists_in_wheel() -> None:
+    """The Cline rule ships under ``skill_files/cline/safelint.md``."""
+    path = _skill_install.bundled_skill_path() / "cline" / "safelint.md"
+    assert path.is_file()
+    head = path.read_text(encoding="utf-8")[:200]
+    assert head.startswith("# safelint")
+
+
+def test_install_cline_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client cline`` copies the bundled rule to ~/.clinerules/safelint.md."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="cline"))
+    assert rc == 0
+    target = home / ".clinerules" / "safelint.md"
+    assert target.is_file()
+    assert not target.is_symlink()
+    out = capsys.readouterr().out
+    assert "Cline rule" in out
+    assert "user scope" in out
+
+
+def test_install_cline_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client cline --project`` lands at <cwd>/.clinerules/safelint.md."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="cline", project=True))
+    assert rc == 0
+    assert (cwd / ".clinerules" / "safelint.md").is_file()
+    assert not (home / ".clinerules").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_cline_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client cline --symlink`` creates a file symlink to the bundled rule."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="cline", symlink=True))
+    assert rc == 0
+    target = home / ".clinerules" / "safelint.md"
+    assert target.is_symlink()
+    bundled = _skill_install.bundled_skill_path() / "cline" / "safelint.md"
+    assert target.resolve() == bundled.resolve()
+
+
+def test_install_cline_with_force_replaces_existing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--force`` replaces a stale Cline rule at the target."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    target = home / ".clinerules" / "safelint.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("stale rule\n", encoding="utf-8")
+    assert _skill_install.run_install(_make_args(client="cline", force=True)) == 0
+    assert "stale rule" not in target.read_text(encoding="utf-8")
+
+
+def test_install_cline_refuses_overwrite_without_force(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A second cline install without ``--force`` exits 1 with the error on stderr."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="cline")) == 0
+    rc = _skill_install.run_install(_make_args(client="cline"))
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "already exists" in captured.err
+
+
+def test_install_auto_detects_cline_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A ``.clinerules/`` directory in cwd triggers project-scope Cline install on auto-detect."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".clinerules").mkdir()
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".clinerules" / "safelint.md").is_file()
+    out = capsys.readouterr().out
+    assert "Cline" in out
+
+
+def test_run_path_with_client_cline_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill path --client cline`` prints the bundled rule file path."""
+    rc = _skill_install.run_path(argparse.Namespace(client="cline"))
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    p = Path(out)
+    assert p.is_file()
+    assert p.name == "safelint.md"
+
+
+def test_cli_routes_skill_install_with_cline_client(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill install --client cline --project`` forwards both flags to run_install."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "cline", "--project"])
+    spy = mocker.patch.object(_skill_install, "run_install", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    args = spy.call_args.args[0]
+    assert args.client == "cline"
+    assert args.project is True
+
+
+def test_install_copy_excludes_peer_cline_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The materialised Claude skill folder must NOT contain the peer ``cline/`` subdirectory."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    target = home / ".claude" / "skills" / "safelint"
+    assert target.is_dir()
+    assert not (target / "cline").exists(), "peer cline/ leaked into Claude skill"
+
+
 def test_section_body_extraction_round_trips() -> None:
     """``_render_section_body`` and ``_extract_section_body`` round-trip identically (no content mutation)."""
     spec = _skill_install._CODEX_SPEC
@@ -1156,14 +1265,14 @@ def test_cli_routes_skill_install_default_client_is_auto(monkeypatch: pytest.Mon
 
 
 def test_cli_skill_install_rejects_unknown_client(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    """``--client cline`` (unknown) fails loudly via argparse choice validation."""
-    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "cline"])
+    """``--client <unknown>`` fails loudly via argparse choice validation."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "definitely-not-a-real-client"])
     with pytest.raises(SystemExit) as exc:
         cli.main()
     assert exc.value.code == 2
     err = capsys.readouterr().err
     assert "client" in err
-    assert "cline" in err
+    assert "definitely-not-a-real-client" in err
 
 
 # ---------------------------------------------------------------------------
