@@ -23,6 +23,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **GitHub Copilot** | Instructions Markdown | `~/.github/copilot-instructions.md` (user-global) or `<cwd>/.github/copilot-instructions.md` (project — canonical) | `.github/copilot-instructions.md`, `.github/copilot/`, or `.github/instructions/` in cwd; `~/.github/copilot-instructions.md` for user-scope |
 | **Gemini** | Instructions Markdown (`GEMINI.md`) | `~/GEMINI.md` (user-global) or `<cwd>/GEMINI.md` (project — canonical, auto-discovered by Gemini CLI) | `GEMINI.md` or `.gemini/` in cwd; `~/.gemini/` for user-scope |
 | **Windsurf** | Project rules (`.windsurfrules`) | `~/.windsurfrules` (user-global) or `<cwd>/.windsurfrules` (project — canonical, auto-loaded by Windsurf) | `.windsurfrules` or `.codeium/` in cwd; `~/.codeium/` for user-scope |
+| **codex** | Markdown instructions (`.codex/instructions.md`); also writes a delimited section into `AGENTS.md` when present | `~/.codex/instructions.md` (user) or `<cwd>/.codex/instructions.md` (project) — plus `<scope>/AGENTS.md` (section-only edit) when that file already exists | `.codex/` or `AGENTS.md` in cwd; `~/.codex/` for user-scope |
 
 More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
 
@@ -158,6 +159,26 @@ Restart Gemini CLI (or your IDE's Gemini integration). The `GEMINI.md` file is a
 
 Reload Windsurf (or restart the editor). The rules are auto-loaded from `.windsurfrules`. Then ask Windsurf *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
 
+### codex
+
+**Markers:** `.codex/` or `AGENTS.md` in the project root for project-scope; `~/.codex/` for user-scope. `AGENTS.md` is intentionally a marker because it's the cross-agent shared file convention — its presence is a strong signal codex is in use.
+
+**Install location:**
+
+- Primary (always written): `~/.codex/instructions.md` (user) or `<cwd>/.codex/instructions.md` (project — canonical, auto-discovered by codex).
+- Secondary (only when `AGENTS.md` already exists at the scope root): `<scope>/AGENTS.md` gets a delimited HTML-comment section (`safelint:begin` / `safelint:end`) injected. **Other content in `AGENTS.md` — your hand-written notes, instructions for other agents — is preserved untouched.** safelint never auto-creates `AGENTS.md`; the secondary install is opt-in via "the user already has the file".
+
+**Lifecycle of the secondary section:**
+
+- `install` — writes the section into `AGENTS.md` if the file exists.
+- `update` — re-renders the section in place when content drifts (or unchanged when fresh).
+- `status` — reports DIFFERS when the section content has drifted from bundled, even if the primary file is fresh.
+- `remove` — strips just the section from `AGENTS.md`. Other content is preserved. If `AGENTS.md` ends up empty (only safelint content was ever there), the empty file is removed too.
+
+**How to invoke after install:**
+
+Restart codex (or your codex-aware editor). The primary `.codex/instructions.md` is auto-discovered. Then ask codex *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+
 ## Manual install (`--client`)
 
 Skip auto-detection by passing an explicit client name:
@@ -192,6 +213,12 @@ safelint skill install --client windsurf --project
 
 # Windsurf, user-global rules (merged with project rules at runtime)
 safelint skill install --client windsurf
+
+# codex, project-scoped (canonical .codex/instructions.md; also injects section into AGENTS.md if present)
+safelint skill install --client codex --project
+
+# codex, user-global
+safelint skill install --client codex
 ```
 
 When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd).

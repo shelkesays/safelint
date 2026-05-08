@@ -1080,7 +1080,7 @@ def _run_skill(args: argparse.Namespace) -> int:
 
 _HELP_COMMANDS: tuple[tuple[str, str], ...] = (
     ("check", "Scan a file or directory for safety violations"),
-    ("skill", "Manage the bundled AI-client skill / project rule (Claude Code, Cursor, Copilot, Gemini, Windsurf)"),
+    ("skill", "Manage the bundled AI-client skill / project rule (Claude, Cursor, Copilot, Gemini, Windsurf, codex)"),
     ("help", "Print this message or the help of the given subcommand"),
     ("version", "Display SafeLint's version"),
 )
@@ -1104,7 +1104,7 @@ _HELP_SKILL_SUBCOMMANDS: tuple[tuple[str, str], ...] = (
 # parser is the source of truth. Listed here so users see ``--force``
 # and friends without first running ``safelint help skill <action>``.
 _HELP_SKILL_FLAGS: tuple[tuple[str, str], ...] = (
-    ("--client <NAME>", "Target AI client: ``auto`` (default) | ``claude`` | ``cursor`` | ``copilot`` | ``gemini`` | ``windsurf``"),
+    ("--client <NAME>", "Target AI client: ``auto`` (default) | ``claude`` | ``cursor`` | ``copilot`` | ``gemini`` | ``windsurf`` | ``codex``"),
     ("--project", "Restrict to project-scope installs (``<cwd>/.<client>/...``)"),
     ("--symlink", "Use symlink mode instead of copying — ``pip upgrade safelint`` then auto-updates the artefact"),
     ("--force", "``install``: replace existing artefact. ``update``: refresh even when status reports fresh"),
