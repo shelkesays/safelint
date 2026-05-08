@@ -27,6 +27,7 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 | **Continue.dev** | Markdown rule (`.continue/rules/<name>.md`) | `~/.continue/rules/safelint.md` (user) or `<cwd>/.continue/rules/safelint.md` (project) | `.continue/`, `.continuerc`, or `.continuerc.json` in cwd; `~/.continue/` for user-scope |
 | **Cline** | Markdown rule (`.clinerules/<name>.md`) | `~/.clinerules/safelint.md` (user) or `<cwd>/.clinerules/safelint.md` (project) | `.clinerules/` in cwd; `~/.clinerules/` for user-scope |
 | **aider** | Markdown conventions (`CONVENTIONS.md`) — **not auto-loaded**; wire via `read:` in `aider.conf.yml` | `~/CONVENTIONS.md` (user) or `<cwd>/CONVENTIONS.md` (project) | `.aider.conf.yml`, `.aider.conf.yaml`, or `CONVENTIONS.md` in cwd; `~/.aider.conf.{yml,yaml}` for user-scope |
+| **Trae** | Markdown rule (`.trae/rules/<name>.md`) | `~/.trae/rules/safelint.md` (user) or `<cwd>/.trae/rules/safelint.md` (project) | `.trae/` in cwd; `~/.trae/` for user-scope |
 
 More are on the [roadmap](#roadmap). The registry in `src/safelint/_skill_install.py` is open-ended — adding a new client is a one-`ClientSpec` change (see [Adding a new AI client](#adding-a-new-ai-client)).
 
@@ -231,6 +232,19 @@ The post-install message reminds you of this — without the `read:` entry, aide
 
 Once `read:` is wired up, run `aider` (no flags). The conventions are loaded as part of aider's system context. Then ask aider *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
 
+### Trae
+
+**Markers:** `.trae/` in the project root for project-scope; `~/.trae/` for user-scope.
+
+**Install location:**
+
+- User-scoped: `~/.trae/rules/safelint.md`
+- Project-scoped: `<cwd>/.trae/rules/safelint.md` — Trae auto-loads workspace rules. **Recommended for team-shared repos — commit the file.**
+
+**How to invoke after install:**
+
+Reload Trae (or restart the IDE). The rule is auto-loaded from `.trae/rules/`. Then ask Trae *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+
 ## Manual install (`--client`)
 
 Skip auto-detection by passing an explicit client name:
@@ -289,6 +303,12 @@ safelint skill install --client aider --project
 
 # aider, user-global
 safelint skill install --client aider
+
+# Trae, project-scoped (recommended for team-shared repos)
+safelint skill install --client trae --project
+
+# Trae, user-global
+safelint skill install --client trae
 ```
 
 When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd).

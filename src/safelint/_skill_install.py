@@ -230,6 +230,22 @@ _CLINE_SPEC = ClientSpec(
 )
 
 
+_TRAE_SPEC = ClientSpec(
+    name="trae",
+    display_name="Trae",
+    artefact_label="rule",
+    # Trae's project rules live under ``.trae/rules/``. The directory's
+    # presence is the conventional signal of an active Trae workspace.
+    cwd_markers=(".trae",),
+    home_markers=(".trae",),
+    install_relpath=(".trae", "rules", "safelint.md"),
+    bundled_relpath=("trae", "safelint.md"),
+    restart_hint="Reload Trae (or restart the IDE) to pick up the new rule.",
+    usage_hint='Then ask Trae "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("trae", "safelint.md"),),
+)
+
+
 _AIDER_SPEC = ClientSpec(
     name="aider",
     display_name="aider",
@@ -277,7 +293,7 @@ _CODEX_SPEC = ClientSpec(
 
 # Registry — append to extend. Order matters: detection / multi-install
 # output follows registry order so users see results in a stable sequence.
-_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC, _CODEX_SPEC, _CONTINUE_SPEC, _CLINE_SPEC, _AIDER_SPEC)
+_CLIENT_SPECS: tuple[ClientSpec, ...] = (_CLAUDE_SPEC, _CURSOR_SPEC, _COPILOT_SPEC, _GEMINI_SPEC, _WINDSURF_SPEC, _CODEX_SPEC, _CONTINUE_SPEC, _CLINE_SPEC, _AIDER_SPEC, _TRAE_SPEC)
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
 
@@ -294,7 +310,7 @@ PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
 # Subdirectories under ``skill_files/`` that hold peer-client bundles.
 # Excluded from a Claude install (copy or symlink) so the materialised
 # skill folder doesn't carry irrelevant peer artefacts.
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex", "continue", "cline", "aider"})
+_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex", "continue", "cline", "aider", "trae"})
 
 
 # ---------------------------------------------------------------------------

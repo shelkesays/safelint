@@ -1,10 +1,10 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
+A bundled skill / project-rule that lets AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae; more on the way) run `safelint` against the current project and present the violations in a reviewable format. Language-agnostic core with per-language addendums — mirrors safelint's `src/safelint/languages/` package layout.
 
 > **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](../../AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
 
-Nine clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
+Ten clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
 
 - **Claude Code** — installs as a directory skill at `~/.claude/skills/safelint/` containing `SKILL.md` + `languages/`.
 - **Cursor** — installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
@@ -15,6 +15,7 @@ Nine clients ship today; all follow the *same* workflow because safelint's CLI s
 - **Continue.dev** — installs as a Markdown rule at `<cwd>/.continue/rules/safelint.md` (canonical, auto-loaded) or `~/.continue/rules/safelint.md` (user-global; loaded across workspaces).
 - **Cline** — installs as a Markdown rule at `<cwd>/.clinerules/safelint.md` (canonical, auto-loaded) or `~/.clinerules/safelint.md` (user-global).
 - **aider** — installs as `<cwd>/CONVENTIONS.md` or `~/CONVENTIONS.md`. **Not auto-loaded** — wire it in by adding `read: [CONVENTIONS.md]` to your `aider.conf.yml`.
+- **Trae** — installs as a Markdown rule at `<cwd>/.trae/rules/safelint.md` (canonical, auto-loaded) or `~/.trae/rules/safelint.md` (user-global).
 
 Once installed, ask the agent things like:
 
@@ -80,6 +81,10 @@ safelint skill install --client cline               # ~/.clinerules/safelint.md 
 # aider (then wire `read: [CONVENTIONS.md]` into .aider.conf.yml)
 safelint skill install --client aider --project     # <cwd>/CONVENTIONS.md
 safelint skill install --client aider               # ~/CONVENTIONS.md
+
+# Trae
+safelint skill install --client trae --project      # <cwd>/.trae/rules/safelint.md (auto-loaded)
+safelint skill install --client trae                # ~/.trae/rules/safelint.md (user-global)
 ```
 
 ### Options
@@ -181,6 +186,8 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 │   └── safelint.md          # Cline's rule (installed to .clinerules/safelint.md)
 ├── aider/
 │   └── CONVENTIONS.md       # aider's conventions (installed to CONVENTIONS.md; wire via read: in aider.conf.yml)
+├── trae/
+│   └── safelint.md          # Trae's rule (installed to .trae/rules/safelint.md)
 └── languages/               # One addendum per supported language
     └── python.md            # Python-specific install / rationale / idiomatic fixes
 ```
