@@ -2834,9 +2834,13 @@ def test_remove_path_dry_run_labels_broken_symlink_directory_as_symlink(tmp_path
     "symlink", not "copy". The previous implementation used
     ``_is_symlink_managed_directory`` (working-symlinks-required)
     for the shape label, mislabelling broken installs as copy.
+
+    Path is built under a Claude-shaped tail
+    (``.claude/skills/safelint``) so the security guard introduced in
+    the v1.11.0 hardening accepts it.
     """
-    odd_dir = tmp_path / "stray_claude_install"
-    odd_dir.mkdir()
+    odd_dir = tmp_path / ".claude" / "skills" / "safelint"
+    odd_dir.mkdir(parents=True)
     # Build a Claude-style symlink directory with a broken inner symlink.
     bundled = _skill_install.bundled_skill_path()
     (odd_dir / "languages").symlink_to(bundled / "languages", target_is_directory=True)
@@ -2848,6 +2852,131 @@ def test_remove_path_dry_run_labels_broken_symlink_directory_as_symlink(tmp_path
     assert rc == 0
     out = capsys.readouterr().out
     assert "(symlink)" in out, "broken Claude-style directory should label as symlink"
+
+
+# ---------------------------------------------------------------------------
+# Security hardening (v1.11.0): symlink refusal at the secondary install
+# destination, and install-shape validation on `skill remove --path PATH`.
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_codex_refuses_symlinked_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``_install_secondary`` MUST NOT follow a symlink at AGENTS.md (would clobber the target file).
+
+    Threat model: an attacker with cwd write access (e.g. shared CI
+    workspace) plants ``AGENTS.md`` as a symlink to a sensitive file
+    (``/etc/passwd``, ``~/.ssh/authorized_keys``, etc.). When the
+    victim runs ``safelint skill install``, codex auto-detects (via
+    ``.codex/`` or ``AGENTS.md`` markers) and the secondary install
+    would normally read+rewrite the file *through* the symlink,
+    corrupting whatever it points at. Hardening: refuse to follow,
+    print a warning, leave the symlink target untouched.
+    """
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Plant a sensitive-looking file outside the install scope.
+    sensitive = tmp_path / "sensitive.txt"
+    sensitive.write_text("DO NOT MODIFY\n", encoding="utf-8")
+    # Make AGENTS.md a symlink to it.
+    (cwd / "AGENTS.md").symlink_to(sensitive)
+
+    rc = _skill_install.run_install(_make_args(client="codex", project=True))
+    # Primary install still succeeds.
+    assert rc == 0
+    assert (cwd / ".codex" / "instructions.md").is_file()
+    # Sensitive file UNCHANGED — symlink was refused.
+    assert sensitive.read_text(encoding="utf-8") == "DO NOT MODIFY\n"
+    # Warning surfaced to stderr.
+    err = capsys.readouterr().err
+    err_lower = err.lower()
+    assert "refusing" in err_lower
+    assert "symlink" in err_lower
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_remove_codex_refuses_symlinked_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``_remove_secondary`` MUST NOT follow a symlink at AGENTS.md when stripping the section."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    # Plant a real AGENTS.md, install codex normally.
+    (cwd / "AGENTS.md").write_text("user content\n", encoding="utf-8")
+    assert _skill_install.run_install(_make_args(client="codex", project=True)) == 0
+    capsys.readouterr()
+    # Now replace AGENTS.md with a symlink to a sensitive file.
+    sensitive = tmp_path / "sensitive.txt"
+    sensitive.write_text("DO NOT MODIFY\n", encoding="utf-8")
+    (cwd / "AGENTS.md").unlink()
+    (cwd / "AGENTS.md").symlink_to(sensitive)
+
+    rc = _skill_install.run_remove(_make_remove_args(client="codex", project=True))
+    assert rc == 0
+    # Primary removed, sensitive target untouched, warning surfaced.
+    assert not (cwd / ".codex" / "instructions.md").exists()
+    assert sensitive.read_text(encoding="utf-8") == "DO NOT MODIFY\n"
+    err = capsys.readouterr().err
+    err_lower = err.lower()
+    assert "refusing" in err_lower
+    assert "symlink" in err_lower
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_secondary_status_treats_symlink_as_missing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``_secondary_status`` must treat a symlinked AGENTS.md as MISSING (refuse to read through)."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    sensitive = tmp_path / "sensitive.txt"
+    sensitive.write_text("DO NOT READ\n", encoding="utf-8")
+    (cwd / "AGENTS.md").symlink_to(sensitive)
+
+    status = _skill_install._secondary_status(_skill_install._CODEX_SPEC, project=True)
+    assert status == _skill_install.INSTALL_STATUS_MISSING
+
+
+def test_remove_path_refuses_unrecognised_path(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``skill remove --path PATH`` must refuse paths that don't match any registered install shape.
+
+    Catches typos / shell-expansion accidents (e.g. ``--path ~/.config``
+    instead of ``--path ~/.cursor/...``) before they trigger
+    ``shutil.rmtree`` on the wrong directory.
+    """
+    bogus = tmp_path / "definitely-not-a-safelint-install"
+    bogus.mkdir()
+    (bogus / "important_file.txt").write_text("DO NOT DELETE\n", encoding="utf-8")
+
+    rc = _skill_install.run_remove(_make_remove_args(path=bogus))
+    assert rc == 1
+    # Path NOT deleted.
+    assert bogus.is_dir()
+    assert (bogus / "important_file.txt").read_text(encoding="utf-8") == "DO NOT DELETE\n"
+    err = capsys.readouterr().err
+    assert "refusing to remove" in err
+    assert "registered safelint install shape" in err
+
+
+def test_remove_path_accepts_unusual_parent_with_known_install_shape(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--path`` allows non-standard parent dirs as long as the tail matches a registered install shape.
+
+    Use case: user has a Cursor install at ``~/projects/foo/.cursor/rules/safelint.mdc``
+    that auto-detect missed. The tail matches Cursor's ``install_relpath``
+    so the security guard accepts it.
+    """
+    odd_install = tmp_path / "unusual" / "place" / ".cursor" / "rules" / "safelint.mdc"
+    odd_install.parent.mkdir(parents=True)
+    odd_install.write_text("safelint cursor rule\n", encoding="utf-8")
+
+    rc = _skill_install.run_remove(_make_remove_args(path=odd_install))
+    assert rc == 0
+    assert not odd_install.exists()
+
+
+def test_path_looks_like_safelint_install_recognises_every_registered_client() -> None:
+    """The shape-check helper must recognise every registered client's canonical install path.
+
+    Regression test: when a new client is added to ``_CLIENT_SPECS``,
+    its ``install_relpath`` should be automatically allowed by the
+    ``--path`` security guard (the helper iterates over the registry).
+    """
+    for spec in _skill_install._CLIENT_SPECS:
+        canonical = Path("/some/parent").joinpath(*spec.install_relpath)
+        assert _skill_install._path_looks_like_safelint_install(canonical), f"{spec.name}'s canonical install path {canonical} should be recognised"
 
 
 def test_update_one_handles_namespace_without_force_attribute(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -3005,8 +3134,13 @@ def test_remove_symlink_filter_skips_copy_installs(monkeypatch: pytest.MonkeyPat
 
 
 def test_remove_path_deletes_explicit_location(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """``--path PATH`` removes one specific location, bypassing detection."""
-    odd_location = tmp_path / "weird" / "place" / "safelint.mdc"
+    """``--path PATH`` removes one specific location, bypassing detection.
+
+    Path is built under a Cursor-shaped tail
+    (``.cursor/rules/safelint.mdc``) so the security guard introduced
+    in the v1.11.0 hardening accepts it.
+    """
+    odd_location = tmp_path / "weird" / "place" / ".cursor" / "rules" / "safelint.mdc"
     odd_location.parent.mkdir(parents=True)
     odd_location.write_text("# stray install\n", encoding="utf-8")
 
@@ -3029,8 +3163,12 @@ def test_remove_path_missing_returns_one_with_stderr_error(tmp_path: Path, capsy
 
 
 def test_remove_path_dry_run_previews_without_deleting(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """``--path PATH --dry-run`` previews; the file must remain on disk."""
-    odd_location = tmp_path / "weird" / "place" / "safelint.mdc"
+    """``--path PATH --dry-run`` previews; the file must remain on disk.
+
+    Same Cursor-shaped tail as the deletion test so the install-shape
+    security guard accepts the path.
+    """
+    odd_location = tmp_path / "weird" / "place" / ".cursor" / "rules" / "safelint.mdc"
     odd_location.parent.mkdir(parents=True)
     odd_location.write_text("# stray\n", encoding="utf-8")
 

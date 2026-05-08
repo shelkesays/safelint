@@ -719,15 +719,37 @@ def _print_secondary_remove_done(target: Path) -> None:
     print(f"safelint: stripped safelint section from {target} (other content preserved)")
 
 
+def _print_secondary_symlink_refused(target: Path) -> None:
+    """Stderr warning emitted when the secondary destination is a symlink (refuse to follow)."""
+    # Security guard: reading/writing through a symlink at the secondary
+    # destination would let an attacker (or a careless user setup) redirect
+    # the safelint section into an arbitrary file. We refuse and warn.
+    print(
+        f"safelint: warning: refusing to install/remove safelint section through symlink at {target} — remove the symlink first if you want safelint to manage this file directly",
+        file=sys.stderr,
+    )
+
+
 def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
     """Write the safelint section into *spec*'s secondary file when it already exists.
 
     Returns True when the secondary file was modified. False when the
     secondary destination is unset, the file doesn't exist (we don't
-    auto-create), or the file's section already matches the bundle.
+    auto-create), the file is a symlink (refused — see security note),
+    or the file's section already matches the bundle.
+
+    **Security note:** if the secondary destination is a symlink, we
+    refuse to follow it. Reading/writing through a symlink would let a
+    malicious or accidental setup (e.g. ``AGENTS.md → /etc/passwd``)
+    redirect our section write into an arbitrary file. The refusal is
+    surfaced via :func:`_print_secondary_symlink_refused` so the user
+    can investigate.
     """
     target = _secondary_target(spec, project=project)
     if target is None or not target.exists():
+        return False
+    if target.is_symlink():
+        _print_secondary_symlink_refused(target)
         return False
     bundled = _spec_bundled_source(spec).read_text(encoding="utf-8")
     existing = target.read_text(encoding="utf-8")
@@ -739,9 +761,16 @@ def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
 
 
 def _remove_secondary(spec: ClientSpec, *, project: bool) -> bool:
-    """Strip the safelint section from *spec*'s secondary file. Returns True when modified."""
+    """Strip the safelint section from *spec*'s secondary file. Returns True when modified.
+
+    Same symlink refusal as :func:`_install_secondary` — we never
+    follow a symlink at the secondary destination.
+    """
     target = _secondary_target(spec, project=project)
     if target is None or not target.exists():
+        return False
+    if target.is_symlink():
+        _print_secondary_symlink_refused(target)
         return False
     existing = target.read_text(encoding="utf-8")
     stripped = _strip_section(existing, spec)
@@ -759,12 +788,14 @@ def _remove_secondary(spec: ClientSpec, *, project: bool) -> bool:
 def _secondary_status(spec: ClientSpec, *, project: bool) -> str:
     """Return INSTALL_STATUS_* for *spec*'s secondary install.
 
-    MISSING: secondary file doesn't exist OR has no safelint section.
+    MISSING: secondary file doesn't exist, is a symlink (refused —
+    see security note in :func:`_install_secondary`), or has no
+    safelint section.
     FRESH: section body matches bundled content (whitespace-stripped).
     DIFFERS: section present but body has drifted.
     """
     target = _secondary_target(spec, project=project)
-    if target is None or not target.exists():
+    if target is None or not target.exists() or target.is_symlink():
         return INSTALL_STATUS_MISSING
     if spec.secondary_install_section_markers is None:  # pragma: no cover
         return INSTALL_STATUS_MISSING
@@ -1402,24 +1433,89 @@ def _remove_one(spec: ClientSpec, *, project: bool, dry_run: bool) -> int:
     target = _spec_target(spec, project=project)
     scope = "project" if project else "user"
     shape = _shape_label(spec, project=project)
-    secondary = _secondary_target(spec, project=project)
-    secondary_active = secondary is not None and _secondary_status(spec, project=project) != INSTALL_STATUS_MISSING
     if dry_run:
         _print_remove_dry_run(spec, target, scope, shape=shape)
-        if secondary_active and secondary is not None:
-            _print_secondary_remove_dry_run(secondary)
+        _emit_secondary_remove_notice(spec, project=project, dry_run=True)
         return 0
     _remove_existing(target)
     _print_remove_success(spec, target, scope)
-    if secondary_active and secondary is not None and _remove_secondary(spec, project=project):
-        _print_secondary_remove_done(secondary)
+    _emit_secondary_remove_notice(spec, project=project, dry_run=False)
     return 0
 
 
+def _emit_secondary_remove_notice(spec: ClientSpec, *, project: bool, dry_run: bool) -> None:
+    """Print the appropriate secondary-destination notice during ``remove``.
+
+    Three cases:
+    - **Active section** (file present, valid section): print "would
+      strip" / "stripped" depending on *dry_run*.
+    - **Symlink** (security: refused): warn that we won't follow.
+    - **Missing / no section**: silent.
+
+    Pulled out of :func:`_remove_one` to keep that function within the
+    cyclomatic-complexity ceiling.
+    """
+    secondary = _secondary_target(spec, project=project)
+    if secondary is None:
+        return
+    if secondary.is_symlink():
+        _print_secondary_symlink_refused(secondary)
+        return
+    if _secondary_status(spec, project=project) == INSTALL_STATUS_MISSING:
+        return
+    if dry_run:
+        _print_secondary_remove_dry_run(secondary)
+    elif _remove_secondary(spec, project=project):
+        _print_secondary_remove_done(secondary)
+
+
+def _path_looks_like_safelint_install(path: Path) -> bool:
+    """Return True when *path*'s tail matches some registered ``install_relpath``.
+
+    Security guard for ``safelint skill remove --path PATH``. We compare
+    the tail components of *path* against every registered client's
+    ``install_relpath`` (e.g. ``(".cursor", "rules", "safelint.mdc")``
+    for Cursor) and accept on any match. This catches the typical typo
+    case (``--path ~/.config`` instead of ``--path ~/.cursor/...``)
+    while still allowing legitimate unusual install locations whose
+    parent directories happen to be non-standard
+    (e.g. ``~/odd/place/.cursor/rules/safelint.mdc``).
+    """
+    parts = path.parts
+    for spec in _CLIENT_SPECS:
+        relpath = spec.install_relpath
+        if len(parts) >= len(relpath) and parts[-len(relpath) :] == relpath:
+            return True
+    return False
+
+
+def _print_remove_path_unrecognised(path: Path) -> None:
+    """Stderr error emitted when ``--path PATH`` doesn't look like a safelint install."""
+    print(
+        f"safelint: error: refusing to remove {path} — path does not match any registered safelint "
+        "install shape (e.g. '.cursor/rules/safelint.mdc', '.codex/instructions.md'). "
+        "If this is a legitimate unusual install, remove it manually with `rm` after confirming "
+        "the contents.",
+        file=sys.stderr,
+    )
+
+
 def _remove_path(path: Path, *, dry_run: bool) -> int:
-    """Remove an explicit ``--path`` target. Returns 0 on success, 1 if missing."""
+    """Remove an explicit ``--path`` target. Returns 0 on success, 1 on missing or unrecognised path.
+
+    **Security guard:** the path's tail must match some registered
+    client's ``install_relpath`` (see
+    :func:`_path_looks_like_safelint_install`). This prevents typos
+    and shell-expansion accidents (e.g. ``--path ~/.config`` instead
+    of ``--path ~/.cursor/rules/safelint.mdc``) from triggering
+    ``shutil.rmtree`` on the wrong directory. Truly unusual install
+    locations should be removed manually with ``rm``.
+    """
     if not path.exists() and not path.is_symlink():
         _print_remove_path_missing(path)
+        return 1
+    if not _path_looks_like_safelint_install(path):
+        _print_remove_path_unrecognised(path)
         return 1
     shape = "symlink" if path.is_symlink() or (path.is_dir() and _is_symlink_directory_shape(path)) else "copy"
     if dry_run:

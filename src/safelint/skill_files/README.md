@@ -139,9 +139,11 @@ safelint skill remove --symlink
 # Preview removal without deleting
 safelint skill remove --dry-run
 
-# Remove an unusual install location auto-detect won't see
-safelint skill remove --path /unusual/place/safelint.mdc
+# Remove an unusual install location auto-detect won't see (path tail must match a registered install shape)
+safelint skill remove --path /unusual/place/.cursor/rules/safelint.mdc
 ```
+
+> **Security note:** ``--path PATH`` validates that *PATH*'s tail matches a registered install relpath (e.g. `.cursor/rules/safelint.mdc`, `.codex/instructions.md`) before deleting, so a typo like `--path ~/.config` (intending `--path ~/.cursor/...`) won't ``shutil.rmtree`` the wrong directory. The codex secondary install at `AGENTS.md` also refuses to follow symlinks during install / update / remove, so a symlinked `AGENTS.md` won't be read or written through.
 
 ### Where are the bundled files?
 
