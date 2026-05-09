@@ -71,13 +71,33 @@ markdown_extensions:
       custom_checkbox: true
 
 # Site navigation --------------------------------------------------------------
-#
-# Phase 1: whole-file ports. CONFIGURATION and AI_CLIENTS land as single index
-# pages under their section dirs. Phase 2 will split them into multiple pages.
 nav:
   - Home: index.md
-  - Configuration: configuration/index.md
-  - AI client integrations: ai-clients/index.md
+  - Configuration:
+      - Overview: configuration/index.md
+      - CLI flags and commands: configuration/cli.md
+      - Suppression mechanisms: configuration/suppression.md
+      - Configuration file: configuration/toml.md
+      - Rules reference: configuration/rules.md
+  - AI client integrations:
+      - Overview: ai-clients/index.md
+      - Manual install: ai-clients/manual-install.md
+      - Project vs user scope: ai-clients/scope.md
+      - Updating, removing, freshness: ai-clients/lifecycle.md
+      - Troubleshooting: ai-clients/troubleshooting.md
+      - Per-client guides:
+          - Claude Code: ai-clients/clients/claude-code.md
+          - Cursor: ai-clients/clients/cursor.md
+          - GitHub Copilot: ai-clients/clients/github-copilot.md
+          - Gemini: ai-clients/clients/gemini.md
+          - Windsurf: ai-clients/clients/windsurf.md
+          - codex: ai-clients/clients/codex.md
+          - Continue.dev: ai-clients/clients/continue-dev.md
+          - Cline: ai-clients/clients/cline.md
+          - aider: ai-clients/clients/aider.md
+          - Trae: ai-clients/clients/trae.md
+          - Antigravity: ai-clients/clients/antigravity.md
+          - Zed: ai-clients/clients/zed.md
   - JSON output schema: json-schema.md
   - Contributing:
       - Overview: contributing/index.md

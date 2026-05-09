@@ -145,7 +145,7 @@ For each rule that ports, the work is:
 ### 6. Update tests and docs
 
 * Tests under `tests/` should add a per-language test file (e.g. `test_engine_typescript.py`) covering at minimum: discovery picks up the extension, the suppression parser recognises `// nosafe`, and at least one rule fires on a known-bad TS file.
-* `CONFIGURATION.md` rule-by-rule table should grow a "Languages" column.
+* The [Rules reference](../configuration/rules.md) rule-by-rule table should grow a "Languages" column.
 * `README.md` should list the supported languages prominently.
 * `CHANGELOG.md` gets an entry under **Added**.
 

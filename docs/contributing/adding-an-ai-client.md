@@ -222,9 +222,11 @@ The existing Cursor tests are a good template — copy them and substitute paths
 
 Three places to touch:
 
-1. **[AI client integrations](../ai-clients/index.md)** — add a row to the *Supported clients* table; add a *Per-client guides* subsection (markers, install location, how to invoke after install); update the *Roadmap* section so the new client is no longer there.
-2. **[`src/safelint/skill_files/README.md`](https://github.com/shelkesays/safelint/blob/main/src/safelint/skill_files/README.md)** — extend the supported-clients list at the top; update the install examples if the new client has a non-obvious setup.
-3. **[Changelog](../project/changelog.md)** — add an entry under the next release section announcing the support.
+1. **[AI client integrations](../ai-clients/index.md)** — add a row to the *Supported clients* table.
+2. **Per-client guide** — add a new page at `docs/ai-clients/clients/<client>.md` (mirroring the existing per-client pages: markers, install location, how to invoke after install, manual install) and register it under the `nav.AI client integrations.Per-client guides` entry in `mkdocs.yml`.
+3. **[Manual install (`--client`)](../ai-clients/manual-install.md)** — append the `--client <name>` and `--client <name> --project` invocations.
+4. **[`src/safelint/skill_files/README.md`](https://github.com/shelkesays/safelint/blob/main/src/safelint/skill_files/README.md)** — extend the supported-clients list at the top; update the install examples if the new client has a non-obvious setup.
+5. **[Changelog](../project/changelog.md)** — add an entry under the next release section announcing the support.
 
 ### 8. Run the pipeline
 
@@ -270,7 +272,7 @@ Before opening a pull request:
 - [ ] `pyproject.toml` package-data glob covers any new file extension
 - [ ] Tests added: bundled-file existence, copy/symlink user/project, force replace, CLI routing, auto-detection
 - [ ] Pipeline green: `pytest`, `ruff check`, `ruff format --check`, `ty check`, `safelint check src/` all clean at >=97% coverage
-- [ ] Documentation updated: `AI_CLIENTS.md`, `src/safelint/skill_files/README.md`, `CHANGELOG.md`
+- [ ] Documentation updated: `docs/ai-clients/index.md` (Supported clients table), new `docs/ai-clients/clients/<client>.md` page, `docs/ai-clients/manual-install.md`, `mkdocs.yml` nav, `src/safelint/skill_files/README.md`, `CHANGELOG.md`
 - [ ] PR description includes a screenshot or transcript of `safelint skill install --client <new>` succeeding on a fresh project
 
 ## Things to avoid
