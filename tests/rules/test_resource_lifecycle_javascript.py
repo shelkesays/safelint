@@ -161,6 +161,55 @@ def test_js_user_can_extend_tracked_list(tmp_path: Path) -> None:
     assert any(v.code == "SAFE401" for v in result.violations)
 
 
+def test_js_acquirer_in_nested_function_does_not_inherit_outer_try_finally(tmp_path: Path) -> None:
+    """A resource acquirer in a nested function isn't guarded by the OUTER function's try/finally.
+
+    The outer ``finally`` runs when the outer function returns —
+    not when ``setTimeout`` (or any other deferred caller) eventually
+    invokes the nested function. The inner stream needs its own
+    ``try/finally`` (or its own ``using`` declaration) to be safe.
+    Without the function-boundary check in ``_is_inside_try_finally``
+    this case would silently slip past SAFE401.
+    """
+    sample = tmp_path / "nested_callback.js"
+    sample.write_text(
+        "function outer() {\n"
+        "  try {\n"
+        "    setTimeout(function callback() {\n"
+        "      const stream = fs.createReadStream(path);\n"  # NOT guarded by outer finally
+        "      return processStream(stream);\n"
+        "    }, 1000);\n"
+        "  } finally {\n"
+        "    cleanup();\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_acquirer_in_nested_arrow_does_not_inherit_outer_try_finally(tmp_path: Path) -> None:
+    """Same scope-leak hazard as the previous test, but with an arrow function."""
+    sample = tmp_path / "nested_arrow.js"
+    sample.write_text(
+        "function outer() {\n"
+        "  try {\n"
+        "    const handler = () => {\n"
+        "      const stream = fs.createReadStream(path);\n"
+        "      return processStream(stream);\n"
+        "    };\n"
+        "    queue.push(handler);\n"
+        "  } finally {\n"
+        "    cleanup();\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE401" for v in result.violations)
+
+
 def test_js_connect_call_outside_try_finally_fires(tmp_path: Path) -> None:
     """DB / socket ``connect(...)`` calls fire when not in try/finally."""
     sample = tmp_path / "connect.js"

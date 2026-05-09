@@ -118,7 +118,9 @@ COMMENT = "comment"
 # Assignment / declaration shapes — used by the dataflow analyser.
 # JS doesn't separate "annotated assignment" from "regular assignment"
 # the way Python does; type annotations live in the TS grammar, not JS.
-ASSIGNMENT_EXPRESSION = "assignment_expression"
+# Reuse ``ASSIGNMENT_EXPRESSION`` from the *Expressions* section above —
+# kept canonical there because the dataflow analyser also imports it
+# under that grouping.
 AUGMENTED_ASSIGNMENT_EXPRESSION = "augmented_assignment_expression"
 VARIABLE_DECLARATOR = "variable_declarator"  # ``const x = y``, ``let x = y``, ``var x = y``
 LEXICAL_DECLARATION = "lexical_declaration"  # ``const`` / ``let`` wrapper
