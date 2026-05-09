@@ -38,10 +38,7 @@ def test_js_function_with_node_assert_does_not_fire(tmp_path: Path) -> None:
     """``assert(condition)`` (Node assert module) satisfies the rule."""
     sample = tmp_path / "node_assert.js"
     sample.write_text(
-        "function add(a, b) {\n"
-        "  assert(typeof a === 'number');\n"
-        "  return a + b;\n"
-        "}\n",
+        "function add(a, b) {\n  assert(typeof a === 'number');\n  return a + b;\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine().check_file(str(sample))
@@ -52,10 +49,7 @@ def test_js_function_with_assert_equal_does_not_fire(tmp_path: Path) -> None:
     """``assert.equal(a, b)`` — call_name resolves to ``equal`` which is in the default list."""
     sample = tmp_path / "assert_equal.js"
     sample.write_text(
-        "function add(a, b) {\n"
-        "  assert.equal(typeof a, 'number');\n"
-        "  return a + b;\n"
-        "}\n",
+        "function add(a, b) {\n  assert.equal(typeof a, 'number');\n  return a + b;\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine().check_file(str(sample))
@@ -66,10 +60,7 @@ def test_js_function_with_console_assert_does_not_fire(tmp_path: Path) -> None:
     """``console.assert(cond, msg)`` satisfies the rule."""
     sample = tmp_path / "console_assert.js"
     sample.write_text(
-        "function add(a, b) {\n"
-        "  console.assert(typeof a === 'number', 'a must be a number');\n"
-        "  return a + b;\n"
-        "}\n",
+        "function add(a, b) {\n  console.assert(typeof a === 'number', 'a must be a number');\n  return a + b;\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine().check_file(str(sample))
@@ -80,9 +71,7 @@ def test_js_function_with_jest_expect_does_not_fire(tmp_path: Path) -> None:
     """``expect(x).toBe(y)`` (Jest / Chai) — call_name finds ``expect`` in the default list."""
     sample = tmp_path / "jest.js"
     sample.write_text(
-        "function testStuff(x) {\n"
-        "  expect(x).toBe(42);\n"
-        "}\n",
+        "function testStuff(x) {\n  expect(x).toBe(42);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine().check_file(str(sample))

@@ -22,11 +22,7 @@ def test_js_while_true_no_break_fires_safe501(tmp_path: Path) -> None:
     """``while (true) { ... }`` with no break inside fires SAFE501."""
     sample = tmp_path / "infinite.js"
     sample.write_text(
-        "function f() {\n"
-        "  while (true) {\n"
-        "    work();\n"
-        "  }\n"
-        "}\n",
+        "function f() {\n  while (true) {\n    work();\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -37,13 +33,7 @@ def test_js_while_true_with_break_does_not_fire(tmp_path: Path) -> None:
     """``while (true) { ... break; ... }`` is bounded and clean."""
     sample = tmp_path / "bounded.js"
     sample.write_text(
-        "function f(queue) {\n"
-        "  while (true) {\n"
-        "    const item = queue.shift();\n"
-        "    if (item === undefined) break;\n"
-        "    work(item);\n"
-        "  }\n"
-        "}\n",
+        "function f(queue) {\n  while (true) {\n    const item = queue.shift();\n    if (item === undefined) break;\n    work(item);\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -59,11 +49,7 @@ def test_js_while_with_property_access_does_not_fire(tmp_path: Path) -> None:
     """
     sample = tmp_path / "idiomatic.js"
     sample.write_text(
-        "function f(queue) {\n"
-        "  while (queue.length) {\n"
-        "    work(queue.shift());\n"
-        "  }\n"
-        "}\n",
+        "function f(queue) {\n  while (queue.length) {\n    work(queue.shift());\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -74,12 +60,7 @@ def test_js_while_with_function_call_does_not_fire(tmp_path: Path) -> None:
     """``while (token = next())`` (JS-style cursor pattern) does NOT fire."""
     sample = tmp_path / "cursor.js"
     sample.write_text(
-        "function f(stream) {\n"
-        "  let token;\n"
-        "  while ((token = stream.next())) {\n"
-        "    process(token);\n"
-        "  }\n"
-        "}\n",
+        "function f(stream) {\n  let token;\n  while ((token = stream.next())) {\n    process(token);\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -115,12 +96,7 @@ def test_js_break_in_inner_function_does_not_save_outer(tmp_path: Path) -> None:
     # that early-returns. The outer while still has no break.
     sample = tmp_path / "innerfn.js"
     sample.write_text(
-        "function f() {\n"
-        "  while (true) {\n"
-        "    const helper = () => { return; };\n"
-        "    helper();\n"
-        "  }\n"
-        "}\n",
+        "function f() {\n  while (true) {\n    const helper = () => { return; };\n    helper();\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))

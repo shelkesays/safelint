@@ -27,10 +27,7 @@ def test_js_create_read_stream_outside_try_finally_fires(tmp_path: Path) -> None
     """``fs.createReadStream(...)`` called bare in a function body fires SAFE401."""
     sample = tmp_path / "stream.js"
     sample.write_text(
-        "function readData(path) {\n"
-        "  const stream = fs.createReadStream(path);\n"
-        "  return processStream(stream);\n"
-        "}\n",
+        "function readData(path) {\n  const stream = fs.createReadStream(path);\n  return processStream(stream);\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -58,10 +55,7 @@ def test_js_create_server_outside_try_finally_fires(tmp_path: Path) -> None:
     """``http.createServer(...)`` outside try/finally fires."""
     sample = tmp_path / "server.js"
     sample.write_text(
-        "function startServer(port) {\n"
-        "  const server = http.createServer(handler);\n"
-        "  server.listen(port);\n"
-        "}\n",
+        "function startServer(port) {\n  const server = http.createServer(handler);\n  server.listen(port);\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -91,15 +85,7 @@ def test_js_create_read_stream_inside_try_finally_does_not_fire(tmp_path: Path) 
     """Wrapped in ``try { ... } finally { ... }`` — clean."""
     sample = tmp_path / "wrapped.js"
     sample.write_text(
-        "function readData(path) {\n"
-        "  let stream;\n"
-        "  try {\n"
-        "    stream = fs.createReadStream(path);\n"
-        "    return processStream(stream);\n"
-        "  } finally {\n"
-        "    if (stream) stream.close();\n"
-        "  }\n"
-        "}\n",
+        "function readData(path) {\n  let stream;\n  try {\n    stream = fs.createReadStream(path);\n    return processStream(stream);\n  } finally {\n    if (stream) stream.close();\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -110,16 +96,7 @@ def test_js_nested_try_finally_around_call_does_not_fire(tmp_path: Path) -> None
     """An outer try/finally also counts when the call is nested inside."""
     sample = tmp_path / "nested_try.js"
     sample.write_text(
-        "function readData(path) {\n"
-        "  try {\n"
-        "    if (path) {\n"
-        "      const stream = fs.createReadStream(path);\n"
-        "      return processStream(stream);\n"
-        "    }\n"
-        "  } finally {\n"
-        "    cleanup();\n"
-        "  }\n"
-        "}\n",
+        "function readData(path) {\n  try {\n    if (path) {\n      const stream = fs.createReadStream(path);\n      return processStream(stream);\n    }\n  } finally {\n    cleanup();\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -135,14 +112,7 @@ def test_js_try_with_only_catch_no_finally_fires(tmp_path: Path) -> None:
     """``try { stream = ... } catch { }`` (no finally) doesn't satisfy the rule."""
     sample = tmp_path / "try_catch.js"
     sample.write_text(
-        "function readData(path) {\n"
-        "  try {\n"
-        "    const stream = fs.createReadStream(path);\n"
-        "    return processStream(stream);\n"
-        "  } catch (e) {\n"
-        "    console.error(e);\n"
-        "  }\n"
-        "}\n",
+        "function readData(path) {\n  try {\n    const stream = fs.createReadStream(path);\n    return processStream(stream);\n  } catch (e) {\n    console.error(e);\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -195,10 +165,7 @@ def test_js_connect_call_outside_try_finally_fires(tmp_path: Path) -> None:
     """DB / socket ``connect(...)`` calls fire when not in try/finally."""
     sample = tmp_path / "connect.js"
     sample.write_text(
-        "function loadFromDB() {\n"
-        "  const db = connect('postgres://...');\n"
-        "  return db.query('select 1');\n"
-        "}\n",
+        "function loadFromDB() {\n  const db = connect('postgres://...');\n  return db.query('select 1');\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
