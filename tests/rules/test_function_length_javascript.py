@@ -83,12 +83,7 @@ def test_js_async_function_too_long_fires_safe101(tmp_path: Path) -> None:
 
 def test_js_short_function_does_not_fire(tmp_path: Path) -> None:
     """A function under the default 60-line cap produces no SAFE101."""
-    source = (
-        "function short(a, b) {\n"
-        "  if (a > b) return a;\n"
-        "  return b;\n"
-        "}\n"
-    )
+    source = "function short(a, b) {\n  if (a > b) return a;\n  return b;\n}\n"
     sample = tmp_path / "short.js"
     sample.write_text(source, encoding="utf-8")
 
@@ -110,16 +105,8 @@ def test_js_logical_lines_mode_skips_blanks_and_comments(tmp_path: Path) -> None
     """
     # 4 logical lines of code + many blanks + many ``//``-only lines.
     blank_filler = "\n" * 80
-    comment_filler = ("// just a note\n" * 80)
-    source = (
-        "function f() {\n"
-        + blank_filler
-        + comment_filler
-        + "  const a = 1;\n"
-        + "  const b = 2;\n"
-        + "  return a + b;\n"
-        + "}\n"
-    )
+    comment_filler = "// just a note\n" * 80
+    source = "function f() {\n" + blank_filler + comment_filler + "  const a = 1;\n" + "  const b = 2;\n" + "  return a + b;\n" + "}\n"
     sample = tmp_path / "logical.js"
     sample.write_text(source, encoding="utf-8")
 

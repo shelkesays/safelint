@@ -46,10 +46,7 @@ def test_js_taint_through_assignment_fires(tmp_path: Path) -> None:
     """``const y = userInput; eval(y);`` propagates taint through the const declaration."""
     sample = tmp_path / "assign.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const y = userInput;\n"
-        "  eval(y);\n"
-        "}\n",
+        "function f(userInput) {\n  const y = userInput;\n  eval(y);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -75,10 +72,7 @@ def test_js_taint_through_template_string_fires(tmp_path: Path) -> None:
     """Template string with ``${tainted}`` interpolation carries taint."""
     sample = tmp_path / "template.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const y = `prefix ${userInput} suffix`;\n"
-        "  eval(y);\n"
-        "}\n",
+        "function f(userInput) {\n  const y = `prefix ${userInput} suffix`;\n  eval(y);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -89,9 +83,7 @@ def test_js_destructured_param_is_tainted(tmp_path: Path) -> None:
     """``function f({userInput}) { eval(userInput); }`` — destructured params are taint sources."""
     sample = tmp_path / "destruct.js"
     sample.write_text(
-        "function f({userInput, other}) {\n"
-        "  eval(userInput);\n"
-        "}\n",
+        "function f({userInput, other}) {\n  eval(userInput);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -102,9 +94,7 @@ def test_js_array_destructured_param_is_tainted(tmp_path: Path) -> None:
     """``function f([userInput, ...rest]) { ... }`` — array-destructured params are tainted."""
     sample = tmp_path / "array_destruct.js"
     sample.write_text(
-        "function f([userInput, ...rest]) {\n"
-        "  Function(userInput);\n"
-        "}\n",
+        "function f([userInput, ...rest]) {\n  Function(userInput);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -115,9 +105,7 @@ def test_js_sanitizer_clears_taint(tmp_path: Path) -> None:
     """``eval(escape(userInput))`` does NOT fire — escape is a sanitizer."""
     sample = tmp_path / "sanitize.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  eval(escape(userInput));\n"
-        "}\n",
+        "function f(userInput) {\n  eval(escape(userInput));\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -128,9 +116,7 @@ def test_js_dompurify_sanitizer(tmp_path: Path) -> None:
     """``DOMPurify`` is in the default sanitizer list."""
     sample = tmp_path / "dompurify.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  eval(DOMPurify(userInput));\n"
-        "}\n",
+        "function f(userInput) {\n  eval(DOMPurify(userInput));\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -141,10 +127,7 @@ def test_js_source_call_injects_taint(tmp_path: Path) -> None:
     """``prompt()`` is in the default source list — its result is tainted."""
     sample = tmp_path / "source.js"
     sample.write_text(
-        "function f() {\n"
-        "  const userInput = prompt('enter:');\n"
-        "  eval(userInput);\n"
-        "}\n",
+        "function f() {\n  const userInput = prompt('enter:');\n  eval(userInput);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -166,10 +149,7 @@ def test_js_assume_taint_preserving_false_drops_unknown_calls(tmp_path: Path) ->
     """With ``assume_taint_preserving = false``, taint through unknown wrappers is dropped."""
     sample = tmp_path / "wrapper.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const y = wrap(userInput);\n"
-        "  eval(y);\n"
-        "}\n",
+        "function f(userInput) {\n  const y = wrap(userInput);\n  eval(y);\n}\n",
         encoding="utf-8",
     )
     # Default mode: taint flows through unknown ``wrap``.
@@ -317,10 +297,7 @@ def test_js_taint_through_destructured_assignment(tmp_path: Path) -> None:
     """``const {a} = userInput;`` propagates taint through object destructuring."""
     sample = tmp_path / "destruct_assign.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const {value} = userInput;\n"
-        "  eval(value);\n"
-        "}\n",
+        "function f(userInput) {\n  const {value} = userInput;\n  eval(value);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -331,10 +308,7 @@ def test_js_taint_through_array_destructuring(tmp_path: Path) -> None:
     """``const [a, ...rest] = userInput;`` propagates taint to every bound name."""
     sample = tmp_path / "array_destruct_assign.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const [first, ...rest] = userInput;\n"
-        "  eval(first);\n"
-        "}\n",
+        "function f(userInput) {\n  const [first, ...rest] = userInput;\n  eval(first);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -345,10 +319,7 @@ def test_js_taint_through_object_destruct_alias(tmp_path: Path) -> None:
     """``const {key: alias} = userInput;`` taints alias, not key."""
     sample = tmp_path / "alias_destruct.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const {key: alias} = userInput;\n"
-        "  eval(alias);\n"
-        "}\n",
+        "function f(userInput) {\n  const {key: alias} = userInput;\n  eval(alias);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -359,11 +330,7 @@ def test_js_taint_through_augmented_assignment(tmp_path: Path) -> None:
     """``x += userInput;`` taints x via aug-assignment."""
     sample = tmp_path / "aug.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  let x = '';\n"
-        "  x += userInput;\n"
-        "  eval(x);\n"
-        "}\n",
+        "function f(userInput) {\n  let x = '';\n  x += userInput;\n  eval(x);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -374,10 +341,7 @@ def test_js_taint_through_binary_expression(tmp_path: Path) -> None:
     """``const x = 'prefix' + userInput;`` taints via string concat."""
     sample = tmp_path / "concat.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const x = 'prefix' + userInput;\n"
-        "  eval(x);\n"
-        "}\n",
+        "function f(userInput) {\n  const x = 'prefix' + userInput;\n  eval(x);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -388,10 +352,7 @@ def test_js_taint_through_ternary(tmp_path: Path) -> None:
     """``const x = cond ? userInput : 'safe';`` taints through ternary."""
     sample = tmp_path / "ternary.js"
     sample.write_text(
-        "function f(userInput, cond) {\n"
-        "  const x = cond ? userInput : 'safe';\n"
-        "  eval(x);\n"
-        "}\n",
+        "function f(userInput, cond) {\n  const x = cond ? userInput : 'safe';\n  eval(x);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -402,10 +363,7 @@ def test_js_taint_through_array_literal(tmp_path: Path) -> None:
     """``const arr = [userInput, 'safe'];`` taints via array literal."""
     sample = tmp_path / "arr.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const arr = [userInput, 'safe'];\n"
-        "  eval(arr);\n"
-        "}\n",
+        "function f(userInput) {\n  const arr = [userInput, 'safe'];\n  eval(arr);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -416,10 +374,7 @@ def test_js_taint_through_member_expression(tmp_path: Path) -> None:
     """``const x = userInput.field;`` taints x because the receiver is tainted."""
     sample = tmp_path / "member.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const x = userInput.field;\n"
-        "  eval(x);\n"
-        "}\n",
+        "function f(userInput) {\n  const x = userInput.field;\n  eval(x);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -430,10 +385,7 @@ def test_js_taint_through_subscript_expression(tmp_path: Path) -> None:
     """``const x = userInput[0];`` taints x because the receiver is tainted."""
     sample = tmp_path / "sub.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const x = userInput[0];\n"
-        "  eval(x);\n"
-        "}\n",
+        "function f(userInput) {\n  const x = userInput[0];\n  eval(x);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -444,10 +396,7 @@ def test_js_taint_through_parenthesized(tmp_path: Path) -> None:
     """``const x = (userInput);`` propagates through parens."""
     sample = tmp_path / "paren.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const x = (userInput);\n"
-        "  eval(x);\n"
-        "}\n",
+        "function f(userInput) {\n  const x = (userInput);\n  eval(x);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -458,9 +407,7 @@ def test_js_taint_expr_arg_to_sink(tmp_path: Path) -> None:
     """A non-identifier expression arg to a sink reports as ``<expr>``."""
     sample = tmp_path / "expr.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  eval(userInput + 'suffix');\n"
-        "}\n",
+        "function f(userInput) {\n  eval(userInput + 'suffix');\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -473,10 +420,7 @@ def test_js_assignment_with_no_value_does_not_crash(tmp_path: Path) -> None:
     """``var x;`` (no initial value) shouldn't crash the analyser."""
     sample = tmp_path / "novalue.js"
     sample.write_text(
-        "function f() {\n"
-        "  var x;\n"
-        "  return x;\n"
-        "}\n",
+        "function f() {\n  var x;\n  return x;\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -487,10 +431,7 @@ def test_js_template_string_no_substitution(tmp_path: Path) -> None:
     """A plain template string (no ``${...}``) is not tainted, even with tainted vars in scope."""
     sample = tmp_path / "plain_template.js"
     sample.write_text(
-        "function f(userInput) {\n"
-        "  const x = `plain template`;\n"
-        "  eval(x);\n"
-        "}\n",
+        "function f(userInput) {\n  const x = `plain template`;\n  eval(x);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -501,9 +442,7 @@ def test_js_default_value_param_is_tainted(tmp_path: Path) -> None:
     """``function f(x = 5)`` — the param ``x`` is a taint source via assignment_pattern."""
     sample = tmp_path / "default_param.js"
     sample.write_text(
-        "function f(userInput = 'fallback') {\n"
-        "  eval(userInput);\n"
-        "}\n",
+        "function f(userInput = 'fallback') {\n  eval(userInput);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -514,9 +453,7 @@ def test_js_pair_pattern_param_taints_alias(tmp_path: Path) -> None:
     """``function f({key: alias})`` — the alias is the bound (and tainted) name."""
     sample = tmp_path / "pair_pattern.js"
     sample.write_text(
-        "function f({raw: userInput}) {\n"
-        "  eval(userInput);\n"
-        "}\n",
+        "function f({raw: userInput}) {\n  eval(userInput);\n}\n",
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))

@@ -27,10 +27,7 @@ def test_js_get_function_with_console_log_fires_safe303(tmp_path: Path) -> None:
     """A function named ``getX`` that calls ``console.log`` is hidden I/O."""
     sample = tmp_path / "hidden.js"
     sample.write_text(
-        "function getUser(id) {\n"
-        "  console.log('fetching');\n"
-        "  return id;\n"
-        "}\n",
+        "function getUser(id) {\n  console.log('fetching');\n  return id;\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -44,10 +41,7 @@ def test_js_calculate_function_with_fetch_fires_safe303(tmp_path: Path) -> None:
     """``calculate*`` calling ``fetch()`` is hidden network I/O."""
     sample = tmp_path / "hiddenfetch.js"
     sample.write_text(
-        "function calculateTotal(items) {\n"
-        "  fetch('/api/total');\n"
-        "  return items.length;\n"
-        "}\n",
+        "function calculateTotal(items) {\n  fetch('/api/total');\n  return items.length;\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -59,10 +53,7 @@ def test_js_validate_function_with_fs_readfile_fires_safe303(tmp_path: Path) -> 
     """``validate*`` calling ``fs.readFile`` is hidden file I/O."""
     sample = tmp_path / "validate.js"
     sample.write_text(
-        "function validateConfig(path) {\n"
-        "  const data = fs.readFile(path);\n"
-        "  return data;\n"
-        "}\n",
+        "function validateConfig(path) {\n  const data = fs.readFile(path);\n  return data;\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -93,10 +84,7 @@ def test_js_io_named_function_with_io_does_not_fire(tmp_path: Path) -> None:
     """A function named to signal I/O (no pure-prefix match) doesn't fire SAFE303."""
     sample = tmp_path / "intentional.js"
     sample.write_text(
-        "function logUser(id) {\n"
-        "  console.log(id);\n"
-        "  return id;\n"
-        "}\n",
+        "function logUser(id) {\n  console.log(id);\n  return id;\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -112,10 +100,7 @@ def test_js_unnamed_function_with_console_log_fires_safe304(tmp_path: Path) -> N
     """A function whose name doesn't signal I/O fires SAFE304 on ``console.log``."""
     sample = tmp_path / "unnamed.js"
     sample.write_text(
-        "function processOrder(order) {\n"
-        "  console.log('processing');\n"
-        "  return order;\n"
-        "}\n",
+        "function processOrder(order) {\n  console.log('processing');\n  return order;\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))

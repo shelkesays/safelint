@@ -27,9 +27,7 @@ def test_js_globalthis_assignment_fires_safe302(tmp_path: Path) -> None:
     """``globalThis.x = 1`` inside a function fires SAFE302."""
     sample = tmp_path / "g1.js"
     sample.write_text(
-        "function setCounter(n) {\n"
-        "  globalThis.counter = n;\n"
-        "}\n",
+        "function setCounter(n) {\n  globalThis.counter = n;\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -105,8 +103,7 @@ def test_js_top_level_assignment_does_not_fire(tmp_path: Path) -> None:
     """Module-level ``globalThis.x = 1`` (outside any function) is module setup, not the bug."""
     sample = tmp_path / "top.js"
     sample.write_text(
-        "globalThis.appConfig = {debug: true};\n"
-        "globalThis.startTime = Date.now();\n",
+        "globalThis.appConfig = {debug: true};\nglobalThis.startTime = Date.now();\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -128,8 +125,7 @@ def test_js_read_global_does_not_fire(tmp_path: Path) -> None:
     """Reading a global (no write) doesn't fire — only mutations do."""
     sample = tmp_path / "read.js"
     sample.write_text(
-        "function getEnv() { return globalThis.env; }\n"
-        "function getUserAgent() { return window.navigator.userAgent; }\n",
+        "function getEnv() { return globalThis.env; }\nfunction getUserAgent() { return window.navigator.userAgent; }\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -140,10 +136,7 @@ def test_js_nested_function_isolation(tmp_path: Path) -> None:
     """Inner function's globals don't get attributed to the outer function."""
     sample = tmp_path / "nested.js"
     sample.write_text(
-        "function outer() {\n"
-        "  function inner() { globalThis.x = 1; }\n"
-        "  return inner;\n"
-        "}\n",
+        "function outer() {\n  function inner() { globalThis.x = 1; }\n  return inner;\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))

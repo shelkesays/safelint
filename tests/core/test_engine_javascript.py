@@ -79,8 +79,7 @@ def test_engine_parses_js_file_with_no_python_rules_firing(tmp_path: Path) -> No
     """
     sample = tmp_path / "ok.js"
     sample.write_text(
-        "function add(a, b) { return a + b; }\n"
-        "const result = add(1, 2);\n",
+        "function add(a, b) { return a + b; }\nconst result = add(1, 2);\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -92,8 +91,7 @@ def test_engine_parses_mjs_file(tmp_path: Path) -> None:
     """``.mjs`` (ES module) files are accepted by the JS parser."""
     sample = tmp_path / "module.mjs"
     sample.write_text(
-        "export function add(a, b) { return a + b; }\n"
-        "import { other } from './other.mjs';\n",
+        "export function add(a, b) { return a + b; }\nimport { other } from './other.mjs';\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))

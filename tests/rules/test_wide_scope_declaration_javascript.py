@@ -127,11 +127,7 @@ def test_js_for_let_does_not_fire(tmp_path: Path) -> None:
     """``for (let i = 0; ...)`` is the safe form — ``i`` is block-scoped to the loop."""
     sample = tmp_path / "for_let.js"
     sample.write_text(
-        "function f(arr) {\n"
-        "  for (let i = 0; i < arr.length; i++) {\n"
-        "    arr[i] = i * 2;\n"
-        "  }\n"
-        "}\n",
+        "function f(arr) {\n  for (let i = 0; i < arr.length; i++) {\n    arr[i] = i * 2;\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -170,9 +166,7 @@ def test_python_file_does_not_fire_safe305(tmp_path: Path) -> None:
     """SAFE305 is JS-only — Python files don't trigger it (engine's per-language dispatch)."""
     sample = tmp_path / "code.py"
     sample.write_text(
-        "x = 1\n"
-        "def f():\n"
-        "    return x\n",
+        "x = 1\ndef f():\n    return x\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))

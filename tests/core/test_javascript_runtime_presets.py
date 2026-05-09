@@ -192,10 +192,7 @@ def test_load_config_applies_browser_preset(tmp_path: Path, monkeypatch: pytest.
 def test_load_config_user_explicit_overrides_preset(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """User's explicit ``_javascript`` config still wins over the preset."""
     (tmp_path / "safelint.toml").write_text(
-        '[javascript]\nruntime = "browser"\n'
-        "\n"
-        "[rules.global_mutation]\n"
-        'global_namespaces_javascript = ["myCustomGlobal"]\n',
+        '[javascript]\nruntime = "browser"\n\n[rules.global_mutation]\nglobal_namespaces_javascript = ["myCustomGlobal"]\n',
         encoding="utf-8",
     )
     monkeypatch.chdir(tmp_path)

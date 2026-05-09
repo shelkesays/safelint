@@ -268,27 +268,14 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
     cross_lang_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript")}
     js_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("javascript",)}
     assert cross_lang_actual == _RULES_WIDENED_FOR_JAVASCRIPT, (
-        f"Cross-language allow-list out of sync. "
-        f"Actually ('python', 'javascript'): {sorted(cross_lang_actual)}; "
-        f"documented: {sorted(_RULES_WIDENED_FOR_JAVASCRIPT)}"
+        f"Cross-language allow-list out of sync. Actually ('python', 'javascript'): {sorted(cross_lang_actual)}; documented: {sorted(_RULES_WIDENED_FOR_JAVASCRIPT)}"
     )
-    assert js_only_actual == _RULES_JAVASCRIPT_ONLY, (
-        f"JS-only allow-list out of sync. "
-        f"Actually ('javascript',): {sorted(js_only_actual)}; "
-        f"documented: {sorted(_RULES_JAVASCRIPT_ONLY)}"
-    )
+    assert js_only_actual == _RULES_JAVASCRIPT_ONLY, f"JS-only allow-list out of sync. Actually ('javascript',): {sorted(js_only_actual)}; documented: {sorted(_RULES_JAVASCRIPT_ONLY)}"
 
     for cls in ALL_RULES:
         if cls.__name__ in _RULES_WIDENED_FOR_JAVASCRIPT:
-            assert cls.language == ("python", "javascript"), (
-                f"{cls.__name__} should be ('python', 'javascript'); got {cls.language}"
-            )
+            assert cls.language == ("python", "javascript"), f"{cls.__name__} should be ('python', 'javascript'); got {cls.language}"
         elif cls.__name__ in _RULES_JAVASCRIPT_ONLY:
-            assert cls.language == ("javascript",), (
-                f"{cls.__name__} should be ('javascript',); got {cls.language}"
-            )
+            assert cls.language == ("javascript",), f"{cls.__name__} should be ('javascript',); got {cls.language}"
         else:
-            assert cls.language == ("python",), (
-                f"{cls.__name__} has unexpected language={cls.language}; "
-                f"add it to _RULES_WIDENED_FOR_JAVASCRIPT or _RULES_JAVASCRIPT_ONLY if intentional"
-            )
+            assert cls.language == ("python",), f"{cls.__name__} has unexpected language={cls.language}; add it to _RULES_WIDENED_FOR_JAVASCRIPT or _RULES_JAVASCRIPT_ONLY if intentional"

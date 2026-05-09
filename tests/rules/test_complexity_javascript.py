@@ -48,11 +48,7 @@ def test_js_short_circuit_operators_count(tmp_path: Path) -> None:
     """``&&`` / ``||`` / ``??`` each add 1 to complexity."""
     # Short-circuit ops in a return expression — each counts 1.
     # Complexity = 1 (base) + 11 short-circuits = 12 > 10
-    source = (
-        "function f(a, b, c, d, e) {\n"
-        "  return a && b && c && d && e || a || b || c || d || e ?? a;\n"
-        "}\n"
-    )
+    source = "function f(a, b, c, d, e) {\n  return a && b && c && d && e || a || b || c || d || e ?? a;\n}\n"
     sample = tmp_path / "shortcircuit.js"
     sample.write_text(source, encoding="utf-8")
 
@@ -102,15 +98,7 @@ def test_js_simple_function_does_not_fire(tmp_path: Path) -> None:
 def test_js_loops_and_catch_count(tmp_path: Path) -> None:
     """``for`` / ``for…in`` / ``while`` / ``do`` / ``catch`` each add 1."""
     # 1 (base) + for + for_in + while + do + catch = 6
-    source = (
-        "function f(items, x) {\n"
-        "  for (let i = 0; i < 10; i++) {}\n"
-        "  for (const k in items) {}\n"
-        "  while (x) {}\n"
-        "  do {} while (x);\n"
-        "  try {} catch (e) {}\n"
-        "}\n"
-    )
+    source = "function f(items, x) {\n  for (let i = 0; i < 10; i++) {}\n  for (const k in items) {}\n  while (x) {}\n  do {} while (x);\n  try {} catch (e) {}\n}\n"
     sample = tmp_path / "loops.js"
     sample.write_text(source, encoding="utf-8")
 
