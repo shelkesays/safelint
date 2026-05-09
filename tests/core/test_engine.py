@@ -225,6 +225,11 @@ _RULES_WIDENED_FOR_JAVASCRIPT: frozenset[str] = frozenset(
         "NestingDepthRule",
         "MaxArgumentsRule",
         "ComplexityRule",
+        # Slice 3: error-handling and side-effects rules.
+        "EmptyExceptRule",
+        "LoggingOnErrorRule",
+        "SideEffectsHiddenRule",
+        "SideEffectsRule",
     }
 )
 

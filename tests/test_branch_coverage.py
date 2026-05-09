@@ -30,7 +30,7 @@ from safelint.core.engine import LintResult, SafetyEngine, _nosafe_codes
 from safelint.core.runner import run
 from safelint.languages._node_utils import call_name as _call_name
 from safelint.rules.base import Violation
-from safelint.rules.error_handling import _except_body
+from safelint.rules.error_handling import _catch_body
 
 
 if TYPE_CHECKING:
@@ -250,8 +250,8 @@ def test_resource_lifecycle_with_missing_value_field(tmp_path: Path) -> None:
     SafetyEngine(DEFAULTS).check_file(str(sample))
 
 
-def test_error_handling_except_body_fallback() -> None:
-    """``_except_body`` falls back to the last named child when the ``body``
+def test_error_handling_catch_body_fallback() -> None:
+    """``_catch_body`` falls back to the last named child when the ``body``
     field isn't directly present — exercise via a tree-sitter parse."""
     lang = tree_sitter.Language(tree_sitter_python.language())
     parser = tree_sitter.Parser(lang)
@@ -259,7 +259,7 @@ def test_error_handling_except_body_fallback() -> None:
     # Find the except_clause node.
     try_node = tree.root_node.children[0]
     except_node = next(c for c in try_node.children if c.type == "except_clause")
-    body = _except_body(except_node)
+    body = _catch_body(except_node)
     # Either field-based or named_children-based fallback should yield a block.
     assert body is not None
 

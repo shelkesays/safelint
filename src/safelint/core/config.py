@@ -92,7 +92,25 @@ DEFAULTS: dict[str, Any] = {
         "side_effects_hidden": {
             "enabled": True,
             "severity": "error",
+            # Per-language I/O primitive lists. Adding both keys here
+            # rather than a single shared list avoids Python false
+            # positives on calls like ``logger.error()`` (where
+            # ``call_name`` returns ``"error"``) — the JS list is only
+            # consulted on ``.js`` / ``.mjs`` / ``.cjs`` files.
             "io_functions": ["open", "print", "input", "subprocess"],
+            "io_functions_javascript": [
+                "log",  # console.log
+                "error",  # console.error
+                "warn",  # console.warn
+                "info",  # console.info
+                "debug",  # console.debug
+                "fetch",  # network I/O
+                "readFile",
+                "writeFile",
+                "readFileSync",
+                "writeFileSync",
+                "open",  # fs.open
+            ],
             "pure_prefixes": [
                 "calculate",
                 "compute",
@@ -114,7 +132,22 @@ DEFAULTS: dict[str, Any] = {
         "side_effects": {
             "enabled": True,
             "severity": "warning",
+            # Per-language defaults — see the note on ``side_effects_hidden``
+            # above. ``io_name_keywords`` and the rule's general structure
+            # are language-agnostic; only the I/O primitive list differs.
             "io_functions": ["open", "print", "input"],
+            "io_functions_javascript": [
+                "log",
+                "error",
+                "warn",
+                "info",
+                "debug",
+                "fetch",
+                "readFile",
+                "writeFile",
+                "readFileSync",
+                "writeFileSync",
+            ],
             "io_name_keywords": [
                 "print",
                 "log",

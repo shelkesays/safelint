@@ -106,14 +106,29 @@ def node_text(node: tree_sitter.Node) -> str:
     return node.text.decode("utf-8") if node.text else ""
 
 
+#: Tree-sitter node types that represent a function-call expression
+#: across every registered language. Use ``node.type in CALL_TYPES``
+#: instead of importing per-language constants when a rule needs to
+#: walk calls without caring about source language. (Python emits
+#: ``call``; JavaScript emits ``call_expression``.)
+CALL_TYPES: frozenset[str] = frozenset({"call", "call_expression"})
+
+
 def call_name(call_node: tree_sitter.Node) -> str | None:
-    """Return the bare callable name from a ``call`` node, or None if unresolvable.
+    """Return the bare callable name from a call node, or None if unresolvable.
 
-    Handles two forms:
-    - ``foo(...)``         → returns ``"foo"``
-    - ``obj.method(...)``  → returns ``"method"``
+    Handles four forms across the languages safelint registers:
 
-    This replaces ``BaseRule._call_name(node.func)`` from the old code.
+    * Python ``foo(...)``           — function field is ``identifier`` → ``"foo"``
+    * Python ``obj.method(...)``    — function field is ``attribute``  → ``"method"``
+    * JavaScript ``foo(...)``       — function field is ``identifier`` → ``"foo"``
+    * JavaScript ``obj.method(...)``— function field is ``member_expression`` → ``"method"``
+
+    Returns ``None`` for callees the rule layer can't resolve to a
+    bareword (subscripted calls like ``x[0]()``, immediately-invoked
+    function expressions, etc.) — rules that filter on call name then
+    naturally skip those.
+
     Callers must pass the call node itself (not the function sub-node).
     """
     func_node = call_node.child_by_field_name("function")
@@ -122,6 +137,11 @@ def call_name(call_node: tree_sitter.Node) -> str | None:
     if func_node.type == "identifier":
         return node_text(func_node)
     if func_node.type == "attribute":
+        # Python: ``obj.method``. Property is the ``attribute`` field.
         attr_node = func_node.child_by_field_name("attribute")
         return node_text(attr_node) if attr_node else None
+    if func_node.type == "member_expression":
+        # JavaScript: ``obj.method``. Property is the ``property`` field.
+        prop_node = func_node.child_by_field_name("property")
+        return node_text(prop_node) if prop_node else None
     return None
