@@ -216,14 +216,46 @@ def test_base_rule_default_language_is_python_only() -> None:
     assert BaseRule.language == ("python",)
 
 
-def test_every_registered_rule_inherits_python_default() -> None:
-    """No registered rule has widened its language tuple yet.
+_RULES_WIDENED_FOR_JAVASCRIPT: frozenset[str] = frozenset(
+    {
+        # Slice 2: structural rules ported to JavaScript. Each one's
+        # ``language`` tuple should be exactly ``("python", "javascript")``;
+        # silent drift past this allow-list is what the assertion catches.
+        "FunctionLengthRule",
+        "NestingDepthRule",
+        "MaxArgumentsRule",
+        "ComplexityRule",
+    }
+)
 
-    When the second language lands, contributors revisit per-rule
-    portability and widen ``language`` on the cross-language ones
-    (e.g. ``("python", "typescript")``). Today every registered rule
-    should still match the BaseRule default — flag if anyone has
-    diverged silently.
+
+def test_widened_rules_match_the_documented_allow_list() -> None:
+    """The set of rules with non-default ``language`` matches the documented allow-list.
+
+    Catches two failure modes:
+
+    * A rule silently grows its language tuple (e.g. someone adds
+      ``"typescript"`` mid-port without finishing the work). The allow-list
+      surfaces that as a test failure rather than letting half-ported
+      behaviour ship.
+    * A rule listed here regresses to the default ``("python",)`` —
+      the test fails too, prompting the contributor to remove the entry
+      from the allow-list along with the deliberate scope reduction.
     """
+    widened_actual = {cls.__name__ for cls in ALL_RULES if cls.language != ("python",)}
+    assert widened_actual == _RULES_WIDENED_FOR_JAVASCRIPT, (
+        f"Widened-rules allow-list out of sync. "
+        f"Actually widened: {sorted(widened_actual)}; "
+        f"documented: {sorted(_RULES_WIDENED_FOR_JAVASCRIPT)}"
+    )
+
     for cls in ALL_RULES:
-        assert cls.language == ("python",), f"{cls.__name__} has widened language to {cls.language}; expected ('python',) until second-language work begins"
+        if cls.__name__ in _RULES_WIDENED_FOR_JAVASCRIPT:
+            assert cls.language == ("python", "javascript"), (
+                f"{cls.__name__} should be ('python', 'javascript'); got {cls.language}"
+            )
+        else:
+            assert cls.language == ("python",), (
+                f"{cls.__name__} has unexpected language={cls.language}; "
+                f"add it to _RULES_WIDENED_FOR_JAVASCRIPT if intentional"
+            )
