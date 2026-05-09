@@ -10,6 +10,6 @@
   # filetype tags pre-commit recognises; safelint then drops anything
   # that isn't in ``supported_extensions()``. Add the new tag here
   # when registering a new language (e.g. ``- ts`` for TypeScript).
-  types_or: [python]
+  types_or: [python, javascript]
   args: [--fail-on=error]
   files: ^src/

@@ -24,6 +24,7 @@ classifiers = [
 dependencies = [
     "tree-sitter>=0.23.0",
     "tree-sitter-python>=0.23.0",
+    "tree-sitter-javascript>=0.23.0",
 ]
 
 [project.urls]
