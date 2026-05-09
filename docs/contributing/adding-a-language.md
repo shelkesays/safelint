@@ -1,6 +1,6 @@
-# Adding a new language to safelint
+# Adding a new language to SafeLint
 
-This guide is the cheat sheet for adding support for a new programming language (TypeScript, Go, Rust, etc.) to safelint. The architecture was prepared with multi-language in mind; the moving parts you need to understand and the steps you need to follow are below.
+This guide is the cheat sheet for adding support for a new programming language (TypeScript, Go, Rust, etc.) to SafeLint. The architecture was prepared with multi-language in mind; the moving parts you need to understand and the steps you need to follow are below.
 
 !!! note
 
@@ -91,7 +91,7 @@ That's enough for safelint to **discover and parse** TypeScript files. None of t
 
 ### 4. Watch out for: block-comment `nosafe` directives
 
-The current `_parse_suppressions` in `core/engine.py` walks `comment` nodes from the Tree-sitter tree and treats each as a single line-style directive. For languages with `/* … */` block comments (TypeScript, Go, Rust, C, …), a multi-line `nosafe` block comment **may need extra handling** — the directive should still apply to the line containing the closing `*/` (or whatever line carries the violation).
+The current `_parse_directives` in `core/engine.py` walks `comment` nodes from the Tree-sitter tree and treats each as a single line-style directive. For languages with `/* … */` block comments (TypeScript, Go, Rust, C, …), a multi-line `nosafe` block comment **may need extra handling** — the directive should still apply to the line containing the closing `*/` (or whatever line carries the violation).
 
 If the grammar emits block comments as the same `comment` node type and the parser's `start_point[0]` aligns with the violation's line, you're fine. Otherwise, the safest path is to add per-language helpers for "extract suppression line ranges from a comment node" rather than the current single-line assumption. A future refactor — flag and handle when you hit it.
 
@@ -186,7 +186,7 @@ Concretely:
 
 ## Things to leave alone
 
-* Don't touch `_parse_suppressions` itself unless block-comment handling is genuinely needed; the current impl is generic via `LanguageDefinition`.
+* Don't touch `_parse_directives` itself unless block-comment handling is genuinely needed; the current impl is generic via `LanguageDefinition`. (The `_parse_suppressions` / `_parse_file_level_ignores` wrappers it backs are thin re-exports for unit tests — modify the underlying `_parse_directives` if you need to change the comment-walk logic.)
 * Don't touch the cache layer — keys are content-hashed and language-agnostic.
 * Don't refactor the rule registry to support per-language filtering pre-emptively. Add it the first time a Python-only rule needs to be skipped on a non-Python file.
 
