@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.languages._node_utils import call_name, resolve_lang_name, walk
+from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import CALL, WITH_ITEM
 from safelint.rules.base import BaseRule
 
@@ -64,23 +65,40 @@ def _iter_with_items(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
 
 
 def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
-    """Return True if *node* has an enclosing ``try_statement`` with a ``finally_clause``.
+    """Return True if *node* has an enclosing guarding try/finally within the same function scope.
 
     Walks the parent chain (Tree-sitter Node exposes ``.parent``) and
     short-circuits on the first ``try_statement`` whose children include a
-    ``finally_clause``. Multiple nested try-statements are tolerated: an
-    outer ``try { ... } finally { ... }`` still counts as guarding a
-    deeply-nested call.
+    ``finally_clause``. Multiple nested try-statements within the same
+    function are tolerated: an outer ``try { ... } finally { ... }``
+    still counts as guarding a deeply-nested call inside that function.
 
-    Heuristic: this rule doesn't verify that the ``finally`` block
-    actually closes the resource — only that *some* finally exists.
-    Catches the most common "I opened a stream and forgot to handle
-    cleanup at all" case while staying simple. False negatives possible
-    for try-finally blocks that don't actually clean up; users with
-    those patterns can suppress with ``// nosafe: SAFE401``.
+    **Stops at function boundaries.** If the walk crosses a JavaScript
+    function-defining node (``function_declaration``, ``arrow_function``,
+    ``method_definition``, etc.) before finding a guarding ``try_statement``,
+    the call is *not* guarded — the outer function's ``finally`` block
+    runs when the *outer* function returns, not when the inner function
+    is invoked later (e.g. via ``setTimeout(callback, 1000)``). Without
+    this boundary check the rule would silently miss the most common
+    leak pattern of all: an acquirer call inside a callback / arrow /
+    method nested in an unrelated outer try/finally.
+
+    Heuristic: the rule still doesn't verify that the ``finally`` block
+    actually closes the resource — only that *some* finally exists in
+    the same function scope. Catches the common "I opened a stream and
+    forgot to handle cleanup at all" case while staying simple.
+    False positives are possible for try-finally blocks that don't
+    actually clean up; users with those patterns can suppress with
+    ``// nosafe: SAFE401``.
     """
     cur = node.parent
     while cur is not None:
+        if cur.type in _JS_FUNCTION_TYPES:
+            # Walked out of the call's function scope without finding a
+            # guarding try/finally — anything further up belongs to a
+            # different function whose ``finally`` doesn't run when this
+            # call eventually executes.
+            return False
         if _try_statement_has_finally(cur):
             return True
         cur = cur.parent
