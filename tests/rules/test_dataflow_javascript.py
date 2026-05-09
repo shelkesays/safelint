@@ -479,3 +479,35 @@ def test_js_new_function_with_tainted_arg_fires(tmp_path: Path) -> None:
     assert len(safe801) == 1
     assert "Function" in safe801[0].message
     assert "userInput" in safe801[0].message
+
+
+def test_js_taint_through_await_expression_fires(tmp_path: Path) -> None:
+    """``const x = await transform(input)`` — taint flows through ``await``.
+
+    Without ``await_expression`` in the spreading set, awaited values
+    silently drop their taint, leaving every async sink reachable via
+    ``await`` invisible to SAFE801 — a major false-negative gap for
+    real-world JS where almost every taint-carrying network call is
+    awaited.
+    """
+    sample = tmp_path / "await.js"
+    sample.write_text(
+        "async function f(input) {\n  const x = await transform(input);\n  eval(x);\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    safe801 = [v for v in result.violations if v.code == "SAFE801"]
+    assert len(safe801) == 1
+    assert "eval" in safe801[0].message
+
+
+def test_js_taint_through_destructuring_default_fires(tmp_path: Path) -> None:
+    """``const [a = '', b] = arr`` — default-valued destructuring still binds ``a``."""
+    sample = tmp_path / "destructure_default.js"
+    sample.write_text(
+        "function f(arr) {\n  const [a = '', b] = arr;\n  eval(a);\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    safe801 = [v for v in result.violations if v.code == "SAFE801"]
+    assert len(safe801) == 1

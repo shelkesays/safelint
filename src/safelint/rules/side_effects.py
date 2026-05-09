@@ -47,6 +47,33 @@ def _first_io_call(func_node: tree_sitter.Node, io_funcs: frozenset[str], functi
     return None
 
 
+def _func_display_name(func_node: tree_sitter.Node) -> str:
+    """Return the function's effective name for display / prefix matching.
+
+    Direct ``name`` field wins (Python ``def foo``, JS named function
+    declarations). Anonymous JS forms (``arrow_function``,
+    ``function_expression`` without a name) have no ``name`` field but
+    are usually bound through a surrounding ``const x = () => ...`` /
+    ``let x = function() {}``; in that shape Tree-sitter makes the
+    function expression a child of a ``variable_declarator`` whose
+    ``name`` field carries the binding identifier — surface that
+    identifier as the effective name. Without this fallback,
+    ``const fetchUser = () => ...`` renders as ``<anonymous>`` *and*
+    the SAFE303 ``pure_prefixes`` check (which matches against the
+    name's lowercase prefix) silently drops every named arrow binding
+    that's exactly the case the rule is designed to catch.
+    """
+    name_node = func_node.child_by_field_name("name")
+    if name_node is not None:
+        return node_text(name_node)
+    parent = func_node.parent
+    if parent is not None and parent.type == "variable_declarator":
+        binding = parent.child_by_field_name("name")
+        if binding is not None:
+            return node_text(binding)
+    return "<anonymous>"
+
+
 class SideEffectsHiddenRule(BaseRule):
     """Reject functions with pure-sounding names that perform I/O."""
 
@@ -67,13 +94,7 @@ class SideEffectsHiddenRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
-            name_node = node.child_by_field_name("name")
-            # Anonymous JS forms (arrow functions, function expressions
-            # without a name) have no ``name`` field — without an explicit
-            # fallback the violation message would render as
-            # ``Function "" ...`` which is unhelpful. Match the
-            # ``<anonymous>`` fallback used by the structural rules.
-            func_name = node_text(name_node) if name_node else "<anonymous>"
+            func_name = _func_display_name(node)
             name_lower = func_name.lower()
             if not any(name_lower.startswith(p) or name_lower == p.rstrip("_") for p in pure_prefixes):
                 continue
@@ -111,13 +132,7 @@ class SideEffectsRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
-            name_node = node.child_by_field_name("name")
-            # Anonymous JS forms (arrow functions, function expressions
-            # without a name) have no ``name`` field — without an explicit
-            # fallback the violation message would render as
-            # ``Function "" ...`` which is unhelpful. Match the
-            # ``<anonymous>`` fallback used by the structural rules.
-            func_name = node_text(name_node) if name_node else "<anonymous>"
+            func_name = _func_display_name(node)
             name_lower = func_name.lower()
             if any(kw in name_lower for kw in io_keywords):
                 continue

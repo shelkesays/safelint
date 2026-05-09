@@ -165,3 +165,41 @@ def test_js_logging_in_nested_function_does_not_satisfy_outer(tmp_path: Path) ->
     result = _engine().check_file(str(sample))
     safe203 = [v for v in result.violations if v.code == "SAFE203"]
     assert len(safe203) == 1
+
+
+def test_js_catch_throw_different_identifier_requires_logging(tmp_path: Path) -> None:
+    """``catch (e) { throw freshError; }`` is NOT a re-raise — logging still required.
+
+    The original ``e`` is still in scope and could be lost; the rule
+    must require logging unless the throw operand is exactly the
+    caught binding.
+    """
+    sample = tmp_path / "throw_other.js"
+    sample.write_text(
+        "function f() {\n  try {\n    risky();\n  } catch (e) {\n    throw freshError;\n  }\n}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE203" for v in result.violations)
+
+
+def test_js_catch_no_binding_throw_requires_logging(tmp_path: Path) -> None:
+    """``catch { throw e; }`` — no caught binding, so any throw is a fresh error."""
+    sample = tmp_path / "throw_no_binding.js"
+    sample.write_text(
+        "function f() {\n  try {\n    risky();\n  } catch {\n    throw outerErr;\n  }\n}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE203" for v in result.violations)
+
+
+def test_js_catch_throw_caught_binding_does_not_fire(tmp_path: Path) -> None:
+    """``catch (e) { throw e; }`` — exact binding match is the only legit re-raise."""
+    sample = tmp_path / "throw_caught.js"
+    sample.write_text(
+        "function f() {\n  try {\n    risky();\n  } catch (e) {\n    throw e;\n  }\n}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE203" for v in result.violations)

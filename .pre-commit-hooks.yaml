@@ -12,4 +12,3 @@
   # when registering a new language (e.g. ``- ts`` for TypeScript).
   types_or: [python, javascript]
   args: [--fail-on=error]
-  files: ^src/
