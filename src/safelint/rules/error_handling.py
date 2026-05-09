@@ -361,11 +361,7 @@ class LoggingOnErrorRule(BaseRule):
         body = _catch_body(except_node)
         if body is None:  # pragma: no cover
             return False
-        return any(
-            call_name(node) in self._LOG_METHODS
-            for node in walk(body, skip_types=tuple(function_types))
-            if node.type in CALL_TYPES
-        )
+        return any(call_name(node) in self._LOG_METHODS for node in walk(body, skip_types=tuple(function_types)) if node.type in CALL_TYPES)
 
     def _is_unlogged(self, except_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str]) -> bool:
         """Return True when this catch clause swallows an error without logging."""

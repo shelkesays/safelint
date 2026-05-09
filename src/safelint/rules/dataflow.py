@@ -282,11 +282,7 @@ class ReturnValueIgnoredRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag bare calls whose return value is discarded."""
         lang_name = resolve_lang_name(filepath)
-        flagged = (
-            frozenset(self.config.get("flagged_calls", self._DEFAULT_FLAGGED))
-            if lang_name == "python"
-            else frozenset(self.config.get("flagged_calls_javascript", []))
-        )
+        flagged = frozenset(self.config.get("flagged_calls", self._DEFAULT_FLAGGED)) if lang_name == "python" else frozenset(self.config.get("flagged_calls_javascript", []))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type != EXPRESSION_STATEMENT:

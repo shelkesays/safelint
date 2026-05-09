@@ -28,16 +28,10 @@ def _python_has_assertion(func_node: tree_sitter.Node, function_types: frozenset
     Skips nested function bodies so the outer function isn't credited
     for asserts that live inside an inner ``def``.
     """
-    return any(
-        c.type == ASSERT_STATEMENT
-        for c in walk(func_node, skip_types=tuple(function_types))
-        if c is not func_node
-    )
+    return any(c.type == ASSERT_STATEMENT for c in walk(func_node, skip_types=tuple(function_types)) if c is not func_node)
 
 
-def _javascript_has_assertion(
-    func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str]
-) -> bool:
+def _javascript_has_assertion(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str]) -> bool:
     """Return True when the function body contains a call to a configured assertion function.
 
     JS doesn't have a built-in ``assert`` keyword (``assert`` is just a
