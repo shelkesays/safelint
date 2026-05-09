@@ -170,3 +170,39 @@ def test_js_python_io_list_does_not_leak_into_js(tmp_path: Path) -> None:
     )
     result = _engine().check_file(str(sample))
     assert not any(v.code == "SAFE304" for v in result.violations)
+
+
+def test_js_anonymous_arrow_with_io_uses_anonymous_fallback(tmp_path: Path) -> None:
+    """A nameless arrow function that calls I/O fires SAFE304 with ``<anonymous>`` in the message.
+
+    Regression guard: the JS function-defining nodes (``arrow_function``,
+    ``function_expression``) have no ``name`` field. Without an explicit
+    fallback the message would render as ``Function "" calls I/O primitive
+    "log"`` — unreadable and visually identical to a real bug. The
+    ``<anonymous>`` fallback matches the structural rules' behaviour
+    (SAFE101 etc.) and signals the cause directly.
+    """
+    sample = tmp_path / "anon.js"
+    sample.write_text(
+        "queue.push(() => { console.log('processing'); });\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    safe304 = [v for v in result.violations if v.code == "SAFE304"]
+    assert len(safe304) == 1
+    assert "<anonymous>" in safe304[0].message
+    # Defensive: the obviously-wrong empty-name form is gone.
+    assert 'Function ""' not in safe304[0].message
+
+
+def test_js_anonymous_function_expression_uses_anonymous_fallback(tmp_path: Path) -> None:
+    """``function () { console.log(...); }`` (anonymous function expression) — same fallback."""
+    sample = tmp_path / "anon_fn.js"
+    sample.write_text(
+        "queue.push(function () { console.log('processing'); });\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    safe304 = [v for v in result.violations if v.code == "SAFE304"]
+    assert len(safe304) == 1
+    assert "<anonymous>" in safe304[0].message
