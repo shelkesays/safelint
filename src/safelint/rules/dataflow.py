@@ -30,7 +30,8 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": _JS_FUNCTION_TYPES,
 }
 
-# Python parameter shapes — same as Slice 2's max_arguments rule.
+# Python parameter shapes — kept in sync with the same set in
+# safelint.rules.max_arguments to avoid drift.
 _PY_PARAM_TYPES = frozenset(
     {
         "identifier",

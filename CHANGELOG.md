@@ -7,6 +7,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0] - 2026-05-09
+
+**JavaScript (Node) is now a supported language alongside Python.** Six commits across five infrastructure slices land registry-driven multi-language support: `.js` / `.mjs` / `.cjs` files are discovered, parsed via Tree-sitter, and run against 15 of the 19 user-facing rules. Python users see no behaviour change beyond the v1.12.2 `.pyw` bugfix; the additive language work is what justifies this release as `1.13.0` (per the project's semver rules: scope expansion is MINOR, never MAJOR).
+
+### Added
+
+- **`safelint.languages.javascript`** — new module registering JavaScript with `LanguageDefinition(name="javascript", file_extensions=frozenset({".js", ".mjs", ".cjs"}), comment_node_type="comment", comment_prefix="//")`. Plus the JS Tree-sitter node-type constants every rule needs (function/control-flow/expression/statement/pattern types).
+- **`tree-sitter-javascript>=0.23.0`** runtime dependency. Peer of the existing `tree-sitter-python` dep.
+- **`safelint.analysis.dataflow_javascript`** — new module with `JsTaintTracker`, the JavaScript counterpart of the Python `TaintTracker`. Same public surface; per-language node-type vocabulary internally. Handles `const` / `let` / `var` declarations, `assignment_expression` / `augmented_assignment_expression`, template-string interpolation (`\`${expr}\``), destructuring (array / object / rest / pair patterns), spread elements, member / subscript propagation, and the `assume_taint_preserving` knob.
+- **15 rules now lint JavaScript** with `language=("python", "javascript")`:
+  - **Structural:** `function_length` (SAFE101), `nesting_depth` (SAFE102), `max_arguments` (SAFE103), `complexity` (SAFE104).
+  - **Error handling + side-effects:** `empty_except` (SAFE202 — JS empty catch), `logging_on_error` (SAFE203 — recognises `console.*` and generic `logger.*` plus `throw <id>;` as re-raise), `side_effects_hidden` (SAFE303), `side_effects` (SAFE304).
+  - **Loop / tests / assertions:** `unbounded_loops` (SAFE501 — only the `while (true)` no-break case fires on JS; the non-comparison-condition heuristic stays Python-only), `missing_assertions` (SAFE601 — walks for *calls* to `assert` / `expect` / `console.assert` / Node's `assert.*` helpers), `test_existence` (SAFE701) and `test_coupling` (SAFE702 — pair Python `test_<stem>.py` *and* JS `<stem>.test.{js,mjs,cjs}` / `<stem>.spec.{js,mjs,cjs}`).
+  - **Dataflow:** `tainted_sink` (SAFE801), `return_value_ignored` (SAFE802), `null_dereference` (SAFE803 — recognises optional chaining `foo?.bar` as the safe form, exempt from the rule).
+- **Per-language config keys** (additive — existing user TOMLs unchanged):
+  - `[tool.safelint.rules.side_effects_hidden]` and `[...].side_effects` get `io_functions_javascript`.
+  - `[...].missing_assertions]` gets `assertion_calls_javascript`.
+  - `[...].tainted_sink]` gets `sinks_javascript`, `sanitizers_javascript`, `sources_javascript`.
+  - `[...].return_value_ignored]` gets `flagged_calls_javascript`.
+  - `[...].null_dereference]` gets `nullable_methods_javascript`.
+- **`CALL_TYPES`** frozenset and **`resolve_lang_name`** helper in `safelint.languages._node_utils` — cross-language utilities used by the widened rules.
+- **Bundled AI-client skills** — `src/safelint/skill_files/languages/javascript.md` (the JS shared addendum) ships a full per-rule notes table, idiomatic-fix patterns for each of the 15 ported rules, and the "rules that stay Python-only" reference. All 12 client docs (Claude Code's `SKILL.md`, Cursor's `cursor/safelint.mdc`, GitHub Copilot's `copilot/copilot-instructions.md`, Gemini's `gemini/GEMINI.md`, Windsurf's `windsurf/safelint-rules.md`, codex's `codex/instructions.md`, Continue.dev's `continue/safelint.md`, Cline's `cline/safelint.md`, aider's `aider/CONVENTIONS.md`, Trae's `trae/safelint.md`, Antigravity's `antigravity/safelint.md`, Zed's `zed/safelint.md`) gained a JavaScript row in their **Step 2 — Identify the language(s) involved** registry tables.
+- **115 new tests** distributed across per-rule JS test files (`tests/rules/test_*_javascript.py`) and the engine-level smoke test file (`tests/core/test_engine_javascript.py`). Total: 764 tests pass at 97.25% coverage.
+
+### Changed
+
+- **Pre-commit hook spec** (`.pre-commit-hooks.yaml`) and **the in-tree self-development hook** (`.pre-commit-config.yaml`) — `types_or: [python]` becomes `types_or: [python, javascript]`. Downstream users with mixed Python + JS repos automatically have both filetypes routed to safelint after upgrade.
+- **`call_name`** in `_node_utils.py` extended (during Slice 3) to handle JavaScript `member_expression` (`obj.method(...)`) alongside Python `attribute` (`obj.method(...)`). Both `foo(...)` forms (bare identifier function calls) continue to resolve via the existing `identifier` branch.
+
+### Stays Python-only (by design)
+
+Four rules don't have a clean JavaScript translation and remain registered for Python only — they will not fire on `.js` / `.mjs` / `.cjs` files. The decision rationale lives in `src/safelint/skill_files/languages/javascript.md` "Rules that stay Python-only".
+
+- **SAFE201 `bare_except`** — Python `except:` (no exception type) silently catches `KeyboardInterrupt` and `SystemExit`. JS `try/catch` always binds the caught error; the equivalent process-signal hazard doesn't exist.
+- **SAFE301 `global_state` / SAFE302 `global_mutation`** — Python `global` keyword has no clean JS equivalent. JS scoping (`var` / `let` / `const`, `globalThis.x`, `window.x`) is fundamentally different.
+- **SAFE401 `resource_lifecycle`** — Python `with` blocks have no clean JS analogue. JS resource patterns (callback `fs.open`, promise-returning APIs, the new `using` declarations) vary widely; a useful rule needs a separate per-pattern analysis.
+
+### Behaviour changes (heads-up)
+
+- **JS-only projects** — anyone who had `safelint check` running on a Python repo with stray `.js` files: those files will now be discovered, parsed, and linted (most rules will fire). If that's not what you want, scope-suppress with `[tool.safelint.per_file_ignores]` keyed on the `.js` glob, or set `enabled = false` per rule.
+- **Mixed Python + JS projects** — both file types now flow through pre-commit and `safelint check` automatically. The 15 widened rules apply to both languages with their per-language defaults.
+- **Pure-Python projects** — no behaviour change. Every rule's Python codepath is byte-equivalent to v1.12.2.
+
+### Limitations documented for future enhancement
+
+- **Block-style `nosafe` directives** (`/* nosafe */`) are not recognised — only line-style `// nosafe` and `// safelint: ignore`. Documented in the JS shared addendum and `docs/contributing/adding-a-language.md` Step 4.
+- **JSX (`.jsx`)** is not registered. `tree-sitter-javascript` parses some JSX leniently as a superset, but flagging it as a separate language registration later avoids accidental drift in rule semantics.
+- **TypeScript (`.ts` / `.tsx`)** is a separate language addition — not in this release.
+- **Arrow-function naming via variable binding** (`const getX = () => ...`) — the rules that read function names via `func_node.child_by_field_name("name")` don't resolve through the parent `variable_declarator`. SAFE303 (pure-named function with hidden I/O) doesn't fire on `getX = () => console.log(...)`. Documented limitation; can be enhanced later by walking up to the binding.
+
 ## [1.12.2] - 2026-05-09
 
 Completion of the multi-language readiness work started in v1.12.1. The engine, cache, suppression parser, file discovery, and per-rule dispatch were already registry-driven, but three CLI helpers and the published pre-commit hook spec still hard-coded `.py`. With this release every supported-extension check reads from `safelint.languages.supported_extensions()`, so registering a new language is genuinely additive — drop a `LanguageDefinition` into `languages/<lang>.py`, append it to the registry loop, append the new filetype tag to `types_or` in `.pre-commit-hooks.yaml`, and the CLI discovers it everywhere automatically.
@@ -343,7 +393,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.12.2...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.13.0...HEAD
+[1.13.0]: https://github.com/shelkesays/safelint/compare/v1.12.2...v1.13.0
 [1.12.2]: https://github.com/shelkesays/safelint/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/shelkesays/safelint/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/shelkesays/safelint/compare/v1.11.0...v1.12.0

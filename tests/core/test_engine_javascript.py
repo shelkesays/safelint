@@ -1,13 +1,13 @@
-"""End-to-end smoke tests for JavaScript (Node) support — Slice 1 of the rollout.
+"""End-to-end smoke tests for JavaScript (Node) language registration.
 
-This file covers the language-registry plumbing: ``.js`` / ``.mjs`` / ``.cjs``
-files are discovered, the JavaScript parser handles them, parse errors surface
-as ``SAFE000``, and Python-only rules (which still default to
-``language=("python",)``) are correctly skipped on JS files.
+Covers the language-registry plumbing: ``.js`` / ``.mjs`` / ``.cjs``
+files are discovered, the JavaScript parser handles them, parse errors
+surface as ``SAFE000``, and Python-only rules are correctly skipped on
+JS files (the engine's per-language dispatch is exercised here).
 
-When Slice 2 widens individual rules to ``("python", "javascript")``, those
-rules will need their own per-language test files (``test_function_length_js.py``
-etc.). This file stays focused on the cross-language plumbing.
+Per-rule JavaScript behaviour lives in dedicated test files under
+``tests/rules/test_*_javascript.py`` — this file stays focused on the
+cross-language plumbing.
 """
 
 from __future__ import annotations
@@ -70,10 +70,12 @@ def test_javascript_language_definition_basics() -> None:
 def test_engine_parses_js_file_with_no_python_rules_firing(tmp_path: Path) -> None:
     """A clean JS file produces zero violations (Python-only rules are filtered out).
 
-    Slice 1 hasn't widened any rule's ``language`` tuple yet, so every
-    registered rule still defaults to ``("python",)`` and the engine
-    skips them all on a ``.js`` file. Result: a structurally-valid JS
-    file is parsed and reports zero violations.
+    Sample is small enough that no widened rule fires (function is
+    short, has no nesting, no I/O, no taint flow). Verifies the
+    engine parses the file and returns no violations rather than
+    crashing on an empty rule list — the per-language dispatch
+    correctly invokes only the rules whose ``language`` tuple
+    includes ``"javascript"``.
     """
     sample = tmp_path / "ok.js"
     sample.write_text(
