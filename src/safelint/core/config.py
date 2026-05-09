@@ -388,6 +388,403 @@ DEFAULTS: dict[str, Any] = {
 
 
 # ---------------------------------------------------------------------------
+# JavaScript runtime presets
+# ---------------------------------------------------------------------------
+#
+# JavaScript source is JavaScript source — the parser, AST, and rule logic
+# are runtime-agnostic. But the *defaults* baked into ``DEFAULTS["rules"]``
+# (sinks / sanitisers / sources / I/O verbs / nullable methods / resource
+# acquirers / global namespaces) are Node-flavoured today: ``fs.readFile``,
+# ``createReadStream``, ``process.env``, ``child_process.exec``, etc.
+#
+# Other JavaScript runtimes (Browser / Deno / Cloudflare Workers / Bun /
+# WASM-hosted JS engines) expose different APIs. Users select one via:
+#
+#   [tool.safelint.javascript]
+#   runtime = "browser"   # or "deno" / "cloudflare-workers" / "bun" / "node"
+#
+# The named preset overrides Node defaults *before* the user's TOML is
+# merged in — so an explicit ``[tool.safelint.rules.tainted_sink]
+# sinks_javascript = […]`` in the user's config still wins, even when a
+# runtime is selected. The default runtime is ``"node"`` so existing
+# users see no behaviour change.
+#
+# To add a new preset: add a ``"<name>"`` entry below with the same
+# nested shape as ``DEFAULTS["rules"]`` (only the keys you want to
+# override). To add a new language whose runtime varies similarly,
+# follow the same pattern with a ``[tool.safelint.<lang>] runtime``
+# selector.
+
+_JS_VALID_RUNTIMES: frozenset[str] = frozenset({"node", "browser", "deno", "cloudflare-workers", "bun"})
+
+_JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
+    # ``node`` is the baseline — equal to DEFAULTS, so the preset is empty
+    # (no overrides needed). Listed for completeness so unknown-runtime
+    # validation can compare against the full set of accepted names.
+    "node": {},
+    # ``browser`` — Web APIs (DOM, fetch, localStorage, BroadcastChannel,
+    # observers). No Node fs / child_process / process surface.
+    "browser": {
+        "rules": {
+            "tainted_sink": {
+                "sinks_javascript": [
+                    "eval",
+                    "Function",
+                    "execScript",  # legacy IE / DOM
+                    "setTimeout",
+                    "setInterval",
+                    "write",  # document.write
+                    "writeln",
+                ],
+                "sources_javascript": [
+                    "prompt",
+                    "confirm",
+                    "getItem",  # localStorage / sessionStorage
+                ],
+            },
+            "return_value_ignored": {
+                # Browser DOM mutation / event-API methods whose return
+                # value carries success/failure or registration handles
+                # that need cleanup.
+                "flagged_calls_javascript": [
+                    "setItem",
+                    "removeItem",
+                    "clear",
+                    "addEventListener",
+                    "dispatchEvent",
+                    "postMessage",
+                ],
+            },
+            "null_dereference": {
+                "nullable_methods_javascript": [
+                    # DOM lookups that return null on miss:
+                    "getElementById",
+                    "querySelector",
+                    "closest",
+                    "getAttribute",
+                    "getNamedItem",
+                    # Common collection methods:
+                    "find",
+                    "pop",
+                    "shift",
+                    # Regex / string match:
+                    "exec",
+                    "match",
+                ],
+            },
+            "resource_lifecycle": {
+                # Browser has no fs surface; the resources that need
+                # cleanup are observers / workers / streams / sockets.
+                "tracked_functions_javascript": [
+                    "Worker",
+                    "SharedWorker",
+                    "EventSource",
+                    "WebSocket",
+                    "BroadcastChannel",
+                    "IntersectionObserver",
+                    "MutationObserver",
+                    "ResizeObserver",
+                    "PerformanceObserver",
+                    "ReadableStream",
+                    "WritableStream",
+                    "TransformStream",
+                ],
+            },
+            "global_mutation": {
+                "global_namespaces_javascript": [
+                    "globalThis",
+                    "window",
+                    "self",
+                    "document",
+                    # Drop ``global`` and ``process`` — Node-only.
+                ],
+            },
+            "side_effects_hidden": {
+                "io_functions_javascript": [
+                    "log",
+                    "error",
+                    "warn",
+                    "info",
+                    "debug",
+                    "fetch",
+                    "setItem",
+                    "getItem",
+                    "removeItem",
+                    "appendChild",
+                    "removeChild",
+                    "replaceChild",
+                ],
+            },
+            "side_effects": {
+                "io_functions_javascript": [
+                    "log",
+                    "error",
+                    "warn",
+                    "info",
+                    "debug",
+                    "fetch",
+                    "setItem",
+                    "removeItem",
+                ],
+            },
+        },
+    },
+    # ``deno`` — ``Deno.*`` APIs + Web APIs. No Node-style ``fs`` /
+    # ``child_process`` / ``process``.
+    "deno": {
+        "rules": {
+            "tainted_sink": {
+                "sinks_javascript": [
+                    "eval",
+                    "Function",
+                    "run",  # Deno.run (deprecated but still seen)
+                    "Command",  # Deno.Command (newer)
+                    "setTimeout",
+                    "setInterval",
+                ],
+                "sources_javascript": [
+                    "prompt",
+                    "readLine",
+                    "read",  # Deno.stdin.read
+                    "readTextFile",
+                ],
+            },
+            "return_value_ignored": {
+                "flagged_calls_javascript": [
+                    "writeFile",
+                    "writeTextFile",
+                    "remove",
+                    "rename",
+                    "mkdir",
+                    "chmod",
+                    "chown",
+                    "truncate",
+                    "write",
+                    "send",
+                ],
+            },
+            "null_dereference": {
+                "nullable_methods_javascript": [
+                    "find",
+                    "pop",
+                    "shift",
+                    "get",  # Map.get / Headers.get
+                    "exec",
+                    "match",
+                ],
+            },
+            "resource_lifecycle": {
+                "tracked_functions_javascript": [
+                    # ``call_name`` extracts the method, not the namespace:
+                    "open",  # Deno.open
+                    "openSync",
+                    "connect",  # Deno.connect / connectTls
+                    "listen",  # Deno.listen / listenTls
+                    "create",  # Deno.create
+                    "createSync",
+                ],
+            },
+            "global_mutation": {
+                "global_namespaces_javascript": [
+                    "globalThis",
+                    "self",
+                    "Deno",
+                    # Drop window, global, process
+                ],
+            },
+            "side_effects_hidden": {
+                "io_functions_javascript": [
+                    "log",
+                    "error",
+                    "warn",
+                    "info",
+                    "debug",
+                    "fetch",
+                    "readFile",
+                    "readTextFile",
+                    "writeFile",
+                    "writeTextFile",
+                    "open",
+                    "create",
+                ],
+            },
+            "side_effects": {
+                "io_functions_javascript": [
+                    "log",
+                    "error",
+                    "warn",
+                    "info",
+                    "debug",
+                    "fetch",
+                    "readFile",
+                    "readTextFile",
+                    "writeFile",
+                    "writeTextFile",
+                ],
+            },
+        },
+    },
+    # ``cloudflare-workers`` — Workers Runtime (V8 isolates with Web APIs +
+    # KV / Durable Objects / R2). No fs surface.
+    "cloudflare-workers": {
+        "rules": {
+            "tainted_sink": {
+                "sinks_javascript": [
+                    "eval",
+                    "Function",
+                    "setTimeout",
+                    "setInterval",
+                ],
+                "sources_javascript": [
+                    # Request body methods carry untrusted user input:
+                    "text",
+                    "json",
+                    "formData",
+                    "arrayBuffer",
+                    "blob",
+                ],
+            },
+            "return_value_ignored": {
+                "flagged_calls_javascript": [
+                    "put",  # KV.put, R2.put
+                    "delete",
+                    "send",
+                    "addEventListener",
+                ],
+            },
+            "null_dereference": {
+                "nullable_methods_javascript": [
+                    "get",  # KV.get returns null for missing keys
+                    "find",
+                    "pop",
+                    "shift",
+                    "exec",
+                    "match",
+                ],
+            },
+            "resource_lifecycle": {
+                # Workers has very few resource-lifecycle concerns —
+                # WebSocket pairs being the main one.
+                "tracked_functions_javascript": [
+                    "WebSocketPair",
+                ],
+            },
+            "global_mutation": {
+                "global_namespaces_javascript": [
+                    "globalThis",
+                    "self",
+                    # No window / document / global / process
+                ],
+            },
+            "side_effects_hidden": {
+                "io_functions_javascript": [
+                    "log",
+                    "error",
+                    "warn",
+                    "info",
+                    "debug",
+                    "fetch",
+                    "put",
+                    "delete",
+                    "get",  # KV.get
+                ],
+            },
+            "side_effects": {
+                "io_functions_javascript": [
+                    "log",
+                    "error",
+                    "warn",
+                    "info",
+                    "debug",
+                    "fetch",
+                    "put",
+                    "delete",
+                ],
+            },
+        },
+    },
+    # ``bun`` — mostly Node-compatible API surface plus ``Bun.*`` extras.
+    # Defaults equal to Node with a couple of Bun-specific additions
+    # (``Bun.spawn``, ``Bun.serve``, ``Bun.file`` — call names ``spawn``
+    # / ``serve`` / ``file`` mostly already in the Node defaults).
+    "bun": {
+        "rules": {
+            "resource_lifecycle": {
+                "tracked_functions_javascript": [
+                    # Inherit Node's defaults; add Bun.serve which keeps
+                    # an HTTP server alive for the lifetime of the process.
+                    "createReadStream",
+                    "createWriteStream",
+                    "openSync",
+                    "createServer",
+                    "createConnection",
+                    "connect",
+                    "createWorker",
+                    "serve",  # Bun.serve
+                    "listen",  # net.listen / Bun.listen
+                ],
+            },
+        },
+    },
+}
+
+
+def _apply_javascript_runtime_preset(defaults: dict[str, Any], runtime: str) -> None:
+    """Modify *defaults* in place to apply the JS runtime preset.
+
+    No-op when the runtime is ``"node"`` (defaults already encode that
+    runtime) or when the runtime is unknown — unknown-runtime warnings
+    are emitted by the caller via ``_diagnostics.print_warning``.
+
+    The preset's nested shape mirrors ``DEFAULTS``: each key is a path
+    into ``DEFAULTS["rules"][...]``, with values that *replace* the
+    Node default for that rule. The user's TOML is then deep-merged on
+    top, so explicit user overrides still win.
+    """
+    preset = _JS_RUNTIME_PRESETS.get(runtime)
+    if not preset:
+        return
+    for rule_name, rule_overrides in preset.get("rules", {}).items():
+        target = defaults["rules"].setdefault(rule_name, {})
+        for key, value in rule_overrides.items():
+            target[key] = value
+
+
+def _resolve_javascript_runtime(cfg: dict[str, Any]) -> str:
+    """Extract the JS runtime selector from *cfg* (user TOML), defaulting to ``"node"``.
+
+    Validates the value: unknown runtimes surface as a stderr warning
+    via :mod:`safelint.core._diagnostics` and fall back to ``"node"``.
+    Type errors (non-string ``runtime``) surface the same way.
+    """
+    js_section = cfg.get("javascript", {})
+    if not isinstance(js_section, dict):
+        from safelint.core import _diagnostics  # noqa: PLC0415  — circular avoidance
+
+        _diagnostics.print_warning(
+            f"[tool.safelint.javascript] must be a table, got {type(js_section).__name__} — falling back to runtime='node'",
+        )
+        return "node"
+    runtime = js_section.get("runtime", "node")
+    if not isinstance(runtime, str):
+        from safelint.core import _diagnostics  # noqa: PLC0415
+
+        _diagnostics.print_warning(
+            f"[tool.safelint.javascript].runtime must be a string, got {type(runtime).__name__} — falling back to 'node'",
+        )
+        return "node"
+    if runtime not in _JS_VALID_RUNTIMES:
+        from safelint.core import _diagnostics  # noqa: PLC0415
+
+        valid = ", ".join(sorted(_JS_VALID_RUNTIMES))
+        _diagnostics.print_warning(
+            f"[tool.safelint.javascript].runtime={runtime!r} is not recognised (valid: {valid}) — falling back to 'node'",
+        )
+        return "node"
+    return runtime
+
+
+# ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
@@ -679,5 +1076,13 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
         if cfg is None:
             cfg = _try_pyproject(parent)
         if cfg is not None:
-            return _apply_extend_keys(deep_merge(copy.deepcopy(DEFAULTS), cfg))
+            # Apply the JS runtime preset (if any) to a fresh copy of
+            # DEFAULTS *before* the user's TOML is merged in. The
+            # preset replaces Node defaults with browser / deno /
+            # cloudflare-workers / bun equivalents; the user's
+            # explicit ``_javascript`` config keys then win over the
+            # preset via the deep_merge that follows.
+            defaults_with_preset = copy.deepcopy(DEFAULTS)
+            _apply_javascript_runtime_preset(defaults_with_preset, _resolve_javascript_runtime(cfg))
+            return _apply_extend_keys(deep_merge(defaults_with_preset, cfg))
     return copy.deepcopy(DEFAULTS)
