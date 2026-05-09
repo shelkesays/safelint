@@ -273,12 +273,16 @@ class EmptyExceptRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every catch handler whose body is effectively empty."""
         lang_name = resolve_lang_name(filepath)
+        # Match the violation message to the source language's terminology —
+        # JavaScript developers don't write ``except`` blocks. Same
+        # Python/JS message-selection pattern as ``LoggingOnErrorRule``.
+        message = (
+            "Empty catch block - add error handling or a logging call"
+            if lang_name == "javascript"
+            else "Empty except block - add error handling or a logging call"
+        )
         return [
-            self._make_violation_for_node(
-                filepath,
-                clause,
-                "Empty except block - add error handling or a logging call",
-            )
+            self._make_violation_for_node(filepath, clause, message)
             for clause in _iter_catch_clauses(tree, lang_name)
             if _is_noop_body(_catch_body(clause), lang_name)
         ]
