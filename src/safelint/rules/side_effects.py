@@ -4,8 +4,10 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import call_name, node_text, walk
-from safelint.languages.python import ASYNC_FUNCTION_DEF, CALL, FUNCTION_DEF
+from safelint.languages import get_language_for_file
+from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, walk
+from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.rules.base import BaseRule
 
 
@@ -15,10 +17,30 @@ if TYPE_CHECKING:
     from safelint.rules.base import Violation
 
 
-def _first_io_call(func_node: tree_sitter.Node, io_funcs: frozenset[str]) -> tree_sitter.Node | None:
+_FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
+    "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
+    "javascript": _JS_FUNCTION_TYPES,
+}
+
+
+def _io_funcs_for_lang(rule_config: dict, lang_name: str, fallback: list[str]) -> frozenset[str]:
+    """Resolve the active I/O-primitive set for *lang_name* against the rule's config.
+
+    Per-language config is keyed by ``io_functions`` (Python, the default)
+    and ``io_functions_<lang>`` for non-Python languages. Adding a new
+    language is additive — drop a new ``io_functions_<lang>`` list into
+    ``DEFAULTS["rules"]`` and the lookup picks it up.
+    """
+    if lang_name == "python":
+        return frozenset(rule_config.get("io_functions", fallback))
+    key = f"io_functions_{lang_name}"
+    return frozenset(rule_config.get(key, []))
+
+
+def _first_io_call(func_node: tree_sitter.Node, io_funcs: frozenset[str], function_types: frozenset[str]) -> tree_sitter.Node | None:
     """Return the first I/O call inside *func_node* (skipping nested defs), or None."""
-    for child in walk(func_node, skip_types=(FUNCTION_DEF, ASYNC_FUNCTION_DEF)):
-        if child.type != CALL:
+    for child in walk(func_node, skip_types=tuple(function_types)):
+        if child.type not in CALL_TYPES:
             continue
         name = call_name(child)
         if name and name in io_funcs:
@@ -31,24 +53,28 @@ class SideEffectsHiddenRule(BaseRule):
 
     name = "side_effects_hidden"
     code = "SAFE303"
+    language = ("python", "javascript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
-        io_funcs: frozenset[str] = frozenset(self.config.get("io_functions", ["open", "print", "input"]))
+        lang = get_language_for_file(filepath)
+        assert lang is not None, "engine guarantees a registered language at this point"
+        function_types = _FUNCTION_TYPES_BY_LANG[lang.name]
+        io_funcs = _io_funcs_for_lang(self.config, lang.name, ["open", "print", "input"])
         # Normalise both sides of the comparison so user-supplied prefixes
         # like ``["Get", "Calculate"]`` still match ``get_data`` / ``calculate_x``.
         pure_prefixes: tuple[str, ...] = tuple(p.lower() for p in self.config.get("pure_prefixes", []))
 
         violations = []
         for node in walk(tree.root_node):
-            if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
+            if node.type not in function_types:
                 continue
             name_node = node.child_by_field_name("name")
             func_name = node_text(name_node) if name_node else ""
             name_lower = func_name.lower()
             if not any(name_lower.startswith(p) or name_lower == p.rstrip("_") for p in pure_prefixes):
                 continue
-            io_call = _first_io_call(node, io_funcs)
+            io_call = _first_io_call(node, io_funcs, function_types)
             if io_call:
                 io_name = call_name(io_call) or "<unknown>"
                 violations.append(
@@ -66,10 +92,14 @@ class SideEffectsRule(BaseRule):
 
     name = "side_effects"
     code = "SAFE304"
+    language = ("python", "javascript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""
-        io_funcs: frozenset[str] = frozenset(self.config.get("io_functions", ["open", "print", "input"]))
+        lang = get_language_for_file(filepath)
+        assert lang is not None, "engine guarantees a registered language at this point"
+        function_types = _FUNCTION_TYPES_BY_LANG[lang.name]
+        io_funcs = _io_funcs_for_lang(self.config, lang.name, ["open", "print", "input"])
         # Lowercase BOTH sides so the substring check is genuinely
         # case-insensitive — mixed-case keywords in config (e.g. ``"Write"``)
         # still match camelCase function names like ``writeLog``.
@@ -77,14 +107,14 @@ class SideEffectsRule(BaseRule):
 
         violations = []
         for node in walk(tree.root_node):
-            if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
+            if node.type not in function_types:
                 continue
             name_node = node.child_by_field_name("name")
             func_name = node_text(name_node) if name_node else ""
             name_lower = func_name.lower()
             if any(kw in name_lower for kw in io_keywords):
                 continue
-            io_call = _first_io_call(node, io_funcs)
+            io_call = _first_io_call(node, io_funcs, function_types)
             if io_call:
                 io_name = call_name(io_call) or "<unknown>"
                 violations.append(
