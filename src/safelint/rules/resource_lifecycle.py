@@ -69,9 +69,14 @@ def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
 
     Walks the parent chain (Tree-sitter Node exposes ``.parent``) and
     short-circuits on the first ``try_statement`` whose children include a
-    ``finally_clause``. Multiple nested try-statements within the same
-    function are tolerated: an outer ``try { ... } finally { ... }``
-    still counts as guarding a deeply-nested call inside that function.
+    ``finally_clause`` — *unless* the call we're checking sits inside that
+    very ``finally_clause`` itself. A resource acquired inside the finally
+    block has no subsequent finally to clean up *itself*, so the
+    enclosing try/finally that the call lives inside does not count as
+    guarding it. Multiple nested try-statements within the same function
+    are tolerated: an outer ``try { ... } finally { ... }`` still counts
+    as guarding a deeply-nested call inside that function — provided the
+    call is not inside the outer finally.
 
     **Stops at function boundaries.** If the walk crosses a JavaScript
     function-defining node (``function_declaration``, ``arrow_function``,
@@ -91,6 +96,7 @@ def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
     actually clean up; users with those patterns can suppress with
     ``// nosafe: SAFE401``.
     """
+    prev = node
     cur = node.parent
     while cur is not None:
         if cur.type in _JS_FUNCTION_TYPES:
@@ -99,8 +105,15 @@ def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
             # different function whose ``finally`` doesn't run when this
             # call eventually executes.
             return False
-        if _try_statement_has_finally(cur):
+        # ``prev.type != "finally_clause"`` skips a try_statement whose
+        # finally we just came out of — that finally is the *parent* of
+        # the call, not a subsequent cleanup hook for it. Without this
+        # check, ``try { ... } finally { fs.createReadStream(p); }``
+        # would be silently accepted as "guarded" even though no
+        # finally runs after the stream opens.
+        if _try_statement_has_finally(cur) and prev.type != "finally_clause":
             return True
+        prev = cur
         cur = cur.parent
     return False
 

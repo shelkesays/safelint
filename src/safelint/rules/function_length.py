@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.languages import get_language_for_file
 from safelint.languages._node_utils import end_lineno, lineno, node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
@@ -120,7 +121,15 @@ class FunctionLengthRule(BaseRule):
         count_mode: str = self.config.get("count_mode", "lines")
         lang_name = resolve_lang_name(filepath)
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
-        comment_prefix = "//" if lang_name == "javascript" else "#"
+        # Sourced from the registered ``LanguageDefinition`` rather than
+        # branched per-lang here — adding a new language to the registry
+        # then automatically routes the right comment marker without a
+        # separate edit to this rule. Falls back to ``"#"`` for the
+        # unit-test path where ``filepath`` has no registered extension
+        # (``resolve_lang_name`` defaults to Python in that case, so the
+        # comment prefix stays consistent with the dispatched language).
+        lang_def = get_language_for_file(filepath)
+        comment_prefix = lang_def.comment_prefix if lang_def is not None else "#"
         violations = []
         for node in walk(tree.root_node):
             if node.type not in function_types:
