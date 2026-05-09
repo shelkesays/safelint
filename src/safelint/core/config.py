@@ -65,6 +65,7 @@ DEFAULTS: dict[str, Any] = {
             "empty_except",
             "global_state",
             "global_mutation",
+            "wide_scope_declaration",
             "unbounded_loops",
             "complexity",
             "side_effects_hidden",
@@ -103,6 +104,12 @@ DEFAULTS: dict[str, Any] = {
                 "process",
             ],
         },
+        # JavaScript-only: prefer ``let`` / ``const`` over ``var`` for
+        # block scope. Holzmann Power-of-Ten Rule 6 ("declare variables
+        # at the smallest possible scope") translated to JS's actual
+        # scope-control mechanism. No Python equivalent — Python lacks
+        # the var/let/const distinction.
+        "wide_scope_declaration": {"enabled": True, "severity": "warning"},
         "side_effects_hidden": {
             "enabled": True,
             "severity": "error",

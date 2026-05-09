@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.13.0] - 2026-05-09
 
-**JavaScript (Node) is now a supported language alongside Python.** Registry-driven multi-language support: `.js` / `.mjs` / `.cjs` files are discovered, parsed via Tree-sitter, and run against 17 of the 19 user-facing rules. Python users see no behaviour change beyond the v1.12.2 `.pyw` bugfix; the additive language work is what justifies this release as `1.13.0` (per the project's semver rules: scope expansion is MINOR, never MAJOR).
+**JavaScript (Node) is now a supported language alongside Python.** Registry-driven multi-language support: `.js` / `.mjs` / `.cjs` files are discovered, parsed via Tree-sitter, and run against 17 of the 19 cross-language rules — plus one new JS-only rule (SAFE305 `wide_scope_declaration`) for a total of 20 rules safelint now ships. Python users see no behaviour change beyond the v1.12.2 `.pyw` bugfix; the additive language work is what justifies this release as `1.13.0` (per the project's semver rules: scope expansion is MINOR, never MAJOR).
 
 ### Added
 
@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - **Loop / tests / assertions:** `unbounded_loops` (SAFE501 — only the `while (true)` no-break case fires on JS; the non-comparison-condition heuristic stays Python-only), `missing_assertions` (SAFE601 — walks for *calls* to `assert` / `expect` / `console.assert` / Node's `assert.*` helpers), `test_existence` (SAFE701) and `test_coupling` (SAFE702 — pair Python `test_<stem>.py` *and* JS `<stem>.test.{js,mjs,cjs}` / `<stem>.spec.{js,mjs,cjs}`).
   - **Resource safety:** `resource_lifecycle` (SAFE401 — fires on calls to configurable acquirer names — `createReadStream`, `createWriteStream`, `openSync`, `createServer`, `connect`, etc. — that aren't enclosed in a `try { ... } finally { ... }` somewhere up the AST chain; heuristic-only, doesn't verify that the finally actually closes the resource).
   - **Dataflow:** `tainted_sink` (SAFE801), `return_value_ignored` (SAFE802), `null_dereference` (SAFE803 — recognises optional chaining `foo?.bar` as the safe form, exempt from the rule).
+- **New JavaScript-only rule:** `wide_scope_declaration` (SAFE305) flags every `var` declaration. Holzmann Power-of-Ten Rule 6 ("declare variables at the smallest possible scope") translated to JS's actual scope-control mechanism — `var` is function-scoped (hoisted across blocks), `let` / `const` are block-scoped (the narrower scope). Fires on top-level `var`, function-body `var`, block-level `var`, multi-binding `var x = 1, y = 2;` (single violation per declaration node — the line is the unit of fix), and `for (var i = 0; ...)`. Python has no `var` / `let` / `const` distinction; the rule is registered with `language = ("javascript",)` and the engine's per-language dispatch correctly skips it on `.py` / `.pyw` files. Default enabled, severity `warning`.
 - **Per-language config keys** (additive — existing user TOMLs unchanged):
   - `[tool.safelint.rules.side_effects_hidden]` and `[...].side_effects` get `io_functions_javascript`.
   - `[...].missing_assertions]` gets `assertion_calls_javascript`.

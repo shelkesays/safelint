@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.javascript import VARIABLE_DECLARATION as _JS_VARIABLE_DECLARATION
 from safelint.languages.python import (
     ASSIGNMENT,
     ASYNC_FUNCTION_DEF,
@@ -262,4 +263,49 @@ class GlobalMutationRule(BaseRule):
         violations: list[Violation] = []
         for func in _iter_javascript_functions(tree):
             violations.extend(self._javascript_violations_for_func(filepath, func, namespaces))
+        return violations
+
+
+class WideScopeDeclarationRule(BaseRule):
+    """Reject ``var`` declarations — prefer ``let`` / ``const`` for narrower scope.
+
+    Holzmann's Power-of-Ten Rule 6 ("Declare variables at the smallest
+    possible scope") is C-flavoured but maps cleanly to a real
+    JavaScript hazard: ``var`` is *function-scoped* and hoists to the
+    top of the enclosing function (or module), while ``let`` / ``const``
+    are *block-scoped*. A ``var`` declared in one branch is visible
+    in every other branch of the same function — a classic source
+    of accidental cross-branch reads and TDZ-like bugs that block
+    scoping eliminates.
+
+    The fix is mechanical: replace ``var`` with ``let`` (when the
+    binding is reassigned) or ``const`` (when it isn't). The rule
+    fires once per ``variable_declaration`` node — a multi-binding
+    form like ``var x = 1, y = 2;`` produces a single violation
+    (the line is the unit of fix, not each name).
+
+    JavaScript-only: Python has no ``var`` / ``let`` / ``const``
+    distinction. Python users get nothing from this rule; it's
+    registered with ``language = ("javascript",)`` and the engine's
+    per-language dispatch correctly skips it on ``.py`` / ``.pyw``
+    files.
+    """
+
+    name = "wide_scope_declaration"
+    code = "SAFE305"
+    language = ("javascript",)
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag every ``var`` declaration in the file."""
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type != _JS_VARIABLE_DECLARATION:
+                continue
+            violations.append(
+                self._make_violation_for_node(
+                    filepath,
+                    node,
+                    "`var` declaration uses function-scope hoisting — replace with `let` or `const` for block scope",
+                )
+            )
         return violations
