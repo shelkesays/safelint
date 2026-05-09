@@ -115,6 +115,26 @@ class BaseRule(ABC):
     name: str = ""
     code: str = ""
 
+    #: Languages this rule applies to. The engine consults this before
+    #: dispatching ``check_file`` and skips the rule entirely for files
+    #: whose ``LanguageDefinition.name`` isn't listed.
+    #:
+    #: Default ``("python",)`` keeps every existing rule Python-only —
+    #: which is the correct default for today's codebase, where the
+    #: rules import Python-specific Tree-sitter node-type constants
+    #: from :mod:`safelint.languages.python`. When safelint adds a
+    #: second language, contributors widen this on a per-rule basis
+    #: (cross-language portable rules become e.g.
+    #: ``language = ("python", "typescript")``; Python-only-syntax
+    #: rules like ``bare_except`` stay narrow).
+    #:
+    #: This is the engine-side half of the per-language dispatch
+    #: contract documented in ``ADDING_A_LANGUAGE.md``. The other half
+    #: (per-language rule classes vs. runtime dispatch within a rule's
+    #: ``check_file``) is per-rule design and ships *with* each new
+    #: language, not as part of the engine plumbing.
+    language: tuple[str, ...] = ("python",)
+
     def __init__(self, config: dict[str, Any]) -> None:
         """Bind rule-specific config and resolve severity."""
         self.config = config
