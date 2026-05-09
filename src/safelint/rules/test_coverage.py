@@ -58,8 +58,15 @@ def _find_test_file(src_path: Path, test_dirs: list[str], lang_name: str) -> boo
 
 
 def _test_dir_contains(test_dir: Path, candidates: list[str]) -> bool:
-    """Return True if any candidate filename exists anywhere under *test_dir*."""
-    return any(list(test_dir.rglob(name)) for name in candidates)
+    """Return True if any candidate filename exists anywhere under *test_dir*.
+
+    Short-circuits at the first match for both the candidate loop and
+    each candidate's ``rglob``: ``next(iter(...), None)`` stops the
+    rglob walk as soon as it yields one path, and the outer ``any``
+    stops as soon as any candidate finds something. On a large repo
+    this avoids a full materialised file listing per source file.
+    """
+    return any(next(iter(test_dir.rglob(name)), None) is not None for name in candidates)
 
 
 class TestExistenceRule(BaseRule):
@@ -124,8 +131,14 @@ class TestCouplingRule(BaseRule):
             return []
 
         # Was *any* of the candidate test filenames in the changed set?
+        # Compare against the basename of each changed path — a substring
+        # match (``candidate in f``) would falsely treat ``foo.test.js`` as
+        # paired with ``barfoo.test.js`` (or with a directory named
+        # ``foo.test.js/`` further up the tree). ``Path(f).name`` extracts
+        # the final path component regardless of separator normalisation.
         candidates = _candidate_test_filenames(src, lang_name)
-        if any(any(candidate in f for f in changed) for candidate in candidates):
+        changed_basenames = {Path(f).name for f in changed}
+        if any(candidate in changed_basenames for candidate in candidates):
             return []
 
         expected = _test_filename_for_message(src, lang_name)
