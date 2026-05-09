@@ -28,7 +28,8 @@ Completion of the multi-language readiness work started in v1.12.1. The engine, 
 
 ### Behaviour changes (heads-up)
 
-- **None for end users** running `safelint check` or `safelint skill *`. The renamed CLI helpers are private (underscore-prefixed) and behaviour is identical with only Python registered. The `types_or` change is single-element today, so downstream pre-commit users see no difference until a second filetype tag lands.
+- **`.pyw` projects** — see *Fixed* above. The bugfix is genuine, but if your `.pyw` files have been quietly accumulating violations because git-modified mode and the pre-commit hook were skipping them, you'll see those surface on the first `safelint check` after upgrade. Workaround if you need a transitional grace period: scope-suppress with `[tool.safelint.per_file_ignores]` keyed on `**/*.pyw`.
+- **Pure-`.py` projects** — no change. The renamed CLI helpers are private (underscore-prefixed); the `types_or` change is single-element today, so downstream pre-commit users see no difference until a second filetype tag lands.
 
 ## [1.12.1] - 2026-05-09
 
