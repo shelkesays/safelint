@@ -403,7 +403,7 @@ def _run_stdin(args: argparse.Namespace) -> int:
 
 
 def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
-    """Execute pre-commit hook mode against an explicit list of .py files."""
+    """Execute pre-commit hook mode against an explicit list of supported-source files."""
     if not files:
         return 0
 
@@ -543,19 +543,21 @@ def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
     return set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines()) | set(untracked_proc.stdout.splitlines())
 
 
-def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] | None:
-    """Return a 2-tuple of changed .py file lists, or ``None`` on git failure.
+def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str]] | None:
+    """Return a 2-tuple of changed supported-source-file lists, or ``None`` on git failure.
 
-    Includes staged, unstaged, and untracked files.
+    Filtering is registry-driven via :func:`safelint.languages.supported_extensions`,
+    so any language registered in ``safelint.languages`` is included. Includes
+    staged, unstaged, and untracked files.
 
-    Returns ``(all_changed_py, in_target_py)`` where:
+    Returns ``(all_changed, in_target)`` where:
 
-    * *all_changed_py* — every changed .py file across the whole repo.
+    * *all_changed* — every changed supported-source file across the whole repo.
       Paths are relative to cwd when possible, otherwise absolute.
       Passed to :class:`~safelint.core.engine.SafetyEngine` as ``changed_files``
       so cross-file rules (e.g. ``test_coupling``) see the full diff context.
-    * *in_target_py* — the subset of those files that fall under *target*.
-      Same path format as *all_changed_py*. These are the files actually linted.
+    * *in_target* — the subset of those files that fall under *target*.
+      Same path format as *all_changed*. These are the files actually linted.
 
     Returns ``None`` when git is unavailable, the path is outside a git
     repository, or any git command fails — callers should fall back to
@@ -613,7 +615,7 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
     """
     if getattr(args, "all_files", False) or not target.is_dir():
         return None, None, False
-    modified = _get_git_modified_python_files(target)
+    modified = _get_git_modified_supported_files(target)
     if modified is None:
         _print_status(
             "Note: could not determine modified files via git — scanning all files.",
@@ -622,7 +624,7 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
         return None, None, False
     if not modified[1]:
         _print_status(
-            "No modified Python files detected. Use --all-files to scan everything.",
+            "No modified source files detected. Use --all-files to scan everything.",
             output_format=output_format,
         )
         return None, None, True
@@ -818,7 +820,7 @@ def _build_check_parser() -> argparse.ArgumentParser:
         dest="all_files",
         action="store_true",
         default=False,
-        help="Scan all Python files under target (default: git-modified files only)",
+        help="Scan all supported source files under target (default: git-modified files only)",
     )
     parser.add_argument(
         "--check-skill-freshness",
@@ -841,8 +843,9 @@ def _build_hook_parser() -> argparse.ArgumentParser:
     Explicit positional ``files`` (rather than ``parse_known_args``) so an
     unrecognised *flag* fails loudly — silently dropping ``--formta=json``
     would let the user think pretty output was a deliberate choice.
-    Pre-commit passes everything (Markdown, Makefiles, ``.py``) as
-    positional args, so we filter to ``.py`` after parsing.
+    Pre-commit passes everything (Markdown, Makefiles, source files) as
+    positional args, so we filter to entries whose extension is in
+    :func:`safelint.languages.supported_extensions` after parsing.
     """
     parser = argparse.ArgumentParser(
         prog="safelint",
@@ -1079,8 +1082,8 @@ def _run_skill(args: argparse.Namespace) -> int:
 # section headers and cyan command/flag names. Activated *only* via
 # ``safelint help``, ``safelint -h``, or ``safelint --help``. A bare
 # ``safelint`` invocation does NOT show this top-level help — it continues
-# through the normal hook-mode routing (silent on success when no .py files
-# are passed) so pre-commit's contract is preserved.
+# through the normal hook-mode routing (silent on success when no
+# supported source files are passed) so pre-commit's contract is preserved.
 
 
 _HELP_COMMANDS: tuple[tuple[str, str], ...] = (
@@ -1300,7 +1303,8 @@ def main() -> None:
     - First true positional argument is ``check`` → ``check`` subcommand.
     - First true positional argument is ``skill`` → ``skill`` subcommand
       (install / path).
-    - Otherwise → pre-commit hook mode (``.py`` positional arguments are files).
+    - Otherwise → pre-commit hook mode (positional arguments whose extension
+      is in :func:`safelint.languages.supported_extensions` are files).
 
     Global flags (``--format``, ``--fail-on``, ``--mode``, ``--ignore``,
     ``--config``, ``--stdin-filename``) may appear before the subcommand;
@@ -1345,7 +1349,8 @@ def main() -> None:
         sys.exit(_run_skill(args))
 
     args = _build_hook_parser().parse_args()
-    files = [f for f in args.files if f.endswith(tuple(supported_extensions()))]
+    extensions = tuple(supported_extensions())
+    files = [f for f in args.files if f.endswith(extensions)]
     sys.exit(_run_hook(args, files))
 
 

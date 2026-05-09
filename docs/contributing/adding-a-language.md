@@ -146,13 +146,14 @@ For each rule that ports, the work is:
 
 ### 6. Update CLI / pre-commit plumbing
 
-A handful of edges read the supported-language list from the registry; one edge still needs a manual edit. The engine's own file-discovery loop, the suppression parser, the cache layer, and the per-rule dispatch are *already* registry-driven — the new language plugs in via Step 3 alone.
+A handful of edges read the supported-language list from the registry; two pre-commit surfaces still need manual edits. The engine's own file-discovery loop, the suppression parser, the cache layer, and the per-rule dispatch are *already* registry-driven — the new language plugs in via Step 3 alone.
 
-The one manual edit is the published pre-commit hook config:
+Update both of these:
 
 * **`.pre-commit-hooks.yaml`** — `types_or: [python]` lists the pre-commit filetype tags downstream users of `pre-commit-hooks` will get matched against. Add the new tag (e.g. `- ts` for TypeScript) so users who configure the hook in their `.pre-commit-config.yaml` get the new files passed in. SafeLint itself still drops anything not in `supported_extensions()` defensively, but pre-commit's own filter happens first and would otherwise hide the new files from the hook.
+* **`.pre-commit-config.yaml`** — this repo's own in-tree `safelint (in-tree)` hook also has its own `types_or: [python]` filter. Add the new language's tag there too, or the in-repo hook run will keep excluding that language's files even after the published hook metadata is updated. (The peer hooks in the same file — `ty`, `pytest-cov` — are tooling-only and can stay `types: [python]`.)
 
-The CLI's git-status filters (`_collect_all_supported_files`, `_filter_supported_files` in `cli.py`, plus the hook-mode pre-filter on the bottom of `main()`) call `supported_extensions()` directly and need no edit.
+The CLI's git-status filters (`_collect_all_supported_files`, `_filter_supported_files` in `cli.py`, plus the hook-mode pre-filter at the bottom of `main()`) call `supported_extensions()` directly and need no edit.
 
 ### 7. Update tests and docs
 
