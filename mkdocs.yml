@@ -128,11 +128,16 @@ extra:
       link: https://pypi.org/project/safelint/
       name: safelint on PyPI
 
-# Files outside docs/ that get copied in by the GH Actions workflow before
-# mkdocs build runs:
+# Files outside docs/ that the ``hooks:`` entry point above
+# (``scripts/prepare_docs.py``) copies into the docs tree on every build /
+# serve, with cross-reference rewriting:
 #   CONTRIBUTING.md       → docs/contributing/index.md
 #   CHANGELOG.md          → docs/project/changelog.md
 #   CODE_OF_CONDUCT.md    → docs/project/code-of-conduct.md
 #   SUPPORT.md            → docs/project/support.md
-# These are NOT committed (added to .gitignore) — source of truth is the
-# repo-root file (which GitHub also surfaces in its community-health UI).
+# Plus the rules-at-a-glance snippet at build/snippets/_rules_at_a_glance.md
+# (sourced from ``safelint.rules.ALL_RULES``). All targets are NOT committed
+# (gitignored) — source of truth is the repo-root file (which GitHub also
+# surfaces in its community-health UI). Because the prep step is wired in
+# as a hook, ``uv run mkdocs serve`` and ``uv run mkdocs build --strict``
+# both regenerate everything automatically — no separate prep command.

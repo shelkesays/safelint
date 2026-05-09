@@ -24,7 +24,6 @@ Idempotent. All output paths are listed in ``.gitignore``.
 
 from __future__ import annotations
 
-import re
 import sys
 from pathlib import Path
 
@@ -96,8 +95,13 @@ def _rewrite_links(text: str, mapping: dict[str, str]) -> str:
     # Sort keys longest-first so ``docs/JSON_SCHEMA.md`` is replaced before
     # the bare ``JSON_SCHEMA.md`` would be — defensive against future link forms.
     for old in sorted(mapping, key=len, reverse=True):
-        # Match ``](OLD)`` exactly so we don't touch URL-like strings inside
-        # code spans or prose where ``)`` doesn't close a link.
+        # Plain string substitution — we anchor on the ``](`` prefix and the
+        # closing ``)`` to avoid catching bare filename mentions in prose.
+        # We do *not* parse Markdown structure, so a literal ``](OLD)`` token
+        # inside a code span or fenced block would also be rewritten. None of
+        # the source files (CHANGELOG / CONTRIBUTING / CODE_OF_CONDUCT /
+        # SUPPORT) put literal Markdown link syntax inside code samples
+        # today; if that changes, switch to a Markdown-aware rewrite.
         text = text.replace(f"]({old})", f"]({mapping[old]})")
     return text
 

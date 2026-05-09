@@ -17,6 +17,8 @@ on:
       - "mkdocs.yml"
       - "pyproject.toml"
       - "uv.lock"
+      # Build hook lives here — changes to it should redeploy docs:
+      - "scripts/**"
       # Repo-root files that get copied into docs/ at build time:
       - "README.md"
       - "CHANGELOG.md"
@@ -64,4 +66,8 @@ jobs:
         # `mkdocs gh-deploy` builds again and force-pushes the result to the
         # gh-pages branch. The previous `mkdocs build --strict` step is the
         # actual gate — this step only runs when the strict build passed.
-        run: uv run mkdocs gh-deploy --force --message "docs: deploy ${{ github.sha }}"
+        # `run: |` literal-block so the colon inside the gh-deploy commit
+        # message ("docs: deploy …") is treated as data, not as a YAML
+        # mapping separator.
+        run: |
+          uv run mkdocs gh-deploy --force --message "docs: deploy ${{ github.sha }}"
