@@ -30,6 +30,13 @@ from __future__ import annotations
 import sys
 from pathlib import Path
 
+# Repo-root files copied into docs/ are gitignored at the destination, so
+# Material's auto-computed "Edit this page" link (``repo_url + edit_uri +
+# dest_path``) would 404 against ``main``. We prepend YAML frontmatter
+# with an absolute ``edit_url`` so Material points at the actual source
+# file at the repo root instead.
+_REPO_EDIT_URL_BASE = "https://github.com/shelkesays/safelint/edit/main/"
+
 # Each entry: (source at repo root, destination under docs/, rewrite map).
 #
 # The rewrite map's keys are the *patterns* found in the source file's
@@ -160,12 +167,17 @@ def _generate_rules_index(repo_root: Path) -> str:
 def main() -> None:
     repo_root = Path(__file__).resolve().parent.parent
 
-    # 1. Community-health files: copy + rewrite cross-refs.
+    # 1. Community-health files: copy + rewrite cross-refs + inject
+    #    ``edit_url`` frontmatter so the rendered "Edit this page" link
+    #    points at the repo-root source file (the gitignored docs/ copy
+    #    isn't editable).
     for source_rel, dest_rel, mapping in _COPIES:
         source = repo_root / source_rel
         dest = repo_root / dest_rel
         text = source.read_text(encoding="utf-8")
         text = _rewrite_links(text, mapping)
+        edit_url = f"{_REPO_EDIT_URL_BASE}{source_rel}"
+        text = f"---\nedit_url: {edit_url}\n---\n\n{text}"
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_text(text, encoding="utf-8")
         print(f"prepared {dest_rel} (from {source_rel}, {len(mapping)} link rewrites)")
@@ -181,6 +193,23 @@ def main() -> None:
 # ``mkdocs serve`` so local previews don't need a manual prep step.
 def on_pre_build(config: object, **_: object) -> None:  # noqa: ARG001
     main()
+
+
+def on_page_markdown(markdown: str, page: object, **_: object) -> str:
+    """Honour ``edit_url`` in page frontmatter — MkDocs core ignores it.
+
+    ``mkdocs.structure.pages.Page._set_edit_url`` derives every page's
+    edit link purely from ``repo_url + edit_uri + src_path``; it does
+    not consult ``page.meta``. For pages that exist only in the build
+    tree (the gitignored copies of CHANGELOG / CONTRIBUTING /
+    CODE_OF_CONDUCT / SUPPORT) the auto-derived link 404s, so this
+    hook copies any frontmatter ``edit_url:`` value across to the
+    runtime ``page.edit_url`` attribute that Material's template reads.
+    """
+    edit_url = getattr(page, "meta", {}).get("edit_url")
+    if edit_url:
+        page.edit_url = edit_url  # type: ignore[attr-defined]
+    return markdown
 
 
 if __name__ == "__main__":
