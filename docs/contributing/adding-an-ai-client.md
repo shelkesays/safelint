@@ -2,8 +2,9 @@
 
 This guide is the cheat sheet for adding support for a new AI coding client (GitHub Copilot, codex, windsurf, antigravity, etc.) to SafeLint's `safelint skill install` command. The architecture was built for this — the moving parts you need to understand and the steps you need to follow are below.
 
-> [!NOTE]
-> Twelve clients are registered today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is a one-`ClientSpec` change plus a bundled artefact and tests. No control-flow changes elsewhere — install / detection / CLI choices / output all read from the registry.
+!!! note
+
+    Twelve clients are registered today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is a one-`ClientSpec` change plus a bundled artefact and tests. No control-flow changes elsewhere — install / detection / CLI choices / output all read from the registry.
 
 For the user-facing surface (auto-detection logic, how each client is invoked after install, troubleshooting), see [AI client integrations](../ai-clients/index.md). This file is for contributors *adding* a new entry to the registry.
 

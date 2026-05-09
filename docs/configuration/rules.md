@@ -10,6 +10,12 @@ Each rule has:
 
 For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [Configuration file](toml.md). For inline / file-level suppression see [Suppression mechanisms](suppression.md).
 
+## At a glance
+
+The table below is generated from the live rule registry (`safelint.rules.ALL_RULES`) and the per-rule defaults in `safelint.core.config.DEFAULTS` — it can't drift from the implementation. Click any code to jump to the detailed section below.
+
+--8<-- "_rules_at_a_glance.md"
+
 ## Engine-internal codes
 
 A few codes are emitted by the engine directly rather than by registered `BaseRule` subclasses. They don't have their own config section and follow the global `ignore` list. Inline `# nosafe: SAFE0xx` works for codes emitted *after* parsing (such as SAFE004 — see below) but **not** for SAFE000, because parse errors are raised before the engine has a chance to read suppression directives off the tree.

@@ -52,16 +52,12 @@ jobs:
       - name: Install docs dependencies
         run: uv sync --extra docs
 
-      - name: Copy GitHub-UI files into docs/ build tree
-        # CHANGELOG / CONTRIBUTING / CODE_OF_CONDUCT / SUPPORT live at the
-        # repo root because GitHub's community-health UI surfaces them there.
-        # The docs site needs the same content but the cross-references
-        # inside are repo-root-relative; ``scripts/prepare_docs.py`` copies
-        # *and* rewrites those links to docs-site-relative form. Source of
-        # truth stays at repo root.
-        run: uv run python scripts/prepare_docs.py
-
       - name: Build (strict — fail on warnings)
+        # ``mkdocs build`` invokes ``scripts/prepare_docs.py`` automatically
+        # via the ``hooks:`` entry in ``mkdocs.yml`` (on_pre_build): it copies
+        # CHANGELOG / CONTRIBUTING / CODE_OF_CONDUCT / SUPPORT into ``docs/``
+        # with cross-ref rewriting and regenerates the rules-at-a-glance
+        # snippet from ``safelint.rules.ALL_RULES``.
         run: uv run mkdocs build --strict
 
       - name: Deploy to gh-pages
