@@ -1,0 +1,107 @@
+site_name: SafeLint
+site_description: Holzmann Power-of-Ten safety lint rules for modern Python
+site_url: https://shelkesays.github.io/safelint/
+site_author: Rahul Shelke
+repo_url: https://github.com/shelkesays/safelint
+repo_name: shelkesays/safelint
+edit_uri: edit/main/docs/
+
+# Build behaviour --------------------------------------------------------------
+
+# Treat warnings (broken internal links, missing nav targets, orphan pages,
+# etc.) as errors. CI runs `mkdocs build --strict` so a doc regression fails
+# fast rather than silently shipping. Locally, run `uv run mkdocs serve` for
+# a non-strict live preview.
+strict: false  # set to true via CLI flag in CI
+
+theme:
+  name: material
+  language: en
+  features:
+    - content.code.copy           # copy button on every code block
+    - content.tabs.link           # tabbed content (e.g. per-client install)
+    - navigation.tabs             # top-level sections as tabs
+    - navigation.sections         # section headers in left nav
+    - navigation.indexes          # section index pages (foo/index.md)
+    - navigation.top              # back-to-top button on long pages
+    - search.suggest              # search-as-you-type suggestions
+    - search.highlight            # highlight matched terms on result page
+    - toc.follow                  # right-rail TOC follows scroll
+  palette:
+    # Light/dark toggle. Auto-respects system preference; user can override.
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to light mode
+  icon:
+    repo: fontawesome/brands/github
+
+markdown_extensions:
+  - admonition                    # !!! note / warning / tip blocks
+  - attr_list                     # {.foo} class attributes on elements
+  - md_in_html                    # Markdown inside HTML blocks
+  - tables
+  - footnotes
+  - toc:
+      permalink: "#"              # link icon next to each heading
+      toc_depth: 3
+  - pymdownx.details              # collapsible admonitions
+  - pymdownx.superfences:         # nested fences inside admonitions / tabs
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:              # tabbed content blocks
+      alternate_style: true
+  - pymdownx.snippets             # include from outside docs/
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.tasklist:
+      custom_checkbox: true
+
+# Site navigation --------------------------------------------------------------
+#
+# Phase 1: whole-file ports. CONFIGURATION and AI_CLIENTS land as single index
+# pages under their section dirs. Phase 2 will split them into multiple pages.
+nav:
+  - Home: index.md
+  - Configuration: configuration/index.md
+  - AI client integrations: ai-clients/index.md
+  - JSON output schema: json-schema.md
+  - Contributing:
+      - Overview: contributing/index.md
+      - Adding an AI client: contributing/adding-an-ai-client.md
+      - Adding a language: contributing/adding-a-language.md
+  - Project:
+      - Changelog: project/changelog.md
+      - Code of conduct: project/code-of-conduct.md
+      - Support: project/support.md
+
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/shelkesays/safelint
+      name: safelint on GitHub
+    - icon: fontawesome/brands/python
+      link: https://pypi.org/project/safelint/
+      name: safelint on PyPI
+
+# Files outside docs/ that get copied in by the GH Actions workflow before
+# mkdocs build runs:
+#   CONTRIBUTING.md       → docs/contributing/index.md
+#   CHANGELOG.md          → docs/project/changelog.md
+#   CODE_OF_CONDUCT.md    → docs/project/code-of-conduct.md
+#   SUPPORT.md            → docs/project/support.md
+# These are NOT committed (added to .gitignore) — source of truth is the
+# repo-root file (which GitHub also surfaces in its community-health UI).

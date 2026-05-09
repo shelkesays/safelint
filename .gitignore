@@ -154,6 +154,15 @@ venv.bak/
 # mkdocs documentation
 /site
 
+# Build-time copies of repo-root community-health files into docs/ — the
+# docs.yml workflow does `cp CHANGELOG.md docs/project/changelog.md` etc.
+# before `mkdocs build`. Source of truth stays at the repo root; the copies
+# are ephemeral build artefacts and must never be committed.
+/docs/project/changelog.md
+/docs/project/code-of-conduct.md
+/docs/project/support.md
+/docs/contributing/index.md
+
 # mypy
 .mypy_cache/
 .dmypy.json
