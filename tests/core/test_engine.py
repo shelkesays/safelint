@@ -218,24 +218,22 @@ def test_base_rule_default_language_is_python_only() -> None:
 
 _RULES_WIDENED_FOR_JAVASCRIPT: frozenset[str] = frozenset(
     {
-        # Slice 2: structural rules ported to JavaScript. Each one's
-        # ``language`` tuple should be exactly ``("python", "javascript")``;
-        # silent drift past this allow-list is what the assertion catches.
+        # Each rule's ``language`` tuple should be exactly
+        # ``("python", "javascript")``; silent drift past this
+        # allow-list (a half-ported rule, or a rule unintentionally
+        # narrowing back to Python-only) is what the assertion catches.
         "FunctionLengthRule",
         "NestingDepthRule",
         "MaxArgumentsRule",
         "ComplexityRule",
-        # Slice 3: error-handling and side-effects rules.
         "EmptyExceptRule",
         "LoggingOnErrorRule",
         "SideEffectsHiddenRule",
         "SideEffectsRule",
-        # Slice 4: loop safety, missing assertions, test-coverage rules.
         "UnboundedLoopRule",
         "MissingAssertionsRule",
         "TestExistenceRule",
         "TestCouplingRule",
-        # Slice 5: dataflow rules.
         "TaintedSinkRule",
         "ReturnValueIgnoredRule",
         "NullDereferenceRule",

@@ -35,16 +35,38 @@ Line-style only — `// nosafe`, `// nosafe: SAFE101`, `// safelint: ignore`, `/
 result = eval(userInput);  // nosafe: SAFE801
 ```
 
-## Language-specific rule phrasing
+## Rules ported to JavaScript
 
-When the user asks "why is this flagged?", the universal rationale in the SKILL.md crib sheet is correct, but JavaScript phrasing helps. Note that not every Python rule has a JavaScript counterpart yet — the table below covers the rules ported in v1.13.x. Rules not listed here remain Python-only.
+15 of safelint's 19 user-facing rules now lint JavaScript. The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here remain Python-only by design — see *Rules that stay Python-only* below.
 
 | Code | Rule | JavaScript-specific notes |
 |---|---|---|
-| SAFE101 | function_length | Default cap is 60 source lines (configurable via `[tool.safelint.rules.function_length]` `max_lines`). Counts function declarations, function expressions, arrow functions, generator functions, and class methods uniformly. |
+| SAFE101 | function_length | Default cap is 60 source lines (configurable via `[tool.safelint.rules.function_length]` `max_lines`). Counts function declarations, function expressions, arrow functions, generator functions, and class methods uniformly. `count_mode = "statements"` is Python-only — JS files use `lines` (default) or `logical_lines`. |
 | SAFE102 | nesting_depth | Counts `if` / `for` / `for…in` / `while` / `do…while` / `switch` / `try` blocks. Default max is 2. Optional chaining (`?.`) does not count toward depth — it's a single AST node. |
-| SAFE103 | max_arguments | Counts named parameters, rest parameters (`...args`), and destructured parameters. Default cap is 7. |
-| SAFE104 | complexity | Cyclomatic complexity — every `if` / `else if` / `for` / `while` / `case` / `catch` / `&&` / `||` / `??` / ternary adds one. Default cap is 10. |
+| SAFE103 | max_arguments | Counts named parameters, default-value parameters (`b = 5`), rest parameters (`...args`), and destructured parameters (`{a, b}` / `[x, y]` each count as one). Default cap is 7. Unlike Python, there is no `self` / `cls` skip — every parameter counts. |
+| SAFE104 | complexity | Cyclomatic complexity — every `if` / `else if` / `for` / `while` / `case` / `catch` / ternary adds one, plus `&&` / `||` / `??` short-circuit operators. Arithmetic / comparison `binary_expression` nodes (`+`, `>`, etc.) explicitly do NOT count. Default cap is 10. |
+| SAFE202 | empty_except | Fires on `catch (e) {}` (truly empty), `catch {}` (ES2019 optional binding form), `catch (e) { ; }` (single empty statement), `catch (e) { 0; }` / `catch (e) { null; }` / `catch (e) { "TODO"; }` (single literal statement). Template strings with `${...}` substitution are NOT treated as no-ops. |
+| SAFE203 | logging_on_error | Catch blocks must call a logging method or rethrow. Recognises `console.log` / `console.error` / `console.warn` / `console.info` / `console.debug` / `console.trace`, plus generic `logger.*`, `pino.*`, `bunyan.*` (anything where `call_name` resolves to one of `log` / `info` / `warn` / `error` / `debug` / `trace`). `throw e;` (single-identifier throw of the caught binding) is treated as a re-raise and exempt; `throw new Error(...)` constructs a new error and still requires logging. |
+| SAFE303 | side_effects_hidden | Pure-named function (matches a configured `pure_prefixes` list) calling an I/O primitive. JS default I/O list: `log`, `error`, `warn`, `info`, `debug`, `fetch`, `readFile`, `writeFile`, `readFileSync`, `writeFileSync`, `open`. Per-language config key: `io_functions_javascript`. |
+| SAFE304 | side_effects | Any function (not name-signalled for I/O) calling an I/O primitive. Same JS default list as SAFE303. The `io_name_keywords` exemption (e.g. `logEvent`, `writeData`, `fetchUser`) works the same way as Python: substring match against the lowercased function name. |
+| SAFE501 | unbounded_loops | `while (true)` without a `break` fires the same as Python `while True:`. The "non-comparison condition" heuristic is *Python-only* — JS idioms like `while (queue.length)` / `while (token = stream.next())` / `while (cursor)` are entirely valid and bounded; firing on every non-comparison would flood with false positives. Break-scope boundaries: `for_statement`, `for_in_statement`, `while_statement`, `do_statement`, `switch_statement`, plus all function types. |
+| SAFE601 | missing_assertions | JS has no built-in `assert` keyword — the rule walks for *calls* to a configured set of assertion function names. Default set covers Node's `assert` module helpers (`assert`, `ok`, `equal`, `strictEqual`, `deepEqual`, `deepStrictEqual`, `notEqual`, `notStrictEqual`, `rejects`, `throws`, `doesNotThrow`, `doesNotReject`, `fail`, `ifError`, `match`), `console.assert`, plus test framework entry points (`expect` for Jest / Chai / Vitest, `should` for Should.js). Disabled by default like in Python — opt in with `[tool.safelint.rules.missing_assertions]` `enabled = true`. |
+| SAFE701 | test_existence | JS source pairs with any of `<stem>.test.{js,mjs,cjs}` (Jest convention) or `<stem>.spec.{js,mjs,cjs}` (Mocha / Karma convention) under `test_dirs` (default `["tests"]`). The "expected" filename in violation messages surfaces the Jest-style `.test.<source-extension>` form as the canonical suggestion. |
+| SAFE702 | test_coupling | Same filename patterns as SAFE701. Coupling is satisfied when *any* candidate test filename for the source file appears in the changed-files set — `foo.test.js` *or* `foo.spec.js` both count. |
+| SAFE801 | tainted_sink | Intra-procedural taint analysis. Function parameters seed the tainted set (including destructured names: `function f({userInput})` taints `userInput`; `function f([first, ...rest])` taints both). Taint propagates through `const` / `let` / `var` declarations, `assignment_expression`, `augmented_assignment_expression` (`+=`), template strings (`\`prefix ${tainted}\``), array / object literals, spread, and member / subscript access on tainted receivers. JS default sinks: `eval`, `Function` (constructor), `execScript`, `exec`, `execSync`, `spawn`, `spawnSync`, `setTimeout`, `setInterval`. JS default sanitizers: `escape`, `sanitize`, `encodeURIComponent`, `encodeURI`, `DOMPurify`. JS default sources: `prompt`, `readline`, `stdin`, `input`. Per-language config keys: `sinks_javascript` / `sanitizers_javascript` / `sources_javascript`. |
+| SAFE802 | return_value_ignored | Bare calls (an `expression_statement` whose first child is a call) to a configured set of return-value-significant functions. JS default `flagged_calls_javascript`: Node fs / stream / process methods whose return value or returned promise carries success/failure info — `write`, `writeFile`, `writeFileSync`, `unlink`, `unlinkSync`, `rename`, `renameSync`, `mkdir`, `mkdirSync`, `rmdir`, `rmdirSync`, `rm`, `rmSync`, `send`, `sendall`, `exec`, `execSync`, `spawn`, `spawnSync`. **Common gotcha:** an unhandled rejected promise (e.g. `fs.writeFile(...)` returning a Promise that gets dropped) silently swallows errors — capturing the result with `await` or `.then()` resolves the violation. |
+| SAFE803 | null_dereference | Chained `.field` / `[idx]` access on a call returning `null` / `undefined`. **Optional chaining is the safe form**: `arr.find(...)?.name` is null-safe and is NOT flagged. JS default `nullable_methods_javascript`: Array (`find`, `pop`, `shift`), Map (`get`), DOM (`getElementById`, `querySelector`, `closest`), RegExp (`exec`, `match`). |
+
+### Rules that stay Python-only
+
+The following rules don't apply (or don't translate cleanly) to JavaScript and stay registered for Python only — they will not fire on `.js` / `.mjs` / `.cjs` files.
+
+| Code | Rule | Why JS-only-skipped |
+|---|---|---|
+| SAFE201 | bare_except | Python `except:` (no exception type) silently catches `KeyboardInterrupt` and `SystemExit`. JS `try/catch` always binds the caught error (or uses the optional-binding form `catch {}`); the equivalent process-signal hazard doesn't exist. |
+| SAFE301 | global_state | Python `global` keyword has no clean JS equivalent — JS scoping is fundamentally different (lexical via `var` / `let` / `const` and global-object access via `globalThis.x` / `window.x`). |
+| SAFE302 | global_mutation | Same scoping reason. |
+| SAFE401 | resource_lifecycle | Python `with` blocks have no clean JS analogue. JS resource patterns (callback `fs.open`, promise-returning APIs, the new `using` declarations) vary widely; a useful rule needs a separate per-pattern analysis. |
 
 ## Idiomatic fix patterns
 
@@ -110,6 +132,162 @@ function render(width, height, dpi, colour, font, fontSize, lineHeight, padding)
 function render({ width, height, dpi, colour, font, fontSize, lineHeight, padding }) {
   // ...
 }
+```
+
+### SAFE202 (empty catch)
+
+Always do *something* in a catch — log, rethrow, or recover. Empty catches are the JavaScript equivalent of swallowing exceptions in Python.
+
+```javascript
+// Before
+try {
+  riskyCall();
+} catch (e) {}
+
+// After — log and decide
+try {
+  riskyCall();
+} catch (e) {
+  console.error('riskyCall failed:', e);
+  // ...handle or rethrow as appropriate
+}
+```
+
+### SAFE203 (logging on error)
+
+Every catch that swallows an error must log it. `console.error` is the minimum; structured loggers (`pino`, `winston`, `bunyan`) are preferred in production.
+
+```javascript
+// Before
+try {
+  await fetchUser(id);
+} catch (e) {
+  state.failed = true;
+}
+
+// After
+try {
+  await fetchUser(id);
+} catch (e) {
+  logger.error({ err: e, userId: id }, 'fetchUser failed');
+  state.failed = true;
+}
+```
+
+### SAFE304 (hidden I/O)
+
+Two patterns work well, mirroring the Python guidance:
+
+1. **Rename to signal intent.** A function called `printSummary` is exempt; one called `summary` that internally calls `console.log` isn't.
+2. **Inject the I/O primitive.** Pass the logger / writer / fetcher in as an argument so the function becomes pure modulo its dependencies.
+
+```javascript
+// Before
+function renderReport(data) {
+  console.log(formatReport(data));   // SAFE304
+}
+
+// After (option 1: rename)
+function printReport(data) {
+  console.log(formatReport(data));   // name signals intent
+}
+
+// After (option 2: inject)
+function renderReport(data, write = console.log) {
+  write(formatReport(data));
+}
+```
+
+### SAFE501 (unbounded loop)
+
+If a `while (true)` is genuinely needed (e.g. an event loop, a server's accept loop), make sure there is at least one `break` path inside. If the loop is meant to terminate on a condition, write the condition explicitly.
+
+```javascript
+// Before
+while (true) {
+  doWork();
+}
+
+// After
+while (true) {
+  const item = queue.shift();
+  if (item === undefined) break;   // explicit termination
+  doWork(item);
+}
+```
+
+### SAFE601 (missing assertions)
+
+If your project uses Node's built-in `assert` module, the rule recognises every helper out of the box. For test-framework code, `expect(...)` (Jest, Chai, Vitest) is also recognised. The fix is usually to add a guard / sanity check at the function's entry:
+
+```javascript
+// Before
+function process(items) {
+  return items.map(transform);
+}
+
+// After
+function process(items) {
+  assert(Array.isArray(items), 'items must be an array');
+  return items.map(transform);
+}
+```
+
+### SAFE801 (tainted sink) — JavaScript-specific
+
+The biggest hidden-flow trap in JS is template-string interpolation:
+
+```javascript
+// Before — userInput taints the template, then taint reaches eval
+function run(userInput) {
+  const code = `result = ${userInput};`;
+  eval(code);   // SAFE801
+}
+
+// After — sanitize / use a safer execution model
+function run(userInput) {
+  const safe = sanitize(userInput);
+  eval(`result = ${safe};`);   // OK if ``sanitize`` is in the configured list
+  // …or refactor: avoid eval entirely; parse + interpret instead.
+}
+```
+
+For DOM-XSS contexts, `DOMPurify(userInput)` is recognised as a sanitizer by default.
+
+### SAFE802 (return value ignored)
+
+The Node fs / promise APIs are the most common offenders — a discarded promise from `fs.writeFile` will never throw on failure unless awaited or `.catch`-ed:
+
+```javascript
+// Before
+fs.writeFile('out.txt', data);   // SAFE802 — promise discarded
+
+// After
+await fs.writeFile('out.txt', data);
+
+// Or — in a callback context — explicitly handle the result
+fs.writeFile('out.txt', data, (err) => {
+  if (err) logger.error({ err }, 'write failed');
+});
+```
+
+### SAFE803 (null dereference)
+
+JS's optional chaining is the cleanest fix:
+
+```javascript
+// Before
+const name = users.find(u => u.id === userId).name;   // SAFE803
+
+// After — optional chaining + default
+const name = users.find(u => u.id === userId)?.name ?? '<unknown>';
+
+// Or — explicit guard
+const user = users.find(u => u.id === userId);
+if (user === undefined) {
+  return '<unknown>';
+}
+const name = user.name;
 ```
 
 ## Stdin mode for editor / Claude Code unsaved buffers
