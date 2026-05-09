@@ -5,7 +5,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.analysis.dataflow import TaintTracker
-from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.analysis.dataflow_javascript import JsTaintTracker
+from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
+from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     ATTRIBUTE,
@@ -23,7 +25,13 @@ if TYPE_CHECKING:
     from safelint.rules.base import Violation
 
 
-_ALL_PARAM_TYPES = frozenset(
+_FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
+    "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
+    "javascript": _JS_FUNCTION_TYPES,
+}
+
+# Python parameter shapes — same as Slice 2's max_arguments rule.
+_PY_PARAM_TYPES = frozenset(
     {
         "identifier",
         "typed_parameter",
@@ -34,9 +42,20 @@ _ALL_PARAM_TYPES = frozenset(
     }
 )
 
+# JavaScript parameter shapes inside ``formal_parameters``.
+_JS_PARAM_TYPES = frozenset(
+    {
+        "identifier",
+        "assignment_pattern",
+        "rest_pattern",
+        "object_pattern",
+        "array_pattern",
+    }
+)
 
-def _param_node_name(child: tree_sitter.Node) -> str:
-    """Return the bare identifier name carried by a parameter node, or ``""``."""
+
+def _python_param_node_name(child: tree_sitter.Node) -> str:
+    """Return the bare identifier name carried by a Python parameter node, or ``""``."""
     if child.type == "identifier":
         return node_text(child)
     if child.type in ("list_splat_pattern", "dictionary_splat_pattern"):
@@ -48,19 +67,81 @@ def _param_node_name(child: tree_sitter.Node) -> str:
     return node_text(name_node) if name_node else ""  # pragma: no cover
 
 
-def _param_names(func_node: tree_sitter.Node) -> set[str]:
-    """Return all parameter names for *func_node*, excluding self / cls."""
+def _python_param_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return all parameter names for *func_node* (Python), excluding self / cls."""
     params_node = func_node.child_by_field_name("parameters")
-    if params_node is None:
+    if params_node is None:  # pragma: no cover — defensive: valid Python functions always have a parameters list
         return set()
     names: set[str] = set()
     for child in params_node.named_children:
-        if child.type not in _ALL_PARAM_TYPES:
+        if child.type not in _PY_PARAM_TYPES:
             continue
-        name = _param_node_name(child)
+        name = _python_param_node_name(child)
         if name and name not in ("self", "cls"):
             names.add(name)
     return names
+
+
+def _javascript_param_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return all parameter names for *func_node* (JavaScript).
+
+    Destructured params (``function f({a, b})``, ``function f([x, y])``)
+    contribute every bound name to the taint set — the destructured
+    fields are themselves tainted entry points. Rest params (``...args``)
+    contribute the rest variable name.
+    """
+    params_node = func_node.child_by_field_name("parameters")
+    if params_node is None:  # pragma: no cover — defensive: arrow functions and named functions both expose ``parameters``
+        return set()
+    names: set[str] = set()
+    for child in params_node.named_children:
+        if child.type not in _JS_PARAM_TYPES:
+            continue
+        names.update(_javascript_collect_names(child))
+    return names
+
+
+_JS_NAME_LEAF_TYPES = frozenset({"identifier", "shorthand_property_identifier_pattern"})
+_JS_DESTRUCTURE_CONTAINER_TYPES = frozenset({"array_pattern", "object_pattern", "rest_pattern"})
+
+
+def _javascript_collect_names(node: tree_sitter.Node) -> set[str]:
+    """Walk a JS parameter / pattern node and collect every bound identifier name.
+
+    Dispatches by node-type bucket — leaf identifiers, container patterns
+    (array / object / rest), assignment patterns (``b = 5``), and pair
+    patterns (``{key: alias}``) — into small helpers so this function
+    stays under the cyclomatic-complexity cap.
+    """
+    if node.type in _JS_NAME_LEAF_TYPES:
+        return {node_text(node)}
+    if node.type in _JS_DESTRUCTURE_CONTAINER_TYPES:
+        return _collect_from_container_pattern(node)
+    if node.type == "assignment_pattern":
+        return _collect_from_assignment_pattern(node)
+    if node.type == "pair_pattern":
+        return _collect_from_pair_pattern(node)
+    return set()
+
+
+def _collect_from_container_pattern(node: tree_sitter.Node) -> set[str]:
+    """Collect bound names from ``[a, b]`` / ``{a, b}`` / ``...rest`` patterns."""
+    names: set[str] = set()
+    for c in node.named_children:
+        names.update(_javascript_collect_names(c))
+    return names
+
+
+def _collect_from_assignment_pattern(node: tree_sitter.Node) -> set[str]:
+    """Collect bound names from ``b = 5`` (default-value parameter)."""
+    target = node.named_children[0] if node.named_children else None  # pragma: no branch
+    return _javascript_collect_names(target) if target else set()  # pragma: no cover — defensive
+
+
+def _collect_from_pair_pattern(node: tree_sitter.Node) -> set[str]:
+    """Collect the bound name from ``{key: alias}`` (alias is bound, not key)."""
+    value = node.child_by_field_name("value")
+    return _javascript_collect_names(value) if value else set()  # pragma: no branch
 
 
 class TaintedSinkRule(BaseRule):
@@ -68,6 +149,7 @@ class TaintedSinkRule(BaseRule):
 
     name = "tainted_sink"
     code = "SAFE801"
+    language = ("python", "javascript")
 
     _DEFAULT_SINKS: ClassVar[list[str]] = [
         "eval",
@@ -98,64 +180,84 @@ class TaintedSinkRule(BaseRule):
         "read",
     ]
 
-    def _check_func(
-        self,
-        filepath: str,
-        func_node: tree_sitter.Node,
-        sinks: frozenset[str],
-        sanitizers: frozenset[str],
-        sources: frozenset[str],
-        *,
-        assume_taint_preserving: bool,
-    ) -> list[Violation]:
-        """Run taint analysis on a single function and return violations."""
-        params = _param_names(func_node)
-        tracker = TaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume_taint_preserving)
-        tracker.visit(func_node)
+    def _resolve_assume_taint_preserving(self) -> bool:
+        """Read and validate the ``assume_taint_preserving`` config knob.
+
+        Strict isinstance check: ``bool(...)`` would treat a TOML typo
+        like ``assume_taint_preserving = "false"`` (string) as truthy
+        and silently flip the rule into the opposite mode. Surface the
+        typo as a clear ``TypeError`` instead.
+        """
+        value = self.config.get("assume_taint_preserving", True)
+        if not isinstance(value, bool):
+            msg = f"tainted_sink.assume_taint_preserving must be a bool, got {type(value).__name__}"
+            raise TypeError(msg)
+        return value
+
+    def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run Python taint analysis on every function in *tree*."""
+        sinks = frozenset(self.config.get("sinks", self._DEFAULT_SINKS))
+        sanitizers = frozenset(self.config.get("sanitizers", self._DEFAULT_SANITIZERS))
+        sources = frozenset(self.config.get("sources", self._DEFAULT_SOURCES))
+        assume = self._resolve_assume_taint_preserving()
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
+                continue
+            params = _python_param_names(node)
+            tracker = TaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker.visit(node)
+            violations.extend(self._format_hits(filepath, tracker.sink_hits))
+        return violations
+
+    def _javascript_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run JavaScript taint analysis on every function in *tree*."""
+        sinks = frozenset(self.config.get("sinks_javascript", []))
+        sanitizers = frozenset(self.config.get("sanitizers_javascript", []))
+        sources = frozenset(self.config.get("sources_javascript", []))
+        assume = self._resolve_assume_taint_preserving()
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type not in _JS_FUNCTION_TYPES:
+                continue
+            params = _javascript_param_names(node)
+            tracker = JsTaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker.visit(node)
+            violations.extend(self._format_hits(filepath, tracker.sink_hits))
+        return violations
+
+    def _format_hits(self, filepath: str, hits: list[tuple[tree_sitter.Node, str, str]]) -> list[Violation]:
+        """Convert tracker hits to Violations — same message format for both languages."""
         return [
             self._make_violation_for_node(
                 filepath,
                 call_node,
                 f'Tainted variable "{var}" flows into dangerous sink "{sink}" - sanitize input before use',
             )
-            for call_node, var, sink in tracker.sink_hits
+            for call_node, var, sink in hits
         ]
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Run taint analysis on every function in *tree*."""
-        sinks = frozenset(self.config.get("sinks", self._DEFAULT_SINKS))
-        sanitizers = frozenset(self.config.get("sanitizers", self._DEFAULT_SANITIZERS))
-        sources = frozenset(self.config.get("sources", self._DEFAULT_SOURCES))
-        # Default ``True`` matches the historical behaviour — unknown calls
-        # propagate taint from any tainted argument. Set to ``False`` for a
-        # less conservative analysis with weaker detection: taint is dropped
-        # at every unknown call, which can reduce false positives but
-        # generates false negatives in codebases with many wrapper functions.
-        # See CONFIGURATION.md for guidance.
-        #
-        # Strict isinstance check (not ``bool(...)``): the latter would
-        # treat a TOML typo like ``assume_taint_preserving = "false"``
-        # (string instead of bool) as truthy and silently flip the rule
-        # into the opposite mode the user wanted. Match the validation
-        # style used for other config footguns (tracked_functions /
-        # cleanup_patterns / extend_ignore) and surface the typo as a
-        # clear TypeError when the rule first runs against a file.
-        assume_taint_preserving = self.config.get("assume_taint_preserving", True)
-        if not isinstance(assume_taint_preserving, bool):
-            msg = f"tainted_sink.assume_taint_preserving must be a bool, got {type(assume_taint_preserving).__name__}"
-            raise TypeError(msg)
-        violations: list[Violation] = []
-        for node in walk(tree.root_node):
-            if node.type in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
-                violations.extend(self._check_func(filepath, node, sinks, sanitizers, sources, assume_taint_preserving=assume_taint_preserving))
-        return violations
+        """Run taint analysis on every function in *tree*, dispatching on language."""
+        lang_name = resolve_lang_name(filepath)
+        if lang_name == "javascript":
+            return self._javascript_check(filepath, tree)
+        return self._python_check(filepath, tree)
 
 
 class ReturnValueIgnoredRule(BaseRule):
-    """Flag calls to error-signalling functions whose return value is discarded."""
+    """Flag calls to error-signalling functions whose return value is discarded.
+
+    Cross-language: walks ``expression_statement`` nodes (same name in
+    both grammars) and checks whether the bare statement is a call. The
+    flagged-calls list is per-language so ``write`` can have different
+    semantics in Python (``file.write``) vs JavaScript (``stream.write``,
+    ``fs.writeFile``).
+    """
 
     name = "return_value_ignored"
     code = "SAFE802"
+    language = ("python", "javascript")
 
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
@@ -178,13 +280,18 @@ class ReturnValueIgnoredRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag bare calls whose return value is discarded."""
-        flagged = frozenset(self.config.get("flagged_calls", self._DEFAULT_FLAGGED))
+        lang_name = resolve_lang_name(filepath)
+        flagged = (
+            frozenset(self.config.get("flagged_calls", self._DEFAULT_FLAGGED))
+            if lang_name == "python"
+            else frozenset(self.config.get("flagged_calls_javascript", []))
+        )
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type != EXPRESSION_STATEMENT:
                 continue
             named = node.named_children
-            if not named or named[0].type != CALL:
+            if not named or named[0].type not in CALL_TYPES:
                 continue
             call_node = named[0]
             name = call_name(call_node)
@@ -207,8 +314,9 @@ class NullDereferenceRule(BaseRule):
 
     name = "null_dereference"
     code = "SAFE803"
+    language = ("python", "javascript")
 
-    _DEFAULT_NULLABLE: ClassVar[frozenset[str]] = frozenset(
+    _DEFAULT_NULLABLE_PYTHON: ClassVar[frozenset[str]] = frozenset(
         {
             "get",
             "pop",
@@ -222,13 +330,8 @@ class NullDereferenceRule(BaseRule):
         }
     )
 
-    def _deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
-        """Return the method name if *node* is an unsafe chained dereference, else None.
-
-        The caller already has the *node* in scope, so returning just the
-        method name is enough — the node carries its own position info
-        for column-precise diagnostics.
-        """
+    def _python_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
+        """Return the method name if *node* is an unsafe Python dereference, else None."""
         if node.type not in (ATTRIBUTE, SUBSCRIPT):
             return None
         # attribute → field "object", subscript → field "value"
@@ -237,17 +340,38 @@ class NullDereferenceRule(BaseRule):
         if obj is None or obj.type != CALL:
             return None
         name = call_name(obj)
-        if name and name in nullable:
-            return name
-        return None
+        return name if name and name in nullable else None
+
+    def _javascript_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
+        """Return the method name if *node* is an unsafe JavaScript dereference, else None.
+
+        ``foo?.bar`` (optional chaining) is null-safe by construction —
+        any ``optional_chain`` child token in the member / subscript
+        node means the rule should NOT fire.
+        """
+        if node.type not in ("member_expression", "subscript_expression"):
+            return None
+        # Optional chaining is the safe form — skip it entirely.
+        if any(c.type == "optional_chain" for c in node.children):
+            return None
+        obj = node.child_by_field_name("object")
+        if obj is None or obj.type != "call_expression":
+            return None
+        name = call_name(obj)
+        return name if name and name in nullable else None
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag immediate dereferences on nullable-returning calls."""
-        extra: frozenset[str] = frozenset(self.config.get("nullable_methods", []))
-        nullable = self._DEFAULT_NULLABLE | extra
+        lang_name = resolve_lang_name(filepath)
+        if lang_name == "python":
+            nullable = self._DEFAULT_NULLABLE_PYTHON | frozenset(self.config.get("nullable_methods", []))
+            deref_hit = self._python_deref_hit
+        else:
+            nullable = frozenset(self.config.get("nullable_methods_javascript", []))
+            deref_hit = self._javascript_deref_hit
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            method = self._deref_hit(node, nullable)
+            method = deref_hit(node, nullable)
             if method is not None:
                 violations.append(
                     self._make_violation_for_node(

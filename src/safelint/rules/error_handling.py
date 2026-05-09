@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages import get_language_for_file
-from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, walk
+from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
@@ -273,16 +272,15 @@ class EmptyExceptRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every catch handler whose body is effectively empty."""
-        lang = get_language_for_file(filepath)
-        assert lang is not None, "engine guarantees a registered language at this point"
+        lang_name = resolve_lang_name(filepath)
         return [
             self._make_violation_for_node(
                 filepath,
                 clause,
                 "Empty except block - add error handling or a logging call",
             )
-            for clause in _iter_catch_clauses(tree, lang.name)
-            if _is_noop_body(_catch_body(clause), lang.name)
+            for clause in _iter_catch_clauses(tree, lang_name)
+            if _is_noop_body(_catch_body(clause), lang_name)
         ]
 
 
@@ -381,15 +379,14 @@ class LoggingOnErrorRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag catch blocks that handle an error without any logging call."""
-        lang = get_language_for_file(filepath)
-        assert lang is not None, "engine guarantees a registered language at this point"
-        function_types = _FUNCTION_TYPES_BY_LANG[lang.name]
+        lang_name = resolve_lang_name(filepath)
+        function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         return [
             self._make_violation_for_node(
                 filepath,
                 clause,
                 "Except block missing logging call - errors must be logged before being swallowed",
             )
-            for clause in _iter_catch_clauses(tree, lang.name)
-            if self._is_unlogged(clause, lang.name, function_types)
+            for clause in _iter_catch_clauses(tree, lang_name)
+            if self._is_unlogged(clause, lang_name, function_types)
         ]

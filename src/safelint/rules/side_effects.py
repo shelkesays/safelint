@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages import get_language_for_file
-from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, walk
+from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.rules.base import BaseRule
@@ -57,10 +56,9 @@ class SideEffectsHiddenRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
-        lang = get_language_for_file(filepath)
-        assert lang is not None, "engine guarantees a registered language at this point"
-        function_types = _FUNCTION_TYPES_BY_LANG[lang.name]
-        io_funcs = _io_funcs_for_lang(self.config, lang.name, ["open", "print", "input"])
+        lang_name = resolve_lang_name(filepath)
+        function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
+        io_funcs = _io_funcs_for_lang(self.config, lang_name, ["open", "print", "input"])
         # Normalise both sides of the comparison so user-supplied prefixes
         # like ``["Get", "Calculate"]`` still match ``get_data`` / ``calculate_x``.
         pure_prefixes: tuple[str, ...] = tuple(p.lower() for p in self.config.get("pure_prefixes", []))
@@ -96,10 +94,9 @@ class SideEffectsRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""
-        lang = get_language_for_file(filepath)
-        assert lang is not None, "engine guarantees a registered language at this point"
-        function_types = _FUNCTION_TYPES_BY_LANG[lang.name]
-        io_funcs = _io_funcs_for_lang(self.config, lang.name, ["open", "print", "input"])
+        lang_name = resolve_lang_name(filepath)
+        function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
+        io_funcs = _io_funcs_for_lang(self.config, lang_name, ["open", "print", "input"])
         # Lowercase BOTH sides so the substring check is genuinely
         # case-insensitive — mixed-case keywords in config (e.g. ``"Write"``)
         # still match camelCase function names like ``writeLog``.

@@ -235,6 +235,10 @@ _RULES_WIDENED_FOR_JAVASCRIPT: frozenset[str] = frozenset(
         "MissingAssertionsRule",
         "TestExistenceRule",
         "TestCouplingRule",
+        # Slice 5: dataflow rules.
+        "TaintedSinkRule",
+        "ReturnValueIgnoredRule",
+        "NullDereferenceRule",
     }
 )
 

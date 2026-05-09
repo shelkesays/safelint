@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages import get_language_for_file
-from safelint.languages._node_utils import node_text, walk
+from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
@@ -53,10 +52,9 @@ class NestingDepthRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function whose maximum control-flow nesting depth exceeds max_depth."""
         max_depth: int = self.config.get("max_depth", 2)
-        lang = get_language_for_file(filepath)
-        assert lang is not None, "engine guarantees a registered language at this point"
-        function_types = _FUNCTION_TYPES_BY_LANG[lang.name]
-        depth_types = _DEPTH_NODE_TYPES_BY_LANG[lang.name]
+        lang_name = resolve_lang_name(filepath)
+        function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
+        depth_types = _DEPTH_NODE_TYPES_BY_LANG[lang_name]
         violations = []
         for node in walk(tree.root_node):
             if node.type not in function_types:

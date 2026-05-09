@@ -112,3 +112,32 @@ NUMBER = "number"
 STRING = "string"
 TEMPLATE_STRING = "template_string"
 COMMENT = "comment"
+
+# Assignment / declaration shapes — used by the dataflow analyser.
+# JS doesn't separate "annotated assignment" from "regular assignment"
+# the way Python does; type annotations live in the TS grammar, not JS.
+ASSIGNMENT_EXPRESSION = "assignment_expression"
+AUGMENTED_ASSIGNMENT_EXPRESSION = "augmented_assignment_expression"
+VARIABLE_DECLARATOR = "variable_declarator"  # ``const x = y``, ``let x = y``, ``var x = y``
+LEXICAL_DECLARATION = "lexical_declaration"  # ``const`` / ``let`` wrapper
+VARIABLE_DECLARATION = "variable_declaration"  # ``var`` wrapper
+
+# Destructuring patterns (LHS shapes).
+ARRAY_PATTERN = "array_pattern"  # ``[a, b] = ...``
+OBJECT_PATTERN = "object_pattern"  # ``{a, b} = ...``
+REST_PATTERN = "rest_pattern"  # ``...rest`` in destructuring
+SHORTHAND_PROPERTY_IDENTIFIER_PATTERN = "shorthand_property_identifier_pattern"  # ``{foo}`` short form
+PAIR_PATTERN = "pair_pattern"  # ``{key: alias}`` in object destructuring
+
+# Composite expressions that propagate taint between operands.
+TEMPLATE_SUBSTITUTION = "template_substitution"  # ``${expr}`` inside a template_string
+SPREAD_ELEMENT = "spread_element"  # ``foo(...args)`` in call positions
+
+# Container literals.
+ARRAY = "array"
+OBJECT = "object"
+
+# Field name on a member_expression marking optional chaining (``foo?.bar``).
+# When present, the chained access is null-safe by construction — null_dereference
+# (SAFE803) should NOT fire.
+OPTIONAL_CHAIN = "optional_chain"
