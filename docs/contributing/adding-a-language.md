@@ -144,14 +144,24 @@ For each rule that ports, the work is:
 
    The engine is agnostic to which pattern you pick — both satisfy the `BaseRule` interface. Direct constant imports were the original architectural choice because they keep node-type assumptions explicit at the import site; pattern A preserves that property while pattern B trades it for code reuse.
 
-### 6. Update tests and docs
+### 6. Update CLI / pre-commit plumbing
+
+A handful of edges read the supported-language list from the registry; one edge still needs a manual edit. The engine's own file-discovery loop, the suppression parser, the cache layer, and the per-rule dispatch are *already* registry-driven — the new language plugs in via Step 3 alone.
+
+The one manual edit is the published pre-commit hook config:
+
+* **`.pre-commit-hooks.yaml`** — `types_or: [python]` lists the pre-commit filetype tags downstream users of `pre-commit-hooks` will get matched against. Add the new tag (e.g. `- ts` for TypeScript) so users who configure the hook in their `.pre-commit-config.yaml` get the new files passed in. SafeLint itself still drops anything not in `supported_extensions()` defensively, but pre-commit's own filter happens first and would otherwise hide the new files from the hook.
+
+The CLI's git-status filters (`_collect_all_supported_files`, `_filter_supported_files` in `cli.py`, plus the hook-mode pre-filter on the bottom of `main()`) call `supported_extensions()` directly and need no edit.
+
+### 7. Update tests and docs
 
 * Tests under `tests/` should add a per-language test file (e.g. `test_engine_typescript.py`) covering at minimum: discovery picks up the extension, the suppression parser recognises `// nosafe`, and at least one rule fires on a known-bad TS file.
 * The [Rules reference](../configuration/rules.md) rule-by-rule table should grow a "Languages" column.
 * `README.md` should list the supported languages prominently.
 * `CHANGELOG.md` gets an entry under **Added**.
 
-### 7. Update the bundled AI-client skills
+### 8. Update the bundled AI-client skills
 
 The bundle at `src/safelint/skill_files/` ships one Markdown artefact per registered AI client (12 today: Claude Code's `SKILL.md`, plus a per-client file under each of `cursor/`, `copilot/`, `gemini/`, `windsurf/`, `codex/`, `continue/`, `cline/`, `aider/`, `trae/`, `antigravity/`, `zed/`). Every one of them has a **Step 2 — Identify the language(s) involved** section with a registry table listing the languages safelint can lint. When you add a new language, all twelve files need a new row in that table.
 

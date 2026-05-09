@@ -1,11 +1,15 @@
 - id: safelint
   name: SafeLint (Holzmann safety rules)
   description: >
-    Checks Python files against safety-critical coding rules inspired by
+    Checks source files against safety-critical coding rules inspired by
     Gerard J. Holzmann's Power of Ten (NASA/JPL). Catches oversized functions,
     deep nesting, bare excepts, global mutation, unbounded loops, and more.
   entry: safelint
-  language: python
-  types: [python]
+  language: python  # the hook runtime — not the language being linted
+  # Files passed to the hook. ``types_or`` lists the source-language
+  # filetype tags pre-commit recognises; safelint then drops anything
+  # that isn't in ``supported_extensions()``. Add the new tag here
+  # when registering a new language (e.g. ``- ts`` for TypeScript).
+  types_or: [python]
   args: [--fail-on=error]
   files: ^src/

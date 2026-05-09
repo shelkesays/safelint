@@ -39,6 +39,7 @@ from safelint.core.config import MODE_FAIL_ON, SEVERITY_ORDER, load_config
 from safelint.core.engine import SafetyEngine
 from safelint.core.runner import resolve_cache_dir, run
 from safelint.formatters import format_json, format_sarif
+from safelint.languages import supported_extensions
 
 
 if TYPE_CHECKING:
@@ -475,15 +476,16 @@ def _normalize_path(abs_path: Path, cwd: Path) -> str:
         return str(abs_path)
 
 
-def _collect_all_py_files(raw: set[str], git_root: Path) -> list[str]:
-    """Return paths for all existing .py files in *raw* (no target filter).
+def _collect_all_supported_files(raw: set[str], git_root: Path) -> list[str]:
+    """Return paths for all existing files with a registered language extension (no target filter).
 
     Paths are relative to cwd when possible, otherwise absolute.
     """
     cwd = Path.cwd()
+    exts = tuple(supported_extensions())
     results: list[str] = []
     for rel in raw:
-        if not rel.endswith(".py"):
+        if not rel.endswith(exts):
             continue
         abs_path = (git_root / rel).resolve()
         if abs_path.exists():
@@ -491,17 +493,18 @@ def _collect_all_py_files(raw: set[str], git_root: Path) -> list[str]:
     return sorted(results)
 
 
-def _filter_py_files(raw: set[str], git_root: Path, target_abs: Path) -> list[str]:
-    """Filter git-relative paths to existing .py files under *target_abs*.
+def _filter_supported_files(raw: set[str], git_root: Path, target_abs: Path) -> list[str]:
+    """Filter git-relative paths to existing supported-language files under *target_abs*.
 
     Returned paths are relative to cwd when possible, which keeps diagnostic
     output (``file:line:``) free of Windows drive-letter colons in the common
     case; absolute paths are used as a fallback for files outside cwd.
     """
     cwd = Path.cwd()
+    exts = tuple(supported_extensions())
     results: list[str] = []
     for rel in raw:
-        if not rel.endswith(".py"):
+        if not rel.endswith(exts):
             continue
         abs_path = (git_root / rel).resolve()
         if abs_path.exists() and _is_under_target(abs_path, target_abs):
@@ -581,7 +584,7 @@ def _get_git_modified_python_files(target: Path) -> tuple[list[str], list[str]] 
         raw = _get_raw_changed_files(git_bin, git_root)
         if raw is None:
             return None
-        return _collect_all_py_files(raw, git_root), _filter_py_files(raw, git_root, target_abs)
+        return _collect_all_supported_files(raw, git_root), _filter_supported_files(raw, git_root, target_abs)
 
     # Any git-side failure (no git, not a repo, timeout) means we fall back
     # to scanning all files — that's a documented behaviour, not an error.
@@ -1342,7 +1345,7 @@ def main() -> None:
         sys.exit(_run_skill(args))
 
     args = _build_hook_parser().parse_args()
-    files = [f for f in args.files if f.endswith(".py")]
+    files = [f for f in args.files if f.endswith(tuple(supported_extensions()))]
     sys.exit(_run_hook(args, files))
 
 
