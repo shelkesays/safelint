@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.2] - 2026-05-09
+
+Completion of the multi-language readiness work started in v1.12.1. The engine, cache, suppression parser, file discovery, and per-rule dispatch were already registry-driven, but three CLI helpers and the published pre-commit hook spec still hard-coded `.py`. With this release every supported-extension check reads from `safelint.languages.supported_extensions()`, so registering a new language is genuinely additive — drop a `LanguageDefinition` into `languages/<lang>.py`, append it to the registry loop, append the new filetype tag to `types_or` in `.pre-commit-hooks.yaml`, and the CLI discovers it everywhere automatically.
+
+**No user-visible behaviour change** for current single-language Python usage: with only Python registered, `tuple(supported_extensions())` is `(".py", ".pyw")` and `types_or: [python]` is identical in semantics to the previous `types: [python]`.
+
+### Changed (internal — registry-driven)
+
+- **CLI git-status filters now read from the registry.** `_collect_all_py_files` and `_filter_py_files` in `src/safelint/cli.py` are renamed to `_collect_all_supported_files` and `_filter_supported_files` respectively, and both now build `exts = tuple(supported_extensions())` once per call to drive the `str.endswith` check. The hook-mode pre-filter at the bottom of `main()` (`[f for f in args.files if f.endswith(".py")]`) reads from the registry too. So `safelint` invoked by pre-commit with mixed Python + (future) TypeScript files accepts both rather than silently dropping the non-Python ones.
+- **Published pre-commit hook spec uses `types_or`.** `.pre-commit-hooks.yaml` previously declared `types: [python]`. Switched to `types_or: [python]` so the add-a-language edit becomes a one-line append (`- ts`) instead of a schema change. Description generalised from "Python files" to "source files"; an inline comment marks `language: python` as the hook *runtime* (a real source of confusion in pre-commit configs), not the language being linted.
+
+### Changed (docs)
+
+- **`docs/contributing/adding-a-language.md`** gains an explicit **Step 6 — Update CLI / pre-commit plumbing** that lists the surfaces reading from the registry vs. the one place still requiring a manual edit (the `types_or` line in `.pre-commit-hooks.yaml`). Old Step 6 (tests + docs) is now Step 7; old Step 7 (bundled AI-client skills) is now Step 8.
+
+### Behaviour changes (heads-up)
+
+- **None for end users** running `safelint check` or `safelint skill *`. The renamed CLI helpers are private (underscore-prefixed) and behaviour is identical with only Python registered. The `types_or` change is single-element today, so downstream pre-commit users see no difference until a second filetype tag lands.
+
 ## [1.12.1] - 2026-05-09
 
 A small follow-on to v1.12.0. One user-visible bug fix, one perf optimisation, an internal-API cleanup, and pre-emptive engine plumbing for the eventual second-language work. No behaviour change for current users beyond the bug fix.
