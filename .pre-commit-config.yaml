@@ -139,7 +139,7 @@ repos:
         # itself drops anything not in `supported_extensions()` defensively;
         # this filter just keeps non-source files (Markdown, Makefiles)
         # from reaching the hook in the first place.
-        types_or: [python]
+        types_or: [python, javascript]
         files: ^src/
 
   # ---------------------------------------------------------------------------
