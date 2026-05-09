@@ -101,8 +101,8 @@ def test_js_update_expression_on_global_fires(tmp_path: Path) -> None:
     this branch the rule would silently miss the most concise form of
     global mutation.
     """
-    for expr in ("globalThis.counter++", "--window.x", "process.exitCode++", "++self.tick"):
-        sample = tmp_path / f"update_{hash(expr) & 0xFFFF:x}.js"
+    for idx, expr in enumerate(("globalThis.counter++", "--window.x", "process.exitCode++", "++self.tick")):
+        sample = tmp_path / f"update_{idx}.js"
         sample.write_text(
             f"function bump() {{ {expr}; }}\n",
             encoding="utf-8",
