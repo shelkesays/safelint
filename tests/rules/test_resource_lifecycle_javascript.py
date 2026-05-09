@@ -273,3 +273,84 @@ def test_js_new_inside_try_finally_does_not_fire(tmp_path: Path) -> None:
     )
     result = SafetyEngine(cfg).check_file(str(sample))
     assert not any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_acquirer_inside_finally_block_fires(tmp_path: Path) -> None:
+    """A resource acquired inside a ``finally { ... }`` is NOT guarded.
+
+    Walking up the parent chain naively reaches the same try_statement
+    whose ``finally`` is the *enclosing* block — so without the
+    finally-self check, ``try { ... } finally { fs.createReadStream(...) }``
+    would be silently accepted. There's no subsequent finally to
+    guarantee the cleanup of THIS resource, so the rule must fire.
+    """
+    sample = tmp_path / "in_finally.js"
+    sample.write_text(
+        "function f(path) {\n"
+        "  try {\n"
+        "    work();\n"
+        "  } finally {\n"
+        "    const stream = fs.createReadStream(path);\n"  # acquired in finally → unguarded
+        "    processStream(stream);\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    safe401 = [v for v in result.violations if v.code == "SAFE401"]
+    assert len(safe401) == 1
+    assert "createReadStream" in safe401[0].message
+
+
+def test_js_acquirer_inside_outer_finally_with_inner_try_finally_does_not_fire(tmp_path: Path) -> None:
+    """An acquirer in an outer finally is fine if it has its own try/finally.
+
+    The outer ``finally`` doesn't guard *itself*, but the inner
+    ``try { acquire() } finally { close() }`` inside the outer finally
+    does — so this case must be clean.
+    """
+    sample = tmp_path / "nested_finally_safe.js"
+    sample.write_text(
+        "function f(path) {\n"
+        "  try {\n"
+        "    work();\n"
+        "  } finally {\n"
+        "    let stream;\n"
+        "    try {\n"
+        "      stream = fs.createReadStream(path);\n"
+        "      processStream(stream);\n"
+        "    } finally {\n"
+        "      if (stream) stream.close();\n"
+        "    }\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_acquirer_inside_catch_block_remains_guarded(tmp_path: Path) -> None:
+    """An acquirer in ``catch (e) { ... }`` IS guarded by the same try's finally.
+
+    The finally clause runs after the catch handler, so resources opened
+    in the catch arm are cleaned up by the same try's finally. This is
+    the positive control for the finally-self check — only the finally
+    arm itself is excluded; catch arms remain guarded.
+    """
+    sample = tmp_path / "in_catch_guarded.js"
+    sample.write_text(
+        "function f(path) {\n"
+        "  try {\n"
+        "    work();\n"
+        "  } catch (e) {\n"
+        "    const stream = fs.createReadStream(path);\n"  # in catch → finally runs after
+        "    processStream(stream);\n"
+        "  } finally {\n"
+        "    cleanup();\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE401" for v in result.violations)
