@@ -113,7 +113,18 @@ _RULES_INDEX_DEST = "build/snippets/_rules_at_a_glance.md"
 
 
 def _slugify_heading(code: str, name: str) -> str:
-    """Match the slug pymdownx.toc generates for rules.md ``### SAFE101 — `name``` headings."""
+    """Return the heading slug Python-Markdown's ``toc`` extension produces for a rule.
+
+    Rule headings on ``rules.md`` are written like::
+
+        ### SAFE101 — `function_length`
+
+    Python-Markdown's ``toc`` extension (enabled in ``mkdocs.yml`` as the
+    plain ``toc:`` entry — *not* ``pymdownx.toc``) lowercases the text,
+    drops non-alphanumeric runs, and joins the surviving tokens with
+    single dashes. The em-dash and the inline-code backticks both fall
+    out, leaving e.g. ``safe101-function_length``.
+    """
     return f"{code.lower()}-{name}"
 
 
