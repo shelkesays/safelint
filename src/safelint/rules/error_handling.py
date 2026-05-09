@@ -377,12 +377,15 @@ class LoggingOnErrorRule(BaseRule):
         """Flag catch blocks that handle an error without any logging call."""
         lang_name = resolve_lang_name(filepath)
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
+        # Same language-specific terminology as ``EmptyExceptRule.check_file``
+        # — JavaScript developers write ``catch``, not ``except``.
+        message = (
+            "Catch block missing logging call - errors must be logged before being swallowed"
+            if lang_name == "javascript"
+            else "Except block missing logging call - errors must be logged before being swallowed"
+        )
         return [
-            self._make_violation_for_node(
-                filepath,
-                clause,
-                "Except block missing logging call - errors must be logged before being swallowed",
-            )
+            self._make_violation_for_node(filepath, clause, message)
             for clause in _iter_catch_clauses(tree, lang_name)
             if self._is_unlogged(clause, lang_name, function_types)
         ]

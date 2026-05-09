@@ -5,8 +5,16 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
+from safelint.languages import JAVASCRIPT
 from safelint.languages._node_utils import resolve_lang_name
 from safelint.rules.base import BaseRule
+
+
+# Pre-sorted so ``_candidate_test_filenames`` produces a deterministic
+# order for messages and tests; sourced from the registered
+# ``LanguageDefinition`` so the test-file-pattern set stays in sync if
+# the registered JS extensions ever change.
+_JS_EXTENSIONS: tuple[str, ...] = tuple(sorted(JAVASCRIPT.file_extensions))
 
 
 if TYPE_CHECKING:
@@ -22,16 +30,16 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
 
     JavaScript: ``<stem>.test.<ext>`` (Jest convention) and
     ``<stem>.spec.<ext>`` (Mocha / Karma convention) for each of the
-    registered JS extensions (``.js``, ``.mjs``, ``.cjs``). A source
-    ``foo.js`` matches if any of ``foo.test.js`` / ``foo.test.mjs`` /
-    ``foo.test.cjs`` / ``foo.spec.js`` / ``foo.spec.mjs`` /
-    ``foo.spec.cjs`` exists under the configured ``test_dirs``.
+    registered JS extensions. The extension set is sourced from the
+    ``JAVASCRIPT`` ``LanguageDefinition`` so this rule stays in sync if
+    the registered JS extensions ever change. A source ``foo.js``
+    matches if any of ``foo.test.{ext}`` or ``foo.spec.{ext}`` exists
+    under the configured ``test_dirs`` for ``ext`` in the registry.
     """
     if lang_name == "javascript":
         stem = src_path.stem
-        extensions = (".js", ".mjs", ".cjs")
         infixes = (".test", ".spec")
-        return [f"{stem}{infix}{ext}" for infix in infixes for ext in extensions]
+        return [f"{stem}{infix}{ext}" for infix in infixes for ext in _JS_EXTENSIONS]
     # Python (and any future language without an explicit override).
     return [f"test_{src_path.stem}.py"]
 
