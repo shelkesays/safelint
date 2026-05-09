@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.12.1] - 2026-05-09
+
+A small follow-on to v1.12.0. One user-visible bug fix, one perf optimisation, an internal-API cleanup, and pre-emptive engine plumbing for the eventual second-language work. No behaviour change for current users beyond the bug fix.
+
+### Fixed
+
+- **`per_file_ignores = ["*"]` no longer triggers a spurious typo-guard warning.** v1.12.0 added the `"*"` wildcard as a documented blanket-suppress mechanism in toml `per_file_ignores`, but the validation pass in `_parse_per_file_ignores` still treated `"*"` as an unknown entry and emitted `safelint: warning: unknown entries in per_file_ignores...` for the exact value the docs tell users to use. The validation now exempts `"*"` while preserving the typo guard for genuinely unknown codes/names. The pre-existing wildcard test was extended to capture stderr and assert the absence of the warning, so any future regression here surfaces in CI.
+
+### Changed (internal)
+
+- **Single-pass directive parsing.** `_parse_suppressions` (line-level `# nosafe`) and `_parse_file_level_ignores` (file-level `# safelint: ignore`) used to walk the Tree-sitter tree independently — two full passes per file. New `_parse_directives` helper folds both into one O(N) pass; on a 5000-line generated file (a primary use case for file-level ignores), this halves the per-file walk cost. Behaviour is bit-for-bit identical to the two-pass version. The two original helpers are kept as thin wrappers so the existing unit tests in `tests/core/test_suppression.py` continue to work without changes.
+- **`_merge_in_file_directives` signature cleanup.** The boolean parameter was forcing surrounding mandatory non-bool params into keyword-only territory unnecessarily. Reordered so only the boolean is keyword-only, matching Python convention (positional mandatory params first, then `*`, then keyword-only).
+
+### Added (pre-emptive — dormant until a second language lands)
+
+- **`BaseRule.language: tuple[str, ...] = ("python",)`** — new class attribute that the engine consults in `_run_rules` before dispatching `check_file`. Rules whose `language` tuple doesn't include the active file's `LanguageDefinition.name` are skipped. Today every rule defaults to `("python",)` and Python is the only registered language, so the filter is a no-op for current usage. The plumbing is the engine half of the per-language dispatch contract documented in `ADDING_A_LANGUAGE.md`; the per-rule audit (which existing rules port cross-language vs. stay Python-only) is per-rule work that ships *with* each new language. Adding TypeScript / Go / Rust now requires only registering a new `LanguageDefinition` and widening `language` on the rules that port — no engine changes.
+- 4 new dispatch tests in `tests/core/test_engine.py`: filter skips Python-only rules on a hypothetical-language file (via a monkeypatched fake `LanguageDefinition`), filter doesn't accidentally skip Python rules on Python files (regression guard), `BaseRule.language` default is pinned, every registered rule still inherits the default.
+
+### Behaviour changes (heads-up)
+
+- **None for end-users.** The `"*"` typo-guard fix removes an erroneous warning; the perf and signature-cleanup work is invisible; the dispatch infrastructure is dormant. End-to-end behaviour for `safelint check` and `safelint skill *` commands is identical to v1.12.0.
+
 ## [1.12.0] - 2026-05-08
 
 A focused feature release on top of v1.11.0. The suppression model grows from three layers to four with a new in-file `# safelint: ignore` directive that lets users silence rules for a whole file from inside the file itself — matching the established pattern from ruff (`# ruff: noqa`), flake8 (`# flake8: noqa`), pylint (`# pylint: disable=`), and mypy (`# type: ignore`).
@@ -297,7 +319,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.12.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.12.1...HEAD
+[1.12.1]: https://github.com/shelkesays/safelint/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/shelkesays/safelint/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/shelkesays/safelint/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/shelkesays/safelint/compare/v1.9.0...v1.10.0
