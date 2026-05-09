@@ -82,7 +82,7 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 | Field | Type | Notes |
 |---|---|---|
 | `code` | string | The SAFE-code, e.g. `"SAFE101"`. May be empty for synthetic violations (rare); fall back to `rule` when displaying. |
-| `rule` | string | The snake-case rule name, e.g. `"function_length"`. This is the same key users put in their config file to tune the rule — e.g. `[tool.safelint.rules.function_length]` in `pyproject.toml` or `[rules.function_length]` in a standalone `safelint.toml`. The full list of rule names is in [`CONFIGURATION.md`](../CONFIGURATION.md). |
+| `rule` | string | The snake-case rule name, e.g. `"function_length"`. This is the same key users put in their config file to tune the rule — e.g. `[tool.safelint.rules.function_length]` in `pyproject.toml` or `[rules.function_length]` in a standalone `safelint.toml`. The full list of rule names is in [Configuration](configuration/index.md). |
 | `severity` | `"error"` \| `"warning"` | The per-rule severity. Compare against `summary.fail_on` to decide blocking. |
 | `filepath` | string | Path as the user supplied it to the CLI (typically relative to cwd). Not a URI; not percent-encoded. For SARIF output, use `--format sarif` instead — it normalises to RFC 3986 URIs. |
 | `lineno` | int | 1-based start line. `0` for run-level errors with no specific location (rare; only `SAFE000` parse errors emit this). |
@@ -175,7 +175,7 @@ The `summary.blocking` count tells you the pre-computed answer for the current r
 
 Every rule has both a stable `code` (e.g. `SAFE101`) and a stable `name` (e.g. `function_length`). They form a fixed mapping; safelint will not rename either across major versions. Use `code` for short display, `name` for config keys.
 
-The current full list lives in [`CONFIGURATION.md`](../CONFIGURATION.md).
+The current full list lives in [Configuration](configuration/index.md).
 
 ## Example consumers
 

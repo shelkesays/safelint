@@ -40,6 +40,13 @@ dev = [
     "ruff>=0.15.8",
     "ty>=0.0.26",
 ]
+# Documentation site — Material-themed MkDocs build that publishes to
+# https://shelkesays.github.io/safelint/. Install with `uv sync --extra docs`,
+# then `uv run mkdocs serve` for a live preview at http://127.0.0.1:8000.
+docs = [
+    "mkdocs>=1.6.0",
+    "mkdocs-material>=9.5.0",
+]
 
 [project.scripts]
 safelint = "safelint.cli:main"

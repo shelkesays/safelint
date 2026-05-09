@@ -3,6 +3,9 @@
 [![CI](https://github.com/shelkesays/safelint/actions/workflows/ci.yml/badge.svg)](https://github.com/shelkesays/safelint/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/safelint)](https://pypi.org/project/safelint/)
 [![Python](https://img.shields.io/pypi/pyversions/safelint)](https://pypi.org/project/safelint/)
+[![Docs](https://img.shields.io/badge/docs-shelkesays.github.io%2Fsafelint-blue)](https://shelkesays.github.io/safelint/)
+
+> **📖 Full documentation:** <https://shelkesays.github.io/safelint/> — searchable, navigable, with a per-client install guide for each of the twelve supported AI agents. The README below is the repo home; the docs site is the user reference.
 
 SafeLint is a configurable static analysis tool that enforces safety-critical coding practices inspired by Gerard J. Holzmann's "Power of Ten" rules at NASA/JPL.
 

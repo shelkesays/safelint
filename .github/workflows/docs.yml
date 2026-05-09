@@ -1,0 +1,71 @@
+name: Build and deploy docs
+
+# Builds the MkDocs Material site and publishes it to the `gh-pages` branch.
+# GitHub Pages serves whatever's on `gh-pages` at https://shelkesays.github.io/safelint/.
+#
+# Repo-root files that GitHub uses for community-health UI (CHANGELOG.md,
+# CONTRIBUTING.md, CODE_OF_CONDUCT.md, SUPPORT.md) live at the repo root as
+# their source of truth and are *copied* into docs/ here, just before
+# `mkdocs build`. They're never committed in their docs/ locations — the
+# .gitignore entry for those copy-target paths keeps the working tree clean.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "docs/**"
+      - "mkdocs.yml"
+      - "pyproject.toml"
+      - "uv.lock"
+      # Repo-root files that get copied into docs/ at build time:
+      - "README.md"
+      - "CHANGELOG.md"
+      - "CONTRIBUTING.md"
+      - "CODE_OF_CONDUCT.md"
+      - "SUPPORT.md"
+      - ".github/workflows/docs.yml"
+  # Allow manual re-deploy from the Actions tab without pushing.
+  workflow_dispatch:
+
+# Cancel any in-flight build for the same branch when a new push lands —
+# avoids racing two `mkdocs gh-deploy` runs that both want to force-push to
+# `gh-pages`.
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write  # mkdocs gh-deploy pushes to the gh-pages branch
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # mkdocs gh-deploy needs full history to push to gh-pages
+
+      - uses: astral-sh/setup-uv@v8.1.0
+        with:
+          python-version: "3.11"
+
+      - name: Install docs dependencies
+        run: uv sync --extra docs
+
+      - name: Copy GitHub-UI files into docs/ build tree
+        # CHANGELOG / CONTRIBUTING / CODE_OF_CONDUCT / SUPPORT live at the
+        # repo root because GitHub's community-health UI surfaces them there.
+        # The docs site needs the same content but the cross-references
+        # inside are repo-root-relative; ``scripts/prepare_docs.py`` copies
+        # *and* rewrites those links to docs-site-relative form. Source of
+        # truth stays at repo root.
+        run: uv run python scripts/prepare_docs.py
+
+      - name: Build (strict — fail on warnings)
+        run: uv run mkdocs build --strict
+
+      - name: Deploy to gh-pages
+        # `mkdocs gh-deploy` builds again and force-pushes the result to the
+        # gh-pages branch. The previous `mkdocs build --strict` step is the
+        # actual gate — this step only runs when the strict build passed.
+        run: uv run mkdocs gh-deploy --force --message "docs: deploy ${{ github.sha }}"
