@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Pre-commit hook spec** (`.pre-commit-hooks.yaml`) — dropped the `files: ^src/` filter from the published hook. **Heads-up: this broadens the default scope for downstream consumers.** The filter was a leak from this repo's in-tree `.pre-commit-config.yaml` (where it's intentional — safelint lints itself only under `src/`) into the published hook spec, where it forced every downstream installer onto the same layout. With it gone, the hook honours only `types_or: [python, javascript]` plus the consumer's own `files:` / `exclude:` keys, so projects with sources at the repo root, in `app/`, in `lib/`, etc. now get linted by default after upgrade. If you previously relied on the `^src/` default to scope safelint to one directory, add the equivalent filter to your local `.pre-commit-config.yaml`:
+
+  ```yaml
+  - repo: https://github.com/srahul07/safelint
+    rev: <tag>
+    hooks:
+      - id: safelint
+        files: ^src/   # restore the previous default if needed
+  ```
+
 ## [1.13.0] - 2026-05-09
 
 **JavaScript (Node) is now a supported language alongside Python.** Registry-driven multi-language support: `.js` / `.mjs` / `.cjs` files are discovered, parsed via Tree-sitter, and run against 17 of the 19 existing rules — plus one new JS-only rule (SAFE305 `wide_scope_declaration`) for a total of 20 rules safelint now ships. Python users see no behaviour change beyond the v1.12.2 `.pyw` bugfix; the additive language work is what justifies this release as `1.13.0` (per the project's semver rules: scope expansion is MINOR, never MAJOR).
