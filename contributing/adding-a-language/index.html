@@ -1514,10 +1514,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-update-tests-and-docs" class="md-nav__link">
+  <a href="#6-update-cli-pre-commit-plumbing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Update tests and docs
+        6. Update CLI / pre-commit plumbing
       
     </span>
   </a>
@@ -1525,10 +1525,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#7-update-the-bundled-ai-client-skills" class="md-nav__link">
+  <a href="#7-update-tests-and-docs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        7. Update the bundled AI-client skills
+        7. Update tests and docs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-update-the-bundled-ai-client-skills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Update the bundled AI-client skills
       
     </span>
   </a>
@@ -1845,10 +1856,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#6-update-tests-and-docs" class="md-nav__link">
+  <a href="#6-update-cli-pre-commit-plumbing" class="md-nav__link">
     <span class="md-ellipsis">
       
-        6. Update tests and docs
+        6. Update CLI / pre-commit plumbing
       
     </span>
   </a>
@@ -1856,10 +1867,21 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#7-update-the-bundled-ai-client-skills" class="md-nav__link">
+  <a href="#7-update-tests-and-docs" class="md-nav__link">
     <span class="md-ellipsis">
       
-        7. Update the bundled AI-client skills
+        7. Update tests and docs
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#8-update-the-bundled-ai-client-skills" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Update the bundled AI-client skills
       
     </span>
   </a>
@@ -2111,14 +2133,22 @@
 <p><strong>Pattern A — per-language rule classes</strong> (cleanest separation): split the rule into <code>FunctionLengthRulePython</code> and <code>FunctionLengthRuleTypeScript</code>, each importing constants from its own language module. Same logic, different node-type imports. Doubles class count but keeps each rule's assumptions explicit at the import site.</p>
 <p><strong>Pattern B — runtime dispatch within <code>check_file</code></strong>: single class, look up the right node-type constants based on <code>tree.language</code> (or pass <code>lang_name</code> through). Less code; more cross-language coupling per rule.</p>
 <p>The engine is agnostic to which pattern you pick — both satisfy the <code>BaseRule</code> interface. Direct constant imports were the original architectural choice because they keep node-type assumptions explicit at the import site; pattern A preserves that property while pattern B trades it for code reuse.</p>
-<h3 id="6-update-tests-and-docs">6. Update tests and docs<a class="headerlink" href="#6-update-tests-and-docs" title="Permanent link">#</a></h3>
+<h3 id="6-update-cli-pre-commit-plumbing">6. Update CLI / pre-commit plumbing<a class="headerlink" href="#6-update-cli-pre-commit-plumbing" title="Permanent link">#</a></h3>
+<p>A handful of edges read the supported-language list from the registry; two pre-commit surfaces still need manual edits. The engine's own file-discovery loop, the suppression parser, the cache layer, and the per-rule dispatch are <em>already</em> registry-driven — the new language plugs in via Step 3 alone.</p>
+<p>Update both of these:</p>
+<ul>
+<li><strong><code>.pre-commit-hooks.yaml</code></strong> — <code>types_or: [python]</code> lists the pre-commit filetype tags downstream users of <code>pre-commit-hooks</code> will get matched against. Add the new tag (e.g. <code>- ts</code> for TypeScript) so users who configure the hook in their <code>.pre-commit-config.yaml</code> get the new files passed in. SafeLint itself still drops anything not in <code>supported_extensions()</code> defensively, but pre-commit's own filter happens first and would otherwise hide the new files from the hook.</li>
+<li><strong><code>.pre-commit-config.yaml</code></strong> — this repo's own in-tree <code>safelint (in-tree)</code> hook also has its own <code>types_or: [python]</code> filter. Add the new language's tag there too, or the in-repo hook run will keep excluding that language's files even after the published hook metadata is updated. (The peer hooks in the same file — <code>ty</code>, <code>pytest-cov</code> — are tooling-only and can stay <code>types: [python]</code>.)</li>
+</ul>
+<p>The CLI's git-status filters (<code>_collect_all_supported_files</code>, <code>_filter_supported_files</code> in <code>cli.py</code>, plus the hook-mode pre-filter at the bottom of <code>main()</code>) call <code>supported_extensions()</code> directly and need no edit.</p>
+<h3 id="7-update-tests-and-docs">7. Update tests and docs<a class="headerlink" href="#7-update-tests-and-docs" title="Permanent link">#</a></h3>
 <ul>
 <li>Tests under <code>tests/</code> should add a per-language test file (e.g. <code>test_engine_typescript.py</code>) covering at minimum: discovery picks up the extension, the suppression parser recognises <code>// nosafe</code>, and at least one rule fires on a known-bad TS file.</li>
 <li>The <a href="../../configuration/rules/">Rules reference</a> rule-by-rule table should grow a "Languages" column.</li>
 <li><code>README.md</code> should list the supported languages prominently.</li>
 <li><code>CHANGELOG.md</code> gets an entry under <strong>Added</strong>.</li>
 </ul>
-<h3 id="7-update-the-bundled-ai-client-skills">7. Update the bundled AI-client skills<a class="headerlink" href="#7-update-the-bundled-ai-client-skills" title="Permanent link">#</a></h3>
+<h3 id="8-update-the-bundled-ai-client-skills">8. Update the bundled AI-client skills<a class="headerlink" href="#8-update-the-bundled-ai-client-skills" title="Permanent link">#</a></h3>
 <p>The bundle at <code>src/safelint/skill_files/</code> ships one Markdown artefact per registered AI client (12 today: Claude Code's <code>SKILL.md</code>, plus a per-client file under each of <code>cursor/</code>, <code>copilot/</code>, <code>gemini/</code>, <code>windsurf/</code>, <code>codex/</code>, <code>continue/</code>, <code>cline/</code>, <code>aider/</code>, <code>trae/</code>, <code>antigravity/</code>, <code>zed/</code>). Every one of them has a <strong>Step 2 — Identify the language(s) involved</strong> section with a registry table listing the languages safelint can lint. When you add a new language, all twelve files need a new row in that table.</p>
 <p>You also need to ship a new shared addendum file describing the language. The <code>languages/</code> subdirectory at the bundle root mirrors the <code>safelint/languages/</code> package one-to-one and is <em>shared</em> across every client — there's only one copy of the addendum, and every client references it via <code>safelint skill path</code>.</p>
 <p>Concretely:</p>
