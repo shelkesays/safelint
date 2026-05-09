@@ -37,7 +37,7 @@ result = eval(userInput);  // nosafe: SAFE801
 
 ## Rules ported to JavaScript
 
-15 of safelint's 19 user-facing rules now lint JavaScript. The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here remain Python-only by design — see *Rules that stay Python-only* below.
+17 of safelint's 19 user-facing rules now lint JavaScript. The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here remain Python-only by design — see *Rules that stay Python-only* below.
 
 | Code | Rule | JavaScript-specific notes |
 |---|---|---|
@@ -49,6 +49,8 @@ result = eval(userInput);  // nosafe: SAFE801
 | SAFE203 | logging_on_error | Catch blocks must call a logging method or rethrow. Recognises `console.log` / `console.error` / `console.warn` / `console.info` / `console.debug` / `console.trace`, plus generic `logger.*`, `pino.*`, `bunyan.*` (anything where `call_name` resolves to one of `log` / `info` / `warn` / `error` / `debug` / `trace`). `throw e;` (single-identifier throw of the caught binding) is treated as a re-raise and exempt; `throw new Error(...)` constructs a new error and still requires logging. |
 | SAFE303 | side_effects_hidden | Pure-named function (matches a configured `pure_prefixes` list) calling an I/O primitive. JS default I/O list: `log`, `error`, `warn`, `info`, `debug`, `fetch`, `readFile`, `writeFile`, `readFileSync`, `writeFileSync`, `open`. Per-language config key: `io_functions_javascript`. |
 | SAFE304 | side_effects | Any function (not name-signalled for I/O) calling an I/O primitive. Same JS default list as SAFE303. The `io_name_keywords` exemption (e.g. `logEvent`, `writeData`, `fetchUser`) works the same way as Python: substring match against the lowercased function name. |
+| SAFE302 | global_mutation | Function-body assignments to a configured global namespace fire the rule. Default namespaces: `globalThis`, `window`, `global`, `self`, `process`. Walks the receiver chain leftward — `process.env.NODE_ENV = '...'` resolves to `process` and fires. Reading a global (`return globalThis.env;`) does NOT fire — only writes do. Top-level (module-scope) assignments do NOT fire either; that's module setup, not the bug the rule guards against. Per-language config: `global_namespaces_javascript`. |
+| SAFE401 | resource_lifecycle | A call to a configured acquirer name fires unless wrapped in a `try { ... } finally { ... }` somewhere up the AST ancestor chain. Default JS acquirers: `createReadStream`, `createWriteStream`, `openSync`, `createServer`, `createConnection`, `connect`, `createWorker`. **Heuristic only:** the rule doesn't verify that the `finally` block actually closes the resource — only that *some* finally exists. Catches the most common "I created a stream and didn't think about cleanup at all" leak. The newer `using` declarations (Stage 3 / Node 22+) aren't yet recognised; for now, wrap the call inside `try / finally`. Per-language config: `tracked_functions_javascript`. |
 | SAFE501 | unbounded_loops | `while (true)` without a `break` fires the same as Python `while True:`. The "non-comparison condition" heuristic is *Python-only* — JS idioms like `while (queue.length)` / `while (token = stream.next())` / `while (cursor)` are entirely valid and bounded; firing on every non-comparison would flood with false positives. Break-scope boundaries: `for_statement`, `for_in_statement`, `while_statement`, `do_statement`, `switch_statement`, plus all function types. |
 | SAFE601 | missing_assertions | JS has no built-in `assert` keyword — the rule walks for *calls* to a configured set of assertion function names. Default set covers Node's `assert` module helpers (`assert`, `ok`, `equal`, `strictEqual`, `deepEqual`, `deepStrictEqual`, `notEqual`, `notStrictEqual`, `rejects`, `throws`, `doesNotThrow`, `doesNotReject`, `fail`, `ifError`, `match`), `console.assert`, plus test framework entry points (`expect` for Jest / Chai / Vitest, `should` for Should.js). Disabled by default like in Python — opt in with `[tool.safelint.rules.missing_assertions]` `enabled = true`. |
 | SAFE701 | test_existence | JS source pairs with any of `<stem>.test.{js,mjs,cjs}` (Jest convention) or `<stem>.spec.{js,mjs,cjs}` (Mocha / Karma convention) under `test_dirs` (default `["tests"]`). The "expected" filename in violation messages surfaces the Jest-style `.test.<source-extension>` form as the canonical suggestion. |
@@ -59,14 +61,12 @@ result = eval(userInput);  // nosafe: SAFE801
 
 ### Rules that stay Python-only
 
-The following rules don't apply (or don't translate cleanly) to JavaScript and stay registered for Python only — they will not fire on `.js` / `.mjs` / `.cjs` files.
+The following rules don't apply to JavaScript and stay registered for Python only — they will not fire on `.js` / `.mjs` / `.cjs` files.
 
 | Code | Rule | Why JS-only-skipped |
 |---|---|---|
-| SAFE201 | bare_except | Python `except:` (no exception type) silently catches `KeyboardInterrupt` and `SystemExit`. JS `try/catch` always binds the caught error (or uses the optional-binding form `catch {}`); the equivalent process-signal hazard doesn't exist. |
-| SAFE301 | global_state | Python `global` keyword has no clean JS equivalent — JS scoping is fundamentally different (lexical via `var` / `let` / `const` and global-object access via `globalThis.x` / `window.x`). |
-| SAFE302 | global_mutation | Same scoping reason. |
-| SAFE401 | resource_lifecycle | Python `with` blocks have no clean JS analogue. JS resource patterns (callback `fs.open`, promise-returning APIs, the new `using` declarations) vary widely; a useful rule needs a separate per-pattern analysis. |
+| SAFE201 | bare_except | Python `except:` (no exception type) silently catches `KeyboardInterrupt` and `SystemExit`. JavaScript `try/catch` always catches every throw type by language design (no typed exception filtering); the Python-specific process-signal hazard doesn't exist. SAFE202 (empty catch) and SAFE203 (catch must log) cover the related JS concerns. |
+| SAFE301 | global_state | Python `global` keyword has no clean JS equivalent. The Python rule fires on the *declaration* `global x` regardless of whether a write follows; JavaScript has no read-only-global declaration form, so SAFE301 would always be a strict subset of SAFE302 on JS. JS users get the same protection from SAFE302 alone. |
 
 ## Idiomatic fix patterns
 
@@ -269,6 +269,56 @@ await fs.writeFile('out.txt', data);
 fs.writeFile('out.txt', data, (err) => {
   if (err) logger.error({ err }, 'write failed');
 });
+```
+
+### SAFE302 (global mutation)
+
+Module-level mutable state should be encapsulated, not written from inside arbitrary functions:
+
+```javascript
+// Before
+function setupCache() {
+  globalThis.cache = new Map();   // SAFE302
+  process.env.READY = 'true';     // SAFE302
+}
+
+// After — pass state in / return state
+function buildCache() {
+  return new Map();
+}
+
+// Caller decides where to put it; configuration lives in dedicated config
+// loading code, not scattered across functions.
+const cache = buildCache();
+```
+
+### SAFE401 (resource lifecycle)
+
+The Node-canonical fix is `try { ... } finally { ... }`. The newer `using` declarations are also acceptable (and recognised in a future safelint release).
+
+```javascript
+// Before
+function readData(path) {
+  const stream = fs.createReadStream(path);   // SAFE401
+  return processStream(stream);
+}
+
+// After (option 1: try/finally)
+function readData(path) {
+  let stream;
+  try {
+    stream = fs.createReadStream(path);
+    return processStream(stream);
+  } finally {
+    if (stream) stream.close();
+  }
+}
+
+// After (option 2: ``using`` — Stage 3 / Node 22+)
+async function readData(path) {
+  using stream = fs.createReadStream(path);   // auto-cleaned up at scope exit
+  return await processStream(stream);
+}
 ```
 
 ### SAFE803 (null dereference)

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar
 
-from safelint.languages._node_utils import call_name, walk
+from safelint.languages._node_utils import call_name, resolve_lang_name, walk
 from safelint.languages.python import CALL, WITH_ITEM
 from safelint.rules.base import BaseRule
 
@@ -53,7 +53,7 @@ def _with_item_call(item: tree_sitter.Node) -> tree_sitter.Node | None:
 
 
 def _iter_with_items(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
-    """Yield every ``with_item`` node in *tree*.
+    """Yield every ``with_item`` node in *tree* (Python).
 
     ``with_item`` only appears inside ``with_statement`` in tree-sitter-python,
     so a flat walk is sufficient.
@@ -63,15 +63,75 @@ def _iter_with_items(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
             yield node
 
 
+def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
+    """Return True if *node* has an enclosing ``try_statement`` with a ``finally_clause``.
+
+    Walks the parent chain (Tree-sitter Node exposes ``.parent``) and
+    short-circuits on the first ``try_statement`` whose children include a
+    ``finally_clause``. Multiple nested try-statements are tolerated: an
+    outer ``try { ... } finally { ... }`` still counts as guarding a
+    deeply-nested call.
+
+    Heuristic: this rule doesn't verify that the ``finally`` block
+    actually closes the resource — only that *some* finally exists.
+    Catches the most common "I opened a stream and forgot to handle
+    cleanup at all" case while staying simple. False negatives possible
+    for try-finally blocks that don't actually clean up; users with
+    those patterns can suppress with ``// nosafe: SAFE401``.
+    """
+    cur = node.parent
+    while cur is not None:
+        if _try_statement_has_finally(cur):
+            return True
+        cur = cur.parent
+    return False
+
+
+def _try_statement_has_finally(node: tree_sitter.Node) -> bool:
+    """Return True if *node* is a ``try_statement`` with a ``finally_clause`` child."""
+    if node.type != "try_statement":
+        return False
+    return any(child.type == "finally_clause" for child in node.named_children)
+
+
 class ResourceLifecycleRule(BaseRule):
-    """Require tracked resource-acquisition calls to be wrapped in a with statement."""
+    """Require tracked resource-acquisition calls to be wrapped in cleanup-guaranteed scope.
+
+    Python: the call must appear inside a ``with`` statement (``with
+    open(path) as f:``). Bare assignments without ``with`` fire even
+    when paired with manual ``f.close()`` — Python's idiom is
+    context-manager-first.
+
+    JavaScript: the call must appear inside a ``try`` block whose
+    ``try_statement`` has a ``finally_clause`` somewhere up the
+    ancestor chain. Heuristic-only — the rule doesn't verify that the
+    ``finally`` block actually closes the specific resource. Captures
+    the most common "I created a stream and didn't handle cleanup at
+    all" leak. JavaScript's newer ``using`` declarations (Stage 3 /
+    Node 22+) aren't yet recognised as a safe form; for now, wrap
+    inside ``try { ... } finally { ... }``.
+    """
 
     name = "resource_lifecycle"
     code = "SAFE401"
+    language = ("python", "javascript")
+
+    _DEFAULT_TRACKED_JAVASCRIPT: ClassVar[list[str]] = [
+        # File / stream APIs.
+        "createReadStream",
+        "createWriteStream",
+        "openSync",  # fs.openSync — returns a raw fd
+        # Network / server.
+        "createServer",
+        "createConnection",  # net.createConnection / db drivers
+        "connect",  # database drivers, sockets
+        # Worker pools.
+        "createWorker",
+    ]
 
     @staticmethod
-    def _collect_guarded(tree: tree_sitter.Tree, tracked: frozenset[str]) -> set[int]:
-        """Return the set of start_byte values for tracked calls already inside a with block."""
+    def _python_collect_guarded(tree: tree_sitter.Tree, tracked: frozenset[str]) -> set[int]:
+        """Return the set of start_byte values for tracked calls already inside a ``with`` block."""
         guarded: set[int] = set()
         for item in _iter_with_items(tree):
             call_node = _with_item_call(item)
@@ -82,13 +142,8 @@ class ResourceLifecycleRule(BaseRule):
                 guarded.add(call_node.start_byte)
         return guarded
 
-    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Flag unguarded calls to tracked resource-acquisition functions.
-
-        ``tracked_functions`` defines the base set; ``extend_tracked_functions``
-        appends to it without forcing the user to redeclare the defaults
-        (mirrors ruff's ``extend-select`` ergonomics).
-        """
+    def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run the Python-specific check (call must be inside a ``with`` block)."""
         base_tracked = _validated_string_list(self.config.get("tracked_functions", ["open"]), "tracked_functions")
         extra_tracked = _validated_string_list(self.config.get("extend_tracked_functions", []), "extend_tracked_functions")
         tracked: frozenset[str] = frozenset(base_tracked + extra_tracked)
@@ -99,7 +154,7 @@ class ResourceLifecycleRule(BaseRule):
         # it the same way for consistency.
         cleanup_list = _validated_string_list(self.config.get("cleanup_patterns", ["close"]), "cleanup_patterns")
         cleanup: frozenset[str] = frozenset(cleanup_list)
-        guarded = self._collect_guarded(tree, tracked)
+        guarded = self._python_collect_guarded(tree, tracked)
         cleanup_str = " / ".join(sorted(cleanup))
 
         violations: list[Violation] = []
@@ -117,3 +172,35 @@ class ResourceLifecycleRule(BaseRule):
                 )
             )
         return violations
+
+    def _javascript_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run the JavaScript-specific check (call must be inside ``try { ... } finally { ... }``)."""
+        tracked_js = _validated_string_list(
+            self.config.get("tracked_functions_javascript", self._DEFAULT_TRACKED_JAVASCRIPT),
+            "tracked_functions_javascript",
+        )
+        tracked: frozenset[str] = frozenset(tracked_js)
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type != "call_expression":
+                continue
+            name = call_name(node)
+            if not name or name not in tracked:
+                continue
+            if _is_inside_try_finally(node):
+                continue
+            violations.append(
+                self._make_violation_for_node(
+                    filepath,
+                    node,
+                    f'"{name}()" not wrapped in try/finally - guarantee cleanup with try {{ ... }} finally {{ ... }} or a `using` declaration',
+                )
+            )
+        return violations
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag unguarded calls to tracked resource-acquisition functions."""
+        lang_name = resolve_lang_name(filepath)
+        if lang_name == "python":
+            return self._python_check(filepath, tree)
+        return self._javascript_check(filepath, tree)

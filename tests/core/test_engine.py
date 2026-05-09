@@ -237,6 +237,8 @@ _RULES_WIDENED_FOR_JAVASCRIPT: frozenset[str] = frozenset(
         "TaintedSinkRule",
         "ReturnValueIgnoredRule",
         "NullDereferenceRule",
+        "GlobalMutationRule",
+        "ResourceLifecycleRule",
     }
 )
 
