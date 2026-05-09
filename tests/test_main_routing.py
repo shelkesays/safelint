@@ -487,7 +487,7 @@ def test_run_check_json_emits_empty_doc_when_no_modified_files(
     empty stream)."""
     import json  # noqa: PLC0415
 
-    mocker.patch.object(cli, "_get_git_modified_python_files", return_value=([], []))
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=([], []))
     args = argparse.Namespace(
         target=tmp_path,
         config=None,
@@ -519,7 +519,7 @@ def test_run_check_pretty_prints_all_clear_on_clean_run(
     sample = tmp_path / "ok.py"
     sample.write_text("x = 1\n", encoding="utf-8")
     # Skip the git-modified-files probe so all_files-style discovery runs.
-    mocker.patch.object(cli, "_get_git_modified_python_files", return_value=None)
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
     args = argparse.Namespace(
         target=sample,
         config=None,
@@ -549,7 +549,7 @@ def test_run_check_json_emits_doc_with_violations(
 
     sample = tmp_path / "long.py"
     sample.write_text("def f():\n" + "    a = 1\n" * 80 + "    return a\n", encoding="utf-8")
-    mocker.patch.object(cli, "_get_git_modified_python_files", return_value=None)
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
     args = argparse.Namespace(
         target=sample,
         config=None,

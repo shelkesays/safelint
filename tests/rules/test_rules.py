@@ -2100,7 +2100,7 @@ def test_logging_on_error_non_log_name_call_fires(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# CLI: git-based file selection (_get_git_modified_python_files branches)
+# CLI: git-based file selection (_get_git_modified_supported_files branches)
 # ---------------------------------------------------------------------------
 
 
@@ -2135,7 +2135,7 @@ def test_cli_check_git_diff_failure_falls_back_to_full_scan(tmp_path: Path, mock
 
 
 def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker, capsys) -> None:
-    """_run_check exits 0 with a status message when git reports no modified Python files."""
+    """_run_check exits 0 with a status message when git reports no modified source files."""
 
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
     rev_parse = _make_proc(mocker, returncode=0, stdout=str(tmp_path) + "\n")
@@ -2144,7 +2144,7 @@ def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker, capsys) -> 
 
     args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False, ignore=None)
     assert _run_check(args) == 0
-    assert "No modified Python files detected" in capsys.readouterr().out
+    assert "No modified source files detected" in capsys.readouterr().out
 
 
 def test_cli_check_all_files_bypasses_git(tmp_path: Path, mocker) -> None:
