@@ -37,15 +37,15 @@ In 1987, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly fo
 
 | # | Holzmann's Rule | SafeLint Rule | Code |
 |---|---|---|---|
-| 1 | No complex control flow - no `goto`, no deep recursion | `nesting_depth`, `complexity` | [SAFE102](CONFIGURATION.md#safe102----nesting_depth), [SAFE104](CONFIGURATION.md#safe104----complexity) |
-| 2 | All loops must have a fixed upper bound | `unbounded_loops` | [SAFE501](CONFIGURATION.md#safe501----unbounded_loops) |
+| 1 | No complex control flow - no `goto`, no deep recursion | `nesting_depth`, `complexity` | [SAFE102](https://shelkesays.github.io/safelint/configuration/rules/#safe102-nesting_depth), [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity) |
+| 2 | All loops must have a fixed upper bound | `unbounded_loops` | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) |
 | 3 | No dynamic memory allocation after startup | - | *(not applicable to Python)* |
-| 4 | Functions must fit on one printed page | `function_length` | [SAFE101](CONFIGURATION.md#safe101----function_length) |
-| 5 | Use at least two assertions per function | `missing_assertions` | [SAFE601](CONFIGURATION.md#safe601----missing_assertions) |
+| 4 | Functions must fit on one printed page | `function_length` | [SAFE101](https://shelkesays.github.io/safelint/configuration/rules/#safe101-function_length) |
+| 5 | Use at least two assertions per function | `missing_assertions` | [SAFE601](https://shelkesays.github.io/safelint/configuration/rules/#safe601-missing_assertions) |
 | 6 | Declare variables at the smallest scope | - | *(Python handles this)* |
-| 7 | Check the return value of every non-void function | `return_value_ignored`, `bare_except`, `empty_except` | [SAFE802](CONFIGURATION.md#safe802----return_value_ignored), [SAFE201](CONFIGURATION.md#safe201----bare_except), [SAFE202](CONFIGURATION.md#safe202----empty_except) |
+| 7 | Check the return value of every non-void function | `return_value_ignored`, `bare_except`, `empty_except` | [SAFE802](https://shelkesays.github.io/safelint/configuration/rules/#safe802-return_value_ignored), [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except), [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except) |
 | 8 | Limit preprocessor use | - | *(not applicable to Python)* |
-| 9 | Restrict pointer use - no chained indirection | `null_dereference` | [SAFE803](CONFIGURATION.md#safe803----null_dereference) |
+| 9 | Restrict pointer use - no chained indirection | `null_dereference` | [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference) |
 | 10 | Compile with all warnings; use static analysis | SafeLint itself | - |
 
 Original paper: [spinroot.com/gerard/pdf/P10.pdf](https://spinroot.com/gerard/pdf/P10.pdf)
@@ -159,29 +159,29 @@ SafeLint will now run on every `git commit` and block the commit if it finds err
 
 | Code | Rule | What it flags |
 |---|---|---|
-| [SAFE101](CONFIGURATION.md#safe101----function_length) | `function_length` | Functions longer than 60 lines |
-| [SAFE102](CONFIGURATION.md#safe102----nesting_depth) | `nesting_depth` | Control flow nested more than 2 levels deep |
-| [SAFE103](CONFIGURATION.md#safe103----max_arguments) | `max_arguments` | Functions with more than 7 parameters |
-| [SAFE104](CONFIGURATION.md#safe104----complexity) | `complexity` | Functions with high cyclomatic complexity |
-| [SAFE201](CONFIGURATION.md#safe201----bare_except) | `bare_except` | `except:` with no exception type |
-| [SAFE202](CONFIGURATION.md#safe202----empty_except) | `empty_except` | `except` blocks that do nothing (`pass`) |
-| [SAFE203](CONFIGURATION.md#safe203----logging_on_error) | `logging_on_error` | Except blocks that swallow errors silently |
-| [SAFE301](CONFIGURATION.md#safe301----global_state) | `global_state` | Use of the `global` keyword inside functions |
-| [SAFE302](CONFIGURATION.md#safe302----global_mutation) | `global_mutation` | Writing to global variables inside functions |
-| [SAFE303](CONFIGURATION.md#safe303----side_effects_hidden) | `side_effects_hidden` | Pure-looking functions that secretly do I/O |
-| [SAFE304](CONFIGURATION.md#safe304----side_effects) | `side_effects` | Functions that call `print`, `open`, etc. without signalling intent |
-| [SAFE401](CONFIGURATION.md#safe401----resource_lifecycle) | `resource_lifecycle` | Files or connections opened outside a `with` block |
-| [SAFE501](CONFIGURATION.md#safe501----unbounded_loops) | `unbounded_loops` | `while True` loops with no `break` |
+| [SAFE101](https://shelkesays.github.io/safelint/configuration/rules/#safe101-function_length) | `function_length` | Functions longer than 60 lines |
+| [SAFE102](https://shelkesays.github.io/safelint/configuration/rules/#safe102-nesting_depth) | `nesting_depth` | Control flow nested more than 2 levels deep |
+| [SAFE103](https://shelkesays.github.io/safelint/configuration/rules/#safe103-max_arguments) | `max_arguments` | Functions with more than 7 parameters |
+| [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity) | `complexity` | Functions with high cyclomatic complexity |
+| [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except) | `bare_except` | `except:` with no exception type |
+| [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except) | `empty_except` | `except` blocks that do nothing (`pass`) |
+| [SAFE203](https://shelkesays.github.io/safelint/configuration/rules/#safe203-logging_on_error) | `logging_on_error` | Except blocks that swallow errors silently |
+| [SAFE301](https://shelkesays.github.io/safelint/configuration/rules/#safe301-global_state) | `global_state` | Use of the `global` keyword inside functions |
+| [SAFE302](https://shelkesays.github.io/safelint/configuration/rules/#safe302-global_mutation) | `global_mutation` | Writing to global variables inside functions |
+| [SAFE303](https://shelkesays.github.io/safelint/configuration/rules/#safe303-side_effects_hidden) | `side_effects_hidden` | Pure-looking functions that secretly do I/O |
+| [SAFE304](https://shelkesays.github.io/safelint/configuration/rules/#safe304-side_effects) | `side_effects` | Functions that call `print`, `open`, etc. without signalling intent |
+| [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) | `resource_lifecycle` | Files or connections opened outside a `with` block |
+| [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) | `unbounded_loops` | `while True` loops with no `break` |
 
 **Dataflow rules** (opt-in, disabled by default):
 
 | Code | Rule | What it flags |
 |---|---|---|
-| [SAFE801](CONFIGURATION.md#safe801----tainted_sink) | `tainted_sink` | User input flowing into `eval`, `exec`, `subprocess`, etc. without sanitization |
-| [SAFE802](CONFIGURATION.md#safe802----return_value_ignored) | `return_value_ignored` | Discarding the return value of calls like `subprocess.run` or `file.write` |
-| [SAFE803](CONFIGURATION.md#safe803----null_dereference) | `null_dereference` | Chaining methods directly on calls that can return `None`, e.g. `d.get("key").strip()` |
+| [SAFE801](https://shelkesays.github.io/safelint/configuration/rules/#safe801-tainted_sink) | `tainted_sink` | User input flowing into `eval`, `exec`, `subprocess`, etc. without sanitization |
+| [SAFE802](https://shelkesays.github.io/safelint/configuration/rules/#safe802-return_value_ignored) | `return_value_ignored` | Discarding the return value of calls like `subprocess.run` or `file.write` |
+| [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference) | `null_dereference` | Chaining methods directly on calls that can return `None`, e.g. `d.get("key").strip()` |
 
-For opt-in rules (`SAFE601`, `SAFE701`, `SAFE702`) and full configuration options for every rule, see [CONFIGURATION.md](CONFIGURATION.md).
+For opt-in rules (`SAFE601`, `SAFE701`, `SAFE702`) and full configuration options for every rule, see the [Rules reference](https://shelkesays.github.io/safelint/configuration/rules/).
 
 ---
 
@@ -223,13 +223,13 @@ ignore = ["SAFE203", "side_effects"]          # suppress project-wide
 "tests/**" = ["SAFE101", "SAFE103"]           # suppress only for matching files
 ```
 
-See [CONFIGURATION.md — Inline suppression](CONFIGURATION.md#inline-suppression), [CONFIGURATION.md — Global ignore list](CONFIGURATION.md#global-ignore-list), and [CONFIGURATION.md — Per-file ignore list](CONFIGURATION.md#per-file-ignore-list) for full reference.
+See [Inline suppression](https://shelkesays.github.io/safelint/configuration/suppression/#inline-nosafe), [Global ignore list](https://shelkesays.github.io/safelint/configuration/toml/#global-ignore-list), and [Per-file ignore list](https://shelkesays.github.io/safelint/configuration/toml/#per-file-ignore-list) for full reference.
 
 ---
 
 ## Configuration
 
-SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` file at your project root. When both exist in the same directory, **`safelint.toml` wins** — its values override anything in `[tool.safelint]` — matching ruff's `ruff.toml` / `pyproject.toml` precedence. See [CONFIGURATION.md](CONFIGURATION.md) for all options, defaults, and examples.
+SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` file at your project root. When both exist in the same directory, **`safelint.toml` wins** — its values override anything in `[tool.safelint]` — matching ruff's `ruff.toml` / `pyproject.toml` precedence. See the [Configuration reference](https://shelkesays.github.io/safelint/configuration/) for all options, defaults, and examples.
 
 Highlights:
 
@@ -285,12 +285,12 @@ safelint skill remove        # auto-detects and removes every install
 
 `safelint skill remove` accepts a few filter flags: `--symlink` keeps copy installs and only removes the ones created with `--symlink` (i.e., the skill file is a symlink pointing back at the bundled wheel — handy for skill developers); `--path PATH` removes one specific install location safelint's auto-detect didn't find; `--dry-run` previews everything without touching disk.
 
-For explicit control (`--client <name>` for any of the twelve), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, post-upgrade workflow, and troubleshooting, see [`AI_CLIENTS.md`](AI_CLIENTS.md). To add support for a new AI client (the registry is open-ended), follow the contributor walkthrough in [`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md).
+For explicit control (`--client <name>` for any of the twelve), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, post-upgrade workflow, and troubleshooting, see the [AI client integrations guide](https://shelkesays.github.io/safelint/ai-clients/). To add support for a new AI client (the registry is open-ended), follow the contributor walkthrough in [Adding a new AI client](https://shelkesays.github.io/safelint/contributing/adding-an-ai-client/).
 
 ### Other integration points
 
 - **Stdin mode** — `safelint --stdin --stdin-filename PATH --format json` lints unsaved buffer contents fed via stdin. Designed for editor extensions (VSCode plugin, custom LSP wrappers).
-- **JSON / SARIF output** — `--format json` and `--format sarif` emit stable, machine-readable documents. The JSON schema is documented in [`docs/JSON_SCHEMA.md`](docs/JSON_SCHEMA.md). SARIF output is GitHub code-scanning compatible.
+- **JSON / SARIF output** — `--format json` and `--format sarif` emit stable, machine-readable documents. The JSON schema is documented in the [JSON output schema](https://shelkesays.github.io/safelint/json-schema/). SARIF output is GitHub code-scanning compatible.
 - **Column-precise positions** — every violation carries `lineno`, `end_lineno`, `column_start`, `column_end` (1-based, half-open). Maps directly to LSP / VSCode `Range` and SARIF `region.endColumn`. Synthetic violations (e.g. `test_existence`) leave column fields `null`; editors should treat that as "underline the whole line".
 - **Advisory suggestions** — every violation may carry a `suggestions` array with one-line descriptions and `TextEdit` ranges. **Editor integrations must never apply these automatically** — every edit goes through user confirmation. SARIF output uses the spec's native `fixes[]` block for the same data. SafeLint will never ship a `--fix` flag.
 
