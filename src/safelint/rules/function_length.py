@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages import get_language_for_file
-from safelint.languages._node_utils import end_lineno, lineno, node_text, walk
+from safelint.languages._node_utils import end_lineno, lineno, node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.rules.base import BaseRule
@@ -119,16 +118,14 @@ class FunctionLengthRule(BaseRule):
         """Flag any function or async function exceeding the configured size."""
         max_lines: int = self.config.get("max_lines", 60)
         count_mode: str = self.config.get("count_mode", "lines")
-        # Engine has already filtered to languages in self.language, so
-        # ``get_language_for_file`` is guaranteed non-None here.
-        lang = get_language_for_file(filepath)
-        assert lang is not None, "engine guarantees a registered language at this point"
-        function_types = _FUNCTION_TYPES_BY_LANG[lang.name]
+        lang_name = resolve_lang_name(filepath)
+        function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
+        comment_prefix = "//" if lang_name == "javascript" else "#"
         violations = []
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
-            length = self._function_size(node, count_mode, lang.name, function_types, lang.comment_prefix)
+            length = self._function_size(node, count_mode, lang_name, function_types, comment_prefix)
             if length > max_lines:
                 name_node = node.child_by_field_name("name")
                 func_name = node_text(name_node) if name_node else "<anonymous>"

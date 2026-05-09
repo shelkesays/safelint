@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from safelint.languages import get_language_for_file
+from safelint.languages._node_utils import resolve_lang_name
 from safelint.rules.base import BaseRule
 
 
@@ -74,13 +74,12 @@ class TestExistenceRule(BaseRule):
 
         Filename pattern is language-aware — see :func:`_candidate_test_filenames`.
         """
-        lang = get_language_for_file(filepath)
-        assert lang is not None, "engine guarantees a registered language at this point"
+        lang_name = resolve_lang_name(filepath)
         test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
         src = Path(filepath)
-        if _find_test_file(src, test_dirs, lang.name):
+        if _find_test_file(src, test_dirs, lang_name):
             return []
-        expected = _test_filename_for_message(src, lang.name)
+        expected = _test_filename_for_message(src, lang_name)
         dirs = ", ".join(test_dirs)
         return [
             self._make_violation(
@@ -114,23 +113,22 @@ class TestCouplingRule(BaseRule):
         if "_changed_files" not in self.config:
             return []
 
-        lang = get_language_for_file(filepath)
-        assert lang is not None, "engine guarantees a registered language at this point"
+        lang_name = resolve_lang_name(filepath)
 
         test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
         changed: set[str] = set(self.config["_changed_files"])
         src = Path(filepath)
 
         # If no test file exists at all, defer to test_existence.
-        if not _find_test_file(src, test_dirs, lang.name):
+        if not _find_test_file(src, test_dirs, lang_name):
             return []
 
         # Was *any* of the candidate test filenames in the changed set?
-        candidates = _candidate_test_filenames(src, lang.name)
+        candidates = _candidate_test_filenames(src, lang_name)
         if any(any(candidate in f for f in changed) for candidate in candidates):
             return []
 
-        expected = _test_filename_for_message(src, lang.name)
+        expected = _test_filename_for_message(src, lang_name)
         dirs = ", ".join(test_dirs)
         return [
             self._make_violation(

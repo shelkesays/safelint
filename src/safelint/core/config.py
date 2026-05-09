@@ -228,6 +228,7 @@ DEFAULTS: dict[str, Any] = {
         "tainted_sink": {
             "enabled": False,
             "severity": "error",
+            # Python source / sanitizer / sink lists.
             "sinks": [
                 "eval",
                 "exec",
@@ -242,10 +243,47 @@ DEFAULTS: dict[str, Any] = {
             ],
             "sanitizers": ["escape", "sanitize", "clean", "validate", "quote", "encode", "bleach"],
             "sources": ["input", "readline", "recv", "recvfrom", "read"],
+            # JavaScript source / sanitizer / sink lists. Per-language
+            # to avoid false positives — e.g. ``call_name`` returns
+            # ``"read"`` for both Python's ``file.read()`` (a tainted
+            # source) and JavaScript's ``Buffer.read()`` (which has a
+            # very different threat model). Adding a new language is
+            # additive: drop new ``<key>_<lang>`` lists in here.
+            "sinks_javascript": [
+                "eval",
+                "Function",  # ``new Function(code)`` — same risk as eval
+                "execScript",  # legacy IE
+                "exec",  # child_process.exec
+                "execSync",
+                "spawn",
+                "spawnSync",
+                "execFile",
+                "execFileSync",
+                "setTimeout",  # only with string arg, but rule can't tell at this level
+                "setInterval",  # same
+                "innerHTML",  # via ``el.innerHTML = tainted`` — assignment-side, not call; documented limitation
+            ],
+            "sanitizers_javascript": [
+                "escape",
+                "sanitize",
+                "encodeURIComponent",
+                "encodeURI",
+                "DOMPurify",  # commonly imported as a sanitizer
+                "validate",
+                "clean",
+            ],
+            "sources_javascript": [
+                "prompt",  # window.prompt
+                "readline",  # interactive readline
+                "stdin",  # process.stdin
+                "input",  # generic input wrappers
+            ],
         },
         "return_value_ignored": {
             "enabled": False,
             "severity": "warning",
+            # Python defaults — Python file/network/subprocess functions
+            # whose return value carries success/failure info.
             "flagged_calls": [
                 "run",
                 "call",
@@ -264,11 +302,53 @@ DEFAULTS: dict[str, Any] = {
                 "mkdir",
                 "rmdir",
             ],
+            # JavaScript defaults — Node fs / stream / process methods
+            # whose return value (or returned promise) carries
+            # success/failure info. Discarded promises in particular
+            # silently swallow rejections.
+            "flagged_calls_javascript": [
+                "write",  # stream.write, fs.write
+                "writeFile",
+                "writeFileSync",
+                "unlink",
+                "unlinkSync",
+                "rename",
+                "renameSync",
+                "mkdir",
+                "mkdirSync",
+                "rmdir",
+                "rmdirSync",
+                "rm",
+                "rmSync",
+                "send",
+                "sendall",
+                "exec",  # child_process.exec
+                "execSync",
+                "spawn",
+                "spawnSync",
+            ],
         },
         "null_dereference": {
             "enabled": False,
             "severity": "error",
             "nullable_methods": [],
+            # JavaScript's null-or-undefined-returning methods. ``find``
+            # / ``pop`` / ``shift`` are Array.prototype; ``get`` is
+            # Map.prototype (returns ``undefined`` for missing keys);
+            # ``getElementById`` / ``querySelector`` are DOM APIs that
+            # return ``null`` for no match; ``exec`` is RegExp.prototype.
+            # User can extend via ``[tool.safelint.rules.null_dereference]``.
+            "nullable_methods_javascript": [
+                "find",
+                "pop",
+                "shift",
+                "get",
+                "getElementById",
+                "querySelector",
+                "exec",
+                "match",
+                "closest",
+            ],
         },
     },
 }

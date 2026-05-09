@@ -4,8 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages import get_language_for_file
-from safelint.languages._node_utils import walk
+from safelint.languages._node_utils import resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
@@ -127,14 +126,13 @@ class UnboundedLoopRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag while loops that may be infinite."""
-        lang = get_language_for_file(filepath)
-        assert lang is not None, "engine guarantees a registered language at this point"
-        while_type = _WHILE_STATEMENT_BY_LANG[lang.name]
+        lang_name = resolve_lang_name(filepath)
+        while_type = _WHILE_STATEMENT_BY_LANG[lang_name]
         violations = []
         for node in walk(tree.root_node):
             if node.type != while_type:
                 continue
-            v = self._check_while_node(filepath, node, lang.name)
+            v = self._check_while_node(filepath, node, lang_name)
             if v:
                 violations.append(v)
         return violations

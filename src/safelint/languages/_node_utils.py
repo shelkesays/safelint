@@ -114,6 +114,24 @@ def node_text(node: tree_sitter.Node) -> str:
 CALL_TYPES: frozenset[str] = frozenset({"call", "call_expression"})
 
 
+def resolve_lang_name(filepath: str) -> str:
+    """Return the active language name for *filepath*, falling back to ``"python"``.
+
+    The engine's dispatch loop only invokes rules whose ``language`` tuple
+    matches the resolved language, so this helper always returns a known
+    language inside engine-driven calls. The fallback exists for direct
+    unit-test invocations of ``check_file`` that pass a placeholder
+    filepath with no registered extension — historical tests assume the
+    Python rule path, so default there.
+    """
+    # Local import to avoid a cycle: safelint.languages.__init__ imports
+    # from this module via _types / language modules.
+    from safelint.languages import get_language_for_file  # noqa: PLC0415
+
+    lang = get_language_for_file(filepath)
+    return lang.name if lang is not None else "python"
+
+
 def call_name(call_node: tree_sitter.Node) -> str | None:
     """Return the bare callable name from a call node, or None if unresolvable.
 
