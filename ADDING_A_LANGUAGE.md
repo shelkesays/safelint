@@ -8,13 +8,14 @@ This guide is the cheat sheet for adding support for a new programming language 
 > [!IMPORTANT]
 > Adding a new language also requires updating the bundled AI-client skills (`SKILL.md` and `cursor/safelint.mdc`) to list the new language and its file extensions in their **Step 2** registry tables. The drift-detection test `test_skill_documents_every_supported_extension` fails the moment a new extension lands in `supported_extensions()` without the corresponding bundled-doc update — and the test is parametrised over every registered AI client, so you only need to make the additions once per skill file.
 
-## The architecture, in five sentences
+## The architecture, in six sentences
 
 1. `safelint.languages.LanguageDefinition` is a frozen dataclass holding everything the engine needs about a language: file extensions, parser factory, comment node type, comment prefix.
 2. Adding a language = creating one new module under `src/safelint/languages/` (e.g. `typescript.py`), instantiating a `LanguageDefinition`, and registering it in `languages/__init__.py`.
-3. The engine's parse-and-walk loop is language-agnostic — it reads `lang.create_parser()`, queries `lang.comment_node_type` for `# nosafe` directives, and runs every active rule against the resulting Tree-sitter tree.
-4. **Rules** import per-language node-type constants directly (e.g. `from safelint.languages.python import FUNCTION_DEF`). Most existing rules are Python-specific because they reference Python-only constructs like `global`, `assert`, or specific exception node types. Each rule has to be audited for whether its concept maps cleanly to the new language and, if so, port the node type lookups.
-5. Suppressions are parsed via `_parse_suppressions` which uses `lang.comment_node_type` and `lang.comment_prefix` from the `LanguageDefinition` — so `# nosafe` works automatically wherever you point it. **The literal token form** (`# nosafe`, `// nosafe`, etc.) follows from `comment_prefix`.
+3. The engine's parse-and-walk loop is language-agnostic — it reads `lang.create_parser()`, queries `lang.comment_node_type` for both `# nosafe` and `# safelint: ignore` directives, and runs every active rule against the resulting Tree-sitter tree.
+4. **Per-language rule dispatch is built into the engine.** Each `BaseRule` subclass declares a `language: tuple[str, ...]` class attribute (default `("python",)`); the engine in `_run_rules` checks `lang.name in rule.language` before calling `check_file` and skips the rule otherwise. So rules referencing Python-only constructs (`global`, `assert`, bare `except:`, etc.) keep the default and are auto-exempt from new languages — no code change needed. Rules that *should* port widen the tuple per-rule (`language = ("python", "typescript")`) and adapt their node-type lookups; see Step 5 of the walkthrough for the two patterns (per-language rule classes vs. runtime dispatch).
+5. **Rules** import per-language node-type constants directly today (e.g. `from safelint.languages.python import FUNCTION_DEF`). Most existing rules import Python's constants because Python is the only registered language. Per-rule porting is what each new language triggers; the engine plumbing for it is already in place.
+6. Suppressions are parsed via `_parse_directives` (a single tree walk producing both line-level `# nosafe` and file-level `# safelint: ignore` results) which uses `lang.comment_node_type` and `lang.comment_prefix` from the `LanguageDefinition` — so directives work automatically wherever you point them. **The literal token form** (`# nosafe`, `// nosafe`, etc.) follows from `comment_prefix`.
 
 ## Step-by-step: adding TypeScript as an example
 
@@ -131,9 +132,15 @@ For each rule that ports, the work is:
    ```
    The node type for "function" in this grammar is `function_declaration` (Python's grammar calls it `function_definition`). Use that string in step 2.
 2. Add per-language constants in the language module (e.g. `typescript.FUNCTION_DEF = "function_declaration"`). One constant per node type the rules need.
-3. Update the rule to dispatch on the file's language. Today rules import constants directly from `safelint.languages.python` because Python is the only registered language. When a second language lands, the cleanest path is **per-language rule classes** (e.g. `FunctionLengthRulePython`, `FunctionLengthRuleTypeScript`) — same logic, different constants imported. Direct imports were chosen over a runtime dispatch table because they keep each rule's node-type assumptions explicit at the import site, which makes auditing easier.
+3. Decide whether the rule **ports** to the new language and update its `language` tuple accordingly:
+   - The engine consults `BaseRule.language` (a class attribute, defaults to `("python",)`) before calling `check_file`. Rules whose tuple doesn't include the file's language name are skipped entirely. So Python-only-syntax rules (e.g. `bare_except`, `global_state`, `empty_except`) keep `("python",)` and are *automatically* exempt from the new language — no per-rule code change needed.
+   - For rules that *should* port, widen the tuple: `language = ("python", "typescript")`. The rule's `check_file` then needs to handle both — pick one of the two patterns below.
 
-Alternative: a `language` field on `BaseRule` indicating which language the rule supports (default: `("python",)`), and the engine filters rules by file's language. Add this when a 2nd language actually exists.
+   **Pattern A — per-language rule classes** (cleanest separation): split the rule into `FunctionLengthRulePython` and `FunctionLengthRuleTypeScript`, each importing constants from its own language module. Same logic, different node-type imports. Doubles class count but keeps each rule's assumptions explicit at the import site.
+
+   **Pattern B — runtime dispatch within `check_file`**: single class, look up the right node-type constants based on `tree.language` (or pass `lang_name` through). Less code; more cross-language coupling per rule.
+
+   The engine is agnostic to which pattern you pick — both satisfy the `BaseRule` interface. Direct constant imports were the original architectural choice because they keep node-type assumptions explicit at the import site; pattern A preserves that property while pattern B trades it for code reuse.
 
 ### 6. Update tests and docs
 
