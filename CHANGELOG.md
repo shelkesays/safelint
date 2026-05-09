@@ -11,7 +11,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Completion of the multi-language readiness work started in v1.12.1. The engine, cache, suppression parser, file discovery, and per-rule dispatch were already registry-driven, but three CLI helpers and the published pre-commit hook spec still hard-coded `.py`. With this release every supported-extension check reads from `safelint.languages.supported_extensions()`, so registering a new language is genuinely additive — drop a `LanguageDefinition` into `languages/<lang>.py`, append it to the registry loop, append the new filetype tag to `types_or` in `.pre-commit-hooks.yaml`, and the CLI discovers it everywhere automatically.
 
-**No user-visible behaviour change** for current single-language Python usage: with only Python registered, `tuple(supported_extensions())` is `(".py", ".pyw")` and `types_or: [python]` is identical in semantics to the previous `types: [python]`.
+`tuple(supported_extensions())` now contains `.py` and `.pyw` (the registry is a `frozenset`, so iteration order isn't guaranteed); `types_or: [python]` is identical in semantics to the previous `types: [python]` for downstream pre-commit users.
+
+### Fixed
+
+- **`.pyw` files now picked up by git-modified mode and the pre-commit hook.** The old CLI helpers used `str.endswith(".py")` for filtering, which silently dropped `.pyw` files (`"foo.pyw".endswith(".py")` is `False`). The engine's `--all-files` discovery loop already used the registry and handled `.pyw` correctly, so this only affected git-modified runs (`safelint check src/`) and pre-commit hook mode. Existing `.pyw` projects that were getting clean runs in those modes may now see previously-hidden violations on those files; if that's unwelcome on a transitional codebase, scope-suppress with `[tool.safelint.per_file_ignores]` keyed on a `*.pyw` glob.
 
 ### Changed (internal — registry-driven)
 
@@ -338,7 +342,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.12.1...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.12.2...HEAD
+[1.12.2]: https://github.com/shelkesays/safelint/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/shelkesays/safelint/compare/v1.12.0...v1.12.1
 [1.12.0]: https://github.com/shelkesays/safelint/compare/v1.11.0...v1.12.0
 [1.11.0]: https://github.com/shelkesays/safelint/compare/v1.10.0...v1.11.0
