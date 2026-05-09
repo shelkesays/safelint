@@ -230,6 +230,11 @@ _RULES_WIDENED_FOR_JAVASCRIPT: frozenset[str] = frozenset(
         "LoggingOnErrorRule",
         "SideEffectsHiddenRule",
         "SideEffectsRule",
+        # Slice 4: loop safety, missing assertions, test-coverage rules.
+        "UnboundedLoopRule",
+        "MissingAssertionsRule",
+        "TestExistenceRule",
+        "TestCouplingRule",
     }
 )
 

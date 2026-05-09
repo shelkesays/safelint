@@ -189,7 +189,39 @@ DEFAULTS: dict[str, Any] = {
             "cleanup_patterns": ["close", "commit", "rollback", "release", "shutdown"],
         },
         "unbounded_loops": {"enabled": True, "severity": "warning"},
-        "missing_assertions": {"enabled": False, "severity": "warning"},
+        "missing_assertions": {
+            "enabled": False,
+            "severity": "warning",
+            # JavaScript assertion-function names. Python uses the
+            # built-in ``assert`` keyword (no config needed); JS doesn't
+            # have an assert keyword, so the rule walks for *calls* to
+            # any of these names. Default covers Node's ``assert``
+            # module (top-level + the asserting helpers), browser/Node
+            # ``console.assert``, and common test frameworks.
+            "assertion_calls_javascript": [
+                # Node ``assert`` module
+                "assert",
+                "ok",
+                "equal",
+                "strictEqual",
+                "deepEqual",
+                "deepStrictEqual",
+                "notEqual",
+                "notStrictEqual",
+                "rejects",
+                "throws",
+                "doesNotThrow",
+                "doesNotReject",
+                "fail",
+                "ifError",
+                "match",
+                # console.assert (browser + Node)
+                "assert",  # already listed; harmless duplicate
+                # Test frameworks (call-name level — receiver is irrelevant)
+                "expect",  # Jest, Chai (when used via expect()), Vitest's vi.expect
+                "should",  # Should.js
+            ],
+        },
         "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
         "test_coupling": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
         # Dataflow hybrid rules - disabled by default; opt-in via config
