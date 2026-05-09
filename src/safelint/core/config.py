@@ -88,7 +88,21 @@ DEFAULTS: dict[str, Any] = {
         "empty_except": {"enabled": True, "severity": "error"},
         "logging_on_error": {"enabled": True, "severity": "warning"},
         "global_state": {"enabled": True, "severity": "warning"},
-        "global_mutation": {"enabled": True, "severity": "error"},
+        "global_mutation": {
+            "enabled": True,
+            "severity": "error",
+            # JavaScript: function-body assignments to any of these
+            # global namespaces fire the rule. ``process`` covers the
+            # common ``process.env.X = ...`` pattern (chained namespace
+            # walked leftward to the root identifier).
+            "global_namespaces_javascript": [
+                "globalThis",
+                "window",
+                "global",
+                "self",
+                "process",
+            ],
+        },
         "side_effects_hidden": {
             "enabled": True,
             "severity": "error",
@@ -187,6 +201,18 @@ DEFAULTS: dict[str, Any] = {
                 "TarFile",  # tarfile.TarFile / tarfile.open
             ],
             "cleanup_patterns": ["close", "commit", "rollback", "release", "shutdown"],
+            # JavaScript: tracked acquirer call names. The rule fires when
+            # any of these is called outside an enclosing ``try { ... }
+            # finally { ... }`` block.
+            "tracked_functions_javascript": [
+                "createReadStream",
+                "createWriteStream",
+                "openSync",
+                "createServer",
+                "createConnection",
+                "connect",
+                "createWorker",
+            ],
         },
         "unbounded_loops": {"enabled": True, "severity": "warning"},
         "missing_assertions": {

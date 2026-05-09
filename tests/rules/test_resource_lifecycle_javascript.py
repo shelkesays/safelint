@@ -1,0 +1,205 @@
+"""Tests for ``resource_lifecycle`` (SAFE401) on JavaScript files."""
+
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+
+if TYPE_CHECKING:
+    from pathlib import Path
+
+from safelint.core.config import DEFAULTS, deep_merge
+from safelint.core.engine import SafetyEngine
+
+
+def _engine(overrides: dict | None = None) -> SafetyEngine:
+    """SafetyEngine with optional config overrides merged on top of DEFAULTS."""
+    config = deep_merge(DEFAULTS, overrides or {})
+    return SafetyEngine(config)
+
+
+# ---------------------------------------------------------------------------
+# Acquirer calls outside any try/finally fire.
+# ---------------------------------------------------------------------------
+
+
+def test_js_create_read_stream_outside_try_finally_fires(tmp_path: Path) -> None:
+    """``fs.createReadStream(...)`` called bare in a function body fires SAFE401."""
+    sample = tmp_path / "stream.js"
+    sample.write_text(
+        "function readData(path) {\n"
+        "  const stream = fs.createReadStream(path);\n"
+        "  return processStream(stream);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    safe401 = [v for v in result.violations if v.code == "SAFE401"]
+    assert len(safe401) == 1
+    assert "createReadStream" in safe401[0].message
+
+
+def test_js_create_write_stream_outside_try_finally_fires(tmp_path: Path) -> None:
+    """``fs.createWriteStream(...)`` outside try/finally fires."""
+    sample = tmp_path / "write.js"
+    sample.write_text(
+        "function writeData(path, data) {\n"
+        "  const stream = fs.createWriteStream(path);\n"
+        "  stream.write(data);\n"
+        "  stream.end();\n"  # explicit cleanup, but rule is strict — no try/finally
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_create_server_outside_try_finally_fires(tmp_path: Path) -> None:
+    """``http.createServer(...)`` outside try/finally fires."""
+    sample = tmp_path / "server.js"
+    sample.write_text(
+        "function startServer(port) {\n"
+        "  const server = http.createServer(handler);\n"
+        "  server.listen(port);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_open_sync_outside_try_finally_fires(tmp_path: Path) -> None:
+    """``fs.openSync(...)`` (raw fd) outside try/finally fires."""
+    sample = tmp_path / "fd.js"
+    sample.write_text(
+        "function readFD(path) {\n"
+        "  const fd = fs.openSync(path, 'r');\n"
+        "  return fd;\n"  # no cleanup at all
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE401" for v in result.violations)
+
+
+# ---------------------------------------------------------------------------
+# Acquirer calls inside try/finally do not fire.
+# ---------------------------------------------------------------------------
+
+
+def test_js_create_read_stream_inside_try_finally_does_not_fire(tmp_path: Path) -> None:
+    """Wrapped in ``try { ... } finally { ... }`` — clean."""
+    sample = tmp_path / "wrapped.js"
+    sample.write_text(
+        "function readData(path) {\n"
+        "  let stream;\n"
+        "  try {\n"
+        "    stream = fs.createReadStream(path);\n"
+        "    return processStream(stream);\n"
+        "  } finally {\n"
+        "    if (stream) stream.close();\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_nested_try_finally_around_call_does_not_fire(tmp_path: Path) -> None:
+    """An outer try/finally also counts when the call is nested inside."""
+    sample = tmp_path / "nested_try.js"
+    sample.write_text(
+        "function readData(path) {\n"
+        "  try {\n"
+        "    if (path) {\n"
+        "      const stream = fs.createReadStream(path);\n"
+        "      return processStream(stream);\n"
+        "    }\n"
+        "  } finally {\n"
+        "    cleanup();\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE401" for v in result.violations)
+
+
+# ---------------------------------------------------------------------------
+# Acquirer calls inside try-without-finally fire.
+# ---------------------------------------------------------------------------
+
+
+def test_js_try_with_only_catch_no_finally_fires(tmp_path: Path) -> None:
+    """``try { stream = ... } catch { }`` (no finally) doesn't satisfy the rule."""
+    sample = tmp_path / "try_catch.js"
+    sample.write_text(
+        "function readData(path) {\n"
+        "  try {\n"
+        "    const stream = fs.createReadStream(path);\n"
+        "    return processStream(stream);\n"
+        "  } catch (e) {\n"
+        "    console.error(e);\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_clean_function_does_not_fire(tmp_path: Path) -> None:
+    """A function with no acquirer calls is clean."""
+    sample = tmp_path / "clean.js"
+    sample.write_text(
+        "function add(a, b) { return a + b; }\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_unrelated_function_call_does_not_fire(tmp_path: Path) -> None:
+    """Calls to functions NOT in the tracked list don't fire."""
+    sample = tmp_path / "unrelated.js"
+    sample.write_text(
+        "function f(path) { const data = JSON.parse(path); return data; }\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_user_can_extend_tracked_list(tmp_path: Path) -> None:
+    """``tracked_functions_javascript`` is config-overridable."""
+    sample = tmp_path / "custom.js"
+    sample.write_text(
+        "function f() { const handle = acquireHandle(); return handle; }\n",
+        encoding="utf-8",
+    )
+    # Default: ``acquireHandle`` not tracked — no fire.
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE401" for v in result.violations)
+
+    # With override: fires.
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"resource_lifecycle": {"tracked_functions_javascript": ["acquireHandle"]}}},
+    )
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_connect_call_outside_try_finally_fires(tmp_path: Path) -> None:
+    """DB / socket ``connect(...)`` calls fire when not in try/finally."""
+    sample = tmp_path / "connect.js"
+    sample.write_text(
+        "function loadFromDB() {\n"
+        "  const db = connect('postgres://...');\n"
+        "  return db.query('select 1');\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE401" for v in result.violations)
