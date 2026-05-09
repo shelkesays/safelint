@@ -218,8 +218,8 @@ def test_base_rule_default_language_is_python_only() -> None:
 
 _RULES_WIDENED_FOR_JAVASCRIPT: frozenset[str] = frozenset(
     {
-        # Each rule's ``language`` tuple should be exactly
-        # ``("python", "javascript")``; silent drift past this
+        # Cross-language rules: ``language`` should be exactly
+        # ``("python", "javascript")``. Silent drift past this
         # allow-list (a half-ported rule, or a rule unintentionally
         # narrowing back to Python-only) is what the assertion catches.
         "FunctionLengthRule",
@@ -242,6 +242,15 @@ _RULES_WIDENED_FOR_JAVASCRIPT: frozenset[str] = frozenset(
     }
 )
 
+_RULES_JAVASCRIPT_ONLY: frozenset[str] = frozenset(
+    {
+        # JS-only rules (``language=("javascript",)``) — the JS hazard
+        # has no useful Python translation. Listed explicitly so the
+        # allow-list test catches accidental drift either way.
+        "WideScopeDeclarationRule",  # SAFE305: ``var`` keyword (no Python equivalent)
+    }
+)
+
 
 def test_widened_rules_match_the_documented_allow_list() -> None:
     """The set of rules with non-default ``language`` matches the documented allow-list.
@@ -256,11 +265,17 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
       the test fails too, prompting the contributor to remove the entry
       from the allow-list along with the deliberate scope reduction.
     """
-    widened_actual = {cls.__name__ for cls in ALL_RULES if cls.language != ("python",)}
-    assert widened_actual == _RULES_WIDENED_FOR_JAVASCRIPT, (
-        f"Widened-rules allow-list out of sync. "
-        f"Actually widened: {sorted(widened_actual)}; "
+    cross_lang_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript")}
+    js_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("javascript",)}
+    assert cross_lang_actual == _RULES_WIDENED_FOR_JAVASCRIPT, (
+        f"Cross-language allow-list out of sync. "
+        f"Actually ('python', 'javascript'): {sorted(cross_lang_actual)}; "
         f"documented: {sorted(_RULES_WIDENED_FOR_JAVASCRIPT)}"
+    )
+    assert js_only_actual == _RULES_JAVASCRIPT_ONLY, (
+        f"JS-only allow-list out of sync. "
+        f"Actually ('javascript',): {sorted(js_only_actual)}; "
+        f"documented: {sorted(_RULES_JAVASCRIPT_ONLY)}"
     )
 
     for cls in ALL_RULES:
@@ -268,8 +283,12 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
             assert cls.language == ("python", "javascript"), (
                 f"{cls.__name__} should be ('python', 'javascript'); got {cls.language}"
             )
+        elif cls.__name__ in _RULES_JAVASCRIPT_ONLY:
+            assert cls.language == ("javascript",), (
+                f"{cls.__name__} should be ('javascript',); got {cls.language}"
+            )
         else:
             assert cls.language == ("python",), (
                 f"{cls.__name__} has unexpected language={cls.language}; "
-                f"add it to _RULES_WIDENED_FOR_JAVASCRIPT if intentional"
+                f"add it to _RULES_WIDENED_FOR_JAVASCRIPT or _RULES_JAVASCRIPT_ONLY if intentional"
             )

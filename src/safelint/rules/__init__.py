@@ -13,7 +13,7 @@ from safelint.rules.max_arguments import MaxArgumentsRule
 from safelint.rules.nesting_depth import NestingDepthRule
 from safelint.rules.resource_lifecycle import ResourceLifecycleRule
 from safelint.rules.side_effects import SideEffectsHiddenRule, SideEffectsRule
-from safelint.rules.state_purity import GlobalMutationRule, GlobalStateRule
+from safelint.rules.state_purity import GlobalMutationRule, GlobalStateRule, WideScopeDeclarationRule
 from safelint.rules.test_coverage import TestCouplingRule, TestExistenceRule
 
 
@@ -27,6 +27,7 @@ ALL_RULES: list[type[BaseRule]] = [
     EmptyExceptRule,
     GlobalStateRule,
     GlobalMutationRule,
+    WideScopeDeclarationRule,
     UnboundedLoopRule,
     ComplexityRule,
     SideEffectsHiddenRule,
@@ -70,4 +71,5 @@ __all__ = [
     "TestExistenceRule",
     "UnboundedLoopRule",
     "Violation",
+    "WideScopeDeclarationRule",
 ]
