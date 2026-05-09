@@ -12,8 +12,11 @@ Two responsibilities run from one place so both the GH Actions workflow and
 2. **Generate the rules-at-a-glance table.** ``ALL_RULES`` and the per-rule
    defaults dict in ``safelint.core.config`` are the source of truth for
    rule code → name → severity → enabled. We snapshot them into
-   ``docs/configuration/_rules_at_a_glance.md`` (gitignored) and the
-   ``rules.md`` page pulls it in via the snippets extension.
+   ``build/snippets/_rules_at_a_glance.md`` — outside ``docs/`` on purpose,
+   so MkDocs doesn't treat the snippet as a standalone page — and the
+   ``rules.md`` page pulls it in via the snippets extension (configured
+   with ``base_path: ["build/snippets", "docs"]`` in ``mkdocs.yml``).
+   The output path is gitignored.
 
 Run from the repo root:
 
