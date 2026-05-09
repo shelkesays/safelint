@@ -135,12 +135,15 @@ def resolve_lang_name(filepath: str) -> str:
 def call_name(call_node: tree_sitter.Node) -> str | None:
     """Return the bare callable name from a call node, or None if unresolvable.
 
-    Handles four forms across the languages safelint registers:
+    Handles five forms across the languages safelint registers:
 
     * Python ``foo(...)``           — function field is ``identifier`` → ``"foo"``
     * Python ``obj.method(...)``    — function field is ``attribute``  → ``"method"``
     * JavaScript ``foo(...)``       — function field is ``identifier`` → ``"foo"``
     * JavaScript ``obj.method(...)``— function field is ``member_expression`` → ``"method"``
+    * JavaScript ``new Foo(...)``   — *constructor* field on ``new_expression``
+      (instead of ``function``) → ``"Foo"`` for the identifier form,
+      ``"WriteStream"`` for ``new fs.WriteStream(...)``.
 
     Returns ``None`` for callees the rule layer can't resolve to a
     bareword (subscripted calls like ``x[0]()``, immediately-invoked
@@ -149,7 +152,11 @@ def call_name(call_node: tree_sitter.Node) -> str | None:
 
     Callers must pass the call node itself (not the function sub-node).
     """
-    func_node = call_node.child_by_field_name("function")
+    # ``call`` (Python) and ``call_expression`` (JS) expose the callee
+    # via the ``function`` field; JS ``new_expression`` uses ``constructor``.
+    # Probing both lets a single helper cover all five shapes without the
+    # rule layer having to branch on node type.
+    func_node = call_node.child_by_field_name("function") or call_node.child_by_field_name("constructor")
     if func_node is None:
         return None
     if func_node.type == "identifier":
@@ -159,7 +166,8 @@ def call_name(call_node: tree_sitter.Node) -> str | None:
         attr_node = func_node.child_by_field_name("attribute")
         return node_text(attr_node) if attr_node else None
     if func_node.type == "member_expression":
-        # JavaScript: ``obj.method``. Property is the ``property`` field.
+        # JavaScript: ``obj.method`` (or ``new fs.WriteStream`` — same shape).
+        # Property is the ``property`` field.
         prop_node = func_node.child_by_field_name("property")
         return node_text(prop_node) if prop_node else None
     return None

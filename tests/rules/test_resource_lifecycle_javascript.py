@@ -219,3 +219,57 @@ def test_js_connect_call_outside_try_finally_fires(tmp_path: Path) -> None:
     )
     result = _engine().check_file(str(sample))
     assert any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_new_worker_outside_try_finally_fires(tmp_path: Path) -> None:
+    """``new Worker(...)`` (constructor invocation) must also fire SAFE401.
+
+    Regression guard: the runtime presets populate
+    ``tracked_functions_javascript`` with constructor names
+    (``Worker``, ``WebSocket``, ``MutationObserver``, ...) — invoked
+    via ``new`` rather than as plain calls. A call-only walk would
+    silently miss every browser preset entry.
+    """
+    sample = tmp_path / "new_worker.js"
+    sample.write_text(
+        "function start() {\n  const w = new Worker('worker.js');\n  return w;\n}\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"resource_lifecycle": {"tracked_functions_javascript": ["Worker"]}}},
+    )
+    result = SafetyEngine(cfg).check_file(str(sample))
+    safe401 = [v for v in result.violations if v.code == "SAFE401"]
+    assert len(safe401) == 1
+    assert "Worker" in safe401[0].message
+
+
+def test_js_new_member_constructor_fires(tmp_path: Path) -> None:
+    """``new fs.WriteStream(...)`` — ``call_name`` resolves member_expression constructors."""
+    sample = tmp_path / "new_member.js"
+    sample.write_text(
+        "function start() {\n  const s = new fs.WriteStream(path);\n  return s;\n}\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"resource_lifecycle": {"tracked_functions_javascript": ["WriteStream"]}}},
+    )
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert any(v.code == "SAFE401" for v in result.violations)
+
+
+def test_js_new_inside_try_finally_does_not_fire(tmp_path: Path) -> None:
+    """Constructor wrapped in try/finally is correctly recognised as guarded."""
+    sample = tmp_path / "new_wrapped.js"
+    sample.write_text(
+        "function start() {\n  let w;\n  try {\n    w = new Worker('worker.js');\n    return work(w);\n  } finally {\n    if (w) w.terminate();\n  }\n}\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(
+        DEFAULTS,
+        {"rules": {"resource_lifecycle": {"tracked_functions_javascript": ["Worker"]}}},
+    )
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert not any(v.code == "SAFE401" for v in result.violations)

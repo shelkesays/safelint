@@ -84,20 +84,25 @@ def _python_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None
     return None
 
 
-def _javascript_global_namespace_root(member_expr: tree_sitter.Node) -> str | None:
-    """Walk a ``member_expression`` chain leftward and return the root identifier name.
+def _javascript_global_namespace_root(target: tree_sitter.Node) -> str | None:
+    """Walk a member / subscript chain leftward and return the root identifier name.
 
     For ``globalThis.x``                  → ``"globalThis"``.
+    For ``globalThis['x']``               → ``"globalThis"`` (bracket notation).
     For ``window.config``                 → ``"window"``.
-    For ``process.env.NODE_ENV``          → ``"process"`` (walks past ``process.env``).
+    For ``window["config"]["x"]``         → ``"window"`` (chained subscripts).
+    For ``process.env.NODE_ENV``          → ``"process"``.
+    For ``process.env["NODE_ENV"]``       → ``"process"`` (mixed dot + bracket).
     For ``somelocal.field``               → ``"somelocal"`` (caller filters by namespace list).
-    For ``arr[0].field``                  → ``None`` (subscript breaks the bare-identifier chain).
+    For ``arr[0]().field``                → ``None`` (call result breaks the bare-identifier chain).
 
     Returns ``None`` if the chain doesn't terminate in a bare identifier
-    (e.g. the receiver is a call result, a subscript, ``this``, etc.).
+    (e.g. the receiver is a call result, ``this``, etc.). ``member_expression``
+    and ``subscript_expression`` are walked uniformly because they share the
+    ``object`` field name and serve the same ownership-chain semantics.
     """
-    cur: tree_sitter.Node | None = member_expr
-    while cur is not None and cur.type == "member_expression":  # nosafe: SAFE501
+    cur: tree_sitter.Node | None = target
+    while cur is not None and cur.type in ("member_expression", "subscript_expression"):  # nosafe: SAFE501
         cur = cur.child_by_field_name("object")
     if cur is None or cur.type != "identifier":
         return None
@@ -225,7 +230,7 @@ class GlobalMutationRule(BaseRule):
             # the ``left`` field for the LHS; ``update_expression`` (``x++`` /
             # ``--y``) uses ``argument`` for the operand.
             target = node.child_by_field_name("argument") if node.type == "update_expression" else node.child_by_field_name("left")
-            if target is None or target.type != "member_expression":
+            if target is None or target.type not in ("member_expression", "subscript_expression"):
                 continue
             root = _javascript_global_namespace_root(target)
             if root is None or root not in namespaces:

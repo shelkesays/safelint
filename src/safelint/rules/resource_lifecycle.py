@@ -192,7 +192,16 @@ class ResourceLifecycleRule(BaseRule):
         return violations
 
     def _javascript_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Run the JavaScript-specific check (call must be inside ``try { ... } finally { ... }``)."""
+        """Run the JavaScript-specific check (call must be inside ``try { ... } finally { ... }``).
+
+        Walks both ``call_expression`` and ``new_expression`` — the runtime
+        presets populate ``tracked_functions_javascript`` with constructor
+        names (``Worker``, ``WebSocket``, ``MutationObserver``, ...) that
+        are typically invoked via ``new``, so a call-only walk would
+        miss exactly the cases the browser preset is designed to catch.
+        ``call_name`` resolves both shapes — the rule layer doesn't need
+        to branch.
+        """
         tracked_js = _validated_string_list(
             self.config.get("tracked_functions_javascript", self._DEFAULT_TRACKED_JAVASCRIPT),
             "tracked_functions_javascript",
@@ -200,7 +209,7 @@ class ResourceLifecycleRule(BaseRule):
         tracked: frozenset[str] = frozenset(tracked_js)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "call_expression":
+            if node.type not in ("call_expression", "new_expression"):
                 continue
             name = call_name(node)
             if not name or name not in tracked:

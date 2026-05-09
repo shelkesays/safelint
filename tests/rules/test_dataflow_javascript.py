@@ -458,3 +458,24 @@ def test_js_pair_pattern_param_taints_alias(tmp_path: Path) -> None:
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
     assert any(v.code == "SAFE801" for v in result.violations)
+
+
+def test_js_new_function_with_tainted_arg_fires(tmp_path: Path) -> None:
+    """``new Function(userInput)`` is a sink invocation — the constructor counts.
+
+    Regression guard: the default JS sinks list includes ``Function``,
+    which is canonically invoked via ``new Function(code)`` (not as
+    ``Function(code)``). Without ``new_expression`` handling in the
+    taint tracker, ``new Function(userInput)`` would silently slip
+    past SAFE801 — the highest-impact JS taint sink.
+    """
+    sample = tmp_path / "new_function.js"
+    sample.write_text(
+        "function f(userInput) {\n  return new Function(userInput);\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    safe801 = [v for v in result.violations if v.code == "SAFE801"]
+    assert len(safe801) == 1
+    assert "Function" in safe801[0].message
+    assert "userInput" in safe801[0].message

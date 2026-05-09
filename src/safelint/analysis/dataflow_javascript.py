@@ -104,7 +104,11 @@ class JsTaintTracker:
             self._visit_aug_assignment(node)
         elif node.type == "variable_declarator":
             self._visit_var_declarator(node)
-        elif node.type == "call_expression":
+        elif node.type in ("call_expression", "new_expression"):
+            # Treat ``new Foo(tainted)`` the same as ``Foo(tainted)`` for
+            # taint tracking — the default JS sinks list includes ``Function``,
+            # which is canonically invoked via ``new Function(code)``.
+            # ``call_name`` resolves both shapes.
             self._visit_call(node)
 
     def _iter_target_identifiers(self, target: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
@@ -212,7 +216,7 @@ class JsTaintTracker:
         node_type = node.type
         if node_type == "identifier":
             return node_text(node) in self.tainted
-        if node_type == "call_expression":
+        if node_type in ("call_expression", "new_expression"):
             return self._call_tainted(node)
         if node_type == "template_string":
             return self._template_tainted(node)
