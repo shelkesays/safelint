@@ -1,0 +1,3364 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python">
+      
+      
+        <meta name="author" content="Rahul Shelke">
+      
+      
+        <link rel="canonical" href="https://shelkesays.github.io/safelint/project/changelog/">
+      
+      
+        <link rel="prev" href="../../contributing/adding-a-language/">
+      
+      
+        <link rel="next" href="../code-of-conduct/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+    
+    
+      
+        <title>Changelog - SafeLint</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#changelog" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="SafeLint" class="md-header__button md-logo" aria-label="SafeLint" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            SafeLint
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Changelog
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to dark mode"  type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="indigo" data-md-color-accent="indigo"  aria-label="Switch to light mode"  type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"/></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"/></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/shelkesays/safelint" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    shelkesays/safelint
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../.." class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../configuration/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Configuration
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../ai-clients/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  AI client integrations
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../../json-schema/" class="md-tabs__link">
+        
+  
+  
+    
+  
+  JSON output schema
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    
+    
+      <li class="md-tabs__item">
+        <a href="../../contributing/" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Contributing
+
+        </a>
+      </li>
+    
+  
+
+      
+        
+  
+  
+  
+    
+  
+  
+    
+    
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="./" class="md-tabs__link">
+          
+  
+  
+    
+  
+  Project
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="SafeLint" class="md-nav__button md-logo" aria-label="SafeLint" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    SafeLint
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/shelkesays/safelint" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    shelkesays/safelint
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../configuration/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_2" id="__nav_2_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/cli/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    CLI flags and commands
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/suppression/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Suppression mechanisms
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/toml/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration file
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../configuration/rules/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rules reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../ai-clients/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AI client integrations
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    AI client integrations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/manual-install/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Manual install
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/scope/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project vs user scope
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/lifecycle/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Updating, removing, freshness
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/troubleshooting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Troubleshooting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_3_6" id="__nav_3_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Per-client guides
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_3_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Per-client guides
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/claude-code/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Claude Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/cursor/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cursor
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/github-copilot/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    GitHub Copilot
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/gemini/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Gemini
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/windsurf/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Windsurf
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/codex/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    codex
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/continue-dev/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Continue.dev
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/cline/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cline
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/aider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    aider
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/trae/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Trae
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/antigravity/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Antigravity
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/zed/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Zed
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../json-schema/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    JSON output schema
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../../contributing/" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contributing
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Contributing
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/adding-an-ai-client/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding an AI client
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/adding-a-language/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Adding a language
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+        
+        
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Project
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Project
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unreleased
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1121-2026-05-09" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.12.1 - 2026-05-09
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.12.1 - 2026-05-09">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed-internal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed (internal)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added-pre-emptive-dormant-until-a-second-language-lands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added (pre-emptive — dormant until a second language lands)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behaviour-changes-heads-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes (heads-up)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1120-2026-05-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.12.0 - 2026-05-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.12.0 - 2026-05-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behaviour-changes-heads-up_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes (heads-up)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1110-2026-05-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.11.0 - 2026-05-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.11.0 - 2026-05-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behaviour-changes-heads-up_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes (heads-up)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security hardening
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1100-2026-05-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.10.0 - 2026-05-06
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.10.0 - 2026-05-06">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#190-2026-05-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.9.0 - 2026-05-05
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.9.0 - 2026-05-05">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#180-2026-05-04" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.8.0 - 2026-05-04
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.8.0 - 2026-05-04">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#170-2026-05-04" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.7.0 - 2026-05-04
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.7.0 - 2026-05-04">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#160-2026-05-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.6.0 - 2026-05-02
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.6.0 - 2026-05-02">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#150-2026-05-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5.0 - 2026-05-02
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.5.0 - 2026-05-02">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#141-2026-05-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4.1 - 2026-05-01
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.4.1 - 2026-05-01">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#140-2026-05-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4.0 - 2026-05-01
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.4.0 - 2026-05-01">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#131-2026-04-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3.1 - 2026-04-24
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.3.1 - 2026-04-24">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#130-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3.0 - 2026-03-01
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.3.0 - 2026-03-01">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../code-of-conduct/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code of conduct
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../support/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Support
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#unreleased" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Unreleased
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1121-2026-05-09" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.12.1 - 2026-05-09
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.12.1 - 2026-05-09">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#fixed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed-internal" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed (internal)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#added-pre-emptive-dormant-until-a-second-language-lands" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added (pre-emptive — dormant until a second language lands)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behaviour-changes-heads-up" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes (heads-up)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1120-2026-05-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.12.0 - 2026-05-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.12.0 - 2026-05-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behaviour-changes-heads-up_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes (heads-up)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1110-2026-05-08" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.11.0 - 2026-05-08
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.11.0 - 2026-05-08">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#behaviour-changes-heads-up_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Behaviour changes (heads-up)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-hardening" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security hardening
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1100-2026-05-06" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.10.0 - 2026-05-06
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.10.0 - 2026-05-06">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#190-2026-05-05" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.9.0 - 2026-05-05
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.9.0 - 2026-05-05">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#180-2026-05-04" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.8.0 - 2026-05-04
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.8.0 - 2026-05-04">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#170-2026-05-04" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.7.0 - 2026-05-04
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.7.0 - 2026-05-04">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#160-2026-05-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.6.0 - 2026-05-02
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.6.0 - 2026-05-02">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_2" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#150-2026-05-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.5.0 - 2026-05-02
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.5.0 - 2026-05-02">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#notes_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Notes
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#141-2026-05-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4.1 - 2026-05-01
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.4.1 - 2026-05-01">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_8" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_3" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#140-2026-05-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4.0 - 2026-05-01
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.4.0 - 2026-05-01">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_9" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_6" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_4" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#131-2026-04-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3.1 - 2026-04-24
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.3.1 - 2026-04-24">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#changed_7" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Changed
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#fixed_5" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Fixed
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#130-2026-03-01" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3.0 - 2026-03-01
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1.3.0 - 2026-03-01">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#added_11" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Added
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/shelkesays/safelint/edit/main/CHANGELOG.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
+    </a>
+  
+  
+
+
+<h1 id="changelog">Changelog<a class="headerlink" href="#changelog" title="Permanent link">#</a></h1>
+<p>All notable changes to this project will be documented in this file.</p>
+<p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
+and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v1.12.1...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="1121-2026-05-09"><a href="https://github.com/shelkesays/safelint/compare/v1.12.0...v1.12.1">1.12.1</a> - 2026-05-09<a class="headerlink" href="#1121-2026-05-09" title="Permanent link">#</a></h2>
+<p>A small follow-on to v1.12.0. One user-visible bug fix, one perf optimisation, an internal-API cleanup, and pre-emptive engine plumbing for the eventual second-language work. No behaviour change for current users beyond the bug fix.</p>
+<h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
+<ul>
+<li><strong><code>per_file_ignores = ["*"]</code> no longer triggers a spurious typo-guard warning.</strong> v1.12.0 added the <code>"*"</code> wildcard as a documented blanket-suppress mechanism in toml <code>per_file_ignores</code>, but the validation pass in <code>_parse_per_file_ignores</code> still treated <code>"*"</code> as an unknown entry and emitted <code>safelint: warning: unknown entries in per_file_ignores...</code> for the exact value the docs tell users to use. The validation now exempts <code>"*"</code> while preserving the typo guard for genuinely unknown codes/names. The pre-existing wildcard test was extended to capture stderr and assert the absence of the warning, so any future regression here surfaces in CI.</li>
+</ul>
+<h3 id="changed-internal">Changed (internal)<a class="headerlink" href="#changed-internal" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Single-pass directive parsing.</strong> <code>_parse_suppressions</code> (line-level <code># nosafe</code>) and <code>_parse_file_level_ignores</code> (file-level <code># safelint: ignore</code>) used to walk the Tree-sitter tree independently — two full passes per file. New <code>_parse_directives</code> helper folds both into one O(N) pass; on a 5000-line generated file (a primary use case for file-level ignores), this halves the per-file walk cost. Behaviour is bit-for-bit identical to the two-pass version. The two original helpers are kept as thin wrappers so the existing unit tests in <code>tests/core/test_suppression.py</code> continue to work without changes.</li>
+<li><strong><code>_merge_in_file_directives</code> signature cleanup.</strong> The boolean parameter was forcing surrounding mandatory non-bool params into keyword-only territory unnecessarily. Reordered so only the boolean is keyword-only, matching Python convention (positional mandatory params first, then <code>*</code>, then keyword-only).</li>
+</ul>
+<h3 id="added-pre-emptive-dormant-until-a-second-language-lands">Added (pre-emptive — dormant until a second language lands)<a class="headerlink" href="#added-pre-emptive-dormant-until-a-second-language-lands" title="Permanent link">#</a></h3>
+<ul>
+<li><strong><code>BaseRule.language: tuple[str, ...] = ("python",)</code></strong> — new class attribute that the engine consults in <code>_run_rules</code> before dispatching <code>check_file</code>. Rules whose <code>language</code> tuple doesn't include the active file's <code>LanguageDefinition.name</code> are skipped. Today every rule defaults to <code>("python",)</code> and Python is the only registered language, so the filter is a no-op for current usage. The plumbing is the engine half of the per-language dispatch contract documented in <code>ADDING_A_LANGUAGE.md</code>; the per-rule audit (which existing rules port cross-language vs. stay Python-only) is per-rule work that ships <em>with</em> each new language. Adding TypeScript / Go / Rust now requires only registering a new <code>LanguageDefinition</code> and widening <code>language</code> on the rules that port — no engine changes.</li>
+<li>4 new dispatch tests in <code>tests/core/test_engine.py</code>: filter skips Python-only rules on a hypothetical-language file (via a monkeypatched fake <code>LanguageDefinition</code>), filter doesn't accidentally skip Python rules on Python files (regression guard), <code>BaseRule.language</code> default is pinned, every registered rule still inherits the default.</li>
+</ul>
+<h3 id="behaviour-changes-heads-up">Behaviour changes (heads-up)<a class="headerlink" href="#behaviour-changes-heads-up" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>None for end-users.</strong> The <code>"*"</code> typo-guard fix removes an erroneous warning; the perf and signature-cleanup work is invisible; the dispatch infrastructure is dormant. End-to-end behaviour for <code>safelint check</code> and <code>safelint skill *</code> commands is identical to v1.12.0.</li>
+</ul>
+<h2 id="1120-2026-05-08"><a href="https://github.com/shelkesays/safelint/compare/v1.11.0...v1.12.0">1.12.0</a> - 2026-05-08<a class="headerlink" href="#1120-2026-05-08" title="Permanent link">#</a></h2>
+<p>A focused feature release on top of v1.11.0. The suppression model grows from three layers to four with a new in-file <code># safelint: ignore</code> directive that lets users silence rules for a whole file from inside the file itself — matching the established pattern from ruff (<code># ruff: noqa</code>), flake8 (<code># flake8: noqa</code>), pylint (<code># pylint: disable=</code>), and mypy (<code># type: ignore</code>).</p>
+<h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
+<ul>
+<li>
+<p><strong>In-file <code># safelint: ignore</code> directive</strong> — file-scope suppression placed as a top-of-file (or anywhere alone-on-its-line) comment. Three forms:
+  <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># safelint: ignore                        # suppress every rule for this file</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># safelint: ignore: SAFE101               # suppress one code</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="c1"># safelint: ignore: SAFE101, SAFE304      # suppress multiple</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># safelint: ignore: function_length       # by rule name (equivalent to the code form)</span>
+</code></pre></div>
+  Best for the case "this whole file is intentionally violating" — auto-generated code, fixtures, vendor adapters — where toml's <code>per_file_ignores</code> is overkill (no glob pattern needed) and inline <code># nosafe</code> is wrong (the violation isn't on a single line).</p>
+</li>
+<li>
+<p><strong>Tree-sitter parsed</strong>, so <code># safelint: ignore</code> <em>literals</em> inside docstrings or string content are correctly ignored.</p>
+</li>
+<li><strong>Comment must be alone on its line.</strong> Trailing comments after code are skipped — those are scope-local and use <code># nosafe</code> instead. This prevents a per-line directive that's typed with the wrong prefix from silently extending to the whole file.</li>
+<li><strong>Typo-guarded.</strong> Unknown codes / rule names emit a <code>safelint: warning:</code> line on stderr (matching the toml typo guard); the run continues.</li>
+<li>
+<p><strong>Auditable.</strong> Suppressed violations still land in <code>LintResult.suppressed</code> and surface in the CLI's per-code breakdown at the end of a run.</p>
+</li>
+<li>
+<p><strong><code>"*"</code> wildcard support in <code>per_file_ignores</code></strong> — falls out of the same machinery the bare file-level directive uses. You can now write <code>[tool.safelint.per_file_ignores]</code> with <code>"some/path/**" = ["*"]</code> to skip every rule for a path pattern, instead of having to enumerate every code.</p>
+</li>
+</ul>
+<h3 id="changed">Changed<a class="headerlink" href="#changed" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Suppression model is now four layers</strong>, narrowest to widest. They compose — a violation is suppressed if <em>any</em> layer matches:</li>
+<li><strong><code># nosafe</code></strong> (line scope) — same as before.</li>
+<li><strong><code># safelint: ignore</code></strong> (file scope) — new in 1.12.0.</li>
+<li><strong><code>per_file_ignores</code></strong> (glob scope) — same as before, plus <code>"*"</code> wildcard support.</li>
+<li><strong><code>ignore</code></strong> (project scope) — same as before.</li>
+</ul>
+<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>CONFIGURATION.md</strong> — new <em>File-level suppression</em> section with form table, placement rule, typo-guard behaviour, and a four-mechanism comparison table mapping each scope to its right use case.</li>
+<li><strong>CLAUDE.md</strong> — <em>Suppression model</em> section updated from 3 layers to 4 with implementation pointers (<code>_parse_file_level_ignores</code>, <code>_merge_in_file_directives</code>, <code>_is_per_file_ignored</code>'s wildcard short-circuit).</li>
+</ul>
+<h3 id="behaviour-changes-heads-up_1">Behaviour changes (heads-up)<a class="headerlink" href="#behaviour-changes-heads-up_1" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>None for existing files.</strong> Files without a <code># safelint: ignore</code> directive behave identically to v1.11.0 — the new code path is purely additive. The only observable difference is the new wildcard <code>"*"</code> interpretation in <code>per_file_ignores</code>; if any user was previously writing literal <code>"*"</code> as a rule code (would have been a no-op since no rule matches), they'll now find that entry blanket-suppresses every rule. We're not aware of any such usage in the wild.</li>
+</ul>
+<h2 id="1110-2026-05-08"><a href="https://github.com/shelkesays/safelint/compare/v1.10.0...v1.11.0">1.11.0</a> - 2026-05-08<a class="headerlink" href="#1110-2026-05-08" title="Permanent link">#</a></h2>
+<p>Multi-client expansion — the AI-client skill registry grows from 2 supported clients to 12. The architecture from v1.6.0–v1.10.0 was built for this; each new client is one <code>ClientSpec</code> append plus a bundled artefact (and 10 install/lifecycle regression tests). Top-level <code>safelint help</code> gains dedicated <em>Skill subcommands</em> and <em>Skill flags</em> sections so the install / update / remove / status / path surface is discoverable without a second <code>safelint help skill</code> round-trip.</p>
+<h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Ten new AI-client integrations:</strong> GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed. Every client follows the same install / update / remove / status / path surface and the same project-vs-user-scope semantics, with auto-detection wired into the existing <code>--client auto</code> flow. Per-client install destinations:</li>
+<li><strong>GitHub Copilot</strong> — <code>.github/copilot-instructions.md</code> (auto-loaded by VS Code Copilot Chat)</li>
+<li><strong>Gemini</strong> — <code>GEMINI.md</code> at repo root (auto-discovered by Gemini CLI)</li>
+<li><strong>Windsurf</strong> — <code>.windsurfrules</code> at repo root</li>
+<li><strong>codex</strong> — <code>.codex/instructions.md</code> (primary) <strong>plus</strong> a delimited section in <code>AGENTS.md</code> when that file exists (preserves user content; see <em>Secondary install</em> below)</li>
+<li><strong>Continue.dev</strong> — <code>.continue/rules/safelint.md</code></li>
+<li><strong>Cline</strong> — <code>.clinerules/safelint.md</code></li>
+<li><strong>aider</strong> — <code>CONVENTIONS.md</code> (project or user); requires a one-line <code>read: [CONVENTIONS.md]</code> entry in <code>.aider.conf.yml</code> since aider doesn't auto-load conventions files. The post-install message reminds users.</li>
+<li><strong>Trae</strong> — <code>.trae/rules/safelint.md</code></li>
+<li><strong>Antigravity</strong> — <code>.antigravity/rules/safelint.md</code></li>
+<li><strong>Zed</strong> — <code>.rules</code> at repo root</li>
+<li><strong><code>ClientSpec</code> secondary-install architecture.</strong> New optional fields <code>secondary_install_relpath</code> and <code>secondary_install_section_markers</code> let a client write a <em>delimited HTML-comment section</em> into a shared cross-agent file (e.g. <code>AGENTS.md</code>) when that file already exists at the scope root. Used by codex; the architecture generalises to any future cross-agent shared file. <strong>Lifecycle parity:</strong> install writes the section, update re-renders on drift, status escalates to DIFFERS when section content drifts (even if the primary install is fresh), remove strips just the section (preserving other content; deletes the file only if it becomes empty after stripping). Section-based edits are <em>always</em> the contract for the secondary destination — never a full-file overwrite — so user content in shared files is safe.</li>
+<li><strong>Top-level <code>safelint help</code> gains <em>Skill subcommands</em> and <em>Skill flags</em> sections.</strong> All five lifecycle actions (<code>install</code>, <code>update</code>, <code>remove</code>, <code>status</code>, <code>path</code>) and the common flags (<code>--client</code>, <code>--project</code>, <code>--symlink</code>, <code>--force</code>, plus <code>--path</code> and <code>--dry-run</code> for <code>remove</code>) are now visible at the top level — no second <code>safelint help skill</code> round-trip needed to find <code>--force</code> etc. <code>--force</code> is intentionally placed under <em>Skill flags</em> (not <em>Global options</em>) since it doesn't apply to <code>check</code>.</li>
+<li><strong><code>run_update</code> performance: hash/walk runs at most once per install per run.</strong> Previously <code>run_update</code> and <code>_update_one</code> each invoked <code>_install_status</code> independently per target, doubling the directory walk and content hash for Claude installs (the most file-heavy bundle). <code>_update_one</code> now accepts an optional <code>status</code> parameter; <code>run_update</code> threads its precomputed value through. Direct callers and tests are unaffected (default <code>None</code> means "compute internally").</li>
+<li><strong><code>run_update</code> no longer falsely prints "all up to date" when every target was OSError-skipped.</strong> New <code>any_processed</code> flag gates <code>_print_update_all_fresh</code> on at least one target having a readable status. Without the gate, an all-permission-denied run would silently report success.</li>
+</ul>
+<h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">#</a></h3>
+<ul>
+<li><strong><code>io_functions</code> in the bundled <code>safelint.toml</code> (<code>[rules.side_effects_hidden]</code>)</strong> — removed the unmatchable <code>"subprocess"</code> entry (the rule walks bare callable names — <code>subprocess.run(...)</code> resolves to <code>"run"</code>) and replaced it with the actual subprocess callable names (<code>run</code>, <code>Popen</code>, <code>call</code>, <code>check_call</code>, <code>check_output</code>).</li>
+<li><strong>Documentation fan-out for the multi-client expansion:</strong> <code>AI_CLIENTS.md</code> (Supported clients table + Per-client guides + manual install examples), <code>src/safelint/skill_files/README.md</code> (clients list + layout tree + manual install examples), <code>README.md</code> (top-level integration block), and <code>ADDING_AN_AI_CLIENT.md</code> all enumerate the 12 supported clients. The Roadmap section in <code>AI_CLIENTS.md</code> was retired since the previously listed candidates (Copilot, codex, windsurf, antigravity) all shipped.</li>
+<li><strong>Test coverage threshold remains 97%; current coverage 97.24% across 628 tests.</strong> The 10 new client integrations add 100+ install/symlink/force/overwrite/auto-detect/CLI-routing/path-print/peer-exclusion tests plus 24 codex-specific tests for the secondary-install lifecycle and section helpers.</li>
+</ul>
+<h3 id="behaviour-changes-heads-up_2">Behaviour changes (heads-up)<a class="headerlink" href="#behaviour-changes-heads-up_2" title="Permanent link">#</a></h3>
+<ul>
+<li><strong><code>safelint help</code> output changed shape</strong> — <em>Skill subcommands</em> and <em>Skill flags</em> sections now appear between <em>Commands</em> and <em>Options</em>. Existing users see a longer (more discoverable) help; no commands or flags removed.</li>
+<li><strong>Auto-detection now scans for 12 client markers, not 2.</strong> A project with markers for several clients gets installs for all of them in registry order. To install for a single client, pass <code>--client &lt;name&gt;</code> explicitly.</li>
+<li><strong>codex's secondary install touches <code>AGENTS.md</code> when present.</strong> If you have an existing <code>AGENTS.md</code> with content for other agents, <code>safelint skill install --client codex --project</code> will <em>append</em> a delimited safelint section to it (your other content is preserved). The section sits between <code>&lt;!-- safelint:begin --&gt;</code> and <code>&lt;!-- safelint:end --&gt;</code> markers; <code>safelint skill remove --client codex</code> strips it cleanly. If you don't want any AGENTS.md modification, install codex without <code>--project</code> so it lands at user-scope only, or remove the AGENTS.md file before installing.</li>
+</ul>
+<h3 id="security-hardening">Security hardening<a class="headerlink" href="#security-hardening" title="Permanent link">#</a></h3>
+<ul>
+<li><strong><code>safelint skill remove --path PATH</code> now validates that <em>PATH</em>'s tail matches a registered install relpath before deleting.</strong> Without this guard, a typo or shell-expansion accident (<code>--path ~/.config</code> instead of <code>~/.cursor/...</code>, or an unset env-var that expanded to a sensitive path) could trigger <code>shutil.rmtree</code> on the wrong directory. The check accepts every registered client's canonical install path (<code>.cursor/rules/safelint.mdc</code>, <code>.codex/instructions.md</code>, <code>.continue/rules/safelint.md</code>, <code>.clinerules/safelint.md</code>, <code>.trae/rules/safelint.md</code>, <code>.antigravity/rules/safelint.md</code>, <code>.windsurfrules</code>, <code>GEMINI.md</code>, <code>.rules</code>, <code>CONVENTIONS.md</code>, <code>.claude/skills/safelint</code>, <code>.github/copilot-instructions.md</code>) regardless of where the parent directories sit. Truly unrecognisable install locations should be removed manually with <code>rm</code> after inspecting their contents.</li>
+<li><strong>codex secondary install (<code>AGENTS.md</code>) refuses to follow symlinks.</strong> Without this guard, an <code>AGENTS.md</code> set up as a symlink — intentionally by the user, or maliciously by an attacker with write access to the install scope (e.g. shared CI workspace) — would have caused <code>install</code>/<code>update</code>/<code>remove</code> to read and write <em>through</em> the symlink, potentially corrupting any user-writable file the link pointed at (e.g. <code>~/.ssh/authorized_keys</code>, system files when running as root). All three lifecycle paths (<code>_install_secondary</code>, <code>_remove_secondary</code>, <code>_secondary_status</code>) now check <code>target.is_symlink()</code> and refuse with a <code>safelint: warning: refusing to install/remove safelint section through symlink at ...</code> line on stderr. The primary <code>.codex/instructions.md</code> install is unaffected.</li>
+</ul>
+<h2 id="1100-2026-05-06"><a href="https://github.com/shelkesays/safelint/compare/v1.9.0...v1.10.0">1.10.0</a> - 2026-05-06<a class="headerlink" href="#1100-2026-05-06" title="Permanent link">#</a></h2>
+<p>Round-out release for the skill-install lifecycle: <code>update</code> and <code>remove</code> complete the install / status / update / remove quartet so users have a full set of maintenance commands without falling back to manual <code>rm</code> / re-install cycles.</p>
+<h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">#</a></h3>
+<ul>
+<li><strong><code>safelint skill update</code></strong> — refresh installed skills whose content has drifted from the bundled wheel. Idempotent by default (no-op when fresh), with <code>--force</code> to re-install regardless of drift status (useful for reverting customised installs back to bundled). Inherits <code>--client</code> / <code>--project</code> / <code>--symlink</code> / <code>--force</code> from install. <code>--client auto</code> here resolves via existing install paths, NOT marker files like install does — "what's installed?" vs "what client is the user using?" are separate questions.</li>
+<li><strong><code>safelint skill remove</code></strong> — delete detected installs. Inherits <code>--client</code> / <code>--project</code> from install, plus three remove-specific flags:</li>
+<li><strong><code>--symlink</code></strong> — filter to symlink-shape installs only, leaving copy-mode installs intact ("delete only my symlink installs").</li>
+<li><strong><code>--path PATH</code></strong> — remove one specific location, bypassing every other flag (useful for unusual / forgotten install locations).</li>
+<li><strong><code>--dry-run</code></strong> — preview what would be removed without deleting anything.</li>
+<li><strong>Shared install-path auto-detection</strong> between <code>update</code> and <code>remove</code> via new <code>_detected_installed_clients(*, only_symlink)</code> helper. Distinct from install's <code>_detected_clients(directory, marker_attr)</code> (marker-file scan).</li>
+</ul>
+<h2 id="190-2026-05-05"><a href="https://github.com/shelkesays/safelint/compare/v1.8.0...v1.9.0">1.9.0</a> - 2026-05-05<a class="headerlink" href="#190-2026-05-05" title="Permanent link">#</a></h2>
+<p>A focused follow-on to v1.8.0 covering one practical question users asked: <strong>how do I know my installed AI-client skill is up to date after <code>pip install --upgrade safelint</code>?</strong> Two new surfaces answer it. Also lands a build-time drift-detection test pair that prevents bundled-doc rot for every registered AI client (and every future one — the tests parametrise over the registry).</p>
+<h3 id="added_3">Added<a class="headerlink" href="#added_3" title="Permanent link">#</a></h3>
+<ul>
+<li><strong><code>safelint skill status</code></strong> — new subcommand that compares every detected installed AI-client skill (Claude Code at <code>~/.claude/skills/safelint/</code>, Cursor at <code>~/.cursor/rules/safelint.mdc</code>, project-scoped equivalents) against the bundled artefact in the active wheel. Reports per-location <em>fresh</em> / <em>differs from bundled</em>, exit 0 when every detected install matches, exit 1 when any differs. Pipe-friendly: <code>safelint skill status || safelint skill install --force</code> is the canonical "refresh after upgrade" idiom. Symlink installs always report fresh by construction. Documented in <code>AI_CLIENTS.md</code> "Updating after a safelint upgrade" → "Checking whether your installed skill is current".</li>
+<li><strong><code>safelint check --check-skill-freshness</code></strong> — opt-in flag that folds the same drift check into a normal lint run. Stale installs surface as <code>safelint: warning: …</code> lines on stderr through the diagnostics channel. Informational only — doesn't fail the lint. Off by default so day-to-day <code>safelint check</code> invocations stay fast (no extra FS scan).</li>
+<li><strong><code>ClientSpec.documentation_relpaths</code></strong> + parametrised drift-detection tests. Each registered AI client declares which files under <code>skill_files/</code> collectively must mention every rule code/name in <code>ALL_RULES</code> and every extension in <code>supported_extensions()</code>. Two parametrised tests (<code>test_skill_documents_every_active_rule[&lt;client&gt;]</code>, <code>test_skill_documents_every_supported_extension[&lt;client&gt;]</code>) fail CI the moment a contributor adds a rule or language without updating each registered client's bundled docs. New clients added to <code>_CLIENT_SPECS</code> automatically inherit both checks.</li>
+<li>Bundled skill crib-sheets (<code>SKILL.md</code>, <code>cursor/safelint.mdc</code>) backfilled with the eight rules previously absent from their rationale tables: SAFE203, SAFE401, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803. The drift test now passes at 100% rule coverage.</li>
+</ul>
+<h3 id="changed_2">Changed<a class="headerlink" href="#changed_2" title="Permanent link">#</a></h3>
+<ul>
+<li>Top-level <code>safelint --help</code> "Commands" entry for <code>skill</code> now lists <code>status</code> alongside <code>install</code> and <code>path</code>. Same change in the <code>CONFIGURATION.md</code> embedded help example.</li>
+<li>Documentation fan-out: the new commands and <code>--check-skill-freshness</code> flag are now mentioned in the top-level <code>README.md</code>, the bundled-in-wheel <code>src/safelint/skill_files/README.md</code>, and the <code>CONFIGURATION.md</code> <code>safelint check</code> flag table — not only in <code>AI_CLIENTS.md</code>.</li>
+</ul>
+<h2 id="180-2026-05-04"><a href="https://github.com/shelkesays/safelint/compare/v1.7.0...v1.8.0">1.8.0</a> - 2026-05-04<a class="headerlink" href="#180-2026-05-04" title="Permanent link">#</a></h2>
+<p>This release bundles three internal milestones (originally tracked as 1.8.0 / 1.9.0 / 1.10.0 during development; only 1.7.0 was published to PyPI) into a single user-visible release. It closes the most-asked-about gaps versus ruff — incremental config, unused-suppression detection, per-rule statistics, broader resource-lifecycle coverage, smarter empty-except detection, configurable global-mutation strictness, configurable function-size counting — <em>and</em> tightens the SAFE801 (<code>tainted_sink</code>) dataflow analysis <em>and</em> introduces advisory suggestions on JSON / SARIF outputs alongside a ruff-style top-level CLI surface. SafeLint stays <em>review-only</em> — there is no <code>--fix</code> flag now or planned.</p>
+<h3 id="added_4">Added<a class="headerlink" href="#added_4" title="Permanent link">#</a></h3>
+<h4 id="configuration-ergonomics">Configuration ergonomics<a class="headerlink" href="#configuration-ergonomics" title="Permanent link">#</a></h4>
+<ul>
+<li><strong><code>extend_ignore</code> / <code>extend_per_file_ignores</code> config keys</strong> — grow the corresponding default lists instead of replacing them. Mirrors ruff's <code>extend-select</code> ergonomics. Both are folded into the canonical <code>ignore</code> / <code>per_file_ignores</code> keys at config-load time and stripped from the resolved dict, so downstream consumers (engine, runner) only see the merged lists. Order-preserving dedupe means duplicates between the base and the extension collapse to a single entry.</li>
+<li><strong><code>extend_tracked_functions</code> config key on the <code>resource_lifecycle</code> rule</strong> — appends to the (now-richer) default list instead of replacing it.</li>
+<li><strong><code>strict</code> config flag on the <code>global_mutation</code> rule</strong> — <code>strict = true</code> fires on any <code>global</code> declaration even without a write, mirroring ruff's <code>PLW0603</code>. Default <code>strict = false</code> keeps the original Holzmann-aligned behaviour (only flag actual mutations). Useful for teams whose policy is to ban the <code>global</code> keyword entirely.</li>
+<li><strong><code>count_mode</code> config option on the <code>function_length</code> rule</strong> — three counting strategies:</li>
+<li><code>"lines"</code> (default) — inclusive source-line span. Original behaviour.</li>
+<li><code>"logical_lines"</code> — source lines minus blanks and pure-comment lines. Less game-able than the raw-lines metric.</li>
+<li><code>"statements"</code> — count Python statement nodes. Equivalent to ruff's <code>PLR0915</code>; fully formatting-independent. Skips nested function bodies so an inner helper doesn't inflate its outer's count.</li>
+<li><strong><code>assume_taint_preserving</code> config option on the <code>tainted_sink</code> rule</strong> — controls how unknown function calls (those whose name is in neither <code>sources</code> nor <code>sanitizers</code>) propagate taint. <code>true</code> (default — preserves the historical behaviour) means an unknown call's result is tainted iff any argument is tainted. <code>false</code> means unknown calls always drop taint, giving a less conservative analysis with fewer false positives but new false negatives where an internal helper does flow tainted data through to a sink. Set to <code>false</code> when your codebase has many "obviously safe" wrappers and you'd rather miss a flow than report a false positive.</li>
+</ul>
+<h4 id="new-rules-and-detection-improvements">New rules and detection improvements<a class="headerlink" href="#new-rules-and-detection-improvements" title="Permanent link">#</a></h4>
+<ul>
+<li><strong><code>SAFE004</code> (<code>unused_suppression</code>)</strong> — emits a warning for any inline <code># nosafe</code> directive that didn't actually suppress anything. Catches stale annotations after refactors. The engine tracks per-(line, code) usage during the rule run; unused entries are reported afterward. Globally disable via <code>ignore = ["SAFE004"]</code> if your workflow generates many transient suppressions. Self-referential directives (both <code># nosafe: SAFE004</code> and <code># nosafe: unused_suppression</code>, case-insensitive on the code form) are special-cased to avoid recursion.</li>
+<li><strong>Broader default tracked functions for SAFE401</strong> — covers <code>socket</code>, <code>mmap</code>, <code>Lock</code>/<code>RLock</code>/<code>Semaphore</code>, <code>Pool</code>/<code>ThreadPoolExecutor</code>/<code>ProcessPoolExecutor</code>, <code>TemporaryFile</code>/<code>NamedTemporaryFile</code>/<code>TemporaryDirectory</code>, <code>ZipFile</code>/<code>TarFile</code>, plus <code>Session</code> (PEP-8-cased) alongside the existing <code>open</code>/<code>connect</code>/<code>session</code>. Extended cleanup-pattern list adds <code>release</code> and <code>shutdown</code>. Closes the most common ruff-vs-safelint coverage gap on real codebases.</li>
+<li><strong><code>SAFE202</code> now catches the canonical <code>except: pass</code> and other no-op idioms</strong> — previously the rule's check was so narrow it effectively never fired on real code (only on the malformed-AST case). Now flags <code>pass</code> / <code>continue</code> / <code>...</code> / single-literal expression bodies (<code>0</code>, <code>None</code>, <code>True</code>, <code>False</code>, string-as-comment <code>"TODO"</code> / <code>""</code> etc.) when they're the entire body of an except clause. Multi-statement bodies are still allowed (so <code>log_message; pass</code> doesn't trip).</li>
+<li><strong>Splatted-arg taint propagation</strong> — <code>foo(*tainted_list)</code> and <code>foo(**tainted_dict)</code> now correctly flow the splat operand's taint into the call. Previously <code>list_splat</code> and <code>dictionary_splat</code> Tree-sitter nodes weren't matched in <code>TaintTracker._is_tainted</code>, so calls like <code>eval(*user_args)</code> slipped through without a violation.</li>
+</ul>
+<h4 id="advisory-suggestions-json-sarif">Advisory suggestions (JSON / SARIF)<a class="headerlink" href="#advisory-suggestions-json-sarif" title="Permanent link">#</a></h4>
+<ul>
+<li><strong><code>suggestions[]</code> array on every Violation</strong> — a list of advisory <code>Suggestion</code> objects, each with a one-line <code>description</code> and zero or more <code>TextEdit</code> entries (range + replacement). Empty when the rule has no fix to offer. Surfaced in JSON output (<code>--format json</code>), in SARIF output (<code>--format sarif</code> → native <code>fixes[]</code> block, advisory by spec), and via the public Python API (<code>Violation.suggestions: tuple[Suggestion, ...]</code>).</li>
+<li><strong><code>SAFE201 (bare_except)</code> ships the first suggestion</strong> — replace bare <code>except:</code> with <code>except Exception:</code>. Validates the schema end-to-end with a real rule. More rules can attach suggestions in subsequent releases without further schema changes.</li>
+<li><strong><code>docs/JSON_SCHEMA.md</code></strong> documents the new <code>Suggestion</code> and <code>TextEdit</code> shapes and dedicates a section to the <em>advisory only</em> contract for editor / CI integrations.</li>
+</ul>
+<h4 id="cli-surface">CLI surface<a class="headerlink" href="#cli-surface" title="Permanent link">#</a></h4>
+<ul>
+<li><strong><code>--statistics</code> CLI flag</strong> — prints a per-rule count summary at the end of a pretty-mode run (<code>CODE  RULE  ACTIVE  SUPPRESSED</code>). Useful for "where do we stand?" snapshots in CI. Sorted by descending total count, ties broken alphabetically by code for deterministic output. Silent on a clean run.</li>
+<li><strong>Top-level CLI help and version, ruff-style.</strong> New <code>safelint help</code> and <code>safelint version</code> commands plus the conventional <code>-h</code> / <code>--help</code> / <code>-V</code> / <code>--version</code> short and long flags. Help text uses a coloured layout matching ruff's (Commands / Options / Global options sections, bold headers, cyan command names, dim descriptions). Subcommand-level help is reachable via either <code>safelint help check</code> or <code>safelint check --help</code>. ANSI colour auto-disables when stdout is not a TTY. Documented in <code>CONFIGURATION.md</code> under "Top-level commands and flags".</li>
+</ul>
+<h4 id="ai-client-integration">AI-client integration<a class="headerlink" href="#ai-client-integration" title="Permanent link">#</a></h4>
+<ul>
+<li><strong>Cursor support alongside Claude Code.</strong> <code>safelint skill install</code> gains a <code>--client</code> flag accepting <code>auto</code> / <code>claude</code> / <code>cursor</code>. Cursor installs deliver a single MDC project rule (<code>safelint.mdc</code>) to <code>~/.cursor/rules/</code> (user) or <code>&lt;cwd&gt;/.cursor/rules/</code> (project), matching Cursor's native Project Rules format. Both clients share the same step-by-step workflow because safelint's CLI surface is the same; the bundled language addendums remain accessible to either client via <code>safelint skill path</code>. The Claude install excludes the <code>cursor/</code> subdirectory from the materialised skill folder so peer-client bundles don't leak into <code>~/.claude/skills/safelint/</code> (in both copy <em>and</em> symlink modes — symlink mode now per-entry-symlinks the directory contents instead of linking the whole tree).</li>
+<li><strong>Auto-detection is now the default.</strong> <code>safelint skill install</code> (no <code>--client</code>) is <code>--client auto</code> under the hood. It scans cwd for client markers (<code>CLAUDE.md</code> / <code>.claude/</code> / <code>.cursor/</code> / <code>.cursorrules</code>); if found, installs each detected client's skill <strong>project-scoped</strong>. Otherwise it scans home (<code>~/.claude/</code> / <code>~/.cursor/</code>) and installs <strong>user-scoped</strong>. If neither has any markers, it errors out with the exact <code>--client</code> commands the user can run instead. Multi-detection is supported — both Claude and Cursor present means both get installed in registry order. <code>--client auto --project</code> skips the home fallback. <strong>Behaviour change for users running off the development branch:</strong> prior to 1.8.0 in this branch, bare <code>safelint skill install</code> always installed Claude unconditionally. The new default may install Cursor or both in some environments. Pass <code>--client claude</code> explicitly to preserve the prior behaviour. (No PyPI users are affected — only 1.7.0 has shipped to PyPI.)</li>
+<li><strong><code>ClientSpec</code> registry pattern.</strong> A frozen dataclass + tuple registry in <code>safelint._skill_install</code> defines each supported client. Adding GitHub Copilot, codex, windsurf, etc. is one <code>ClientSpec</code> append plus the bundled artefact — no control-flow changes elsewhere. CLI <code>--client</code> choices are derived from the registry so argparse stays in sync automatically.</li>
+<li><strong>New top-level user guide:</strong> <a href="../../ai-clients/"><code>AI_CLIENTS.md</code></a> documents auto-detection logic, per-client install / usage, project-vs-user scope, symlink mode, troubleshooting, and the developer guide for adding a new client. The bundled in-wheel reference at <code>src/safelint/skill_files/README.md</code> stays as a short install-focused doc and links out.</li>
+</ul>
+<h3 id="changed_3">Changed<a class="headerlink" href="#changed_3" title="Permanent link">#</a></h3>
+<ul>
+<li>Pretty-mode summary line updated from "No fixes available (safelint does not auto-fix violations)" to either "No suggestions available (safelint does not auto-fix)." (when no rule emitted suggestions) or "<em>N</em> advisory suggestion(s) available — view via --format json or --format sarif (safelint does not auto-apply fixes)" (when at least one rule did). Wording deliberately distinguishes "no auto-fix" (a permanent design choice) from "no suggestions available" (a per-run state). Test assertions updated accordingly.</li>
+<li>Cache schema version bumped from "1" to "2". The new <code>suggestions[]</code> field on <code>Violation</code> requires a richer reconstruction than <code>Violation(**dict)</code>, which the cache now handles via <code>_dict_to_violation</code> / <code>_dict_to_suggestion</code> / <code>_dict_to_text_edit</code>. Existing cache entries written by older safelint versions become unreachable automatically (the version is folded into the engine fingerprint, which is part of the cache key).</li>
+<li>The taint-through-formatting paths (f-strings, <code>"…".format(tainted)</code>, <code>"… %s …" % tainted</code>) now have explicit regression tests covering each form. The behaviour itself was already in place since the original SAFE801 implementation; this release just locks the contract in so it can't silently regress.</li>
+</ul>
+<h3 id="fixed_1">Fixed<a class="headerlink" href="#fixed_1" title="Permanent link">#</a></h3>
+<ul>
+<li><code>SAFE202</code> previously only matched empty-named-children blocks (which Tree-sitter doesn't actually produce for valid Python), so the rule was effectively dead code. The broadened detection above fixes this.</li>
+<li><code>ReturnValueIgnoredRule</code> now anchors violations on the call node rather than the wrapping <code>expression_statement</code>, so column ranges match the offending call instead of including trailing newline / semicolon tokens.</li>
+</ul>
+<h3 id="notes">Notes<a class="headerlink" href="#notes" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>The contract is permanent: SafeLint will never ship <code>--fix</code>.</strong> This is documented as a project policy in <code>docs/JSON_SCHEMA.md</code> ("Suggestions are advisory only" section). Editor integrations (Claude Code skill, VSCode plugin) may render suggestions as Quick Fix code actions, but every edit goes through user confirmation. The SARIF <code>fixes[]</code> block is natively advisory per the SARIF 2.1.0 spec — GitHub code scanning, IDE extensions, and other consumers already implement confirmation flows for it.</li>
+<li>Helper-function inlining (cross-function taint analysis) was considered for the SAFE801 work in this release but deferred. Adding it would require a full call-graph walker bounded by depth limits and constitutes a larger rewrite of <code>TaintTracker</code>. The current intra-procedural-only analysis remains the design contract; if a real-world need emerges for cross-function taint, it can be picked up in a future release.</li>
+<li>Internal milestones 1.9.0 and 1.10.0 were never published to PyPI; their work is included in this 1.8.0 release. Those version numbers remain available for future use.</li>
+</ul>
+<h2 id="170-2026-05-04"><a href="https://github.com/shelkesays/safelint/compare/v1.6.0...v1.7.0">1.7.0</a> - 2026-05-04<a class="headerlink" href="#170-2026-05-04" title="Permanent link">#</a></h2>
+<p>This release adds column-precise positioning to violations — the foundational change needed before a polished VSCode extension can underline the exact span of an offending construct rather than the whole line. No breaking changes; the new fields default to <code>null</code> for any consumer that doesn't read them.</p>
+<h3 id="added_5">Added<a class="headerlink" href="#added_5" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Fully-resolved range positions on every Violation</strong>: <code>end_lineno</code>, <code>column_start</code>, <code>column_end</code> (in addition to the existing required <code>lineno</code>). All four are 1-based; the range is half-open <code>[start, end)</code>, matching LSP / VSCode <code>Range</code> and SARIF <code>region</code> semantics. <code>end_lineno</code> correctly anchors <code>column_end</code> to the end-line of multi-line constructs (function definitions, except clauses, while loops) — without it, editors would mis-apply <code>column_end</code> to the start line. <code>lineno</code> remains required (no default); the three additional fields default to <code>None</code> for synthetic violations without a Tree-sitter node (e.g. <code>test_existence</code> against missing files), which editor consumers should treat as "underline the whole line".</li>
+<li><strong><code>node_range(node)</code> helper</strong> in <code>safelint.languages._node_utils</code> — returns <code>(start_line, end_line, column_start, column_end)</code> tuples directly from a Tree-sitter node, so rule code stays free of inline <code>start_point[0] + 1</code> / <code>end_point[1] + 1</code> plumbing.</li>
+<li><strong><code>BaseRule._make_violation_for_node(filepath, node, message)</code></strong> — convenience wrapper around <code>_make_violation</code> that auto-extracts the full 4-coordinate position info from a Tree-sitter node. Most rules now use this; the lower-level <code>_make_violation</code> accepts <code>column_start</code> / <code>column_end</code> / <code>end_lineno</code> kwargs for the few cases (e.g. parse errors) where the node isn't available.</li>
+</ul>
+<h3 id="changed_4">Changed<a class="headerlink" href="#changed_4" title="Permanent link">#</a></h3>
+<ul>
+<li>All built-in rules with a Tree-sitter node in scope now populate columns: <code>function_length</code>, <code>nesting_depth</code>, <code>max_arguments</code>, <code>complexity</code>, <code>bare_except</code>, <code>empty_except</code>, <code>logging_on_error</code>, <code>side_effects</code>, <code>side_effects_hidden</code>, <code>resource_lifecycle</code>, <code>unbounded_loops</code>, <code>missing_assertions</code>, <code>global_state</code>, <code>global_mutation</code>, <code>tainted_sink</code>, <code>return_value_ignored</code>, <code>null_dereference</code>. The <code>test_existence</code> / <code>test_coupling</code> rules continue to emit file-level violations with no column data (the violation is about the file, not a span).</li>
+<li><code>TaintTracker.sink_hits</code> now stores <code>(call_node, var_name, sink_name)</code> tuples instead of <code>(lineno, var_name, sink_name)</code> so the consuming rule can derive position info — including columns — from the node directly.</li>
+<li>Parse-error violations (<code>SAFE000</code>) now carry the column of the offending token as a zero-width caret (<code>column_start == column_end</code>), so editors can render a precise marker.</li>
+<li>JSON output (<code>--format json</code>) gains <code>end_lineno</code>, <code>column_start</code>, and <code>column_end</code> keys on every violation. Existing consumers ignoring unknown keys are unaffected.</li>
+<li>SARIF output (<code>--format sarif</code>) populates <code>region.startColumn</code>, <code>region.endColumn</code>, and (for multi-line constructs only) <code>region.endLine</code>. Single-line <code>endLine</code> is omitted because SARIF spec defaults absent <code>endLine</code> to <code>startLine</code>.</li>
+</ul>
+<h2 id="160-2026-05-02"><a href="https://github.com/shelkesays/safelint/compare/v1.5.0...v1.6.0">1.6.0</a> - 2026-05-02<a class="headerlink" href="#160-2026-05-02" title="Permanent link">#</a></h2>
+<p>This release ships the Claude Code skill inside the wheel and adds a one-line install command, plus a batch of correctness fixes from the v1.5.0 review cycle (caching, argv routing, SARIF URIs, CLI strictness, clean-run UX).</p>
+<h3 id="added_6">Added<a class="headerlink" href="#added_6" title="Permanent link">#</a></h3>
+<ul>
+<li><strong><code>safelint skill install</code></strong> subcommand — copies the bundled Claude Code skill into <code>~/.claude/skills/safelint/</code> (default) or <code>&lt;cwd&gt;/.claude/skills/safelint/</code> (with <code>--project</code>). Use <code>--symlink</code> for a live link to the bundled location, <code>--force</code> to replace an existing install. New install flow is <code>pip install safelint &amp;&amp; safelint skill install</code>.</li>
+<li><strong><code>safelint skill path</code></strong> subcommand — prints the on-disk location of the bundled skill files. Useful for inspecting <code>SKILL.md</code> directly or debugging install issues.</li>
+<li><strong>Skill files are now bundled in the wheel</strong> at <code>safelint/skill_files/</code> (mirroring <code>safelint/languages/</code> one-to-one). <code>safelint skill install</code> finds them via <code>importlib.resources</code>, so the same code path works for <code>pip install</code>, <code>uv add</code>, and editable installs from a checkout.</li>
+<li><strong><code>docs/JSON_SCHEMA.md</code></strong> — the stable schema for <code>safelint check --format json</code>. Documents top-level keys, the Violation object, severity / fail_on / blocking semantics, and example consumers in bash / Python / Node. Versioning policy: additions are non-breaking; removals require a major bump.</li>
+</ul>
+<h3 id="changed_5">Changed<a class="headerlink" href="#changed_5" title="Permanent link">#</a></h3>
+<ul>
+<li>The Claude Code skill now lives at <code>src/safelint/skill_files/</code> in the source tree (was <code>skills/safelint/</code>). The skill itself is also more modular: a language-agnostic core (<code>SKILL.md</code>) plus per-language addendums under <code>languages/&lt;lang&gt;.md</code>, mirroring <code>src/safelint/languages/&lt;lang&gt;.py</code>. To add a new language, follow the new step 7 in <a href="../../contributing/adding-a-language/"><code>ADDING_A_LANGUAGE.md</code></a>.</li>
+</ul>
+<h3 id="fixed_2">Fixed<a class="headerlink" href="#fixed_2" title="Permanent link">#</a></h3>
+<ul>
+<li><code>per_file_ignores</code> is now folded into the engine fingerprint, so adding/removing/editing a glob entry between runs invalidates the affected cache entries. Previously a cache hit carried the cached <code>suppressed</code> list over unchanged, which meant <em>removing</em> a <code>per_file_ignores</code> entry left previously suppressed violations stuck in the suppressed list — the user would loosen config and still see the silence applied. The post-hit re-filter (which only walked the active list and never the suppressed list) is now also redundant and has been removed.</li>
+<li>Argv routing no longer breaks when a value-taking global flag precedes the <code>check</code> subcommand. Previously <code>safelint --format json check src</code> saw <code>json</code> as the first non-<code>-</code> token and fell into hook mode, silently no-oping (<code>json</code> and <code>check</code> aren't <code>.py</code>) with exit 0. The router now recognises the value-taking flags (<code>--format</code>, <code>--fail-on</code>, <code>--mode</code>, <code>--ignore</code>, <code>--config</code>, <code>--stdin-filename</code>) and skips their values when looking for the subcommand.</li>
+<li>Cache key now includes the normalised filepath (in addition to source bytes and engine fingerprint), so two files with identical contents under different paths no longer share a cache entry. Without this, every emitted <code>Violation</code> from the second-served file would carry the <em>first</em> file's path, and path-dependent rules (<code>test_existence</code>, <code>test_coupling</code>) would draw conclusions from the wrong file.</li>
+<li>Cache directory now anchors to the <em>discovered</em> config root (where <code>safelint.toml</code> or <code>[tool.safelint]</code> was actually found while walking up), not to the directory the user happened to pass to <code>safelint check</code>. Hook mode resolves the location the same way as check mode, so a single project can no longer end up with multiple <code>.safelint_cache/</code> directories scattered across subdirectories.</li>
+<li><code>safelint check</code> in pretty mode now prints the <code>All checks passed.</code> summary on a clean run (matching ruff/ty's UX). Pre-commit hook mode and <code>--stdin</code> mode stay silent on success via a new <code>silent_on_clean</code> flag.</li>
+<li>SARIF <code>artifactLocation.uri</code> now emits a valid URI reference: backslash separators are normalised to forward slashes, absolute paths are made cwd-relative when possible, and special characters are percent-encoded. GitHub code scanning previously rejected SARIF docs produced on Windows hosts.</li>
+<li>CLI now fails loudly on unknown flags. <code>--formta=json</code> and similar typos used to be silently ignored (because hook/stdin parsing called <code>parse_known_args</code>); they now surface as <code>error: unrecognized arguments: --formta=json</code>.</li>
+<li>In <code>--format json</code>/<code>--format sarif</code>, status messages from the git-modified-files probe go to stderr instead of stdout, so machine-readable output stays a single parseable document. The "no modified Python files" early-return now also emits an empty JSON/SARIF doc on stdout in those modes.</li>
+</ul>
+<h3 id="migration">Migration<a class="headerlink" href="#migration" title="Permanent link">#</a></h3>
+<p>If you installed the v1.5.0 skill by symlinking <code>skills/safelint/</code> from a git checkout, that path no longer exists in v1.6.0. To migrate:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>rm<span class="w"> </span>~/.claude/skills/safelint<span class="w">           </span><span class="c1"># remove the stale symlink</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>safelint
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install
+</code></pre></div>
+<h2 id="150-2026-05-02"><a href="https://github.com/shelkesays/safelint/compare/v1.4.1...v1.5.0">1.5.0</a> - 2026-05-02<a class="headerlink" href="#150-2026-05-02" title="Permanent link">#</a></h2>
+<p>This release adds the foundations needed by editor integrations and the upcoming Claude Code skill / VSCode plugin: structured output formats, an in-process stdin mode, and a content-addressed result cache. No breaking changes.</p>
+<h3 id="added_7">Added<a class="headerlink" href="#added_7" title="Permanent link">#</a></h3>
+<ul>
+<li><strong><code>--format</code></strong> flag with three choices: <code>pretty</code> (default — unchanged ruff/ty multi-line coloured output), <code>json</code>, and <code>sarif</code>. The JSON format emits a stable schema with a <code>version</code>, <code>summary</code> (counts + suppressed breakdown), and flat <code>violations</code> / <code>suppressed</code> lists. The SARIF format is SARIF 2.1.0 conformant and consumable by GitHub code scanning, Azure DevOps, and similar tools. The flag is available in both <code>safelint check</code> and pre-commit hook modes.</li>
+<li><strong><code>--stdin</code></strong> / <strong><code>--stdin-filename PATH</code></strong> flags read source from stdin instead of from disk and lint it as if it came from <code>PATH</code>. Designed for editor integrations that need to lint un-saved buffers without round-tripping through a temp file. The pseudo-filename drives language detection by extension and shows up as the violation file path.</li>
+<li><strong><code>SafetyEngine.check_source(filepath, source)</code></strong> public method runs the same rule pipeline as <code>check_file</code> but on a caller-provided buffer. Used by stdin mode and available to library consumers building editor integrations.</li>
+<li><strong>Per-file lint-result cache</strong> keyed on <code>sha256(source + engine fingerprint)</code> where the engine fingerprint folds in safelint version, an internal cache schema version, and the active rule set with per-rule config. The cache lives at <code>&lt;config-dir&gt;/.safelint_cache/</code> (next to <code>pyproject.toml</code> / <code>safelint.toml</code>, mirroring <code>.pytest_cache</code>'s convention) and stores one JSON file per key. Re-runs on unchanged files are essentially instant — important for editor "lint on save" loops.</li>
+<li><strong><code>--no-cache</code></strong> flag disables the cache for the current run (e.g. CI where every run is fresh anyway, or when debugging cache-related issues). <code>.safelint_cache/</code> added to the project's <code>.gitignore</code>.</li>
+<li><strong><code>ADDING_A_LANGUAGE.md</code></strong> developer guide: a concrete walkthrough of adding a new language (TypeScript, Go, Rust, …), with a per-rule audit of which Python rules are portable, language-agnostic, or Python-only.</li>
+</ul>
+<h3 id="notes_1">Notes<a class="headerlink" href="#notes_1" title="Permanent link">#</a></h3>
+<ul>
+<li><code>--stdin</code> mode unconditionally bypasses the disk cache. Editor keystrokes produce a slightly different buffer every time; caching them would only churn the project tree without ever helping. The <code>--no-cache</code> flag is therefore a no-op in stdin mode.</li>
+<li>The new public <code>LintCache</code> class accepts <code>cache_dir=None</code> to opt out of caching at the engine level — used by <code>--no-cache</code>, by stdin mode, and recommended for any tests / library callers that need isolation.</li>
+</ul>
+<h2 id="141-2026-05-01"><a href="https://github.com/shelkesays/safelint/compare/v1.4.0...v1.4.1">1.4.1</a> - 2026-05-01<a class="headerlink" href="#141-2026-05-01" title="Permanent link">#</a></h2>
+<h3 id="added_8">Added<a class="headerlink" href="#added_8" title="Permanent link">#</a></h3>
+<ul>
+<li><code>max_file_size_bytes</code> top-level config option (default <strong>5 MiB</strong>). Files larger than the bound are skipped with a <code>safelint: warning: skipping &lt;path&gt; (&lt;size&gt; bytes exceeds max_file_size_bytes=…)</code> diagnostic to stderr instead of being read into memory and parsed. Guards against OOM on accidentally-huge inputs (binary blobs masquerading as <code>.py</code>, very large generated files). To allow larger files, raise the bound explicitly — <code>0</code> is rejected as a likely typo (it would disable the OOM guard entirely) and falls back to the default with an init-time warning. Engine init validates the value: must be a non-negative integer, otherwise <code>TypeError</code>/<code>ValueError</code> fires before any file is read. Closes #20.</li>
+</ul>
+<h3 id="fixed_3">Fixed<a class="headerlink" href="#fixed_3" title="Permanent link">#</a></h3>
+<ul>
+<li>File discovery is now safe against symlink cycles. <code>SafetyEngine._discover_files</code> switched from <code>Path.rglob('*')</code> (which follows symlinks and can recurse forever on a cycle like <code>a/sub -&gt; ..</code>) to <code>os.walk(target, followlinks=False)</code>. Same single-pass O(number_of_files) cost, but safe by construction. Matches what ruff and flake8 do by default. Closes #19.</li>
+</ul>
+<h2 id="140-2026-05-01"><a href="https://github.com/shelkesays/safelint/compare/v1.3.1...v1.4.0">1.4.0</a> - 2026-05-01<a class="headerlink" href="#140-2026-05-01" title="Permanent link">#</a></h2>
+<blockquote>
+<p><strong>Heads-up — breaking library API change.</strong> <code>LintResult.suppressed</code> is now <code>list[Violation]</code> (was <code>int</code>). Library consumers that read this field directly need to switch to <code>len(result.suppressed)</code> for the count. CLI users are unaffected. See <strong>Changed</strong> below for details and migration notes.</p>
+</blockquote>
+<h3 id="added_9">Added<a class="headerlink" href="#added_9" title="Permanent link">#</a></h3>
+<ul>
+<li>Standalone <code>safelint.toml</code> configuration file (top-level keys, no <code>[tool.safelint]</code> wrapper). When both <code>safelint.toml</code> and <code>pyproject.toml</code> <code>[tool.safelint]</code> exist in the same directory, <code>safelint.toml</code> wins — matching <code>ruff.toml</code> / <code>pyproject.toml</code> precedence.</li>
+<li><code>examples/sample.safelint.toml</code> reference covering every supported configuration key.</li>
+<li>Public <code>safelint.languages.supported_extensions() -&gt; frozenset[str]</code> for callers that need to know which file extensions have a registered language. Use this instead of importing the private <code>_REGISTRY</code>.</li>
+<li><code>walk()</code> in <code>safelint.languages._node_utils</code> accepts an optional <code>skip_types</code> parameter that prunes subtrees rooted at any matching node type (used by per-function rules to avoid descending into nested <code>def</code> / <code>async def</code> bodies).</li>
+</ul>
+<h3 id="changed_6">Changed<a class="headerlink" href="#changed_6" title="Permanent link">#</a></h3>
+<ul>
+<li><code>side_effects</code> (SAFE304) and <code>side_effects_hidden</code> (SAFE303) now normalise <strong>both</strong> sides of the name comparison. Function names are lowercased for matching, and user-supplied <code>io_name_keywords</code> / <code>pure_prefixes</code> are lowercased once at config load — so configurations like <code>io_name_keywords = ["Write", "Log"]</code> or <code>pure_prefixes = ["Get", "Calculate"]</code> behave the same as their lowercase forms. Previously only the function name was lowered, leaving uppercase config entries silently unmatched.</li>
+<li><code>load_config()</code> now returns a fresh deep copy of the merged config on every call. Mutating the result (e.g. <code>config["ignore"].append(...)</code>) no longer corrupts the module-global <code>DEFAULTS</code>.</li>
+<li><strong>Removed</strong> YAML (<code>.safelint.yaml</code>) configuration support and the <code>safelint[yaml]</code> install extra. Migrate to <code>[tool.safelint]</code> in <code>pyproject.toml</code> or to a standalone <code>safelint.toml</code>.</li>
+<li>CLI summary "All checks passed." is now bold green to match <code>ruff</code> / <code>ty</code>.</li>
+<li>The "No fixes available …" line is no longer printed on clean runs (with or without suppressions). It only appears when there are active violations a developer might wonder about auto-fixing.</li>
+<li>Suppressed-violation summary now shows a per-code breakdown — e.g. <code>(2 SAFE501, 1 SAFE304 suppressed)</code> — instead of a bare <code>(N suppressed)</code> count, so it is clear which rules were silenced.</li>
+<li><strong>Breaking (library API):</strong> <code>LintResult.suppressed</code> is now <code>list[Violation]</code> (was <code>int</code>). Use <code>len(result.suppressed)</code> for the count and iterate to inspect codes, rules, file paths, and line numbers of suppressed violations.</li>
+<li>Replaced internal use of Python's <code>logging</code> module with a dedicated diagnostics channel that writes formatted single-line messages to stderr (<code>safelint: warning: …</code>, <code>safelint: error: …</code>). Configuration typos and malformed-TOML errors are now surfaced cleanly instead of leaking through Python's <code>lastResort</code> logging handler.</li>
+<li><code>walk()</code> now traverses only <code>named_children</code> (skips Tree-sitter's anonymous punctuation/keyword tokens), reducing the number of nodes visited per traversal across every rule and the suppression parser.</li>
+<li>Parse-error violations (<code>SAFE000</code>) now include line, column (1-based), and a kind hint such as <code>missing ':'</code> or <code>syntax error</code>. The lineno on the violation now points at the offending location instead of being hardcoded to 0.</li>
+<li><code>MaxArgumentsRule</code> now counts <code>*args</code> and <code>**kwargs</code> parameters, each as one argument. Previously they were silently ignored, allowing functions to exceed <code>max_args</code> without triggering.</li>
+<li>An empty <code>[tool.safelint]</code> section in <code>pyproject.toml</code> (or an empty <code>safelint.toml</code>) is now treated as a present-but-empty config. Previously the loader fell through to an ancestor directory's config, hiding unintentionally-blank sections.</li>
+<li>Self-development pre-commit hook switched from <code>repo: https://github.com/shelkesays/safelint @ v1.3.2</code> to <code>repo: local</code>, so contributors run the in-tree code rather than an outdated published release while iterating on safelint itself.</li>
+</ul>
+<h3 id="fixed_4">Fixed<a class="headerlink" href="#fixed_4" title="Permanent link">#</a></h3>
+<ul>
+<li>Per-function rules no longer incorrectly aggregate metrics from nested <code>def</code> / <code>async def</code> bodies into the enclosing function. Affects <code>complexity</code>, <code>nesting_depth</code>, <code>missing_assertions</code>, <code>unbounded_loops</code>, <code>global_state</code>, <code>global_mutation</code>, <code>logging_on_error</code> (a logging call inside a nested helper would have falsely satisfied the rule), and the dataflow <code>TaintTracker</code>. Each nested function is scored as its own unit, as the outer-walk loop already intended.</li>
+<li><code>state_purity</code> (<code>global_state</code>, <code>global_mutation</code>) now also stops at nested class definitions — a <code>global X</code> declared inside a nested class body lives in that class's scope, not the enclosing function's.</li>
+<li><code>function_length</code> (SAFE101) reported counts that were off by one (a 60-line function showed <code>59 lines</code>). The calculation is now inclusive of the <code>def</code> line.</li>
+<li>Dataflow taint tracker now unwraps <code>keyword_argument</code> nodes — <code>eval(code=user_input)</code> is no longer missed because the tainted value was hidden behind a kwarg wrapper.</li>
+<li>Dataflow taint tracker now propagates taint through tuple/list destructure targets (<code>a, b = tainted</code>, <code>[a, b] = tainted</code>, <code>(a, b) = tainted</code>), starred destructures (<code>a, *rest = tainted</code>), and chained assignments (<code>a = b = tainted</code>). Previously the LHS shape was assumed to be a single bare identifier, so every other form silently dropped the taint.</li>
+<li>Top-level <code>ignore</code> and <code>per_file_ignores</code> entries now validate that every value is a string. Non-string elements (e.g. <code>["SAFE101", 42]</code>) and wrong-shape values (e.g. <code>ignore = "SAFE101"</code>) are reported with a clear <code>TypeError</code> at engine init instead of crashing later on <code>.upper()</code>.</li>
+<li>File discovery now does a single <code>rglob('*')</code> pass and filters by suffix, instead of one <code>rglob('*&lt;ext&gt;')</code> per registered extension. Discovery is now O(number_of_files) rather than O(number_of_extensions * number_of_files). No behaviour change on a single-language registry, but matters as more languages are added.</li>
+</ul>
+<h2 id="131-2026-04-24"><a href="https://github.com/shelkesays/safelint/compare/v1.3.0...v1.3.1">1.3.1</a> - 2026-04-24<a class="headerlink" href="#131-2026-04-24" title="Permanent link">#</a></h2>
+<h3 id="added_10">Added<a class="headerlink" href="#added_10" title="Permanent link">#</a></h3>
+<ul>
+<li><code>ignore</code> config key and <code>--ignore</code> CLI flag: suppress rules globally by code (<code>SAFE101</code>) or name (<code>function_length</code>); unknown entries log a warning at startup.</li>
+<li><code>per_file_ignores</code> config key: suppress specific rules for files matching a glob pattern (e.g. <code>"tests/**" = ["SAFE101", "SAFE103"]</code>); multiple patterns union their ignore lists.</li>
+<li><code># nosafe: RULE, CODE</code> inline suppression: codes and rule names can now be mixed in the same comma-separated list on a single <code># nosafe:</code> comment.</li>
+<li>Suppressed violation count (from both <code># nosafe</code> and <code>per_file_ignores</code>) reported in the end-of-run summary so suppressions remain auditable.</li>
+</ul>
+<h3 id="changed_7">Changed<a class="headerlink" href="#changed_7" title="Permanent link">#</a></h3>
+<ul>
+<li><code>SafetyEngine.__init__</code> extracted into two focused static methods (<code>_build_active_rules</code>, <code>_parse_per_file_ignores</code>) to keep complexity within bounds.</li>
+<li>Pattern matching for <code>exclude_paths</code> and <code>per_file_ignores</code> switched from <code>pathlib.Path.match</code> to <code>fnmatch.fnmatchcase(path.as_posix(), pattern)</code>, fixing incorrect <code>**</code> handling on Python ≤ 3.12.</li>
+<li><code>--ignore</code> CLI flag changed from <code>nargs="+"</code> to <code>action="append"</code> so it can be repeated (<code>--ignore SAFE101 --ignore SAFE103</code>).</li>
+<li>CLI summary now shows <code>(N suppressed)</code> instead of <code>(N suppressed via # nosafe)</code> to cover all suppression mechanisms.</li>
+</ul>
+<h3 id="fixed_5">Fixed<a class="headerlink" href="#fixed_5" title="Permanent link">#</a></h3>
+<ul>
+<li><code>per_file_ignores</code> patterns with <code>**</code> (e.g. <code>tests/**</code>) now correctly match files in nested subdirectories on Python ≤ 3.12.</li>
+<li>Pre-commit hook no longer shows a success message for files that were silently excluded.</li>
+</ul>
+<h2 id="130-2026-03-01"><a href="https://github.com/shelkesays/safelint/releases/tag/v1.3.0">1.3.0</a> - 2026-03-01<a class="headerlink" href="#130-2026-03-01" title="Permanent link">#</a></h2>
+<h3 id="added_11">Added<a class="headerlink" href="#added_11" title="Permanent link">#</a></h3>
+<ul>
+<li>Initial public release with 16 built-in rules covering function length, nesting depth, cyclomatic complexity, error handling, global state, side effects, resource lifecycle, loop safety, and opt-in dataflow analysis.</li>
+<li>TOML (<code>pyproject.toml</code>) and YAML (<code>.safelint.yaml</code>) configuration with deep-merge against built-in defaults.</li>
+<li><code># nosafe</code> inline suppression (bare and with specific codes).</li>
+<li><code>exclude_paths</code> glob patterns to skip directories entirely.</li>
+<li><code>fail_fast</code> execution option.</li>
+<li>Pre-commit hook integration.</li>
+<li><code>--mode=ci</code> and <code>--fail-on</code> CLI flags.</li>
+</ul>
+
+
+
+
+
+
+
+  
+  
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+  <script>var tabs=__md_get("__tabs");if(Array.isArray(tabs))e:for(var set of document.querySelectorAll(".tabbed-set")){var labels=set.querySelector(".tabbed-labels");for(var tab of tabs)for(var label of labels.getElementsByTagName("label"))if(label.innerText.trim()===tab){var input=document.getElementById(label.htmlFor);input.checked=!0;continue e}}</script>
+
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+      
+      <nav class="md-footer__inner md-grid" aria-label="Footer" >
+        
+          
+          <a href="../../contributing/adding-a-language/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Adding a language">
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+            </div>
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Previous
+              </span>
+              <div class="md-ellipsis">
+                Adding a language
+              </div>
+            </div>
+          </a>
+        
+        
+          
+          <a href="../code-of-conduct/" class="md-footer__link md-footer__link--next" aria-label="Next: Code of conduct">
+            <div class="md-footer__title">
+              <span class="md-footer__direction">
+                Next
+              </span>
+              <div class="md-ellipsis">
+                Code of conduct
+              </div>
+            </div>
+            <div class="md-footer__button md-icon">
+              
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg>
+            </div>
+          </a>
+        
+      </nav>
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+        
+<div class="md-social">
+  
+    
+    
+    
+    
+    <a href="https://github.com/shelkesays/safelint" target="_blank" rel="noopener" title="safelint on GitHub" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+    </a>
+  
+    
+    
+    
+    
+    <a href="https://pypi.org/project/safelint/" target="_blank" rel="noopener" title="safelint on PyPI" class="md-social__link">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.8 200.5c-7.7-30.9-22.3-54.2-53.4-54.2h-40.1v47.4c0 36.8-31.2 67.8-66.8 67.8H172.7c-29.2 0-53.4 25-53.4 54.3v101.8c0 29 25.2 46 53.4 54.3 33.8 9.9 66.3 11.7 106.8 0 26.9-7.8 53.4-23.5 53.4-54.3v-40.7H226.2v-13.6h160.2c31.1 0 42.6-21.7 53.4-54.2 11.2-33.5 10.7-65.7 0-108.6M286.2 444.7a20.4 20.4 0 1 1 0-40.7 20.4 20.4 0 1 1 0 40.7M167.8 248.1h106.8c29.7 0 53.4-24.5 53.4-54.3V91.9c0-29-24.4-50.7-53.4-55.6-35.8-5.9-74.7-5.6-106.8.1-45.2 8-53.4 24.7-53.4 55.6v40.7h106.9v13.6h-147c-31.1 0-58.3 18.7-66.8 54.2-9.8 40.7-10.2 66.1 0 108.6 7.6 31.6 25.7 54.2 56.8 54.2H101v-48.8c0-35.3 30.5-66.4 66.8-66.4m-6.6-183.4a20.4 20.4 0 1 1 0 40.8 20.4 20.4 0 1 1 0-40.8"/></svg>
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.copy", "content.code.annotate", "content.tabs.link", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "search.share", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      
+    
+  </body>
+</html>
