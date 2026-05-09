@@ -1,8 +1,10 @@
 # SafeLint
 
-> Holzmann "Power of Ten" safety lint rules for modern Python — adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy) doesn't reach.
+> Holzmann "Power of Ten" safety lint rules for modern **Python and JavaScript** — adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint) doesn't reach.
 
 SafeLint complements your existing linters. Where ruff handles style and pylint catches general defects, SafeLint enforces a focused set of *safety* rules — the kind you'd want in code that has to be reviewable, testable, and predictably-terminating. It's a CLI, a pre-commit hook, a JSON / SARIF emitter for editor and CI consumers, and an [AI-client skill](ai-clients/index.md) that twelve agents (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) speak.
+
+Languages: **Python** (`.py`, `.pyw`) and **JavaScript** (`.js`, `.mjs`, `.cjs` — Node.js by default; per-runtime presets for browser / Deno / Cloudflare Workers / Bun via [`[tool.safelint.javascript] runtime = "..."`](configuration/toml.md#javascript-runtime-presets)). 17 of the 20 rules apply to both languages; 2 are Python-only (the `bare_except` and `global_state` keywords don't have JS equivalents) and 1 is JavaScript-only (the `var` keyword's function-scoping hazard doesn't exist in Python).
 
 ## Quick start
 

@@ -6,9 +6,20 @@ Each rule has:
 - A **name** — the key used in config files.
 - An **enabled** flag — set to `false` to turn the rule off.
 - A **severity** — `"error"` blocks the commit; `"warning"` is informational.
+- A **language scope** — most rules apply to both Python and JavaScript; a few are language-specific (see below).
 - Rule-specific options documented below.
 
-For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [Configuration file](toml.md). For inline / file-level suppression see [Suppression mechanisms](suppression.md).
+For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [Configuration file](toml.md). For inline / file-level suppression see [Suppression mechanisms](suppression.md). JavaScript projects may also want to set a [runtime preset](toml.md#javascript-runtime-presets) so rule defaults match the deployment target (browser / Deno / Cloudflare Workers / Bun).
+
+## Language coverage
+
+| Scope | Count | Codes |
+|---|---|---|
+| **Cross-language** (Python and JavaScript) | 17 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE302, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 |
+| **Python-only** | 2 | SAFE201 (`bare_except` — JS catches always bind the error; no `KeyboardInterrupt` hijack hazard), SAFE301 (`global_state` — JS has no `global` keyword; SAFE302 covers JS's "writes to module-level state" cases) |
+| **JavaScript-only** | 1 | SAFE305 (`wide_scope_declaration` — Python has no `var` / `let` / `const` distinction) |
+
+The engine's per-language dispatch automatically skips rules whose `language` tuple doesn't include the active file's language. There's no manual configuration to do — drop a `.py` file in a JS project (or vice versa) and the right rules fire on each.
 
 ## At a glance
 
@@ -235,21 +246,41 @@ severity = "warning"
 
 ### SAFE302 — `global_mutation`
 
-**What it flags:** By default, functions that declare `global x` and then assign to `x`. With `strict = true`, *any* `global` declaration is flagged regardless of whether a write follows.
+**What it flags:** writes to module-level state from inside a function. Cross-language — the *intent* is the same in Python and JavaScript, but the syntactic shape differs.
 
-This is stricter than `SAFE301`. A function that both declares a variable global *and* writes to it is mutating shared state — the most dangerous form of global use. The default behaviour is more nuanced than ruff's `PLW0603` (which fires on any `global`); set `strict = true` if your team's policy is to ban the keyword entirely.
+**Python:** by default, functions that declare `global x` and then assign to `x`. With `strict = true`, *any* `global` declaration is flagged regardless of whether a write follows. This is stricter than `SAFE301`. The default behaviour is more nuanced than ruff's `PLW0603` (which fires on any `global`); set `strict = true` if your team's policy is to ban the keyword entirely.
+
+**JavaScript:** function-body assignments (`assignment_expression` or `augmented_assignment_expression`) whose LHS is a `member_expression` rooted in a configured global namespace. The receiver chain is walked leftward — `process.env.NODE_ENV = '...'` resolves to `process` and fires. The default namespace list (`global_namespaces_javascript`) is `["globalThis", "window", "global", "self", "process"]`; runtime presets adjust this (browser drops `process`, adds `document`; Deno adds `Deno`, drops `window` and `process`). Module-level (top-of-file) writes do NOT fire — that's setup, not the bug pattern. Reading a global (`return globalThis.env;`) does NOT fire — only writes.
 
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"error"` | `"error"` or `"warning"` |
-| `strict` | `false` | When `true`, fire on every `global` declaration even without a subsequent write — mirrors ruff's `PLW0603`. *Added in 1.8.0.* |
+| `strict` | `false` | (Python only.) When `true`, fire on every `global` declaration even without a subsequent write — mirrors ruff's `PLW0603`. *Added in 1.8.0.* |
+| `global_namespaces_javascript` | see above | (JavaScript only.) Receiver names that count as "global namespace" — function-body assignments rooted in any of these fire. *Added in 1.13.0.* |
 
 ```toml
 [tool.safelint.rules.global_mutation]
 enabled = true
 severity = "error"
-strict = false   # set true to ban the `global` keyword outright
+strict = false                                                       # Python: ban global keyword outright when true
+global_namespaces_javascript = ["globalThis", "window", "process"]   # JavaScript: tighten or relax the namespace list
+```
+
+**JavaScript example:**
+
+```javascript
+// Bad — function-body write to a global namespace
+function setupCache() {
+  globalThis.cache = new Map();   // SAFE302
+  process.env.READY = "true";     // SAFE302
+}
+
+// Good — encapsulate state, return rather than mutate
+function buildCache() {
+  return new Map();
+}
+const cache = buildCache();   // module-level setup is fine; not flagged
 ```
 
 ### SAFE303 — `side_effects_hidden`
@@ -285,36 +316,94 @@ Broader than `SAFE303` — applies to *all* functions, not just pure-named ones.
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"warning"` | `"error"` or `"warning"` |
-| `io_functions` | `["open", "print", "input"]` | Call names considered I/O |
-| `io_name_keywords` | see below | Functions whose names contain these words are exempt |
+| `io_functions` | `["open", "print", "input"]` | (Python.) Call names considered I/O |
+| `io_functions_javascript` | see below | (JavaScript.) Call names considered I/O. Runtime presets (`[tool.safelint.javascript] runtime`) adjust this default. *Added in 1.13.0.* |
+| `io_name_keywords` | see below | Functions whose names contain these words are exempt (cross-language) |
 
-Default `io_name_keywords`: `print`, `log`, `write`, `read`, `save`, `load`, `send`, `fetch`, `export`, `import`
+Default `io_name_keywords`: `print`, `log`, `write`, `read`, `save`, `load`, `send`, `fetch`, `export`, `import`. The substring check is case-insensitive, so it matches `writeData` (camelCase) the same way as `write_data` (snake_case).
+
+Default `io_functions_javascript` (Node — the default): `["log", "error", "warn", "info", "debug", "fetch", "readFile", "writeFile", "readFileSync", "writeFileSync"]`. The browser / deno / cloudflare-workers presets swap in different verbs — see [JavaScript runtime presets](toml.md#javascript-runtime-presets).
 
 ```toml
 [tool.safelint.rules.side_effects]
 enabled = true
 severity = "warning"
-io_functions = ["open", "print", "input"]
+io_functions = ["open", "print", "input"]                                  # Python list
+io_functions_javascript = ["log", "error", "warn", "fetch", "writeFile"]   # JavaScript list (overrides the runtime preset)
 io_name_keywords = ["print", "log", "write", "read", "save", "load", "send", "fetch"]
+```
+
+### SAFE305 — `wide_scope_declaration`
+
+**What it flags:** JavaScript `var` declarations. **JavaScript-only** — Python has no `var` / `let` / `const` distinction.
+
+`var` is **function-scoped**: a `var` declared inside one branch of an `if` is visible throughout the entire enclosing function (and at module top, throughout the module), because the declaration is hoisted to the top of its containing function. `let` and `const` are **block-scoped**: they only exist inside the `{ ... }` they're declared in. The rule's intent matches Holzmann Power-of-Ten Rule 6 ("declare variables at the smallest possible scope") translated to JS's actual scope-control mechanism.
+
+The fix is mechanical: replace `var` with `let` (when the binding is reassigned later) or `const` (when it isn't). The rule fires once per `variable_declaration` node — a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `true` | Turn rule on/off |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+```toml
+[tool.safelint.rules.wide_scope_declaration]
+enabled = true
+severity = "warning"
+```
+
+**Bad:**
+
+```javascript
+function f(items) {
+  if (items.length > 0) {
+    var first = items[0];   // SAFE305 - hoists; visible after the if
+  }
+  return first;             // accidentally accessible — exactly the bug
+}
+
+for (var i = 0; i < arr.length; i++) {   // SAFE305 - i leaks out of the loop
+  arr[i] = i * 2;
+}
+return i;                                 // i is still accessible
+```
+
+**Good:**
+
+```javascript
+function f(items) {
+  if (items.length > 0) {
+    const first = items[0];   // block-scoped to the if
+    return first;
+  }
+  return undefined;
+}
+
+for (let i = 0; i < arr.length; i++) {   // i is block-scoped to the loop
+  arr[i] = i * 2;
+}
 ```
 
 ## Resource safety rules
 
 ### SAFE401 — `resource_lifecycle`
 
-**What it flags:** Calls to resource-acquisition functions (like `open()`) that are not inside a `with` block.
+**What it flags:** Resource-acquisition calls that aren't wrapped in a cleanup-guaranteed scope. Cross-language with language-specific scope semantics.
 
-Resources that are opened must be closed. If an exception occurs between `open()` and `close()`, the resource leaks. A `with` block guarantees cleanup even if an exception is raised.
+**Python:** the call must appear inside a `with` statement (`with open(path) as f:`). Bare assignments without `with` fire even when paired with manual `f.close()` — Python's idiom is context-manager-first.
+
+**JavaScript:** the call must appear inside a `try` block whose `try_statement` has a `finally_clause` somewhere up the AST ancestor chain. Heuristic-only — the rule doesn't verify that the `finally` block actually closes the specific resource. Captures the most common "I created a stream and didn't think about cleanup at all" leak. JavaScript's newer `using` declarations (Stage 3 / Node 22+) aren't yet recognised as a safe form; for now, wrap inside `try { ... } finally { ... }`.
 
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"error"` | `"error"` or `"warning"` |
-| `tracked_functions` | (see below) | Calls that must be inside a `with` block. Replaces the default list when set. |
-| `extend_tracked_functions` | `[]` | Appended to the default list — use this when you want to *add* custom functions without losing the defaults. *Added in 1.8.0.* |
-| `cleanup_patterns` | `["close", "commit", "rollback", "release", "shutdown"]` | Acceptable cleanup method names as an alternative |
+| `tracked_functions` | (see below) | (Python.) Calls that must be inside a `with` block. Replaces the default list when set. |
+| `extend_tracked_functions` | `[]` | (Python.) Appended to the default list — use this when you want to *add* custom functions without losing the defaults. *Added in 1.8.0.* |
+| `cleanup_patterns` | `["close", "commit", "rollback", "release", "shutdown"]` | (Python.) Acceptable cleanup method names as an alternative |
+| `tracked_functions_javascript` | (see below) | (JavaScript.) Calls that must be inside a `try { ... } finally { ... }`. Runtime presets (`[tool.safelint.javascript] runtime`) adjust this default. *Added in 1.13.0.* |
 
-**Default `tracked_functions`** (expanded in 1.8.0):
+**Default `tracked_functions`** (Python, expanded in 1.8.0):
 
 ```toml
 tracked_functions = [
@@ -327,19 +416,31 @@ tracked_functions = [
 ]
 ```
 
+**Default `tracked_functions_javascript`** (Node — the default runtime):
+
 ```toml
-# Add custom acquirers without losing the defaults
+tracked_functions_javascript = [
+    "createReadStream", "createWriteStream", "openSync",   # fs
+    "createServer", "createConnection", "connect",         # net / DB drivers
+    "createWorker",                                        # worker pools
+]
+```
+
+The browser / deno / cloudflare-workers presets swap in different lists — see [JavaScript runtime presets](toml.md#javascript-runtime-presets).
+
+```toml
+# Add custom Python acquirers without losing the defaults
 [tool.safelint.rules.resource_lifecycle]
 extend_tracked_functions = ["acquire_widget", "rent_db_handle"]
 ```
 
 ```toml
-# Or replace the list entirely (overrides the built-in defaults)
+# Replace the JS tracked list entirely (overrides the runtime preset)
 [tool.safelint.rules.resource_lifecycle]
-tracked_functions = ["open", "connect"]
+tracked_functions_javascript = ["openSync", "createServer", "myCustomAcquirer"]
 ```
 
-**Bad:**
+**Python — Bad:**
 
 ```python
 f = open("data.txt")   # SAFE401 - not in a with block
@@ -347,11 +448,34 @@ data = f.read()
 f.close()              # won't run if f.read() raises
 ```
 
-**Good:**
+**Python — Good:**
 
 ```python
 with open("data.txt") as f:
     data = f.read()
+```
+
+**JavaScript — Bad:**
+
+```javascript
+function readData(path) {
+  const stream = fs.createReadStream(path);   // SAFE401 - not wrapped in try/finally
+  return processStream(stream);
+}
+```
+
+**JavaScript — Good:**
+
+```javascript
+function readData(path) {
+  let stream;
+  try {
+    stream = fs.createReadStream(path);
+    return processStream(stream);
+  } finally {
+    if (stream) stream.close();
+  }
+}
 ```
 
 ## Loop safety rules

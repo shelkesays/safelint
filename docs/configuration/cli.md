@@ -47,7 +47,7 @@ ANSI colour is auto-disabled when stdout is not a TTY (piping to a file produces
 
 | Flag | Default | What it does |
 |---|---|---|
-| `--all-files` | off | Scan every supported source file under the target (today: `.py` and `.pyw`). Default (without this flag) is to check only git-modified files. |
+| `--all-files` | off | Scan every supported source file under the target (today: `.py`, `.pyw`, `.js`, `.mjs`, `.cjs`). Default (without this flag) is to check only git-modified files. |
 | `--fail-on` | from config | Override the minimum severity that blocks the run: `error` or `warning`. |
 | `--mode` | from config | `local` (only errors block) or `ci` (warnings block too). |
 | `--config` | auto-discovered | Path to a config file (`pyproject.toml` or `safelint.toml`) or a directory to use as the config search root. |
