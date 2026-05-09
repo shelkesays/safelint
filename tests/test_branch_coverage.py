@@ -17,7 +17,7 @@ from __future__ import annotations
 
 import argparse
 import io
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, ClassVar, cast
 
 import pytest
 import tree_sitter
@@ -250,18 +250,63 @@ def test_resource_lifecycle_with_missing_value_field(tmp_path: Path) -> None:
     SafetyEngine(DEFAULTS).check_file(str(sample))
 
 
-def test_error_handling_catch_body_fallback() -> None:
-    """``_catch_body`` falls back to the last named child when the ``body``
-    field isn't directly present — exercise via a tree-sitter parse."""
+def test_error_handling_catch_body_field_present_returns_field() -> None:
+    """``_catch_body`` returns the ``body`` field when tree-sitter populates it.
+
+    Real parsing always populates ``body`` on a valid ``except_clause`` —
+    this is the path every production call takes.
+    """
     lang = tree_sitter.Language(tree_sitter_python.language())
     parser = tree_sitter.Parser(lang)
     tree = parser.parse(b"try:\n    pass\nexcept:\n    pass\n")
-    # Find the except_clause node.
     try_node = tree.root_node.children[0]
     except_node = next(c for c in try_node.children if c.type == "except_clause")
     body = _catch_body(except_node)
-    # Either field-based or named_children-based fallback should yield a block.
     assert body is not None
+    assert body.type == "block"
+
+
+def test_error_handling_catch_body_falls_back_to_last_named_child() -> None:
+    """When ``child_by_field_name("body")`` returns None, ``_catch_body``
+    falls back to ``named_children[-1]``.
+
+    Real tree-sitter always populates the ``body`` field on a parsed
+    ``except_clause``, so the fallback never fires from a real parse —
+    but it exists as a defensive guard for malformed AST shapes that
+    upstream callers could encounter, and the previous test for it
+    (which used a real parse) silently took the field path instead,
+    leaving the fallback completely untested. Force the path with a
+    minimal stand-in node.
+    """
+
+    class _FakeBlock:
+        type = "block"
+
+    class _FakeNoBody:
+        named_children: ClassVar[list[object]] = [_FakeBlock()]
+
+        def child_by_field_name(self, _name: str) -> object | None:
+            return None
+
+    body = _catch_body(cast("tree_sitter.Node", _FakeNoBody()))
+    assert body is not None
+    assert body.type == "block"
+
+
+def test_error_handling_catch_body_returns_none_when_no_field_and_empty() -> None:
+    """No ``body`` field AND no named children → ``_catch_body`` returns None.
+
+    The empty-list branch of ``named[-1] if named else None`` — completes
+    the matrix of fallback shapes alongside the populated case above.
+    """
+
+    class _FakeEmpty:
+        named_children: ClassVar[list[object]] = []
+
+        def child_by_field_name(self, _name: str) -> object | None:
+            return None
+
+    assert _catch_body(cast("tree_sitter.Node", _FakeEmpty())) is None
 
 
 def test_per_file_ignores_rejects_non_mapping_value() -> None:

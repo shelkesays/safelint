@@ -187,7 +187,7 @@ def _catch_body(catch_node: tree_sitter.Node) -> tree_sitter.Node | None:
     if body_node is not None:
         return body_node
     named = catch_node.named_children
-    return named[-1] if named else None  # pragma: no cover
+    return named[-1] if named else None
 
 
 def _has_typed_exception(except_node: tree_sitter.Node) -> bool:
