@@ -192,3 +192,37 @@ def test_js_arrow_function_fires(tmp_path: Path) -> None:
     )
     result = _engine().check_file(str(sample))
     assert any(v.code == "SAFE302" for v in result.violations)
+
+
+def test_js_subscript_assignment_to_global_fires(tmp_path: Path) -> None:
+    """``globalThis['x'] = 1`` (bracket notation) is also a write — fires."""
+    sample = tmp_path / "sub.js"
+    sample.write_text(
+        "function set(v) { globalThis['counter'] = v; }\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    safe302 = [v for v in result.violations if v.code == "SAFE302"]
+    assert len(safe302) == 1
+
+
+def test_js_chained_subscript_on_process_env_fires(tmp_path: Path) -> None:
+    """``process.env['NODE_ENV'] = '...'`` walks dot+subscript chain to the ``process`` root."""
+    sample = tmp_path / "subenv.js"
+    sample.write_text(
+        "function configure() { process.env['NODE_ENV'] = 'production'; }\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE302" for v in result.violations)
+
+
+def test_js_pure_subscript_chain_on_window_fires(tmp_path: Path) -> None:
+    """``window["config"]["x"] = 5`` (chained subscripts) walks to ``window`` root."""
+    sample = tmp_path / "chain.js"
+    sample.write_text(
+        "function configure() { window['config']['x'] = 5; }\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE302" for v in result.violations)
