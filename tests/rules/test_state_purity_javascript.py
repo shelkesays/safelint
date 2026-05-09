@@ -94,6 +94,23 @@ def test_js_augmented_assignment_to_global_fires(tmp_path: Path) -> None:
     assert any(v.code == "SAFE302" for v in result.violations)
 
 
+def test_js_update_expression_on_global_fires(tmp_path: Path) -> None:
+    """``globalThis.counter++`` and ``--window.x`` (update_expression) also fire — they mutate the global.
+
+    Postfix and prefix ``++`` / ``--`` are unambiguously writes; without
+    this branch the rule would silently miss the most concise form of
+    global mutation.
+    """
+    for expr in ("globalThis.counter++", "--window.x", "process.exitCode++", "++self.tick"):
+        sample = tmp_path / f"update_{hash(expr) & 0xffff:x}.js"
+        sample.write_text(
+            f"function bump() {{ {expr}; }}\n",
+            encoding="utf-8",
+        )
+        result = _engine().check_file(str(sample))
+        assert any(v.code == "SAFE302" for v in result.violations), f"Expected SAFE302 for: {expr}"
+
+
 # ---------------------------------------------------------------------------
 # Cases that should NOT fire.
 # ---------------------------------------------------------------------------

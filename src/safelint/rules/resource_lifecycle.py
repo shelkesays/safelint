@@ -193,7 +193,7 @@ class ResourceLifecycleRule(BaseRule):
                 self._make_violation_for_node(
                     filepath,
                     node,
-                    f'"{name}()" not wrapped in try/finally - guarantee cleanup with try {{ ... }} finally {{ ... }} or a `using` declaration',
+                    f'"{name}()" not wrapped in try/finally - guarantee cleanup with try {{ ... }} finally {{ ... }}',
                 )
             )
         return violations

@@ -208,25 +208,29 @@ class GlobalMutationRule(BaseRule):
     def _javascript_violations_for_func(self, filepath: str, func: tree_sitter.Node, namespaces: frozenset[str]) -> list[Violation]:
         """Return violations for global-namespace writes inside *func* (JavaScript).
 
-        Walks the function body for ``assignment_expression`` and
-        ``augmented_assignment_expression`` nodes whose LHS is a
-        ``member_expression`` rooted in one of *namespaces*. Skips nested
-        function bodies (assignments there belong to that inner scope).
+        Walks the function body for ``assignment_expression``,
+        ``augmented_assignment_expression``, and ``update_expression``
+        (``++`` / ``--``) nodes whose target is a ``member_expression``
+        rooted in one of *namespaces*. Skips nested function bodies
+        (assignments there belong to that inner scope).
         """
         func_name = _func_name(func)
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(_JS_FUNCTION_TYPES)):
             if node is func:
                 continue
-            if node.type not in ("assignment_expression", "augmented_assignment_expression"):
+            if node.type not in ("assignment_expression", "augmented_assignment_expression", "update_expression"):
                 continue
-            left = node.child_by_field_name("left")
-            if left is None or left.type != "member_expression":
+            # ``assignment_expression`` / ``augmented_assignment_expression`` use
+            # the ``left`` field for the LHS; ``update_expression`` (``x++`` /
+            # ``--y``) uses ``argument`` for the operand.
+            target = node.child_by_field_name("argument") if node.type == "update_expression" else node.child_by_field_name("left")
+            if target is None or target.type != "member_expression":
                 continue
-            root = _javascript_global_namespace_root(left)
+            root = _javascript_global_namespace_root(target)
             if root is None or root not in namespaces:
                 continue
-            target_text = node_text(left)
+            target_text = node_text(target)
             violations.append(
                 self._make_violation_for_node(
                     filepath,
