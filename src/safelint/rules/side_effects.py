@@ -68,7 +68,12 @@ class SideEffectsHiddenRule(BaseRule):
             if node.type not in function_types:
                 continue
             name_node = node.child_by_field_name("name")
-            func_name = node_text(name_node) if name_node else ""
+            # Anonymous JS forms (arrow functions, function expressions
+            # without a name) have no ``name`` field — without an explicit
+            # fallback the violation message would render as
+            # ``Function "" ...`` which is unhelpful. Match the
+            # ``<anonymous>`` fallback used by the structural rules.
+            func_name = node_text(name_node) if name_node else "<anonymous>"
             name_lower = func_name.lower()
             if not any(name_lower.startswith(p) or name_lower == p.rstrip("_") for p in pure_prefixes):
                 continue
@@ -107,7 +112,12 @@ class SideEffectsRule(BaseRule):
             if node.type not in function_types:
                 continue
             name_node = node.child_by_field_name("name")
-            func_name = node_text(name_node) if name_node else ""
+            # Anonymous JS forms (arrow functions, function expressions
+            # without a name) have no ``name`` field — without an explicit
+            # fallback the violation message would render as
+            # ``Function "" ...`` which is unhelpful. Match the
+            # ``<anonymous>`` fallback used by the structural rules.
+            func_name = node_text(name_node) if name_node else "<anonymous>"
             name_lower = func_name.lower()
             if any(kw in name_lower for kw in io_keywords):
                 continue
