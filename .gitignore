@@ -162,6 +162,11 @@ venv.bak/
 /docs/project/code-of-conduct.md
 /docs/project/support.md
 /docs/contributing/index.md
+# Rules-at-a-glance table generated from ALL_RULES + DEFAULTS by
+# scripts/prepare_docs.py — pulled into docs/configuration/rules.md via
+# the snippets extension. Lives outside docs/ so mkdocs doesn't try to
+# render it as a standalone page. Regenerated on every build.
+/build/snippets/
 
 # mypy
 .mypy_cache/

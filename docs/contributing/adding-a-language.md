@@ -2,11 +2,13 @@
 
 This guide is the cheat sheet for adding support for a new programming language (TypeScript, Go, Rust, etc.) to safelint. The architecture was prepared with multi-language in mind; the moving parts you need to understand and the steps you need to follow are below.
 
-> [!NOTE]
-> Today only Python is registered. The supporting structure (parser hookup, file-discovery loop, suppression parser) is already language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants, and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.
+!!! note
 
-> [!IMPORTANT]
-> Adding a new language also requires updating the bundled AI-client skills (`SKILL.md` and `cursor/safelint.mdc`) to list the new language and its file extensions in their **Step 2** registry tables. The drift-detection test `test_skill_documents_every_supported_extension` fails the moment a new extension lands in `supported_extensions()` without the corresponding bundled-doc update — and the test is parametrised over every registered AI client, so you only need to make the additions once per skill file.
+    Today only Python is registered. The supporting structure (parser hookup, file-discovery loop, suppression parser) is already language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants, and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.
+
+!!! warning "Bundled AI-client skills also need an update"
+
+    Adding a new language also requires updating the bundled AI-client skills (`SKILL.md` and `cursor/safelint.mdc`) to list the new language and its file extensions in their **Step 2** registry tables. The drift-detection test `test_skill_documents_every_supported_extension` fails the moment a new extension lands in `supported_extensions()` without the corresponding bundled-doc update — and the test is parametrised over every registered AI client, so you only need to make the additions once per skill file.
 
 ## The architecture, in six sentences
 

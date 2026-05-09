@@ -14,18 +14,27 @@ edit_uri: edit/main/docs/
 # a non-strict live preview.
 strict: false  # set to true via CLI flag in CI
 
+# Hooks: run scripts/prepare_docs.py before every build/serve so the rules-
+# at-a-glance snippet and the docs/-tree copies of CHANGELOG / CONTRIBUTING
+# / CODE_OF_CONDUCT / SUPPORT stay in sync without a manual prep step.
+hooks:
+  - scripts/prepare_docs.py
+
 theme:
   name: material
   language: en
   features:
     - content.code.copy           # copy button on every code block
+    - content.code.annotate       # inline ``# (1)`` -> footnote-style annotations
     - content.tabs.link           # tabbed content (e.g. per-client install)
     - navigation.tabs             # top-level sections as tabs
     - navigation.sections         # section headers in left nav
     - navigation.indexes          # section index pages (foo/index.md)
     - navigation.top              # back-to-top button on long pages
+    - navigation.footer           # next/previous links at the foot of every page
     - search.suggest              # search-as-you-type suggestions
     - search.highlight            # highlight matched terms on result page
+    - search.share                # shareable URL for any search query
     - toc.follow                  # right-rail TOC follows scroll
   palette:
     # Light/dark toggle. Auto-respects system preference; user can override.
@@ -63,7 +72,9 @@ markdown_extensions:
           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:              # tabbed content blocks
       alternate_style: true
-  - pymdownx.snippets             # include from outside docs/
+  - pymdownx.snippets:            # include from outside docs/
+      base_path: ["build/snippets", "docs"]
+      check_paths: true           # fail-fast if a snippet target is missing
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.inlinehilite
