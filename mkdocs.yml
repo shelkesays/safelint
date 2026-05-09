@@ -24,6 +24,7 @@ theme:
   name: material
   language: en
   features:
+    - content.action.edit         # "Edit this page" button at the page head
     - content.code.copy           # copy button on every code block
     - content.code.annotate       # inline ``# (1)`` -> footnote-style annotations
     - content.tabs.link           # tabbed content (e.g. per-client install)
@@ -59,6 +60,9 @@ markdown_extensions:
   - admonition                    # !!! note / warning / tip blocks
   - attr_list                     # {.foo} class attributes on elements
   - md_in_html                    # Markdown inside HTML blocks
+  - meta                          # YAML frontmatter — used by prepare_docs.py
+                                  # to set per-page edit_url on the gitignored
+                                  # community-health copies
   - tables
   - footnotes
   - toc:
