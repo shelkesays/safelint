@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.13.0] - 2026-05-09
 
-**JavaScript (Node) is now a supported language alongside Python.** Registry-driven multi-language support: `.js` / `.mjs` / `.cjs` files are discovered, parsed via Tree-sitter, and run against 17 of the 19 cross-language rules — plus one new JS-only rule (SAFE305 `wide_scope_declaration`) for a total of 20 rules safelint now ships. Python users see no behaviour change beyond the v1.12.2 `.pyw` bugfix; the additive language work is what justifies this release as `1.13.0` (per the project's semver rules: scope expansion is MINOR, never MAJOR).
+**JavaScript (Node) is now a supported language alongside Python.** Registry-driven multi-language support: `.js` / `.mjs` / `.cjs` files are discovered, parsed via Tree-sitter, and run against 17 of the 19 existing rules — plus one new JS-only rule (SAFE305 `wide_scope_declaration`) for a total of 20 rules safelint now ships. Python users see no behaviour change beyond the v1.12.2 `.pyw` bugfix; the additive language work is what justifies this release as `1.13.0` (per the project's semver rules: scope expansion is MINOR, never MAJOR).
 
 ### Added
 
