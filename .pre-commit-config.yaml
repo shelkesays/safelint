@@ -29,6 +29,14 @@ repos:
       - id: check-toml
         files: ^src/
       - id: check-yaml
+        # ``--unsafe`` skips constructor resolution for YAML's Python-specific
+        # tags but still validates the file's syntax. Needed because
+        # ``mkdocs.yml`` wires up the mermaid renderer via
+        # ``!!python/object/apply:pymdownx.superfences.fence_code_format``,
+        # which is the documented mkdocs-material idiom — at runtime
+        # ``mkdocs build`` uses PyYAML's full loader, so the tag resolves
+        # correctly there.
+        args: [--unsafe]
       - id: fix-byte-order-marker
       - id: end-of-file-fixer
         files: ^src/

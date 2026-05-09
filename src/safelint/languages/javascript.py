@@ -57,14 +57,16 @@ GENERATOR_FUNCTION_DECLARATION = "generator_function_declaration"
 
 #: Aggregate of every JS node type that defines a function. Use in rules
 #: instead of listing the individual constants — keeps porting consistent.
-FUNCTION_TYPES = frozenset({
-    FUNCTION_DECLARATION,
-    FUNCTION_EXPRESSION,
-    ARROW_FUNCTION,
-    METHOD_DEFINITION,
-    GENERATOR_FUNCTION,
-    GENERATOR_FUNCTION_DECLARATION,
-})
+FUNCTION_TYPES = frozenset(
+    {
+        FUNCTION_DECLARATION,
+        FUNCTION_EXPRESSION,
+        ARROW_FUNCTION,
+        METHOD_DEFINITION,
+        GENERATOR_FUNCTION,
+        GENERATOR_FUNCTION_DECLARATION,
+    }
+)
 
 CLASS_DECLARATION = "class_declaration"
 CLASS_BODY = "class_body"

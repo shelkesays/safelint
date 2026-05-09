@@ -205,9 +205,7 @@ class GlobalMutationRule(BaseRule):
             for assignment, name in self._python_mutating_assignments(func, global_names)
         ]
 
-    def _javascript_violations_for_func(
-        self, filepath: str, func: tree_sitter.Node, namespaces: frozenset[str]
-    ) -> list[Violation]:
+    def _javascript_violations_for_func(self, filepath: str, func: tree_sitter.Node, namespaces: frozenset[str]) -> list[Violation]:
         """Return violations for global-namespace writes inside *func* (JavaScript).
 
         Walks the function body for ``assignment_expression`` and

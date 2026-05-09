@@ -177,17 +177,10 @@ class FunctionLengthRule(BaseRule):
         the helper's statements toward the outer's total.
         """
         if lang_name not in _STATEMENT_TYPES_BY_LANG:
-            msg = (
-                f"function_length count_mode='statements' is not supported for {lang_name!r} files; "
-                f"use 'lines' or 'logical_lines' instead"
-            )
+            msg = f"function_length count_mode='statements' is not supported for {lang_name!r} files; use 'lines' or 'logical_lines' instead"
             raise ValueError(msg)
         statement_types = _STATEMENT_TYPES_BY_LANG[lang_name]
-        return sum(
-            1
-            for n in walk(func_node, skip_types=tuple(function_types))
-            if n is not func_node and n.type in statement_types
-        )
+        return sum(1 for n in walk(func_node, skip_types=tuple(function_types)) if n is not func_node and n.type in statement_types)
 
     @staticmethod
     def _count_logical_lines(func_node: tree_sitter.Node, comment_prefix: str) -> int:
