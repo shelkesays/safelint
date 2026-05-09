@@ -172,6 +172,37 @@ The `mode` setting is a shorthand:
 
 CLI `--fail-on` always takes priority over the config file.
 
+## JavaScript runtime presets
+
+JavaScript source is the same regardless of where it runs (Node.js, browser, Deno, Cloudflare Workers, Bun, WASM-hosted JS engines), but the *APIs* it interacts with differ. The `[tool.safelint.javascript]` table selects which API surface the JavaScript rule defaults assume — sinks for taint analysis, tracked acquirers for resource-lifecycle, global namespaces for globals, etc.
+
+```toml
+[tool.safelint.javascript]
+runtime = "browser"   # or "node" (default) / "deno" / "cloudflare-workers" / "bun"
+```
+
+| Runtime | When to pick it | What changes |
+|---|---|---|
+| `node` (default) | Backend Node.js apps, CLIs, serverless functions running on Node-compatible runtimes | Node `fs` / `child_process` / `process` / streams. The `_javascript` config-key defaults you see in the [Rules reference](rules.md). |
+| `browser` | Browser-side JS, ES module bundles, anything running in a `<script>` or via a bundler targeting browsers | Web APIs only. DOM lookups (`getElementById`, `querySelector`) for SAFE803; observers, Workers, WebSocket, ReadableStream for SAFE401; `localStorage` / `addEventListener` / `postMessage` for SAFE802; `globalThis` / `window` / `self` / `document` global namespaces for SAFE302. Drops Node `fs` and `child_process` entirely. |
+| `deno` | Deno scripts and Deno Deploy applications | `Deno.*` API surface. `Deno.open` / `Deno.connect` / `Deno.listen` for SAFE401; `Deno.run` / `Deno.Command` for SAFE801; `Deno` added to global namespaces; `process` and `window` dropped. |
+| `cloudflare-workers` | Cloudflare Workers (V8 isolates); also a reasonable starting point for other Web-API-only edge runtimes | KV / R2 / Durable Object methods (`put` / `delete` / `get` for SAFE802 and SAFE803), `Request` body methods (`json` / `formData` / `arrayBuffer` / `blob`) as taint sources, minimal global-namespace list. No `fs` surface. |
+| `bun` | Bun runtime | Node defaults plus Bun-specific extras (`Bun.serve`, `Bun.spawn`). |
+
+User-explicit `_javascript` config keys still win over the preset — the preset only changes the *default* list, not your overrides:
+
+```toml
+[tool.safelint.javascript]
+runtime = "browser"
+
+[tool.safelint.rules.tainted_sink]
+sinks_javascript = ["eval", "Function", "myCustomDangerousFunction"]   # overrides the browser preset
+```
+
+Unknown runtime names surface a `safelint: warning:` line on stderr and fall back to `node`. Pure WebAssembly (`.wat` / `.wasm`) and AssemblyScript are out of scope for this configuration — they would land as separate `LanguageDefinition` registrations, not as JavaScript runtimes.
+
+Source-language analysis itself (the parser, the AST walks, the per-rule logic) is identical across runtimes — only the *defaults* change.
+
 ## Adoption path
 
 If you are adding SafeLint to an existing project with many existing violations, start permissive and tighten over time:

@@ -155,6 +155,19 @@ Update both of these:
 
 The CLI's git-status filters (`_collect_all_supported_files`, `_filter_supported_files` in `cli.py`, plus the hook-mode pre-filter at the bottom of `main()`) call `supported_extensions()` directly and need no edit.
 
+#### Optional: runtime presets
+
+Some languages have meaningfully different default API surfaces depending on where the code runs — JavaScript is the canonical example: the same `.js` source can target Node.js (with `fs` / `child_process` / `process`), browsers (with DOM / Web APIs), Deno (`Deno.*`), Cloudflare Workers (Web APIs + KV / R2), or Bun. SafeLint exposes this via the `[tool.safelint.javascript] runtime = "..."` config table and a `_JS_RUNTIME_PRESETS` dict in `core/config.py`.
+
+If your new language has the same kind of runtime fragmentation, mirror the pattern:
+
+1. Add a `_<LANG>_RUNTIME_PRESETS` dict alongside `_JS_RUNTIME_PRESETS`. Each entry's nested shape mirrors `DEFAULTS["rules"]`; only override the keys that should differ per runtime.
+2. Add `_<LANG>_VALID_RUNTIMES` so unknown-runtime names surface as a warning.
+3. Add a `_resolve_<lang>_runtime(cfg)` helper that reads `cfg["<lang>"]["runtime"]`, validates against the allowlist, defaults to a sensible baseline, and falls back with a stderr warning on bad input.
+4. Wire it into `load_config` *before* the user's TOML is deep-merged on top — that way the user's explicit `_<lang>` config keys still win over the preset.
+
+If the new language's API surface is uniform across runtimes (or the runtime fragmentation is small enough that one set of defaults is fine), skip this step entirely. Most languages — TypeScript, Go, Rust — would not need runtime presets.
+
 ### 7. Update tests and docs
 
 * Tests under `tests/` should add a per-language test file (e.g. `test_engine_typescript.py`) covering at minimum: discovery picks up the extension, the suppression parser recognises `// nosafe`, and at least one rule fires on a known-bad TS file.
