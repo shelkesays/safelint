@@ -443,16 +443,16 @@ _JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
                 ],
             },
             "return_value_ignored": {
-                # Browser DOM mutation / event-API methods whose return
-                # value carries success/failure or registration handles
-                # that need cleanup.
+                # ``EventTarget.dispatchEvent`` returns a boolean
+                # (``false`` if any handler called ``preventDefault``);
+                # ignoring it loses the cancellation signal. The other
+                # browser DOM-mutation / event-registration methods
+                # (``setItem``, ``removeItem``, ``clear``,
+                # ``addEventListener``, ``postMessage``) all return
+                # ``undefined`` — capturing the return value would be
+                # meaningless, so flagging them only produces noise.
                 "flagged_calls_javascript": [
-                    "setItem",
-                    "removeItem",
-                    "clear",
-                    "addEventListener",
                     "dispatchEvent",
-                    "postMessage",
                 ],
             },
             "null_dereference": {
@@ -649,7 +649,9 @@ _JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
                     "put",  # KV.put, R2.put
                     "delete",
                     "send",
-                    "addEventListener",
+                    # ``addEventListener`` deliberately omitted — it
+                    # returns ``undefined`` and produces only noise
+                    # when flagged (same reason as the browser preset).
                 ],
             },
             "null_dereference": {
@@ -744,10 +746,18 @@ def _apply_javascript_runtime_preset(defaults: dict[str, Any], runtime: str) -> 
     preset = _JS_RUNTIME_PRESETS.get(runtime)
     if not preset:
         return
+    # ``deepcopy`` each value before planting it into the defaults dict
+    # so downstream callers can't mutate ``_JS_RUNTIME_PRESETS`` by
+    # mutating the resolved config (the preset's lists are otherwise
+    # shared by reference). Defensive — current consumers treat the
+    # config as read-only, but the cost is one shallow deepcopy per
+    # preset key and the protection is permanent.
+    import copy  # noqa: PLC0415
+
     for rule_name, rule_overrides in preset.get("rules", {}).items():
         target = defaults["rules"].setdefault(rule_name, {})
         for key, value in rule_overrides.items():
-            target[key] = value
+            target[key] = copy.deepcopy(value)
 
 
 def _resolve_javascript_runtime(cfg: dict[str, Any]) -> str:

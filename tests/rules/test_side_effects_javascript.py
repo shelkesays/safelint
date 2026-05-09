@@ -63,21 +63,17 @@ def test_js_validate_function_with_fs_readfile_fires_safe303(tmp_path: Path) -> 
 
 
 def test_js_arrow_function_pure_named_with_io_fires(tmp_path: Path) -> None:
-    """Arrow function with a pure-prefix name is also subject to the rule."""
+    """Arrow function bound via ``const`` resolves its name through the
+    enclosing ``variable_declarator`` — the pure-prefix check fires."""
     sample = tmp_path / "arrow.js"
     sample.write_text(
         "const getData = () => { console.log('side effect'); return 1; };\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
-    # Arrow functions don't have a ``name`` field on the function node
-    # itself — the variable binding is on the parent ``variable_declarator``.
-    # Today the rule reads ``func_node.child_by_field_name("name")`` which
-    # returns None for arrow functions. So the prefix check fails and no
-    # SAFE303 fires. Documented as a known limitation; arrow-function
-    # naming-via-binding can be a future enhancement.
     safe303 = [v for v in result.violations if v.code == "SAFE303"]
-    assert safe303 == []
+    assert len(safe303) == 1
+    assert "getData" in safe303[0].message
 
 
 def test_js_io_named_function_with_io_does_not_fire(tmp_path: Path) -> None:
@@ -206,3 +202,38 @@ def test_js_anonymous_function_expression_uses_anonymous_fallback(tmp_path: Path
     safe304 = [v for v in result.violations if v.code == "SAFE304"]
     assert len(safe304) == 1
     assert "<anonymous>" in safe304[0].message
+
+
+def test_js_arrow_function_named_via_const_resolves_binding_name(tmp_path: Path) -> None:
+    """``const fetchUser = () => fetch(...);`` — name comes from the enclosing variable_declarator.
+
+    Without the ``variable_declarator`` fallback the function would
+    render as ``<anonymous>`` AND silently slip past SAFE304's
+    io_name_keyword exemption (the lowercase prefix check would never
+    see ``fetch``). This is the most common JS code shape — almost
+    every callback / hook / handler is bound this way — so the
+    fallback is essential, not cosmetic.
+    """
+    sample = tmp_path / "named_arrow.js"
+    sample.write_text(
+        "const fetchUser = () => fetch('/users');\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(DEFAULTS, {"rules": {"side_effects": {"io_name_keywords": ["fetch"]}}})
+    result = SafetyEngine(cfg).check_file(str(sample))
+    safe304 = [v for v in result.violations if v.code == "SAFE304"]
+    assert not safe304  # ``fetchUser`` matches ``fetch`` keyword → exempt
+
+
+def test_js_pure_named_arrow_function_fires_safe303(tmp_path: Path) -> None:
+    """``const getCount = () => fetch(...);`` — pure-prefix match works on the bound name."""
+    sample = tmp_path / "pure_arrow.js"
+    sample.write_text(
+        "const getCount = () => fetch('/count');\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(DEFAULTS, {"rules": {"side_effects_hidden": {"pure_prefixes": ["get"]}}})
+    result = SafetyEngine(cfg).check_file(str(sample))
+    safe303 = [v for v in result.violations if v.code == "SAFE303"]
+    assert len(safe303) == 1
+    assert "getCount" in safe303[0].message

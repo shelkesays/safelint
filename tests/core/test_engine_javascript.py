@@ -12,11 +12,7 @@ cross-language plumbing.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
-
-
-if TYPE_CHECKING:
-    from pathlib import Path
+from pathlib import Path
 
 import pytest
 
@@ -135,7 +131,7 @@ def test_engine_discovers_js_files_under_directory(tmp_path: Path) -> None:
     (tmp_path / "f.md").write_text("# notes\n", encoding="utf-8")
 
     results = _engine().check_path(str(tmp_path))
-    file_names = {result.path.rsplit("/", 1)[-1] for result in results}
+    file_names = {Path(result.path).name for result in results}
     assert {"a.js", "b.mjs", "c.cjs", "d.py"}.issubset(file_names)
     assert "e.json" not in file_names
     assert "f.md" not in file_names

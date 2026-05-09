@@ -322,12 +322,16 @@ class LoggingOnErrorRule(BaseRule):
         Python: ``raise`` with no operand. ``raise Exception()`` raises a
         *new* error and so logging is still expected.
 
-        JavaScript: ``throw <identifier>;`` — single-identifier throw of
-        the caught binding (``catch (e) { throw e; }``). JS has no bare
-        ``throw;`` (it's a syntax error), so the cleanest analogue of
-        Python's bare ``raise`` is "throw of a single identifier".
-        ``throw new Error(...);`` or ``throw {code: 1};`` raises a *new*
-        error, so logging is still expected.
+        JavaScript: ``throw <caught-binding>;`` where ``<caught-binding>``
+        is the exact identifier introduced by the ``catch (e)`` clause
+        — only ``catch (e) { throw e; }`` counts as a re-raise.
+        ``catch (e) { throw freshError; }`` is throwing a *different*
+        value (the original ``e`` may even still be in scope) and so
+        logging is still expected; ``catch { throw x; }`` (no caught
+        binding — ES2019 optional-binding form) can't be a re-raise
+        of the caught value at all, so any throw there requires
+        logging. ``throw new Error(...)`` / ``throw {code: 1}`` etc.
+        construct fresh values and are always non-re-raises.
         """
         body_node = _catch_body(except_node)
         # Defensive — ``_catch_body`` only returns None for malformed AST
@@ -342,9 +346,17 @@ class LoggingOnErrorRule(BaseRule):
         if lang_name == "python":
             # Bare ``raise`` has no children.
             return not children
-        # JavaScript: ``throw <identifier>;`` propagates; anything else
-        # constructs a new value.
-        return len(children) == 1 and children[0].type == "identifier"
+        # JavaScript: ``throw <identifier>;`` only counts as a re-raise
+        # when ``<identifier>`` is the exact name bound by the
+        # ``catch`` clause. Without a caught binding (``catch {}``)
+        # there is no name to re-raise, so any throw there is a fresh
+        # error and the rule still requires logging.
+        if len(children) != 1 or children[0].type != "identifier":
+            return False
+        param_node = except_node.child_by_field_name("parameter")
+        if param_node is None or param_node.type != "identifier":
+            return False
+        return node_text(children[0]) == node_text(param_node)
 
     def _has_log_call(self, except_node: tree_sitter.Node, function_types: frozenset[str]) -> bool:
         """Return True when the handler body contains at least one logging call.

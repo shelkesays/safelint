@@ -38,7 +38,10 @@ if TYPE_CHECKING:
 
 
 # Composite expressions whose taint state is the OR of their named children.
-# Mirrors ``_SPREADING_TYPES`` in the Python tracker.
+# Mirrors ``_SPREADING_TYPES`` in the Python tracker. ``await_expression``
+# and ``yield_expression`` are included so awaited / yielded values
+# propagate taint — e.g. ``const x = await transform(input);`` keeps
+# ``x`` tainted when ``input`` is and ``transform`` is taint-preserving.
 _SPREADING_TYPES = frozenset(
     {
         "binary_expression",
@@ -47,6 +50,8 @@ _SPREADING_TYPES = frozenset(
         "update_expression",
         "sequence_expression",
         "parenthesized_expression",
+        "await_expression",
+        "yield_expression",
     }
 )
 
@@ -122,6 +127,9 @@ class JsTaintTracker:
         * ``{key: alias}``         — ``object_pattern`` with
           ``pair_pattern`` children (the alias is bound, not the key)
         * ``[a, ...rest]``         — ``rest_pattern`` wraps the inner name
+        * ``[a = 1, b]``           — ``assignment_pattern`` wraps the
+          binding name on the ``left`` field; the default value on
+          ``right`` is irrelevant to which name gets bound.
 
         ``shorthand_property_identifier_pattern`` is treated as an
         identifier shape — it carries the bound name directly in its
@@ -131,23 +139,27 @@ class JsTaintTracker:
         if target.type in ("identifier", "shorthand_property_identifier_pattern"):
             yield target
             return
-        if target.type == "array_pattern":
+        # ``array_pattern`` / ``object_pattern`` / ``rest_pattern`` all
+        # bind every named child — same recursion shape, so a single
+        # branch keeps cyclomatic complexity in check.
+        if target.type in ("array_pattern", "object_pattern", "rest_pattern"):
             for child in target.named_children:
                 yield from self._iter_target_identifiers(child)
             return
-        if target.type == "object_pattern":
-            for child in target.named_children:
-                yield from self._iter_target_identifiers(child)
+        # Patterns that bind through a *specific* field name. ``pair_pattern``
+        # carries the bound alias on ``value`` (``{key: alias}``);
+        # ``assignment_pattern`` carries the binding on ``left``
+        # (``[a = 1]`` / ``function f(a = 1) {}`` — the ``right`` is
+        # the default value, not a binding). Without ``assignment_pattern``
+        # taint flowing into a destructuring target with a default would
+        # silently drop on the floor.
+        field_by_type = {"pair_pattern": "value", "assignment_pattern": "left"}
+        field = field_by_type.get(target.type)
+        if field is None:
             return
-        if target.type == "pair_pattern":
-            # ``{key: alias}`` — only ``alias`` gets bound.
-            value = target.child_by_field_name("value")
-            if value is not None:
-                yield from self._iter_target_identifiers(value)
-            return
-        if target.type == "rest_pattern":
-            for child in target.named_children:
-                yield from self._iter_target_identifiers(child)
+        inner = target.child_by_field_name(field)
+        if inner is not None:
+            yield from self._iter_target_identifiers(inner)
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x = value`` (assignment_expression)."""
