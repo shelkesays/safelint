@@ -8,8 +8,15 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+    import pytest
+
+from safelint import languages as lang_module
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
+from safelint.languages import PYTHON
+from safelint.languages._types import LanguageDefinition
+from safelint.rules import ALL_RULES
+from safelint.rules.base import BaseRule
 
 
 def _engine(overrides: dict | None = None) -> SafetyEngine:
@@ -145,3 +152,78 @@ def test_engine_parse_error_returns_parse_violation(tmp_path: Path) -> None:
     assert len(violations) == 1
     assert violations[0].rule == "parse"
     assert violations[0].severity == "error"
+
+
+# ---------------------------------------------------------------------------
+# Per-language rule dispatch (engine._run_rules filter on rule.language)
+#
+# Today every registered rule defaults to ``language = ("python",)`` and
+# Python is the only registered language, so the filter is a no-op for
+# real usage. The tests below construct a *fake* LanguageDefinition
+# (non-Python name, but Python's parser internals so the source still
+# parses) and verify the engine skips Python-only rules for files
+# routed through it. This is pre-emptive infrastructure for the
+# second-language work — when TypeScript / Go / … land, contributors
+# widen each rule's ``language`` tuple per-rule; this engine plumbing
+# doesn't need further changes.
+# ---------------------------------------------------------------------------
+
+
+def _hypothetical_lang_definition() -> LanguageDefinition:
+    """Build a LanguageDefinition with a non-python name but Python's parser internals."""
+    return LanguageDefinition(
+        name="hypothetical",
+        file_extensions=frozenset({".hypothetical"}),
+        comment_node_type=PYTHON.comment_node_type,
+        comment_prefix=PYTHON.comment_prefix,
+        create_parser=PYTHON.create_parser,
+    )
+
+
+def test_engine_skips_python_only_rules_when_file_language_differs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A rule defaulting to ``language=("python",)`` must NOT fire on a file routed through a non-Python LanguageDefinition."""
+    fake_lang = _hypothetical_lang_definition()
+    monkeypatch.setitem(lang_module._REGISTRY, ".hypothetical", fake_lang)
+
+    # Source that *would* trigger function_length on a Python file.
+    long_body = "    x = 1\n" * 65
+    source = "def too_long():\n" + long_body
+    sample = tmp_path / "fake.hypothetical"
+    sample.write_text(source, encoding="utf-8")
+
+    result = _engine().check_file(str(sample))
+
+    # function_length defaults to ``language=("python",)``; the engine
+    # filters it out for the hypothetical-language file. Result: zero
+    # violations even though the source content would otherwise match.
+    assert not any(v.rule == "function_length" for v in result.violations)
+    assert not any(v.rule == "function_length" for v in result.suppressed)
+
+
+def test_engine_runs_python_rules_on_python_files_unchanged(tmp_path: Path) -> None:
+    """Filter must not accidentally skip Python rules on Python files (regression guard)."""
+    long_body = "    x = 1\n" * 65
+    source = "def too_long():\n" + long_body
+    sample = tmp_path / "real.py"
+    sample.write_text(source, encoding="utf-8")
+
+    result = _engine().check_file(str(sample))
+    assert any(v.rule == "function_length" for v in result.violations)
+
+
+def test_base_rule_default_language_is_python_only() -> None:
+    """``BaseRule.language`` default must be ``("python",)`` — every existing rule inherits it."""
+    assert BaseRule.language == ("python",)
+
+
+def test_every_registered_rule_inherits_python_default() -> None:
+    """No registered rule has widened its language tuple yet.
+
+    When the second language lands, contributors revisit per-rule
+    portability and widen ``language`` on the cross-language ones
+    (e.g. ``("python", "typescript")``). Today every registered rule
+    should still match the BaseRule default — flag if anyone has
+    diverged silently.
+    """
+    for cls in ALL_RULES:
+        assert cls.language == ("python",), f"{cls.__name__} has widened language to {cls.language}; expected ('python',) until second-language work begins"

@@ -640,6 +640,7 @@ class SafetyEngine:
         ignored_names: frozenset[str],
         ignored_codes: frozenset[str],
         used_suppressions: set[tuple[int, str | None]],
+        lang_name: str,
     ) -> tuple[list[Violation], list[Violation], bool]:
         """Run active rules against *tree*, returning (active, suppressed, stopped_early).
 
@@ -648,11 +649,18 @@ class SafetyEngine:
         SAFE004 (``unused_suppression``) pass: if later rules never
         ran, we don't yet know whether their corresponding ``# nosafe``
         directives were truly unused or just blocked from firing.
+
+        *lang_name* is the active file's :attr:`LanguageDefinition.name`.
+        Rules whose ``language`` tuple doesn't include this name are
+        skipped — they were registered for a different language (today
+        always Python; relevant once a second language lands).
         """
         active: list[Violation] = []
         suppressed: list[Violation] = []
         stopped_early = False
         for rule in self.rules:
+            if lang_name not in rule.language:
+                continue
             rule_violations = rule.check_file(filepath, tree)
             rule_active, rule_suppressed = self._partition_rule_output(rule_violations, suppressions, ignored_names, ignored_codes, used_suppressions)
             active.extend(rule_active)
@@ -784,7 +792,7 @@ class SafetyEngine:
         ignored_names, ignored_codes = self._file_ignored_set(filepath)
         ignored_names, ignored_codes = self._merge_in_file_directives(filepath, file_codes, ignored_names, ignored_codes, bare=file_bare)
         used_suppressions: set[tuple[int, str | None]] = set()
-        active, suppressed, stopped_early = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes, used_suppressions)
+        active, suppressed, stopped_early = self._run_rules(filepath, tree, suppressions, ignored_names, ignored_codes, used_suppressions, lang.name)
         # Skip the SAFE004 unused-suppression pass when ``fail_fast``
         # short-circuited the rule loop: ``used_suppressions`` is
         # incomplete in that case (later rules never got to mark their
