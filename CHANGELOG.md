@@ -7,18 +7,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Changed
-
-- **Pre-commit hook spec** (`.pre-commit-hooks.yaml`) — dropped the `files: ^src/` filter from the published hook. **Heads-up: this broadens the default scope for downstream consumers.** The filter was a leak from this repo's in-tree `.pre-commit-config.yaml` (where it's intentional — safelint lints itself only under `src/`) into the published hook spec, where it forced every downstream installer onto the same layout. With it gone, the hook honours only `types_or: [python, javascript]` plus the consumer's own `files:` / `exclude:` keys, so projects with sources at the repo root, in `app/`, in `lib/`, etc. now get linted by default after upgrade. If you previously relied on the `^src/` default to scope safelint to one directory, add the equivalent filter to your local `.pre-commit-config.yaml`:
-
-  ```yaml
-  - repo: https://github.com/srahul07/safelint
-    rev: <tag>
-    hooks:
-      - id: safelint
-        files: ^src/   # restore the previous default if needed
-  ```
-
 ## [1.13.0] - 2026-05-09
 
 **JavaScript (Node) is now a supported language alongside Python.** Registry-driven multi-language support: `.js` / `.mjs` / `.cjs` files are discovered, parsed via Tree-sitter, and run against 17 of the 19 existing rules — plus one new JS-only rule (SAFE305 `wide_scope_declaration`) for a total of 20 rules safelint now ships. Python users see no behaviour change beyond the v1.12.2 `.pyw` bugfix; the additive language work is what justifies this release as `1.13.0` (per the project's semver rules: scope expansion is MINOR, never MAJOR).
@@ -51,7 +39,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Pre-commit hook spec** (`.pre-commit-hooks.yaml`) and **the in-tree self-development hook** (`.pre-commit-config.yaml`) — `types_or: [python]` becomes `types_or: [python, javascript]`. Downstream users with mixed Python + JS repos automatically have both filetypes routed to safelint after upgrade.
+- **Pre-commit hook spec** (`.pre-commit-hooks.yaml`) and **the in-tree self-development hook** (`.pre-commit-config.yaml`) — `types_or: [python]` becomes `types_or: [python, javascript]`. Downstream users with mixed Python + JS repos automatically have both filetypes routed to safelint after upgrade. Additionally the published `.pre-commit-hooks.yaml` drops its `files: ^src/` filter — that filter was a leak from this repo's in-tree `.pre-commit-config.yaml` (where it's intentional — safelint lints itself only under `src/`) into the published hook spec, where it forced every downstream installer onto the same layout. **Heads-up: this broadens the default scope for downstream consumers.** With it gone, the hook honours only `types_or: [python, javascript]` plus the consumer's own `files:` / `exclude:` keys, so projects with sources at the repo root, in `app/`, in `lib/`, etc. now get linted by default after upgrade. If you previously relied on the `^src/` default to scope safelint to one directory, add the equivalent filter to your local `.pre-commit-config.yaml`:
+
+  ```yaml
+  - repo: https://github.com/srahul07/safelint
+    rev: <tag>
+    hooks:
+      - id: safelint
+        files: ^src/   # restore the previous default if needed
+  ```
 - **`call_name`** in `_node_utils.py` extended (during Slice 3) to handle JavaScript `member_expression` (`obj.method(...)`) alongside Python `attribute` (`obj.method(...)`). Both `foo(...)` forms (bare identifier function calls) continue to resolve via the existing `identifier` branch.
 
 ### Stays Python-only (by design)
@@ -72,7 +68,7 @@ Two rules don't have a useful JavaScript translation and remain registered for P
 - **Block-style `nosafe` directives** (`/* nosafe */`) are not recognised — only line-style `// nosafe` and `// safelint: ignore`. Documented in the JS shared addendum and `docs/contributing/adding-a-language.md` Step 4.
 - **JSX (`.jsx`)** is not registered. `tree-sitter-javascript` parses some JSX leniently as a superset, but flagging it as a separate language registration later avoids accidental drift in rule semantics.
 - **TypeScript (`.ts` / `.tsx`)** is a separate language addition — not in this release.
-- **Arrow-function naming via variable binding** (`const getX = () => ...`) — the rules that read function names via `func_node.child_by_field_name("name")` don't resolve through the parent `variable_declarator`. SAFE303 (pure-named function with hidden I/O) doesn't fire on `getX = () => console.log(...)`. Documented limitation; can be enhanced later by walking up to the binding.
+- **Arrow-function naming via variable binding** (`const getX = () => ...`) — this remains a limitation only for rules that still read function names solely via `func_node.child_by_field_name("name")` and therefore may report such functions as `<anonymous>` (e.g., SAFE101 `function_length`). SAFE303 (`side_effects_hidden`) and SAFE304 (`side_effects`) already resolve JS arrow-function names through the parent `variable_declarator` via the shared `_func_display_name` helper, so `const getX = () => console.log(...)` correctly reports as `getX` for those rules. Other rules can be enhanced the same way later.
 
 ## [1.12.2] - 2026-05-09
 
