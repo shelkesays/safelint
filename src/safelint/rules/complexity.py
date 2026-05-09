@@ -4,7 +4,9 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.languages import get_language_for_file
 from safelint.languages._node_utils import node_text, walk
+from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     BOOLEAN_OPERATOR,
@@ -26,20 +28,70 @@ if TYPE_CHECKING:
     from safelint.rules.base import Violation
 
 
+_FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
+    "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
+    "javascript": _JS_FUNCTION_TYPES,
+}
+
+# Node types that add 1 to cyclomatic complexity. Both languages: every
+# ``if`` / ``for`` / ``while`` / ``except``/``catch`` / ternary adds a
+# branch. Python also counts ``elif_clause`` (separate node), comprehension
+# ``if_clause``, and ``boolean_operator`` (a single node containing chained
+# ``and`` / ``or``). JavaScript uses ``binary_expression`` for ``&&`` /
+# ``||`` / ``??`` and the operator must be inspected — see the special
+# branch in ``_cyclomatic_complexity``.
+_BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
+    "python": frozenset(
+        {
+            IF_STATEMENT,
+            ELIF_CLAUSE,
+            FOR_STATEMENT,
+            WHILE_STATEMENT,
+            EXCEPT_CLAUSE,
+            CONDITIONAL_EXPRESSION,
+            IF_CLAUSE,
+            BOOLEAN_OPERATOR,
+        }
+    ),
+    "javascript": frozenset(
+        {
+            "if_statement",
+            "for_statement",
+            "for_in_statement",  # also covers ``for...of`` in tree-sitter-javascript
+            "while_statement",
+            "do_statement",
+            "switch_case",
+            "catch_clause",
+            "ternary_expression",
+        }
+    ),
+}
+
+# JavaScript: ``binary_expression`` covers many operators (``+``, ``>``,
+# etc.) that are NOT branches. Only short-circuiting / null-coalescing
+# operators add complexity.
+_JS_BRANCHING_BINARY_OPS = frozenset({"&&", "||", "??"})
+
+
 class ComplexityRule(BaseRule):
     """Reject functions whose cyclomatic complexity exceeds max_complexity."""
 
     name = "complexity"
     code = "SAFE104"
+    language = ("python", "javascript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions whose cyclomatic complexity exceeds the configured maximum."""
         max_cc: int = self.config.get("max_complexity", 10)
+        lang = get_language_for_file(filepath)
+        assert lang is not None, "engine guarantees a registered language at this point"
+        function_types = _FUNCTION_TYPES_BY_LANG[lang.name]
+        branching_types = _BRANCHING_TYPES_BY_LANG[lang.name]
         violations = []
         for node in walk(tree.root_node):
-            if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
+            if node.type not in function_types:
                 continue
-            complexity = self._cyclomatic_complexity(node)
+            complexity = self._cyclomatic_complexity(node, lang.name, function_types, branching_types)
             if complexity > max_cc:
                 name_node = node.child_by_field_name("name")
                 func_name = node_text(name_node) if name_node else "<anonymous>"
@@ -53,7 +105,12 @@ class ComplexityRule(BaseRule):
         return violations
 
     @staticmethod
-    def _cyclomatic_complexity(func_node: tree_sitter.Node) -> int:
+    def _cyclomatic_complexity(
+        func_node: tree_sitter.Node,
+        lang_name: str,
+        function_types: frozenset[str],
+        branching_types: frozenset[str],
+    ) -> int:
         """Count cyclomatic complexity for *func_node* (McCabe 1976).
 
         Skips nested function definitions — they are scored separately by the
@@ -61,19 +118,25 @@ class ComplexityRule(BaseRule):
         the parent.
         """
         complexity = 1
-        for node in walk(func_node, skip_types=(FUNCTION_DEF, ASYNC_FUNCTION_DEF)):
-            if (
-                node.type
-                in (
-                    IF_STATEMENT,
-                    ELIF_CLAUSE,
-                    FOR_STATEMENT,
-                    WHILE_STATEMENT,
-                    EXCEPT_CLAUSE,
-                    CONDITIONAL_EXPRESSION,
-                    IF_CLAUSE,
-                )
-                or node.type == BOOLEAN_OPERATOR
-            ):
+        for node in walk(func_node, skip_types=tuple(function_types)):
+            if _is_branch_node(node, lang_name, branching_types):
                 complexity += 1
         return complexity
+
+
+def _is_branch_node(node: tree_sitter.Node, lang_name: str, branching_types: frozenset[str]) -> bool:
+    """Return True if *node* contributes 1 to the enclosing function's cyclomatic complexity.
+
+    Most languages can answer this with a simple node-type set membership.
+    JavaScript needs a side check because ``&&`` / ``||`` / ``??`` parse as
+    ``binary_expression`` (a node type that also covers ``+``, ``>``, ``-``,
+    etc., which are *not* branches) — we filter on the operator string.
+    """
+    if node.type in branching_types:
+        return True
+    if lang_name != "javascript" or node.type != "binary_expression":
+        return False
+    op = node.child_by_field_name("operator")
+    if op is None or op.text is None:
+        return False
+    return op.text.decode("utf-8") in _JS_BRANCHING_BINARY_OPS

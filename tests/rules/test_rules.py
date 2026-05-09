@@ -1314,11 +1314,12 @@ def test_function_length_statement_types_invariant() -> None:
     threshold. A direct membership assertion on the constant fails
     fast on either parity break.
     """
-    from safelint.rules.function_length import _STATEMENT_TYPES  # noqa: PLC0415
+    from safelint.rules.function_length import _STATEMENT_TYPES_BY_LANG  # noqa: PLC0415
 
-    assert "class_definition" in _STATEMENT_TYPES
-    assert "function_definition" not in _STATEMENT_TYPES
-    assert "async_function_definition" not in _STATEMENT_TYPES
+    py_stmts = _STATEMENT_TYPES_BY_LANG["python"]
+    assert "class_definition" in py_stmts
+    assert "function_definition" not in py_stmts
+    assert "async_function_definition" not in py_stmts
 
 
 def test_function_length_logical_lines_message_uses_logical_lines_unit(tmp_path: Path) -> None:
