@@ -384,8 +384,4 @@ class LoggingOnErrorRule(BaseRule):
             if lang_name == "javascript"
             else "Except block missing logging call - errors must be logged before being swallowed"
         )
-        return [
-            self._make_violation_for_node(filepath, clause, message)
-            for clause in _iter_catch_clauses(tree, lang_name)
-            if self._is_unlogged(clause, lang_name, function_types)
-        ]
+        return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if self._is_unlogged(clause, lang_name, function_types)]

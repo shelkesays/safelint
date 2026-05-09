@@ -102,7 +102,7 @@ def test_js_update_expression_on_global_fires(tmp_path: Path) -> None:
     global mutation.
     """
     for expr in ("globalThis.counter++", "--window.x", "process.exitCode++", "++self.tick"):
-        sample = tmp_path / f"update_{hash(expr) & 0xffff:x}.js"
+        sample = tmp_path / f"update_{hash(expr) & 0xFFFF:x}.js"
         sample.write_text(
             f"function bump() {{ {expr}; }}\n",
             encoding="utf-8",
