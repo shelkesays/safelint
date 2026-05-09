@@ -27,6 +27,31 @@ For pre-commit integration, the published hook accepts JavaScript via the `javas
 
 safelint lints `.js`, `.mjs`, and `.cjs` files in JavaScript / Node projects. JSX (`.jsx`) and TypeScript (`.ts`, `.tsx`) are *not* registered today — JSX may be added later as part of JavaScript; TypeScript is a separate language addition. The skill doesn't need to filter by extension — `safelint check` walks the project and picks up the registered extensions automatically.
 
+## Runtime presets
+
+JavaScript source is the same regardless of where it runs, but the *APIs* it interacts with are runtime-specific. ``[tool.safelint.javascript] runtime = "<name>"`` selects which API surface to assume when the rule defaults are picked. Five presets ship today:
+
+| Runtime | When to pick it | What changes |
+|---|---|---|
+| `node` (default) | Backend Node.js apps; CLIs; serverless functions running on Node-compatible runtimes | Node `fs` / `child_process` / `process` / streams. The values you see in the rule descriptions above. |
+| `browser` | Browser-side JS, ES module bundles, anything running in a `<script>` or via a bundler targeting browsers | Web APIs only. DOM lookups (`getElementById` / `querySelector`) for SAFE803; observers + workers + WebSocket for SAFE401; `localStorage` / `setItem` for SAFE304; `globalThis` / `window` / `self` / `document` for SAFE302. Drops Node `fs` / `child_process` / `process` entirely. |
+| `deno` | Deno scripts and Deno Deploy applications | `Deno.*` API surface. ``Deno.open`` / ``Deno.connect`` / ``Deno.listen`` for SAFE401; ``Deno.run`` / ``Deno.Command`` for SAFE801; ``Deno`` added to global namespaces; `process` and `window` dropped. |
+| `cloudflare-workers` | Cloudflare Workers (V8 isolates) — also a reasonable starting point for other Web-API-only edge runtimes | KV / R2 / Durable Object methods (``put`` / ``delete`` / ``get`` for SAFE802 and SAFE803), ``Request`` body methods (``json`` / ``formData`` / ``arrayBuffer``) as taint sources, minimal global-namespace list. No `fs` surface (Workers has none). |
+| `bun` | Bun runtime | Node defaults plus Bun-specific extras (``Bun.serve`` / ``Bun.spawn``). Most things behave identically to the Node preset. |
+
+Configure via TOML:
+
+```toml
+[tool.safelint.javascript]
+runtime = "browser"   # or "deno" / "cloudflare-workers" / "bun" / "node"
+```
+
+User-explicit ``_javascript`` config keys (e.g. ``[tool.safelint.rules.tainted_sink] sinks_javascript = [...]``) still win over the preset — the preset only changes the *default* list, not your overrides.
+
+Unknown runtime names surface a ``safelint: warning:`` line on stderr and fall back to ``"node"``. The validation list lives in ``safelint.core.config._JS_VALID_RUNTIMES`` — adding a new preset is a one-dict-entry change in the same module.
+
+**Pure WebAssembly (`.wat` / `.wasm`)** and **AssemblyScript** are out of scope for this language registration — they're separate Tree-sitter grammars and would land as their own ``LanguageDefinition`` registrations.
+
 ## Suppression directive form
 
 Line-style only — `// nosafe`, `// nosafe: SAFE101`, `// safelint: ignore`, `// safelint: ignore: SAFE101`. Block-style directives (`/* nosafe */`) are *not* recognised in this release; if a line has both code and a violation, prefer a trailing line comment.
