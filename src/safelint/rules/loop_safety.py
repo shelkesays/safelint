@@ -92,8 +92,12 @@ class UnboundedLoopRule(BaseRule):
             return None
 
         # JavaScript wraps the condition in a ``parenthesized_expression``
-        # because of the mandatory ``while (...)`` syntax. Reach inside.
-        if condition.type == "parenthesized_expression" and condition.named_children:
+        # because of the mandatory ``while (...)`` syntax. Extra formatting
+        # parentheses can nest (``while ((true))``, ``while ((((x)))) ``),
+        # so unwrap until we reach the underlying expression — otherwise
+        # ``is_literal_true`` would be False on the outer wrapper and the
+        # ``while (true)`` check would silently skip.
+        while condition.type == "parenthesized_expression" and condition.named_children:  # nosafe: SAFE501
             condition = condition.named_children[0]
 
         is_literal_true = condition.type == _TRUE_LITERAL_BY_LANG[lang_name]

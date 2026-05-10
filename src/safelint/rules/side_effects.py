@@ -8,6 +8,7 @@ from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, res
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.rules.base import BaseRule
+from safelint.rules.resource_lifecycle import _validated_string_list
 
 
 if TYPE_CHECKING:
@@ -29,11 +30,15 @@ def _io_funcs_for_lang(rule_config: dict, lang_name: str, fallback: list[str]) -
     and ``io_functions_<lang>`` for non-Python languages. Adding a new
     language is additive — drop a new ``io_functions_<lang>`` list into
     ``DEFAULTS["rules"]`` and the lookup picks it up.
+
+    Validates that the value is a list/tuple of strings before building
+    the frozenset. A bare-string typo (``io_functions_javascript = "log"``)
+    would otherwise be silently coerced to a set of single characters
+    and effectively disable detection — fail loud instead.
     """
-    if lang_name == "python":
-        return frozenset(rule_config.get("io_functions", fallback))
-    key = f"io_functions_{lang_name}"
-    return frozenset(rule_config.get(key, []))
+    key = "io_functions" if lang_name == "python" else f"io_functions_{lang_name}"
+    raw = rule_config.get(key, fallback if lang_name == "python" else [])
+    return frozenset(_validated_string_list(raw, key))
 
 
 def _first_io_call(func_node: tree_sitter.Node, io_funcs: frozenset[str], function_types: frozenset[str]) -> tree_sitter.Node | None:

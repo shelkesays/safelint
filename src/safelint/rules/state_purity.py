@@ -17,6 +17,7 @@ from safelint.languages.python import (
     IDENTIFIER,
 )
 from safelint.rules.base import BaseRule
+from safelint.rules.resource_lifecycle import _validated_string_list
 
 
 if TYPE_CHECKING:
@@ -260,13 +261,19 @@ class GlobalMutationRule(BaseRule):
         return violations
 
     def _javascript_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Run the JavaScript-specific check (assignment to ``globalThis.*`` / ``window.*`` / etc.)."""
-        namespaces = frozenset(
-            self.config.get(
-                "global_namespaces_javascript",
-                self._DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT,
-            )
+        """Run the JavaScript-specific check (assignment to ``globalThis.*`` / ``window.*`` / etc.).
+
+        Validates that ``global_namespaces_javascript`` is a list of strings
+        before building the frozenset. A bare-string typo
+        (``global_namespaces_javascript = "globalThis"``) would otherwise
+        be silently coerced into a set of single characters and cause
+        SAFE302 to stop matching any namespace — fail loud instead.
+        """
+        raw = self.config.get(
+            "global_namespaces_javascript",
+            self._DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT,
         )
+        namespaces = frozenset(_validated_string_list(raw, "global_namespaces_javascript"))
         violations: list[Violation] = []
         for func in _iter_javascript_functions(tree):
             violations.extend(self._javascript_violations_for_func(filepath, func, namespaces))

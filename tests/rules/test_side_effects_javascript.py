@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+import pytest
+
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
 
@@ -237,3 +239,27 @@ def test_js_pure_named_arrow_function_fires_safe303(tmp_path: Path) -> None:
     safe303 = [v for v in result.violations if v.code == "SAFE303"]
     assert len(safe303) == 1
     assert "getCount" in safe303[0].message
+
+
+def test_js_io_functions_javascript_must_be_list_not_string(tmp_path: Path) -> None:
+    """A bare-string typo for ``io_functions_javascript`` raises TypeError, not silently disable.
+
+    ``io_functions_javascript = "log"`` would otherwise be coerced into
+    a set of single characters (``{'l', 'o', 'g'}``) by frozenset(...)
+    and quietly stop detecting any I/O call. Validate up front so the
+    misconfiguration fails loud on the first run.
+    """
+    sample = tmp_path / "anything.js"
+    sample.write_text("function f() { console.log('x'); }\n", encoding="utf-8")
+    cfg = deep_merge(DEFAULTS, {"rules": {"side_effects": {"io_functions_javascript": "log"}}})
+    with pytest.raises(TypeError, match="io_functions_javascript"):
+        SafetyEngine(cfg).check_file(str(sample))
+
+
+def test_js_io_functions_javascript_rejects_non_string_entries(tmp_path: Path) -> None:
+    """Lists with non-string entries also fail clearly."""
+    sample = tmp_path / "anything.js"
+    sample.write_text("function f() { console.log('x'); }\n", encoding="utf-8")
+    cfg = deep_merge(DEFAULTS, {"rules": {"side_effects": {"io_functions_javascript": ["log", 42]}}})
+    with pytest.raises(TypeError, match="io_functions_javascript"):
+        SafetyEngine(cfg).check_file(str(sample))
