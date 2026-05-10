@@ -108,7 +108,7 @@ def test_js_unnamed_function_with_console_log_fires_safe304(tmp_path: Path) -> N
 
 
 def test_js_io_keyword_in_name_exempts_safe304(tmp_path: Path) -> None:
-    """A function whose name *contains* an I/O keyword (``log``, ``write``, ``fetch``) is exempt."""
+    """A function whose name *contains* an I/O keyword (``log``, ``write``, ``fetch``, ``send``, ``load``) is exempt."""
     for func_name in ("logEvent", "writeData", "fetchUser", "sendMessage", "loadConfig"):
         sample = tmp_path / f"{func_name}.js"
         sample.write_text(
