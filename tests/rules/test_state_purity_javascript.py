@@ -160,9 +160,13 @@ def test_js_nested_function_isolation(tmp_path: Path) -> None:
     )
     result = _engine().check_file(str(sample))
     safe302 = [v for v in result.violations if v.code == "SAFE302"]
-    # Exactly one violation, attributed to ``inner`` (not ``outer``).
+    # Exactly one violation, attributed to ``inner`` — and explicitly
+    # NOT to ``outer``. The negative check guards against a regression
+    # where the rule mis-attributes nested-function writes to the
+    # enclosing function (would render messages with both names).
     assert len(safe302) == 1
     assert "inner" in safe302[0].message
+    assert "outer" not in safe302[0].message
 
 
 def test_js_user_can_extend_namespace_list(tmp_path: Path) -> None:
