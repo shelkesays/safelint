@@ -101,3 +101,33 @@ def test_js_break_in_inner_function_does_not_save_outer(tmp_path: Path) -> None:
     )
     result = _engine().check_file(str(sample))
     assert any(v.code == "SAFE501" for v in result.violations)
+
+
+def test_js_while_double_parens_true_no_break_fires_safe501(tmp_path: Path) -> None:
+    """``while ((true)) { ... }`` — extra formatting parens still detected.
+
+    The mandatory ``while (...)`` outer paren wraps the condition in a
+    ``parenthesized_expression``; extra formatting parens nest another
+    layer. Single-layer unwrap left ``is_literal_true`` False on the
+    outer wrapper and silently skipped the no-break check — a real
+    false-negative that automated reformatters can introduce.
+    """
+    sample = tmp_path / "double_paren.js"
+    sample.write_text(
+        "function f() { while ((true)) { work(); } }\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    safe501 = [v for v in result.violations if v.code == "SAFE501"]
+    assert len(safe501) == 1
+
+
+def test_js_while_double_parens_true_with_break_does_not_fire(tmp_path: Path) -> None:
+    """``while ((true))`` with a break is still recognised as bounded — positive control."""
+    sample = tmp_path / "double_paren_break.js"
+    sample.write_text(
+        "function f() { while ((true)) { if (cond) break; work(); } }\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE501" for v in result.violations)

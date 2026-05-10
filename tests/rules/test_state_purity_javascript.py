@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+import pytest
+
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
 
@@ -226,3 +228,26 @@ def test_js_pure_subscript_chain_on_window_fires(tmp_path: Path) -> None:
     )
     result = _engine().check_file(str(sample))
     assert any(v.code == "SAFE302" for v in result.violations)
+
+
+def test_js_global_namespaces_javascript_must_be_list_not_string(tmp_path: Path) -> None:
+    """A bare-string typo for ``global_namespaces_javascript`` raises TypeError.
+
+    ``global_namespaces_javascript = "globalThis"`` would otherwise be
+    coerced to ``{'g', 'l', 'o', 'b', 'a', 'T', 'h', 'i', 's'}`` and
+    silently stop matching any namespace — fail loud instead.
+    """
+    sample = tmp_path / "anything.js"
+    sample.write_text("function f() { globalThis.x = 1; }\n", encoding="utf-8")
+    cfg = deep_merge(DEFAULTS, {"rules": {"global_mutation": {"global_namespaces_javascript": "globalThis"}}})
+    with pytest.raises(TypeError, match="global_namespaces_javascript"):
+        SafetyEngine(cfg).check_file(str(sample))
+
+
+def test_js_global_namespaces_javascript_rejects_non_string_entries(tmp_path: Path) -> None:
+    """Lists with non-string entries also fail clearly."""
+    sample = tmp_path / "anything.js"
+    sample.write_text("function f() { globalThis.x = 1; }\n", encoding="utf-8")
+    cfg = deep_merge(DEFAULTS, {"rules": {"global_mutation": {"global_namespaces_javascript": ["globalThis", 42]}}})
+    with pytest.raises(TypeError, match="global_namespaces_javascript"):
+        SafetyEngine(cfg).check_file(str(sample))
