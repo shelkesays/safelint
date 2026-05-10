@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+import pytest
+
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
 
@@ -112,3 +114,28 @@ def test_js_assertion_in_nested_function_does_not_credit_outer(tmp_path: Path) -
     # would normally also fire but its parameters are not validated and
     # its body has the assert — so helper is fine.
     assert any("outer" in v.message for v in safe601)
+
+
+def test_js_assertion_calls_javascript_must_be_list_not_string(tmp_path: Path) -> None:
+    """A bare-string typo for ``assertion_calls_javascript`` raises TypeError.
+
+    ``assertion_calls_javascript = "assert"`` would otherwise be
+    coerced to ``{'a', 's', 'e', 'r', 't'}`` and silently break
+    SAFE601 detection — fail loud instead. Same validation shape as
+    ``io_functions_javascript`` (SAFE303 / SAFE304) and
+    ``global_namespaces_javascript`` (SAFE302).
+    """
+    sample = tmp_path / "anything.js"
+    sample.write_text("function f(a) { return a + 1; }\n", encoding="utf-8")
+    cfg = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "assertion_calls_javascript": "assert"}}})
+    with pytest.raises(TypeError, match="assertion_calls_javascript"):
+        SafetyEngine(cfg).check_file(str(sample))
+
+
+def test_js_assertion_calls_javascript_rejects_non_string_entries(tmp_path: Path) -> None:
+    """Lists with non-string entries also fail clearly."""
+    sample = tmp_path / "anything.js"
+    sample.write_text("function f(a) { return a + 1; }\n", encoding="utf-8")
+    cfg = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "assertion_calls_javascript": ["assert", 42]}}})
+    with pytest.raises(TypeError, match="assertion_calls_javascript"):
+        SafetyEngine(cfg).check_file(str(sample))

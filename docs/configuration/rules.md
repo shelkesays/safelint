@@ -362,10 +362,12 @@ function f(items) {
   return first;             // accidentally accessible — exactly the bug
 }
 
-for (var i = 0; i < arr.length; i++) {   // SAFE305 - i leaks out of the loop
-  arr[i] = i * 2;
+function doubleAndReturnLastIndex(arr) {
+  for (var i = 0; i < arr.length; i++) {   // SAFE305 - i leaks out of the loop
+    arr[i] = i * 2;
+  }
+  return i;                                 // i is still accessible — that's the bug
 }
-return i;                                 // i is still accessible
 ```
 
 **Good:**
@@ -379,8 +381,10 @@ function f(items) {
   return undefined;
 }
 
-for (let i = 0; i < arr.length; i++) {   // i is block-scoped to the loop
-  arr[i] = i * 2;
+function doubleEach(arr) {
+  for (let i = 0; i < arr.length; i++) {   // i is block-scoped to the loop
+    arr[i] = i * 2;
+  }
 }
 ```
 
