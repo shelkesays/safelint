@@ -177,8 +177,17 @@ CLI `--fail-on` always takes priority over the config file.
 JavaScript source is the same regardless of where it runs (Node.js, browser, Deno, Cloudflare Workers, Bun, WASM-hosted JS engines), but the *APIs* it interacts with differ. The `[tool.safelint.javascript]` table selects which API surface the JavaScript rule defaults assume — sinks for taint analysis, tracked acquirers for resource-lifecycle, global namespaces for globals, etc.
 
 ```toml
+# pyproject.toml
 [tool.safelint.javascript]
 runtime = "browser"   # or "node" (default) / "deno" / "cloudflare-workers" / "bun"
+```
+
+In a standalone `safelint.toml` (no `[tool.safelint]` wrapper), drop the prefix — the table name is just `[javascript]`:
+
+```toml
+# safelint.toml (standalone — no [tool.safelint] wrapper)
+[javascript]
+runtime = "browser"
 ```
 
 | Runtime | When to pick it | What changes |
