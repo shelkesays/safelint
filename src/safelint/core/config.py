@@ -35,13 +35,69 @@ TOML_CONFIG_KEY = "safelint"
 STANDALONE_TOML_FILENAME = "safelint.toml"
 
 # ---------------------------------------------------------------------------
+# Default vendor / generated directories pruned from discovery
+# ---------------------------------------------------------------------------
+#
+# Almost no project wants safelint walking into these — they hold
+# third-party code (virtualenvs, ``node_modules``), build outputs
+# (``build/`` / ``dist/``), or generated caches (``__pycache__``,
+# ``.pytest_cache``, etc.). Without these defaults, a fresh
+# ``safelint check --all-files`` from a project root with a venv at
+# ``.venv/`` would trip over the virtualenv's own Python files and
+# produce noise from code the user didn't author.
+#
+# **Two patterns per entry** because Python's ``fnmatch.fnmatchcase``
+# is anchored at both ends and doesn't span ``/`` separators in the
+# way some glob implementations do:
+#
+# * ``<dir>/**`` matches a top-level vendor dir (the most common case
+#   — e.g. ``.venv/`` directly under the project root).
+# * ``**/<dir>/**`` matches the same name nested anywhere in the tree
+#   (e.g. ``packages/foo/node_modules/``).
+#
+# Users can:
+# * **Override completely** by setting ``exclude_paths = []`` in
+#   their config — clears every default, useful for the rare case of
+#   wanting safelint to look inside a normally-excluded directory.
+# * **Extend additively** via ``extend_exclude_paths = [...]`` —
+#   keeps the defaults and adds the user's patterns. Recommended for
+#   project-specific excludes (``"generated/**"``, ``"vendor/**"``,
+#   etc.).
+_DEFAULT_EXCLUDE_VENDOR_DIRS: tuple[str, ...] = (
+    # Python virtual environments
+    ".venv",
+    "venv",
+    # Python test / build tooling
+    ".tox",
+    ".nox",
+    # Python caches
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".ty_cache",
+    # Python build outputs
+    "build",
+    "dist",
+    # Coverage outputs
+    "htmlcov",
+    # JavaScript / Node
+    "node_modules",
+    # Site packages (defensive — sometimes installed into the project tree)
+    "site-packages",
+)
+
+_DEFAULT_EXCLUDE_PATHS: list[str] = [pattern for vendor_dir in _DEFAULT_EXCLUDE_VENDOR_DIRS for pattern in (f"{vendor_dir}/**", f"**/{vendor_dir}/**")]
+
+
+# ---------------------------------------------------------------------------
 # Built-in defaults - every key can be overridden via pyproject.toml
 # ---------------------------------------------------------------------------
 
 DEFAULTS: dict[str, Any] = {
     "mode": "local",
     "fail_on": "error",
-    "exclude_paths": [],
+    "exclude_paths": list(_DEFAULT_EXCLUDE_PATHS),  # copy so callers can't mutate the module-level list
     "ignore": [],
     "per_file_ignores": {},
     # Skip files whose size exceeds this many bytes. Guards against
