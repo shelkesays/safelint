@@ -80,7 +80,7 @@ def _path_components_contain(haystack: tuple[str, ...], needle: tuple[str, ...])
     if not needle:
         return False
     n = len(needle)
-    return any(haystack[i:i + n] == needle for i in range(len(haystack) - n + 1))
+    return any(haystack[i : i + n] == needle for i in range(len(haystack) - n + 1))
 
 
 def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
