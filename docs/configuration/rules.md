@@ -64,7 +64,7 @@ These check the shape of your functions. They are cheap to run and always go fir
 
 ### SAFE101 — `function_length`
 
-**What it flags:** Functions longer than `max_lines` (interpreted under the configured `count_mode`).
+**What it flags:** Functions longer than `max_lines` (interpreted under the configured `count_mode`). Cross-language.
 
 Long functions are hard to read, test, and reason about. The Holzmann rule says a function should fit on one printed page.
 
@@ -87,7 +87,7 @@ When switching to `"statements"`, lower `max_lines` accordingly — a function w
 
 ### SAFE102 — `nesting_depth`
 
-**What it flags:** Functions with control-flow nested more than `max_depth` levels deep.
+**What it flags:** Functions with control-flow nested more than `max_depth` levels deep. Cross-language.
 
 Deep nesting (if inside for inside if inside while…) makes code hard to follow and test. Two levels is enough for most real functions.
 
@@ -106,7 +106,7 @@ max_depth = 2
 
 ### SAFE103 — `max_arguments`
 
-**What it flags:** Functions with more than `max_args` parameters.
+**What it flags:** Functions with more than `max_args` parameters. Cross-language.
 
 Too many arguments usually means a function is doing too much, or needs a config object. `self` and `cls` are excluded from the count. `*args` and `**kwargs` each count as one parameter — they bring real callers, just an unbounded number of them, so they cannot be free.
 
@@ -125,7 +125,7 @@ max_args = 7
 
 ### SAFE104 — `complexity`
 
-**What it flags:** Functions with cyclomatic complexity above `max_complexity`.
+**What it flags:** Functions with cyclomatic complexity above `max_complexity`. Cross-language.
 
 Cyclomatic complexity counts the number of independent paths through a function. It starts at 1 and goes up by 1 for every `if`, `elif`, `for`, `while`, `except`, ternary expression, `and`/`or` operator, and comprehension condition. A score above 10 means the function has too many possible paths to test reliably.
 
@@ -148,7 +148,7 @@ These check that exceptions are handled clearly and not swallowed silently.
 
 ### SAFE201 — `bare_except`
 
-**What it flags:** `except:` clauses with no exception type.
+**What it flags:** `except:` clauses with no exception type. **Python-only** — JavaScript `catch` clauses always bind the caught error (and don't have the `KeyboardInterrupt` / `SystemExit` hijack hazard), so there's no equivalent hazard to flag on JS files. SAFE202 + SAFE203 cover the related JS concerns.
 
 A bare `except:` catches everything including `KeyboardInterrupt` and `SystemExit`, which are signals — not bugs. Always specify the exception type you expect.
 
@@ -183,7 +183,7 @@ except ConnectionError as exc:
 
 ### SAFE202 — `empty_except`
 
-**What it flags:** `except` blocks whose body is effectively a no-op:
+**What it flags:** `except` / `catch` blocks whose body is effectively a no-op. Cross-language.
 
 - `except E: pass`
 - `except E: continue`
@@ -267,7 +267,7 @@ These check for use of global variables and unexpected side effects in functions
 
 ### SAFE301 — `global_state`
 
-**What it flags:** Functions that declare the `global` keyword.
+**What it flags:** Functions that declare the `global` keyword. **Python-only** — JavaScript has no `global` read-only declaration form; on JS this rule would always be a strict subset of SAFE302 (`global_mutation`), so it isn't separately registered. JS users get the same protection from SAFE302 alone.
 
 Using `global` means a function reads or writes shared state outside its own scope. This makes functions hard to test and creates hidden dependencies between parts of your code. Pass values as arguments instead.
 
@@ -367,7 +367,7 @@ pure_prefixes = ["calculate", "compute", "get", "check", "validate", "is", "has"
 
 ### SAFE304 — `side_effects`
 
-**What it flags:** Any function that calls an I/O primitive and is not named to signal that fact.
+**What it flags:** Any function that calls an I/O primitive and is not named to signal that fact. Cross-language.
 
 Broader than `SAFE303` — applies to *all* functions, not just pure-named ones. A function named `process_order` that calls `print()` should be renamed to `log_order` or refactored to use dependency injection.
 
@@ -750,7 +750,7 @@ These combine AST analysis with intra-procedural taint tracking. They are more e
 
 ### SAFE801 — `tainted_sink`
 
-**What it flags:** User-controlled input (function parameters, `input()` calls) flowing into dangerous functions like `eval`, `exec`, or `subprocess` without being sanitized first.
+**What it flags:** User-controlled input (function parameters, `input()` calls in Python, `prompt()` / `confirm()` / `getItem()` in JS, etc.) flowing into dangerous functions like `eval`, `exec`, `subprocess` (Python) or `eval` / `Function` / `child_process` (JavaScript) without being sanitized first. Cross-language.
 
 The rule tracks data flow through assignments: if `x = user_data` then `x` is tainted. If `y = x + "_suffix"` then `y` is tainted too. Calling `eval(y)` then triggers a violation. Passing the value through a configured sanitizer (e.g. `escape(x)`) clears the taint.
 
@@ -828,7 +828,7 @@ function runQuery(userInput) {
 
 ### SAFE802 — `return_value_ignored`
 
-**What it flags:** Calls to functions whose return value signals success or failure, where the return value is discarded.
+**What it flags:** Calls to functions whose return value signals success or failure, where the return value is discarded. Cross-language.
 
 Calling `subprocess.run(["rm", "-rf", path])` as a bare statement (not assigning the result) means you never check whether the command succeeded. Same with `file.write()` — it returns the number of bytes written, and silently ignoring it means you may have written nothing.
 
@@ -877,7 +877,7 @@ await fs.promises.writeFile("out.txt", data);   // await surfaces failure
 
 ### SAFE803 — `null_dereference`
 
-**What it flags:** Chained attribute access or subscript directly on a call that can return `None`, without a guard.
+**What it flags:** Chained attribute access or subscript directly on a call that can return `None` (Python) / `null` or `undefined` (JavaScript), without a guard. Cross-language.
 
 `dict.get()` returns `None` when the key is absent. Calling `.strip()` on the result without checking for `None` first will raise `AttributeError` at runtime. Same with ORM methods like `session.scalar()` or `cursor.fetchone()`.
 
