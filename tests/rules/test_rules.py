@@ -812,9 +812,7 @@ def test_test_coupling_ignores_same_basename_outside_test_dirs(tmp_path: Path) -
     engine = SafetyEngine(config)
     violations = engine.check_file(str(sample)).violations
 
-    assert any(v.rule == "test_coupling" for v in violations), (
-        "Same-basename file outside test_dirs should not satisfy the coupling check"
-    )
+    assert any(v.rule == "test_coupling" for v in violations), "Same-basename file outside test_dirs should not satisfy the coupling check"
 
 
 # ---------------------------------------------------------------------------
