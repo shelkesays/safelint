@@ -958,6 +958,31 @@ def test_null_deref_subscript_non_nullable_call(tmp_path: Path) -> None:
     assert not any(v.rule == "null_dereference" for v in violations)
 
 
+def test_null_dereference_message_uses_python_syntax(tmp_path: Path) -> None:
+    """SAFE803 message on a Python file says ``None check`` / ``is not None``, not JS's ``null check``.
+
+    The same hazard exists in JS but is written as ``null`` /
+    ``undefined`` + optional chaining; per-language wording keeps the
+    recommended idiom matching the source file's language.
+    """
+    source = textwrap.dedent("""\
+        def f(users):
+            name = users.get("alice").upper()
+            return name
+    """)
+    sample = tmp_path / "msg_nd.py"
+    sample.write_text(source, encoding="utf-8")
+
+    config = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
+    violations = SafetyEngine(config).check_file(str(sample)).violations
+    safe803 = [v for v in violations if v.code == "SAFE803"]
+    assert len(safe803) == 1
+    assert "None check" in safe803[0].message
+    assert "is not None" in safe803[0].message
+    assert "null check" not in safe803[0].message
+    assert "?." not in safe803[0].message
+
+
 # ---------------------------------------------------------------------------
 # LoggingOnErrorRule: bare Name logger call (e.g. error("msg")) is sufficient
 # ---------------------------------------------------------------------------

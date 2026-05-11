@@ -306,6 +306,21 @@ class ReturnValueIgnoredRule(BaseRule):
         return violations
 
 
+def _null_dereference_message(method: str, lang_name: str) -> str:
+    """Build the language-specific SAFE803 violation message.
+
+    Python uses ``None`` / ``is not None``; JavaScript uses
+    ``null`` / ``undefined`` and the optional-chaining (``?.``) idiom
+    that's the modern guard. The two-form JS message also surfaces the
+    loose ``!= null`` check because it's the explicit alternative that
+    catches both ``null`` and ``undefined`` (the strict ``!== null``
+    misses ``undefined``).
+    """
+    if lang_name == "javascript":
+        return f'Result of "{method}()" is immediately dereferenced without a null check - guard with optional chaining ("result?.field") or "if (result != null)"'
+    return f'Result of "{method}()" is immediately dereferenced without a None check - guard with "if result is not None"'
+
+
 class NullDereferenceRule(BaseRule):
     """Flag chained attribute or subscript access on calls that can return None."""
 
@@ -358,7 +373,16 @@ class NullDereferenceRule(BaseRule):
         return name if name and name in nullable else None
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Flag immediate dereferences on nullable-returning calls."""
+        """Flag immediate dereferences on nullable-returning calls.
+
+        Per-language message: Python users get the ``None`` / ``is not None``
+        idiom; JavaScript users get the null-or-undefined hazard surfaced
+        with optional chaining (``result?.field`` — the modern guard) and
+        the loose ``!= null`` form (which catches both ``null`` and
+        ``undefined``) as the explicit alternative. Same per-language
+        wording pattern as ``EmptyExceptRule`` / ``LoggingOnErrorRule``
+        / ``UnboundedLoopsRule``.
+        """
         lang_name = resolve_lang_name(filepath)
         if lang_name == "python":
             nullable = self._DEFAULT_NULLABLE_PYTHON | frozenset(self.config.get("nullable_methods", []))
@@ -374,7 +398,7 @@ class NullDereferenceRule(BaseRule):
                     self._make_violation_for_node(
                         filepath,
                         node,
-                        f'Result of "{method}()" is immediately dereferenced without a None check - guard with "if result is not None"',
+                        _null_dereference_message(method, lang_name),
                     )
                 )
         return violations
