@@ -208,9 +208,9 @@ severity = "error"
 
 ### SAFE203 — `logging_on_error`
 
-**What it flags:** `except` blocks that handle an error without any logging call.
+**What it flags:** `except` / `catch` blocks that handle an error without any logging call. Cross-language.
 
-If you catch an exception and do something with it but never log it, the error is invisible. This rule requires at least one call to a logger method (`debug`, `info`, `warning`, `error`, `exception`, `critical`) inside the except block. Blocks that simply re-raise are exempt.
+If you catch an exception and do something with it but never log it, the error is invisible. This rule requires at least one call to a logger method (`debug`, `info`, `warning`, `error`, `exception`, `critical`, plus the JavaScript `console.*` family of `log` / `info` / `warn` / `error` / `debug` / `trace`) inside the handler. Blocks that simply re-raise the exact caught binding (Python `raise`; JavaScript `throw e;` where `e` is the catch parameter) are exempt — throwing a *different* identifier or `new Error(...)` still requires logging.
 
 | Option | Default | Description |
 |---|---|---|
@@ -221,6 +221,44 @@ If you catch an exception and do something with it but never log it, the error i
 [tool.safelint.rules.logging_on_error]
 enabled = true
 severity = "warning"
+```
+
+**Python — Bad:**
+
+```python
+try:
+    risky()
+except Exception:
+    pass            # SAFE203 - error swallowed silently
+```
+
+**Python — Good:**
+
+```python
+try:
+    risky()
+except Exception:
+    logger.exception("risky() failed")
+```
+
+**JavaScript — Bad:**
+
+```javascript
+try {
+  risky();
+} catch (e) {
+  // SAFE203 - error swallowed silently
+}
+```
+
+**JavaScript — Good:**
+
+```javascript
+try {
+  risky();
+} catch (e) {
+  console.error("risky() failed", e);
+}
 ```
 
 ## State and purity rules
@@ -267,7 +305,24 @@ strict = false                                                       # Python: b
 global_namespaces_javascript = ["globalThis", "window", "process"]   # JavaScript: tighten or relax the namespace list
 ```
 
-**JavaScript example:**
+**Python — Bad:**
+
+```python
+COUNTER = 0
+
+def bump():
+    global COUNTER
+    COUNTER += 1   # SAFE302 - function-body write to module-level state
+```
+
+**Python — Good:**
+
+```python
+def increment(counter):
+    return counter + 1   # state flows through arguments / returns, not globals
+```
+
+**JavaScript — Bad:**
 
 ```javascript
 // Bad — function-body write to a global namespace
@@ -275,7 +330,11 @@ function setupCache() {
   globalThis.cache = new Map();   // SAFE302
   process.env.READY = "true";     // SAFE302
 }
+```
 
+**JavaScript — Good:**
+
+```javascript
 // Good — encapsulate state, return rather than mutate
 function buildCache() {
   return new Map();
@@ -285,9 +344,9 @@ const cache = buildCache();   // module-level setup is fine; not flagged
 
 ### SAFE303 — `side_effects_hidden`
 
-**What it flags:** Functions with "pure-sounding" names that perform I/O.
+**What it flags:** Functions with "pure-sounding" names that perform I/O. Cross-language.
 
-A function named `calculate_total` or `get_user` implies it just computes and returns a value. If it secretly calls `open()`, `print()`, or `input()`, it is hiding a side effect. This is a core Holzmann risk — callers cannot reason about the function's behaviour.
+A function named `calculate_total` (Python) or `calculateTotal` (JavaScript) implies it just computes and returns a value. If it secretly calls `open()` / `print()` / `input()` (Python) or `console.log` / `fetch` / `fs.readFile` (JavaScript), it is hiding a side effect. This is a core Holzmann risk — callers cannot reason about the function's behaviour. The prefix-match check is case-insensitive on the lowercased function name, so it works equally on `snake_case` (Python convention) and `camelCase` (JavaScript convention).
 
 | Option | Default | Description |
 |---|---|---|
@@ -331,6 +390,40 @@ severity = "warning"
 io_functions = ["open", "print", "input"]                                  # Python list
 io_functions_javascript = ["log", "error", "warn", "fetch", "writeFile"]   # JavaScript list (overrides the runtime preset)
 io_name_keywords = ["print", "log", "write", "read", "save", "load", "send", "fetch"]
+```
+
+**Python — Bad:**
+
+```python
+def process_order(order):
+    print(f"processing {order}")   # SAFE304 - non-io-named function calls I/O
+    return order
+```
+
+**Python — Good:**
+
+```python
+def log_order(order):              # name signals I/O — exempt
+    print(f"processing {order}")
+    return order
+```
+
+**JavaScript — Bad:**
+
+```javascript
+function processOrder(order) {
+  console.log(`processing ${order}`);   // SAFE304 - non-io-named function calls I/O
+  return order;
+}
+```
+
+**JavaScript — Good:**
+
+```javascript
+function logOrder(order) {              // name contains ``log`` — exempt
+  console.log(`processing ${order}`);
+  return order;
+}
 ```
 
 ### SAFE305 — `wide_scope_declaration`
@@ -486,12 +579,12 @@ function readData(path) {
 
 ### SAFE501 — `unbounded_loops`
 
-**What it flags:** `while` loops that may run forever.
+**What it flags:** `while` loops that may run forever. Cross-language.
 
 Two cases are flagged:
 
-1. `while True:` with no `break` inside — guaranteed infinite loop.
-2. `while <condition>:` where the condition is not a comparison — the loop bound is unclear.
+1. **Literal-`true` condition with no `break` inside** — applies to both `while True:` (Python) and `while (true)` (JavaScript). Guaranteed infinite loop unless something inside the body breaks out.
+2. **Non-comparison condition** — applies to Python only (`while x:` where `x` isn't a comparison expression). JS idioms like `while (queue.length)` and `while (token)` are commonly bounded, so the heuristic stays Python-only — flagging them on JS files would produce too much noise.
 
 | Option | Default | Description |
 |---|---|---|
@@ -504,23 +597,104 @@ enabled = true
 severity = "warning"
 ```
 
+**Python — Bad:**
+
+```python
+def poll():
+    while True:        # SAFE501 - no break inside
+        check()
+```
+
+**Python — Good:**
+
+```python
+def poll():
+    while True:
+        if done():
+            break       # break exits the loop — rule satisfied
+        check()
+```
+
+**JavaScript — Bad:**
+
+```javascript
+function poll() {
+  while (true) {   // SAFE501 - no break inside
+    check();
+  }
+}
+```
+
+**JavaScript — Good:**
+
+```javascript
+function poll() {
+  while (true) {
+    if (done()) break;
+    check();
+  }
+}
+```
+
 ## Documentation rules
 
 ### SAFE601 — `missing_assertions`
 
-**What it flags:** Functions that contain no `assert` statements.
+**What it flags:** Functions that contain no assertion calls. Cross-language.
 
 Based on Holzmann rule 5: every function should have at least two assertions to validate its assumptions. This is a heuristic — disabled by default because many functions legitimately have no assertions (e.g. simple data transformations).
+
+Python walks for the AST `assert_statement` (built-in keyword). JavaScript has no built-in `assert` keyword, so the rule walks for *calls* to a configured set of assertion-function names — Node's `assert` module (`assert`, `ok`, `equal`, `strictEqual`, `deepEqual`, `match`, ...), `console.assert`, and test-framework idioms (`expect` for Jest / Chai-via-`expect`, `should` for Should.js, `vi.expect` for Vitest). Configure via `assertion_calls_javascript`.
 
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `false` | Disabled by default — opt-in |
 | `severity` | `"warning"` | `"error"` or `"warning"` |
+| `assertion_calls_javascript` | (see default JS list above) | (JavaScript only.) Call names that satisfy the assertion check. *Added in 1.13.0.* |
 
 ```toml
 [tool.safelint.rules.missing_assertions]
 enabled = true
 severity = "warning"
+assertion_calls_javascript = ["assert", "expect", "should"]
+```
+
+**Python — Bad:**
+
+```python
+def transfer(amount, src, dst):    # SAFE601 - no assert statements
+    src.balance -= amount
+    dst.balance += amount
+```
+
+**Python — Good:**
+
+```python
+def transfer(amount, src, dst):
+    assert amount > 0
+    assert src.balance >= amount
+    src.balance -= amount
+    dst.balance += amount
+```
+
+**JavaScript — Bad:**
+
+```javascript
+function transfer(amount, src, dst) {   // SAFE601 - no assertion calls
+  src.balance -= amount;
+  dst.balance += amount;
+}
+```
+
+**JavaScript — Good:**
+
+```javascript
+function transfer(amount, src, dst) {
+  assert(amount > 0);
+  assert(src.balance >= amount);
+  src.balance -= amount;
+  dst.balance += amount;
+}
 ```
 
 ## Test coverage rules
@@ -529,9 +703,14 @@ These are disabled by default. Enable them in CI to enforce test discipline.
 
 ### SAFE701 — `test_existence`
 
-**What it flags:** Source files that have no corresponding test file.
+**What it flags:** Source files that have no corresponding test file. Cross-language.
 
-For every file `src/mymodule/foo.py` it looks for `test_foo.py` under the configured `test_dirs`. If no matching test file is found, it flags the source file.
+The expected test filename pattern is language-aware:
+
+- **Python** — looks for `test_<stem>.py` (e.g. `src/mymodule/foo.py` pairs with `test_foo.py`).
+- **JavaScript** — looks for `<stem>.test.<ext>` (Jest convention) or `<stem>.spec.<ext>` (Mocha / Karma convention) across all registered JS extensions (`.js` / `.mjs` / `.cjs`). For example `src/app/foo.js` pairs with `foo.test.js` *or* `foo.spec.js`.
+
+The rule searches under the configured `test_dirs` for any of these patterns. Test files themselves (files under a `test_dirs` entry, or files whose names already match the pattern) are skipped — the rule doesn't ask a test to have its own test.
 
 | Option | Default | Description |
 |---|---|---|
@@ -548,9 +727,9 @@ test_dirs = ["tests", "test"]
 
 ### SAFE702 — `test_coupling`
 
-**What it flags:** Source files that were changed without a corresponding change to their test file.
+**What it flags:** Source files that were changed without a corresponding change to their test file. Cross-language.
 
-If you modify `src/foo.py`, you must also modify `tests/test_foo.py` in the same commit. This enforces the discipline that source changes come with test updates. Unlike `SAFE701`, this requires the test file to exist — if it does not, `SAFE701` fires instead.
+If you modify `src/foo.py`, you must also modify `tests/test_foo.py` in the same commit. For JavaScript, modifying `src/foo.js` requires updating `foo.test.js` or `foo.spec.js`. This enforces the discipline that source changes come with test updates. Same filename patterns as SAFE701. Unlike `SAFE701`, this requires the test file to exist — if it does not, `SAFE701` fires instead.
 
 | Option | Default | Description |
 |---|---|---|
@@ -611,19 +790,40 @@ The naming says it directly: when ``assume_taint_preserving = true``, the analys
 
 Note the asymmetry: `false` is the *less* conservative setting (fewer reports, more chance of missing real issues), not "stricter". The trade-off is fundamental to intra-procedural analysis — there's no way to know whether ``wrap`` actually preserves the taint without inlining it. Switch modes based on which failure mode hurts more in your codebase.
 
-**Bad:**
+**Python — Bad:**
 
 ```python
 def run_query(user_input):
     cursor.execute(user_input)   # SAFE801 - tainted param reaches execute()
 ```
 
-**Good:**
+**Python — Good:**
 
 ```python
 def run_query(user_input):
     safe = sanitize(user_input)
     cursor.execute(safe)          # sanitizer clears taint - no violation
+```
+
+**JavaScript — Bad:**
+
+```javascript
+function runQuery(userInput) {
+  eval(userInput);                // SAFE801 - tainted param reaches eval()
+}
+
+function buildFn(userInput) {
+  return new Function(userInput); // SAFE801 - Function constructor is a sink too
+}
+```
+
+**JavaScript — Good:**
+
+```javascript
+function runQuery(userInput) {
+  const safe = sanitize(userInput);
+  someApi.run(safe);              // sanitizer clears taint - no violation
+}
 ```
 
 ### SAFE802 — `return_value_ignored`
@@ -647,19 +847,32 @@ severity = "warning"
 flagged_calls = ["run", "write", "send", "remove", "unlink"]
 ```
 
-**Bad:**
+**Python — Bad:**
 
 ```python
 subprocess.run(["deploy.sh"])    # SAFE802 - return value discarded
 f.write(data)                    # SAFE802 - bytes written not checked
 ```
 
-**Good:**
+**Python — Good:**
 
 ```python
 result = subprocess.run(["deploy.sh"])
 if result.returncode != 0:
     raise RuntimeError("Deploy failed")
+```
+
+**JavaScript — Bad:**
+
+```javascript
+fs.writeFile("out.txt", data, cb);   // SAFE802 - the returned Promise is discarded
+stream.write(buf);                   // SAFE802 - backpressure signal ignored
+```
+
+**JavaScript — Good:**
+
+```javascript
+await fs.promises.writeFile("out.txt", data);   // await surfaces failure
 ```
 
 ### SAFE803 — `null_dereference`
@@ -683,16 +896,37 @@ severity = "error"
 nullable_methods = ["get", "pop", "find", "fetchone", "first"]
 ```
 
-**Bad:**
+**Python — Bad:**
 
 ```python
 name = config.get("username").strip()   # SAFE803 - .get() can return None
 row = cursor.fetchone().value           # SAFE803 - fetchone() can return None
 ```
 
-**Good:**
+**Python — Good:**
 
 ```python
 username = config.get("username")
 name = username.strip() if username is not None else ""
+```
+
+**JavaScript — Bad:**
+
+```javascript
+const text = document.getElementById("title").textContent;   // SAFE803 - getElementById can return null
+const first = users.find(u => u.id === id).name;             // SAFE803 - .find() can return undefined
+```
+
+**JavaScript — Good:**
+
+```javascript
+// Optional chaining — the modern guard
+const text = document.getElementById("title")?.textContent;
+const first = users.find(u => u.id === id)?.name;
+
+// Or explicit check (catches both null and undefined via loose !=)
+const el = document.getElementById("title");
+if (el != null) {
+  process(el.textContent);
+}
 ```

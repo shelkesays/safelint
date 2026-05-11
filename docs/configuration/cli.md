@@ -8,7 +8,7 @@ SafeLint's top-level surface mirrors ruff's: every command can be invoked positi
 
 ```text
 $ safelint --help
-SafeLint: Holzmann-inspired safety lint rules and pre-commit integration for Python.
+SafeLint: Holzmann-inspired safety lint rules and pre-commit integration for Python and JavaScript.
 
 Usage: safelint [OPTIONS] <COMMAND>
 
