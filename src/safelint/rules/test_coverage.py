@@ -215,11 +215,7 @@ class TestCouplingRule(BaseRule):
         # contiguous subsequence — the same logic ``_is_test_file``
         # uses — fixes the false-negative.
         candidates = _candidate_test_filenames(src, lang_name)
-        changed_under_test_dirs = {
-            f
-            for f in changed
-            if any(_path_components_contain(Path(f).parts, Path(td).parts) for td in test_dirs)
-        }
+        changed_under_test_dirs = {f for f in changed if any(_path_components_contain(Path(f).parts, Path(td).parts) for td in test_dirs)}
         changed_basenames = {Path(f).name for f in changed_under_test_dirs}
         if any(candidate in changed_basenames for candidate in candidates):
             return []
