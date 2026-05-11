@@ -1150,7 +1150,7 @@ def _print_main_help() -> None:
     experience. Colour is auto-disabled when stdout is not a TTY (see
     ``_c``), so piping to a file produces clean text.
     """
-    tagline = _c("SafeLint", _BOLD, _GREEN) + ": Holzmann-inspired safety lint rules and pre-commit integration for Python."
+    tagline = _c("SafeLint", _BOLD, _GREEN) + ": Holzmann-inspired safety lint rules and pre-commit integration for Python and JavaScript."
     print(tagline)
     print()
     print(f"{_c('Usage:', _BOLD)} {_c('safelint', _CYAN)} [OPTIONS] <COMMAND>")
