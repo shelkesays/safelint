@@ -255,3 +255,38 @@ def test_js_global_namespaces_javascript_rejects_non_string_entries(tmp_path: Pa
     cfg = deep_merge(DEFAULTS, {"rules": {"global_mutation": {"global_namespaces_javascript": ["globalThis", 42]}}})
     with pytest.raises(TypeError, match="global_namespaces_javascript"):
         SafetyEngine(cfg).check_file(str(sample))
+
+
+def test_js_parenthesized_root_fires(tmp_path: Path) -> None:
+    """``(globalThis).x = 1`` — paren-wrapped root still resolves.
+
+    Without the unwrap, the leftward walk would land on the
+    ``parenthesized_expression`` node and the bare-identifier check
+    at the tail of ``_javascript_global_namespace_root`` would return
+    None — silently skipping the write.
+    """
+    sample = tmp_path / "paren_root.js"
+    sample.write_text("function f() { (globalThis).x = 1; }\n", encoding="utf-8")
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE302" for v in result.violations)
+
+
+def test_js_nested_parenthesized_chain_fires(tmp_path: Path) -> None:
+    """``((process).env).NODE_ENV = 'prod'`` — parens at every step still resolve to ``process``."""
+    sample = tmp_path / "paren_chain.js"
+    sample.write_text("function f() { ((process).env).NODE_ENV = 'prod'; }\n", encoding="utf-8")
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE302" for v in result.violations)
+
+
+def test_js_parenthesized_lhs_target_fires(tmp_path: Path) -> None:
+    """``(globalThis.x) = 1`` — paren-wrapped LHS target also recognised.
+
+    Distinct from the ``(root).x`` cases: here the *outermost* LHS
+    node is the parenthesised wrapper, not a member_expression. Without
+    unwrapping at the LHS-type filter the whole write would be skipped.
+    """
+    sample = tmp_path / "paren_lhs.js"
+    sample.write_text("function f() { (globalThis.x) = 1; }\n", encoding="utf-8")
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE302" for v in result.violations)
