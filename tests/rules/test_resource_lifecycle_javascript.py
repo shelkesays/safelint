@@ -242,7 +242,10 @@ def test_js_new_worker_outside_try_finally_fires(tmp_path: Path) -> None:
     result = SafetyEngine(cfg).check_file(str(sample))
     safe401 = [v for v in result.violations if v.code == "SAFE401"]
     assert len(safe401) == 1
-    assert "Worker" in safe401[0].message
+    # Message must show the constructor form (``new Worker()``) so
+    # users grep'ing for ``Worker(`` find the actual call site —
+    # ``Worker()`` alone wouldn't match ``new Worker(...)`` in source.
+    assert "new Worker()" in safe401[0].message
 
 
 def test_js_new_member_constructor_fires(tmp_path: Path) -> None:

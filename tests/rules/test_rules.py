@@ -719,6 +719,31 @@ def test_test_existence_fires_when_no_test_file(tmp_path: Path) -> None:
     assert any(v.rule == "test_existence" for v in violations)
 
 
+def test_test_existence_skips_python_test_file_itself(tmp_path: Path) -> None:
+    """SAFE701 doesn't fire on a Python test file passed as ``filepath``.
+
+    Without the ``_is_test_file`` guard the rule would search for
+    ``test_test_foo.py`` when handed ``tests/test_foo.py`` — pure
+    noise. With ``files: ^src/`` dropped from the published
+    pre-commit hook in v1.13.0, the rules now reach test files in
+    projects that don't restore the filter locally, so the guard
+    matters.
+    """
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    test_file = test_dir / "test_foo.py"
+    test_file.write_text("def test_x(): pass\n", encoding="utf-8")
+
+    config = deep_merge(
+        DEFAULTS,
+        {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(test_dir)]}}},
+    )
+    engine = SafetyEngine(config)
+    violations = engine.check_file(str(test_file)).violations
+
+    assert not any(v.rule == "test_existence" for v in violations)
+
+
 def test_test_coupling_fires_when_test_not_updated(tmp_path: Path) -> None:
     """test_coupling fires when the paired test file exists but was not changed."""
     src_dir = tmp_path / "src"

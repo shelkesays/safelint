@@ -234,11 +234,17 @@ class ResourceLifecycleRule(BaseRule):
                 continue
             if _is_inside_try_finally(node):
                 continue
+            # Distinguish constructor invocations (``new Worker(...)``)
+            # from plain calls (``createReadStream(...)``) in the
+            # message. Reporting ``Worker()`` for ``new Worker(...)``
+            # would be misleading — the user grep'ing for ``Worker(``
+            # in the source wouldn't find the offending site.
+            invocation = f"new {name}()" if node.type == "new_expression" else f"{name}()"
             violations.append(
                 self._make_violation_for_node(
                     filepath,
                     node,
-                    f'"{name}()" not wrapped in try/finally - guarantee cleanup with try {{ ... }} finally {{ ... }}',
+                    f'"{invocation}" not wrapped in try/finally - guarantee cleanup with try {{ ... }} finally {{ ... }}',
                 )
             )
         return violations
