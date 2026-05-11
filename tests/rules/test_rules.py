@@ -772,6 +772,51 @@ def test_test_coupling_fires_when_test_not_updated(tmp_path: Path) -> None:
     assert any(v.rule == "test_coupling" for v in violations)
 
 
+def test_test_coupling_ignores_same_basename_outside_test_dirs(tmp_path: Path) -> None:
+    """SAFE702 must NOT be satisfied by a same-basename file changed outside ``test_dirs``.
+
+    Without the test_dirs gate, a changed ``legacy/test_mymodule.py``
+    (or any other file with the matching basename) would silently
+    satisfy the coupling check even though the *actual* paired test
+    under ``tests/`` wasn't touched. Restricting the basename match
+    to changed paths under a configured test_dirs entry — the same
+    path-component subsequence logic ``_is_test_file`` uses — fixes
+    the false-negative.
+    """
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    legacy_dir = tmp_path / "legacy"
+    legacy_dir.mkdir()
+
+    sample = src_dir / "mymodule.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    (test_dir / "test_mymodule.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    decoy = legacy_dir / "test_mymodule.py"  # same basename, outside test_dirs
+    decoy.write_text("def test_legacy(): pass\n", encoding="utf-8")
+
+    config = deep_merge(
+        DEFAULTS,
+        {
+            "rules": {
+                "test_coupling": {
+                    "enabled": True,
+                    "test_dirs": [str(test_dir)],
+                    # Source changed; decoy changed; the REAL paired test was NOT.
+                    "_changed_files": [str(sample), str(decoy)],
+                }
+            }
+        },
+    )
+    engine = SafetyEngine(config)
+    violations = engine.check_file(str(sample)).violations
+
+    assert any(v.rule == "test_coupling" for v in violations), (
+        "Same-basename file outside test_dirs should not satisfy the coupling check"
+    )
+
+
 # ---------------------------------------------------------------------------
 # CLI entry points (tested via the underlying functions, not subprocess)
 # ---------------------------------------------------------------------------
