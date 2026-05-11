@@ -203,14 +203,24 @@ class TestCouplingRule(BaseRule):
         if not _find_test_file(src, test_dirs, lang_name):
             return []
 
-        # Was *any* of the candidate test filenames in the changed set?
-        # Compare against the basename of each changed path — a substring
-        # match (``candidate in f``) would falsely treat ``foo.test.js`` as
-        # paired with ``barfoo.test.js`` (or with a directory named
-        # ``foo.test.js/`` further up the tree). ``Path(f).name`` extracts
-        # the final path component regardless of separator normalisation.
+        # Was *any* of the candidate test filenames part of this commit
+        # *and located under one of the configured test_dirs*? The
+        # test_dirs gate is essential: a same-basename file changed
+        # outside the test root (e.g. ``legacy/test_foo.py`` or
+        # ``packages/foo/bar/foo.test.js`` when ``test_dirs=["tests"]``)
+        # would otherwise satisfy the basename match and silently
+        # skip SAFE702 even though the paired test under ``tests/``
+        # wasn't touched. Restricting the candidate match to changed
+        # paths whose components include a ``test_dirs`` entry as a
+        # contiguous subsequence — the same logic ``_is_test_file``
+        # uses — fixes the false-negative.
         candidates = _candidate_test_filenames(src, lang_name)
-        changed_basenames = {Path(f).name for f in changed}
+        changed_under_test_dirs = {
+            f
+            for f in changed
+            if any(_path_components_contain(Path(f).parts, Path(td).parts) for td in test_dirs)
+        }
+        changed_basenames = {Path(f).name for f in changed_under_test_dirs}
         if any(candidate in changed_basenames for candidate in candidates):
             return []
 
