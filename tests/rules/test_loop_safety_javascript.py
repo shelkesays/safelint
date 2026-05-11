@@ -165,14 +165,7 @@ def test_js_labeled_break_from_nested_for_exits_outer_while(tmp_path: Path) -> N
     """
     sample = tmp_path / "labeled.js"
     sample.write_text(
-        "function f(items, target) {\n"
-        "  outer: while (true) {\n"
-        "    for (const item of items) {\n"
-        "      if (item === target) { break outer; }\n"
-        "      process(item);\n"
-        "    }\n"
-        "  }\n"
-        "}\n",
+        "function f(items, target) {\n  outer: while (true) {\n    for (const item of items) {\n      if (item === target) { break outer; }\n      process(item);\n    }\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -183,14 +176,7 @@ def test_js_labeled_break_from_nested_switch_exits_outer_while(tmp_path: Path) -
     """Same fix applies to labelled breaks from inside a ``switch`` — also a pruned construct."""
     sample = tmp_path / "labeled_switch.js"
     sample.write_text(
-        "function f(token) {\n"
-        "  outer: while (true) {\n"
-        "    switch (token.type) {\n"
-        "      case 'END': break outer;\n"
-        "      default: token = next(token);\n"
-        "    }\n"
-        "  }\n"
-        "}\n",
+        "function f(token) {\n  outer: while (true) {\n    switch (token.type) {\n      case 'END': break outer;\n      default: token = next(token);\n    }\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -206,14 +192,7 @@ def test_js_labeled_break_to_different_label_still_fires(tmp_path: Path) -> None
     """
     sample = tmp_path / "labeled_other.js"
     sample.write_text(
-        "function f(items) {\n"
-        "  outer: while (true) {\n"
-        "    inner: for (const item of items) {\n"
-        "      if (item.done) { break inner; }\n"
-        "      process(item);\n"
-        "    }\n"
-        "  }\n"
-        "}\n",
+        "function f(items) {\n  outer: while (true) {\n    inner: for (const item of items) {\n      if (item.done) { break inner; }\n      process(item);\n    }\n  }\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
