@@ -215,3 +215,47 @@ def test_js_inline_test_file_outside_test_dir_does_not_fire(tmp_path: Path) -> N
         inline.write_text("describe('foo', () => {});\n", encoding="utf-8")
         result = _enabled_engine().check_file(str(inline))
         assert not any(v.code == "SAFE701" for v in result.violations)
+
+
+def test_js_nested_test_dir_recognises_helpers(tmp_path: Path) -> None:
+    """``test_dirs = ["tests/unit"]`` (multi-component) — helpers under it are recognised as test files.
+
+    Regression guard for the path-component subsequence match: a naive
+    ``td in path.parts`` check fails on multi-component entries
+    because ``"tests/unit"`` is one string while ``path.parts`` has
+    each segment separately. Without the subsequence form,
+    ``tests/unit/conftest.js`` (a fixture helper, not matching the
+    ``.test.``/``.spec.`` pattern) would be treated as a source file
+    and SAFE701 would search for the nonsensical ``conftest.test.js``.
+    """
+    with _cd(tmp_path):
+        nested = tmp_path / "tests" / "unit"
+        nested.mkdir(parents=True)
+        helper = nested / "conftest.js"
+        helper.write_text("module.exports.setup = () => {};\n", encoding="utf-8")
+        cfg = deep_merge(
+            DEFAULTS,
+            {"rules": {"test_existence": {"enabled": True, "test_dirs": ["tests/unit"]}}},
+        )
+        result = SafetyEngine(cfg).check_file(str(helper))
+        assert not any(v.code == "SAFE701" for v in result.violations)
+
+
+def test_js_absolute_test_dir_recognises_helpers(tmp_path: Path) -> None:
+    """Absolute-path ``test_dirs`` entries also work.
+
+    ``Path("/abs/path/tests").parts`` is ``("/", "abs", "path", "tests")``;
+    the subsequence match against the same prefix in the filepath's
+    parts correctly identifies the file as a test.
+    """
+    with _cd(tmp_path):
+        td = tmp_path / "tests"
+        td.mkdir()
+        helper = td / "conftest.js"
+        helper.write_text("module.exports.setup = () => {};\n", encoding="utf-8")
+        cfg = deep_merge(
+            DEFAULTS,
+            {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(td)]}}},
+        )
+        result = SafetyEngine(cfg).check_file(str(helper))
+        assert not any(v.code == "SAFE701" for v in result.violations)
