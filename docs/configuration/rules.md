@@ -13,6 +13,25 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 
 ## Language coverage
 
+### Currently supported
+
+- **Python** (`.py`, `.pyw`).
+- **JavaScript** (`.js`, `.mjs`, `.cjs`) — source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime *defaults* (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the [`[tool.safelint.javascript] runtime = "..."`](toml.md#javascript-runtime-presets) preset — the source-language rules themselves don't change.
+
+### Planned
+
+Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see [Adding a language](../contributing/adding-a-language.md)) makes each new language incremental — community contributions for any of these are welcome.
+
+1. **TypeScript** (`.ts`, `.tsx`) — likely shares most parser / dispatch infrastructure with the existing JavaScript support. The same registration will also cover **AssemblyScript** (`.as` — TypeScript-syntax language that compiles to WebAssembly), since AS source parses with the TypeScript grammar.
+2. **Go** (`.go`).
+3. **Rust** (`.rs`).
+4. **Java** (`.java`).
+5. **C** (`.c`, `.h`) — Holzmann's original target language.
+6. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) — same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
+7. **PHP** (`.php`).
+
+### Rule scope (current languages)
+
 | Scope | Count | Codes |
 |---|---|---|
 | **Cross-language** (Python and JavaScript) | 17 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE302, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 |
