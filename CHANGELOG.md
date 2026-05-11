@@ -66,7 +66,7 @@ Two rules don't have a useful JavaScript translation and remain registered for P
 ### Behaviour changes (heads-up)
 
 - **JS-only projects** — anyone who had `safelint check` running on a Python repo with stray `.js` files: those files will now be discovered, parsed, and linted (most rules will fire). If that's not what you want, scope-suppress with `[tool.safelint.per_file_ignores]` keyed on the `.js` glob, or set `enabled = false` per rule.
-- **Mixed Python + JS projects** — both file types now flow through pre-commit and `safelint check` automatically. The 15 widened rules apply to both languages with their per-language defaults.
+- **Mixed Python + JS projects** — both file types now flow through pre-commit and `safelint check` automatically. The 17 widened rules apply to both languages with their per-language defaults.
 - **Pure-Python projects** — no intended default-behaviour change beyond the v1.12.2 `.pyw` bugfix. Some Python codepaths did pick up correctness fixes during the v1.13.0 cycle (e.g. SAFE701/702 now skip test files themselves and gate the coupling check to changed paths under `test_dirs`, SAFE102 now counts `match` blocks for Python 3.10+), but those only affect users who had explicitly enabled the relevant rules — defaults are unchanged.
 
 ### Limitations documented for future enhancement
