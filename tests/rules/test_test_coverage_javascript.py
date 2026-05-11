@@ -172,3 +172,46 @@ def test_js_changed_source_changed_spec_test_does_not_fire(tmp_path: Path) -> No
     with _cd(tmp_path):
         result = _enabled_engine(overrides).check_file(str(src))
     assert not any(v.code == "SAFE702" for v in result.violations)
+
+
+def test_js_test_file_does_not_fire_safe701(tmp_path: Path) -> None:
+    """Running SAFE701 on a test file itself doesn't fire.
+
+    Without the ``_is_test_file`` guard the rule would treat
+    ``foo.test.js`` as a source file and search for the
+    nonsensical ``foo.test.test.js``. With ``files: ^src/``
+    dropped from the published pre-commit hook in v1.13.0,
+    this guard is necessary so test edits don't trigger
+    self-referential violations.
+    """
+    with _cd(tmp_path):
+        test_file = tmp_path / "tests" / "foo.test.js"
+        test_file.parent.mkdir()
+        test_file.write_text("describe('foo', () => {});\n", encoding="utf-8")
+        result = _enabled_engine().check_file(str(test_file))
+        assert not any(v.code == "SAFE701" for v in result.violations)
+
+
+def test_js_spec_file_does_not_fire_safe701(tmp_path: Path) -> None:
+    """Same guard for Mocha-style ``.spec.js`` test files."""
+    with _cd(tmp_path):
+        test_file = tmp_path / "tests" / "foo.spec.js"
+        test_file.parent.mkdir()
+        test_file.write_text("describe('foo', () => {});\n", encoding="utf-8")
+        result = _enabled_engine().check_file(str(test_file))
+        assert not any(v.code == "SAFE701" for v in result.violations)
+
+
+def test_js_inline_test_file_outside_test_dir_does_not_fire(tmp_path: Path) -> None:
+    """Inline test (``src/foo/foo.test.js``) is recognised by filename pattern.
+
+    Some projects collocate tests next to source rather than using a
+    dedicated ``tests/`` tree — the filename match catches those even
+    when path-component lookup wouldn't.
+    """
+    with _cd(tmp_path):
+        inline = tmp_path / "src" / "foo.test.js"
+        inline.parent.mkdir()
+        inline.write_text("describe('foo', () => {});\n", encoding="utf-8")
+        result = _enabled_engine().check_file(str(inline))
+        assert not any(v.code == "SAFE701" for v in result.violations)

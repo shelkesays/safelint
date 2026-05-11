@@ -65,6 +65,37 @@ def _find_test_file(src_path: Path, test_dirs: list[str], lang_name: str) -> boo
     return any(_test_dir_contains(Path(d), candidates) for d in test_dirs)
 
 
+def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
+    """Return True if *filepath* is itself a test file (so SAFE701/702 should not run on it).
+
+    Without this guard the test-coverage rules would treat a test file
+    as a source file and look for *its* paired test (e.g. ``tests/foo.test.js``
+    would search for ``foo.test.test.js``, ``tests/test_bar.py`` would
+    search for ``test_test_bar.py``). With ``files: ^src/`` dropped
+    from the published pre-commit hook in v1.13.0, the rules now reach
+    test files in any project that doesn't restore the filter locally,
+    making this false-positive guard necessary.
+
+    Two checks, OR'd together:
+
+    1. **Path-component match.** ``filepath`` lives under any
+       configured ``test_dirs`` entry — covers test files even if
+       their filenames don't follow the pattern convention
+       (``conftest.py``, ``__init__.py``, fixtures, helpers).
+    2. **Filename-pattern match.** The bare filename matches the
+       language's test-file convention — covers tests written
+       inline alongside source (some projects do
+       ``src/foo/foo.test.js``).
+    """
+    path = Path(filepath)
+    if any(td in path.parts for td in test_dirs):
+        return True
+    name = path.name
+    if lang_name == "javascript":
+        return ".test." in name or ".spec." in name
+    return name.startswith("test_")
+
+
 def _test_dir_contains(test_dir: Path, candidates: list[str]) -> bool:
     """Return True if any candidate filename exists anywhere under *test_dir*.
 
@@ -88,9 +119,13 @@ class TestExistenceRule(BaseRule):
         """Return a violation when no matching test file can be found.
 
         Filename pattern is language-aware — see :func:`_candidate_test_filenames`.
+        Skips test files themselves (see :func:`_is_test_file`) so we
+        don't ask a test to have its own test.
         """
         lang_name = resolve_lang_name(filepath)
         test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
+        if _is_test_file(filepath, test_dirs, lang_name):
+            return []
         src = Path(filepath)
         if _find_test_file(src, test_dirs, lang_name):
             return []
@@ -131,6 +166,11 @@ class TestCouplingRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
 
         test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
+        # A test file isn't a source file with a paired test — skip
+        # the coupling check rather than asking the test file's own
+        # test to also change.
+        if _is_test_file(filepath, test_dirs, lang_name):
+            return []
         changed: set[str] = set(self.config["_changed_files"])
         src = Path(filepath)
 
