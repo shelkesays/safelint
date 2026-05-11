@@ -85,6 +85,26 @@ def _python_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None
     return None
 
 
+def _unwrap_parenthesized(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Strip every layer of ``parenthesized_expression`` around *node*.
+
+    Parentheses don't change the underlying ownership chain in JS —
+    ``(globalThis).x`` writes to the same object as ``globalThis.x``,
+    and ``((process).env).NODE_ENV`` is the same write as
+    ``process.env.NODE_ENV``. Without unwrapping, every left-walk step
+    that lands on a parenthesised expression would break the
+    bare-identifier check at the end of
+    :func:`_javascript_global_namespace_root` (and the LHS-type filter
+    in :meth:`GlobalMutationRule._javascript_violations_for_func`)
+    and silently skip the violation.
+    """
+    cur = node
+    while cur is not None and cur.type == "parenthesized_expression":  # nosafe: SAFE501
+        named = cur.named_children
+        cur = named[0] if named else None
+    return cur
+
+
 def _javascript_global_namespace_root(target: tree_sitter.Node) -> str | None:
     """Walk a member / subscript chain leftward and return the root identifier name.
 
@@ -94,6 +114,8 @@ def _javascript_global_namespace_root(target: tree_sitter.Node) -> str | None:
     For ``window["config"]["x"]``         → ``"window"`` (chained subscripts).
     For ``process.env.NODE_ENV``          → ``"process"``.
     For ``process.env["NODE_ENV"]``       → ``"process"`` (mixed dot + bracket).
+    For ``(globalThis).x``                → ``"globalThis"`` (paren-wrapped root).
+    For ``((process).env).NODE_ENV``      → ``"process"`` (nested paren steps).
     For ``somelocal.field``               → ``"somelocal"`` (caller filters by namespace list).
     For ``arr[0]().field``                → ``None`` (call result breaks the bare-identifier chain).
 
@@ -101,10 +123,12 @@ def _javascript_global_namespace_root(target: tree_sitter.Node) -> str | None:
     (e.g. the receiver is a call result, ``this``, etc.). ``member_expression``
     and ``subscript_expression`` are walked uniformly because they share the
     ``object`` field name and serve the same ownership-chain semantics.
+    Parentheses are unwrapped on entry and after each leftward step
+    because they do not change the underlying ownership chain.
     """
-    cur: tree_sitter.Node | None = target
+    cur = _unwrap_parenthesized(target)
     while cur is not None and cur.type in ("member_expression", "subscript_expression"):  # nosafe: SAFE501
-        cur = cur.child_by_field_name("object")
+        cur = _unwrap_parenthesized(cur.child_by_field_name("object"))
     if cur is None or cur.type != "identifier":
         return None
     return node_text(cur)
@@ -231,6 +255,12 @@ class GlobalMutationRule(BaseRule):
             # the ``left`` field for the LHS; ``update_expression`` (``x++`` /
             # ``--y``) uses ``argument`` for the operand.
             target = node.child_by_field_name("argument") if node.type == "update_expression" else node.child_by_field_name("left")
+            # Unwrap a paren-wrapped target so ``(globalThis.x) = 1``
+            # and ``((process).exitCode)++`` are recognised — without
+            # this the LHS-type filter would reject the
+            # ``parenthesized_expression`` wrapper and skip the write
+            # entirely.
+            target = _unwrap_parenthesized(target)
             if target is None or target.type not in ("member_expression", "subscript_expression"):
                 continue
             root = _javascript_global_namespace_root(target)
