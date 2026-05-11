@@ -1,4 +1,4 @@
-"""State & purity rules: global_state and global_mutation."""
+"""State & purity rules: global_state (SAFE301, Python-only), global_mutation (SAFE302), and wide_scope_declaration (SAFE305, JavaScript-only)."""
 
 from __future__ import annotations
 
