@@ -11,7 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import resolve_lang_name, walk
+from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
@@ -70,6 +70,84 @@ _BREAK_SCOPE_BOUNDARIES_BY_LANG: dict[str, tuple[str, ...]] = {
 }
 
 
+def _outer_while_label(while_node: tree_sitter.Node) -> str | None:
+    """Return the label name if *while_node* is the body of a ``labeled_statement``.
+
+    JavaScript ``outer: while (true) { ... }`` parses as a
+    ``labeled_statement`` wrapping the ``while_statement``. A
+    ``break outer;`` inside a nested loop / switch is the labelled
+    form of breaking out — we need the label name to recognise
+    that break as exiting *this* while. Python has no labelled-
+    break construct so this helper returns None on Python (no
+    ``labeled_statement`` parent ever appears).
+    """
+    parent = while_node.parent
+    if parent is None or parent.type != "labeled_statement":
+        return None
+    label = parent.child_by_field_name("label")
+    return node_text(label) if label is not None else None
+
+
+def _is_unlabelled_break(break_node: tree_sitter.Node, lang_name: str) -> bool:
+    """Return True if *break_node* is a bare ``break`` (no label).
+
+    Python ``break`` is always unlabelled. JavaScript ``break`` may
+    carry a ``statement_identifier`` child (the labelled form
+    ``break outer;``) — those count only via the labelled-break
+    path, not the direct-scope path.
+    """
+    if lang_name != "javascript":
+        return True
+    return not any(child.type == "statement_identifier" for child in break_node.named_children)
+
+
+def _has_direct_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
+    """Return True if *while_node* contains an unlabelled break in direct scope.
+
+    The pruned walk skips nested loops / switches / functions so
+    their own breaks don't falsely satisfy this outer while.
+    """
+    boundaries = _BREAK_SCOPE_BOUNDARIES_BY_LANG[lang_name]
+    break_type = _BREAK_STATEMENT_BY_LANG[lang_name]
+    return any(c.type == break_type and _is_unlabelled_break(c, lang_name) for c in walk(while_node, skip_types=boundaries))
+
+
+def _has_labelled_break_to(while_node: tree_sitter.Node, label: str) -> bool:
+    """Return True if any ``break <label>;`` inside *while_node* targets *label* (JavaScript).
+
+    Walks without pruning loops / switches — labelled breaks legally
+    cross those — but does prune function bodies, because in JS
+    labels don't cross function scope (a labelled break inside a
+    nested function is a SyntaxError).
+    """
+    function_boundaries = tuple(sorted(_JS_FUNCTION_TYPES))
+    for c in walk(while_node, skip_types=function_boundaries):
+        if c.type != "break_statement":
+            continue
+        if any(child.type == "statement_identifier" and node_text(child) == label for child in c.named_children):
+            return True
+    return False
+
+
+def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
+    """Return True if *while_node*'s body contains a break that exits it.
+
+    Two cases, OR'd together: an unlabelled break in direct scope
+    (see :func:`_has_direct_break`), or — JavaScript only — a
+    labelled break targeting this while's own label
+    (``outer: while (true) { for (...) { break outer; } }`` —
+    see :func:`_has_labelled_break_to`).
+    """
+    if _has_direct_break(while_node, lang_name):
+        return True
+    if lang_name != "javascript":
+        return False
+    label = _outer_while_label(while_node)
+    if label is None:
+        return False
+    return _has_labelled_break_to(while_node, label)
+
+
 class UnboundedLoopRule(BaseRule):
     """Flag while loops that lack a provable bound.
 
@@ -109,10 +187,7 @@ class UnboundedLoopRule(BaseRule):
 
         is_literal_true = condition.type == _TRUE_LITERAL_BY_LANG[lang_name]
         if is_literal_true:
-            boundaries = _BREAK_SCOPE_BOUNDARIES_BY_LANG[lang_name]
-            break_type = _BREAK_STATEMENT_BY_LANG[lang_name]
-            has_break = any(c.type == break_type for c in walk(node, skip_types=boundaries))
-            if not has_break:
+            if not _has_exiting_break(node, lang_name):
                 # Match the violation message to the source language's
                 # surface syntax — Python's ``while True:`` and
                 # JavaScript's ``while (true)`` are the same hazard but

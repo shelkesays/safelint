@@ -150,3 +150,82 @@ def test_js_while_true_no_break_message_uses_js_syntax(tmp_path: Path) -> None:
     assert len(safe501) == 1
     assert "while (true)" in safe501[0].message
     assert "while True" not in safe501[0].message
+
+
+def test_js_labeled_break_from_nested_for_exits_outer_while(tmp_path: Path) -> None:
+    """``outer: while (true) { for (...) { break outer; } }`` — labelled break exits the while.
+
+    Regression guard: the pruned walk prunes nested loops wholesale,
+    so a labelled break inside a nested ``for`` would otherwise be
+    invisible to the rule and the outer ``while (true)`` would be
+    flagged as having no exit. This is a real false-positive that
+    automated reformatters / refactors can introduce (extracting a
+    loop into a nested loop with a labelled break is a common
+    pattern in algorithm code).
+    """
+    sample = tmp_path / "labeled.js"
+    sample.write_text(
+        "function f(items, target) {\n"
+        "  outer: while (true) {\n"
+        "    for (const item of items) {\n"
+        "      if (item === target) { break outer; }\n"
+        "      process(item);\n"
+        "    }\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE501" for v in result.violations)
+
+
+def test_js_labeled_break_from_nested_switch_exits_outer_while(tmp_path: Path) -> None:
+    """Same fix applies to labelled breaks from inside a ``switch`` — also a pruned construct."""
+    sample = tmp_path / "labeled_switch.js"
+    sample.write_text(
+        "function f(token) {\n"
+        "  outer: while (true) {\n"
+        "    switch (token.type) {\n"
+        "      case 'END': break outer;\n"
+        "      default: token = next(token);\n"
+        "    }\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert not any(v.code == "SAFE501" for v in result.violations)
+
+
+def test_js_labeled_break_to_different_label_still_fires(tmp_path: Path) -> None:
+    """A labelled break targeting a *different* label doesn't satisfy our while.
+
+    ``outer: while (true) { inner: for (...) { break inner; } }`` —
+    ``break inner`` exits the for, not the while. The outer
+    ``while (true)`` has no exit and should still fire SAFE501.
+    """
+    sample = tmp_path / "labeled_other.js"
+    sample.write_text(
+        "function f(items) {\n"
+        "  outer: while (true) {\n"
+        "    inner: for (const item of items) {\n"
+        "      if (item.done) { break inner; }\n"
+        "      process(item);\n"
+        "    }\n"
+        "  }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE501" for v in result.violations)
+
+
+def test_js_unlabeled_while_unaffected(tmp_path: Path) -> None:
+    """A ``while (true)`` with no label and no break still fires — the new code path doesn't regress the existing case."""
+    sample = tmp_path / "unlabeled.js"
+    sample.write_text(
+        "function f() { while (true) { work(); } }\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE501" for v in result.violations)
