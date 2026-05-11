@@ -511,3 +511,25 @@ def test_js_taint_through_destructuring_default_fires(tmp_path: Path) -> None:
     result = _enabled_engine("tainted_sink").check_file(str(sample))
     safe801 = [v for v in result.violations if v.code == "SAFE801"]
     assert len(safe801) == 1
+
+
+def test_js_null_dereference_message_uses_js_syntax(tmp_path: Path) -> None:
+    """SAFE803 message on a JS file says ``null check`` / ``?.``, not Python's ``None check``.
+
+    The hazard is identical (the call can return null/undefined, the
+    immediate dereference will crash), but the surface idioms differ.
+    A Python-flavored ``if result is not None`` recommendation in JS
+    violation output looks like a bug or copy-paste mistake.
+    """
+    sample = tmp_path / "msg.js"
+    sample.write_text(
+        "function f(el) {\n  const x = el.getElementById('id').textContent;\n  return x;\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("null_dereference").check_file(str(sample))
+    safe803 = [v for v in result.violations if v.code == "SAFE803"]
+    assert len(safe803) == 1
+    assert "null check" in safe803[0].message
+    assert "?." in safe803[0].message
+    assert "None" not in safe803[0].message
+    assert "is not None" not in safe803[0].message
