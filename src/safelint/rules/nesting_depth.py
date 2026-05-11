@@ -11,6 +11,7 @@ from safelint.languages.python import (
     FOR_STATEMENT,
     FUNCTION_DEF,
     IF_STATEMENT,
+    MATCH_STATEMENT,
     TRY_STATEMENT,
     WHILE_STATEMENT,
     WITH_STATEMENT,
@@ -30,14 +31,16 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 }
 
 # Per-language node-type sets that count as one nesting step.
-# Python: ``if/for/while/with/try``. ``elif_clause`` is *not* in this set —
-# in Tree-sitter's Python grammar elif is its own node type, so it does not
-# double-count like it did with ``ast``-module representation.
-# JavaScript: same plus ``do_statement`` and ``switch_statement``;
+# Python: ``if`` / ``for`` / ``while`` / ``with`` / ``try`` / ``match``
+# (PEP 634, Python 3.10+ — safelint requires 3.11+ so the construct is
+# always available). ``elif_clause`` is *not* in this set — in
+# Tree-sitter's Python grammar elif is its own node type, so it does
+# not double-count like it did with ``ast``-module representation.
+# JavaScript: same shape plus ``do_statement`` and ``switch_statement``;
 # ``for_in_statement`` covers both ``for...in`` and ``for...of`` in
 # tree-sitter-javascript.
 _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({IF_STATEMENT, FOR_STATEMENT, WHILE_STATEMENT, WITH_STATEMENT, TRY_STATEMENT}),
+    "python": frozenset({IF_STATEMENT, FOR_STATEMENT, WHILE_STATEMENT, WITH_STATEMENT, TRY_STATEMENT, MATCH_STATEMENT}),
     "javascript": frozenset({"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"}),
 }
 
