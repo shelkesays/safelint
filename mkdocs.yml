@@ -1,5 +1,5 @@
 site_name: SafeLint
-site_description: Holzmann Power-of-Ten safety lint rules for modern Python
+site_description: Holzmann Power-of-Ten safety lint rules for modern Python and JavaScript
 site_url: https://shelkesays.github.io/safelint/
 site_author: Rahul Shelke
 repo_url: https://github.com/shelkesays/safelint
