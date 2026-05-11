@@ -2324,3 +2324,47 @@ def test_cli_check_only_in_target_files_linted(tmp_path: Path, mocker) -> None:
     # Target is src/ only — test_mod.py must not be linted
     args = argparse.Namespace(target=src_dir, config=None, fail_on="error", mode=None, all_files=False, ignore=None)
     assert _run_check(args) == 0
+
+
+def test_test_coupling_handles_relative_changed_files_against_absolute_test_dirs(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """SAFE702 must recognise paired-test updates when changed_files are relative but test_dirs is absolute.
+
+    Real-world case: the CLI passes ``--changed-files`` relative-to-cwd
+    (``tests/test_foo.py``), but the user's pyproject configures
+    ``test_dirs = ["/abs/path/tests"]`` (absolute). Without normalising
+    both sides via ``.absolute()`` before the path-component
+    comparison, the test_dirs gate would reject the relative changed
+    file and SAFE702 would falsely fire even though the paired test
+    *was* updated in the same commit.
+    """
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    sample = src_dir / "mymodule.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    test_file = test_dir / "test_mymodule.py"
+    test_file.write_text("def test_x(): pass\n", encoding="utf-8")
+
+    # changed_files passes the paired test as a RELATIVE path
+    # (against tmp_path) while test_dirs is ABSOLUTE.
+    monkeypatch.chdir(tmp_path)
+    config = deep_merge(
+        DEFAULTS,
+        {
+            "rules": {
+                "test_coupling": {
+                    "enabled": True,
+                    "test_dirs": [str(test_dir)],  # absolute
+                    "_changed_files": [str(sample), "tests/test_mymodule.py"],  # mixed
+                }
+            }
+        },
+    )
+    engine = SafetyEngine(config)
+    violations = engine.check_file(str(sample)).violations
+
+    # The relative ``tests/test_mymodule.py`` must be recognised as
+    # under the absolute ``test_dirs`` entry — coupling satisfied,
+    # SAFE702 must NOT fire.
+    assert not any(v.rule == "test_coupling" for v in violations)

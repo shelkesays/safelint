@@ -221,8 +221,15 @@ class TestCouplingRule(BaseRule):
         # paths whose components include a ``test_dirs`` entry as a
         # contiguous subsequence — the same logic ``_is_test_file``
         # uses — fixes the false-negative.
+        #
+        # Both sides are normalised via ``.absolute()`` before the
+        # parts comparison so a relative ``changed_files`` entry
+        # (CLI passes relative paths when possible) and an absolute
+        # ``test_dirs`` entry (user-configured) still match. Mirrors
+        # the normalisation in ``_is_test_file``.
         candidates = _candidate_test_filenames(src, lang_name)
-        changed_under_test_dirs = {f for f in changed if any(_path_components_contain(Path(f).parts, Path(td).parts) for td in test_dirs)}
+        td_parts_list = [Path(td).absolute().parts for td in test_dirs]
+        changed_under_test_dirs = {f for f in changed if any(_path_components_contain(Path(f).absolute().parts, td_parts) for td_parts in td_parts_list)}
         changed_basenames = {Path(f).name for f in changed_under_test_dirs}
         if any(candidate in changed_basenames for candidate in candidates):
             return []
