@@ -1,4 +1,9 @@
-"""resource_lifecycle rule - tracked resource functions must use context managers."""
+"""resource_lifecycle rule - tracked resource functions must be wrapped in cleanup-guaranteed scope.
+
+Cross-language: Python requires a ``with`` block (context manager);
+JavaScript requires a ``try { ... } finally { ... }`` somewhere up the
+AST ancestor chain.
+"""
 
 from __future__ import annotations
 

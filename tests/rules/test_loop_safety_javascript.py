@@ -131,3 +131,22 @@ def test_js_while_double_parens_true_with_break_does_not_fire(tmp_path: Path) ->
     )
     result = _engine().check_file(str(sample))
     assert not any(v.code == "SAFE501" for v in result.violations)
+
+
+def test_js_while_true_no_break_message_uses_js_syntax(tmp_path: Path) -> None:
+    """SAFE501 message on a JS file says ``while (true)``, not ``while True``.
+
+    The hazard is the same in both languages but the surface syntax
+    differs — a Python-flavored ``while True`` message in a JS
+    violation block would be visually jarring and look like a bug.
+    """
+    sample = tmp_path / "msg.js"
+    sample.write_text(
+        "function f() { while (true) { work(); } }\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    safe501 = [v for v in result.violations if v.code == "SAFE501"]
+    assert len(safe501) == 1
+    assert "while (true)" in safe501[0].message
+    assert "while True" not in safe501[0].message
