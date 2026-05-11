@@ -1977,6 +1977,29 @@ def test_nesting_depth_elif_chain_not_deeper(tmp_path: Path) -> None:
     assert not any(v.rule == "nesting_depth" for v in violations)
 
 
+def test_nesting_depth_match_statement_counts(tmp_path: Path) -> None:
+    """PEP 634 ``match`` is control-flow and contributes to nesting depth.
+
+    A ``for`` containing a ``match`` containing an ``if`` is 3 levels
+    deep — without ``match_statement`` in the depth-node set, the rule
+    would silently miss this and let users exceed the configured depth.
+    """
+    source = textwrap.dedent("""\
+        def foo(items):
+            for item in items:
+                match item:
+                    case {"type": "x"}:
+                        if item.get("ready"):
+                            process(item)
+    """)
+    sample = tmp_path / "match.py"
+    sample.write_text(source, encoding="utf-8")
+
+    # max_depth default is 2; the for/match/if nesting reaches 3
+    violations = _engine().check_file(str(sample)).violations
+    assert any(v.rule == "nesting_depth" for v in violations)
+
+
 # ---------------------------------------------------------------------------
 # SideEffectsHiddenRule: subscript call and no-io-call paths
 # ---------------------------------------------------------------------------

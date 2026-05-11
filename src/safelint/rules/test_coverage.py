@@ -110,9 +110,16 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
        inline alongside source (some projects do
        ``src/foo/foo.test.js``).
     """
-    path_parts = Path(filepath).parts
+    # Normalise both sides to absolute paths before the parts comparison.
+    # Without this, a relative ``filepath`` (``tests/conftest.js``) wouldn't
+    # match against an absolute ``test_dirs`` entry (``/abs/project/tests``)
+    # and helper files under the test root would be misclassified as
+    # source — triggering false-positive SAFE701/702 violations. Using
+    # ``.absolute()`` (not ``.resolve()``) avoids following symlinks, which
+    # is what we want for path-component comparison.
+    path_parts = Path(filepath).absolute().parts
     for td in test_dirs:
-        td_parts = Path(td).parts
+        td_parts = Path(td).absolute().parts
         if _path_components_contain(path_parts, td_parts):
             return True
     name = Path(filepath).name
