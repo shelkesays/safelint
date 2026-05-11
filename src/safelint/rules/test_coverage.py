@@ -65,6 +65,24 @@ def _find_test_file(src_path: Path, test_dirs: list[str], lang_name: str) -> boo
     return any(_test_dir_contains(Path(d), candidates) for d in test_dirs)
 
 
+def _path_components_contain(haystack: tuple[str, ...], needle: tuple[str, ...]) -> bool:
+    """Return True if *needle* appears as a contiguous subsequence in *haystack*.
+
+    Used by :func:`_is_test_file` to recognise test-dir membership for
+    multi-component (``"tests/unit"``) and absolute (``"/abs/path/tests"``)
+    ``test_dirs`` entries. ``Path(td).parts`` produces a tuple per
+    component, and matching the whole tuple as a contiguous slice of
+    ``Path(filepath).parts`` correctly handles both single-component
+    (``"tests"``) and nested (``"tests/unit"``) forms — a plain
+    ``in path.parts`` membership check would only match the
+    single-component case.
+    """
+    if not needle:
+        return False
+    n = len(needle)
+    return any(haystack[i:i + n] == needle for i in range(len(haystack) - n + 1))
+
+
 def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
     """Return True if *filepath* is itself a test file (so SAFE701/702 should not run on it).
 
@@ -82,15 +100,22 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
        configured ``test_dirs`` entry — covers test files even if
        their filenames don't follow the pattern convention
        (``conftest.py``, ``__init__.py``, fixtures, helpers).
+       Handles multi-component entries (``"tests/unit"``,
+       ``"packages/foo/tests"``) and absolute paths
+       (``"/abs/path/tests"``) by matching each ``test_dirs`` entry's
+       full ``Path.parts`` tuple as a contiguous subsequence of the
+       filepath's parts.
     2. **Filename-pattern match.** The bare filename matches the
        language's test-file convention — covers tests written
        inline alongside source (some projects do
        ``src/foo/foo.test.js``).
     """
-    path = Path(filepath)
-    if any(td in path.parts for td in test_dirs):
-        return True
-    name = path.name
+    path_parts = Path(filepath).parts
+    for td in test_dirs:
+        td_parts = Path(td).parts
+        if _path_components_contain(path_parts, td_parts):
+            return True
+    name = Path(filepath).name
     if lang_name == "javascript":
         return ".test." in name or ".spec." in name
     return name.startswith("test_")
