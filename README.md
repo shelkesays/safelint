@@ -43,16 +43,18 @@ In 1987, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly fo
 |---|---|---|---|
 | 1 | No complex control flow - no `goto`, no deep recursion | `nesting_depth`, `complexity` | [SAFE102](https://shelkesays.github.io/safelint/configuration/rules/#safe102-nesting_depth), [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity) |
 | 2 | All loops must have a fixed upper bound | `unbounded_loops` | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) |
-| 3 | No dynamic memory allocation after startup | - | *(not applicable to Python)* |
+| 3 | No dynamic memory allocation after startup | `resource_lifecycle` | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) — *adapted: managed runtimes allocate dynamically by default; the rule becomes "acquired resources must have guaranteed cleanup"* |
 | 4 | Functions must fit on one printed page | `function_length` | [SAFE101](https://shelkesays.github.io/safelint/configuration/rules/#safe101-function_length) |
 | 5 | Use at least two assertions per function | `missing_assertions` | [SAFE601](https://shelkesays.github.io/safelint/configuration/rules/#safe601-missing_assertions) |
-| 6 | Declare variables at the smallest scope | - | *(Python handles this)* |
-| 7 | Check the return value of every non-void function | `return_value_ignored`, `bare_except`, `empty_except` | [SAFE802](https://shelkesays.github.io/safelint/configuration/rules/#safe802-return_value_ignored), [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except), [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except) |
-| 8 | Limit preprocessor use | - | *(not applicable to Python)* |
+| 6 | Declare variables at the smallest scope | `wide_scope_declaration` | [SAFE305](https://shelkesays.github.io/safelint/configuration/rules/#safe305-wide_scope_declaration) *(JavaScript — `var` → `let` / `const`; Python's lexical scoping handles this natively)* |
+| 7 | Check the return value of every non-void function | `return_value_ignored`, `bare_except`, `empty_except`, `logging_on_error` | [SAFE802](https://shelkesays.github.io/safelint/configuration/rules/#safe802-return_value_ignored), [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except), [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except), [SAFE203](https://shelkesays.github.io/safelint/configuration/rules/#safe203-logging_on_error) |
+| 8 | Limit preprocessor use | - | *(not applicable to Python or JavaScript)* |
 | 9 | Restrict pointer use - no chained indirection | `null_dereference` | [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference) |
 | 10 | Compile with all warnings; use static analysis | SafeLint itself | - |
 
 Original paper: [spinroot.com/gerard/pdf/P10.pdf](https://spinroot.com/gerard/pdf/P10.pdf)
+
+SafeLint also ships several rules that go beyond Holzmann's original ten — modern additions for state purity (`global_state` / `global_mutation` for shared-state writes), hidden side effects (`side_effects_hidden` / `side_effects` for I/O lurking behind pure-sounding names), dataflow taint (`tainted_sink` for unsanitised input reaching `eval` / `exec` / equivalents), and test discipline (`test_existence` / `test_coupling` for paired-test enforcement). See the [full rules reference](https://shelkesays.github.io/safelint/configuration/rules/) for every rule with examples and configuration.
 
 ---
 
