@@ -349,7 +349,7 @@ class SafetyEngine:
         rules_cfg: dict[str, Any] = config.get("rules", {})
         exec_cfg: dict[str, Any] = config.get("execution", {})
         self.fail_fast: bool = exec_cfg.get("fail_fast", False)
-        self.exclude_paths: list[str] = config.get("exclude_paths", [])
+        self.exclude_paths: list[str] = self._resolve_exclude_paths(config)
         self.max_file_size_bytes: int = self._resolve_max_file_size_bytes(config)
 
         raw_ignore = config.get("ignore", [])
@@ -415,6 +415,38 @@ class SafetyEngine:
                 rule_cfg["_changed_files"] = changed_files
             active_rules.append(cls(rule_cfg))
         return sorted(active_rules, key=lambda r: order_index.get(r.name, len(order)))
+
+    @staticmethod
+    def _resolve_exclude_paths(config: dict[str, Any]) -> list[str]:
+        """Resolve the active exclude-path list from *config*.
+
+        Two keys participate:
+
+        * ``exclude_paths`` — replaces the built-in defaults entirely.
+          The standard pattern when a project wants tight control over
+          what's linted (or wants to clear defaults with ``[]``).
+        * ``extend_exclude_paths`` — appended to whatever ``exclude_paths``
+          resolves to. The standard pattern for projects that want the
+          built-in vendor-dir defaults plus a few project-specific
+          additions.
+
+        Both keys must be lists of strings; a bare-string typo
+        (``exclude_paths = "build/**"``) would otherwise be silently
+        coerced to a list of single characters and exclude nothing.
+        Fail loud instead.
+        """
+        base = config.get("exclude_paths", DEFAULTS["exclude_paths"])
+        extend = config.get("extend_exclude_paths", [])
+        for key, value in (("exclude_paths", base), ("extend_exclude_paths", extend)):
+            if not isinstance(value, (list, tuple)):
+                msg = f"{key} must be a list of strings, got {type(value).__name__}"
+                raise TypeError(msg)
+            non_strings = [e for e in value if not isinstance(e, str)]
+            if non_strings:
+                bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
+                msg = f"{key} must contain only strings — got: {bad}"
+                raise TypeError(msg)
+        return [*base, *extend]
 
     @staticmethod
     def _resolve_max_file_size_bytes(config: dict[str, Any]) -> int:

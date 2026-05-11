@@ -12,7 +12,8 @@ For per-rule TOML options (`[tool.safelint.rules.<name>]`) see the [Rules refere
 |---|---|---|
 | `mode` | `"local"` | Sets the default failure threshold. `"local"` = only errors block. `"ci"` = warnings block too. |
 | `fail_on` | `"error"` | Minimum severity that blocks the run. `"error"` or `"warning"`. Overrides `mode`. |
-| `exclude_paths` | `[]` | Glob patterns for files to skip entirely, e.g. `["tests/**", "migrations/**"]`. |
+| `exclude_paths` | (see [defaults](#default-exclude-paths)) | Glob patterns for files / directories to skip entirely. **Setting this in your config REPLACES the built-in defaults** — use `extend_exclude_paths` instead if you want to keep them. |
+| `extend_exclude_paths` | `[]` | Glob patterns appended to whatever `exclude_paths` resolves to. Use this for project-specific excludes when you want to keep the vendor-dir defaults active. |
 | `ignore` | `[]` | List of rule codes or names to suppress globally across the entire project. |
 | `per_file_ignores` | `{}` | Map of glob pattern → list of codes/names to suppress only for matching files. |
 | `max_file_size_bytes` | `5242880` (5 MiB) | Skip files larger than this many bytes with a `safelint: warning:` diagnostic instead of trying to parse them. Guards against OOM on accidentally-huge inputs (binary blobs masquerading as `.py`, very large generated parsers). To allow larger files, raise the bound explicitly — `0` is rejected as a likely typo and falls back to the default with a warning, since `0` would defeat the OOM guard entirely. Must be a non-negative integer. |
@@ -21,12 +22,55 @@ For per-rule TOML options (`[tool.safelint.rules.<name>]`) see the [Rules refere
 [tool.safelint]
 mode = "local"
 fail_on = "error"
-exclude_paths = ["tests/**", "docs/**"]
+# Keep the built-in vendor-dir defaults AND add tests/docs:
+extend_exclude_paths = ["tests/**", "docs/**"]
 ignore = ["SAFE203", "side_effects"]
 max_file_size_bytes = 5242880   # 5 MiB; raise explicitly to allow larger files
 
 [tool.safelint.per_file_ignores]
 "tests/**" = ["SAFE101", "SAFE103"]
+```
+
+## Default exclude paths
+
+SafeLint ships a built-in list of vendor and generated directories that almost no project wants linted. These are pruned during file discovery — `os.walk` doesn't even descend into them, so the cost of having them excluded is essentially free.
+
+**Built-in defaults** (each name expands to two patterns, `<name>/**` for top-level and `**/<name>/**` for nested occurrences):
+
+- **Python virtual environments:** `.venv`, `venv`
+- **Python test / build tooling:** `.tox`, `.nox`
+- **Python caches:** `__pycache__`, `.pytest_cache`, `.ruff_cache`, `.mypy_cache`, `.ty_cache`
+- **Python build outputs:** `build`, `dist`
+- **Coverage outputs:** `htmlcov`
+- **JavaScript / Node:** `node_modules`
+- **Site packages:** `site-packages` (defensive — sometimes pip installs into the project tree)
+
+### How to extend vs override
+
+Two related config keys control directory exclusion. Pick the one that matches your intent:
+
+| Key | Semantics | When to use |
+|---|---|---|
+| `exclude_paths` | **Replaces** the built-in defaults. The list you supply IS the final list. | Rare — only when you genuinely want to lint files under, say, `.venv/`. Setting `exclude_paths = []` (empty) explicitly clears every default. |
+| `extend_exclude_paths` | **Appends** to the built-in defaults. You keep `.venv/`, `node_modules/`, etc. excluded and add your project's extras. | The common case. Project has a `generated/` directory? `vendor/` checked-in deps? Add them here without losing the defaults. |
+
+```toml
+# pyproject.toml — typical project setup
+[tool.safelint]
+# Keeps .venv/, node_modules/, build/, etc. excluded by default,
+# adds tests/ and generated/ for this project.
+extend_exclude_paths = ["tests/**", "generated/**"]
+```
+
+```toml
+# safelint.toml (standalone) — same thing without the wrapper
+extend_exclude_paths = ["tests/**", "generated/**"]
+```
+
+```toml
+# Rare: opt-out of the built-in vendor-dir defaults entirely
+[tool.safelint]
+exclude_paths = []   # lints EVERYTHING, including .venv/ if present
 ```
 
 ## Global ignore list

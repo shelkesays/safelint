@@ -11,7 +11,14 @@
 
 mode = "local"    # "local" | "ci"
 fail_on = "warning" # "error" | "warning"
-exclude_paths = ["tests/**", "docs/**"]
+
+# Use ``extend_exclude_paths`` (additive) rather than ``exclude_paths``
+# (replaces defaults) so the built-in vendor-dir excludes
+# (.venv/, venv/, .tox/, node_modules/, __pycache__/, build/, dist/,
+# .pytest_cache/, .mypy_cache/, .ruff_cache/, htmlcov/, etc.) stay
+# active for this repo while we add a couple of project-specific
+# directories on top.
+extend_exclude_paths = ["tests/**", "docs/**"]
 
 [execution]
 fail_fast = false

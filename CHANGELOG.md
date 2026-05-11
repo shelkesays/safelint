@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0rc2] - 2026-05-11
+
+Second release candidate for v1.13.0. Builds on 1.13.0rc1 with one real-world papercut surfaced during validation: `safelint check --all-files` from a project root would trip over the project's own `.venv/`, producing thousands of violations from third-party packages. Default `exclude_paths` now prunes the common vendor / generated directories so that's a non-issue out of the box. Install with `pip install safelint==1.13.0rc2 --pre`.
+
+### Added
+
+- **Built-in `exclude_paths` defaults for common vendor / generated directories.** `safelint check` (and `--all-files`) no longer walks into `.venv/`, `venv/`, `.tox/`, `.nox/`, `__pycache__/`, `.pytest_cache/`, `.ruff_cache/`, `.mypy_cache/`, `.ty_cache/`, `build/`, `dist/`, `htmlcov/`, `node_modules/`, or `site-packages/` by default. Previously these were only excluded if the user listed them explicitly in their config — a `--all-files` run from a project root with a Python virtualenv at `.venv/` would lint thousands of third-party files. The defaults apply at the directory level (`os.walk` prunes descent), so the cost of having them excluded is essentially zero.
+- **New `extend_exclude_paths` config key.** Appends to the active exclude list rather than replacing it. Use this for project-specific excludes (`"generated/**"`, `"vendor/**"`, etc.) when you want to keep the built-in vendor-dir defaults. Sister to the existing `extend_tracked_functions` pattern for SAFE401 — same additive semantics, same shape.
+
+### Changed
+
+- **`exclude_paths` semantics** — setting `exclude_paths` in your config still replaces the built-in defaults wholesale (existing semantics — backwards-compatible). Most projects should migrate to `extend_exclude_paths` to keep the vendor-dir defaults active. See [Default exclude paths](https://shelkesays.github.io/safelint/configuration/toml/#default-exclude-paths) for the migration guide.
+
 ## [1.13.0rc1] - 2026-05-11
 
 Release candidate for v1.13.0. Same content as the upcoming 1.13.0 GA — published as an RC so the JavaScript support can be validated against real-world JS repositories before promoting to stable. Install with `pip install safelint==1.13.0rc1 --pre` (the `--pre` flag opts into pre-releases; `pip install safelint` without it keeps tracking 1.12.x). Promotion to 1.13.0 GA will happen after the validation window; if real-world testing surfaces issues, the changes will land in a 1.13.0rc2 (or later) before GA.
@@ -412,8 +425,9 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.13.0rc1...HEAD
-[1.13.0]: https://github.com/shelkesays/safelint/compare/v1.13.0rc1...v1.13.0
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.13.0rc2...HEAD
+[1.13.0]: https://github.com/shelkesays/safelint/compare/v1.13.0rc2...v1.13.0
+[1.13.0rc2]: https://github.com/shelkesays/safelint/compare/v1.13.0rc1...v1.13.0rc2
 [1.13.0rc1]: https://github.com/shelkesays/safelint/compare/v1.12.2...v1.13.0rc1
 [1.12.2]: https://github.com/shelkesays/safelint/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/shelkesays/safelint/compare/v1.12.0...v1.12.1
