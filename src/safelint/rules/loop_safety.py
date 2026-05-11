@@ -1,4 +1,11 @@
-"""loop_safety rule - while True must have a break; others must use comparisons."""
+"""loop_safety rule - infinite-truthy loops must have a break; others must use comparisons.
+
+Cross-language: Python ``while True:`` and JavaScript ``while (true)``
+are the same hazard — fires when no ``break`` reaches the loop. The
+non-comparison-condition heuristic stays Python-only (JS idioms like
+``while (queue.length)`` are commonly bounded — flagging them would
+be noise).
+"""
 
 from __future__ import annotations
 
@@ -106,10 +113,16 @@ class UnboundedLoopRule(BaseRule):
             break_type = _BREAK_STATEMENT_BY_LANG[lang_name]
             has_break = any(c.type == break_type for c in walk(node, skip_types=boundaries))
             if not has_break:
+                # Match the violation message to the source language's
+                # surface syntax — Python's ``while True:`` and
+                # JavaScript's ``while (true)`` are the same hazard but
+                # written differently. Same per-language wording pattern
+                # as ``EmptyExceptRule`` / ``LoggingOnErrorRule``.
+                construct = "while (true)" if lang_name == "javascript" else "while True"
                 return self._make_violation_for_node(
                     filepath,
                     node,
-                    "while True loop has no break - potential infinite loop",
+                    f"{construct} loop has no break - potential infinite loop",
                 )
             return None
 

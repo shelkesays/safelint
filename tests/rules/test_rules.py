@@ -473,6 +473,28 @@ def test_unbounded_loop_while_true_no_break(tmp_path: Path) -> None:
     assert any(v.rule == "unbounded_loops" for v in violations)
 
 
+def test_unbounded_loop_while_true_message_uses_python_syntax(tmp_path: Path) -> None:
+    """SAFE501 message on a Python file says ``while True``, not ``while (true)``.
+
+    Per-language wording: the same hazard exists in JS but is written
+    as ``while (true)``; the message must match the source file's
+    language to avoid mixed-syntax messages in violation output.
+    """
+    source = textwrap.dedent("""\
+        def poll():
+            while True:
+                pass
+    """)
+    sample = tmp_path / "msg.py"
+    sample.write_text(source, encoding="utf-8")
+
+    violations = _engine().check_file(str(sample)).violations
+    safe501 = [v for v in violations if v.code == "SAFE501"]
+    assert len(safe501) == 1
+    assert "while True" in safe501[0].message
+    assert "while (true)" not in safe501[0].message
+
+
 def test_unbounded_loop_while_true_with_break_is_safe(tmp_path: Path) -> None:
     """while True with a break does not trigger unbounded_loops."""
     source = textwrap.dedent("""\
