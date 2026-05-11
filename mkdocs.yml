@@ -88,6 +88,9 @@ markdown_extensions:
 # Site navigation --------------------------------------------------------------
 nav:
   - Home: index.md
+  - Languages:
+      - Python: languages/python.md
+      - JavaScript: languages/javascript.md
   - Configuration:
       - Overview: configuration/index.md
       - CLI flags and commands: configuration/cli.md
