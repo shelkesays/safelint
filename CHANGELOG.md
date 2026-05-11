@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.13.0rc1] - 2026-05-11
+
+Release candidate for v1.13.0. Same content as the upcoming 1.13.0 GA — published as an RC so the JavaScript support can be validated against real-world JS repositories before promoting to stable. Install with `pip install safelint==1.13.0rc1 --pre` (the `--pre` flag opts into pre-releases; `pip install safelint` without it keeps tracking 1.12.x). Promotion to 1.13.0 GA will happen after the validation window; if real-world testing surfaces issues, the changes will land in a 1.13.0rc2 (or later) before GA.
+
+The full feature list is in the [v1.13.0 section below](#1130---2026-05-09) — the GA changelog section will be updated to merge with this RC entry once promotion happens.
+
 ## [1.13.0] - 2026-05-09
 
 **JavaScript (Node) is now a supported language alongside Python.** Registry-driven multi-language support: `.js` / `.mjs` / `.cjs` files are discovered, parsed via Tree-sitter, and run against 17 of the 19 existing rules — plus one new JS-only rule (SAFE305 `wide_scope_declaration`) for a total of 20 rules safelint now ships. Python users see no behaviour change beyond the v1.12.2 `.pyw` bugfix; the additive language work is what justifies this release as `1.13.0` (per the project's semver rules: scope expansion is MINOR, never MAJOR).
