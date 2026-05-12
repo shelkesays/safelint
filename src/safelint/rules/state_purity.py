@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from safelint.core._validators import _validated_string_list
+from safelint.core._validators import _validated_string_list, get_per_language_config
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.javascript import VARIABLE_DECLARATION as _JS_VARIABLE_DECLARATION
@@ -307,7 +307,7 @@ class GlobalMutationRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
         if lang_name == "python":
             return self._python_check(filepath, tree)
-        return self._javascript_check(filepath, tree)
+        return self._javascript_check(filepath, tree, lang_name)
 
     def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run the Python-specific check (``global`` keyword + write)."""
@@ -316,20 +316,26 @@ class GlobalMutationRule(BaseRule):
             violations.extend(self._python_violations_for_func(filepath, func))
         return violations
 
-    def _javascript_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Run the JavaScript-specific check (assignment to ``globalThis.*`` / ``window.*`` / etc.).
+    def _javascript_check(self, filepath: str, tree: tree_sitter.Tree, lang_name: str) -> list[Violation]:
+        """Run the JS-family (JavaScript / TypeScript) check (assignment to ``globalThis.*`` / ``window.*`` / etc.).
 
-        Validates that ``global_namespaces_javascript`` is a list of strings
+        Validates that the resolved ``global_namespaces`` list is a list of strings
         before building the frozenset. A bare-string typo
         (``global_namespaces_javascript = "globalThis"``) would otherwise
         be silently coerced into a set of single characters and cause
         SAFE302 to stop matching any namespace — fail loud instead.
+
+        TypeScript inherits the JS global namespaces by default;
+        users can set ``global_namespaces_typescript`` for TS-only overrides.
         """
-        raw = self.config.get(
-            "global_namespaces_javascript",
-            self._DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT,
+        raw = get_per_language_config(
+            self.config,
+            "global_namespaces",
+            lang_name,
+            default=self._DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT,
         )
-        namespaces = frozenset(_validated_string_list(raw, "global_namespaces_javascript"))
+        error_key = f"global_namespaces_{lang_name}"
+        namespaces = frozenset(_validated_string_list(raw, error_key))
         violations: list[Violation] = []
         for func in _iter_javascript_functions(tree):
             violations.extend(self._javascript_violations_for_func(filepath, func, namespaces))

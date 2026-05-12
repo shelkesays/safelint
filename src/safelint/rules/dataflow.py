@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from safelint.analysis.dataflow import TaintTracker
 from safelint.analysis.dataflow_javascript import JsTaintTracker
+from safelint.core._validators import get_per_language_config
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
@@ -239,11 +240,17 @@ class TaintedSinkRule(BaseRule):
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 
-    def _javascript_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Run JavaScript taint analysis on every function in *tree*."""
-        sinks = frozenset(self.config.get("sinks_javascript", []))
-        sanitizers = frozenset(self.config.get("sanitizers_javascript", []))
-        sources = frozenset(self.config.get("sources_javascript", []))
+    def _javascript_check(self, filepath: str, tree: tree_sitter.Tree, lang_name: str) -> list[Violation]:
+        """Run JS-family (JavaScript or TypeScript) taint analysis on every function in *tree*.
+
+        TypeScript inherits the JavaScript sink / sanitizer / source
+        lists by default — same runtime, same threat surface. Users
+        can override with ``sinks_typescript`` etc. when they want
+        different behaviour for ``.ts`` files.
+        """
+        sinks = frozenset(get_per_language_config(self.config, "sinks", lang_name, default=[]))
+        sanitizers = frozenset(get_per_language_config(self.config, "sanitizers", lang_name, default=[]))
+        sources = frozenset(get_per_language_config(self.config, "sources", lang_name, default=[]))
         assume = self._resolve_assume_taint_preserving()
         violations: list[Violation] = []
         for node in walk(tree.root_node):
@@ -270,7 +277,7 @@ class TaintedSinkRule(BaseRule):
         """Run taint analysis on every function in *tree*, dispatching on language."""
         lang_name = resolve_lang_name(filepath)
         if lang_name in ("javascript", "typescript"):
-            return self._javascript_check(filepath, tree)
+            return self._javascript_check(filepath, tree, lang_name)
         return self._python_check(filepath, tree)
 
 
@@ -310,7 +317,11 @@ class ReturnValueIgnoredRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag bare calls whose return value is discarded."""
         lang_name = resolve_lang_name(filepath)
-        flagged = frozenset(self.config.get("flagged_calls", self._DEFAULT_FLAGGED)) if lang_name == "python" else frozenset(self.config.get("flagged_calls_javascript", []))
+        if lang_name == "python":
+            flagged = frozenset(self.config.get("flagged_calls", self._DEFAULT_FLAGGED))
+        else:
+            # JS-family (JS / TS): TypeScript inherits the JS list by default.
+            flagged = frozenset(get_per_language_config(self.config, "flagged_calls", lang_name, default=[]))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type != EXPRESSION_STATEMENT:
@@ -428,7 +439,8 @@ class NullDereferenceRule(BaseRule):
             nullable = self._DEFAULT_NULLABLE_PYTHON | frozenset(self.config.get("nullable_methods", []))
             deref_hit = self._python_deref_hit
         else:
-            nullable = frozenset(self.config.get("nullable_methods_javascript", []))
+            # JS-family (JS / TS): TypeScript inherits the JS list by default.
+            nullable = frozenset(get_per_language_config(self.config, "nullable_methods", lang_name, default=[]))
             deref_hit = self._javascript_deref_hit
         violations: list[Violation] = []
         for node in walk(tree.root_node):

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.core._validators import _validated_string_list
+from safelint.core._validators import _validated_string_list, get_per_language_config
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASSERT_STATEMENT, ASYNC_FUNCTION_DEF, FUNCTION_DEF
@@ -88,8 +88,11 @@ class MissingAssertionsRule(BaseRule):
         """
         if lang_name == "python":
             return _python_has_assertion(func_node, function_types)
-        raw = self.config.get("assertion_calls_javascript", [])
-        assertion_calls = frozenset(_validated_string_list(raw, "assertion_calls_javascript"))
+        # JS-family (JS / TS): TypeScript inherits the JS list by default
+        # via the TS→JS fallback in ``get_per_language_config``.
+        raw = get_per_language_config(self.config, "assertion_calls", lang_name, default=[])
+        error_key = f"assertion_calls_{lang_name}"
+        assertion_calls = frozenset(_validated_string_list(raw, error_key))
         return _javascript_has_assertion(func_node, function_types, assertion_calls)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:

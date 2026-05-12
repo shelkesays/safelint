@@ -313,9 +313,40 @@ runtime = "browser"
 sinks_javascript = ["eval", "Function", "myCustomDangerousFunction"]   # overrides the browser preset
 ```
 
-Unknown runtime names surface a `safelint: warning:` line on stderr and fall back to `node`. Pure WebAssembly (`.wat` / `.wasm`) and AssemblyScript are out of scope for this configuration — they would land as separate `LanguageDefinition` registrations, not as JavaScript runtimes.
+Unknown runtime names surface a `safelint: warning:` line on stderr and fall back to `node`. Pure WebAssembly (`.wat` / `.wasm`) is out of scope for this configuration. **AssemblyScript** (`.as`) is supported — it parses with the same Tree-sitter grammar as TypeScript and is treated as a TS variant; the runtime preset that applies depends on where the compiled WebAssembly module runs.
 
 Source-language analysis itself (the parser, the AST walks, the per-rule logic) is identical across runtimes — only the *defaults* change.
+
+### TypeScript and the `_javascript` config keys
+
+TypeScript (`.ts` / `.tsx` / `.as` files) **shares the JavaScript runtime presets** because TS compiles to JS at runtime — the sink lists, taint sources, global namespaces, and I/O primitives are properties of the runtime environment, not the source language.
+
+By default, every TS file reads the `_javascript`-suffixed config keys directly:
+
+| TS file reads | when … |
+|---|---|
+| `sinks_typescript` | the user has set it explicitly |
+| `sinks_javascript` | `sinks_typescript` is unset (the default — TS inherits the JS list) |
+| (the rule's built-in default) | neither is set |
+
+Same precedence applies to every other `_javascript`-suffixed key (`sanitizers_javascript`, `sources_javascript`, `tracked_functions_javascript`, `global_namespaces_javascript`, `io_functions_javascript`, `assertion_calls_javascript`, `nullable_methods_javascript`, `flagged_calls_javascript`).
+
+**Most projects don't need TS-specific config.** TS inherits JS defaults / overrides automatically — running `safelint check src/` on a mixed `.js` / `.ts` codebase gives the right behaviour out of the box. Set `_typescript`-suffixed keys only when you have a concrete reason for `.ts` files to behave differently from `.js` files in the same project (a stricter sink list for new TS code, a different test-framework's assertion functions, etc.).
+
+```toml
+# pyproject.toml — typical project (no TS-specific config needed)
+[tool.safelint.javascript]
+runtime = "node"
+
+[tool.safelint.rules.tainted_sink]
+sinks_javascript = ["eval", "Function", "myCustomDangerousFunction"]
+# Both .js and .ts files use this list — no _typescript key needed.
+
+# Rare: project wants stricter TS sinks (legacy JS keeps the JS list)
+[tool.safelint.rules.tainted_sink]
+sinks_javascript = ["eval", "Function"]                                      # legacy JS
+sinks_typescript = ["eval", "Function", "Object.assign", "innerHTML"]        # stricter for TS
+```
 
 ## Adoption path
 
