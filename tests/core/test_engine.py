@@ -134,9 +134,7 @@ def test_engine_default_excludes_prune_venv_during_discovery(tmp_path: Path) -> 
     discovered_paths = {r.path for r in discovered}
 
     assert str(src_dir / "app.py") in discovered_paths
-    assert not any(".venv" in p for p in discovered_paths), (
-        f".venv leaked into discovery: {[p for p in discovered_paths if '.venv' in p]}"
-    )
+    assert not any(".venv" in p for p in discovered_paths), f".venv leaked into discovery: {[p for p in discovered_paths if '.venv' in p]}"
 
 
 def test_engine_default_excludes_prune_node_modules(tmp_path: Path) -> None:
