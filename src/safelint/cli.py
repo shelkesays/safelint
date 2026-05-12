@@ -868,10 +868,7 @@ def _emit_skill_install_grammar_hint(target: Path) -> None:
     install = _compose_extras_install_command(needed_extras)
     plural = "" if len(needed_extras) == 1 else "s"
     extras_list = ", ".join(sorted(needed_extras))
-    _diagnostics.print_warning(
-        f"Detected source files for {len(needed_extras)} language{plural} ({extras_list}) "
-        f"whose tree-sitter grammar isn't installed. Run: {install}"
-    )
+    _diagnostics.print_warning(f"Detected source files for {len(needed_extras)} language{plural} ({extras_list}) whose tree-sitter grammar isn't installed. Run: {install}")
 
 
 def _emit_skill_freshness_warnings() -> None:
