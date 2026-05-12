@@ -45,33 +45,78 @@ SafeLint ships a built-in list of vendor and generated directories that almost n
 - **JavaScript / Node:** `node_modules`
 - **Site packages:** `site-packages` (defensive — sometimes pip installs into the project tree)
 
-### How to extend vs override
+### Two config keys: `exclude_paths` and `extend_exclude_paths`
 
-Two related config keys control directory exclusion. Pick the one that matches your intent:
+SafeLint lets you customise which directories are excluded through two TOML keys. **Both can coexist.** The right one to use depends on what you want to achieve. Here are the four scenarios you're likely to hit, ordered from most to least common:
 
-| Key | Semantics | When to use |
-|---|---|---|
-| `exclude_paths` | **Replaces** the built-in defaults. The list you supply IS the final list. | Rare — only when you genuinely want to lint files under, say, `.venv/`. Setting `exclude_paths = []` (empty) explicitly clears every default. |
-| `extend_exclude_paths` | **Appends** to the built-in defaults. You keep `.venv/`, `node_modules/`, etc. excluded and add your project's extras. | The common case. Project has a `generated/` directory? `vendor/` checked-in deps? Add them here without losing the defaults. |
+#### Scenario 1: "I want to keep the defaults and add my own dirs" → use `extend_exclude_paths`
+
+This is the **most common case**. SafeLint keeps excluding `.venv/`, `node_modules/`, `build/`, `dist/`, etc. (the built-in defaults above), and your patterns are added on top. Nothing is lost; everything you specify is added.
 
 ```toml
-# pyproject.toml — typical project setup
+# pyproject.toml — common case
 [tool.safelint]
-# Keeps .venv/, node_modules/, build/, etc. excluded by default,
-# adds tests/ and generated/ for this project.
+# .venv/, node_modules/, build/, dist/, __pycache__/, etc. STILL excluded
+# (built-in defaults preserved). Your additions stack on top.
 extend_exclude_paths = ["tests/**", "generated/**"]
 ```
 
-```toml
-# safelint.toml (standalone) — same thing without the wrapper
-extend_exclude_paths = ["tests/**", "generated/**"]
-```
+#### Scenario 2: "I want full control — define exactly what's excluded, ignore the defaults" → use `exclude_paths`
+
+Setting `exclude_paths` **replaces** the built-in defaults entirely. The list you supply IS the final list. SafeLint stops excluding `.venv/`, `node_modules/`, etc. unless you list them yourself.
 
 ```toml
-# Rare: opt-out of the built-in vendor-dir defaults entirely
+# pyproject.toml — power-user case
+[tool.safelint]
+# Built-in defaults REPLACED. SafeLint now only excludes what's in this list.
+# Note: .venv/ and node_modules/ are no longer excluded — add them yourself
+# if you don't want them linted.
+exclude_paths = ["build/**", "dist/**", "**/.venv/**", "**/node_modules/**"]
+```
+
+#### Scenario 3: "I want to lint files inside normally-excluded directories" (rare) → use `exclude_paths = []`
+
+Setting `exclude_paths` to an empty list explicitly clears every default. SafeLint walks into everything. Useful when you genuinely want to audit, say, a vendored library inside `.venv/`.
+
+```toml
+# pyproject.toml — opt out of all defaults
 [tool.safelint]
 exclude_paths = []   # lints EVERYTHING, including .venv/ if present
 ```
+
+#### Scenario 4: "I want a custom baseline AND personal additions" (advanced) → use both
+
+Real example: a project's checked-in `safelint.toml` defines a baseline via `exclude_paths`, and individual developers (or overlay configs) add their own dev-only excludes via `extend_exclude_paths` without modifying the project's baseline. The two keys compose — your additions stack on top of whatever `exclude_paths` resolves to.
+
+```toml
+# Project's safelint.toml (checked into git)
+exclude_paths = ["build/**", "dist/**", "vendor/**"]   # team-wide baseline
+
+# A developer's personal overlay can add:
+extend_exclude_paths = ["my-scratch/**", "experiments/**"]   # personal additions
+# Final exclude list = ["build/**", "dist/**", "vendor/**", "my-scratch/**", "experiments/**"]
+```
+
+### Resolution truth table
+
+For when you need the exact rule, the resolution is:
+
+> **final exclude list = (`exclude_paths` if set, else built-in defaults) + `extend_exclude_paths`**
+
+| `exclude_paths` setting | `extend_exclude_paths` setting | Final exclude list |
+|---|---|---|
+| (unset) | (unset) | Built-in vendor-dir defaults |
+| (unset) | `["generated/**"]` | Defaults + `generated/**` |
+| `["build/**"]` | (unset) | Just `build/**` (defaults dropped) |
+| `["build/**"]` | `["generated/**"]` | `build/**` + `generated/**` (defaults dropped; both user lists active) |
+| `[]` | (unset) | Empty — lints everything |
+| `[]` | `["generated/**"]` | Just `generated/**` (defaults dropped, only extend active) |
+
+### Rule of thumb
+
+- **If you can satisfy your needs with `extend_exclude_paths` alone, do that.** Most projects can. You inherit improvements to the built-in defaults automatically (e.g., if a future safelint version adds `.terraform/` to the defaults, your project gets it for free).
+- **Reach for `exclude_paths` only when you have a specific reason** to take control of the baseline (auditing vendored code, project policy requires explicit lists, etc.).
+- **Combine both when a project baseline and a personal overlay are both needed** — they're additive in the documented order.
 
 ## Global ignore list
 
@@ -174,7 +219,7 @@ The `per_file_ignores` key suppresses specific rules for files matching a glob p
 
 Both rule codes (e.g. `SAFE101`) and rule names (e.g. `function_length`) are accepted and can be mixed in the same list. Multiple patterns can match a file — their ignore lists are unioned. Suppressed violations are counted in the end-of-run summary alongside `# nosafe` suppressions.
 
-Patterns follow shell-glob semantics via Python's `fnmatch` module, where `**` matches any number of path segments (including zero), `*` matches within a single segment, and matching is case-sensitive on all platforms. The same dialect applies to `exclude_paths`.
+Patterns follow shell-glob semantics via Python's `fnmatch` module, where `**` matches any number of path segments (including zero), `*` matches within a single segment, and matching is case-sensitive on all platforms. The same dialect applies to `exclude_paths` and `extend_exclude_paths`.
 
 ### How it differs from other suppression mechanisms
 
@@ -184,7 +229,7 @@ Patterns follow shell-glob semantics via Python's `fnmatch` module, where `**` m
 | `ignore` | Project-wide | No | No |
 | `per_file_ignores` | Matching files only | Yes | Yes |
 | `# nosafe` | One line | Yes | Yes |
-| `exclude_paths` | Matching files only | No (file skipped) | No |
+| `exclude_paths` / `extend_exclude_paths` | Matching files only | No (file skipped) | No |
 
 Use `per_file_ignores` when a rule is valid for production code but noise in a specific context — for example, test files deliberately use many assertions and long helper functions, or legacy files are under active migration and you do not want to fix every violation before merging.
 

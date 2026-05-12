@@ -61,9 +61,16 @@ def test_engine_check_source_empty_for_unsupported_extension() -> None:
 
 
 def test_engine_check_source_respects_exclude_paths() -> None:
-    """``exclude_paths`` glob match still applies to in-memory sources —
-    important for editor integrations that lint files in excluded dirs."""
-    cfg = {**DEFAULTS, "exclude_paths": ["build/**"]}
+    """Exclude patterns still apply to in-memory sources — important for
+    editor integrations that lint files in excluded dirs.
+
+    Uses ``extend_exclude_paths`` (the documented recommended form,
+    additive on top of the vendor-dir defaults) rather than
+    ``exclude_paths`` (which would replace those defaults). The
+    in-memory-source check goes through the same matcher either way,
+    so this exercises the path that real users hit.
+    """
+    cfg = {**DEFAULTS, "extend_exclude_paths": ["build/**"]}
     result = SafetyEngine(cfg).check_source("build/generated.py", "x = 1\n")
     assert result.violations == []
 

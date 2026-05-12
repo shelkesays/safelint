@@ -1744,8 +1744,11 @@ def test_discover_files_prunes_excluded_subtrees(tmp_path: Path, monkeypatch: py
     monkeypatch.setattr(_Path, "is_file", spy)
 
     # Pattern matches the excluded directory's exact path so `_is_excluded`
-    # prunes it during descent.
-    cfg = deep_merge(DEFAULTS, {"exclude_paths": [str(excluded_dir)]})
+    # prunes it during descent. ``extend_exclude_paths`` is the documented
+    # recommended form — the pattern goes through the same matcher as
+    # ``exclude_paths``, so this exercises the descent-pruning path users
+    # actually hit.
+    cfg = deep_merge(DEFAULTS, {"extend_exclude_paths": [str(excluded_dir)]})
     files = SafetyEngine(cfg)._discover_files(target)
 
     assert any(f.endswith("good.py") for f in files), "real file should still be discovered"
@@ -1784,8 +1787,10 @@ def test_discover_files_prunes_glob_pattern_directories(tmp_path: Path, monkeypa
     monkeypatch.setattr(_Path, "is_file", spy)
 
     # Run discovery from inside *target* so the patterns match relatively.
+    # ``extend_exclude_paths`` is the recommended form (additive on top of
+    # vendor-dir defaults); same matcher as ``exclude_paths``.
     monkeypatch.chdir(target)
-    cfg = deep_merge(DEFAULTS, {"exclude_paths": ["tests/**"]})
+    cfg = deep_merge(DEFAULTS, {"extend_exclude_paths": ["tests/**"]})
     files = SafetyEngine(cfg)._discover_files(_Path())
 
     assert any(f.endswith("main.py") for f in files), "real file should still be discovered"

@@ -84,14 +84,22 @@ def test_engine_clean_file_produces_no_violations(tmp_path: Path) -> None:
 
 
 def test_engine_excluded_path_is_skipped(tmp_path: Path) -> None:
-    """Files matching exclude_paths are skipped entirely."""
+    """Files matching an exclude pattern are skipped entirely.
+
+    Uses ``extend_exclude_paths`` (the documented recommended form)
+    so it models real-world usage. The
+    ``test_engine_exclude_paths_must_be_list_not_string`` and
+    ``test_engine_explicit_empty_exclude_paths_clears_defaults``
+    tests further down still exercise the ``exclude_paths`` key
+    directly for its replace-defaults semantics.
+    """
     sample = tmp_path / "legacy.py"
     sample.write_text(
         "def foo():\n    try:\n        pass\n    except:\n        pass\n",
         encoding="utf-8",
     )
 
-    config = deep_merge(DEFAULTS, {"exclude_paths": ["**/legacy.py"]})
+    config = deep_merge(DEFAULTS, {"extend_exclude_paths": ["**/legacy.py"]})
     engine = SafetyEngine(config)
     violations = engine.check_file(str(sample)).violations
 
