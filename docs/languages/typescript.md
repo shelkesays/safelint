@@ -102,7 +102,7 @@ Without the extra, `safelint check` skips `.ts` / `.tsx` / `.as` files with a on
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: <tag>           # pin to a release
+    rev: v2.0.0rc1       # pin to a release (replace with the GA tag once v2.0.0 ships)
     hooks:
       - id: safelint
         # TS users add the matching extra so pre-commit's isolated environment

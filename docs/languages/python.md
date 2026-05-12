@@ -102,7 +102,7 @@ pip install 'safelint[all]'                 # kitchen-sink
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: <tag>             # pin to a release
+    rev: v2.0.0rc1         # pin to a release (replace with the GA tag once v2.0.0 ships)
     hooks:
       - id: safelint
         # Every safelint hook needs an extra in v2.0.0+ — including Python-only projects.

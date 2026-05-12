@@ -47,7 +47,7 @@ ANSI colour is auto-disabled when stdout is not a TTY (piping to a file produces
 
 | Flag | Default | What it does |
 |---|---|---|
-| `--all-files` | off | Scan every supported source file under the target (today: `.py`, `.pyw`, `.js`, `.mjs`, `.cjs`). Default (without this flag) is to check only git-modified files. |
+| `--all-files` | off | Scan every supported source file under the target (today: `.py`, `.pyw`, `.js`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.as`). Default (without this flag) is to check only git-modified files. |
 | `--fail-on` | from config | Override the minimum severity that blocks the run: `error` or `warning`. |
 | `--mode` | from config | `local` (only errors block) or `ci` (warnings block too). |
 | `--config` | auto-discovered | Path to a config file (`pyproject.toml` or `safelint.toml`) or a directory to use as the config search root. |
@@ -73,9 +73,19 @@ SafeLint's exit code tells CI / pre-commit how the run finished:
 |------|---------|
 | `0` | Clean run — no blocking violations (suppressed violations don't count). |
 | `1` | One or more blocking violations found (severity ≥ `--fail-on`). |
-| `2` | **Silent-failure guard.** SafeLint saw files in the target but couldn't lint any of them because no matching language grammar was installed. Fires in *every* output mode (pretty / JSON / SARIF) so a CI pipeline can't silently report clean. Fix by installing the matching extra (`pip install 'safelint[python]'` etc.) or, for pre-commit users, adding `additional_dependencies: ['safelint[<lang>]']` to your `.pre-commit-config.yaml`. |
+| `2` | **Silent-failure guard.** Fires in *every* output mode (pretty / JSON / SARIF) so a CI pipeline can't silently report clean. Three distinct triggers — see below for the exact stderr message each emits. |
 
-The exit-2 case includes a stderr error line (`safelint: error: no files linted — every supported file was skipped because its grammar package isn't installed.`) plus the per-language install hints emitted earlier in the run. pre-commit treats exit 2 as a hook *Failed* (red), not Passed — which is exactly what you want, because a hook that ran but linted nothing isn't actually protecting anything.
+### Exit code 2 — silent-failure triggers
+
+All three triggers print a `safelint: error:` line to stderr before exiting; pre-commit treats exit 2 as a hook *Failed* (red), not Passed. Fix by installing the matching grammar extra (`pip install 'safelint[python]'` etc.) or, for pre-commit users, adding `additional_dependencies: ['safelint[<lang>]']` to your `.pre-commit-config.yaml`.
+
+| Trigger | Path | Stderr message |
+|---|---|---|
+| **Directory mode** (`safelint check src/ --all-files`) discovers files but none get linted because every grammar is missing | `_check_exit_code` after `_run_check`'s lint pass | `safelint: error: no files linted — every supported file was skipped because its grammar package isn't installed. See warnings above.` |
+| **Git-modified mode** (default `safelint check src/`) — user modified files but every one was dropped by the supported-extensions filter | `_handle_no_targets` in the no-targets short-circuit | `safelint: error: no files linted — every git-modified source file has a grammar that isn't installed. See warnings above.` |
+| **Hook mode** (pre-commit invokes `safelint <files>`) — every passed file has an extension whose grammar isn't installed | `_guard_hook_silent_failure` before the engine runs | `safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed. See warnings above.` |
+
+Each trigger is preceded by one stderr warning per missing grammar, listing the extensions affected and the install hint (`pip install 'safelint[<lang>]'` in direct-CLI runs; `add 'safelint[<lang>]' to additional_dependencies in your .pre-commit-config.yaml` under pre-commit, detected via the `PRE_COMMIT=1` env var pre-commit sets at hook execution time).
 
 ## `safelint` hook mode flags (pre-commit)
 

@@ -325,8 +325,8 @@ By default, every TS file reads the `_javascript`-suffixed config keys directly:
 
 | TS file reads | when … |
 |---|---|
-| `sinks_typescript` | the user has set it explicitly |
-| `sinks_javascript` | `sinks_typescript` is unset (the default — TS inherits the JS list) |
+| `<key>_typescript` | the user has set it explicitly (e.g. `sinks_typescript`, `sanitizers_typescript`, `sources_typescript`) |
+| `<key>_javascript` | `<key>_typescript` is unset (the default — TS inherits the JS list for every key listed below) |
 | (the rule's built-in default) | neither is set |
 
 Same precedence applies to every other `_javascript`-suffixed key (`sanitizers_javascript`, `sources_javascript`, `tracked_functions_javascript`, `global_namespaces_javascript`, `io_functions_javascript`, `assertion_calls_javascript`, `nullable_methods_javascript`, `flagged_calls_javascript`).

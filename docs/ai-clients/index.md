@@ -5,17 +5,26 @@ SafeLint ships skills / project rules for AI coding clients so you can ask the a
 ## Quick start
 
 ```bash
-pip install safelint            # or: uv add safelint
-safelint skill install          # auto-detects which AI client(s) you use
+# Pick the extra matching your project's language(s) — v2.0.0+
+# ships each grammar separately:
+pip install 'safelint[python]'        # or: uv add 'safelint[python]'
+# pip install 'safelint[javascript]'  # JS / Node
+# pip install 'safelint[typescript]'  # TypeScript (bundles JS too)
+# pip install 'safelint[all]'         # kitchen-sink
+
+safelint skill install                # auto-detects AI clients AND language grammars
 ```
 
-That single command:
+`safelint skill install` runs **two** auto-detections back-to-back:
 
-1. Looks for AI-client markers in the current directory (`CLAUDE.md`, `.cursor/`, etc.).
-2. If any are present, installs each detected client's skill **project-scoped** under the current directory.
-3. If the current directory has no markers, looks in your home directory (`~/.claude/`, `~/.cursor/`).
-4. If found there, installs each detected client's skill **user-scoped** under your home directory.
-5. If nothing is found anywhere, prints an explicit error listing the `--client` commands you can run instead.
+1. **AI clients** — looks for markers (`CLAUDE.md`, `.cursor/`, `.github/copilot-instructions.md`, etc.) in the current directory or your home directory, then installs each detected client's skill at the matching scope.
+2. **Language grammars** *(new in v2.0.0rc1)* — walks the project tree for source-file extensions, compares against the extras currently installed, and emits one composed install line if any grammars are missing. Example output for a Python + TypeScript monorepo with neither grammar installed:
+
+   ```text
+   safelint: warning: Detected source files for 2 languages (python, typescript) whose tree-sitter grammar isn't installed. Run: pip install 'safelint[python,typescript]'
+   ```
+
+   You run the single composed command and you're set up for every language in the repo. Silent when every needed grammar is already installed.
 
 After install, restart the AI client (or reload its window) and ask things like *"run safelint"*.
 
