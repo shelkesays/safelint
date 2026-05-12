@@ -109,13 +109,41 @@ def get_per_language_config(
 
     Returns the raw value as found in config — callers are responsible
     for validating type (e.g. via :func:`_validated_string_list` for
-    string-list keys) before use.
+    string-list keys) before use. Callers that need the *source key*
+    of the resolved value (for example, to surface a precise error
+    message naming the key the user actually set) should use
+    :func:`resolve_lang_config_lookup` instead.
+    """
+    value, _ = resolve_lang_config_lookup(rule_config, base_key, lang_name, default)
+    return value
+
+
+def resolve_lang_config_lookup(
+    rule_config: dict[str, Any],
+    base_key: str,
+    lang_name: str,
+    default: Any = None,  # noqa: ANN401 — config values are intentionally dynamic
+) -> tuple[Any, str]:
+    """Resolve a per-language rule-config value and return it alongside its source key.
+
+    Same lookup semantics as :func:`get_per_language_config`.
+    Returns ``(value, source_key)`` — ``source_key`` is the actual TOML
+    key the value came from. Useful for error reporting: when a TS file
+    inherits a bad ``foo_javascript = "not-a-list"`` value via the
+    TS → JS fallback, raising a ``TypeError`` that names
+    ``foo_typescript`` (the lookup *primary* key) would direct the user
+    to fix a key they never set. Using ``source_key`` instead points
+    them at the offending key directly.
+
+    When the lookup falls through to *default*, ``source_key`` is the
+    *primary* key (e.g. ``foo_typescript`` for a TS file) — that's the
+    key the user would set to override the default.
     """
     primary_key = resolve_lang_config_key(base_key, lang_name)
     if primary_key in rule_config:
-        return rule_config[primary_key]
+        return rule_config[primary_key], primary_key
     if lang_name == "typescript":
         fallback_key = f"{base_key}_javascript"
         if fallback_key in rule_config:
-            return rule_config[fallback_key]
-    return default
+            return rule_config[fallback_key], fallback_key
+    return default, primary_key

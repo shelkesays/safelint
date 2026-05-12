@@ -32,6 +32,24 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_FUNCTION_TYPES,
 }
 
+# Pass-through wrappers in the JS / TS grammar: nodes whose *runtime
+# value* is identical to their inner expression. SAFE803 must peel
+# these to see whether the underlying expression is a nullable call —
+# without it, TypeScript authors writing ``(foo() as Bar).baz``,
+# ``(foo())!.baz``, or ``(foo()).baz`` would slip past the check
+# even though the underlying call IS nullable. Mirrors the TS subset
+# of ``_SPREADING_TYPES`` in ``analysis/dataflow_javascript.py``;
+# kept narrower (no binary / unary / ternary) because for SAFE803
+# we only care about pure pass-throughs, not full taint propagation.
+_JS_PASSTHROUGH_WRAPPER_TYPES = frozenset(
+    {
+        "parenthesized_expression",
+        "as_expression",
+        "satisfies_expression",
+        "non_null_expression",
+    }
+)
+
 # Python parameter shapes — kept in sync with the same set in
 # safelint.rules.max_arguments to avoid drift.
 _PY_PARAM_TYPES = frozenset(
@@ -400,12 +418,22 @@ class NullDereferenceRule(BaseRule):
         any ``optional_chain`` child token in the member / subscript
         node means the rule should NOT fire.
 
-        TypeScript wraps the callee in ``non_null_expression`` when the
-        author writes ``foo()!.bar`` — the ``!`` is a compile-time
-        annotation that says "trust me, it's not null" but provides
-        zero runtime safety. SAFE803 must still fire because the
-        underlying call IS nullable; unwrap the ``non_null_expression``
-        before checking whether ``obj`` is a call.
+        TS / JS routinely wrap the callee in zero-runtime-cost
+        annotations that the rule must peel before checking whether
+        ``obj`` is a call:
+
+        * ``parenthesized_expression`` — ``(foo()).bar``
+        * ``as_expression`` — ``(foo() as Bar).baz``
+        * ``satisfies_expression`` — ``(foo() satisfies Bar).baz``
+        * ``non_null_expression`` — ``foo()!.bar`` (the ``!``
+          is a compile-time annotation that says "trust me, it's
+          not null" but provides zero runtime safety)
+
+        All four are pass-through wrappers — runtime value is
+        identical to the inner expression — so SAFE803 must still
+        fire when the underlying call IS nullable. Peel them in a
+        loop because TS authors freely combine them
+        (``(foo() as Bar)!.baz``).
         """
         if node.type not in ("member_expression", "subscript_expression"):
             return None
@@ -413,10 +441,10 @@ class NullDereferenceRule(BaseRule):
         if any(c.type == "optional_chain" for c in node.children):
             return None
         obj = node.child_by_field_name("object")
-        # TypeScript ``!`` non-null assertion: ``foo()!.bar`` parses as
-        # ``member_expression(object=non_null_expression(call_expression(...)))``.
-        # Unwrap the ``!`` so we see the underlying call.
-        if obj is not None and obj.type == "non_null_expression" and obj.named_children:
+        # Loop is bounded by AST depth (each iteration descends one level into
+        # ``named_children[0]``); Tree-sitter caps node depth well below
+        # Python's recursion limit, so no explicit bound is needed.
+        while obj is not None and obj.type in _JS_PASSTHROUGH_WRAPPER_TYPES and obj.named_children:  # nosafe: SAFE501
             obj = obj.named_children[0]
         if obj is None or obj.type != "call_expression":
             return None

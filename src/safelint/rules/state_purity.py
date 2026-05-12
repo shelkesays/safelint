@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from safelint.core._validators import _validated_string_list, get_per_language_config
+from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.javascript import VARIABLE_DECLARATION as _JS_VARIABLE_DECLARATION
@@ -328,13 +328,12 @@ class GlobalMutationRule(BaseRule):
         TypeScript inherits the JS global namespaces by default;
         users can set ``global_namespaces_typescript`` for TS-only overrides.
         """
-        raw = get_per_language_config(
+        raw, error_key = resolve_lang_config_lookup(
             self.config,
             "global_namespaces",
             lang_name,
             default=self._DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT,
         )
-        error_key = f"global_namespaces_{lang_name}"
         namespaces = frozenset(_validated_string_list(raw, error_key))
         violations: list[Violation] = []
         for func in _iter_javascript_functions(tree):
