@@ -15,6 +15,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -137,6 +139,63 @@ def test_ts_optional_chaining_still_does_not_fire(tmp_path: Path) -> None:
     cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
     result = SafetyEngine(cfg).check_file(str(sample))
     assert not any(v.code == "SAFE803" for v in result.violations)
+
+
+def test_ts_as_cast_does_not_bypass_safe803(tmp_path: Path) -> None:
+    """``(users.find(...) as User).name`` — the ``as`` cast is a compile-time annotation.
+
+    Regression guard: earlier the rule only unwrapped a single
+    ``non_null_expression`` wrapper, so ``(call as Type).prop``,
+    ``(call).prop``, and ``(call satisfies Type).prop`` all silently
+    bypassed SAFE803 because the immediate ``object`` was a
+    ``parenthesized_expression`` / ``as_expression`` /
+    ``satisfies_expression``, not a ``call_expression``. The fix peels
+    all four pass-through wrappers in a loop.
+    """
+    sample = tmp_path / "ascast.ts"
+    sample.write_text(
+        "interface User { name: string; }\nfunction f(users: User[]): string {\n  return (users.find((u: User) => u.name === 'a') as User).name;\n}\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert any(v.code == "SAFE803" for v in result.violations), "(users.find(...) as User).name should fire — ``as`` is a compile-time annotation, not a runtime guard"
+
+
+def test_ts_parenthesized_call_does_not_bypass_safe803(tmp_path: Path) -> None:
+    """``(users.find(...)).name`` — bare parentheses must not bypass SAFE803."""
+    sample = tmp_path / "parens.ts"
+    sample.write_text(
+        "function f(users: any[]): string {\n  return (users.find((u: any) => u.id === 1)).name;\n}\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert any(v.code == "SAFE803" for v in result.violations), "(users.find(...)).name should fire — parens are pass-through"
+
+
+def test_ts_satisfies_expression_does_not_bypass_safe803(tmp_path: Path) -> None:
+    """``(users.find(...) satisfies User).name`` — ``satisfies`` is a TS compile-time annotation."""
+    sample = tmp_path / "satisfies.ts"
+    sample.write_text(
+        "interface User { name: string; }\nfunction f(users: User[]): string {\n  return (users.find((u: User) => u.name === 'a') satisfies User).name;\n}\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert any(v.code == "SAFE803" for v in result.violations), "(users.find(...) satisfies User).name should fire — ``satisfies`` is compile-time-only"
+
+
+def test_ts_combined_wrappers_do_not_bypass_safe803(tmp_path: Path) -> None:
+    """``(users.find(...) as User)!.name`` — paren + ``as`` + ``!`` stacked should still fire."""
+    sample = tmp_path / "combined.ts"
+    sample.write_text(
+        "interface User { name: string; }\nfunction f(users: User[]): string {\n  return (users.find((u: User) => u.name === 'a') as User)!.name;\n}\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert any(v.code == "SAFE803" for v in result.violations), "stacked wrappers should still fire — all four are zero-runtime-cost"
 
 
 # ---------------------------------------------------------------------------
@@ -374,3 +433,35 @@ def test_ts_io_functions_inherits_javascript_default(tmp_path: Path) -> None:
     )
     result = _engine().check_file(str(sample))
     assert any(v.code == "SAFE304" for v in result.violations), "TS file with default config should fire SAFE304 — TS inherits io_functions_javascript"
+
+
+def test_ts_bad_javascript_value_error_message_names_the_javascript_key(tmp_path: Path) -> None:
+    """When a TS file inherits a malformed ``*_javascript`` value via fallback, the TypeError names the actual source key.
+
+    Regression guard: rules used to set ``error_key = f"{base}_{lang_name}"``
+    unconditionally, so when a TS file resolved a bad ``foo_javascript = "x"``
+    value via the TS→JS fallback, the TypeError pointed at
+    ``foo_typescript`` — a key the user never set. The fix is to thread
+    the actual source key through via ``resolve_lang_config_lookup`` so
+    diagnostics name the key the user can actually fix.
+
+    Exercised here via SAFE304 / ``io_functions_javascript`` because it's
+    the cheapest path; the same fix applies to ``global_namespaces``,
+    ``tracked_functions``, and ``assertion_calls``.
+    """
+    sample = tmp_path / "bad_inherited.ts"
+    sample.write_text("function f(): void { console.log('hi'); }\n", encoding="utf-8")
+    cfg = deep_merge(
+        DEFAULTS,
+        {
+            "rules": {
+                "side_effects": {
+                    "enabled": True,
+                    # Bare string — user typo, should have been a list. Fails validation.
+                    "io_functions_javascript": "log",
+                }
+            }
+        },
+    )
+    with pytest.raises(TypeError, match="io_functions_javascript"):
+        SafetyEngine(cfg).check_file(str(sample))

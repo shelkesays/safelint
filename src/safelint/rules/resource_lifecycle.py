@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from safelint.core._validators import _validated_string_list, get_per_language_config  # ``_validated_string_list`` re-exported for backwards-compat
+from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup  # ``_validated_string_list`` re-exported for backwards-compat
 from safelint.languages._node_utils import call_name, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import CALL, WITH_ITEM
@@ -214,13 +214,12 @@ class ResourceLifecycleRule(BaseRule):
         # JS-family (JS / TS): TypeScript inherits the JS list by default
         # via ``get_per_language_config``'s TS→JS fallback; users can
         # override per-language by setting ``tracked_functions_typescript``.
-        raw_tracked = get_per_language_config(
+        raw_tracked, error_key = resolve_lang_config_lookup(
             self.config,
             "tracked_functions",
             lang_name,
             default=self._DEFAULT_TRACKED_JAVASCRIPT,
         )
-        error_key = f"tracked_functions_{lang_name}"
         tracked_js = _validated_string_list(raw_tracked, error_key)
         tracked: frozenset[str] = frozenset(tracked_js)
         violations: list[Violation] = []

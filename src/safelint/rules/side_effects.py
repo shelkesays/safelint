@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.core._validators import _validated_string_list, get_per_language_config
+from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
@@ -41,10 +41,7 @@ def _io_funcs_for_lang(rule_config: dict, lang_name: str, fallback: list[str]) -
     detection — fail loud instead.
     """
     py_default = fallback if lang_name == "python" else []
-    raw = get_per_language_config(rule_config, "io_functions", lang_name, default=py_default)
-    # ``error_key`` is what shows up in the TypeError message — point users
-    # at the key they'd actually need to fix in their config.
-    error_key = "io_functions" if lang_name == "python" else f"io_functions_{lang_name}"
+    raw, error_key = resolve_lang_config_lookup(rule_config, "io_functions", lang_name, default=py_default)
     return frozenset(_validated_string_list(raw, error_key))
 
 
