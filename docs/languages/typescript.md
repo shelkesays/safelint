@@ -89,7 +89,7 @@ sinks_typescript = ["eval", "Function", "Object.assign", "innerHTML"]  # stricte
 ```yaml
 # .pre-commit-config.yaml
 repos:
-  - repo: https://github.com/srahul07/safelint
+  - repo: https://github.com/shelkesays/safelint
     rev: <tag>           # pin to a release
     hooks:
       - id: safelint

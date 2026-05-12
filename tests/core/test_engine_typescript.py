@@ -1,11 +1,11 @@
 """End-to-end smoke tests for TypeScript discovery and rule dispatch.
 
-These are the "Slice 1 / Foundation" tests: they verify that ``.ts``,
-``.tsx``, and ``.as`` files are discovered, parsed via the right
-Tree-sitter grammar, and routed to the JavaScript-family rule
-implementations. Detailed per-rule TS behaviour is tested in the
-per-rule test files (``test_*_typescript.py`` in the rules folder)
-once Slice 2 lands TS-specific tweaks.
+Verifies that ``.ts``, ``.tsx``, and ``.as`` files are discovered,
+parsed via the right Tree-sitter grammar, and routed to the
+JavaScript-family rule implementations. Detailed per-rule TS
+behaviour (TS-specific AST shapes — generic type parameters, ``as``
+casts, non-null assertions, etc.) is covered by
+``tests/rules/test_typescript_specific.py``.
 """
 
 from __future__ import annotations

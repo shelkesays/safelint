@@ -87,7 +87,7 @@ See [Configuration file](../configuration/toml.md) for the full list of top-leve
 ```yaml
 # .pre-commit-config.yaml
 repos:
-  - repo: https://github.com/srahul07/safelint
+  - repo: https://github.com/shelkesays/safelint
     rev: <tag>             # pin to a release
     hooks:
       - id: safelint
@@ -95,7 +95,7 @@ repos:
         files: ^src/
 ```
 
-The published hook spec sets `types_or: [python, javascript]` and no `files:` filter — add your own `files:` / `exclude:` keys to scope it.
+The published hook spec sets `types_or: [python, javascript, ts, tsx]` and no `files:` filter — add your own `files:` / `exclude:` keys to scope it.
 
 ## Python-specific config keys
 

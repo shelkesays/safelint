@@ -150,8 +150,8 @@ A handful of edges read the supported-language list from the registry; two pre-c
 
 Update both of these:
 
-* **`.pre-commit-hooks.yaml`** — `types_or: [python]` lists the pre-commit filetype tags downstream users of `pre-commit-hooks` will get matched against. Add the new tag (e.g. `- ts` for TypeScript) so users who configure the hook in their `.pre-commit-config.yaml` get the new files passed in. SafeLint itself still drops anything not in `supported_extensions()` defensively, but pre-commit's own filter happens first and would otherwise hide the new files from the hook.
-* **`.pre-commit-config.yaml`** — this repo's own in-tree `safelint (in-tree)` hook also has its own `types_or: [python]` filter. Add the new language's tag there too, or the in-repo hook run will keep excluding that language's files even after the published hook metadata is updated. (The peer hooks in the same file — `ty`, `pytest-cov` — are tooling-only and can stay `types: [python]`.)
+* **`.pre-commit-hooks.yaml`** — `types_or` lists the pre-commit filetype tags downstream users of `pre-commit-hooks` will get matched against (today: `[python, javascript, ts, tsx]`). Append the new tag so users who configure the hook in their `.pre-commit-config.yaml` get the new files passed in. SafeLint itself still drops anything not in `supported_extensions()` defensively, but pre-commit's own filter happens first and would otherwise hide the new files from the hook.
+* **`.pre-commit-config.yaml`** — this repo's own in-tree `safelint (in-tree)` hook also has its own `types_or` filter (today: `[python, javascript]`, since the safelint source tree itself is Python + JS only). Add the new language's tag there too if the in-repo source tree starts containing that language. (The peer hooks in the same file — `ty`, `pytest-cov` — are tooling-only and can stay `types: [python]`.)
 
 The CLI's git-status filters (`_collect_all_supported_files`, `_filter_supported_files` in `cli.py`, plus the hook-mode pre-filter at the bottom of `main()`) call `supported_extensions()` directly and need no edit.
 

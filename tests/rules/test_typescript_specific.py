@@ -1,14 +1,14 @@
-"""Slice 2 — TS-specific rule behavior.
+"""TS-specific rule behaviour.
 
 Tests that exercise TypeScript-only syntactic constructs (type
 parameters, type annotations, ambient declarations, ``as``
 expressions, non-null assertions, decorators) and verify each
-cross-language rule does the right thing. Surfaces the TS-specific
-fixes the JS rule implementations need.
-
-Once each rule's TS behaviour is locked here, the tests for the
-remaining JS-family-rules-on-TS pattern can be added to the per-rule
-test files (``test_*_typescript.py``).
+cross-language rule does the right thing on them. Covers the
+TS-specific handling the JS rule implementations would otherwise
+miss — generic type parameters not counting toward
+``max_arguments``, ``(globalThis as any).x = 1`` resolving via the
+paren / cast unwrap, taint flowing through ``as`` / ``satisfies``
+/ ``!``, etc.
 """
 
 from __future__ import annotations
@@ -279,7 +279,7 @@ def test_ts_long_type_signature_does_not_inflate_function_length(tmp_path: Path)
 
 
 # ---------------------------------------------------------------------------
-# Per-language config precedence (Slice 3): TS → JS fallback
+# Per-language config precedence: TS → JS fallback
 # ---------------------------------------------------------------------------
 
 
@@ -358,7 +358,7 @@ def test_ts_typescript_key_used_when_javascript_unset(tmp_path: Path) -> None:
 def test_ts_io_functions_inherits_javascript_default(tmp_path: Path) -> None:
     """SAFE304 on a TS file uses ``io_functions_javascript`` defaults.
 
-    Latent bug from Slice 1: ``side_effects.py:_io_funcs_for_lang`` built
+    Regression guard: ``side_effects.py:_io_funcs_for_lang`` previously built
     its config key from ``f"io_functions_{lang_name}"``, producing
     ``io_functions_typescript`` for TS files — which has no default.
     The TS→JS fallback in ``get_per_language_config`` restores the
