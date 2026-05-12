@@ -23,6 +23,13 @@ hooks:
 theme:
   name: material
   language: en
+  # Brand identity — served from ``docs/assets/`` (committed alongside
+  # the markdown so mkdocs picks them up via its default static-asset
+  # handling). Same image used for the header logo and the favicon for
+  # consistency; if/when we ship a stripped-down favicon-only variant,
+  # split these.
+  logo: assets/logo.png
+  favicon: assets/logo.png
   features:
     - content.action.edit         # "Edit this page" button at the page head
     - content.code.copy           # copy button on every code block
