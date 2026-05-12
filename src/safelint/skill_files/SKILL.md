@@ -1,6 +1,6 @@
 ---
 name: safelint
-description: Run safelint static analysis on the user's project and present Holzmann Power-of-Ten safety violations grouped by file. Supports any language registered with safelint (currently Python and JavaScript; more languages can be added). Use this for "safelint check", "lint with safelint", "safety review", "Power-of-Ten review", or similar requests for safelint's specific rule set. For generic linting use the project's configured tools (ruff, eslint, etc.) instead.
+description: Run safelint static analysis on the user's project and present Holzmann Power-of-Ten safety violations grouped by file. Supports any language registered with safelint (currently Python, JavaScript, and TypeScript including TSX / AssemblyScript; more languages can be added). Use this for "safelint check", "lint with safelint", "safety review", "Power-of-Ten review", or similar requests for safelint's specific rule set. For generic linting use the project's configured tools (ruff, eslint, etc.) instead.
 ---
 
 # safelint skill
@@ -28,7 +28,7 @@ Look at the project files in cwd to figure out which languages safelint can lint
 |---|---|---|
 | Python | `.py`, `.pyw` | `languages/python.md` |
 | JavaScript (Node) | `.js`, `.mjs`, `.cjs` | `languages/javascript.md` |
-| TypeScript (also AssemblyScript) | `.ts`, `.tsx`, `.as` | `languages/javascript.md` (shares JS notes) |
+| TypeScript (also AssemblyScript) | `.ts`, `.tsx`, `.as` | `languages/typescript.md` |
 
 (More languages will land over time. To check the live list, run `python -c "from safelint.languages import supported_extensions; print(sorted(supported_extensions()))"`.)
 

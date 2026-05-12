@@ -6,7 +6,7 @@ Each rule has:
 - A **name** — the key used in config files.
 - An **enabled** flag — set to `false` to turn the rule off.
 - A **severity** — `"error"` blocks the commit; `"warning"` is informational.
-- A **language scope** — most rules apply to both Python and JavaScript; a few are language-specific (see below).
+- A **language scope** — most rules apply to Python, JavaScript, and TypeScript; a few are language-specific (see below).
 - Rule-specific options documented below.
 
 For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [Configuration file](toml.md). For inline / file-level suppression see [Suppression mechanisms](suppression.md). JavaScript projects may also want to set a [runtime preset](toml.md#javascript-runtime-presets) so rule defaults match the deployment target (browser / Deno / Cloudflare Workers / Bun).
@@ -17,28 +17,28 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 
 - **Python** (`.py`, `.pyw`).
 - **JavaScript** (`.js`, `.mjs`, `.cjs`) — source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime *defaults* (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the [`[tool.safelint.javascript] runtime = "..."`](toml.md#javascript-runtime-presets) preset — the source-language rules themselves don't change.
+- **TypeScript** (`.ts`, `.tsx`) — and **AssemblyScript** (`.as` — TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, `as` casts, non-null assertions, `declare global` ambient declarations, etc.). Shares the JavaScript runtime presets — TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See [TypeScript](../languages/typescript.md) for the full language reference.
 
 ### Planned
 
 Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see [Adding a language](../contributing/adding-a-language.md)) makes each new language incremental — community contributions for any of these are welcome.
 
-1. **TypeScript** (`.ts`, `.tsx`) — likely shares most parser / dispatch infrastructure with the existing JavaScript support. The same registration will also cover **AssemblyScript** (`.as` — TypeScript-syntax language that compiles to WebAssembly), since AS source parses with the TypeScript grammar.
-2. **Go** (`.go`).
-3. **Rust** (`.rs`).
-4. **Java** (`.java`).
-5. **C** (`.c`, `.h`) — Holzmann's original target language.
-6. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) — same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
-7. **PHP** (`.php`).
+1. **Go** (`.go`).
+2. **Rust** (`.rs`).
+3. **Java** (`.java`).
+4. **C** (`.c`, `.h`) — Holzmann's original target language.
+5. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) — same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
+6. **PHP** (`.php`).
 
 ### Rule scope (current languages)
 
 | Scope | Count | Codes |
 |---|---|---|
-| **Cross-language** (Python and JavaScript) | 17 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE302, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 |
-| **Python-only** | 2 | SAFE201 (`bare_except` — JS catches always bind the error; no `KeyboardInterrupt` hijack hazard), SAFE301 (`global_state` — JS has no `global` keyword; SAFE302 covers JS's "writes to module-level state" cases) |
-| **JavaScript-only** | 1 | SAFE305 (`wide_scope_declaration` — Python has no `var` / `let` / `const` distinction) |
+| **Cross-language** (Python, JavaScript, TypeScript) | 17 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE302, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 |
+| **Python-only** | 2 | SAFE201 (`bare_except` — JS / TS catches always bind the error; no `KeyboardInterrupt` hijack hazard), SAFE301 (`global_state` — JS / TS have no `global` keyword; SAFE302 covers their "writes to module-level state" cases) |
+| **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration` — Python has no `var` / `let` / `const` distinction; ``var`` is still legal in TS and the same scope-hoisting hazard applies, so the rule fires on both `.js` and `.ts`) |
 
-The engine's per-language dispatch automatically skips rules whose `language` tuple doesn't include the active file's language. There's no manual configuration to do — drop a `.py` file in a JS project (or vice versa) and the right rules fire on each.
+The engine's per-language dispatch automatically skips rules whose `language` tuple doesn't include the active file's language. There's no manual configuration to do — drop a `.py` file in a JS / TS project (or vice versa) and the right rules fire on each.
 
 ## At a glance
 
@@ -303,7 +303,7 @@ severity = "warning"
 
 ### SAFE302 — `global_mutation`
 
-**What it flags:** writes to module-level state from inside a function. Cross-language — the *intent* is the same in Python and JavaScript, but the syntactic shape differs.
+**What it flags:** writes to module-level state from inside a function. Cross-language — the *intent* is the same in Python, JavaScript, and TypeScript, but the syntactic shape differs.
 
 **Python:** by default, functions that declare `global x` and then assign to `x`. With `strict = true`, *any* `global` declaration is flagged regardless of whether a write follows. This is stricter than `SAFE301`. The default behaviour is more nuanced than ruff's `PLW0603` (which fires on any `global`); set `strict = true` if your team's policy is to ban the keyword entirely.
 
