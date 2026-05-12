@@ -487,7 +487,10 @@ def test_run_check_json_emits_empty_doc_when_no_modified_files(
     empty stream)."""
     import json  # noqa: PLC0415
 
-    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=([], []))
+    # 3-tuple per v2.0.0+ signature: (all_changed, in_target, raw_modified).
+    # Empty raw_modified means "user genuinely modified nothing" — distinct
+    # from "modified but all filtered out" which is the silent-pass case.
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=([], [], set()))
     args = argparse.Namespace(
         target=tmp_path,
         config=None,
@@ -567,3 +570,76 @@ def test_run_check_json_emits_doc_with_violations(
     out = capsys.readouterr().out
     doc = json.loads(out)
     assert any(v["code"] == "SAFE101" for v in doc["violations"])
+
+
+def test_run_check_returns_2_when_only_modified_files_have_unavailable_grammar(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Silent-pass guard: git-modified files all dropped for missing grammars → exit 2.
+
+    Regression for the bug where ``_resolve_check_targets`` returned
+    ``no_targets=True`` whenever the post-filter file list was empty,
+    masking the case where the user DID modify files but every one
+    was filtered out because its grammar isn't installed.
+    ``no_targets=True`` would then exit 0 (silent pass) without ever
+    consulting the unavailable-extension state — exactly the worst-
+    case CI scenario.
+
+    Fix plumbs the *raw* (un-filtered) git-modified set through, so
+    the no-targets path can distinguish "user modified nothing" from
+    "user modified .ts files but TS grammar isn't installed".
+    """
+    # Simulate: user modified app.ts. TS grammar not installed.
+    # Raw set has the modification; filtered (supported-extensions)
+    # set is empty because .ts isn't in supported_extensions().
+    mocker.patch.object(
+        cli,
+        "_get_git_modified_supported_files",
+        return_value=([], [], {"app.ts"}),
+    )
+    mocker.patch.object(
+        cli,
+        "unavailable_extensions",
+        return_value={".ts": "pip install 'safelint[typescript]'"},
+    )
+    args = argparse.Namespace(
+        target=tmp_path,
+        config=None,
+        all_files=False,
+        ignore=None,
+        no_cache=True,
+        statistics=False,
+        fail_on=None,
+        mode=None,
+        output_format="pretty",
+    )
+    rc = cli._run_check(args)
+    assert rc == 2, (
+        f"Expected exit 2 (silent-pass guard) when raw git output has unavailable-grammar "
+        f"files but post-filter is empty; got {rc}"
+    )
+
+
+def test_run_check_returns_0_when_genuinely_no_modifications(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Negative control: empty raw set (user truly modified nothing) → exit 0, no false silent-pass alarm."""
+    mocker.patch.object(
+        cli,
+        "_get_git_modified_supported_files",
+        return_value=([], [], set()),  # empty raw — genuine clean
+    )
+    mocker.patch.object(
+        cli,
+        "unavailable_extensions",
+        return_value={".ts": "pip install 'safelint[typescript]'"},
+    )
+    args = argparse.Namespace(
+        target=tmp_path,
+        config=None,
+        all_files=False,
+        ignore=None,
+        no_cache=True,
+        statistics=False,
+        fail_on=None,
+        mode=None,
+        output_format="pretty",
+    )
+    rc = cli._run_check(args)
+    assert rc == 0, f"Expected exit 0 (genuine clean run) when raw git set is empty; got {rc}"

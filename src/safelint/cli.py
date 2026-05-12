@@ -544,14 +544,14 @@ def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
     return set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines()) | set(untracked_proc.stdout.splitlines())
 
 
-def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str]] | None:
-    """Return a 2-tuple of changed supported-source-file lists, or ``None`` on git failure.
+def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str], set[str]] | None:
+    """Return changed supported-source-file lists + the raw git-modified set, or ``None`` on git failure.
 
     Filtering is registry-driven via :func:`safelint.languages.supported_extensions`,
     so any language registered in ``safelint.languages`` is included. Includes
     staged, unstaged, and untracked files.
 
-    Returns ``(all_changed, in_target)`` where:
+    Returns ``(all_changed, in_target, raw_modified)`` where:
 
     * *all_changed* — every changed supported-source file across the whole repo.
       Paths are relative to cwd when possible, otherwise absolute.
@@ -559,6 +559,11 @@ def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str
       so cross-file rules (e.g. ``test_coupling``) see the full diff context.
     * *in_target* — the subset of those files that fall under *target*.
       Same path format as *all_changed*. These are the files actually linted.
+    * *raw_modified* — the *un-filtered* set of paths git reported as
+      modified (staged + unstaged + untracked, relative to ``git_root``).
+      Lets callers detect "user modified files but they were all dropped
+      by the supported-extensions filter" — the silent-pass scenario the
+      missing-grammar guard needs to catch when ``in_target`` is empty.
 
     Returns ``None`` when git is unavailable, the path is outside a git
     repository, or any git command fails — callers should fall back to
@@ -587,7 +592,7 @@ def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str
         raw = _get_raw_changed_files(git_bin, git_root)
         if raw is None:
             return None
-        return _collect_all_supported_files(raw, git_root), _filter_supported_files(raw, git_root, target_abs)
+        return _collect_all_supported_files(raw, git_root), _filter_supported_files(raw, git_root, target_abs), raw
 
     # Any git-side failure (no git, not a repo, timeout) means we fall back
     # to scanning all files — that's a documented behaviour, not an error.
@@ -602,10 +607,10 @@ def _config_dir(config_path: Path | None, target: Path) -> Path:
     return target if target.is_dir() else target.parent
 
 
-def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format: str) -> tuple[list[str] | None, list[str] | None, bool]:
-    """Resolve the (changed_files, files, no_targets) tuple for ``check`` mode.
+def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format: str) -> tuple[list[str] | None, list[str] | None, bool, set[str]]:
+    """Resolve the (changed_files, files, no_targets, raw_modified) tuple for ``check`` mode.
 
-    Returns a 3-tuple:
+    Returns a 4-tuple:
 
     * ``changed_files`` — the full repo-wide diff list passed to the engine
       so cross-file rules see the right context, or None to skip that hint.
@@ -613,24 +618,31 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
       that's been git-modified), or None to fall back to directory discovery.
     * ``no_targets`` — True when git reported no modified files under
       *target* and the caller should short-circuit with an empty result.
+    * ``raw_modified`` — the un-filtered set of paths git reported as
+      modified (relative to ``git_root``). Empty set when ``--all-files``
+      / git unavailable / git reported nothing. Callers use this to
+      detect the silent-pass case where the user modified files but
+      every one was filtered out by missing-grammar extensions —
+      ``no_targets`` would be True in that case, but the appropriate
+      exit code is 2 (configuration error), not 0.
     """
     if getattr(args, "all_files", False) or not target.is_dir():
-        return None, None, False
+        return None, None, False, set()
     modified = _get_git_modified_supported_files(target)
     if modified is None:
         _print_status(
             "Note: could not determine modified files via git — scanning all files.",
             output_format=output_format,
         )
-        return None, None, False
+        return None, None, False, set()
     if not modified[1]:
         _print_status(
             "No modified source files detected. Use --all-files to scan everything.",
             output_format=output_format,
         )
-        return None, None, True
-    changed_files, files = modified
-    return changed_files, files, False
+        return None, None, True, modified[2]
+    changed_files, files, raw = modified
+    return changed_files, files, False, raw
 
 
 # Default dir-name exclusions for the missing-grammar walk. Kept narrow —
@@ -885,6 +897,31 @@ def _emit_skill_install_grammar_hint(target: Path) -> None:
     _diagnostics.print_warning(f"Detected source files for {len(needed_extras)} language{plural} ({extras_list}) whose tree-sitter grammar isn't installed. Run: {install}")
 
 
+def _handle_no_targets(output_format: str, fail_on: str, raw_modified: set[str]) -> int:
+    """Resolve the exit code for the ``_resolve_check_targets`` no-targets short-circuit.
+
+    Two distinct cases land here and the exit code differs:
+
+    * **Genuine clean run** — user truly hasn't modified anything
+      (``raw_modified`` is empty). Print the empty results document
+      and exit 0. Machine output modes still need a parseable empty
+      document on stdout so downstream CI uploaders / SARIF consumers
+      don't choke on empty input.
+    * **Silent-pass** — user modified files but every one was dropped
+      by the supported-extensions filter because its grammar isn't
+      installed. ``raw_modified`` intersects ``unavailable_extensions()``.
+      Print the empty document AND a stderr error AND exit 2 so
+      pre-commit / CI shows the run as Failed rather than silently
+      Passed.
+    """
+    unavailable_in_modified = _matching_suffixes(list(raw_modified), unavailable_extensions())
+    _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, options=_PrintOptions(silent_on_clean=True))
+    if unavailable_in_modified:
+        _diagnostics.print_error("no files linted — every git-modified source file has a grammar that isn't installed. See warnings above.")
+        return 2
+    return 0
+
+
 def _emit_skill_freshness_warnings() -> None:
     """Emit a stderr warning for each stale AI-client skill install.
 
@@ -917,17 +954,12 @@ def _run_check(args: argparse.Namespace) -> int:
     # quiet stderr alongside the parseable stdout document.
     unavailable_found = _emit_missing_grammar_warnings(target, silent=(output_format != "pretty"))
 
-    changed_files, files, no_targets = _resolve_check_targets(args, target, output_format)
+    changed_files, files, no_targets, raw_modified = _resolve_check_targets(args, target, output_format)
     config = load_config(_config_dir(Path(config_path) if config_path else None, target))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
 
     if no_targets:
-        # Machine modes still need a parseable empty document on stdout
-        # so downstream tools (CI uploaders, SARIF consumers) don't choke
-        # on empty input. Pretty mode already emitted the human-readable
-        # status above and exits 0 silently.
-        _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, options=_PrintOptions(silent_on_clean=True))
-        return 0
+        return _handle_no_targets(output_format, fail_on, raw_modified)
 
     results = run(
         target,

@@ -1,5 +1,5 @@
 <div align="center">
-  <img src="logo/safelint-logo.svg" alt="SafeLint logo" width="240" />
+  <img src="https://raw.githubusercontent.com/shelkesays/safelint/main/logo/safelint-logo.svg" alt="SafeLint logo" width="240" />
 </div>
 
 
