@@ -62,7 +62,7 @@ result = eval(userInput);  // nosafe: SAFE801
 
 ## Rules ported to JavaScript
 
-17 of safelint's 19 user-facing rules now lint JavaScript. The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here remain Python-only by design — see *Rules that stay Python-only* below.
+18 of safelint's 20 user-facing rules now lint JavaScript — the 17 cross-language rules plus SAFE305 (`wide_scope_declaration`, JavaScript-only). The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here remain Python-only by design — see *Rules that stay Python-only* below.
 
 | Code | Rule | JavaScript-specific notes |
 |---|---|---|
