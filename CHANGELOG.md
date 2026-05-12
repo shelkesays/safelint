@@ -487,8 +487,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.14.0rc1...HEAD
-[1.14.0rc1]: https://github.com/shelkesays/safelint/compare/v1.13.0...v1.14.0rc1
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.0.0rc1...HEAD
+[2.0.0rc1]: https://github.com/shelkesays/safelint/compare/v1.13.0...v2.0.0rc1
 [1.13.0]: https://github.com/shelkesays/safelint/compare/v1.12.2...v1.13.0
 [1.12.2]: https://github.com/shelkesays/safelint/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/shelkesays/safelint/compare/v1.12.0...v1.12.1

@@ -167,7 +167,7 @@ Add this to your `.pre-commit-config.yaml` — pick the `additional_dependencies
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.0.0  # replace with the latest release tag
+    rev: v2.0.0rc1  # replace with the latest release tag (use the GA tag once v2.0.0 ships)
     hooks:
       - id: safelint
         # Required in v2.0.0+ — pick the line for the language(s) your repo lints:
@@ -189,7 +189,7 @@ The same `id: safelint` handles Python, JavaScript, and TypeScript — there's n
 
 The `additional_dependencies` line is genuinely required in v2.0.0+ — including for Python projects, which used to work without it. Forgetting it doesn't silently pass: safelint emits one stderr line per missing grammar with the exact fix and exits with code **2**, which pre-commit reports as **Failed** (red):
 
-```
+```text
 safelint: warning: skipping .py files — add 'safelint[python]' to additional_dependencies in your .pre-commit-config.yaml
 safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed. See warnings above.
 ```

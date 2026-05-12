@@ -1,6 +1,6 @@
 # TypeScript
 
-SafeLint analyses TypeScript source for the Holzmann "Power of Ten" safety rules — function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like ESLint don't catch. TypeScript support landed in v1.14.0 and reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; the AST is a superset), with TypeScript-specific handling for the type-only constructs that the JS rules wouldn't otherwise recognise.
+SafeLint analyses TypeScript source for the Holzmann "Power of Ten" safety rules — function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like ESLint don't catch. TypeScript support landed in v2.0.0rc1 and reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; the AST is a superset), with TypeScript-specific handling for the type-only constructs that the JS rules wouldn't otherwise recognise.
 
 ## File extensions
 
@@ -11,13 +11,13 @@ SafeLint analyses TypeScript source for the Holzmann "Power of Ten" safety rules
 ## Quick start
 
 ```bash
-pip install safelint              # the tool itself runs on Python; lints any registered language
-safelint check src/               # lint a directory (git-modified files by default)
-safelint check --all-files .      # lint everything
-safelint check --format json src/ # machine-readable for editors / CI
+pip install 'safelint[typescript]'     # the tool runs on Python; the [typescript] extra adds the TS grammar (and bundles JS too)
+safelint check src/                    # lint a directory (git-modified files by default)
+safelint check --all-files .           # lint everything
+safelint check --format json src/      # machine-readable for editors / CI
 ```
 
-If your project doesn't already have a Python toolchain, `pipx install safelint` isolates the install; or add safelint as a dev dependency through any pip-compatible manager.
+If your project doesn't already have a Python toolchain, `pipx install 'safelint[typescript]'` isolates the install; or add `'safelint[typescript]'` as a dev dependency through any pip-compatible manager. v2.0.0+ ships every language grammar as an opt-in extra — plain `pip install safelint` installs only the engine and would skip every `.ts` / `.tsx` / `.as` file with an install hint on first run.
 
 ## Rules that fire on TypeScript
 

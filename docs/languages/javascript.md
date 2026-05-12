@@ -121,7 +121,7 @@ pip install 'safelint[typescript]'    # bundles tree-sitter-javascript too
 pip install 'safelint[all]'
 ```
 
-Without the extra, `safelint check` skips `.js` / `.mjs` / `.cjs` files with a one-line install hint at lint time — no hard error.
+Without the extra, `safelint check` skips `.js` / `.mjs` / `.cjs` files with a one-line install hint at lint time. **Heads-up for CI:** if the run discovers JS files but every one is skipped because the grammar isn't installed, safelint exits with code **2** (the silent-failure guard) so a CI pipeline can't accidentally report green when no linting actually happened. If your CI logic distinguishes "lint clean" from "lint setup is broken", branch on exit code 2 — or just install the matching extra and the guard never fires.
 
 ## Pre-commit integration
 
