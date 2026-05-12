@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <style>
+      .navy { fill: #0B1F3A; }
+      .orange { fill: #F97316; }
+      .white { fill: #FFFFFF; }
+    </style>
+  </defs>
+
+  <!-- motion lines -->
+  <rect x="40" y="180" width="80" height="10" rx="5" class="orange"/>
+  <rect x="20" y="220" width="110" height="10" rx="5" class="orange"/>
+  <rect x="40" y="260" width="70" height="10" rx="5" class="orange"/>
+
+  <rect x="392" y="180" width="80" height="10" rx="5" class="navy"/>
+  <rect x="382" y="220" width="110" height="10" rx="5" class="navy"/>
+  <rect x="402" y="260" width="70" height="10" rx="5" class="navy"/>
+
+  <!-- shield -->
+  <path d="M256 40 L370 85 L370 220 Q370 320 256 395 Q142 320 142 220 L142 85 Z" class="navy"/>
+  <path d="M165 100 L347 100 L347 155 L165 165 Z" class="orange"/>
+  <text x="256" y="275" text-anchor="middle" class="white" style="font: 700 150px Arial, sans-serif;">10</text>
+</svg>
