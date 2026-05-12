@@ -32,6 +32,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_FUNCTION_TYPES,
 }
 
+
 # Pass-through wrappers in the JS / TS grammar: nodes whose *runtime
 # value* is identical to their inner expression. SAFE803 must peel
 # these to see whether the underlying expression is a nullable call —
