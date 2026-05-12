@@ -683,16 +683,28 @@ def _format_install_action(install_hint: str) -> str:
 def _matching_suffixes(filenames: list[str], unavailable: dict[str, str]) -> set[str]:
     """Return the subset of *unavailable* extensions present in *filenames*.
 
-    Mirrors ``pathlib.Path.suffix`` semantics — a name with no dot (``"README"``)
-    or a leading-dot dotfile (``".ts"``, ``".gitignore"``) has no suffix.
-    Without the ``idx > 0`` guard, a literal file named ``.ts`` would
-    spuriously trigger the "missing TypeScript grammar" hint.
+    Mirrors ``pathlib.Path.suffix`` semantics:
+
+    * A name with no dot (``"README"``) → no suffix.
+    * A leading-dot dotfile (``".ts"``, ``".gitignore"``) → no suffix.
+    * A dotfile *inside a directory* (``"src/.ts"``,
+      ``"a/b/.gitignore"``) → still no suffix; the basename rule
+      applies regardless of where the file sits in the tree.
+
+    Hook-mode callers (``_emit_hook_grammar_warnings``) pass full
+    paths like ``src/app.py`` straight from pre-commit's argv. A naive
+    ``rfind('.')`` on the full path would treat ``src/.ts`` as having
+    suffix ``.ts`` (the rightmost dot is at index > 0 in the full
+    string), but the file is actually a dotfile with no suffix. The
+    ``os.path.basename`` step strips any directory prefix so the
+    ``idx > 0`` guard catches dotfiles in subdirectories too.
     """
     found: set[str] = set()
     for name in filenames:
-        idx = name.rfind(".")
-        if idx > 0 and name[idx:] in unavailable:
-            found.add(name[idx:])
+        base = Path(name).name
+        idx = base.rfind(".")
+        if idx > 0 and base[idx:] in unavailable:
+            found.add(base[idx:])
     return found
 
 
