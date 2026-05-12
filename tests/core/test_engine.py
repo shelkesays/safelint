@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 
 if TYPE_CHECKING:
     from pathlib import Path
-
-    import pytest
 
 from safelint import languages as lang_module
 from safelint.core.config import DEFAULTS, deep_merge
@@ -96,6 +96,158 @@ def test_engine_excluded_path_is_skipped(tmp_path: Path) -> None:
     violations = engine.check_file(str(sample)).violations
 
     assert violations == []
+
+
+# ---------------------------------------------------------------------------
+# Default exclude_paths defaults: prune common vendor / generated dirs
+# ---------------------------------------------------------------------------
+
+
+def test_engine_default_excludes_prune_venv_during_discovery(tmp_path: Path) -> None:
+    """Default ``exclude_paths`` skip ``.venv/`` during file discovery.
+
+    Regression guard for the rc2 papercut: a fresh
+    ``safelint check --all-files`` from a project root with a Python
+    virtualenv at ``.venv/`` should not lint third-party files inside
+    the venv. Without the built-in default excludes the engine would
+    walk in and report violations on packaged code the user didn't
+    author.
+    """
+    # Create a "project" layout: src/ with one real file, plus a fake
+    # .venv with a deliberately-violating file that must NOT be reported.
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    (src_dir / "app.py").write_text("def f(): return 1\n", encoding="utf-8")
+
+    venv = tmp_path / ".venv" / "lib" / "python3.11" / "site-packages"
+    venv.mkdir(parents=True)
+    bad = venv / "vendor.py"
+    bad.write_text(
+        # Deliberately-violating: bare except + empty body would normally fire SAFE201/202.
+        "def vendor_func():\n    try:\n        do()\n    except:\n        pass\n",
+        encoding="utf-8",
+    )
+
+    # Use the engine's default exclude_paths (don't override with config).
+    engine = SafetyEngine(DEFAULTS)
+    discovered = engine.check_path(str(tmp_path))
+    discovered_paths = {r.path for r in discovered}
+
+    assert str(src_dir / "app.py") in discovered_paths
+    assert not any(".venv" in p for p in discovered_paths), (
+        f".venv leaked into discovery: {[p for p in discovered_paths if '.venv' in p]}"
+    )
+
+
+def test_engine_default_excludes_prune_node_modules(tmp_path: Path) -> None:
+    """Default ``exclude_paths`` also skip ``node_modules/`` (JS vendor dir)."""
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    (src_dir / "app.js").write_text("function f() { return 1; }\n", encoding="utf-8")
+
+    vendor = tmp_path / "node_modules" / "some-lib"
+    vendor.mkdir(parents=True)
+    (vendor / "index.js").write_text(
+        # Deliberate SAFE501: bare while(true) with no break.
+        "function loop() { while (true) { work(); } }\n",
+        encoding="utf-8",
+    )
+
+    engine = SafetyEngine(DEFAULTS)
+    discovered = engine.check_path(str(tmp_path))
+    discovered_paths = {r.path for r in discovered}
+
+    assert str(src_dir / "app.js") in discovered_paths
+    assert not any("node_modules" in p for p in discovered_paths)
+
+
+def test_engine_explicit_empty_exclude_paths_clears_defaults(tmp_path: Path) -> None:
+    """Setting ``exclude_paths = []`` is the documented escape hatch — defaults dropped."""
+    venv = tmp_path / ".venv"
+    venv.mkdir()
+    inside = venv / "vendor.py"
+    inside.write_text("x = 1\n", encoding="utf-8")
+
+    # Empty list explicitly overrides defaults. The .venv file is now discovered.
+    config = deep_merge(DEFAULTS, {"exclude_paths": []})
+    engine = SafetyEngine(config)
+    discovered = engine.check_path(str(tmp_path))
+    discovered_paths = {r.path for r in discovered}
+
+    assert str(inside) in discovered_paths, "exclude_paths=[] should clear vendor-dir defaults"
+
+
+def test_engine_extend_exclude_paths_appends_to_defaults(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``extend_exclude_paths`` appends without losing the vendor-dir defaults.
+
+    Runs from cwd=tmp_path (matching real CLI usage where users invoke
+    ``safelint check .`` from the project root) so single-component
+    patterns like ``legacy_vendor/**`` match the relative paths
+    discovery produces.
+    """
+    # .venv (would be pruned by defaults), legacy_vendor (project-specific extra)
+    (tmp_path / ".venv").mkdir()
+    (tmp_path / ".venv" / "vendor.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "legacy_vendor").mkdir()
+    (tmp_path / "legacy_vendor" / "old.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "app.py").write_text("def f(): return 1\n", encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+    config = deep_merge(DEFAULTS, {"extend_exclude_paths": ["legacy_vendor/**"]})
+    engine = SafetyEngine(config)
+    discovered = engine.check_path(".")
+    discovered_paths = {r.path for r in discovered}
+
+    assert any("app.py" in p for p in discovered_paths), f"expected app.py in: {discovered_paths}"
+    assert not any(".venv" in p for p in discovered_paths), "vendor defaults must still be active"
+    assert not any("legacy_vendor" in p for p in discovered_paths), "extend_exclude_paths must be applied"
+
+
+def test_engine_extend_exclude_paths_combines_with_explicit_exclude_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """``extend_exclude_paths`` appends to a user-set ``exclude_paths`` too (not just defaults).
+
+    Same cwd-based setup as the previous test — exclude patterns
+    are matched against walked paths, which are relative when the
+    target is relative.
+    """
+    # User wants tight control: no defaults, but two custom dirs.
+    (tmp_path / "build").mkdir()
+    (tmp_path / "build" / "out.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "generated").mkdir()
+    (tmp_path / "generated" / "x.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "src").mkdir()
+    (tmp_path / "src" / "app.py").write_text("def f(): return 1\n", encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+    config = deep_merge(
+        DEFAULTS,
+        {
+            "exclude_paths": ["build/**"],  # replaces defaults entirely
+            "extend_exclude_paths": ["generated/**"],  # appended on top
+        },
+    )
+    engine = SafetyEngine(config)
+    discovered = engine.check_path(".")
+    discovered_paths = {r.path for r in discovered}
+
+    assert any("app.py" in p for p in discovered_paths)
+    assert not any("build" in p for p in discovered_paths)
+    assert not any("generated" in p for p in discovered_paths)
+
+
+def test_engine_extend_exclude_paths_must_be_list_not_string() -> None:
+    """Bare-string typo for ``extend_exclude_paths`` raises TypeError, not silently coerce."""
+    config = deep_merge(DEFAULTS, {"extend_exclude_paths": "build/**"})
+    with pytest.raises(TypeError, match="extend_exclude_paths"):
+        SafetyEngine(config)
+
+
+def test_engine_exclude_paths_must_be_list_not_string() -> None:
+    """Bare-string typo for ``exclude_paths`` raises TypeError, not silently coerce."""
+    config = deep_merge(DEFAULTS, {"exclude_paths": "build/**"})
+    with pytest.raises(TypeError, match="exclude_paths"):
+        SafetyEngine(config)
 
 
 def test_engine_disabled_rule_not_applied(tmp_path: Path) -> None:

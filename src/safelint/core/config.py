@@ -47,13 +47,24 @@ STANDALONE_TOML_FILENAME = "safelint.toml"
 # produce noise from code the user didn't author.
 #
 # **Two patterns per entry** because Python's ``fnmatch.fnmatchcase``
-# is anchored at both ends and doesn't span ``/`` separators in the
-# way some glob implementations do:
+# matches the entire path string (anchored at both ends), combined
+# with the literal ``/`` before ``<dir>`` in the nested form:
 #
 # * ``<dir>/**`` matches a top-level vendor dir (the most common case
-#   — e.g. ``.venv/`` directly under the project root).
-# * ``**/<dir>/**`` matches the same name nested anywhere in the tree
-#   (e.g. ``packages/foo/node_modules/``).
+#   — e.g. ``.venv/foo`` directly under the project root). The
+#   anchored start means this pattern does NOT match a nested
+#   occurrence like ``a/b/.venv/foo``.
+# * ``**/<dir>/**`` matches the same name nested anywhere else
+#   (e.g. ``packages/foo/node_modules/x``). The leading ``**/``
+#   requires SOME parent path with a slash separator before ``<dir>``,
+#   so this pattern does NOT match the top-level ``.venv/foo`` case
+#   (no leading parent path with ``/`` before ``.venv``).
+#
+# Note: fnmatch's ``*`` and ``**`` both match across ``/`` separators
+# (unlike pathspec / git-style globs where ``*`` is single-segment).
+# Verify with ``fnmatch.fnmatchcase("a/b/c", "*")`` — returns ``True``.
+# The reason we need both patterns is the *anchoring + literal slash*,
+# not a "wildcards don't span slashes" limitation.
 #
 # Users can:
 # * **Override completely** by setting ``exclude_paths = []`` in

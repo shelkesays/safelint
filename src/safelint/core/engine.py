@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
 
 from safelint.core import _cache, _diagnostics
+from safelint.core._validators import _validated_string_list
 from safelint.core.config import DEFAULTS, SEVERITY_ORDER
 from safelint.languages import get_language_for_file, supported_extensions
 from safelint.languages._node_utils import lineno as node_lineno
@@ -430,22 +431,14 @@ class SafetyEngine:
           built-in vendor-dir defaults plus a few project-specific
           additions.
 
-        Both keys must be lists of strings; a bare-string typo
-        (``exclude_paths = "build/**"``) would otherwise be silently
-        coerced to a list of single characters and exclude nothing.
-        Fail loud instead.
+        Both keys go through the shared ``_validated_string_list`` so
+        bare-string typos (``exclude_paths = "build/**"``) fail loud
+        with the same TypeError shape users see elsewhere across the
+        config surface (``tracked_functions``, ``io_functions_*``,
+        ``global_namespaces_javascript``, etc.).
         """
-        base = config.get("exclude_paths", DEFAULTS["exclude_paths"])
-        extend = config.get("extend_exclude_paths", [])
-        for key, value in (("exclude_paths", base), ("extend_exclude_paths", extend)):
-            if not isinstance(value, (list, tuple)):
-                msg = f"{key} must be a list of strings, got {type(value).__name__}"
-                raise TypeError(msg)
-            non_strings = [e for e in value if not isinstance(e, str)]
-            if non_strings:
-                bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
-                msg = f"{key} must contain only strings — got: {bad}"
-                raise TypeError(msg)
+        base = _validated_string_list(config.get("exclude_paths", DEFAULTS["exclude_paths"]), "exclude_paths")
+        extend = _validated_string_list(config.get("extend_exclude_paths", []), "extend_exclude_paths")
         return [*base, *extend]
 
     @staticmethod
