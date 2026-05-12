@@ -696,7 +696,7 @@ def _matching_suffixes(filenames: list[str], unavailable: dict[str, str]) -> set
     ``rfind('.')`` on the full path would treat ``src/.ts`` as having
     suffix ``.ts`` (the rightmost dot is at index > 0 in the full
     string), but the file is actually a dotfile with no suffix. The
-    ``os.path.basename`` step strips any directory prefix so the
+    ``Path(name).name`` step strips any directory prefix so the
     ``idx > 0`` guard catches dotfiles in subdirectories too.
     """
     found: set[str] = set()
