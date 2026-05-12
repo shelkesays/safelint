@@ -224,15 +224,17 @@ Patterns are matched via Python's `fnmatch.fnmatchcase`. The match is **anchored
 Important — `fnmatch` is not segment-aware:
 
 - **`*`** matches any sequence of characters, **including `/`**. So `*.py` matches not just `foo.py` but also `deep/nested/foo.py` — the `*` happily spans path separators.
-- **`**`** has no special meaning — it's just `*` written twice and behaves identically to a single `*`. Patterns written with `**` work in safelint's vendor-dir defaults (e.g. `.venv/**`) only because the literal `/` before `**` forces a slash to appear at that position; the `**` itself isn't doing segment-aware work.
+- **`**`** has no special meaning in `fnmatch` — it's just `*` written twice and behaves identically to a single `*`. **This is a notable departure from gitignore / shell-glob conventions**, where `**` is the explicit "match across directory boundaries" wildcard. In safelint's matcher, `**` is *not* segment-aware; patterns like `.venv/**` work only because the literal `/` before `**` forces a slash to appear at that position (the `**` itself is just matching the rest of the path the same way a plain `*` would).
 - **`?`** matches exactly one character (including `/`).
 - **`[abc]`** matches one character from the set.
 
 Practical consequences:
 
 - `"tests/**"` matches anything starting with `tests/` (the literal `tests/` is anchored, then `**` matches the rest). This is what you want.
-- `"*.py"` matches any `.py` file at any depth — likely NOT what you want if you intended "only at the top level." Use `"./*.py"` (or list-target via the CLI) if you really want a single-level match.
-- `"**/*.py"` is equivalent to `"*.py"` for the same reason — both match any `.py` file at any depth.
+- `"*.py"` matches any `.py` file at any depth — likely NOT what you want if you intended "only at the top level." **There is no reliable `fnmatch` pattern that means "match only files at the top level of the project."** The engine matches against `Path(filepath).as_posix()`, which normalises away any leading `./` (so a hypothetical `"./*.py"` pattern would never match anything), and `*` already spans `/` (so `"*.py"` already matches at any depth). The practical alternatives when you really need a single-level scope are:
+    - **Explicitly list the files on the CLI** (e.g. let your shell expand `*.py` to a concrete file list: `safelint check *.py`).
+    - **Exclude the subdirectories you don't want** via `exclude_paths` / `extend_exclude_paths` (e.g. exclude `src/**`, `tests/**`, etc. to leave only top-level files).
+- `"**/*.py"` is equivalent to `"*.py"` for the same reason — neither pattern is limited to a single directory level; both match any `.py` file at any depth.
 - The vendor-dir defaults ship as `<dir>/**` plus `**/<dir>/**` per entry (see [Default exclude paths](#default-exclude-paths) above) because the literal `/` in each pattern is what does the work, not the `*` / `**` wildcards.
 
 ### How it differs from other suppression mechanisms
