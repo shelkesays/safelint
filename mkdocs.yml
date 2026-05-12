@@ -91,6 +91,7 @@ nav:
   - Languages:
       - Python: languages/python.md
       - JavaScript: languages/javascript.md
+      - TypeScript: languages/typescript.md
   - Configuration:
       - Overview: configuration/index.md
       - CLI flags and commands: configuration/cli.md
