@@ -28,9 +28,10 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 
 # ``count_mode = "statements"`` is language-aware: each language has a
 # different notion of what counts as a statement node. Python is wired
-# up; JS will be added in a follow-up slice (the universal ``lines`` /
-# ``logical_lines`` modes work for JS today). A language not in this
-# table raises a clear error rather than silently miscounting.
+# up; JS / TS files use the universal ``lines`` (default) or
+# ``logical_lines`` modes — adding a JS / TS statement-set is possible
+# but the universal modes have proven sufficient in practice. A language
+# not in this table raises a clear error rather than silently miscounting.
 _STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # Tree-sitter node types that count as "one statement" for Python.
     # Lined up with what Python's ``ast`` module would call statement nodes

@@ -114,12 +114,12 @@ User-explicit `_javascript`-suffixed config keys always win over the runtime pre
 ```yaml
 # .pre-commit-config.yaml
 repos:
-  - repo: https://github.com/srahul07/safelint
+  - repo: https://github.com/shelkesays/safelint
     rev: <tag>             # pin to a release
     hooks:
       - id: safelint
-        # The published hook lints both python and javascript filetypes
-        # by default. Optional: scope to a directory.
+        # The published hook lints python, javascript, and typescript
+        # filetypes by default. Optional: scope to a directory.
         files: ^src/
 ```
 
@@ -142,4 +142,4 @@ All of these accept a list of strings; bare-string typos like `"log"` (instead o
 
 ## Contributing
 
-Want to refine a rule's JavaScript behaviour, add a runtime preset, or fix a parser edge case? See [Adding a language](../contributing/adding-a-language.md) for the architecture overview, or open an issue / PR against the [main repo](https://github.com/shelkesays/safelint). TypeScript support is on the roadmap and will reuse most of this infrastructure — contributions welcome there too.
+Want to refine a rule's JavaScript behaviour, add a runtime preset, or fix a parser edge case? See [Adding a language](../contributing/adding-a-language.md) for the architecture overview, or open an issue / PR against the [main repo](https://github.com/shelkesays/safelint). TypeScript (including TSX and AssemblyScript) reuses this infrastructure end-to-end — see the [TypeScript language page](typescript.md) for the per-language notes.

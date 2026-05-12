@@ -33,9 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **`docs/configuration/rules.md` language coverage section** updated to count 17 cross-language (Python / JS / TS), 2 Python-only, 1 JS-family-only (JS + TS).
 - **`docs/configuration/toml.md`** gained a "TypeScript and the `_javascript` config keys" subsection documenting the TS → JS fallback precedence with a concrete example of when to split the keys per language.
 
-### Fixed (latent Slice 1 bug)
+### Fixed
 
-- **SAFE303 / SAFE304 on TypeScript** — `side_effects.py:_io_funcs_for_lang` built its config key via `f"io_functions_{lang_name}"`, producing `io_functions_typescript` for TS files. That key wasn't in `DEFAULTS` (only `io_functions_javascript` was), so TS files silently got an empty I/O primitive list and SAFE303 / SAFE304 never fired on TypeScript. The Slice 3 helper fixes this via the TS → JS fallback. Regression test added (`test_ts_io_functions_inherits_javascript_default`).
+- **SAFE303 / SAFE304 on TypeScript** — `side_effects.py:_io_funcs_for_lang` built its config key via `f"io_functions_{lang_name}"`, producing `io_functions_typescript` for TS files. That key wasn't in `DEFAULTS` (only `io_functions_javascript` was), so TS files silently got an empty I/O primitive list and SAFE303 / SAFE304 never fired on TypeScript. The new TS → JS config-key fallback (see Added above) fixes this. Regression test added (`test_ts_io_functions_inherits_javascript_default`).
 
 ## [1.13.0] - 2026-05-12
 
@@ -97,7 +97,7 @@ The rest of this section describes the JavaScript support that landed in `1.13.0
       - id: safelint
         files: ^src/   # restore the previous default if needed
   ```
-- **`call_name`** in `_node_utils.py` extended (during Slice 3) to handle JavaScript `member_expression` (`obj.method(...)`) alongside Python `attribute` (`obj.method(...)`). Both `foo(...)` forms (bare identifier function calls) continue to resolve via the existing `identifier` branch.
+- **`call_name`** in `_node_utils.py` extended to handle JavaScript `member_expression` (`obj.method(...)`) alongside Python `attribute` (`obj.method(...)`). Both `foo(...)` forms (bare identifier function calls) continue to resolve via the existing `identifier` branch.
 
 ### Stays Python-only (by design)
 
