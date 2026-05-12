@@ -82,6 +82,18 @@ max_lines = 80
 
 See [Configuration file](../configuration/toml.md) for the full list of top-level keys and [Rules reference](../configuration/rules.md) for every per-rule option.
 
+## Installing the Python extra
+
+v2.0.0 ships every language grammar — Python included — as an opt-in extra so projects only install what they actually lint:
+
+```bash
+pip install 'safelint[python]'              # Python-only project
+pip install 'safelint[python,javascript]'   # Python + JS monorepo
+pip install 'safelint[all]'                 # kitchen-sink
+```
+
+`pip install safelint` (no extras) installs only the engine. safelint will emit `safelint: warning: skipping .py files — install with: pip install 'safelint[python]'` on first run when it finds Python files but the grammar isn't installed — no hard error.
+
 ## Pre-commit integration
 
 ```yaml
@@ -91,11 +103,13 @@ repos:
     rev: <tag>             # pin to a release
     hooks:
       - id: safelint
+        # Every safelint hook needs an extra in v2.0.0+ — including Python-only projects.
+        additional_dependencies: ['safelint[python]']
         # Optional: scope to a directory
         files: ^src/
 ```
 
-The published hook spec sets `types_or: [python, javascript, ts, tsx]` and no `files:` filter — add your own `files:` / `exclude:` keys to scope it.
+The published hook spec sets `types_or: [python, javascript, ts, tsx]` and no `files:` filter — add your own `files:` / `exclude:` keys to scope it. Mixed-language projects compose extras: `additional_dependencies: ['safelint[python,javascript]']` (or `[all]`).
 
 ## Python-specific config keys
 

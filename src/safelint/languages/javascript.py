@@ -18,16 +18,48 @@ in ``docs/contributing/adding-a-language.md`` Step 4.
 from __future__ import annotations
 
 import tree_sitter
-import tree_sitter_javascript
 
 from safelint.languages._types import LanguageDefinition
 
 
-_JAVASCRIPT_TS_LANGUAGE = tree_sitter.Language(tree_sitter_javascript.language())
+# Grammar import is *optional* — JavaScript support ships in the ``[javascript]``
+# extra. Python-only users (``pip install safelint``) don't need to install
+# ``tree-sitter-javascript`` and shouldn't pay the disk / install cost. Module
+# import always succeeds; whether the parser can actually be constructed
+# depends on ``_GRAMMAR_AVAILABLE``.
+try:
+    import tree_sitter_javascript  # type: ignore[import-not-found]
+
+    _JAVASCRIPT_TS_LANGUAGE: tree_sitter.Language | None = tree_sitter.Language(tree_sitter_javascript.language())
+    _GRAMMAR_AVAILABLE = True
+# Silent fallback is intentional: the CLI surfaces the install hint
+# at lint time via ``_emit_missing_grammar_warnings``. Logging here
+# would noise up every safelint import for users on non-JS extras.
+# Coverage exclusion: see the note in ``python.py``.
+except ImportError:  # nosafe: SAFE203
+    _JAVASCRIPT_TS_LANGUAGE = None
+    _GRAMMAR_AVAILABLE = False
+
+
+#: Install hint surfaced by the CLI when a user has ``.js`` / ``.mjs`` / ``.cjs``
+#: files in their project but ``tree-sitter-javascript`` isn't installed. Kept
+#: as a module-level string so the CLI can pull it without re-deriving the
+#: extra name.
+GRAMMAR_INSTALL_HINT = "pip install 'safelint[javascript]'"
 
 
 def _create_javascript_parser() -> tree_sitter.Parser:
-    """Return a fresh Tree-sitter parser configured for JavaScript."""
+    """Return a fresh Tree-sitter parser configured for JavaScript.
+
+    Raises :class:`ImportError` with a clear install hint if
+    ``tree-sitter-javascript`` isn't installed. The registry filters
+    ``.js`` / ``.mjs`` / ``.cjs`` out of ``supported_extensions()`` when
+    the grammar isn't available, so this error is reached only when
+    something bypasses the registry (rare in normal flow).
+    """
+    if _JAVASCRIPT_TS_LANGUAGE is None:
+        msg = f"tree-sitter-javascript is not installed. Run: {GRAMMAR_INSTALL_HINT}"
+        raise ImportError(msg)
     return tree_sitter.Parser(_JAVASCRIPT_TS_LANGUAGE)
 
 

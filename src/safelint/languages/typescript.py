@@ -40,25 +40,55 @@ silently ignored. Same limitation as JavaScript; documented in
 from __future__ import annotations
 
 import tree_sitter
-import tree_sitter_typescript
 
 from safelint.languages._types import LanguageDefinition
 
 
-# Two distinct Tree-sitter grammars: one for ``.ts`` / ``.as``, one for ``.tsx``.
-# Loaded once at module import — Tree-sitter language objects are immutable
-# and parser instances are cheap to construct from them.
-_TYPESCRIPT_TS_LANGUAGE = tree_sitter.Language(tree_sitter_typescript.language_typescript())
-_TSX_TS_LANGUAGE = tree_sitter.Language(tree_sitter_typescript.language_tsx())
+# Grammar import is *optional* — TypeScript support ships in the ``[typescript]``
+# extra. Module import always succeeds; parser construction errors with a clear
+# install hint if the grammar package isn't present.
+try:
+    import tree_sitter_typescript  # type: ignore[import-not-found]
+
+    _TYPESCRIPT_TS_LANGUAGE: tree_sitter.Language | None = tree_sitter.Language(tree_sitter_typescript.language_typescript())
+    _TSX_TS_LANGUAGE: tree_sitter.Language | None = tree_sitter.Language(tree_sitter_typescript.language_tsx())
+    _GRAMMAR_AVAILABLE = True
+# Silent fallback is intentional: the CLI surfaces the install hint
+# at lint time via ``_emit_missing_grammar_warnings``. Logging here
+# would noise up every safelint import for users on non-TS extras.
+# Coverage exclusion: see the note in ``python.py``.
+except ImportError:  # nosafe: SAFE203
+    _TYPESCRIPT_TS_LANGUAGE = None
+    _TSX_TS_LANGUAGE = None
+    _GRAMMAR_AVAILABLE = False
+
+
+#: Install hint surfaced by the CLI when a user has ``.ts`` / ``.tsx`` / ``.as``
+#: files but ``tree-sitter-typescript`` isn't installed.
+GRAMMAR_INSTALL_HINT = "pip install 'safelint[typescript]'"
 
 
 def _create_typescript_parser() -> tree_sitter.Parser:
-    """Return a fresh Tree-sitter parser configured for TypeScript (``.ts`` / ``.as``)."""
+    """Return a fresh Tree-sitter parser configured for TypeScript (``.ts`` / ``.as``).
+
+    Raises :class:`ImportError` with a clear install hint if
+    ``tree-sitter-typescript`` isn't installed.
+    """
+    if _TYPESCRIPT_TS_LANGUAGE is None:
+        msg = f"tree-sitter-typescript is not installed. Run: {GRAMMAR_INSTALL_HINT}"
+        raise ImportError(msg)
     return tree_sitter.Parser(_TYPESCRIPT_TS_LANGUAGE)
 
 
 def _create_tsx_parser() -> tree_sitter.Parser:
-    """Return a fresh Tree-sitter parser configured for TSX (``.tsx``)."""
+    """Return a fresh Tree-sitter parser configured for TSX (``.tsx``).
+
+    Raises :class:`ImportError` with a clear install hint if
+    ``tree-sitter-typescript`` isn't installed.
+    """
+    if _TSX_TS_LANGUAGE is None:
+        msg = f"tree-sitter-typescript is not installed. Run: {GRAMMAR_INSTALL_HINT}"
+        raise ImportError(msg)
     return tree_sitter.Parser(_TSX_TS_LANGUAGE)
 
 

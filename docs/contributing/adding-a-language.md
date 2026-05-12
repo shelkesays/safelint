@@ -155,6 +155,20 @@ Update both of these:
 
 The CLI's git-status filters (`_collect_all_supported_files`, `_filter_supported_files` in `cli.py`, plus the hook-mode pre-filter at the bottom of `main()`) call `supported_extensions()` directly and need no edit.
 
+### 6b. Wire the grammar package as an optional extra
+
+Tree-sitter grammar packages ship as **optional extras** so a Python-only project never pays for a grammar it'll never use. Adding a new language means adding a new extra alongside `[javascript]` / `[typescript]` / `[all]`:
+
+1. **`pyproject.toml`** — add a `<lang> = ["tree-sitter-<lang>>=…"]` entry under `[project.optional-dependencies]`. If the new language is *typically* paired with another (the way TS is paired with JS), include the paired grammar in the same extra. Append the new grammar package(s) to the existing `all` extra so `pip install 'safelint[all]'` continues to cover the whole supported set. Also add them to `dev` so `uv sync --extra dev` keeps the full test suite working.
+
+2. **`src/safelint/languages/<lang>.py`** — gate the grammar import with `try` / `except ImportError`, mirroring `javascript.py` / `typescript.py`. Set a `_GRAMMAR_AVAILABLE` flag and a `GRAMMAR_INSTALL_HINT` module-level string (e.g. `"pip install 'safelint[go]'"`). The parser-factory function raises `ImportError` with that same hint when invoked without the grammar installed.
+
+3. **`src/safelint/languages/__init__.py`** — gate the new language's registry entry on `<lang>_mod._GRAMMAR_AVAILABLE`, mirroring the JS / TS blocks. When the grammar isn't installed, register the extensions in `_UNAVAILABLE_EXTENSIONS` (mapped to the hint string) so the CLI can surface a per-language install hint at lint time.
+
+The user-facing flow then becomes: `pip install safelint` (Python only) → `pip install 'safelint[go]'` to add Go → the CLI emits `safelint: warning: skipping .go files — install with: pip install 'safelint[go]'` if the user has `.go` files but hasn't installed the extra yet.
+
+The CLI's missing-grammar hint helpers (`_emit_missing_grammar_warnings`, `_emit_hook_grammar_warnings`, `_scan_for_unavailable_extensions`) are language-agnostic — they read directly from `unavailable_extensions()` and need no edit when a new language lands.
+
 #### Optional: runtime presets
 
 Some languages have meaningfully different default API surfaces depending on where the code runs — JavaScript is the canonical example: the same `.js` source can target Node.js (with `fs` / `child_process` / `process`), browsers (with DOM / Web APIs), Deno (`Deno.*`), Cloudflare Workers (Web APIs + KV / R2), or Bun. SafeLint exposes this via the `[tool.safelint.javascript] runtime = "..."` config table and a `_JS_RUNTIME_PRESETS` dict in `core/config.py`.

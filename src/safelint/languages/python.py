@@ -2,21 +2,56 @@
 
 Registers Python as a supported language and exposes all Python-specific
 Tree-sitter node type constants that rules use for type-checking nodes.
+
+Grammar import is *optional* — Python support ships in the ``[python]``
+extra (``pip install 'safelint[python]'``). Module import always
+succeeds; whether ``tree-sitter-python`` is actually loaded depends on
+:data:`_GRAMMAR_AVAILABLE`. This keeps non-Python projects from paying
+the disk / install cost of a grammar they'll never use.
 """
 
 from __future__ import annotations
 
 import tree_sitter
-import tree_sitter_python
 
 from safelint.languages._types import LanguageDefinition
 
 
-_PYTHON_TS_LANGUAGE = tree_sitter.Language(tree_sitter_python.language())
+try:
+    import tree_sitter_python  # type: ignore[import-not-found]
+
+    _PYTHON_TS_LANGUAGE: tree_sitter.Language | None = tree_sitter.Language(tree_sitter_python.language())
+    _GRAMMAR_AVAILABLE = True
+# Silent fallback is intentional: the CLI surfaces the install hint
+# at lint time via ``_emit_missing_grammar_warnings``. Logging here
+# would noise up every safelint import for users on non-Python extras.
+# Coverage of this branch is excluded via ``except ImportError:`` in
+# ``[tool.coverage.report].exclude_lines`` — the dev environment
+# always installs the grammar, so the branch is genuinely unreachable
+# in tests; behaviour is verified via monkeypatching the resulting
+# state in ``tests/core/test_optional_grammars.py``.
+except ImportError:  # nosafe: SAFE203
+    _PYTHON_TS_LANGUAGE = None
+    _GRAMMAR_AVAILABLE = False
+
+
+#: Install hint surfaced by the CLI when a user has ``.py`` / ``.pyw``
+#: files but ``tree-sitter-python`` isn't installed.
+GRAMMAR_INSTALL_HINT = "pip install 'safelint[python]'"
 
 
 def _create_python_parser() -> tree_sitter.Parser:
-    """Return a fresh Tree-sitter parser configured for Python."""
+    """Return a fresh Tree-sitter parser configured for Python.
+
+    Raises :class:`ImportError` with a clear install hint if
+    ``tree-sitter-python`` isn't installed. The registry filters
+    ``.py`` / ``.pyw`` out of ``supported_extensions()`` when the
+    grammar isn't available, so this error is reached only when
+    something bypasses the registry (rare in normal flow).
+    """
+    if _PYTHON_TS_LANGUAGE is None:
+        msg = f"tree-sitter-python is not installed. Run: {GRAMMAR_INSTALL_HINT}"
+        raise ImportError(msg)
     return tree_sitter.Parser(_PYTHON_TS_LANGUAGE)
 
 
