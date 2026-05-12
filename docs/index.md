@@ -4,7 +4,17 @@
 
 SafeLint complements your existing linters. Where ruff handles style and pylint catches general defects, SafeLint enforces a focused set of *safety* rules — the kind you'd want in code that has to be reviewable, testable, and predictably-terminating. It's a CLI, a pre-commit hook, a JSON / SARIF emitter for editor and CI consumers, and an [AI-client skill](ai-clients/index.md) that twelve agents (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) speak.
 
-Languages: **Python** (`.py`, `.pyw`), **JavaScript** (`.js`, `.mjs`, `.cjs` — runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine; per-runtime *defaults* are switchable via [`[tool.safelint.javascript] runtime = "..."`](configuration/toml.md#javascript-runtime-presets)), and **TypeScript** including **AssemblyScript** (`.ts`, `.tsx`, `.as` — reuses the JS rule implementations end-to-end with TS-specific handling for type-only constructs; shares JS runtime presets since TS compiles to JS). 17 rules apply to all three languages; 2 are Python-only (the `bare_except` and `global_state` keywords don't have JS/TS equivalents) and 1 is JavaScript-family-only (the `var` keyword's function-scoping hazard doesn't exist in Python, but applies to both `.js` and `.ts`). **Planned future languages** (in working-priority order, no timelines committed): Go, Rust, Java, C, C++, PHP — see the [language-coverage roadmap](configuration/rules.md#planned).
+## Currently supported languages
+
+| Language | Extensions | Notes |
+|----------|------------|-------|
+| **Python** | `.py`, `.pyw` | — |
+| **JavaScript** | `.js`, `.mjs`, `.cjs` | Runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine. Per-runtime *defaults* are switchable via [`[tool.safelint.javascript] runtime = "..."`](configuration/toml.md#javascript-runtime-presets). |
+| **TypeScript** (including **AssemblyScript**) | `.ts`, `.tsx`, `.as` | Reuses the JS rule implementations end-to-end with TS-specific handling for type-only constructs (generics, `as` casts, non-null assertions, `declare global` blocks, etc.). Shares JS runtime presets since TS compiles to JS. |
+
+**Rule coverage:** 17 rules apply to all three languages; 2 are Python-only (`bare_except`, `global_state` — the keywords don't exist in JS/TS) and 1 is JavaScript-family-only (`wide_scope_declaration` — `var`'s function-scoping hazard doesn't exist in Python, but applies to both `.js` and `.ts`).
+
+**Planned future languages** (in working-priority order, no timelines committed): Go, Rust, Java, C, C++, PHP — see the [language-coverage roadmap](configuration/rules.md#planned).
 
 ## Quick start
 
