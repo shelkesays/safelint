@@ -219,7 +219,21 @@ The `per_file_ignores` key suppresses specific rules for files matching a glob p
 
 Both rule codes (e.g. `SAFE101`) and rule names (e.g. `function_length`) are accepted and can be mixed in the same list. Multiple patterns can match a file — their ignore lists are unioned. Suppressed violations are counted in the end-of-run summary alongside `# nosafe` suppressions.
 
-Patterns follow shell-glob semantics via Python's `fnmatch` module, where `**` matches any number of path segments (including zero), `*` matches within a single segment, and matching is case-sensitive on all platforms. The same dialect applies to `exclude_paths` and `extend_exclude_paths`.
+Patterns are matched via Python's `fnmatch.fnmatchcase`. The match is **anchored at both ends** (the entire path string must match the pattern) and **case-sensitive on all platforms**. The same matcher applies to `exclude_paths` and `extend_exclude_paths`.
+
+Important — `fnmatch` is not segment-aware:
+
+- **`*`** matches any sequence of characters, **including `/`**. So `*.py` matches not just `foo.py` but also `deep/nested/foo.py` — the `*` happily spans path separators.
+- **`**`** has no special meaning — it's just `*` written twice and behaves identically to a single `*`. Patterns written with `**` work in safelint's vendor-dir defaults (e.g. `.venv/**`) only because the literal `/` before `**` forces a slash to appear at that position; the `**` itself isn't doing segment-aware work.
+- **`?`** matches exactly one character (including `/`).
+- **`[abc]`** matches one character from the set.
+
+Practical consequences:
+
+- `"tests/**"` matches anything starting with `tests/` (the literal `tests/` is anchored, then `**` matches the rest). This is what you want.
+- `"*.py"` matches any `.py` file at any depth — likely NOT what you want if you intended "only at the top level." Use `"./*.py"` (or list-target via the CLI) if you really want a single-level match.
+- `"**/*.py"` is equivalent to `"*.py"` for the same reason — both match any `.py` file at any depth.
+- The vendor-dir defaults ship as `<dir>/**` plus `**/<dir>/**` per entry (see [Default exclude paths](#default-exclude-paths) above) because the literal `/` in each pattern is what does the work, not the `*` / `**` wildcards.
 
 ### How it differs from other suppression mechanisms
 
