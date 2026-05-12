@@ -85,21 +85,47 @@ def _python_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None
     return None
 
 
-def _unwrap_parenthesized(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
-    """Strip every layer of ``parenthesized_expression`` around *node*.
+#: Node types that are pure compile-time / no-op-at-runtime annotations
+#: in the JS-family AST. Unwrapping them recovers the underlying
+#: ownership-chain expression — `(globalThis as any).x = 1` writes to
+#: the same global as `globalThis.x = 1`, and the `!` non-null
+#: assertion / `satisfies` clause / parens are all the same shape.
+_PASSTHROUGH_WRAPPER_TYPES = frozenset(
+    {
+        "parenthesized_expression",
+        "as_expression",  # TS: ``x as Foo``
+        "satisfies_expression",  # TS: ``x satisfies Foo``
+        "non_null_expression",  # TS: ``x!``
+    }
+)
 
-    Parentheses don't change the underlying ownership chain in JS —
-    ``(globalThis).x`` writes to the same object as ``globalThis.x``,
-    and ``((process).env).NODE_ENV`` is the same write as
-    ``process.env.NODE_ENV``. Without unwrapping, every left-walk step
-    that lands on a parenthesised expression would break the
-    bare-identifier check at the end of
+
+def _unwrap_parenthesized(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Strip every layer of pass-through wrapper around *node*.
+
+    Pass-through wrappers in the JS family are nodes that don't change
+    the underlying ownership chain at runtime — parentheses
+    (``(globalThis).x``), TypeScript type assertions
+    (``(globalThis as any).x``), ``satisfies`` clauses, and non-null
+    assertions (``globalThis!.x``). All of them produce the same write
+    at runtime; the wrapping is purely syntactic / type-system metadata.
+
+    Without unwrapping, every left-walk step that lands on one of these
+    wrappers would break the bare-identifier check at the end of
     :func:`_javascript_global_namespace_root` (and the LHS-type filter
-    in :meth:`GlobalMutationRule._javascript_violations_for_func`)
-    and silently skip the violation.
+    in :meth:`GlobalMutationRule._javascript_violations_for_func`) and
+    silently skip the violation — particularly painful for TypeScript
+    code where the ``(globalThis as any).foo = ...`` pattern is the
+    standard escape hatch for adding properties to the global object.
     """
     cur = node
-    while cur is not None and cur.type == "parenthesized_expression":  # nosafe: SAFE501
+    while cur is not None and cur.type in _PASSTHROUGH_WRAPPER_TYPES:  # nosafe: SAFE501
+        # ``parenthesized_expression`` has the inner expression as its
+        # first (and only) named child. ``as_expression`` /
+        # ``satisfies_expression`` use the same convention — the
+        # expression being cast is the first named child, the type is
+        # the second. ``non_null_expression`` wraps the inner
+        # expression as its first (and only) named child too.
         named = cur.named_children
         cur = named[0] if named else None
     return cur

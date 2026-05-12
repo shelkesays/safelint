@@ -49,10 +49,26 @@ _JS_COUNTED_PARAM_TYPES = frozenset(
     }
 )
 
+# TypeScript wraps each formal parameter in a typed wrapper node:
+# ``required_parameter`` (``x: number``), ``optional_parameter``
+# (``x?: number``), ``rest_parameter`` (``...args: number[]``). The
+# bare JS shapes don't appear in TS source. Note: ``type_parameters``
+# (the ``<T, U>`` generic list) is a SEPARATE child of the function
+# declaration, NOT inside ``formal_parameters``, so generic type
+# parameters are correctly excluded from the count without any
+# additional handling.
+_TS_COUNTED_PARAM_TYPES = frozenset(
+    {
+        "required_parameter",
+        "optional_parameter",
+        "rest_parameter",
+    }
+)
+
 _COUNTED_PARAM_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": _PY_COUNTED_PARAM_TYPES,
     "javascript": _JS_COUNTED_PARAM_TYPES,
-    "typescript": _JS_COUNTED_PARAM_TYPES,
+    "typescript": _TS_COUNTED_PARAM_TYPES,
 }
 
 
