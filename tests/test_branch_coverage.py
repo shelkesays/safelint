@@ -70,10 +70,15 @@ def test_nosafe_codes_returns_false_for_directive_with_garbage_after_nosafe() ->
 
 
 def test_check_file_returns_empty_for_excluded_path(tmp_path: Path) -> None:
-    """A file matching ``exclude_paths`` returns an empty LintResult immediately."""
+    """A file matching an exclude pattern returns an empty LintResult immediately.
+
+    Uses ``extend_exclude_paths`` (the documented recommended form)
+    so it models real-world usage; the matcher behaviour is identical
+    regardless of which key fed the pattern.
+    """
     sample = tmp_path / "skip_me.py"
     sample.write_text("def foo():\n    if True:\n        if True:\n            if True:\n                pass\n", encoding="utf-8")
-    cfg = deep_merge(DEFAULTS, {"exclude_paths": [str(sample)]})
+    cfg = deep_merge(DEFAULTS, {"extend_exclude_paths": [str(sample)]})
     result = SafetyEngine(cfg).check_file(str(sample))
     assert result.violations == []
     assert result.suppressed == []

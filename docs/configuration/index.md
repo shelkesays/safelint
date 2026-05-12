@@ -13,9 +13,14 @@ Per-rule options (`max_lines`, `max_depth`, dataflow `sinks`, …) and what each
 ```toml
 # pyproject.toml — every key is optional; defaults match the section below.
 [tool.safelint]
-mode = "local"          # "local" → fail on errors only; "ci" → fail on warnings too
-fail_on = "error"       # overrides mode if both are set
-exclude_paths = ["migrations/**"]
+mode = "local"                            # "local" → fail on errors only; "ci" → fail on warnings too
+fail_on = "error"                         # overrides mode if both are set
+# Append project-specific dirs on top of the built-in vendor-dir
+# defaults (.venv/, venv/, node_modules/, build/, dist/, __pycache__/,
+# .pytest_cache/, .ruff_cache/, .mypy_cache/, .tox/, .nox/, htmlcov/,
+# site-packages/). Prefer this over ``exclude_paths`` (which replaces
+# defaults entirely — see the Configuration file reference).
+extend_exclude_paths = ["migrations/**"]
 ignore = ["SAFE203"]
 
 [tool.safelint.per_file_ignores]
