@@ -7,6 +7,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.14.0rc1] - 2026-05-12
+
+**TypeScript (and AssemblyScript) is now a supported language alongside Python and JavaScript.** Registry-driven multi-language support extends to `.ts` / `.tsx` / `.as` files via the existing JavaScript rule implementations — TS compiles to JS at runtime and the AST is a JS superset, so the cross-language rules dispatch directly to JS code with TypeScript-specific handling only where the type system genuinely changes things (generic type parameters, `as` casts, non-null assertions, `declare global` ambient declarations, etc.). 18 rules now lint TypeScript — the 17 cross-language rules plus SAFE305 (`wide_scope_declaration`, which also fires on TS because `var` is still legal there and still hazardous). Install with `pip install safelint==1.14.0rc1 --pre`.
+
+**Release candidate for v1.14.0** — published as an RC so the TypeScript support can be validated against real-world TS / Angular / Next.js / Deno codebases before promoting to stable. Same promotion path as v1.13.0: if real-world testing surfaces issues, fixes land in `1.14.0rc2`; otherwise the RC promotes directly to GA. The `--pre` flag is required because `pip install safelint` without it keeps tracking 1.13.0.
+
+### Added
+
+- **TypeScript (`.ts`) and TSX (`.tsx`) as registered languages** — `tree-sitter-typescript>=0.23.0` added as a runtime dependency. Two grammars (`typescript` and `tsx`) under one logical language name (`"typescript"`); both grammars share the same rule dispatch.
+- **AssemblyScript (`.as`) ride-along** — `.as` files are parsed with the standard TypeScript grammar; no separate registration, zero parser-side work. AssemblyScript users get the full TypeScript rule suite for free.
+- **TypeScript-specific rule handling** for the AST shapes JS rules didn't recognise:
+  - **SAFE103 (max_arguments)** — generic type parameters (`<T, U, V>`) live in a separate `type_parameters` AST node, NOT inside `formal_parameters`, so they correctly don't count toward the limit. New `_TS_COUNTED_PARAM_TYPES` set recognises `required_parameter` / `optional_parameter` / `rest_parameter` wrappers.
+  - **SAFE302 (global_mutation)** — new `_PASSTHROUGH_WRAPPER_TYPES` set extends paren-unwrapping with TS-only `as_expression` / `satisfies_expression` / `non_null_expression`. `(globalThis as any).counter = 1` now correctly resolves to `globalThis` and fires. `declare global { ... }` ambient blocks correctly don't fire (no runtime assignments inside).
+  - **SAFE801 (tainted_sink)** — `_SPREADING_TYPES` in `JsTaintTracker` extends to TS pass-through wrappers; taint flows through `eval(userInput as string)` / `eval(userInput satisfies T)` / `eval(userInput!)`. The same TS wrapper types (`required_parameter` etc.) are now recognised as parameter shapes, so TS function parameters get seeded into the tainted set.
+  - **SAFE803 (null_dereference)** — unwraps `non_null_expression` before checking whether the object is a nullable call; `users.find()!.name` correctly fires (the `!` is a TS-only annotation, zero runtime safety).
+  - **SAFE701 / SAFE702 (test_existence / test_coupling)** — generate TS test filename patterns (`foo.test.ts` / `foo.spec.ts` / `foo.test.tsx` / `foo.spec.tsx` / `foo.test.as` / `foo.spec.as`). A `foo.ts` source pairs with TS tests, not JS tests.
+- **Per-language config-key precedence with TS → JS fallback** — new `get_per_language_config` helper in `safelint.core._validators`. For TypeScript files, every `_javascript`-suffixed config key (`sinks_javascript`, `tracked_functions_javascript`, `global_namespaces_javascript`, `io_functions_javascript`, `assertion_calls_javascript`, `nullable_methods_javascript`, `flagged_calls_javascript`, plus `sanitizers_javascript` / `sources_javascript`) is automatically inherited unless an explicit `_typescript`-suffixed key overrides it. The override door is open; most projects won't need to use it because TS and JS share the same runtime threat surface.
+- **`docs/languages/typescript.md`** — new per-language nav page covering scope (TS / TSX / AS), the 18 rules that fire, TS-specific rule notes, config sharing with JS, and the runtime preset story.
+- **`src/safelint/skill_files/languages/typescript.md`** — bundled AI-client addendum with TS-specific rule notes; all 12 client skill files now reference it from their language registry table.
+
+### Changed
+
+- **17 cross-language rules** widened from `language = ("python", "javascript")` to `("python", "javascript", "typescript")`. SAFE305 (`wide_scope_declaration`) widened from `("javascript",)` to `("javascript", "typescript")` — `var` is still hazardous in TypeScript.
+- **`docs/configuration/rules.md` language coverage section** updated to count 17 cross-language (Python / JS / TS), 2 Python-only, 1 JS-family-only (JS + TS).
+- **`docs/configuration/toml.md`** gained a "TypeScript and the `_javascript` config keys" subsection documenting the TS → JS fallback precedence with a concrete example of when to split the keys per language.
+
+### Fixed (latent Slice 1 bug)
+
+- **SAFE303 / SAFE304 on TypeScript** — `side_effects.py:_io_funcs_for_lang` built its config key via `f"io_functions_{lang_name}"`, producing `io_functions_typescript` for TS files. That key wasn't in `DEFAULTS` (only `io_functions_javascript` was), so TS files silently got an empty I/O primitive list and SAFE303 / SAFE304 never fired on TypeScript. The Slice 3 helper fixes this via the TS → JS fallback. Regression test added (`test_ts_io_functions_inherits_javascript_default`).
+
 ## [1.13.0] - 2026-05-12
 
 Previewed as `1.13.0rc1` (2026-05-11) and `1.13.0rc2` (2026-05-11). The RC validation window surfaced one real-world papercut — `safelint check --all-files` would trip over project virtualenvs at `.venv/` — which landed in `1.13.0rc2` (built-in vendor-dir defaults for `exclude_paths`, plus a new `extend_exclude_paths` config key for additive use). No further issues surfaced after rc2, so the GA ships with the same content. Install with `pip install safelint` (the `--pre` flag is no longer needed).
@@ -425,7 +455,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.13.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v1.14.0rc1...HEAD
+[1.14.0rc1]: https://github.com/shelkesays/safelint/compare/v1.13.0...v1.14.0rc1
 [1.13.0]: https://github.com/shelkesays/safelint/compare/v1.12.2...v1.13.0
 [1.12.2]: https://github.com/shelkesays/safelint/compare/v1.12.1...v1.12.2
 [1.12.1]: https://github.com/shelkesays/safelint/compare/v1.12.0...v1.12.1
