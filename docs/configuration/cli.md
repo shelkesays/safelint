@@ -81,11 +81,11 @@ All three triggers print a `safelint: error:` line to stderr before exiting; pre
 
 | Trigger | Path | Stderr message |
 |---|---|---|
-| **Directory mode** (`safelint check src/ --all-files`) discovers files but none get linted because every grammar is missing | `_check_exit_code` after `_run_check`'s lint pass | `safelint: error: no files linted — every supported file was skipped because its grammar package isn't installed. See warnings above.` |
-| **Git-modified mode** (default `safelint check src/`) — user modified files but every one was dropped by the supported-extensions filter | `_handle_no_targets` in the no-targets short-circuit | `safelint: error: no files linted — every git-modified source file has a grammar that isn't installed. See warnings above.` |
-| **Hook mode** (pre-commit invokes `safelint <files>`) — every passed file has an extension whose grammar isn't installed | `_guard_hook_silent_failure` before the engine runs | `safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed. See warnings above.` |
+| **Directory mode** (`safelint check src/ --all-files`) discovers files but none get linted because every grammar is missing | `_check_exit_code` after `_run_check`'s lint pass | `safelint: error: no files linted — every supported file was skipped because its grammar package isn't installed — install with: pip install 'safelint[<lang>]'` |
+| **Git-modified mode** (default `safelint check src/`) — user modified files but every one was dropped by the supported-extensions filter | `_handle_no_targets` in the no-targets short-circuit | `safelint: error: no files linted — every git-modified source file has a grammar that isn't installed — install with: pip install 'safelint[<lang>]'` |
+| **Hook mode** (pre-commit invokes `safelint <files>`) — every passed file has an extension whose grammar isn't installed | `_guard_hook_silent_failure` before the engine runs | `safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed — add 'safelint[<lang>]' to additional_dependencies in your .pre-commit-config.yaml` |
 
-Each trigger is preceded by one stderr warning per missing grammar, listing the extensions affected and the install hint (`pip install 'safelint[<lang>]'` in direct-CLI runs; `add 'safelint[<lang>]' to additional_dependencies in your .pre-commit-config.yaml` under pre-commit, detected via the `PRE_COMMIT=1` env var pre-commit sets at hook execution time).
+Each error embeds the install hint for the missing extras so the failure is self-explanatory in machine output modes (JSON / SARIF suppress the per-extension stderr warnings) and even when no prior warnings were printed (e.g. the no-targets short-circuit). The hint phrasing flips between `install with: pip install 'safelint[<lang>]'` (direct CLI) and `add 'safelint[<lang>]' to additional_dependencies in your .pre-commit-config.yaml` (pre-commit, detected via `PRE_COMMIT=1`). In pretty mode the trigger is also preceded by one stderr warning per missing grammar listing the affected extensions.
 
 ## `safelint` hook mode flags (pre-commit)
 
