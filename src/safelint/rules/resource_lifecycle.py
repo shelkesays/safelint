@@ -9,10 +9,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
+from safelint.core._validators import _validated_string_list  # re-exported for backwards-compat
 from safelint.languages._node_utils import call_name, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import CALL, WITH_ITEM
 from safelint.rules.base import BaseRule
+
+
+# ``_validated_string_list`` was historically defined in this module
+# and re-exported because several rules import it from here. It now
+# lives in ``safelint.core._validators`` so core/ and rules/ can
+# share the helper without cross-rule imports. The line above keeps
+# the old import path working — third-party rules / forks doing
+# ``from safelint.rules.resource_lifecycle import _validated_string_list``
+# don't break.
 
 
 if TYPE_CHECKING:
@@ -21,29 +31,6 @@ if TYPE_CHECKING:
     import tree_sitter
 
     from safelint.rules.base import Violation
-
-
-def _validated_string_list(value: object, key_name: str) -> list[str]:
-    """Validate that *value* is a list/tuple of strings, return it as a list.
-
-    Raises :class:`TypeError` if *value* is anything else — including a bare
-    ``str``, which Python would otherwise silently coerce into a list of
-    individual characters via ``list(...)``. The early raise turns a typo
-    like ``tracked_functions = "open"`` (note the missing brackets) into a
-    clear error rather than a tracker that mysteriously matches single
-    letters.
-    """
-    if not isinstance(value, (list, tuple)):
-        msg = f"{key_name} must be a list of strings, got {type(value).__name__}"
-        raise TypeError(msg)
-    non_strings = [item for item in value if not isinstance(item, str)]
-    if non_strings:
-        bad = ", ".join(f"{type(item).__name__}({item!r})" for item in non_strings)
-        msg = f"{key_name} must contain only strings — got: {bad}"
-        raise TypeError(msg)
-    # Both checks above guarantee every element is a str; the list
-    # comprehension is a typing-only re-narrowing for ty/mypy.
-    return [item for item in value if isinstance(item, str)]
 
 
 def _with_item_call(item: tree_sitter.Node) -> tree_sitter.Node | None:
