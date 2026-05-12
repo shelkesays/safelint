@@ -41,12 +41,33 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # of ``_SPREADING_TYPES`` in ``analysis/dataflow_javascript.py``;
 # kept narrower (no binary / unary / ternary) because for SAFE803
 # we only care about pure pass-throughs, not full taint propagation.
+def _peel_js_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Descend through TS / JS pass-through wrappers, returning the inner expression.
+
+    Handles ``type_assertion`` (TS angle-bracket cast ``<Foo>x``)
+    specially because the type comes first and the expression second;
+    every other pass-through wrapper has the expression as the first
+    named child. AST depth is bounded by Tree-sitter's own depth cap,
+    so the loop doesn't need an explicit counter — ``# nosafe: SAFE501``
+    on the while.
+    """
+    while node is not None and node.type in _JS_PASSTHROUGH_WRAPPER_TYPES and node.named_children:  # nosafe: SAFE501
+        node = node.named_children[1] if node.type == "type_assertion" and len(node.named_children) >= 2 else node.named_children[0]
+    return node
+
+
 _JS_PASSTHROUGH_WRAPPER_TYPES = frozenset(
     {
         "parenthesized_expression",
         "as_expression",
         "satisfies_expression",
         "non_null_expression",
+        # ``<Foo>x`` — older TS angle-bracket cast syntax, equivalent
+        # to ``as`` but discouraged in TSX (collides with JSX). Plain
+        # TS files still use it; SAFE803 must peel it the same as the
+        # ``as`` cast or ``(call as Foo)!.bar`` would only be partly
+        # handled.
+        "type_assertion",
     }
 )
 
@@ -440,12 +461,7 @@ class NullDereferenceRule(BaseRule):
         # Optional chaining is the safe form — skip it entirely.
         if any(c.type == "optional_chain" for c in node.children):
             return None
-        obj = node.child_by_field_name("object")
-        # Loop is bounded by AST depth (each iteration descends one level into
-        # ``named_children[0]``); Tree-sitter caps node depth well below
-        # Python's recursion limit, so no explicit bound is needed.
-        while obj is not None and obj.type in _JS_PASSTHROUGH_WRAPPER_TYPES and obj.named_children:  # nosafe: SAFE501
-            obj = obj.named_children[0]
+        obj = _peel_js_passthrough(node.child_by_field_name("object"))
         if obj is None or obj.type != "call_expression":
             return None
         name = call_name(obj)

@@ -718,15 +718,18 @@ def _scan_for_unavailable_extensions(target: Path, unavailable: dict[str, str]) 
     return seen
 
 
-def _emit_missing_grammar_warnings(target: Path) -> set[str]:
-    """Warn once per missing-grammar language found under *target*; return the set found.
+def _emit_missing_grammar_warnings(target: Path, *, silent: bool = False) -> set[str]:
+    """Walk *target*, return the set of unavailable extensions found; emit warnings unless *silent*.
 
-    Returns the set of unavailable file extensions that were actually
-    seen in the target tree (subset of :func:`unavailable_extensions`
-    keys). Callers use the returned set to detect total-skip: when
-    file discovery yields zero lintable files AND this returned set
-    is non-empty, the run is silently doing nothing useful and the
-    caller should fail loud rather than report a clean pass.
+    The walk and the set-return run unconditionally — that's what the
+    silent-failure guard in :func:`_check_exit_code` consumes to fire
+    exit code 2 in *every* output mode. The stderr warnings, however,
+    are gated on *silent*: pretty mode prints them, JSON / SARIF mode
+    suppresses them so the tooling-consumer stderr stays clean for
+    parsing pipelines (matching the changelog claim).
+
+    Set ``silent=True`` for machine output modes; leave default for
+    interactive runs.
 
     No-op (returns empty set) when every grammar extra is installed
     or when the target tree contains no unavailable-extension files.
@@ -735,8 +738,8 @@ def _emit_missing_grammar_warnings(target: Path) -> set[str]:
     if not unavailable:
         return set()
     seen_exts = _scan_for_unavailable_extensions(target, unavailable)
-    if not seen_exts:
-        return set()
+    if not seen_exts or silent:
+        return seen_exts
     grouped: dict[str, list[str]] = {}
     for ext in sorted(seen_exts):
         grouped.setdefault(unavailable[ext], []).append(ext)
@@ -759,14 +762,11 @@ def _emit_hook_grammar_warnings(files: list[str]) -> set[str]:
     unavailable = unavailable_extensions()
     if not unavailable:
         return set()
-    seen_exts: set[str] = set()
-    for f in files:
-        # Mirror ``Path.suffix`` semantics — ``idx > 0`` (not ``!= -1``)
-        # so a literal file named ``.ts`` / ``.gitignore`` doesn't
-        # spuriously match an unavailable extension.
-        idx = f.rfind(".")
-        if idx > 0 and f[idx:] in unavailable:
-            seen_exts.add(f[idx:])
+    # Reuse ``_matching_suffixes`` so the dotfile-aware suffix logic
+    # (``idx > 0`` matching ``Path.suffix`` semantics) lives in one
+    # place. Both this helper and the directory walker use the same
+    # rule for "what counts as a suffix".
+    seen_exts = _matching_suffixes(files, unavailable)
     if not seen_exts:
         return set()
     grouped: dict[str, list[str]] = {}
@@ -800,7 +800,7 @@ def _check_exit_code(
     return 1 if all_blocking else 0
 
 
-def _guard_hook_silent_failure(passed: list[str], filtered: list[str], unavailable_in_passed: set[str]) -> None:
+def _guard_hook_silent_failure(passed: list[str], filtered: list[str], unavailable_in_passed: set[str]) -> int:
     """Exit code 2 when every pre-commit-passed file was dropped for missing grammars.
 
     Pre-commit reports the hook as Passed whenever safelint exits 0,
@@ -811,13 +811,15 @@ def _guard_hook_silent_failure(passed: list[str], filtered: list[str], unavailab
     and the user is directed to ``additional_dependencies`` (the lever
     they actually have in hook-only setups).
 
-    No-op when the caller passed no files, when files passed
-    filtering, or when no unavailable extensions were seen — those
-    are normal flows.
+    Returns the exit code the caller should pass to ``sys.exit``: 0
+    when everything is fine, 2 when the silent-failure case fires.
+    Pure function — caller decides whether to actually exit. Makes
+    the helper unit-testable without monkey-patching ``sys.exit``.
     """
     if passed and not filtered and unavailable_in_passed:
         _diagnostics.print_error("no files linted — every file pre-commit passed had a grammar that isn't installed. See warnings above.")
-        sys.exit(2)
+        return 2
+    return 0
 
 
 def _compose_extras_install_command(extras: set[str]) -> str:
@@ -897,10 +899,11 @@ def _run_check(args: argparse.Namespace) -> int:
     target = Path(args.target)
     output_format: str = getattr(args, "output_format", "pretty")
 
-    # Always compute the unavailable-extension set so the silent-failure
-    # guard fires in JSON / SARIF mode too (where hidden-green CI runs
-    # are most dangerous). Stderr warnings stay separate from stdout.
-    unavailable_found = _emit_missing_grammar_warnings(target)
+    # Compute the unavailable-extension set in every output mode so the
+    # silent-failure guard fires for JSON / SARIF runs too. Stderr
+    # warnings are pretty-mode only — JSON / SARIF consumers expect a
+    # quiet stderr alongside the parseable stdout document.
+    unavailable_found = _emit_missing_grammar_warnings(target, silent=(output_format != "pretty"))
 
     changed_files, files, no_targets = _resolve_check_targets(args, target, output_format)
     config = load_config(_config_dir(Path(config_path) if config_path else None, target))
@@ -1602,11 +1605,23 @@ def main() -> None:
         args = _build_skill_parser().parse_args(argv_for_skill)
         sys.exit(_run_skill(args))
 
+    sys.exit(_dispatch_hook_mode())
+
+
+def _dispatch_hook_mode() -> int:
+    """Pre-commit hook entry path used by :func:`main` when no subcommand matched.
+
+    Parses positional file arguments, filters to supported extensions,
+    runs the silent-failure guard (exits with code 2 if every file
+    would be skipped for a missing grammar), and otherwise hands off
+    to :func:`_run_hook`. Extracted from :func:`main` to keep that
+    function's cyclomatic complexity below the project's safelint cap.
+    """
     args = _build_hook_parser().parse_args()
     extensions = tuple(supported_extensions())
     files = [f for f in args.files if f.endswith(extensions)]
-    _guard_hook_silent_failure(args.files, files, _emit_hook_grammar_warnings(args.files))
-    sys.exit(_run_hook(args, files))
+    guard_rc = _guard_hook_silent_failure(args.files, files, _emit_hook_grammar_warnings(args.files))
+    return guard_rc or _run_hook(args, files)
 
 
 if __name__ == "__main__":

@@ -4,7 +4,7 @@ This guide is the cheat sheet for adding support for a new programming language 
 
 !!! note
 
-    Today only Python is registered. The supporting structure (parser hookup, file-discovery loop, suppression parser) is already language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants, and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.
+    Today Python, JavaScript, and TypeScript (including TSX and AssemblyScript) are all registered. The supporting structure (parser hookup, file-discovery loop, suppression parser, optional-grammar extras) is fully language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants and gates the grammar import behind the matching `[project.optional-dependencies]` extra (see Step 1 + Step 6b), and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.
 
 !!! warning "Bundled AI-client skills also need an update"
 
@@ -21,19 +21,28 @@ This guide is the cheat sheet for adding support for a new programming language 
 
 ## Step-by-step: adding TypeScript as an example
 
-### 1. Add the Tree-sitter grammar dependency
+### 1. Add the Tree-sitter grammar as an opt-in extra
 
-Add the grammar to `pyproject.toml`:
+v2.0.0+ ships every language grammar as a PEP 621 optional extra so projects only install what they need. Grammars go under `[project.optional-dependencies]` in `pyproject.toml`, **not** under top-level `dependencies` (which keeps only `tree-sitter` itself — the engine that loads grammars at runtime). See Step 6b for the full wiring; the minimal pyproject delta is:
 
 ```toml
+[project]
 dependencies = [
-    "tree-sitter>=0.23.0",
+    "tree-sitter>=0.23.0",        # core engine; required for every install
+]
+
+[project.optional-dependencies]
+typescript = [                    # ← new extra named after the language
+    "tree-sitter-typescript>=0.23.0",
+]
+all = [                           # append the new grammar to ``[all]`` too
     "tree-sitter-python>=0.23.0",
-    "tree-sitter-typescript>=0.23.0",   # ← new
+    "tree-sitter-javascript>=0.23.0",
+    "tree-sitter-typescript>=0.23.0",   # ← keep in sync with the per-language extra above
 ]
 ```
 
-Run `uv sync` to pull it.
+Run `uv sync --extra dev` to pull the new grammar into the dev environment (the `dev` extra self-references `[all]`).
 
 ### 2. Create the language module
 
@@ -165,7 +174,7 @@ Tree-sitter grammar packages ship as **optional extras** so a Python-only projec
 
 3. **`src/safelint/languages/__init__.py`** — gate the new language's registry entry on `<lang>_mod._GRAMMAR_AVAILABLE`, mirroring the JS / TS blocks. When the grammar isn't installed, register the extensions in `_UNAVAILABLE_EXTENSIONS` (mapped to the hint string) so the CLI can surface a per-language install hint at lint time.
 
-The user-facing flow then becomes: `pip install safelint` (Python only) → `pip install 'safelint[go]'` to add Go → the CLI emits `safelint: warning: skipping .go files — install with: pip install 'safelint[go]'` if the user has `.go` files but hasn't installed the extra yet.
+The user-facing flow then becomes: `pip install 'safelint[python]'` (or `pip install 'safelint[all]'`) → `pip install 'safelint[go]'` to add Go → the CLI emits `safelint: warning: skipping .go files — install with: pip install 'safelint[go]'` if the user has `.go` files but hasn't installed the extra yet.
 
 The CLI's missing-grammar hint helpers (`_emit_missing_grammar_warnings`, `_emit_hook_grammar_warnings`, `_scan_for_unavailable_extensions`) are language-agnostic — they read directly from `unavailable_extensions()` and need no edit when a new language lands.
 

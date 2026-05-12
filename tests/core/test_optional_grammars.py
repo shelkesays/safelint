@@ -148,7 +148,18 @@ def test_registry_skips_typescript_when_grammar_unavailable(monkeypatch: pytest.
 
 
 def test_install_hint_for_returns_none_for_supported_extension() -> None:
-    """``install_hint_for(".py")`` returns None since Python is in core deps."""
+    """``install_hint_for(".py")`` returns None when the Python grammar is installed.
+
+    In v2.0.0+ Python is *not* in core deps — it's an opt-in extra
+    like every other language. This test returns None because the
+    dev / test environment has the ``[python]`` extra installed (via
+    the ``dev`` extra that self-references ``[all]``); when the
+    grammar is absent, ``.py`` will appear in
+    :func:`unavailable_extensions` and ``install_hint_for`` returns
+    the install hint. See
+    :func:`test_install_hint_for_returns_hint_when_grammar_unavailable`
+    for the unavailable-state version.
+    """
     assert install_hint_for(".py") is None
 
 

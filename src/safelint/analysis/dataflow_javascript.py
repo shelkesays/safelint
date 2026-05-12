@@ -43,13 +43,19 @@ if TYPE_CHECKING:
 # propagate taint — e.g. ``const x = await transform(input);`` keeps
 # ``x`` tainted when ``input`` is and ``transform`` is taint-preserving.
 #
-# TypeScript adds three compile-time-only wrappers (``as_expression``
-# for ``x as Foo``, ``satisfies_expression`` for ``x satisfies Foo``,
-# ``non_null_expression`` for ``x!``). All are zero-runtime-cost
-# annotations — the runtime value is identical to the inner
-# expression — so taint flows straight through them. Without these
-# entries, ``eval(userInput as string)`` would silently slip past
-# SAFE801 because the tracker would drop taint on the ``as`` cast.
+# TypeScript adds four compile-time-only wrappers — all zero-runtime-
+# cost annotations whose runtime value is identical to the inner
+# expression. Without these entries, ``eval(userInput as string)``
+# would silently slip past SAFE801 because the tracker would drop
+# taint on the cast.
+#
+#   * ``as_expression`` — ``x as Foo``
+#   * ``satisfies_expression`` — ``x satisfies Foo``
+#   * ``non_null_expression`` — ``x!``
+#   * ``type_assertion`` — ``<Foo>x`` (older TS angle-bracket cast
+#     syntax; equivalent to ``as`` but discouraged in TSX files
+#     because it collides with JSX. Still legal in plain TS — taint
+#     must propagate through it the same as through ``as_expression``)
 _SPREADING_TYPES = frozenset(
     {
         "binary_expression",
@@ -64,6 +70,7 @@ _SPREADING_TYPES = frozenset(
         "as_expression",
         "satisfies_expression",
         "non_null_expression",
+        "type_assertion",
     }
 )
 

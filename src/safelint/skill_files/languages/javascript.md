@@ -22,14 +22,15 @@ For pre-commit integration, the published hook accepts JavaScript via the `javas
 
 ```yaml
 - repo: https://github.com/shelkesays/safelint
-  rev: v1.13.0
+  rev: v2.0.0rc1  # pin to a release (use the GA tag once v2.0.0 ships)
   hooks:
     - id: safelint
+      additional_dependencies: ['safelint[javascript]']
 ```
 
 ## File extensions
 
-safelint lints `.js`, `.mjs`, and `.cjs` files in JavaScript / Node projects. JSX (`.jsx`) and TypeScript (`.ts`, `.tsx`) are *not* registered today — JSX may be added later as part of JavaScript; TypeScript is a separate language addition. The skill doesn't need to filter by extension — `safelint check` walks the project and picks up the registered extensions automatically.
+safelint lints `.js`, `.mjs`, and `.cjs` files in JavaScript / Node projects. TypeScript (`.ts` / `.tsx` / `.as` / AssemblyScript) is also fully supported but lives in a separate language module — see the [TypeScript skill addendum](typescript.md) for TS-specific notes. JSX (`.jsx`) is not yet registered (would land as part of JavaScript when added). The skill doesn't need to filter by extension — `safelint check` walks the project and picks up the registered extensions automatically.
 
 ## Runtime presets
 

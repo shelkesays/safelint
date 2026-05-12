@@ -441,25 +441,40 @@ def test_check_exit_code_returns_0_when_no_files_and_no_unavailable() -> None:
     assert _check_exit_code(results=[], unavailable_found=set(), all_blocking=[]) == 0
 
 
-def test_guard_hook_silent_failure_exits_2_when_every_passed_file_unavailable(mocker: MockerFixture) -> None:
-    """Hook-mode guard exits 2 when pre-commit passed files but none could be linted."""
-    mock_exit = mocker.patch("safelint.cli.sys.exit")
-    _guard_hook_silent_failure(passed=["app.py", "lib.py"], filtered=[], unavailable_in_passed={".py"})
-    mock_exit.assert_called_once_with(2)
+def test_guard_hook_silent_failure_returns_2_when_every_passed_file_unavailable() -> None:
+    """Hook-mode guard returns 2 (exit-code suggestion) when pre-commit passed files but none could be linted."""
+    rc = _guard_hook_silent_failure(passed=["app.py", "lib.py"], filtered=[], unavailable_in_passed={".py"})
+    assert rc == 2
 
 
-def test_guard_hook_silent_failure_noops_when_some_files_linted(mocker: MockerFixture) -> None:
-    """Mixed run with some lintable files — guard doesn't fire."""
-    mock_exit = mocker.patch("safelint.cli.sys.exit")
-    _guard_hook_silent_failure(passed=["app.py", "lib.ts"], filtered=["app.py"], unavailable_in_passed={".ts"})
-    mock_exit.assert_not_called()
+def test_guard_hook_silent_failure_returns_0_when_some_files_linted() -> None:
+    """Mixed run with some lintable files — guard doesn't trigger, returns 0."""
+    rc = _guard_hook_silent_failure(passed=["app.py", "lib.ts"], filtered=["app.py"], unavailable_in_passed={".ts"})
+    assert rc == 0
 
 
-def test_guard_hook_silent_failure_noops_when_no_files_passed(mocker: MockerFixture) -> None:
-    """Pre-commit invokes the hook with no files — not a misconfig, no fail."""
-    mock_exit = mocker.patch("safelint.cli.sys.exit")
-    _guard_hook_silent_failure(passed=[], filtered=[], unavailable_in_passed=set())
-    mock_exit.assert_not_called()
+def test_guard_hook_silent_failure_returns_0_when_no_files_passed() -> None:
+    """Pre-commit invokes the hook with no files — not a misconfig, returns 0."""
+    rc = _guard_hook_silent_failure(passed=[], filtered=[], unavailable_in_passed=set())
+    assert rc == 0
+
+
+def test_emit_missing_grammar_warnings_silent_mode_suppresses_stderr_keeps_return_set(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """``silent=True`` suppresses stderr warnings but still returns the seen-extension set.
+
+    The silent-failure guard depends on the return value to fire exit
+    code 2 in JSON / SARIF mode; the stderr warnings would noise up
+    tooling consumers' parse pipelines. Both must be independently
+    controllable.
+    """
+    (tmp_path / "main.py").write_text("x = 1\n", encoding="utf-8")
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={".py": "pip install 'safelint[python]'"},
+    )
+    seen = _emit_missing_grammar_warnings(tmp_path, silent=True)
+    assert seen == {".py"}  # return value preserved for the silent-failure guard
+    assert capsys.readouterr().err == ""  # but no stderr noise for JSON / SARIF consumers
 
 
 def test_matching_suffixes_ignores_leading_dot_dotfiles() -> None:

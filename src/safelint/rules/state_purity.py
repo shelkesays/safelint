@@ -92,6 +92,7 @@ def _python_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None
 #: assertion / `satisfies` clause / parens are all the same shape.
 _PASSTHROUGH_WRAPPER_TYPES = frozenset(
     {
+        "type_assertion",  # TS: ``<Foo>x`` (angle-bracket cast, equivalent to ``as``)
         "parenthesized_expression",
         "as_expression",  # TS: ``x as Foo``
         "satisfies_expression",  # TS: ``x satisfies Foo``
@@ -120,14 +121,17 @@ def _unwrap_parenthesized(node: tree_sitter.Node | None) -> tree_sitter.Node | N
     """
     cur = node
     while cur is not None and cur.type in _PASSTHROUGH_WRAPPER_TYPES:  # nosafe: SAFE501
-        # ``parenthesized_expression`` has the inner expression as its
-        # first (and only) named child. ``as_expression`` /
-        # ``satisfies_expression`` use the same convention — the
-        # expression being cast is the first named child, the type is
-        # the second. ``non_null_expression`` wraps the inner
-        # expression as its first (and only) named child too.
+        # Pick the expression child. Most wrappers
+        # (``parenthesized_expression`` / ``as_expression`` /
+        # ``satisfies_expression`` / ``non_null_expression``) have the
+        # expression as the FIRST named child — the type (when present)
+        # is the second. ``type_assertion`` (TS angle-bracket cast
+        # ``<Foo>x``) is the exception: it has the type FIRST and the
+        # expression SECOND.
         named = cur.named_children
-        cur = named[0] if named else None
+        if not named:
+            return None
+        cur = named[1] if cur.type == "type_assertion" and len(named) >= 2 else named[0]
     return cur
 
 

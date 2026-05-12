@@ -198,6 +198,28 @@ def test_ts_combined_wrappers_do_not_bypass_safe803(tmp_path: Path) -> None:
     assert any(v.code == "SAFE803" for v in result.violations), "stacked wrappers should still fire — all four are zero-runtime-cost"
 
 
+def test_ts_angle_bracket_cast_does_not_bypass_safe803(tmp_path: Path) -> None:
+    """``(<User>users.find(...)).name`` — older angle-bracket cast syntax must not bypass SAFE803.
+
+    TypeScript's angle-bracket cast (``<Foo>x``) is equivalent to
+    ``x as Foo`` at runtime — both are zero-cost annotations the
+    compiler strips. Tree-sitter parses this as ``type_assertion``
+    (NOT ``as_expression``), so SAFE803 needs the node type in its
+    pass-through wrapper set or the rule silently passes on plain TS
+    files that prefer angle-bracket casts. (Angle-bracket casts are
+    discouraged in TSX because they collide with JSX, but they're
+    still legal in plain ``.ts`` files.)
+    """
+    sample = tmp_path / "anglecast.ts"
+    sample.write_text(
+        "interface User { name: string; }\nfunction f(users: User[]): string {\n  return (<User>users.find((u: User) => u.name === 'a')).name;\n}\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert any(v.code == "SAFE803" for v in result.violations), "(<User>users.find(...)).name should fire — angle-bracket cast is compile-time-only"
+
+
 # ---------------------------------------------------------------------------
 # SAFE801 tainted_sink — `as` cast must not break taint propagation
 # ---------------------------------------------------------------------------
