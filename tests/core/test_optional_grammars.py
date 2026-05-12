@@ -180,11 +180,7 @@ def test_every_language_has_its_own_extra() -> None:
     provides_extras = set(md.get_all("Provides-Extra") or [])
     expected = {"python", "javascript", "typescript", "all"}
     missing = expected - provides_extras
-    assert not missing, (
-        f"v2.0.0 contract: every supported language must have its own "
-        f"opt-in extra. Missing from wheel metadata: {sorted(missing)}. "
-        f"Provides-Extra: {sorted(provides_extras)}"
-    )
+    assert not missing, f"v2.0.0 contract: every supported language must have its own opt-in extra. Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"
 
 
 def test_dev_install_has_every_grammar() -> None:
@@ -193,7 +189,4 @@ def test_dev_install_has_every_grammar() -> None:
     If this test fails, ``uv sync --extra dev`` is missing one of the
     grammar deps — fix ``pyproject.toml`` rather than the test.
     """
-    assert unavailable_extensions() == {}, (
-        "Dev install should have every grammar. Missing: "
-        f"{set(unavailable_extensions())}. Run `uv sync --extra dev`."
-    )
+    assert unavailable_extensions() == {}, f"Dev install should have every grammar. Missing: {set(unavailable_extensions())}. Run `uv sync --extra dev`."
