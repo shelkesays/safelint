@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 
 import pytest
 
-from safelint.cli import _file_summary_line, _make_summary, _run_hook
+from safelint.cli import _emit_hook_grammar_warnings, _emit_missing_grammar_warnings, _file_summary_line, _format_install_action, _make_summary, _run_hook, _scan_for_unavailable_extensions
 from safelint.core.engine import LintResult
 from safelint.rules.base import Violation
 
@@ -227,3 +227,168 @@ def test_run_hook_prints_summary_when_suppressed(tmp_path: Path, capsys: pytest.
     # Clean run should NOT print the no-suggestions / no-fixes line.
     assert "No suggestions available" not in out
     assert "No fixes available" not in out
+
+
+# ---------------------------------------------------------------------------
+# v2.0.0 — missing-grammar hint
+# ---------------------------------------------------------------------------
+
+
+def test_scan_for_unavailable_extensions_finds_matching_files(tmp_path: Path) -> None:
+    """Walker reports the set of unavailable extensions actually present under *target*."""
+    (tmp_path / "app.ts").write_text("x = 1;\n", encoding="utf-8")
+    (tmp_path / "module.js").write_text("x = 1;\n", encoding="utf-8")
+    (tmp_path / "main.py").write_text("x = 1\n", encoding="utf-8")
+    found = _scan_for_unavailable_extensions(tmp_path, {".ts": "hint-ts", ".js": "hint-js"})
+    assert found == {".ts", ".js"}
+
+
+def test_scan_for_unavailable_extensions_returns_empty_when_no_matches(tmp_path: Path) -> None:
+    """No unavailable-extension files → empty set, regardless of how many supported files exist."""
+    (tmp_path / "main.py").write_text("x = 1\n", encoding="utf-8")
+    assert _scan_for_unavailable_extensions(tmp_path, {".ts": "hint"}) == set()
+
+
+def test_scan_for_unavailable_extensions_skips_excluded_dirs(tmp_path: Path) -> None:
+    """The walk skips vendored / generated dirs so node_modules / .venv don't trigger spurious hints."""
+    node_modules = tmp_path / "node_modules"
+    node_modules.mkdir()
+    (node_modules / "lib.js").write_text("x = 1;\n", encoding="utf-8")
+    venv = tmp_path / ".venv"
+    venv.mkdir()
+    (venv / "dep.ts").write_text("x = 1;\n", encoding="utf-8")
+    (tmp_path / "main.py").write_text("x = 1\n", encoding="utf-8")
+    # Walker should report nothing — vendored dirs are filtered.
+    assert _scan_for_unavailable_extensions(tmp_path, {".ts": "hint-ts", ".js": "hint-js"}) == set()
+
+
+def test_scan_for_unavailable_extensions_handles_single_file_target(tmp_path: Path) -> None:
+    """Target may be a file (not just a directory) — single-file path is exercised."""
+    single = tmp_path / "lone.ts"
+    single.write_text("x = 1;\n", encoding="utf-8")
+    assert _scan_for_unavailable_extensions(single, {".ts": "hint"}) == {".ts"}
+
+
+def test_scan_for_unavailable_extensions_handles_nonexistent_target(tmp_path: Path) -> None:
+    """Target that doesn't exist (and isn't a file or dir) returns empty — no crash."""
+    missing = tmp_path / "does-not-exist"
+    assert _scan_for_unavailable_extensions(missing, {".ts": "hint"}) == set()
+
+
+def test_emit_missing_grammar_warnings_silent_when_no_unavailable_extensions(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """When every grammar is installed, the helper is a no-op (no stderr noise)."""
+    mocker.patch("safelint.cli.unavailable_extensions", return_value={})
+    _emit_missing_grammar_warnings(tmp_path)
+    assert capsys.readouterr().err == ""
+
+
+def test_emit_missing_grammar_warnings_emits_per_hint(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """One stderr line per unique install hint, listing the extensions covered."""
+    (tmp_path / "a.ts").write_text("x = 1;\n", encoding="utf-8")
+    (tmp_path / "b.tsx").write_text("x = 1;\n", encoding="utf-8")
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={
+            ".ts": "pip install 'safelint[typescript]'",
+            ".tsx": "pip install 'safelint[typescript]'",
+            ".as": "pip install 'safelint[typescript]'",
+        },
+    )
+    _emit_missing_grammar_warnings(tmp_path)
+    err = capsys.readouterr().err
+    # One line, listing both extensions present, with the single shared hint.
+    assert err.count("safelint: warning:") == 1
+    assert ".ts" in err
+    assert ".tsx" in err
+    assert "pip install 'safelint[typescript]'" in err
+
+
+def test_emit_hook_grammar_warnings_emits_only_for_passed_files(capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """Hook-mode helper takes the explicit file list — no directory walk."""
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={".ts": "pip install 'safelint[typescript]'"},
+    )
+    _emit_hook_grammar_warnings(["app.py", "module.ts", "other.py"])
+    err = capsys.readouterr().err
+    assert "safelint: warning:" in err
+    assert ".ts" in err
+    assert "pip install 'safelint[typescript]'" in err
+
+
+def test_emit_hook_grammar_warnings_silent_when_no_unavailable_files_passed(capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """Pure-Python file list with unavailable TS grammar still produces no warning (no TS files were passed)."""
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={".ts": "pip install 'safelint[typescript]'"},
+    )
+    assert _emit_hook_grammar_warnings(["app.py", "module.py"]) == set()
+    assert capsys.readouterr().err == ""
+
+
+def test_emit_hook_grammar_warnings_returns_seen_unavailable_extensions(mocker: MockerFixture) -> None:
+    """Return value lets ``main()`` detect the total-skip silent-failure case."""
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={".ts": "pip install 'safelint[typescript]'", ".js": "pip install 'safelint[javascript]'"},
+    )
+    assert _emit_hook_grammar_warnings(["app.ts", "lib.js", "other.py"]) == {".ts", ".js"}
+
+
+def test_emit_missing_grammar_warnings_returns_seen_extensions(tmp_path: Path, mocker: MockerFixture) -> None:
+    """Directory-walk variant also returns the set of unavailable extensions found."""
+    (tmp_path / "main.ts").write_text("x = 1;\n", encoding="utf-8")
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={".ts": "pip install 'safelint[typescript]'"},
+    )
+    assert _emit_missing_grammar_warnings(tmp_path) == {".ts"}
+
+
+# ---------------------------------------------------------------------------
+# Pre-commit context detection
+# ---------------------------------------------------------------------------
+
+
+def test_format_install_action_outside_precommit_uses_pip_install_phrasing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Without ``PRE_COMMIT`` env var, the hint nudges the user toward ``pip install``."""
+    monkeypatch.delenv("PRE_COMMIT", raising=False)
+    msg = _format_install_action("pip install 'safelint[python]'")
+    assert msg == "install with: pip install 'safelint[python]'"
+
+
+def test_format_install_action_under_precommit_uses_additional_dependencies_phrasing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """With ``PRE_COMMIT=1``, the hint switches to the additional_dependencies form.
+
+    Pre-commit users can't run ``pip install`` directly — the hook env
+    is isolated. ``additional_dependencies`` in ``.pre-commit-config.yaml``
+    is the actual lever they have.
+    """
+    monkeypatch.setenv("PRE_COMMIT", "1")
+    msg = _format_install_action("pip install 'safelint[python]'")
+    assert "additional_dependencies" in msg
+    assert ".pre-commit-config.yaml" in msg
+    assert "'safelint[python]'" in msg
+    assert "pip install" not in msg
+
+
+def test_format_install_action_typescript_extra_under_precommit(monkeypatch: pytest.MonkeyPatch) -> None:
+    """The pre-commit hint preserves whichever extra spec the language module exports."""
+    monkeypatch.setenv("PRE_COMMIT", "1")
+    msg = _format_install_action("pip install 'safelint[typescript]'")
+    assert "'safelint[typescript]'" in msg
+    assert "additional_dependencies" in msg
+
+
+def test_emit_warnings_use_precommit_hint_when_running_under_precommit(capsys: pytest.CaptureFixture[str], mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
+    """End-to-end: warning emitted in pre-commit context names additional_dependencies, not pip install."""
+    monkeypatch.setenv("PRE_COMMIT", "1")
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={".py": "pip install 'safelint[python]'"},
+    )
+    _emit_hook_grammar_warnings(["app.py"])
+    err = capsys.readouterr().err
+    assert "additional_dependencies" in err
+    assert ".pre-commit-config.yaml" in err
+    assert "pip install" not in err

@@ -27,6 +27,7 @@ import argparse
 from collections import Counter
 from dataclasses import dataclass
 import functools
+import os
 from pathlib import Path
 import shutil
 import subprocess
@@ -39,7 +40,7 @@ from safelint.core.config import MODE_FAIL_ON, SEVERITY_ORDER, load_config
 from safelint.core.engine import SafetyEngine
 from safelint.core.runner import resolve_cache_dir, run
 from safelint.formatters import format_json, format_sarif
-from safelint.languages import supported_extensions
+from safelint.languages import supported_extensions, unavailable_extensions
 
 
 if TYPE_CHECKING:
@@ -632,6 +633,187 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
     return changed_files, files, False
 
 
+# Default dir-name exclusions for the missing-grammar walk. Kept narrow —
+# this is a fast pre-scan whose purpose is to nudge users, not to mirror
+# the engine's full ``exclude_paths`` machinery. The common vendored /
+# generated / dependency trees below are virtually always gitignored; if
+# a user genuinely wants safelint to see ``.js`` files under
+# ``node_modules`` they're far enough off the beaten path to figure out
+# the install hint without our nudge.
+_GRAMMAR_SCAN_EXCLUDED_DIRS = frozenset(
+    {
+        ".git",
+        ".hg",
+        ".svn",
+        ".tox",
+        ".venv",
+        "venv",
+        "node_modules",
+        "dist",
+        "build",
+        "target",
+        "__pycache__",
+        ".pytest_cache",
+        ".mypy_cache",
+        ".ruff_cache",
+        ".safelint_cache",
+    }
+)
+
+
+def _format_install_action(install_hint: str) -> str:
+    """Format the user-facing install action for the active execution context.
+
+    *install_hint* is the canonical ``pip install 'safelint[<lang>]'``
+    string each language module exports. That command is the right
+    answer for direct CLI users — but useless to a pre-commit-only
+    user, who can't run pip directly because pre-commit manages the
+    hook's isolated environment. Detect via the ``PRE_COMMIT`` env
+    var pre-commit sets at hook execution time, and re-route the
+    advice to ``additional_dependencies`` (the actual lever a
+    pre-commit user has).
+    """
+    if os.environ.get("PRE_COMMIT") == "1":
+        prefix = "pip install "
+        spec = install_hint.removeprefix(prefix)
+        return f"add {spec} to additional_dependencies in your .pre-commit-config.yaml"
+    return f"install with: {install_hint}"
+
+
+def _matching_suffixes(filenames: list[str], unavailable: dict[str, str]) -> set[str]:
+    """Return the subset of *unavailable* extensions present in *filenames*."""
+    found: set[str] = set()
+    for name in filenames:
+        idx = name.rfind(".")
+        if idx != -1 and name[idx:] in unavailable:
+            found.add(name[idx:])
+    return found
+
+
+def _scan_for_unavailable_extensions(target: Path, unavailable: dict[str, str]) -> set[str]:
+    """Return the subset of *unavailable* extensions found under *target*.
+
+    Early-exits once every unavailable extension has been seen at least
+    once. Walks with the same default dir-name exclusions safelint uses
+    for its built-in ``exclude_paths`` so vendored ``node_modules`` /
+    ``.venv`` etc. don't trigger the hint spuriously.
+    """
+    if target.is_file():
+        return {target.suffix} if target.suffix in unavailable else set()
+    if not target.is_dir():
+        return set()
+    seen: set[str] = set()
+    target_set = set(unavailable)
+    for _dirpath, dirnames, filenames in os.walk(target, followlinks=False):
+        dirnames[:] = [d for d in dirnames if d not in _GRAMMAR_SCAN_EXCLUDED_DIRS]
+        seen.update(_matching_suffixes(filenames, unavailable))
+        if seen == target_set:
+            return seen
+    return seen
+
+
+def _emit_missing_grammar_warnings(target: Path) -> set[str]:
+    """Warn once per missing-grammar language found under *target*; return the set found.
+
+    Returns the set of unavailable file extensions that were actually
+    seen in the target tree (subset of :func:`unavailable_extensions`
+    keys). Callers use the returned set to detect total-skip: when
+    file discovery yields zero lintable files AND this returned set
+    is non-empty, the run is silently doing nothing useful and the
+    caller should fail loud rather than report a clean pass.
+
+    No-op (returns empty set) when every grammar extra is installed
+    or when the target tree contains no unavailable-extension files.
+    """
+    unavailable = unavailable_extensions()
+    if not unavailable:
+        return set()
+    seen_exts = _scan_for_unavailable_extensions(target, unavailable)
+    if not seen_exts:
+        return set()
+    grouped: dict[str, list[str]] = {}
+    for ext in sorted(seen_exts):
+        grouped.setdefault(unavailable[ext], []).append(ext)
+    for hint, exts in grouped.items():
+        exts_str = ", ".join(exts)
+        _diagnostics.print_warning(f"skipping {exts_str} files — {_format_install_action(hint)}")
+    return seen_exts
+
+
+def _emit_hook_grammar_warnings(files: list[str]) -> set[str]:
+    """Pre-commit / hook-mode variant of :func:`_emit_missing_grammar_warnings`.
+
+    Pre-commit hands files in directly; no directory walk needed. Group
+    the passed files by their unavailable extension, emit one warning
+    per missing grammar, and return the set of unavailable extensions
+    actually found among *files*. Callers use the return value to fail
+    loud when every passed file would be skipped — see ``main()`` for
+    the silent-failure guard.
+    """
+    unavailable = unavailable_extensions()
+    if not unavailable:
+        return set()
+    seen_exts: set[str] = set()
+    for f in files:
+        idx = f.rfind(".")
+        if idx == -1:
+            continue
+        suffix = f[idx:]
+        if suffix in unavailable:
+            seen_exts.add(suffix)
+    if not seen_exts:
+        return set()
+    grouped: dict[str, list[str]] = {}
+    for ext in sorted(seen_exts):
+        grouped.setdefault(unavailable[ext], []).append(ext)
+    for hint, exts in grouped.items():
+        exts_str = ", ".join(exts)
+        _diagnostics.print_warning(f"skipping {exts_str} files — {_format_install_action(hint)}")
+    return seen_exts
+
+
+def _check_exit_code(
+    results: list,  # list[LintResult] — typed loosely to avoid an import cycle in tests
+    unavailable_found: set[str],
+    all_blocking: list,  # list[Violation]
+) -> int:
+    """Resolve the exit code for ``_run_check`` after the lint completes.
+
+    Three cases:
+
+    * **Silent-failure** — file discovery saw unavailable-grammar files
+      AND nothing got linted. The run is reporting "clean" only because
+      no files were processed; surface this as exit 2 (configuration
+      error) so pre-commit / CI shows the hook as failed.
+    * **Blocking violations** — exit 1.
+    * **Clean / advisory only** — exit 0.
+    """
+    if not results and unavailable_found:
+        _diagnostics.print_error("no files linted — every supported file was skipped because its grammar package isn't installed. See warnings above.")
+        return 2
+    return 1 if all_blocking else 0
+
+
+def _guard_hook_silent_failure(passed: list[str], filtered: list[str], unavailable_in_passed: set[str]) -> None:
+    """Exit code 2 when every pre-commit-passed file was dropped for missing grammars.
+
+    Pre-commit reports the hook as Passed whenever safelint exits 0,
+    even if safelint linted zero files because every passed file's
+    grammar wasn't installed. That hidden-green run is the worst
+    failure mode — the user thinks safelint is running but nothing is
+    actually checked. Fail loud so pre-commit shows the hook as Failed
+    and the user is directed to ``additional_dependencies`` (the lever
+    they actually have in hook-only setups).
+
+    No-op when the caller passed no files, when files passed
+    filtering, or when no unavailable extensions were seen — those
+    are normal flows.
+    """
+    if passed and not filtered and unavailable_in_passed:
+        _diagnostics.print_error("no files linted — every file pre-commit passed had a grammar that isn't installed. See warnings above.")
+        sys.exit(2)
+
+
 def _emit_skill_freshness_warnings() -> None:
     """Emit a stderr warning for each stale AI-client skill install.
 
@@ -657,6 +839,12 @@ def _run_check(args: argparse.Namespace) -> int:
     config_path = getattr(args, "config", None)
     target = Path(args.target)
     output_format: str = getattr(args, "output_format", "pretty")
+
+    # Pretty mode only — JSON/SARIF stderr stays clean. Captured for
+    # the silent-failure guard below.
+    unavailable_found: set[str] = set()
+    if output_format == "pretty":
+        unavailable_found = _emit_missing_grammar_warnings(target)
 
     changed_files, files, no_targets = _resolve_check_targets(args, target, output_format)
     config = load_config(_config_dir(Path(config_path) if config_path else None, target))
@@ -703,7 +891,7 @@ def _run_check(args: argparse.Namespace) -> int:
         files_checked=len(results),
         options=_PrintOptions(statistics=getattr(args, "statistics", False)),
     )
-    return 1 if all_blocking else 0
+    return _check_exit_code(results, unavailable_found, all_blocking)
 
 
 def _add_severity_args(parser: argparse.ArgumentParser) -> None:
@@ -1351,6 +1539,7 @@ def main() -> None:
     args = _build_hook_parser().parse_args()
     extensions = tuple(supported_extensions())
     files = [f for f in args.files if f.endswith(extensions)]
+    _guard_hook_silent_failure(args.files, files, _emit_hook_grammar_warnings(args.files))
     sys.exit(_run_hook(args, files))
 
 

@@ -68,9 +68,20 @@ SafeLint also ships several rules that go beyond Holzmann's original ten — mod
 
 ## Installation
 
+SafeLint ships **every** per-language grammar as an opt-in extra. The base install includes only the engine — no grammars — so a Python-only project doesn't pay for JS/TS grammars, a Go/JS project doesn't pay for the Python grammar, and so on. Pick the extras that match the languages you actually lint:
+
 ```bash
-pip install safelint
+pip install 'safelint[python]'         # adds .py, .pyw
+pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs
+pip install 'safelint[typescript]'     # adds .ts, .tsx, .as (and bundles JS too)
+pip install 'safelint[all]'            # every supported language
+
+# Multiple extras compose — perfect for monorepos:
+pip install 'safelint[python,javascript]'
+pip install 'safelint[python,typescript]'
 ```
+
+`pip install safelint` (no extras) installs only the engine. If you run it that way, safelint will emit a one-line hint on first run telling you which extra to add for the files it found. Same story if you mix-and-match — e.g. running safelint with `[python]` installed on a directory containing `.ts` files skips them with a clear `pip install` hint rather than erroring out.
 
 ---
 
@@ -152,11 +163,23 @@ Add this to your `.pre-commit-config.yaml`:
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v1.9.0  # replace with the latest release tag
+    rev: v2.0.0  # replace with the latest release tag
     hooks:
       - id: safelint
         args: [--fail-on=error]  # use --fail-on=warning for stricter CI
         files: ^src/
+```
+
+Always add the matching language extra(s) via `additional_dependencies` so pre-commit's isolated environment pulls in the right tree-sitter grammar — this includes Python-only projects, since v2.0.0 ships grammars as extras for every language:
+
+```yaml
+      - id: safelint
+        additional_dependencies: ['safelint[python]']           # Python-only repo
+        # or:
+        # additional_dependencies: ['safelint[javascript]']     # JS-only repo
+        # additional_dependencies: ['safelint[typescript]']     # TS (also covers .js)
+        # additional_dependencies: ['safelint[python,javascript]']   # mixed monorepo
+        # additional_dependencies: ['safelint[all]']            # everything
 ```
 
 Then install the hooks:

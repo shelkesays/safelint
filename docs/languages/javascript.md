@@ -109,6 +109,20 @@ sinks_javascript = ["eval", "Function", "myCustomDangerousFunction"]
 
 User-explicit `_javascript`-suffixed config keys always win over the runtime preset — the preset only changes the *default* list.
 
+## Installing the JavaScript extra
+
+JavaScript grammar support ships as an optional extra so Python-only projects don't pay for it:
+
+```bash
+pip install 'safelint[javascript]'    # adds .js, .mjs, .cjs
+# or, for TS projects that also have JS:
+pip install 'safelint[typescript]'    # bundles tree-sitter-javascript too
+# or kitchen-sink:
+pip install 'safelint[all]'
+```
+
+Without the extra, `safelint check` skips `.js` / `.mjs` / `.cjs` files with a one-line install hint at lint time — no hard error.
+
 ## Pre-commit integration
 
 ```yaml
@@ -118,8 +132,11 @@ repos:
     rev: <tag>             # pin to a release
     hooks:
       - id: safelint
-        # The published hook lints python, javascript, and typescript
-        # filetypes by default. Optional: scope to a directory.
+        # JS / TS users add the matching extra so pre-commit's isolated
+        # environment installs the right tree-sitter grammar.
+        additional_dependencies: ['safelint[javascript]']
+        # The published hook's `types_or` already includes python,
+        # javascript, ts, and tsx. Optional: scope to a directory.
         files: ^src/
 ```
 

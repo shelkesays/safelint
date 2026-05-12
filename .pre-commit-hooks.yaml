@@ -4,6 +4,10 @@
     Checks source files against safety-critical coding rules inspired by
     Gerard J. Holzmann's Power of Ten (NASA/JPL). Catches oversized functions,
     deep nesting, bare excepts, global mutation, unbounded loops, and more.
+    Python is supported out of the box; JavaScript / TypeScript users add
+    the matching extra via ``additional_dependencies: ['safelint[javascript]']``
+    or ``['safelint[typescript]']`` in their ``.pre-commit-config.yaml`` so
+    pre-commit's isolated environment installs the tree-sitter grammar.
   entry: safelint
   language: python  # the hook runtime — not the language being linted
   # Files passed to the hook. ``types_or`` lists the source-language

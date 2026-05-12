@@ -754,27 +754,42 @@ wheels = [
 
 [[package]]
 name = "safelint"
-version = "1.14.0rc1"
+version = "2.0.0rc1"
 source = { editable = "." }
 dependencies = [
     { name = "tree-sitter" },
+]
+
+[package.optional-dependencies]
+all = [
     { name = "tree-sitter-javascript" },
     { name = "tree-sitter-python" },
     { name = "tree-sitter-typescript" },
 ]
-
-[package.optional-dependencies]
 dev = [
     { name = "pre-commit" },
     { name = "pytest" },
     { name = "pytest-cov" },
     { name = "pytest-mock" },
     { name = "ruff" },
+    { name = "tree-sitter-javascript" },
+    { name = "tree-sitter-python" },
+    { name = "tree-sitter-typescript" },
     { name = "ty" },
 ]
 docs = [
     { name = "mkdocs" },
     { name = "mkdocs-material" },
+]
+javascript = [
+    { name = "tree-sitter-javascript" },
+]
+python = [
+    { name = "tree-sitter-python" },
+]
+typescript = [
+    { name = "tree-sitter-javascript" },
+    { name = "tree-sitter-typescript" },
 ]
 
 [package.dev-dependencies]
@@ -794,12 +809,19 @@ requires-dist = [
     { name = "pytest-mock", marker = "extra == 'dev'", specifier = ">=3.15.1" },
     { name = "ruff", marker = "extra == 'dev'", specifier = ">=0.15.8" },
     { name = "tree-sitter", specifier = ">=0.23.0" },
-    { name = "tree-sitter-javascript", specifier = ">=0.23.0" },
-    { name = "tree-sitter-python", specifier = ">=0.23.0" },
-    { name = "tree-sitter-typescript", specifier = ">=0.23.0" },
+    { name = "tree-sitter-javascript", marker = "extra == 'all'", specifier = ">=0.23.0" },
+    { name = "tree-sitter-javascript", marker = "extra == 'dev'", specifier = ">=0.23.0" },
+    { name = "tree-sitter-javascript", marker = "extra == 'javascript'", specifier = ">=0.23.0" },
+    { name = "tree-sitter-javascript", marker = "extra == 'typescript'", specifier = ">=0.23.0" },
+    { name = "tree-sitter-python", marker = "extra == 'all'", specifier = ">=0.23.0" },
+    { name = "tree-sitter-python", marker = "extra == 'dev'", specifier = ">=0.23.0" },
+    { name = "tree-sitter-python", marker = "extra == 'python'", specifier = ">=0.23.0" },
+    { name = "tree-sitter-typescript", marker = "extra == 'all'", specifier = ">=0.23.0" },
+    { name = "tree-sitter-typescript", marker = "extra == 'dev'", specifier = ">=0.23.0" },
+    { name = "tree-sitter-typescript", marker = "extra == 'typescript'", specifier = ">=0.23.0" },
     { name = "ty", marker = "extra == 'dev'", specifier = ">=0.0.26" },
 ]
-provides-extras = ["dev", "docs"]
+provides-extras = ["python", "javascript", "typescript", "all", "dev", "docs"]
 
 [package.metadata.requires-dev]
 dev = [

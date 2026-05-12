@@ -19,11 +19,19 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 ## Quick start
 
 ```bash
-pip install safelint                  # or: uv add safelint
-safelint check src/                   # lint a directory
-safelint check --all-files .          # lint everything (default is git-modified only)
-safelint check --format json src/     # machine-readable output for editors / CI
+pip install 'safelint[python]'         # adds .py, .pyw
+pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs
+pip install 'safelint[typescript]'     # adds .ts, .tsx, .as (also bundles JS)
+pip install 'safelint[all]'            # every supported language
+pip install 'safelint[python,javascript]'   # multiple extras compose
+# uv add 'safelint[typescript]' works the same way.
+
+safelint check src/                    # lint a directory
+safelint check --all-files .           # lint everything (default is git-modified only)
+safelint check --format json src/      # machine-readable output for editors / CI
 ```
+
+Pick the extras that match the languages you actually lint — every grammar ships as an opt-in extra so a Python-only project never pays for JavaScript / TypeScript grammars, a Go/JS-only project never pays for the Python grammar, and so on. `pip install safelint` alone installs only the engine; safelint emits a one-line install hint on first run telling you which extra to add for the files it found.
 
 ## Where to go from here
 

@@ -84,6 +84,18 @@ sinks_typescript = ["eval", "Function", "Object.assign", "innerHTML"]  # stricte
 
 `[tool.safelint.javascript] runtime = "..."` selects which API surface the rule defaults assume — and TS inherits the chosen preset because the runtime is what determines `fs` vs `Deno.*` vs Cloudflare KV vs Bun-specific APIs. There is no separate `[tool.safelint.typescript]` table; TS and JS share the same runtime story. See [JavaScript runtime presets](../configuration/toml.md#javascript-runtime-presets) for the per-preset details.
 
+## Installing the TypeScript extra
+
+TypeScript grammar support ships as an optional extra so Python-only projects don't pay for it. The `[typescript]` extra also bundles `tree-sitter-javascript` because almost every TS project has a few `.js` files (vite/webpack configs, jest setup, etc.) — one install command covers both:
+
+```bash
+pip install 'safelint[typescript]'    # adds .ts, .tsx, .as (and .js too)
+# or kitchen-sink:
+pip install 'safelint[all]'
+```
+
+Without the extra, `safelint check` skips `.ts` / `.tsx` / `.as` files with a one-line install hint at lint time — no hard error.
+
 ## Pre-commit integration
 
 ```yaml
@@ -93,9 +105,11 @@ repos:
     rev: <tag>           # pin to a release
     hooks:
       - id: safelint
-        # The published hook lints python, javascript, AND typescript filetypes
-        # by default (via the pre-commit ``types_or`` filter). Optional: scope
-        # to a directory.
+        # TS users add the matching extra so pre-commit's isolated environment
+        # installs ``tree-sitter-typescript`` (and the bundled JS grammar).
+        additional_dependencies: ['safelint[typescript]']
+        # The published hook's ``types_or`` already includes python,
+        # javascript, ts, and tsx. Optional: scope to a directory.
         files: ^src/
 ```
 
