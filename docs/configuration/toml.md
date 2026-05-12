@@ -333,20 +333,28 @@ Same precedence applies to every other `_javascript`-suffixed key (`sanitizers_j
 
 **Most projects don't need TS-specific config.** TS inherits JS defaults / overrides automatically — running `safelint check src/` on a mixed `.js` / `.ts` codebase gives the right behaviour out of the box. Set `_typescript`-suffixed keys only when you have a concrete reason for `.ts` files to behave differently from `.js` files in the same project (a stricter sink list for new TS code, a different test-framework's assertion functions, etc.).
 
+**Typical project** — no TS-specific config needed. Both `.js` and `.ts` files use the same sink list via the TS → JS fallback:
+
 ```toml
-# pyproject.toml — typical project (no TS-specific config needed)
+# pyproject.toml
 [tool.safelint.javascript]
 runtime = "node"
 
 [tool.safelint.rules.tainted_sink]
 sinks_javascript = ["eval", "Function", "myCustomDangerousFunction"]
-# Both .js and .ts files use this list — no _typescript key needed.
-
-# Rare: project wants stricter TS sinks (legacy JS keeps the JS list)
-[tool.safelint.rules.tainted_sink]
-sinks_javascript = ["eval", "Function"]                                      # legacy JS
-sinks_typescript = ["eval", "Function", "Object.assign", "innerHTML"]        # stricter for TS
+# .ts files inherit this list automatically — no _typescript key needed.
 ```
+
+**Rare** — a project wants a stricter sink list for TS only, while legacy JS keeps its existing list. Set both keys; the `_typescript` key is consulted first for `.ts` files:
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.tainted_sink]
+sinks_javascript = ["eval", "Function"]                                # legacy JS
+sinks_typescript = ["eval", "Function", "Object.assign", "innerHTML"]  # stricter for TS
+```
+
+(Two separate snippets above — each is a complete, self-contained pyproject excerpt. Don't paste them into the same `[tool.safelint.rules.tainted_sink]` block: TOML rejects duplicate table headers, and the rule's config is *one* table no matter how many language-suffixed keys it carries.)
 
 ## Adoption path
 

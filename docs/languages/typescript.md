@@ -6,7 +6,7 @@ SafeLint analyses TypeScript source for the Holzmann "Power of Ten" safety rules
 
 - **`.ts`** — TypeScript (no JSX). Parsed by `tree-sitter-typescript`'s `typescript` grammar.
 - **`.tsx`** — TypeScript with JSX / React. Parsed by the separate `tsx` grammar (the two grammars differ because JSX changes the meaning of `<`, `>`, and a few other tokens). From the rule perspective TSX is just TypeScript with JSX nodes added — same logical language name (`"typescript"`), so a rule's `language` tuple needs one entry to cover both.
-- **`.as`** — **AssemblyScript** is a TypeScript-syntax subset that compiles to WebAssembly. It parses cleanly with the standard TypeScript grammar; safelint treats `.as` files as TypeScript without special-casing. Rule output uses TypeScript's vocabulary.
+- **`.as`** — **AssemblyScript** is a TypeScript-syntax subset that compiles to WebAssembly. It parses cleanly with the standard TypeScript grammar; SafeLint treats `.as` files as TypeScript without special-casing. Rule output uses TypeScript's vocabulary.
 
 ## Quick start
 

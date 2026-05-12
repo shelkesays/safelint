@@ -28,7 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 | Anything-and-everything | `pip install safelint` | `pip install 'safelint[all]'` |
 | Pre-commit hook (any language) | `additional_dependencies: []` | `additional_dependencies: ['safelint[<lang>]']` |
 
-Forgetting to add the extra is a non-fatal mistake: safelint will skip the now-unsupported files and emit `safelint: warning: skipping .py files — install with: pip install 'safelint[python]'` on stderr. CI runs may go green when they shouldn't until you add the extra — read your warnings.
+Forgetting to add the extra is usually a non-fatal mistake: safelint emits one stderr line per skipped file extension — e.g. `safelint: warning: skipping .py files — install with: pip install 'safelint[python]'` — and continues with whatever files it CAN lint. If at least one file gets linted (mixed-language project, one extra installed), the run finishes normally and the skipped files surface only as warnings. **If every candidate file is skipped because no matching grammar is installed, safelint fails the run with exit code 2** (the silent-failure guard — see the *Silent-failure guards* bullet below). That guard fires in pretty *and* JSON / SARIF modes, so a CI pipeline can't accidentally report green when no linting actually happened.
 
 ### Added
 
