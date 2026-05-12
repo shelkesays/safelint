@@ -637,7 +637,9 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
         return None, None, False, set()
     if not modified[1]:
         _print_status(
-            "No modified source files detected. Use --all-files to scan everything.",
+            f"No modified supported source files detected under target {target}. "
+            "Modified files may be outside the target, or skipped due to missing grammar support; "
+            "use --all-files to scan everything or install the needed grammar extra.",
             output_format=output_format,
         )
         return None, None, True, modified[2]
@@ -819,7 +821,9 @@ def _check_exit_code(
     * **Clean / advisory only** — exit 0.
     """
     if not results and unavailable_found:
-        _diagnostics.print_error("no files linted — every supported file was skipped because its grammar package isn't installed. See warnings above.")
+        action = _install_action_for_extensions(unavailable_found)
+        suffix = f" — {action}" if action else ""
+        _diagnostics.print_error(f"no files linted — every supported file was skipped because its grammar package isn't installed{suffix}")
         return 2
     return 1 if all_blocking else 0
 
@@ -841,7 +845,9 @@ def _guard_hook_silent_failure(passed: list[str], filtered: list[str], unavailab
     the helper unit-testable without monkey-patching ``sys.exit``.
     """
     if passed and not filtered and unavailable_in_passed:
-        _diagnostics.print_error("no files linted — every file pre-commit passed had a grammar that isn't installed. See warnings above.")
+        action = _install_action_for_extensions(unavailable_in_passed)
+        suffix = f" — {action}" if action else ""
+        _diagnostics.print_error(f"no files linted — every file pre-commit passed had a grammar that isn't installed{suffix}")
         return 2
     return 0
 
@@ -854,6 +860,27 @@ def _compose_extras_install_command(extras: set[str]) -> str:
     """
     spec = ",".join(sorted(extras))
     return f"pip install 'safelint[{spec}]'"
+
+
+def _install_action_for_extensions(exts: set[str]) -> str:
+    """Compose the PRE_COMMIT-aware install action for the unavailable *exts*.
+
+    Returns the formatted action string (``install with: pip install
+    'safelint[typescript]'`` for direct CLI users, or ``add
+    'safelint[typescript]' to additional_dependencies in your
+    .pre-commit-config.yaml`` for pre-commit users) so the silent-failure
+    errors are self-contained even when stderr warnings were suppressed
+    (machine output modes) or never emitted (the no-targets short-circuit
+    where the warning walk hasn't run for those paths).
+
+    Empty string when no extension maps to a known extra — defensive
+    fallback so the caller's error message degrades gracefully rather
+    than dangling with a trailing separator.
+    """
+    extras = {name for ext in exts if (name := extra_name_for(ext))}
+    if not extras:
+        return ""
+    return _format_install_action(_compose_extras_install_command(extras))
 
 
 def _emit_skill_install_grammar_hint(target: Path) -> None:
@@ -917,7 +944,9 @@ def _handle_no_targets(output_format: str, fail_on: str, raw_modified: set[str])
     unavailable_in_modified = _matching_suffixes(list(raw_modified), unavailable_extensions())
     _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, options=_PrintOptions(silent_on_clean=True))
     if unavailable_in_modified:
-        _diagnostics.print_error("no files linted — every git-modified source file has a grammar that isn't installed. See warnings above.")
+        action = _install_action_for_extensions(unavailable_in_modified)
+        suffix = f" — {action}" if action else ""
+        _diagnostics.print_error(f"no files linted — every git-modified source file has a grammar that isn't installed{suffix}")
         return 2
     return 0
 

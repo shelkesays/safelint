@@ -2288,7 +2288,7 @@ def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker, capsys) -> 
 
     args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False, ignore=None)
     assert _run_check(args) == 0
-    assert "No modified source files detected" in capsys.readouterr().out
+    assert "No modified supported source files detected" in capsys.readouterr().out
 
 
 def test_cli_check_all_files_bypasses_git(tmp_path: Path, mocker) -> None:
