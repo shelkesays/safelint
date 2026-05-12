@@ -15,10 +15,20 @@ Run `safelint --version` via Bash. This is portable across macOS, Linux, and Win
 
 If either check returns non-zero (or the shell reports "command not found" / "is not recognized"):
 
-- safelint is a Python package, regardless of which language is being linted. Suggest:
-  - `uv add safelint` (if the project uses `uv`)
-  - `pip install safelint` (otherwise)
-- Stop. Do not proceed until they install it.
+- safelint is a Python package regardless of the language being linted, but **v2.0.0+ ships language grammars as opt-in extras** — the install command needs a `[<lang>]` suffix matching the project's language(s). Glance at the file extensions in the project tree, then suggest the right one:
+
+  | Project contains | Install command |
+  |---|---|
+  | `.py` / `.pyw` | `uv add 'safelint[python]'` or `pip install 'safelint[python]'` |
+  | `.js` / `.mjs` / `.cjs` | `uv add 'safelint[javascript]'` or `pip install 'safelint[javascript]'` |
+  | `.ts` / `.tsx` / `.as` | `uv add 'safelint[typescript]'` or `pip install 'safelint[typescript]'` (bundles JS grammar too) |
+  | Multiple languages | Compose, e.g. `pip install 'safelint[python,javascript]'` |
+  | Unsure / kitchen-sink | `pip install 'safelint[all]'` (covers every supported language) |
+
+  Plain `pip install safelint` (no extra) installs only the engine and is rarely what the user wants — on first run safelint emits an install hint pointing them at the right extra and exits with code 2.
+- If safelint is already installed but emits `safelint: warning: skipping .X files — install with: pip install 'safelint[Y]'` followed by `safelint: error: no files linted`, the grammar extra is missing. Re-install with the right `[<lang>]` extra and retry.
+- For pre-commit users: the same extra must go into `additional_dependencies` in `.pre-commit-config.yaml`, e.g. `additional_dependencies: ['safelint[python]']`. Without it, the pre-commit hook also exits 2 and is reported as Failed (red) — there's no silent-pass.
+- Stop. Do not proceed until they install the right extra.
 
 ## Step 2 — Identify the language(s) involved
 

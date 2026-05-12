@@ -6,6 +6,37 @@ AI-client skills. The agent reads it when the user's project contains
 JavaScript rule behaviour — for the canonical per-rule notes, read
 `languages/javascript.md`. The differences below are TypeScript-only.
 
+## Install nuance
+
+TypeScript support ships in the `[typescript]` extra in v2.0.0+. The
+extra **bundles `tree-sitter-javascript` automatically** because almost
+every TS project has `.js` files too (vite/webpack/eslint configs, jest
+setup, generated declaration shims):
+
+```bash
+pip install 'safelint[typescript]'
+# or, for uv-based projects:
+uv add --dev 'safelint[typescript]'
+```
+
+No need to compose `[javascript,typescript]` — the TS extra already
+includes the JS grammar.
+
+For pre-commit integration, set `additional_dependencies` in
+`.pre-commit-config.yaml`:
+
+```yaml
+- repo: https://github.com/shelkesays/safelint
+  rev: v2.0.0
+  hooks:
+    - id: safelint
+      additional_dependencies: ['safelint[typescript]']
+```
+
+Without the extra, the first run emits `safelint: warning: skipping
+.ts files — install with: pip install 'safelint[typescript]'` and
+exits with code 2 (pre-commit shows the hook as **Failed**).
+
 ## Scope
 
 - **`.ts`** — TypeScript (no JSX). Parsed by tree-sitter-typescript's

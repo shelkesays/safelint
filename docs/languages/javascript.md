@@ -4,18 +4,18 @@ SafeLint analyses JavaScript source for the Holzmann "Power of Ten" safety rules
 
 ## File extensions
 
-`.js`, `.mjs`, `.cjs`. JSX (`.jsx`) and TypeScript (`.ts` / `.tsx`) are not yet registered — see the [language roadmap](../configuration/rules.md#planned).
+`.js`, `.mjs`, `.cjs`. JSX (`.jsx`) is not yet registered — see the [language roadmap](../configuration/rules.md#planned). TypeScript (`.ts` / `.tsx` / `.as`) lives on its own [language page](typescript.md) as of v2.0.0.
 
 ## Quick start
 
 ```bash
-pip install safelint              # the tool itself runs on Python; lints any registered language
-safelint check src/               # lint a directory (git-modified files by default)
-safelint check --all-files .      # lint everything
-safelint check --format json src/ # machine-readable for editors / CI
+pip install 'safelint[javascript]'    # the tool itself runs on Python; the extra adds the JS grammar
+safelint check src/                   # lint a directory (git-modified files by default)
+safelint check --all-files .          # lint everything
+safelint check --format json src/     # machine-readable for editors / CI
 ```
 
-If your project doesn't already have a Python toolchain, the same `pip install safelint` works through `pipx install safelint` (isolates the install) or by adding safelint as a dev dependency through any pip-compatible manager.
+If your project doesn't already have a Python toolchain, the same install command works through `pipx install 'safelint[javascript]'` (isolates the install) or by adding `'safelint[javascript]'` as a dev dependency through any pip-compatible manager. v2.0.0 ships every language grammar as an opt-in extra; the `[javascript]` extra installs `tree-sitter-javascript` alongside the engine.
 
 ## Rules that fire on JavaScript
 

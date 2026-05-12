@@ -681,11 +681,17 @@ def _format_install_action(install_hint: str) -> str:
 
 
 def _matching_suffixes(filenames: list[str], unavailable: dict[str, str]) -> set[str]:
-    """Return the subset of *unavailable* extensions present in *filenames*."""
+    """Return the subset of *unavailable* extensions present in *filenames*.
+
+    Mirrors ``pathlib.Path.suffix`` semantics — a name with no dot (``"README"``)
+    or a leading-dot dotfile (``".ts"``, ``".gitignore"``) has no suffix.
+    Without the ``idx > 0`` guard, a literal file named ``.ts`` would
+    spuriously trigger the "missing TypeScript grammar" hint.
+    """
     found: set[str] = set()
     for name in filenames:
         idx = name.rfind(".")
-        if idx != -1 and name[idx:] in unavailable:
+        if idx > 0 and name[idx:] in unavailable:
             found.add(name[idx:])
     return found
 
@@ -755,12 +761,12 @@ def _emit_hook_grammar_warnings(files: list[str]) -> set[str]:
         return set()
     seen_exts: set[str] = set()
     for f in files:
+        # Mirror ``Path.suffix`` semantics — ``idx > 0`` (not ``!= -1``)
+        # so a literal file named ``.ts`` / ``.gitignore`` doesn't
+        # spuriously match an unavailable extension.
         idx = f.rfind(".")
-        if idx == -1:
-            continue
-        suffix = f[idx:]
-        if suffix in unavailable:
-            seen_exts.add(suffix)
+        if idx > 0 and f[idx:] in unavailable:
+            seen_exts.add(f[idx:])
     if not seen_exts:
         return set()
     grouped: dict[str, list[str]] = {}
@@ -840,11 +846,10 @@ def _run_check(args: argparse.Namespace) -> int:
     target = Path(args.target)
     output_format: str = getattr(args, "output_format", "pretty")
 
-    # Pretty mode only — JSON/SARIF stderr stays clean. Captured for
-    # the silent-failure guard below.
-    unavailable_found: set[str] = set()
-    if output_format == "pretty":
-        unavailable_found = _emit_missing_grammar_warnings(target)
+    # Always compute the unavailable-extension set so the silent-failure
+    # guard fires in JSON / SARIF mode too (where hidden-green CI runs
+    # are most dangerous). Stderr warnings stay separate from stdout.
+    unavailable_found = _emit_missing_grammar_warnings(target)
 
     changed_files, files, no_targets = _resolve_check_targets(args, target, output_format)
     config = load_config(_config_dir(Path(config_path) if config_path else None, target))

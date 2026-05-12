@@ -31,8 +31,13 @@ Once installed, ask the agent things like:
 ## Install
 
 ```bash
-pip install safelint            # or: uv add safelint
-safelint skill install          # auto-detects which AI client(s) you use
+# Pick the extra matching your project's language(s) — v2.0.0+ ships
+# each grammar separately. See the project README for the full table.
+pip install 'safelint[python]'            # or: uv add 'safelint[python]'
+# pip install 'safelint[javascript]'      # JS / Node
+# pip install 'safelint[typescript]'      # TypeScript (bundles JS too)
+# pip install 'safelint[all]'             # kitchen-sink
+safelint skill install                    # auto-detects which AI client(s) you use
 ```
 
 By default, `safelint skill install` runs in `--client auto` mode:

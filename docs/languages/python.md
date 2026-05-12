@@ -9,11 +9,13 @@ SafeLint analyses Python source for the Holzmann "Power of Ten" safety rules —
 ## Quick start
 
 ```bash
-pip install safelint              # or: uv add safelint
+pip install 'safelint[python]'    # or: uv add 'safelint[python]'
 safelint check src/               # lint a directory (git-modified files by default)
 safelint check --all-files .      # lint everything
 safelint check --format json src/ # machine-readable for editors / CI
 ```
+
+v2.0.0 ships every language grammar as an opt-in extra — the `[python]` extra installs `tree-sitter-python` alongside the engine. Plain `pip install safelint` installs only the engine and emits an install hint on first run.
 
 ## Rules that fire on Python
 

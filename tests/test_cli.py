@@ -14,7 +14,18 @@ if TYPE_CHECKING:
 
 import pytest
 
-from safelint.cli import _emit_hook_grammar_warnings, _emit_missing_grammar_warnings, _file_summary_line, _format_install_action, _make_summary, _run_hook, _scan_for_unavailable_extensions
+from safelint.cli import (
+    _check_exit_code,
+    _emit_hook_grammar_warnings,
+    _emit_missing_grammar_warnings,
+    _file_summary_line,
+    _format_install_action,
+    _guard_hook_silent_failure,
+    _make_summary,
+    _matching_suffixes,
+    _run_hook,
+    _scan_for_unavailable_extensions,
+)
 from safelint.core.engine import LintResult
 from safelint.rules.base import Violation
 
@@ -392,3 +403,69 @@ def test_emit_warnings_use_precommit_hint_when_running_under_precommit(capsys: p
     assert "additional_dependencies" in err
     assert ".pre-commit-config.yaml" in err
     assert "pip install" not in err
+
+
+# ---------------------------------------------------------------------------
+# Silent-failure guard exit codes
+# ---------------------------------------------------------------------------
+
+
+def test_check_exit_code_returns_2_when_all_files_skipped_for_missing_grammar() -> None:
+    """``_check_exit_code`` returns 2 when discovery found unavailable files AND zero files got linted.
+
+    Regression guard: the silent-failure guard must fire in *every*
+    output mode (pretty / json / sarif), since CI pipelines often run
+    ``--format sarif`` and a hidden-green run there is the worst case
+    — a code-quality dashboard would show "no issues" when actually no
+    linting happened.
+    """
+    assert _check_exit_code(results=[], unavailable_found={".py"}, all_blocking=[]) == 2
+
+
+def test_check_exit_code_returns_1_when_blocking_violations_present() -> None:
+    """Normal failure: at least one blocking violation → exit 1."""
+    fake_violation = object()  # type doesn't matter for the boolean test
+    assert _check_exit_code(results=[object()], unavailable_found=set(), all_blocking=[fake_violation]) == 1
+
+
+def test_check_exit_code_returns_0_on_clean_run() -> None:
+    """No violations, nothing skipped → exit 0."""
+    assert _check_exit_code(results=[object()], unavailable_found=set(), all_blocking=[]) == 0
+
+
+def test_check_exit_code_returns_0_when_no_files_and_no_unavailable() -> None:
+    """Zero files discovered but no unavailable extensions either — likely an empty dir, not a misconfig. Exit 0."""
+    assert _check_exit_code(results=[], unavailable_found=set(), all_blocking=[]) == 0
+
+
+def test_guard_hook_silent_failure_exits_2_when_every_passed_file_unavailable(mocker: MockerFixture) -> None:
+    """Hook-mode guard exits 2 when pre-commit passed files but none could be linted."""
+    mock_exit = mocker.patch("safelint.cli.sys.exit")
+    _guard_hook_silent_failure(passed=["app.py", "lib.py"], filtered=[], unavailable_in_passed={".py"})
+    mock_exit.assert_called_once_with(2)
+
+
+def test_guard_hook_silent_failure_noops_when_some_files_linted(mocker: MockerFixture) -> None:
+    """Mixed run with some lintable files — guard doesn't fire."""
+    mock_exit = mocker.patch("safelint.cli.sys.exit")
+    _guard_hook_silent_failure(passed=["app.py", "lib.ts"], filtered=["app.py"], unavailable_in_passed={".ts"})
+    mock_exit.assert_not_called()
+
+
+def test_guard_hook_silent_failure_noops_when_no_files_passed(mocker: MockerFixture) -> None:
+    """Pre-commit invokes the hook with no files — not a misconfig, no fail."""
+    mock_exit = mocker.patch("safelint.cli.sys.exit")
+    _guard_hook_silent_failure(passed=[], filtered=[], unavailable_in_passed=set())
+    mock_exit.assert_not_called()
+
+
+def test_matching_suffixes_ignores_leading_dot_dotfiles() -> None:
+    """Regression: a literal file named ``.ts`` shouldn't trigger the missing-TS-grammar hint.
+
+    Mirrors ``pathlib.Path.suffix`` semantics — dotfiles have no
+    suffix, so the walker must ignore them. Without the ``idx > 0``
+    guard (vs ``idx != -1``), ``.ts`` / ``.py`` / ``.gitignore``
+    would be misclassified.
+    """
+    found = _matching_suffixes([".ts", ".py", ".gitignore", "real.ts"], {".ts": "hint", ".py": "hint"})
+    assert found == {".ts"}, f"expected only real.ts to match; got {found}"

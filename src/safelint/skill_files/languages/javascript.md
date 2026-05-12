@@ -4,15 +4,19 @@ Language-specific notes for the JavaScript (Node) target. Mirrors `src/safelint/
 
 ## Install nuance
 
-safelint is a Python package, not an npm package. Install it the same way you would for a Python project — even when linting JavaScript:
+safelint is a Python package, not an npm package. v2.0.0+ ships the JavaScript grammar in the `[javascript]` extra — the install needs that suffix or safelint won't have a JS parser:
 
 ```bash
-pip install safelint
+pip install 'safelint[javascript]'
 # or, in a project that already uses uv:
-uv add --dev safelint
+uv add --dev 'safelint[javascript]'
+# or, for a TS project that also has .js files (vite/eslint/jest configs):
+pip install 'safelint[typescript]'   # bundles tree-sitter-javascript automatically
 ```
 
 After install, `safelint` is on `PATH`. Run it from the JavaScript project's root the same way as for a Python project — it auto-detects the language by file extension.
+
+If you run plain `pip install safelint` (no extra) by mistake, the first run emits `safelint: warning: skipping .js files — install with: pip install 'safelint[javascript]'` and exits with code 2. Re-install with the extra and retry.
 
 For pre-commit integration, the published hook accepts JavaScript via the `javascript` filetype tag in `types_or`:
 
