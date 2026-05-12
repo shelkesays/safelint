@@ -72,7 +72,7 @@ Notes:
 
 ## Step 5 — Parse the JSON
 
-The schema is documented in [`docs/JSON_SCHEMA.md`](../../docs/JSON_SCHEMA.md). It's stable since v1.5.0. The shape:
+The schema is documented in [`docs/json-schema.md`](../../docs/json-schema.md). It's stable since v1.5.0. The shape:
 
 ```json
 {

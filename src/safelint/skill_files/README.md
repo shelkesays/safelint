@@ -1,6 +1,6 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets twelve AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/` (currently just Python — mirrors safelint's `src/safelint/languages/` package layout).
+A bundled skill / project-rule that lets twelve AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/` — currently Python, JavaScript, and TypeScript (mirroring safelint's `src/safelint/languages/` package layout).
 
 > **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](../../AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
 
@@ -219,7 +219,9 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 ├── zed/
 │   └── safelint.md          # Zed's workspace rules (installed to .rules at scope root)
 └── languages/               # One addendum per supported language
-    └── python.md            # Python-specific install / rationale / idiomatic fixes
+    ├── python.md            # Python-specific install / rationale / idiomatic fixes
+    ├── javascript.md        # JavaScript (Node) — runtime presets, JS-rule notes
+    └── typescript.md        # TypeScript / TSX / AssemblyScript — TS-specific rule handling
 ```
 
 **What ends up where after install:**
@@ -234,11 +236,13 @@ The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint 
 
 ## Requirements
 
-- `safelint` 1.9.0 or later on `PATH`. Notable history:
+- `safelint` 2.0.0rc1 or later on `PATH`. Notable history:
   - `safelint skill install` and the bundled skill files were added in **v1.6.0**.
   - `--client cursor` (Cursor support) and the auto-detection default for `--client` arrived in **v1.8.0**.
   - `safelint skill status` and `safelint check --check-skill-freshness` (drift detection between bundled and installed skills) arrived in **v1.9.0**.
-- A project with at least one source file in a language safelint supports (currently Python).
+  - JavaScript (Node) support and runtime presets landed in **v1.13.0**.
+  - **v2.0.0rc1** ships language grammars as opt-in extras (`[python]` / `[javascript]` / `[typescript]` / `[all]`), adds TypeScript / TSX / AssemblyScript, adds the silent-failure exit-code-2 guard, and teaches `safelint skill install` to auto-detect project languages. The bundled skill files in this directory document the v2.0.0+ install story, so a 1.x-era `safelint` on `PATH` won't behave the way the skills describe — bump first.
+- A project with at least one source file in a language safelint supports (Python, JavaScript, or TypeScript today; Go / Rust / Java / C / C++ / PHP planned).
 
 ## What the skill does
 

@@ -612,10 +612,7 @@ def test_run_check_returns_2_when_only_modified_files_have_unavailable_grammar(t
         output_format="pretty",
     )
     rc = cli._run_check(args)
-    assert rc == 2, (
-        f"Expected exit 2 (silent-pass guard) when raw git output has unavailable-grammar "
-        f"files but post-filter is empty; got {rc}"
-    )
+    assert rc == 2, f"Expected exit 2 (silent-pass guard) when raw git output has unavailable-grammar files but post-filter is empty; got {rc}"
 
 
 def test_run_check_returns_0_when_genuinely_no_modifications(tmp_path: Path, mocker: MockerFixture) -> None:
