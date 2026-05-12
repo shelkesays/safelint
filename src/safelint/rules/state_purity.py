@@ -101,7 +101,7 @@ _PASSTHROUGH_WRAPPER_TYPES = frozenset(
 )
 
 
-def _unwrap_parenthesized(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+def _unwrap_passthrough_wrappers(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
     """Strip every layer of pass-through wrapper around *node*.
 
     Pass-through wrappers in the JS family are nodes that don't change
@@ -156,9 +156,9 @@ def _javascript_global_namespace_root(target: tree_sitter.Node) -> str | None:
     Parentheses are unwrapped on entry and after each leftward step
     because they do not change the underlying ownership chain.
     """
-    cur = _unwrap_parenthesized(target)
+    cur = _unwrap_passthrough_wrappers(target)
     while cur is not None and cur.type in ("member_expression", "subscript_expression"):  # nosafe: SAFE501
-        cur = _unwrap_parenthesized(cur.child_by_field_name("object"))
+        cur = _unwrap_passthrough_wrappers(cur.child_by_field_name("object"))
     if cur is None or cur.type != "identifier":
         return None
     return node_text(cur)
@@ -290,7 +290,7 @@ class GlobalMutationRule(BaseRule):
             # this the LHS-type filter would reject the
             # ``parenthesized_expression`` wrapper and skip the write
             # entirely.
-            target = _unwrap_parenthesized(target)
+            target = _unwrap_passthrough_wrappers(target)
             if target is None or target.type not in ("member_expression", "subscript_expression"):
                 continue
             root = _javascript_global_namespace_root(target)

@@ -489,6 +489,27 @@ def test_matching_suffixes_ignores_leading_dot_dotfiles() -> None:
     assert found == {".ts"}, f"expected only real.ts to match; got {found}"
 
 
+def test_matching_suffixes_ignores_dotfiles_inside_subdirectories() -> None:
+    """Regression: ``src/.ts`` is a dotfile (Path('src/.ts').suffix == '') and must not match.
+
+    Hook mode passes full paths from pre-commit's argv (e.g.
+    ``src/app.py``, ``src/.ts``). A naive ``rfind('.')`` on the full
+    path would treat ``src/.ts`` as having suffix ``.ts`` (the
+    rightmost dot is at index 4, comfortably > 0) but the file is
+    actually a dotfile with no suffix. ``_matching_suffixes`` must
+    basename the input before applying the ``idx > 0`` rule so
+    dotfiles in subdirectories don't falsely trigger missing-grammar
+    warnings + exit code 2 in pre-commit runs.
+    """
+    found = _matching_suffixes(
+        ["src/.ts", "a/b/.py", "src/.gitignore", "src/real.ts", "deep/nested/dir/app.py"],
+        {".ts": "hint-ts", ".py": "hint-py"},
+    )
+    # Only the real .ts file and the deeply-nested .py file should match —
+    # all three dotfile-in-subdir cases must be ignored.
+    assert found == {".ts", ".py"}, f"expected real files only; got {found}"
+
+
 # ---------------------------------------------------------------------------
 # safelint skill install — language-grammar nudge
 # ---------------------------------------------------------------------------
