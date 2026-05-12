@@ -4,23 +4,26 @@ Language-specific notes for the Python target. Mirrors `src/safelint/languages/p
 
 ## Install nuance
 
-safelint is a Python package. Install it the same way as any other dev dependency:
+safelint is a Python package and Python support ships in the `[python]` extra in v2.0.0+. The plain `pip install safelint` command installs only the engine and won't lint anything until an extra is added:
 
 ```bash
-uv add --dev safelint        # uv-based projects
-pip install safelint         # everything else
+uv add --dev 'safelint[python]'        # uv-based projects
+pip install 'safelint[python]'         # everything else
 ```
 
 After install, `safelint` is on `PATH` (entry point declared in `pyproject.toml`).
 
-For pre-commit integration, add to `.pre-commit-config.yaml`:
+For pre-commit integration, add to `.pre-commit-config.yaml` — note that v2.0.0+ requires `additional_dependencies` even for Python-only projects (the hook env is isolated and needs its own grammar install):
 
 ```yaml
 - repo: https://github.com/shelkesays/safelint
-  rev: v1.9.0
+  rev: v2.0.0  # pin to a release
   hooks:
     - id: safelint
+      additional_dependencies: ['safelint[python]']
 ```
+
+If you forget `additional_dependencies`, safelint exits with code 2 on the first run — pre-commit reports the hook as **Failed** (red), not silently green. The stderr message tells you exactly what to add.
 
 ## File extensions
 

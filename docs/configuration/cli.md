@@ -65,6 +65,18 @@ ANSI colour is auto-disabled when stdout is not a TTY (piping to a file produces
 - Running a one-off full audit
 - `pre-commit run --all-files` already passes all files directly; the hook mode handles this automatically.
 
+## Exit codes
+
+SafeLint's exit code tells CI / pre-commit how the run finished:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Clean run — no blocking violations (suppressed violations don't count). |
+| `1` | One or more blocking violations found (severity ≥ `--fail-on`). |
+| `2` | **Silent-failure guard.** SafeLint saw files in the target but couldn't lint any of them because no matching language grammar was installed. Fires in *every* output mode (pretty / JSON / SARIF) so a CI pipeline can't silently report clean. Fix by installing the matching extra (`pip install 'safelint[python]'` etc.) or, for pre-commit users, adding `additional_dependencies: ['safelint[<lang>]']` to your `.pre-commit-config.yaml`. |
+
+The exit-2 case includes a stderr error line (`safelint: error: no files linted — every supported file was skipped because its grammar package isn't installed.`) plus the per-language install hints emitted earlier in the run. pre-commit treats exit 2 as a hook *Failed* (red), not Passed — which is exactly what you want, because a hook that ran but linted nothing isn't actually protecting anything.
+
 ## `safelint` hook mode flags (pre-commit)
 
 Pre-commit passes the staged files as positional arguments automatically. `--fail-on`, `--mode`, and `--ignore` are all supported here.

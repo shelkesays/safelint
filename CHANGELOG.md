@@ -122,7 +122,7 @@ The rest of this section describes the JavaScript support that landed in `1.13.0
 - **Pre-commit hook spec** (`.pre-commit-hooks.yaml`) and **the in-tree self-development hook** (`.pre-commit-config.yaml`) — `types_or: [python]` becomes `types_or: [python, javascript]`. Downstream users with mixed Python + JS repos automatically have both filetypes routed to safelint after upgrade. Additionally the published `.pre-commit-hooks.yaml` drops its `files: ^src/` filter — that filter was a leak from this repo's in-tree `.pre-commit-config.yaml` (where it's intentional — safelint lints itself only under `src/`) into the published hook spec, where it forced every downstream installer onto the same layout. **Heads-up: this broadens the default scope for downstream consumers.** With it gone, the hook honours only `types_or: [python, javascript]` plus the consumer's own `files:` / `exclude:` keys, so projects with sources at the repo root, in `app/`, in `lib/`, etc. now get linted by default after upgrade. If you previously relied on the `^src/` default to scope safelint to one directory, add the equivalent filter to your local `.pre-commit-config.yaml`:
 
   ```yaml
-  - repo: https://github.com/srahul07/safelint
+  - repo: https://github.com/shelkesays/safelint
     rev: <tag>
     hooks:
       - id: safelint

@@ -158,7 +158,7 @@ By default safelint memoises rule output keyed on `sha256(source + engine config
 
 ## Pre-commit integration
 
-Add this to your `.pre-commit-config.yaml`:
+Add this to your `.pre-commit-config.yaml` — pick the `additional_dependencies` line that matches the languages your repo contains:
 
 ```yaml
 repos:
@@ -166,21 +166,31 @@ repos:
     rev: v2.0.0  # replace with the latest release tag
     hooks:
       - id: safelint
-        args: [--fail-on=error]  # use --fail-on=warning for stricter CI
-        files: ^src/
+        # Required in v2.0.0+ — pick the line for the language(s) your repo lints:
+        additional_dependencies: ['safelint[python]']               # Python-only repo
+        # additional_dependencies: ['safelint[javascript]']         # JS-only repo (Node / browser / Deno / Cloudflare Workers / Bun)
+        # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles tree-sitter-javascript too)
+        # additional_dependencies: ['safelint[python,javascript]']  # mixed monorepo
+        # additional_dependencies: ['safelint[all]']                # kitchen-sink
+
+        args: [--fail-on=error]   # or --fail-on=warning for stricter CI
+        files: ^src/              # optional — scope to a directory
 ```
 
-Always add the matching language extra(s) via `additional_dependencies` so pre-commit's isolated environment pulls in the right tree-sitter grammar — this includes Python-only projects, since v2.0.0 ships grammars as extras for every language:
+### One hook, every language
 
-```yaml
-      - id: safelint
-        additional_dependencies: ['safelint[python]']           # Python-only repo
-        # or:
-        # additional_dependencies: ['safelint[javascript]']     # JS-only repo
-        # additional_dependencies: ['safelint[typescript]']     # TS (also covers .js)
-        # additional_dependencies: ['safelint[python,javascript]']   # mixed monorepo
-        # additional_dependencies: ['safelint[all]']            # everything
+The same `id: safelint` handles Python, JavaScript, and TypeScript — there's no `safelint-python` / `safelint-js` / `safelint-ts` split. The published hook spec sets `types_or: [python, javascript, ts, tsx]` so pre-commit automatically routes the right files to safelint; the engine then dispatches each file to its language-specific rule implementations based on extension. **Every flag (`--fail-on`, `--mode`, `--ignore`, `--format`, `--statistics`) and every config option behaves identically across languages.** The only per-project lever is the `additional_dependencies` extra — that's what tells pre-commit which tree-sitter grammar(s) to install into the hook's isolated environment.
+
+### What happens if you forget the extra
+
+The `additional_dependencies` line is genuinely required in v2.0.0+ — including for Python projects, which used to work without it. Forgetting it doesn't silently pass: safelint emits one stderr line per missing grammar with the exact fix and exits with code **2**, which pre-commit reports as **Failed** (red):
+
 ```
+safelint: warning: skipping .py files — add 'safelint[python]' to additional_dependencies in your .pre-commit-config.yaml
+safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed. See warnings above.
+```
+
+See [Exit codes](https://shelkesays.github.io/safelint/configuration/cli/#exit-codes) for the full table.
 
 Then install the hooks:
 

@@ -82,12 +82,11 @@ dev = [
     "pytest-mock>=3.15.1",
     "ruff>=0.15.8",
     "ty>=0.0.26",
-    # Dev installs lint and test against every supported language, so dev
-    # also pulls in the full grammar set. Keeps ``uv sync --extra dev``
-    # working without an additional ``--extra all``.
-    "tree-sitter-python>=0.23.0",
-    "tree-sitter-javascript>=0.23.0",
-    "tree-sitter-typescript>=0.23.0",
+    # Dev installs lint and test against every supported language.
+    # Pull in the full grammar set via the ``[all]`` extra rather than
+    # repeating the tree-sitter package list — single source of truth
+    # for "every grammar"; adding a new language only edits ``[all]``.
+    "safelint[all]",
 ]
 # Documentation site — Material-themed MkDocs build that publishes to
 # https://shelkesays.github.io/safelint/. Install with `uv sync --extra docs`,
