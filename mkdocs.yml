@@ -77,11 +77,20 @@ markdown_extensions:
       permalink: "#"              # link icon next to each heading
       toc_depth: 3
   - pymdownx.details              # collapsible admonitions
-  - pymdownx.superfences:         # nested fences inside admonitions / tabs
-      custom_fences:
-        - name: mermaid
-          class: mermaid
-          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.superfences          # nested fences inside admonitions / tabs
+  # Note: this used to declare a ``custom_fences:`` block enabling
+  # mermaid diagrams via ``format: !!python/name:...``. The
+  # ``!!python/name:`` YAML tag is mkdocs/PyYAML-specific and trips
+  # generic YAML linters / IDE schemas with "Unresolved tag" warnings.
+  # We don't actually use mermaid anywhere under ``docs/``, so the
+  # block is removed. If a future page needs a mermaid diagram, the
+  # canonical Material recipe is to put it back:
+  #
+  #   - pymdownx.superfences:
+  #       custom_fences:
+  #         - name: mermaid
+  #           class: mermaid
+  #           format: !!python/name:pymdownx.superfences.fence_code_format
   - pymdownx.tabbed:              # tabbed content blocks
       alternate_style: true
   - pymdownx.snippets:            # include from outside docs/
