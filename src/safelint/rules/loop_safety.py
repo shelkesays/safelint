@@ -37,12 +37,14 @@ if TYPE_CHECKING:
 _WHILE_STATEMENT_BY_LANG: dict[str, str] = {
     "python": WHILE_STATEMENT,
     "javascript": "while_statement",
+    "typescript": "while_statement",
 }
 
 # Per-language: ``break`` statement type. Same name in both grammars.
 _BREAK_STATEMENT_BY_LANG: dict[str, str] = {
     "python": BREAK_STATEMENT,
     "javascript": "break_statement",
+    "typescript": "break_statement",
 }
 
 # Per-language: literal-``true`` condition node type. Python emits
@@ -50,23 +52,26 @@ _BREAK_STATEMENT_BY_LANG: dict[str, str] = {
 _TRUE_LITERAL_BY_LANG: dict[str, str] = {
     "python": TRUE,
     "javascript": "true",
+    "typescript": "true",
 }
 
 # Per-language: node types that bound a ``break`` statement's scope —
 # walking out of an outer ``while`` should *not* see a ``break`` inside
 # a nested loop or function definition (those breaks belong to the
 # inner construct, not the outer ``while`` we're checking).
+_JS_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
+    "for_statement",
+    "for_in_statement",  # also covers ``for...of``
+    "while_statement",
+    "do_statement",
+    # Switch arms also stop ``break`` propagation.
+    "switch_statement",
+    *sorted(_JS_FUNCTION_TYPES),
+)
 _BREAK_SCOPE_BOUNDARIES_BY_LANG: dict[str, tuple[str, ...]] = {
     "python": (FOR_STATEMENT, WHILE_STATEMENT, FUNCTION_DEF, ASYNC_FUNCTION_DEF),
-    "javascript": (
-        "for_statement",
-        "for_in_statement",  # also covers ``for...of``
-        "while_statement",
-        "do_statement",
-        # Switch arms also stop ``break`` propagation.
-        "switch_statement",
-        *sorted(_JS_FUNCTION_TYPES),
-    ),
+    "javascript": _JS_BREAK_SCOPE_BOUNDARIES,
+    "typescript": _JS_BREAK_SCOPE_BOUNDARIES,
 }
 
 
@@ -96,7 +101,7 @@ def _is_unlabelled_break(break_node: tree_sitter.Node, lang_name: str) -> bool:
     ``break outer;``) — those count only via the labelled-break
     path, not the direct-scope path.
     """
-    if lang_name != "javascript":
+    if lang_name not in ("javascript", "typescript"):
         return True
     return not any(child.type == "statement_identifier" for child in break_node.named_children)
 
@@ -140,7 +145,7 @@ def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
     """
     if _has_direct_break(while_node, lang_name):
         return True
-    if lang_name != "javascript":
+    if lang_name not in ("javascript", "typescript"):
         return False
     label = _outer_while_label(while_node)
     if label is None:
@@ -166,7 +171,7 @@ class UnboundedLoopRule(BaseRule):
 
     name = "unbounded_loops"
     code = "SAFE501"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     def _check_while_node(self, filepath: str, node: tree_sitter.Node, lang_name: str) -> Violation | None:
         """Return a violation if *node* is an unbounded while loop, else None."""
@@ -193,7 +198,7 @@ class UnboundedLoopRule(BaseRule):
                 # JavaScript's ``while (true)`` are the same hazard but
                 # written differently. Same per-language wording pattern
                 # as ``EmptyExceptRule`` / ``LoggingOnErrorRule``.
-                construct = "while (true)" if lang_name == "javascript" else "while True"
+                construct = "while (true)" if lang_name in ("javascript", "typescript") else "while True"
                 return self._make_violation_for_node(
                     filepath,
                     node,

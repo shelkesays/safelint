@@ -36,7 +36,7 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
     matches if any of ``foo.test.{ext}`` or ``foo.spec.{ext}`` exists
     under the configured ``test_dirs`` for ``ext`` in the registry.
     """
-    if lang_name == "javascript":
+    if lang_name in ("javascript", "typescript"):
         stem = src_path.stem
         infixes = (".test", ".spec")
         return [f"{stem}{infix}{ext}" for infix in infixes for ext in _JS_EXTENSIONS]
@@ -52,7 +52,7 @@ def _test_filename_for_message(src_path: Path, lang_name: str) -> str:
     for JavaScript, the Jest-style ``foo.test.js`` form (the most
     common modern convention).
     """
-    if lang_name == "javascript":
+    if lang_name in ("javascript", "typescript"):
         # Default to the Jest-style ``.test.<source-extension>`` form so the
         # suggestion matches the source file's own extension.
         return f"{src_path.stem}.test{src_path.suffix}"
@@ -123,7 +123,7 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
         if _path_components_contain(path_parts, td_parts):
             return True
     name = Path(filepath).name
-    if lang_name == "javascript":
+    if lang_name in ("javascript", "typescript"):
         return ".test." in name or ".spec." in name
     return name.startswith("test_")
 
@@ -145,7 +145,7 @@ class TestExistenceRule(BaseRule):
 
     name = "test_existence"
     code = "SAFE701"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:  # noqa: ARG002
         """Return a violation when no matching test file can be found.
@@ -186,7 +186,7 @@ class TestCouplingRule(BaseRule):
 
     name = "test_coupling"
     code = "SAFE702"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:  # noqa: ARG002
         """Return a violation when the paired test file was not part of this commit."""

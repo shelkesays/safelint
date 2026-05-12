@@ -24,6 +24,7 @@ from safelint.rules.base import BaseRule, Suggestion, TextEdit
 _CATCH_CLAUSE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({EXCEPT_CLAUSE}),
     "javascript": frozenset({"catch_clause"}),
+    "typescript": frozenset({"catch_clause"}),
 }
 
 # Per-language: function-defining node types (used to skip nested
@@ -33,6 +34,7 @@ _CATCH_CLAUSE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
+    "typescript": _JS_FUNCTION_TYPES,
 }
 
 # Per-language: re-raise statement types. ``except: raise`` (Python) and
@@ -41,6 +43,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 _RERAISE_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({RAISE_STATEMENT}),
     "javascript": frozenset({"throw_statement"}),
+    "typescript": frozenset({"throw_statement"}),
 }
 
 # Statement-only no-op nodes: their presence means "developer wrote something
@@ -52,6 +55,7 @@ _RERAISE_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({"pass_statement", "continue_statement"}),
     "javascript": frozenset({"empty_statement"}),
+    "typescript": frozenset({"empty_statement"}),
 }
 
 # Per-language: literal expression node types that count as "comment-like"
@@ -60,6 +64,15 @@ _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # Python ``string`` is handled separately via :func:`_is_string_literal_expression`
 # to distinguish plain strings from f-strings; JS template strings carry
 # similar interpolation risk so are also delegated to the helper.
+_JS_LITERAL_EXPR_TYPES = frozenset(
+    {
+        "number",
+        "true",
+        "false",
+        "null",
+        "undefined",
+    }
+)
 _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset(
         {
@@ -72,15 +85,8 @@ _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
             "ellipsis",
         }
     ),
-    "javascript": frozenset(
-        {
-            "number",
-            "true",
-            "false",
-            "null",
-            "undefined",
-        }
-    ),
+    "javascript": _JS_LITERAL_EXPR_TYPES,
+    "typescript": _JS_LITERAL_EXPR_TYPES,
 }
 
 
@@ -144,7 +150,7 @@ def _is_string_literal_expression(node: tree_sitter.Node, lang_name: str) -> boo
         # children. f-strings include ``interpolation`` nodes — those carry side
         # effects so we don't treat them as no-ops.
         return all(child.type != "interpolation" for child in node.named_children) and bool(node_text(node))
-    if lang_name == "javascript":
+    if lang_name in ("javascript", "typescript"):
         if node.type not in ("string", "template_string"):
             return False
         # ``template_string`` may contain ``template_substitution`` children
@@ -268,7 +274,7 @@ class EmptyExceptRule(BaseRule):
 
     name = "empty_except"
     code = "SAFE202"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every catch handler whose body is effectively empty."""
@@ -276,7 +282,7 @@ class EmptyExceptRule(BaseRule):
         # Match the violation message to the source language's terminology —
         # JavaScript developers don't write ``except`` blocks. Same
         # Python/JS message-selection pattern as ``LoggingOnErrorRule``.
-        message = "Empty catch block - add error handling or a logging call" if lang_name == "javascript" else "Empty except block - add error handling or a logging call"
+        message = "Empty catch block - add error handling or a logging call" if lang_name in ("javascript", "typescript") else "Empty except block - add error handling or a logging call"
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if _is_noop_body(_catch_body(clause), lang_name)]
 
 
@@ -290,7 +296,7 @@ class LoggingOnErrorRule(BaseRule):
 
     name = "logging_on_error"
     code = "SAFE203"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     # Union of method names treated as "logging" across registered
     # languages. Python stdlib ``logging`` exposes ``debug`` / ``info`` /
@@ -389,7 +395,7 @@ class LoggingOnErrorRule(BaseRule):
         # — JavaScript developers write ``catch``, not ``except``.
         message = (
             "Catch block missing logging call - errors must be logged before being swallowed"
-            if lang_name == "javascript"
+            if lang_name in ("javascript", "typescript")
             else "Except block missing logging call - errors must be logged before being swallowed"
         )
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if self._is_unlogged(clause, lang_name, function_types)]

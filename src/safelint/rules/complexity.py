@@ -30,6 +30,7 @@ if TYPE_CHECKING:
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
+    "typescript": _JS_FUNCTION_TYPES,
 }
 
 # Node types that add 1 to cyclomatic complexity. Both languages: every
@@ -38,7 +39,21 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # ``if_clause``, and ``boolean_operator`` (a single node containing chained
 # ``and`` / ``or``). JavaScript uses ``binary_expression`` for ``&&`` /
 # ``||`` / ``??`` and the operator must be inspected — see the special
-# branch in ``_cyclomatic_complexity``.
+# branch in ``_cyclomatic_complexity``. TypeScript (``.ts`` / ``.tsx`` /
+# ``.as``) reuses the JavaScript branching set — the type system doesn't
+# introduce new branches.
+_JS_BRANCHING_TYPES = frozenset(
+    {
+        "if_statement",
+        "for_statement",
+        "for_in_statement",  # also covers ``for...of`` in tree-sitter-javascript
+        "while_statement",
+        "do_statement",
+        "switch_case",
+        "catch_clause",
+        "ternary_expression",
+    }
+)
 _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset(
         {
@@ -52,18 +67,8 @@ _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
             BOOLEAN_OPERATOR,
         }
     ),
-    "javascript": frozenset(
-        {
-            "if_statement",
-            "for_statement",
-            "for_in_statement",  # also covers ``for...of`` in tree-sitter-javascript
-            "while_statement",
-            "do_statement",
-            "switch_case",
-            "catch_clause",
-            "ternary_expression",
-        }
-    ),
+    "javascript": _JS_BRANCHING_TYPES,
+    "typescript": _JS_BRANCHING_TYPES,
 }
 
 # JavaScript: ``binary_expression`` covers many operators (``+``, ``>``,
@@ -77,7 +82,7 @@ class ComplexityRule(BaseRule):
 
     name = "complexity"
     code = "SAFE104"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions whose cyclomatic complexity exceeds the configured maximum."""
@@ -132,7 +137,7 @@ def _is_branch_node(node: tree_sitter.Node, lang_name: str, branching_types: fro
     """
     if node.type in branching_types:
         return True
-    if lang_name != "javascript" or node.type != "binary_expression":
+    if lang_name not in ("javascript", "typescript") or node.type != "binary_expression":
         return False
     op = node.child_by_field_name("operator")
     if op is None or op.text is None:

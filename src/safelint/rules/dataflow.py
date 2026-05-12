@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
+    "typescript": _JS_FUNCTION_TYPES,
 }
 
 # Python parameter shapes — kept in sync with the same set in
@@ -150,7 +151,7 @@ class TaintedSinkRule(BaseRule):
 
     name = "tainted_sink"
     code = "SAFE801"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     _DEFAULT_SINKS: ClassVar[list[str]] = [
         "eval",
@@ -241,7 +242,7 @@ class TaintedSinkRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run taint analysis on every function in *tree*, dispatching on language."""
         lang_name = resolve_lang_name(filepath)
-        if lang_name == "javascript":
+        if lang_name in ("javascript", "typescript"):
             return self._javascript_check(filepath, tree)
         return self._python_check(filepath, tree)
 
@@ -258,7 +259,7 @@ class ReturnValueIgnoredRule(BaseRule):
 
     name = "return_value_ignored"
     code = "SAFE802"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
@@ -316,7 +317,7 @@ def _null_dereference_message(method: str, lang_name: str) -> str:
     catches both ``null`` and ``undefined`` (the strict ``!== null``
     misses ``undefined``).
     """
-    if lang_name == "javascript":
+    if lang_name in ("javascript", "typescript"):
         return f'Result of "{method}()" is immediately dereferenced without a null check - guard with optional chaining ("result?.field") or "if (result != null)"'
     return f'Result of "{method}()" is immediately dereferenced without a None check - guard with "if result is not None"'
 
@@ -326,7 +327,7 @@ class NullDereferenceRule(BaseRule):
 
     name = "null_dereference"
     code = "SAFE803"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     _DEFAULT_NULLABLE_PYTHON: ClassVar[frozenset[str]] = frozenset(
         {

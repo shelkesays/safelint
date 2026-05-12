@@ -181,7 +181,7 @@ class GlobalMutationRule(BaseRule):
 
     name = "global_mutation"
     code = "SAFE302"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     _DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT: ClassVar[list[str]] = [
         "globalThis",  # universal — works in browsers, Node, web workers
@@ -337,7 +337,7 @@ class WideScopeDeclarationRule(BaseRule):
 
     name = "wide_scope_declaration"
     code = "SAFE305"
-    language = ("javascript",)
+    language = ("javascript", "typescript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every ``var`` declaration in the file."""
