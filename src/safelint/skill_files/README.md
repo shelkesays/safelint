@@ -40,6 +40,15 @@ pip install 'safelint[python]'            # or: uv add 'safelint[python]'
 safelint skill install                    # auto-detects which AI client(s) you use
 ```
 
+`safelint skill install` does **two** auto-detections in one shot:
+
+1. **Which AI client(s) you use** — looks for marker files (`CLAUDE.md`, `.cursor/`, `.github/copilot-instructions.md`, etc.) and installs the skill files into each detected client's config dir.
+2. **Which language grammar(s) your project needs** — walks the project for source-file extensions, compares against installed extras, and if any grammars are missing it emits one composed install line:
+   ```
+   safelint: warning: Detected source files for 2 languages (python, typescript) whose tree-sitter grammar isn't installed. Run: pip install 'safelint[python,typescript]'
+   ```
+   You run the single composed `pip install` command and you're set up for every language in your repo.
+
 By default, `safelint skill install` runs in `--client auto` mode:
 
 1. If your current directory has client markers (e.g. `CLAUDE.md`, `.cursor/`, `.github/copilot-instructions.md`), it installs each detected client's skill **project-scoped**.

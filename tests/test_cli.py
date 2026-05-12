@@ -16,8 +16,10 @@ import pytest
 
 from safelint.cli import (
     _check_exit_code,
+    _compose_extras_install_command,
     _emit_hook_grammar_warnings,
     _emit_missing_grammar_warnings,
+    _emit_skill_install_grammar_hint,
     _file_summary_line,
     _format_install_action,
     _guard_hook_silent_failure,
@@ -27,6 +29,7 @@ from safelint.cli import (
     _scan_for_unavailable_extensions,
 )
 from safelint.core.engine import LintResult
+from safelint.languages import extra_name_for
 from safelint.rules.base import Violation
 
 
@@ -469,3 +472,75 @@ def test_matching_suffixes_ignores_leading_dot_dotfiles() -> None:
     """
     found = _matching_suffixes([".ts", ".py", ".gitignore", "real.ts"], {".ts": "hint", ".py": "hint"})
     assert found == {".ts"}, f"expected only real.ts to match; got {found}"
+
+
+# ---------------------------------------------------------------------------
+# safelint skill install — language-grammar nudge
+# ---------------------------------------------------------------------------
+
+
+def test_compose_extras_install_command_alphabetical(mocker: MockerFixture) -> None:
+    """Composed install command lists extras alphabetically (deterministic for diffs)."""
+    assert _compose_extras_install_command({"typescript", "python"}) == "pip install 'safelint[python,typescript]'"
+    assert _compose_extras_install_command({"python"}) == "pip install 'safelint[python]'"
+    assert _compose_extras_install_command({"javascript", "python", "typescript"}) == "pip install 'safelint[javascript,python,typescript]'"
+
+
+def test_emit_skill_install_grammar_hint_silent_when_every_grammar_installed(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """Dev install (every grammar present) → helper is a no-op, no stderr noise."""
+    mocker.patch("safelint.cli.unavailable_extensions", return_value={})
+    _emit_skill_install_grammar_hint(tmp_path)
+    assert capsys.readouterr().err == ""
+
+
+def test_emit_skill_install_grammar_hint_silent_when_no_source_files_present(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """Empty target tree → no nudge, even when extras are uninstalled (nothing to nudge about)."""
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={".py": "pip install 'safelint[python]'"},
+    )
+    _emit_skill_install_grammar_hint(tmp_path)
+    assert capsys.readouterr().err == ""
+
+
+def test_emit_skill_install_grammar_hint_emits_composed_command_for_multi_language(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """Python + TypeScript project with neither grammar installed → ONE composed command, not two."""
+    (tmp_path / "main.py").write_text("x = 1\n", encoding="utf-8")
+    (tmp_path / "app.ts").write_text("const x = 1;\n", encoding="utf-8")
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={
+            ".py": "pip install 'safelint[python]'",
+            ".ts": "pip install 'safelint[typescript]'",
+            ".tsx": "pip install 'safelint[typescript]'",
+            ".as": "pip install 'safelint[typescript]'",
+        },
+    )
+    mocker.patch("safelint.cli.extra_name_for", new={".py": "python", ".ts": "typescript", ".tsx": "typescript", ".as": "typescript"}.get)
+    _emit_skill_install_grammar_hint(tmp_path)
+    err = capsys.readouterr().err
+    # Single warning line, with the composed two-extra command.
+    assert err.count("safelint: warning:") == 1
+    assert "safelint[python,typescript]" in err
+    assert "2 language" in err  # plural "languages" or count "2 language(s)"
+
+
+def test_emit_skill_install_grammar_hint_emits_single_extra_for_single_language(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """Single-language project missing one grammar → single-extra install command."""
+    (tmp_path / "main.py").write_text("x = 1\n", encoding="utf-8")
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={".py": "pip install 'safelint[python]'"},
+    )
+    mocker.patch("safelint.cli.extra_name_for", new={".py": "python"}.get)
+    _emit_skill_install_grammar_hint(tmp_path)
+    err = capsys.readouterr().err
+    assert "safelint[python]" in err
+    assert "," not in err.split("safelint[")[-1].split("]")[0]  # no comma inside the bracket → not composed
+    assert "1 language" in err
+
+
+def test_extra_name_for_returns_none_when_extension_supported() -> None:
+    """``extra_name_for(".py")`` is None when the Python grammar is installed (dev env)."""
+    assert extra_name_for(".py") is None  # dev env has all grammars
+    assert extra_name_for(".unknown") is None  # never-registered extension

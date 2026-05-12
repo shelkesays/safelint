@@ -40,7 +40,7 @@ from safelint.core.config import MODE_FAIL_ON, SEVERITY_ORDER, load_config
 from safelint.core.engine import SafetyEngine
 from safelint.core.runner import resolve_cache_dir, run
 from safelint.formatters import format_json, format_sarif
-from safelint.languages import supported_extensions, unavailable_extensions
+from safelint.languages import extra_name_for, supported_extensions, unavailable_extensions
 
 
 if TYPE_CHECKING:
@@ -820,6 +820,60 @@ def _guard_hook_silent_failure(passed: list[str], filtered: list[str], unavailab
         sys.exit(2)
 
 
+def _compose_extras_install_command(extras: set[str]) -> str:
+    """Compose a ``pip install 'safelint[a,b,c]'`` line for *extras*.
+
+    Order: alphabetical, so the output is deterministic across runs and
+    diffs cleanly in CI logs.
+    """
+    spec = ",".join(sorted(extras))
+    return f"pip install 'safelint[{spec}]'"
+
+
+def _emit_skill_install_grammar_hint(target: Path) -> None:
+    """After ``safelint skill install``, nudge the user about missing language grammars.
+
+    Symmetric with the existing AI-client auto-detection — ``skill
+    install`` finds the AI clients in this project and installs the
+    skill files; this helper additionally finds the *languages* in
+    this project and tells the user which ``safelint[<lang>]`` extras
+    they're missing.
+
+    For multi-language projects (Python + JS, Python + TS, etc.) the
+    helper emits a single composed install command
+    (``pip install 'safelint[python,typescript]'``) so the user runs
+    one ``pip`` command instead of several. The per-language warnings
+    from :func:`_emit_missing_grammar_warnings` are intentionally
+    *not* emitted here — that helper is the runtime-warning surface
+    and the duplicate output would just be noise. The skill-install
+    surface emits one compact summary line instead.
+
+    Silent when every needed grammar is already installed — the user
+    asked to install skills, not to be lectured about grammars they
+    already have.
+    """
+    unavailable = unavailable_extensions()
+    if not unavailable:
+        return
+    seen_exts = _scan_for_unavailable_extensions(target, unavailable)
+    if not seen_exts:
+        return
+    needed_extras: set[str] = set()
+    for ext in seen_exts:
+        name = extra_name_for(ext)
+        if name is not None:
+            needed_extras.add(name)
+    if not needed_extras:
+        return  # pragma: no cover — defensive; every unavailable ext has an extra
+    install = _compose_extras_install_command(needed_extras)
+    plural = "" if len(needed_extras) == 1 else "s"
+    extras_list = ", ".join(sorted(needed_extras))
+    _diagnostics.print_warning(
+        f"Detected source files for {len(needed_extras)} language{plural} ({extras_list}) "
+        f"whose tree-sitter grammar isn't installed. Run: {install}"
+    )
+
+
 def _emit_skill_freshness_warnings() -> None:
     """Emit a stderr warning for each stale AI-client skill install.
 
@@ -1256,7 +1310,17 @@ def _run_skill(args: argparse.Namespace) -> int:
     from safelint import _skill_install  # noqa: PLC0415
 
     if args.skill_action == "install":
-        return _skill_install.run_install(args)
+        rc = _skill_install.run_install(args)
+        # After a successful skill install, scan the project for source
+        # files whose language grammar isn't installed and nudge the user
+        # toward the matching extras. Symmetric with the existing
+        # AI-client auto-detection: skill install handles BOTH "which
+        # client does this project use" AND "which grammars does this
+        # project need". Only fires on success — a failed install
+        # already has its own diagnostics, no point piling on.
+        if rc == 0:
+            _emit_skill_install_grammar_hint(Path.cwd())
+        return rc
     if args.skill_action == "path":
         return _skill_install.run_path(args)
     if args.skill_action == "status":

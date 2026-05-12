@@ -41,11 +41,14 @@ except ImportError:  # nosafe: SAFE203
     _GRAMMAR_AVAILABLE = False
 
 
+#: PEP 621 extra name (matches the key under
+#: ``[project.optional-dependencies]`` in ``pyproject.toml``). Used by
+#: the CLI to compose multi-language install commands.
+EXTRA_NAME = "javascript"
+
 #: Install hint surfaced by the CLI when a user has ``.js`` / ``.mjs`` / ``.cjs``
-#: files in their project but ``tree-sitter-javascript`` isn't installed. Kept
-#: as a module-level string so the CLI can pull it without re-deriving the
-#: extra name.
-GRAMMAR_INSTALL_HINT = "pip install 'safelint[javascript]'"
+#: files in their project but ``tree-sitter-javascript`` isn't installed.
+GRAMMAR_INSTALL_HINT = f"pip install 'safelint[{EXTRA_NAME}]'"
 
 
 def _create_javascript_parser() -> tree_sitter.Parser:

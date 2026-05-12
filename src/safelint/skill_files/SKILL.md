@@ -27,6 +27,7 @@ If either check returns non-zero (or the shell reports "command not found" / "is
 
   Plain `pip install safelint` (no extra) installs only the engine and is rarely what the user wants — on first run safelint emits an install hint pointing them at the right extra and exits with code 2.
 - If safelint is already installed but emits `safelint: warning: skipping .X files — install with: pip install 'safelint[Y]'` followed by `safelint: error: no files linted`, the grammar extra is missing. Re-install with the right `[<lang>]` extra and retry.
+- After running `safelint skill install`, safelint also auto-detects the project's language(s) and emits a final `safelint: warning: Detected source files for N language(s) ... Run: pip install 'safelint[<a,b>]'` line if any grammars are missing. The composed install command in that line is the one-shot fix for multi-language projects — run it as-is.
 - For pre-commit users: the same extra must go into `additional_dependencies` in `.pre-commit-config.yaml`, e.g. `additional_dependencies: ['safelint[python]']`. Without it, the pre-commit hook also exits 2 and is reported as Failed (red) — there's no silent-pass.
 - Stop. Do not proceed until they install the right extra.
 

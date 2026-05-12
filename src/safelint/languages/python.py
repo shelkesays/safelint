@@ -35,9 +35,16 @@ except ImportError:  # nosafe: SAFE203
     _GRAMMAR_AVAILABLE = False
 
 
+#: PEP 621 extra name (matches the key under
+#: ``[project.optional-dependencies]`` in ``pyproject.toml``). Used by
+#: the CLI to compose multi-language install commands like
+#: ``pip install 'safelint[python,typescript]'`` when more than one
+#: grammar is missing.
+EXTRA_NAME = "python"
+
 #: Install hint surfaced by the CLI when a user has ``.py`` / ``.pyw``
 #: files but ``tree-sitter-python`` isn't installed.
-GRAMMAR_INSTALL_HINT = "pip install 'safelint[python]'"
+GRAMMAR_INSTALL_HINT = f"pip install 'safelint[{EXTRA_NAME}]'"
 
 
 def _create_python_parser() -> tree_sitter.Parser:
