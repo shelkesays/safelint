@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from safelint.core._validators import _validated_string_list  # re-exported for backwards-compat
+from safelint.core._validators import _validated_string_list, get_per_language_config  # ``_validated_string_list`` re-exported for backwards-compat
 from safelint.languages._node_utils import call_name, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import CALL, WITH_ITEM
@@ -196,8 +196,8 @@ class ResourceLifecycleRule(BaseRule):
             )
         return violations
 
-    def _javascript_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Run the JavaScript-specific check (call must be inside ``try { ... } finally { ... }``).
+    def _javascript_check(self, filepath: str, tree: tree_sitter.Tree, lang_name: str) -> list[Violation]:
+        """Run the JS-family (JavaScript / TypeScript) check (call must be inside ``try { ... } finally { ... }``).
 
         Walks both ``call_expression`` and ``new_expression`` — the runtime
         presets populate ``tracked_functions_javascript`` with constructor
@@ -206,11 +206,22 @@ class ResourceLifecycleRule(BaseRule):
         miss exactly the cases the browser preset is designed to catch.
         ``call_name`` resolves both shapes — the rule layer doesn't need
         to branch.
+
+        TypeScript inherits the JS tracked-functions list by default;
+        users can set ``tracked_functions_typescript`` for TS-only
+        overrides.
         """
-        tracked_js = _validated_string_list(
-            self.config.get("tracked_functions_javascript", self._DEFAULT_TRACKED_JAVASCRIPT),
-            "tracked_functions_javascript",
+        # JS-family (JS / TS): TypeScript inherits the JS list by default
+        # via ``get_per_language_config``'s TS→JS fallback; users can
+        # override per-language by setting ``tracked_functions_typescript``.
+        raw_tracked = get_per_language_config(
+            self.config,
+            "tracked_functions",
+            lang_name,
+            default=self._DEFAULT_TRACKED_JAVASCRIPT,
         )
+        error_key = f"tracked_functions_{lang_name}"
+        tracked_js = _validated_string_list(raw_tracked, error_key)
         tracked: frozenset[str] = frozenset(tracked_js)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
@@ -241,4 +252,4 @@ class ResourceLifecycleRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
         if lang_name == "python":
             return self._python_check(filepath, tree)
-        return self._javascript_check(filepath, tree)
+        return self._javascript_check(filepath, tree, lang_name)

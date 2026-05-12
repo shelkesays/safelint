@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.core._validators import _validated_string_list
+from safelint.core._validators import _validated_string_list, get_per_language_config
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
@@ -28,18 +28,24 @@ def _io_funcs_for_lang(rule_config: dict, lang_name: str, fallback: list[str]) -
     """Resolve the active I/O-primitive set for *lang_name* against the rule's config.
 
     Per-language config is keyed by ``io_functions`` (Python, the default)
-    and ``io_functions_<lang>`` for non-Python languages. Adding a new
-    language is additive — drop a new ``io_functions_<lang>`` list into
-    ``DEFAULTS["rules"]`` and the lookup picks it up.
+    and ``io_functions_<lang>`` for non-Python languages. TypeScript
+    inherits the JavaScript list by default — runtime semantics are
+    identical (TS compiles to JS), so the same I/O primitives apply.
+    Users can override per-language by setting
+    ``io_functions_typescript`` explicitly.
 
-    Validates that the value is a list/tuple of strings before building
-    the frozenset. A bare-string typo (``io_functions_javascript = "log"``)
-    would otherwise be silently coerced to a set of single characters
-    and effectively disable detection — fail loud instead.
+    Validates the resolved value is a list/tuple of strings before
+    building the frozenset. A bare-string typo
+    (``io_functions_javascript = "log"``) would otherwise be silently
+    coerced to a set of single characters and effectively disable
+    detection — fail loud instead.
     """
-    key = "io_functions" if lang_name == "python" else f"io_functions_{lang_name}"
-    raw = rule_config.get(key, fallback if lang_name == "python" else [])
-    return frozenset(_validated_string_list(raw, key))
+    py_default = fallback if lang_name == "python" else []
+    raw = get_per_language_config(rule_config, "io_functions", lang_name, default=py_default)
+    # ``error_key`` is what shows up in the TypeError message — point users
+    # at the key they'd actually need to fix in their config.
+    error_key = "io_functions" if lang_name == "python" else f"io_functions_{lang_name}"
+    return frozenset(_validated_string_list(raw, error_key))
 
 
 def _first_io_call(func_node: tree_sitter.Node, io_funcs: frozenset[str], function_types: frozenset[str]) -> tree_sitter.Node | None:

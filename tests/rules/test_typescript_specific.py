@@ -276,3 +276,101 @@ def test_ts_long_type_signature_does_not_inflate_function_length(tmp_path: Path)
     )
     result = _engine().check_file(str(sample))
     assert not any(v.code == "SAFE101" for v in result.violations)
+
+
+# ---------------------------------------------------------------------------
+# Per-language config precedence (Slice 3): TS → JS fallback
+# ---------------------------------------------------------------------------
+
+
+def test_ts_inherits_javascript_config_when_typescript_key_unset(tmp_path: Path) -> None:
+    """A TS file inherits the ``_javascript``-keyed config when ``_typescript`` is not set.
+
+    Default behaviour: ``sinks_javascript = ["eval"]`` (built-in DEFAULTS).
+    The TS file's ``eval(userInput)`` should fire SAFE801 because the
+    rule reads the JS list via the TS → JS fallback.
+    """
+    sample = tmp_path / "fallback.ts"
+    sample.write_text(
+        "function run(userInput: string): void { eval(userInput); }\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert any(v.code == "SAFE801" for v in result.violations), "TS file with default config should fire SAFE801 — TS inherits sinks_javascript"
+
+
+def test_ts_typescript_key_overrides_javascript_when_explicitly_set(tmp_path: Path) -> None:
+    """When ``sinks_typescript`` is explicitly set, the TS file uses it (NOT the JS list).
+
+    Verifies the override door: the user can split TS-specific sinks
+    from JS sinks when they really want different behaviour.
+    """
+    sample = tmp_path / "override.ts"
+    sample.write_text(
+        # ``eval`` is in the JS default sinks but NOT in our custom TS list,
+        # so SAFE801 should NOT fire (TS-specific list overrides JS default).
+        "function run(userInput: string): void { eval(userInput); }\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(
+        DEFAULTS,
+        {
+            "rules": {
+                "tainted_sink": {
+                    "enabled": True,
+                    # Override: TS-specific list — only "myCustomDangerous" is a sink.
+                    "sinks_typescript": ["myCustomDangerous"],
+                }
+            }
+        },
+    )
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert not any(v.code == "SAFE801" for v in result.violations), "sinks_typescript explicit override should replace the JS list — eval should NOT fire"
+
+
+def test_ts_typescript_key_used_when_javascript_unset(tmp_path: Path) -> None:
+    """Setting ``_typescript`` keys without ``_javascript`` keys works for TS files.
+
+    Positive control: confirms the lookup is ``ts_key first, then js_key``,
+    not ``js_key always (with ts_key only being a sometimes-overlay)``.
+    """
+    sample = tmp_path / "tsonly.ts"
+    sample.write_text(
+        "function run(userInput: string): void { customTsSink(userInput); }\n",
+        encoding="utf-8",
+    )
+    cfg = deep_merge(
+        DEFAULTS,
+        {
+            "rules": {
+                "tainted_sink": {
+                    "enabled": True,
+                    "sinks_typescript": ["customTsSink"],
+                }
+            }
+        },
+    )
+    result = SafetyEngine(cfg).check_file(str(sample))
+    assert any(v.code == "SAFE801" for v in result.violations)
+
+
+def test_ts_io_functions_inherits_javascript_default(tmp_path: Path) -> None:
+    """SAFE304 on a TS file uses ``io_functions_javascript`` defaults.
+
+    Latent bug from Slice 1: ``side_effects.py:_io_funcs_for_lang`` built
+    its config key from ``f"io_functions_{lang_name}"``, producing
+    ``io_functions_typescript`` for TS files — which has no default.
+    The TS→JS fallback in ``get_per_language_config`` restores the
+    expected behaviour: TS files see the JS I/O primitive list and
+    SAFE304 fires correctly.
+    """
+    sample = tmp_path / "io.ts"
+    # ``console.log`` is in the default ``io_functions_javascript`` list.
+    # SAFE304 fires when a function NOT named to signal I/O calls an I/O primitive.
+    sample.write_text(
+        "function processOrder(order: string): string {\n  console.log(order);\n  return order;\n}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert any(v.code == "SAFE304" for v in result.violations), "TS file with default config should fire SAFE304 — TS inherits io_functions_javascript"
