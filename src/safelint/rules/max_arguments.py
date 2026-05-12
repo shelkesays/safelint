@@ -19,6 +19,7 @@ if TYPE_CHECKING:
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
+    "typescript": _JS_FUNCTION_TYPES,
 }
 
 _PY_SPLAT_PARAM_TYPES = frozenset({"list_splat_pattern", "dictionary_splat_pattern"})
@@ -51,6 +52,7 @@ _JS_COUNTED_PARAM_TYPES = frozenset(
 _COUNTED_PARAM_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": _PY_COUNTED_PARAM_TYPES,
     "javascript": _JS_COUNTED_PARAM_TYPES,
+    "typescript": _JS_COUNTED_PARAM_TYPES,
 }
 
 
@@ -100,7 +102,7 @@ class MaxArgumentsRule(BaseRule):
 
     name = "max_arguments"
     code = "SAFE103"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function with more arguments than max_args."""

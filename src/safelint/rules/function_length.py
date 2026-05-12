@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
+    "typescript": _JS_FUNCTION_TYPES,
 }
 
 # ``count_mode = "statements"`` is language-aware: each language has a
@@ -113,7 +114,7 @@ class FunctionLengthRule(BaseRule):
 
     name = "function_length"
     code = "SAFE101"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function or async function exceeding the configured size."""

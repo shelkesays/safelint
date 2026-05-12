@@ -374,12 +374,14 @@ def test_base_rule_default_language_is_python_only() -> None:
     assert BaseRule.language == ("python",)
 
 
-_RULES_WIDENED_FOR_JAVASCRIPT: frozenset[str] = frozenset(
+_RULES_WIDENED_FOR_JS_FAMILY: frozenset[str] = frozenset(
     {
         # Cross-language rules: ``language`` should be exactly
-        # ``("python", "javascript")``. Silent drift past this
-        # allow-list (a half-ported rule, or a rule unintentionally
-        # narrowing back to Python-only) is what the assertion catches.
+        # ``("python", "javascript", "typescript")``. The JS family
+        # (JS / TS / TSX / AS) shares rule logic; rules deliberately
+        # widen all three at once. Silent drift past this allow-list
+        # (a half-ported rule, or a rule unintentionally narrowing
+        # back to Python-only) is what the assertion catches.
         "FunctionLengthRule",
         "NestingDepthRule",
         "MaxArgumentsRule",
@@ -400,11 +402,11 @@ _RULES_WIDENED_FOR_JAVASCRIPT: frozenset[str] = frozenset(
     }
 )
 
-_RULES_JAVASCRIPT_ONLY: frozenset[str] = frozenset(
+_RULES_JS_FAMILY_ONLY: frozenset[str] = frozenset(
     {
-        # JS-only rules (``language=("javascript",)``) — the JS hazard
-        # has no useful Python translation. Listed explicitly so the
-        # allow-list test catches accidental drift either way.
+        # JS-family-only rules (``language=("javascript", "typescript")``) —
+        # the hazard has no useful Python translation. ``var`` is
+        # legal in TS too, so SAFE305 fires on both.
         "WideScopeDeclarationRule",  # SAFE305: ``var`` keyword (no Python equivalent)
     }
 )
@@ -416,24 +418,26 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
     Catches two failure modes:
 
     * A rule silently grows its language tuple (e.g. someone adds
-      ``"typescript"`` mid-port without finishing the work). The allow-list
-      surfaces that as a test failure rather than letting half-ported
-      behaviour ship.
+      a new language mid-port without finishing the work). The
+      allow-list surfaces that as a test failure rather than letting
+      half-ported behaviour ship.
     * A rule listed here regresses to the default ``("python",)`` —
       the test fails too, prompting the contributor to remove the entry
       from the allow-list along with the deliberate scope reduction.
     """
-    cross_lang_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript")}
-    js_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("javascript",)}
-    assert cross_lang_actual == _RULES_WIDENED_FOR_JAVASCRIPT, (
-        f"Cross-language allow-list out of sync. Actually ('python', 'javascript'): {sorted(cross_lang_actual)}; documented: {sorted(_RULES_WIDENED_FOR_JAVASCRIPT)}"
+    cross_lang_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript")}
+    js_family_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("javascript", "typescript")}
+    assert cross_lang_actual == _RULES_WIDENED_FOR_JS_FAMILY, (
+        f"Cross-language allow-list out of sync. Actually ('python', 'javascript', 'typescript'): {sorted(cross_lang_actual)}; documented: {sorted(_RULES_WIDENED_FOR_JS_FAMILY)}"
     )
-    assert js_only_actual == _RULES_JAVASCRIPT_ONLY, f"JS-only allow-list out of sync. Actually ('javascript',): {sorted(js_only_actual)}; documented: {sorted(_RULES_JAVASCRIPT_ONLY)}"
+    assert js_family_only_actual == _RULES_JS_FAMILY_ONLY, (
+        f"JS-family-only allow-list out of sync. Actually ('javascript', 'typescript'): {sorted(js_family_only_actual)}; documented: {sorted(_RULES_JS_FAMILY_ONLY)}"
+    )
 
     for cls in ALL_RULES:
-        if cls.__name__ in _RULES_WIDENED_FOR_JAVASCRIPT:
-            assert cls.language == ("python", "javascript"), f"{cls.__name__} should be ('python', 'javascript'); got {cls.language}"
-        elif cls.__name__ in _RULES_JAVASCRIPT_ONLY:
-            assert cls.language == ("javascript",), f"{cls.__name__} should be ('javascript',); got {cls.language}"
+        if cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY:
+            assert cls.language == ("python", "javascript", "typescript"), f"{cls.__name__} should be ('python', 'javascript', 'typescript'); got {cls.language}"
+        elif cls.__name__ in _RULES_JS_FAMILY_ONLY:
+            assert cls.language == ("javascript", "typescript"), f"{cls.__name__} should be ('javascript', 'typescript'); got {cls.language}"
         else:
-            assert cls.language == ("python",), f"{cls.__name__} has unexpected language={cls.language}; add it to _RULES_WIDENED_FOR_JAVASCRIPT or _RULES_JAVASCRIPT_ONLY if intentional"
+            assert cls.language == ("python",), f"{cls.__name__} has unexpected language={cls.language}; add it to _RULES_WIDENED_FOR_JS_FAMILY or _RULES_JS_FAMILY_ONLY if intentional"

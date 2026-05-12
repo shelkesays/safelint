@@ -137,7 +137,7 @@ class ResourceLifecycleRule(BaseRule):
 
     name = "resource_lifecycle"
     code = "SAFE401"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     _DEFAULT_TRACKED_JAVASCRIPT: ClassVar[list[str]] = [
         # File / stream APIs.

@@ -20,6 +20,7 @@ if TYPE_CHECKING:
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
+    "typescript": _JS_FUNCTION_TYPES,
 }
 
 
@@ -84,7 +85,7 @@ class SideEffectsHiddenRule(BaseRule):
 
     name = "side_effects_hidden"
     code = "SAFE303"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
@@ -121,7 +122,7 @@ class SideEffectsRule(BaseRule):
 
     name = "side_effects"
     code = "SAFE304"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""

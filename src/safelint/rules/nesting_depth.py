@@ -28,6 +28,7 @@ if TYPE_CHECKING:
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
+    "typescript": _JS_FUNCTION_TYPES,
 }
 
 # Per-language node-type sets that count as one nesting step.
@@ -42,6 +43,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({IF_STATEMENT, FOR_STATEMENT, WHILE_STATEMENT, WITH_STATEMENT, TRY_STATEMENT, MATCH_STATEMENT}),
     "javascript": frozenset({"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"}),
+    "typescript": frozenset({"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"}),
 }
 
 
@@ -50,7 +52,7 @@ class NestingDepthRule(BaseRule):
 
     name = "nesting_depth"
     code = "SAFE102"
-    language = ("python", "javascript")
+    language = ("python", "javascript", "typescript")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function whose maximum control-flow nesting depth exceeds max_depth."""
