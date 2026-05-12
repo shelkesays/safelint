@@ -783,6 +783,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#default-exclude-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default exclude paths
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Default exclude paths">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-config-keys-exclude_paths-and-extend_exclude_paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two config keys: exclude_paths and extend_exclude_paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resolution-truth-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolution truth table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-of-thumb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule of thumb
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#global-ignore-list" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1916,6 +1966,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#default-exclude-paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Default exclude paths
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Default exclude paths">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#two-config-keys-exclude_paths-and-extend_exclude_paths" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two config keys: exclude_paths and extend_exclude_paths
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#resolution-truth-table" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Resolution truth table
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#rule-of-thumb" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rule of thumb
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#global-ignore-list" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2088,8 +2188,13 @@
 </tr>
 <tr>
 <td><code>exclude_paths</code></td>
+<td>(see <a href="#default-exclude-paths">defaults</a>)</td>
+<td>Glob patterns for files / directories to skip entirely. <strong>Setting this in your config REPLACES the built-in defaults</strong> — use <code>extend_exclude_paths</code> instead if you want to keep them.</td>
+</tr>
+<tr>
+<td><code>extend_exclude_paths</code></td>
 <td><code>[]</code></td>
-<td>Glob patterns for files to skip entirely, e.g. <code>["tests/**", "migrations/**"]</code>.</td>
+<td>Glob patterns appended to whatever <code>exclude_paths</code> resolves to. Use this for project-specific excludes when you want to keep the vendor-dir defaults active.</td>
 </tr>
 <tr>
 <td><code>ignore</code></td>
@@ -2111,47 +2216,146 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">[tool.safelint]</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;local&quot;</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">fail_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;error&quot;</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">exclude_paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;tests/**&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;docs/**&quot;</span><span class="p">]</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE203&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;side_effects&quot;</span><span class="p">]</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">max_file_size_bytes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5242880</span><span class="w">   </span><span class="c1"># 5 MiB; raise explicitly to allow larger files</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="k">[tool.safelint.per_file_ignores]</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE103&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># Keep the built-in vendor-dir defaults AND add tests/docs:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="n">extend_exclude_paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;tests/**&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;docs/**&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE203&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;side_effects&quot;</span><span class="p">]</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">max_file_size_bytes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5242880</span><span class="w">   </span><span class="c1"># 5 MiB; raise explicitly to allow larger files</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="k">[tool.safelint.per_file_ignores]</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE103&quot;</span><span class="p">]</span>
 </code></pre></div>
+<h2 id="default-exclude-paths">Default exclude paths<a class="headerlink" href="#default-exclude-paths" title="Permanent link">#</a></h2>
+<p>SafeLint ships a built-in list of vendor and generated directories that almost no project wants linted. These are pruned during file discovery — <code>os.walk</code> doesn't even descend into them, so the cost of having them excluded is essentially free.</p>
+<p><strong>Built-in defaults</strong> (each name expands to two patterns, <code>&lt;name&gt;/**</code> for top-level and <code>**/&lt;name&gt;/**</code> for nested occurrences):</p>
+<ul>
+<li><strong>Python virtual environments:</strong> <code>.venv</code>, <code>venv</code></li>
+<li><strong>Python test / build tooling:</strong> <code>.tox</code>, <code>.nox</code></li>
+<li><strong>Python caches:</strong> <code>__pycache__</code>, <code>.pytest_cache</code>, <code>.ruff_cache</code>, <code>.mypy_cache</code>, <code>.ty_cache</code></li>
+<li><strong>Python build outputs:</strong> <code>build</code>, <code>dist</code></li>
+<li><strong>Coverage outputs:</strong> <code>htmlcov</code></li>
+<li><strong>JavaScript / Node:</strong> <code>node_modules</code></li>
+<li><strong>Site packages:</strong> <code>site-packages</code> (defensive — sometimes pip installs into the project tree)</li>
+</ul>
+<h3 id="two-config-keys-exclude_paths-and-extend_exclude_paths">Two config keys: <code>exclude_paths</code> and <code>extend_exclude_paths</code><a class="headerlink" href="#two-config-keys-exclude_paths-and-extend_exclude_paths" title="Permanent link">#</a></h3>
+<p>SafeLint lets you customise which directories are excluded through two TOML keys. <strong>Both can coexist.</strong> The right one to use depends on what you want to achieve. Here are the four scenarios you're likely to hit, ordered from most to least common:</p>
+<h4 id="scenario-1-i-want-to-keep-the-defaults-and-add-my-own-dirs-use-extend_exclude_paths">Scenario 1: "I want to keep the defaults and add my own dirs" → use <code>extend_exclude_paths</code><a class="headerlink" href="#scenario-1-i-want-to-keep-the-defaults-and-add-my-own-dirs-use-extend_exclude_paths" title="Permanent link">#</a></h4>
+<p>This is the <strong>most common case</strong>. SafeLint keeps excluding <code>.venv/</code>, <code>node_modules/</code>, <code>build/</code>, <code>dist/</code>, etc. (the built-in defaults above), and your patterns are added on top. Nothing is lost; everything you specify is added.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># pyproject.toml — common case</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">[tool.safelint]</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="c1"># .venv/, node_modules/, build/, dist/, __pycache__/, etc. STILL excluded</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="c1"># (built-in defaults preserved). Your additions stack on top.</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">extend_exclude_paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;tests/**&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;generated/**&quot;</span><span class="p">]</span>
+</code></pre></div>
+<h4 id="scenario-2-i-want-full-control-define-exactly-whats-excluded-ignore-the-defaults-use-exclude_paths">Scenario 2: "I want full control — define exactly what's excluded, ignore the defaults" → use <code>exclude_paths</code><a class="headerlink" href="#scenario-2-i-want-full-control-define-exactly-whats-excluded-ignore-the-defaults-use-exclude_paths" title="Permanent link">#</a></h4>
+<p>Setting <code>exclude_paths</code> <strong>replaces</strong> the built-in defaults entirely. The list you supply IS the final list. SafeLint stops excluding <code>.venv/</code>, <code>node_modules/</code>, etc. unless you list them yourself.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># pyproject.toml — power-user case</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">[tool.safelint]</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="c1"># Built-in defaults REPLACED. SafeLint now only excludes what&#39;s in this list.</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Note: .venv/ and node_modules/ are no longer excluded — add them yourself</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="c1"># if you don&#39;t want them linted.</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">exclude_paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;build/**&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;dist/**&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;**/.venv/**&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;**/node_modules/**&quot;</span><span class="p">]</span>
+</code></pre></div>
+<h4 id="scenario-3-i-want-to-lint-files-inside-normally-excluded-directories-rare-use-exclude_paths">Scenario 3: "I want to lint files inside normally-excluded directories" (rare) → use <code>exclude_paths = []</code><a class="headerlink" href="#scenario-3-i-want-to-lint-files-inside-normally-excluded-directories-rare-use-exclude_paths" title="Permanent link">#</a></h4>
+<p>Setting <code>exclude_paths</code> to an empty list explicitly clears every default. SafeLint walks into everything. Useful when you genuinely want to audit, say, a vendored library inside <code>.venv/</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># pyproject.toml — opt out of all defaults</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">[tool.safelint]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">exclude_paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[]</span><span class="w">   </span><span class="c1"># lints EVERYTHING, including .venv/ if present</span>
+</code></pre></div>
+<h4 id="scenario-4-i-want-a-custom-baseline-and-personal-additions-advanced-use-both">Scenario 4: "I want a custom baseline AND personal additions" (advanced) → use both<a class="headerlink" href="#scenario-4-i-want-a-custom-baseline-and-personal-additions-advanced-use-both" title="Permanent link">#</a></h4>
+<p>Real example: a project's checked-in <code>safelint.toml</code> defines a baseline via <code>exclude_paths</code>, and individual developers (or overlay configs) add their own dev-only excludes via <code>extend_exclude_paths</code> without modifying the project's baseline. The two keys compose — your additions stack on top of whatever <code>exclude_paths</code> resolves to.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># Project&#39;s safelint.toml (checked into git)</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">exclude_paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;build/**&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;dist/**&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;vendor/**&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># team-wide baseline</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1"># A developer&#39;s personal overlay can add:</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="n">extend_exclude_paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;my-scratch/**&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;experiments/**&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># personal additions</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="c1"># Final exclude list = [&quot;build/**&quot;, &quot;dist/**&quot;, &quot;vendor/**&quot;, &quot;my-scratch/**&quot;, &quot;experiments/**&quot;]</span>
+</code></pre></div>
+<h3 id="resolution-truth-table">Resolution truth table<a class="headerlink" href="#resolution-truth-table" title="Permanent link">#</a></h3>
+<p>For when you need the exact rule, the resolution is:</p>
+<blockquote>
+<p><strong>final exclude list = (<code>exclude_paths</code> if set, else built-in defaults) + <code>extend_exclude_paths</code></strong></p>
+</blockquote>
+<table>
+<thead>
+<tr>
+<th><code>exclude_paths</code> setting</th>
+<th><code>extend_exclude_paths</code> setting</th>
+<th>Final exclude list</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>(unset)</td>
+<td>(unset)</td>
+<td>Built-in vendor-dir defaults</td>
+</tr>
+<tr>
+<td>(unset)</td>
+<td><code>["generated/**"]</code></td>
+<td>Defaults + <code>generated/**</code></td>
+</tr>
+<tr>
+<td><code>["build/**"]</code></td>
+<td>(unset)</td>
+<td>Just <code>build/**</code> (defaults dropped)</td>
+</tr>
+<tr>
+<td><code>["build/**"]</code></td>
+<td><code>["generated/**"]</code></td>
+<td><code>build/**</code> + <code>generated/**</code> (defaults dropped; both user lists active)</td>
+</tr>
+<tr>
+<td><code>[]</code></td>
+<td>(unset)</td>
+<td>Empty — lints everything</td>
+</tr>
+<tr>
+<td><code>[]</code></td>
+<td><code>["generated/**"]</code></td>
+<td>Just <code>generated/**</code> (defaults dropped, only extend active)</td>
+</tr>
+</tbody>
+</table>
+<h3 id="rule-of-thumb">Rule of thumb<a class="headerlink" href="#rule-of-thumb" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>If you can satisfy your needs with <code>extend_exclude_paths</code> alone, do that.</strong> Most projects can. You inherit improvements to the built-in defaults automatically (e.g., if a future safelint version adds <code>.terraform/</code> to the defaults, your project gets it for free).</li>
+<li><strong>Reach for <code>exclude_paths</code> only when you have a specific reason</strong> to take control of the baseline (auditing vendored code, project policy requires explicit lists, etc.).</li>
+<li><strong>Combine both when a project baseline and a personal overlay are both needed</strong> — they're additive in the documented order.</li>
+</ul>
 <h2 id="global-ignore-list">Global ignore list<a class="headerlink" href="#global-ignore-list" title="Permanent link">#</a></h2>
 <p>The <code>ignore</code> key lets you suppress one or more rules project-wide without touching each rule's own config section. Both rule codes (e.g. <code>SAFE101</code>) and rule names (e.g. <code>function_length</code>) are accepted and can be mixed.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">[tool.safelint]</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE203&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE304&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;side_effects_hidden&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">[tool.safelint]</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE203&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE304&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;side_effects_hidden&quot;</span><span class="p">]</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># safelint.toml (standalone — no [tool.safelint] wrapper)</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE203&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE304&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;side_effects_hidden&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># safelint.toml (standalone — no [tool.safelint] wrapper)</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE203&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE304&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;side_effects_hidden&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p>Rules in the <code>ignore</code> list are skipped entirely — they produce no violations and add no overhead.</p>
 <h3 id="extend_ignore-grow-the-list-without-redeclaring-it-180"><code>extend_ignore</code> — grow the list without redeclaring it (1.8.0)<a class="headerlink" href="#extend_ignore-grow-the-list-without-redeclaring-it-180" title="Permanent link">#</a></h3>
 <p>When you only want to <em>add</em> to the project's existing ignore list (rather than replace it), use <code>extend_ignore</code>. SafeLint folds it into <code>ignore</code> at config-load time — downstream consumers only see the merged result.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[tool.safelint]</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE701&quot;</span><span class="p">]</span><span class="w">               </span><span class="c1"># baseline ignores</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">extend_ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE702&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE801&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># appended to the above</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># Resolved at runtime → ignore = [&quot;SAFE701&quot;, &quot;SAFE702&quot;, &quot;SAFE801&quot;]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">[tool.safelint]</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE701&quot;</span><span class="p">]</span><span class="w">               </span><span class="c1"># baseline ignores</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">extend_ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE702&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE801&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># appended to the above</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="c1"># Resolved at runtime → ignore = [&quot;SAFE701&quot;, &quot;SAFE702&quot;, &quot;SAFE801&quot;]</span>
 </code></pre></div>
 <p>This is especially useful in layered configs (e.g. one <code>safelint.toml</code> for the project and a developer's local override) — you can extend without losing the baseline.</p>
 <p>The same pattern applies to per-file ignores: <code>extend_per_file_ignores</code> merges into <code>per_file_ignores</code> per glob pattern (entries for an existing pattern are concatenated and deduped; new patterns are added).</p>
 <p>In <code>pyproject.toml</code>, both keys must live under the fully-qualified <code>[tool.safelint.*]</code> table — bare <code>[per_file_ignores]</code> would be parsed as a top-level table, not as a child of <code>[tool.safelint]</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">[tool.safelint.per_file_ignores]</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">]</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="k">[tool.safelint.extend_per_file_ignores]</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE102&quot;</span><span class="p">]</span><span class="w">      </span><span class="c1"># tests/** ends up with SAFE101 + SAFE102</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="s2">&quot;docs/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE601&quot;</span><span class="p">]</span><span class="w">       </span><span class="c1"># new pattern added wholesale</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="k">[tool.safelint.per_file_ignores]</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">]</span>
+<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="k">[tool.safelint.extend_per_file_ignores]</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE102&quot;</span><span class="p">]</span><span class="w">      </span><span class="c1"># tests/** ends up with SAFE101 + SAFE102</span>
+<a id="__codelineno-8-6" name="__codelineno-8-6" href="#__codelineno-8-6"></a><span class="s2">&quot;docs/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE601&quot;</span><span class="p">]</span><span class="w">       </span><span class="c1"># new pattern added wholesale</span>
 </code></pre></div>
 <p>In a standalone <code>safelint.toml</code> (no <code>[tool.safelint]</code> wrapper), drop the prefix:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">[per_file_ignores]</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">]</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="k">[extend_per_file_ignores]</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE102&quot;</span><span class="p">]</span>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="s2">&quot;docs/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE601&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">[per_file_ignores]</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">]</span>
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="k">[extend_per_file_ignores]</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE102&quot;</span><span class="p">]</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a><span class="s2">&quot;docs/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE601&quot;</span><span class="p">]</span>
 </code></pre></div>
 <h3 id="ignore-vs-per-rule-enabled-false"><code>ignore</code> vs. per-rule <code>enabled: false</code><a class="headerlink" href="#ignore-vs-per-rule-enabled-false" title="Permanent link">#</a></h3>
 <p>Both achieve the same result, but they serve different purposes:</p>
@@ -2189,28 +2393,46 @@
 <p>Use <code>ignore</code> (or <code>--ignore</code>) when you want to suppress a rule without committing to a permanent config change for that rule. Use <code>enabled: false</code> when the rule simply does not apply to your project.</p>
 <h3 id="-ignore-cli-flag"><code>--ignore</code> CLI flag<a class="headerlink" href="#-ignore-cli-flag" title="Permanent link">#</a></h3>
 <p>Pass codes or names on the command line to suppress rules for a single run. These stack on top of whatever is already in the config file's <code>ignore</code> list — they do not replace it.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># Ignore two rules for this run only</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>--ignore<span class="w"> </span>SAFE203<span class="w"> </span>--ignore<span class="w"> </span>side_effects
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="c1"># Useful in CI to temporarily unblock a branch</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>--all-files<span class="w"> </span>--fail-on<span class="o">=</span>warning<span class="w"> </span>--ignore<span class="w"> </span>SAFE801
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># Ignore two rules for this run only</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>--ignore<span class="w"> </span>SAFE203<span class="w"> </span>--ignore<span class="w"> </span>side_effects
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="c1"># Useful in CI to temporarily unblock a branch</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>--all-files<span class="w"> </span>--fail-on<span class="o">=</span>warning<span class="w"> </span>--ignore<span class="w"> </span>SAFE801
 </code></pre></div>
 <h2 id="per-file-ignore-list">Per-file ignore list<a class="headerlink" href="#per-file-ignore-list" title="Permanent link">#</a></h2>
 <p>The <code>per_file_ignores</code> key suppresses specific rules for files matching a glob pattern. Unlike the global <code>ignore</code> list (which skips rules entirely), per-file ignores let rules run on most of the codebase while silencing them for particular directories or file types.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">[tool.safelint.per_file_ignores]</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="s2">&quot;tests/**&quot;</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE103&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;missing_assertions&quot;</span><span class="p">]</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="s2">&quot;migrations/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE201&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE202&quot;</span><span class="p">]</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="s2">&quot;src/legacy/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE301&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE302&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;complexity&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="k">[tool.safelint.per_file_ignores]</span>
+<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="s2">&quot;tests/**&quot;</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE103&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;missing_assertions&quot;</span><span class="p">]</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="s2">&quot;migrations/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE201&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE202&quot;</span><span class="p">]</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="s2">&quot;src/legacy/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE301&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE302&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;complexity&quot;</span><span class="p">]</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># safelint.toml (standalone)</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">[per_file_ignores]</span>
-<a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="s2">&quot;tests/**&quot;</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE103&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;missing_assertions&quot;</span><span class="p">]</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="s2">&quot;migrations/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE201&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE202&quot;</span><span class="p">]</span>
-<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="s2">&quot;src/legacy/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE301&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE302&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;complexity&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># safelint.toml (standalone)</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="k">[per_file_ignores]</span>
+<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="s2">&quot;tests/**&quot;</span><span class="w">      </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE103&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;missing_assertions&quot;</span><span class="p">]</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="s2">&quot;migrations/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE201&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE202&quot;</span><span class="p">]</span>
+<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="s2">&quot;src/legacy/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE301&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE302&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;complexity&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p>Both rule codes (e.g. <code>SAFE101</code>) and rule names (e.g. <code>function_length</code>) are accepted and can be mixed in the same list. Multiple patterns can match a file — their ignore lists are unioned. Suppressed violations are counted in the end-of-run summary alongside <code># nosafe</code> suppressions.</p>
-<p>Patterns follow shell-glob semantics via Python's <code>fnmatch</code> module, where <code>**</code> matches any number of path segments (including zero), <code>*</code> matches within a single segment, and matching is case-sensitive on all platforms. The same dialect applies to <code>exclude_paths</code>.</p>
+<p>Patterns are matched via Python's <code>fnmatch.fnmatchcase</code>. The match is <strong>anchored at both ends</strong> (the entire path string must match the pattern) and <strong>case-sensitive on all platforms</strong>. The same matcher applies to <code>exclude_paths</code> and <code>extend_exclude_paths</code>.</p>
+<p>Important — <code>fnmatch</code> is not segment-aware:</p>
+<ul>
+<li><strong><code>*</code></strong> matches any sequence of characters, <strong>including <code>/</code></strong>. So <code>*.py</code> matches not just <code>foo.py</code> but also <code>deep/nested/foo.py</code> — the <code>*</code> happily spans path separators.</li>
+<li><strong><code>**</code></strong> has no special meaning in <code>fnmatch</code> — it's just <code>*</code> written twice and behaves identically to a single <code>*</code>. <strong>This is a notable departure from gitignore / shell-glob conventions</strong>, where <code>**</code> is the explicit "match across directory boundaries" wildcard. In safelint's matcher, <code>**</code> is <em>not</em> segment-aware; patterns like <code>.venv/**</code> work only because the literal <code>/</code> before <code>**</code> forces a slash to appear at that position (the <code>**</code> itself is just matching the rest of the path the same way a plain <code>*</code> would).</li>
+<li><strong><code>?</code></strong> matches exactly one character (including <code>/</code>).</li>
+<li><strong><code>[abc]</code></strong> matches one character from the set.</li>
+</ul>
+<p>Practical consequences:</p>
+<ul>
+<li><code>"tests/**"</code> matches anything starting with <code>tests/</code> (the literal <code>tests/</code> is anchored, then <code>**</code> matches the rest). This is what you want.</li>
+<li><code>"*.py"</code> matches any <code>.py</code> file at any depth — likely NOT what you want if you intended "only at the top level." <strong>There is no reliable <code>fnmatch</code> pattern that means "match only files at the top level of the project."</strong> The engine matches against <code>Path(filepath).as_posix()</code>, which normalises away any leading <code>./</code> (so a hypothetical <code>"./*.py"</code> pattern would never match anything), and <code>*</code> already spans <code>/</code> (so <code>"*.py"</code> already matches at any depth). The practical alternatives when you really need a single-level scope are:<ul>
+<li><strong>Explicitly list the files on the CLI</strong> (e.g. let your shell expand <code>*.py</code> to a concrete file list: <code>safelint check *.py</code>).</li>
+<li><strong>Exclude the subdirectories you don't want</strong> via <code>exclude_paths</code> / <code>extend_exclude_paths</code> (e.g. exclude <code>src/**</code>, <code>tests/**</code>, etc. to leave only top-level files).</li>
+</ul>
+</li>
+<li><code>"**/*.py"</code> is equivalent to <code>"*.py"</code> for the same reason — neither pattern is limited to a single directory level; both match any <code>.py</code> file at any depth.</li>
+<li>The vendor-dir defaults ship as <code>&lt;dir&gt;/**</code> plus <code>**/&lt;dir&gt;/**</code> per entry (see <a href="#default-exclude-paths">Default exclude paths</a> above) because the literal <code>/</code> in each pattern is what does the work, not the <code>*</code> / <code>**</code> wildcards.</li>
+</ul>
 <h3 id="how-it-differs-from-other-suppression-mechanisms">How it differs from other suppression mechanisms<a class="headerlink" href="#how-it-differs-from-other-suppression-mechanisms" title="Permanent link">#</a></h3>
 <table>
 <thead>
@@ -2247,7 +2469,7 @@
 <td>Yes</td>
 </tr>
 <tr>
-<td><code>exclude_paths</code></td>
+<td><code>exclude_paths</code> / <code>extend_exclude_paths</code></td>
 <td>Matching files only</td>
 <td>No (file skipped)</td>
 <td>No</td>
@@ -2277,8 +2499,8 @@
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="k">[tool.safelint.execution]</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="n">fail_fast</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="k">[tool.safelint.execution]</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="n">fail_fast</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">false</span>
 </code></pre></div>
 <h2 id="severity-model">Severity model<a class="headerlink" href="#severity-model" title="Permanent link">#</a></h2>
 <p>Every rule has a <code>severity</code> setting (<code>"error"</code> or <code>"warning"</code>). The global <code>fail_on</code> threshold controls what actually blocks a commit or CI run:</p>
@@ -2311,14 +2533,14 @@
 <p>CLI <code>--fail-on</code> always takes priority over the config file.</p>
 <h2 id="javascript-runtime-presets">JavaScript runtime presets<a class="headerlink" href="#javascript-runtime-presets" title="Permanent link">#</a></h2>
 <p>JavaScript source is the same regardless of where it runs (Node.js, browser, Deno, Cloudflare Workers, Bun, WASM-hosted JS engines), but the <em>APIs</em> it interacts with differ. The <code>[tool.safelint.javascript]</code> table selects which API surface the JavaScript rule defaults assume — sinks for taint analysis, tracked acquirers for resource-lifecycle, global namespaces for globals, etc.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">[tool.safelint.javascript]</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;browser&quot;</span><span class="w">   </span><span class="c1"># or &quot;node&quot; (default) / &quot;deno&quot; / &quot;cloudflare-workers&quot; / &quot;bun&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="k">[tool.safelint.javascript]</span>
+<a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;browser&quot;</span><span class="w">   </span><span class="c1"># or &quot;node&quot; (default) / &quot;deno&quot; / &quot;cloudflare-workers&quot; / &quot;bun&quot;</span>
 </code></pre></div>
 <p>In a standalone <code>safelint.toml</code> (no <code>[tool.safelint]</code> wrapper), drop the prefix — the table name is just <code>[javascript]</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># safelint.toml (standalone — no [tool.safelint] wrapper)</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="k">[javascript]</span>
-<a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;browser&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># safelint.toml (standalone — no [tool.safelint] wrapper)</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">[javascript]</span>
+<a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;browser&quot;</span>
 </code></pre></div>
 <table>
 <thead>
@@ -2357,19 +2579,19 @@
 </tbody>
 </table>
 <p>User-explicit <code>_javascript</code> config keys still win over the preset — the preset only changes the <em>default</em> list, not your overrides:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="k">[tool.safelint.javascript]</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;browser&quot;</span>
-<a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
-<a id="__codelineno-12-5" name="__codelineno-12-5" href="#__codelineno-12-5"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myCustomDangerousFunction&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># overrides the browser preset</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">[tool.safelint.javascript]</span>
+<a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;browser&quot;</span>
+<a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
+<a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myCustomDangerousFunction&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># overrides the browser preset</span>
 </code></pre></div>
 <p>Unknown runtime names surface a <code>safelint: warning:</code> line on stderr and fall back to <code>node</code>. Pure WebAssembly (<code>.wat</code> / <code>.wasm</code>) and AssemblyScript are out of scope for this configuration — they would land as separate <code>LanguageDefinition</code> registrations, not as JavaScript runtimes.</p>
 <p>Source-language analysis itself (the parser, the AST walks, the per-rule logic) is identical across runtimes — only the <em>defaults</em> change.</p>
 <h2 id="adoption-path">Adoption path<a class="headerlink" href="#adoption-path" title="Permanent link">#</a></h2>
 <p>If you are adding SafeLint to an existing project with many existing violations, start permissive and tighten over time:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a>Week 1  - mode: local,  fail_on: error    - get used to the tool, fix errors only
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a>Week 4  - mode: ci,     fail_on: warning  - enforce warnings in CI
-<a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a>Later   - enable tainted_sink, return_value_ignored, null_dereference as needed
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Week 1  - mode: local,  fail_on: error    - get used to the tool, fix errors only
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>Week 4  - mode: ci,     fail_on: warning  - enforce warnings in CI
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>Later   - enable tainted_sink, return_value_ignored, null_dereference as needed
 </code></pre></div>
 
 
