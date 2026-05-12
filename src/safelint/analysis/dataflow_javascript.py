@@ -42,6 +42,14 @@ if TYPE_CHECKING:
 # and ``yield_expression`` are included so awaited / yielded values
 # propagate taint — e.g. ``const x = await transform(input);`` keeps
 # ``x`` tainted when ``input`` is and ``transform`` is taint-preserving.
+#
+# TypeScript adds three compile-time-only wrappers (``as_expression``
+# for ``x as Foo``, ``satisfies_expression`` for ``x satisfies Foo``,
+# ``non_null_expression`` for ``x!``). All are zero-runtime-cost
+# annotations — the runtime value is identical to the inner
+# expression — so taint flows straight through them. Without these
+# entries, ``eval(userInput as string)`` would silently slip past
+# SAFE801 because the tracker would drop taint on the ``as`` cast.
 _SPREADING_TYPES = frozenset(
     {
         "binary_expression",
@@ -52,6 +60,10 @@ _SPREADING_TYPES = frozenset(
         "parenthesized_expression",
         "await_expression",
         "yield_expression",
+        # TypeScript-only pass-through wrappers:
+        "as_expression",
+        "satisfies_expression",
+        "non_null_expression",
     }
 )
 

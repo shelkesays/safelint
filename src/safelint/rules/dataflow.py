@@ -44,16 +44,34 @@ _PY_PARAM_TYPES = frozenset(
     }
 )
 
-# JavaScript parameter shapes inside ``formal_parameters``.
+# JavaScript / TypeScript parameter shapes inside ``formal_parameters``.
+#
+# JavaScript-only shapes appear bare in JS source:
+# ``identifier`` (``x``), ``assignment_pattern`` (``x = 5``),
+# ``rest_pattern`` (``...args``), ``object_pattern`` /
+# ``array_pattern`` (destructuring).
+#
+# TypeScript wraps each parameter in a typed-parameter wrapper:
+# ``required_parameter`` (``x: number``), ``optional_parameter``
+# (``x?: number``), ``rest_parameter`` (``...args: number[]``). The
+# inner binding pattern is the first named child; the type annotation
+# is the second child. ``_javascript_collect_names`` recurses into
+# these wrappers via the unwrap step in :func:`_collect_from_ts_param_wrapper`.
 _JS_PARAM_TYPES = frozenset(
     {
+        # JavaScript shapes
         "identifier",
         "assignment_pattern",
         "rest_pattern",
         "object_pattern",
         "array_pattern",
+        # TypeScript wrapper shapes
+        "required_parameter",
+        "optional_parameter",
+        "rest_parameter",
     }
 )
+_TS_PARAM_WRAPPER_TYPES = frozenset({"required_parameter", "optional_parameter", "rest_parameter"})
 
 
 def _python_param_node_name(child: tree_sitter.Node) -> str:
@@ -108,13 +126,22 @@ _JS_DESTRUCTURE_CONTAINER_TYPES = frozenset({"array_pattern", "object_pattern", 
 
 
 def _javascript_collect_names(node: tree_sitter.Node) -> set[str]:
-    """Walk a JS parameter / pattern node and collect every bound identifier name.
+    """Walk a JS / TS parameter / pattern node and collect every bound identifier name.
 
     Dispatches by node-type bucket — leaf identifiers, container patterns
-    (array / object / rest), assignment patterns (``b = 5``), and pair
-    patterns (``{key: alias}``) — into small helpers so this function
-    stays under the cyclomatic-complexity cap.
+    (array / object / rest), assignment patterns (``b = 5``), pair
+    patterns (``{key: alias}``), and TS typed-parameter wrappers
+    (``required_parameter`` / ``optional_parameter`` / ``rest_parameter``)
+    — into small helpers so this function stays under the
+    cyclomatic-complexity cap.
     """
+    # TypeScript typed-parameter wrappers: ``required_parameter``,
+    # ``optional_parameter``, ``rest_parameter``. The inner binding
+    # pattern is the first named child; the type annotation (if any)
+    # is the second. Recurse into the inner binding pattern. ``or set()``
+    # handles the (defensive) case of a wrapper with no named children.
+    if node.type in _TS_PARAM_WRAPPER_TYPES:
+        return _javascript_collect_names(node.named_children[0]) if node.named_children else set()
     if node.type in _JS_NAME_LEAF_TYPES:
         return {node_text(node)}
     if node.type in _JS_DESTRUCTURE_CONTAINER_TYPES:
@@ -361,6 +388,13 @@ class NullDereferenceRule(BaseRule):
         ``foo?.bar`` (optional chaining) is null-safe by construction —
         any ``optional_chain`` child token in the member / subscript
         node means the rule should NOT fire.
+
+        TypeScript wraps the callee in ``non_null_expression`` when the
+        author writes ``foo()!.bar`` — the ``!`` is a compile-time
+        annotation that says "trust me, it's not null" but provides
+        zero runtime safety. SAFE803 must still fire because the
+        underlying call IS nullable; unwrap the ``non_null_expression``
+        before checking whether ``obj`` is a call.
         """
         if node.type not in ("member_expression", "subscript_expression"):
             return None
@@ -368,6 +402,11 @@ class NullDereferenceRule(BaseRule):
         if any(c.type == "optional_chain" for c in node.children):
             return None
         obj = node.child_by_field_name("object")
+        # TypeScript ``!`` non-null assertion: ``foo()!.bar`` parses as
+        # ``member_expression(object=non_null_expression(call_expression(...)))``.
+        # Unwrap the ``!`` so we see the underlying call.
+        if obj is not None and obj.type == "non_null_expression" and obj.named_children:
+            obj = obj.named_children[0]
         if obj is None or obj.type != "call_expression":
             return None
         name = call_name(obj)

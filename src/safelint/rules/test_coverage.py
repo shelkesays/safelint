@@ -5,16 +5,21 @@ from __future__ import annotations
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-from safelint.languages import JAVASCRIPT
+from safelint.languages import JAVASCRIPT, TSX, TYPESCRIPT
 from safelint.languages._node_utils import resolve_lang_name
 from safelint.rules.base import BaseRule
 
 
 # Pre-sorted so ``_candidate_test_filenames`` produces a deterministic
 # order for messages and tests; sourced from the registered
-# ``LanguageDefinition`` so the test-file-pattern set stays in sync if
-# the registered JS extensions ever change.
+# ``LanguageDefinition``s so the test-file-pattern set stays in sync
+# if the registered extensions ever change. JS and TS extensions are
+# kept separate because a ``.ts`` source pairs with a ``.test.ts``
+# (or ``.test.tsx`` / ``.test.as``) test, NOT a ``.test.js`` — keeping
+# the language-family consistent across source and test is a
+# convention every test runner expects.
 _JS_EXTENSIONS: tuple[str, ...] = tuple(sorted(JAVASCRIPT.file_extensions))
+_TS_EXTENSIONS: tuple[str, ...] = tuple(sorted(TYPESCRIPT.file_extensions | TSX.file_extensions))
 
 
 if TYPE_CHECKING:
@@ -30,16 +35,22 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
 
     JavaScript: ``<stem>.test.<ext>`` (Jest convention) and
     ``<stem>.spec.<ext>`` (Mocha / Karma convention) for each of the
-    registered JS extensions. The extension set is sourced from the
-    ``JAVASCRIPT`` ``LanguageDefinition`` so this rule stays in sync if
-    the registered JS extensions ever change. A source ``foo.js``
-    matches if any of ``foo.test.{ext}`` or ``foo.spec.{ext}`` exists
-    under the configured ``test_dirs`` for ``ext`` in the registry.
+    registered JS extensions (``.js`` / ``.mjs`` / ``.cjs``).
+
+    TypeScript: same ``.test.<ext>`` / ``.spec.<ext>`` patterns but
+    using the TS extension set (``.ts`` / ``.tsx`` / ``.as``). A
+    ``foo.ts`` source pairs with ``foo.test.ts`` (or ``.tsx`` / ``.as``),
+    NOT ``foo.test.js`` — language-family consistency between source
+    and test is a convention every JS / TS test runner expects.
     """
-    if lang_name in ("javascript", "typescript"):
+    if lang_name == "javascript":
         stem = src_path.stem
         infixes = (".test", ".spec")
         return [f"{stem}{infix}{ext}" for infix in infixes for ext in _JS_EXTENSIONS]
+    if lang_name == "typescript":
+        stem = src_path.stem
+        infixes = (".test", ".spec")
+        return [f"{stem}{infix}{ext}" for infix in infixes for ext in _TS_EXTENSIONS]
     # Python (and any future language without an explicit override).
     return [f"test_{src_path.stem}.py"]
 
