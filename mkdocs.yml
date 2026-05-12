@@ -23,13 +23,14 @@ hooks:
 theme:
   name: material
   language: en
-  # Brand identity — served from ``docs/assets/`` (committed alongside
-  # the markdown so mkdocs picks them up via its default static-asset
-  # handling). Same image used for the header logo and the favicon for
-  # consistency; if/when we ship a stripped-down favicon-only variant,
-  # split these.
-  logo: assets/logo.png
-  favicon: assets/logo.png
+  # Brand identity — SVGs served from ``docs/assets/`` (committed
+  # alongside the markdown so mkdocs picks them up via its default
+  # static-asset handling). Two separate files: the full wordmark
+  # logo for the header, and a stripped-down icon variant for the
+  # browser favicon (which renders at 16-32px and needs the simpler
+  # shape to stay legible).
+  logo: assets/safelint-logo.svg
+  favicon: assets/safelint-icon.svg
   features:
     - content.action.edit         # "Edit this page" button at the page head
     - content.code.copy           # copy button on every code block

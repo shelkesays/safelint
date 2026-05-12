@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 420">
+  <defs>
+    <style>
+      .navy { fill: #0B1F3A; }
+      .orange { fill: #F97316; }
+      .white { fill: #FFFFFF; }
+      .text-main { font: 700 96px Arial, sans-serif; letter-spacing: 10px; }
+      .text-sub { font: 600 28px Arial, sans-serif; letter-spacing: 6px; }
+      .text-mini { font: 500 22px Arial, sans-serif; letter-spacing: 5px; }
+    </style>
+  </defs>
+
+  <!-- motion lines -->
+  <g>
+    <rect x="120" y="110" width="90" height="8" rx="4" class="orange"/>
+    <rect x="90" y="145" width="140" height="8" rx="4" class="orange"/>
+    <rect x="130" y="180" width="80" height="8" rx="4" class="orange"/>
+
+    <rect x="690" y="110" width="90" height="8" rx="4" class="navy"/>
+    <rect x="670" y="145" width="140" height="8" rx="4" class="navy"/>
+    <rect x="690" y="180" width="80" height="8" rx="4" class="navy"/>
+  </g>
+
+  <!-- shield -->
+  <g transform="translate(0,-10)">
+    <path d="M450 40 L560 80 L560 185 Q560 260 450 320 Q340 260 340 185 L340 80 Z" class="navy"/>
+    <path d="M360 90 L540 90 L540 140 L360 150 Z" class="orange"/>
+    <text x="450" y="210" text-anchor="middle" class="white" style="font: 700 120px Arial;">10</text>
+  </g>
+
+  <!-- title -->
+  <text x="450" y="360" text-anchor="middle" class="text-main">
+    <tspan class="navy">SAFE</tspan><tspan class="orange">LINT</tspan>
+  </text>
+
+  <text x="450" y="395" text-anchor="middle" class="text-sub navy">HOLZMANN SAFETY RULES</text>
+  <text x="450" y="420" text-anchor="middle" class="text-mini navy">POWER OF TEN</text>
+</svg>
