@@ -863,7 +863,7 @@ def _emit_missing_grammar_warnings(
     return seen_exts
 
 
-def _emit_hook_grammar_warnings(files: list[str]) -> set[str]:
+def _emit_hook_grammar_warnings(files: list[str], *, silent: bool = False) -> set[str]:
     """Pre-commit / hook-mode variant of :func:`_emit_missing_grammar_warnings`.
 
     Pre-commit hands files in directly; no directory walk needed. Group
@@ -872,6 +872,14 @@ def _emit_hook_grammar_warnings(files: list[str]) -> set[str]:
     actually found among *files*. Callers use the return value to fail
     loud when every passed file would be skipped — see ``main()`` for
     the silent-failure guard.
+
+    The set-return runs unconditionally so the silent-failure guard in
+    :func:`_guard_hook_silent_failure` can fire exit code 2 in every
+    output mode. The stderr warnings, however, are gated on *silent*:
+    pretty mode prints one ``safelint: warning: skipping .X files …``
+    line per missing grammar, JSON / SARIF mode suppresses them so the
+    tooling-consumer stderr stays clean for parsing pipelines —
+    symmetric with the directory-walk variant.
     """
     unavailable = unavailable_extensions()
     if not unavailable:
@@ -881,8 +889,8 @@ def _emit_hook_grammar_warnings(files: list[str]) -> set[str]:
     # place. Both this helper and the directory walker use the same
     # rule for "what counts as a suffix".
     seen_exts = _matching_suffixes(files, unavailable)
-    if not seen_exts:
-        return set()
+    if not seen_exts or silent:
+        return seen_exts
     grouped: dict[str, list[str]] = {}
     for ext in sorted(seen_exts):
         grouped.setdefault(unavailable[ext], []).append(ext)
@@ -1827,7 +1835,13 @@ def _dispatch_hook_mode() -> int:
     args = _build_hook_parser().parse_args()
     extensions = tuple(supported_extensions())
     files = [f for f in args.files if f.endswith(extensions)]
-    guard_rc = _guard_hook_silent_failure(args.files, files, _emit_hook_grammar_warnings(args.files))
+    # Suppress per-extension stderr warnings in machine output modes so
+    # JSON / SARIF consumers get a parseable stderr — symmetric with the
+    # ``_run_check`` flow. The set-return still drives the silent-failure
+    # guard in every mode.
+    output_format: str = getattr(args, "output_format", "pretty")
+    unavailable_in_passed = _emit_hook_grammar_warnings(args.files, silent=(output_format != "pretty"))
+    guard_rc = _guard_hook_silent_failure(args.files, files, unavailable_in_passed)
     return guard_rc or _run_hook(args, files)
 
 
