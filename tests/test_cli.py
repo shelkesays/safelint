@@ -399,6 +399,35 @@ def test_emit_hook_grammar_warnings_returns_seen_unavailable_extensions(mocker: 
     assert _emit_hook_grammar_warnings(["app.ts", "lib.js", "other.py"]) == {".ts", ".js"}
 
 
+def test_emit_hook_grammar_warnings_silent_suppresses_stderr_but_returns_set(capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """``silent=True`` (JSON / SARIF hook runs) suppresses stderr warnings but still returns the seen set.
+
+    Mirrors the directory-walk variant's contract: stderr stays
+    parseable for machine-output consumers, but the silent-failure
+    guard still has the data it needs to fire exit 2 if every passed
+    file would be skipped.
+    """
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={".ts": "pip install 'safelint[typescript]'"},
+    )
+    result = _emit_hook_grammar_warnings(["app.ts", "lib.ts"], silent=True)
+    assert result == {".ts"}, "set-return must still expose the missing grammar so the silent-failure guard can fire"
+    captured = capsys.readouterr()
+    assert captured.err == "", f"expected no stderr in silent mode; got {captured.err!r}"
+
+
+def test_emit_hook_grammar_warnings_silent_default_keeps_stderr_emission(capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """Default (silent=False, pretty mode) preserves the per-extension stderr warning."""
+    mocker.patch(
+        "safelint.cli.unavailable_extensions",
+        return_value={".ts": "pip install 'safelint[typescript]'"},
+    )
+    _emit_hook_grammar_warnings(["app.ts"])
+    captured = capsys.readouterr()
+    assert "skipping .ts files" in captured.err
+
+
 def test_emit_missing_grammar_warnings_returns_seen_extensions(tmp_path: Path, mocker: MockerFixture) -> None:
     """Directory-walk variant also returns the set of unavailable extensions found."""
     (tmp_path / "main.ts").write_text("x = 1;\n", encoding="utf-8")
