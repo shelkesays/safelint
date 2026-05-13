@@ -194,7 +194,7 @@ The `additional_dependencies` line is genuinely required in v2.0.0+ — includin
 
 ```text
 safelint: warning: skipping .py files — add 'safelint[python]' to additional_dependencies in your .pre-commit-config.yaml
-safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed. See warnings above.
+safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed — add 'safelint[python]' to additional_dependencies in your .pre-commit-config.yaml
 ```
 
 See [Exit codes](https://shelkesays.github.io/safelint/configuration/cli/#exit-codes) for the full table.
