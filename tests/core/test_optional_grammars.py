@@ -1,14 +1,21 @@
 """Tests for the optional-grammar / extras packaging model.
 
-v2.0.0 split tree-sitter grammar packages out of the base install into
-``[javascript]`` / ``[typescript]`` / ``[all]`` extras. The registry
-must:
+v2.0.0 split **every** tree-sitter grammar package out of the base
+install into per-language extras — ``[python]`` / ``[javascript]`` /
+``[typescript]`` / ``[all]``. The base ``pip install safelint`` ships
+the engine only (``tree-sitter>=0.23.0``) and zero grammars; users opt
+in to whichever languages their project contains. Python is treated
+*symmetrically* with the other languages — there is no always-installed
+"core" grammar.
 
-1. Skip languages whose grammar package isn't importable.
+The registry must therefore:
+
+1. Skip every language whose grammar package isn't importable —
+   including Python, when ``tree-sitter-python`` isn't installed.
 2. Keep those extensions reachable via :func:`unavailable_extensions`
-   so the CLI can surface a clear install hint.
-3. Still load Python (which is always in core deps).
-4. Raise a clear :class:`ImportError` from the parser factory when
+   so the CLI can surface a clear install hint for each one (Python
+   shows up here just like JS / TS would).
+3. Raise a clear :class:`ImportError` from the parser factory when
    something bypasses the registry filter and tries to construct a
    parser for an unavailable language.
 
