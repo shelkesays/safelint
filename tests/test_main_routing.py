@@ -66,6 +66,75 @@ def test_main_hook_mode_filters_non_py_args(monkeypatch: pytest.MonkeyPatch, moc
     assert files == ["src/foo.py"]
 
 
+def test_dispatch_hook_silent_failure_emits_only_error_no_redundant_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    mocker: MockerFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Silent-failure case (every file dropped for missing grammar) emits ONE message, not two.
+
+    Regression for the UX bug where pre-commit batched files across N
+    invocations and each invocation emitted both a per-extension
+    warning AND the silent-failure error containing the same install
+    hint — N batches × 2 lines = noisy duplication. The fix detects
+    the silent-failure case *before* emitting per-extension warnings
+    and skips the warning since the error already carries the
+    actionable install hint.
+    """
+    # TS grammar unavailable, all passed files are .ts → silent-failure case.
+    mocker.patch.object(
+        cli,
+        "unavailable_extensions",
+        return_value={".ts": "pip install 'safelint[typescript]'"},
+    )
+    mocker.patch.object(cli, "supported_extensions", return_value=frozenset({".py"}))
+    monkeypatch.setattr("sys.argv", ["safelint", "app.ts", "lib.ts"])
+
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 2
+
+    err = capsys.readouterr().err
+    # Error: present, single line about the missing grammar.
+    assert err.count("safelint: error: no files linted") == 1
+    # Warning: must NOT be present in silent-failure case (the error covers it).
+    assert "safelint: warning: skipping" not in err, (
+        f"per-extension warning should be suppressed in silent-failure case; got stderr: {err!r}"
+    )
+
+
+def test_dispatch_hook_mixed_run_still_emits_per_extension_warning(
+    monkeypatch: pytest.MonkeyPatch,
+    mocker: MockerFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Mixed run (some files lintable, others skipped) still emits the per-extension warning as context.
+
+    The warning is actionable in mixed runs: it tells the user which
+    additional extra would let safelint also lint the skipped files.
+    Only the silent-failure case suppresses it.
+    """
+    mocker.patch.object(
+        cli,
+        "unavailable_extensions",
+        return_value={".ts": "pip install 'safelint[typescript]'"},
+    )
+    mocker.patch.object(cli, "supported_extensions", return_value=frozenset({".py"}))
+    mocker.patch.object(cli, "_run_hook", return_value=0)
+    # One .py (will lint), one .ts (will be skipped) — mixed case.
+    monkeypatch.setattr("sys.argv", ["safelint", "app.py", "lib.ts"])
+
+    with pytest.raises(SystemExit):
+        cli.main()
+
+    err = capsys.readouterr().err
+    assert "safelint: warning: skipping .ts files" in err, (
+        f"per-extension warning expected in mixed run; got stderr: {err!r}"
+    )
+    # No silent-failure error in a mixed run.
+    assert "no files linted" not in err
+
+
 def test_main_propagates_nonzero_exit_from_runner(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
     """If the chosen runner returns non-zero, ``main`` exits with that code."""
     monkeypatch.setattr("sys.argv", ["safelint"])
