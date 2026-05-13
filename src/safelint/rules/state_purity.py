@@ -1,4 +1,4 @@
-"""State & purity rules: global_state (SAFE301, Python-only), global_mutation (SAFE302), and wide_scope_declaration (SAFE305, JavaScript-only)."""
+"""State & purity rules: global_state (SAFE301, Python-only), global_mutation (SAFE302), and wide_scope_declaration (SAFE305, JS-family — JavaScript and TypeScript)."""
 
 from __future__ import annotations
 
@@ -363,11 +363,13 @@ class WideScopeDeclarationRule(BaseRule):
     form like ``var x = 1, y = 2;`` produces a single violation
     (the line is the unit of fix, not each name).
 
-    JavaScript-only: Python has no ``var`` / ``let`` / ``const``
-    distinction. Python users get nothing from this rule; it's
-    registered with ``language = ("javascript",)`` and the engine's
-    per-language dispatch correctly skips it on ``.py`` / ``.pyw``
-    files.
+    JS-family only (JavaScript and TypeScript): Python has no ``var`` /
+    ``let`` / ``const`` distinction, so Python users get nothing from
+    this rule. ``var`` is still legal in TypeScript and carries the
+    same function-scoped-and-hoisted hazard there, so the rule
+    registers ``language = ("javascript", "typescript")`` and the
+    engine's per-language dispatch correctly skips it on ``.py`` /
+    ``.pyw`` files.
     """
 
     name = "wide_scope_declaration"
