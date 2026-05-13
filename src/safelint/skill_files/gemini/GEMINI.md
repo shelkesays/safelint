@@ -172,4 +172,4 @@ For language-specific phrasing read the relevant `languages/<lang>.md` addendum 
 - **Do not run `--all-files` on a large repo by default.** Git-modified is the default for a reason — it's fast and scoped to current work.
 - **Respect inline-suppression directives.** They appear in `suppressed`, not `violations`. Don't suggest removing them; they're intentional.
 - **Don't assume Python idioms when fixing other languages.** For language-specific fix patterns, consult the addendum.
-- If the user asks "is my code safe?", answer based on the blocking count, not the total. `summary.blocking == 0` means the run *passed* under the configured `fail_on` threshold.
+- If the user asks "is my code safe?", answer based on the blocking count **combined with the exit code**: `summary.blocking == 0` AND exit 0 means the run *passed* under the configured `fail_on` threshold; `summary.blocking == 0` AND exit 2 means zero files were actually linted (silent-failure guard fired) — that is **not** the same as passing, surface the stderr install hint instead of declaring the code safe.
