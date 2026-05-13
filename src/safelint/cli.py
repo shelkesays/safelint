@@ -1831,18 +1831,39 @@ def _dispatch_hook_mode() -> int:
     would be skipped for a missing grammar), and otherwise hands off
     to :func:`_run_hook`. Extracted from :func:`main` to keep that
     function's cyclomatic complexity below the project's safelint cap.
+
+    **Per-extension warnings are emitted only for *mixed* runs** — runs
+    where some files lint successfully and others get skipped. In the
+    silent-failure case (every file dropped for a missing grammar), the
+    error message from :func:`_guard_hook_silent_failure` already
+    carries the install hint, so the per-extension warning would just
+    duplicate it. That duplication is especially loud under pre-commit:
+    pre-commit batches files across multiple hook invocations to stay
+    under OS argv limits, and every batch invocation would otherwise
+    emit the same warning + error pair (22 lines for 11 batches). The
+    guard error fires once per invocation either way, but skipping the
+    warning halves the noise.
     """
     args = _build_hook_parser().parse_args()
     extensions = tuple(supported_extensions())
     files = [f for f in args.files if f.endswith(extensions)]
-    # Suppress per-extension stderr warnings in machine output modes so
-    # JSON / SARIF consumers get a parseable stderr — symmetric with the
-    # ``_run_check`` flow. The set-return still drives the silent-failure
-    # guard in every mode.
+
+    # Compute the missing-grammar set without emitting warnings yet so we
+    # can decide whether per-extension warnings would add useful context
+    # or just duplicate the silent-failure error below.
+    unavailable_in_passed = _matching_suffixes(args.files, unavailable_extensions())
+    will_silent_fail = bool(args.files and not files and unavailable_in_passed)
+    if will_silent_fail:
+        return _guard_hook_silent_failure(args.files, files, unavailable_in_passed)
+
+    # Mixed run (or no missing-grammar files at all) — emit per-extension
+    # warnings as actionable context for the skipped files, then lint
+    # what we have. Machine output modes suppress the warnings to keep
+    # stderr parseable; the set-return is not consulted here because
+    # we've already decided the guard won't fire.
     output_format: str = getattr(args, "output_format", "pretty")
-    unavailable_in_passed = _emit_hook_grammar_warnings(args.files, silent=(output_format != "pretty"))
-    guard_rc = _guard_hook_silent_failure(args.files, files, unavailable_in_passed)
-    return guard_rc or _run_hook(args, files)
+    _emit_hook_grammar_warnings(args.files, silent=(output_format != "pretty"))
+    return _run_hook(args, files)
 
 
 if __name__ == "__main__":
