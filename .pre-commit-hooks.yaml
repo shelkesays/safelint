@@ -21,13 +21,15 @@
   # ``file`` / ``text`` tags. Adding ``files: \.as$`` alone is **not
   # enough**: pre-commit AND-s ``types_or`` with ``files``, so the
   # manifest's ``types_or`` still excludes the file. To lint ``.as``
-  # via the published hook, AS users must OVERRIDE both filters in
-  # their ``.pre-commit-config.yaml``:
+  # via the published hook, AS users must OVERRIDE ``types_or`` with
+  # a permissive tag that ``.as`` files actually carry (``text`` or
+  # ``file``) and use ``files`` to scope the match. ``types_or: []``
+  # does NOT work — pre-commit treats an empty tag list as "no tag
+  # matches" rather than "filter disabled", so the hook never fires:
   #
   #     - id: safelint
   #       additional_dependencies: ['safelint[typescript]']
-  #       types: [text]            # replaces manifest's types_or
-  #       types_or: []             # explicitly drop the tag restriction
-  #       files: \.as$
+  #       types_or: [text]         # permissive tag that .as files actually carry
+  #       files: \.(ts|tsx|as)$    # restrict to TS-family extensions
   types_or: [python, javascript, ts, tsx]
   args: [--fail-on=error]
