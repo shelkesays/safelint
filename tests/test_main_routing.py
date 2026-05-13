@@ -76,7 +76,7 @@ def test_dispatch_hook_silent_failure_emits_only_error_no_redundant_warning(
     Regression for the UX bug where pre-commit batched files across N
     invocations and each invocation emitted both a per-extension
     warning AND the silent-failure error containing the same install
-    hint — N batches × 2 lines = noisy duplication. The fix detects
+    hint — N batches * 2 lines = noisy duplication. The fix detects
     the silent-failure case *before* emitting per-extension warnings
     and skips the warning since the error already carries the
     actionable install hint.

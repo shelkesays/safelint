@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "safelint"
-version = "2.0.0rc1"
+version = "2.0.0rc2"
 description = "Engineering safety lint rules and pre-commit integration for modern Python, JavaScript, and TypeScript codebases"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -54,8 +54,8 @@ Issues = "https://github.com/shelkesays/safelint/issues"
 # for a Python+JS monorepo, etc. As more languages land (Go, Rust, Java,
 # C, C++, PHP), each gets its own extra and is folded into ``[all]``.
 #
-# While ``version`` above is still ``2.0.0rc1``, pin the RC explicitly
-# (e.g. ``pip install 'safelint[python]==2.0.0rc1'``) or pass ``--pre``
+# While ``version`` above is still ``2.0.0rc2``, pin the RC explicitly
+# (e.g. ``pip install 'safelint[python]==2.0.0rc2'``) or pass ``--pre``
 # — an unpinned ``pip install 'safelint[<lang>]'`` resolves to the latest
 # stable 1.x release on PyPI, which doesn't define these extras. Drop
 # the pin once v2.0.0 GA ships.

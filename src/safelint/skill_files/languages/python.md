@@ -17,7 +17,7 @@ For pre-commit integration, add to `.pre-commit-config.yaml` — note that v2.0.
 
 ```yaml
 - repo: https://github.com/shelkesays/safelint
-  rev: v2.0.0rc1  # pin to a release (use the GA tag once v2.0.0 ships)
+  rev: v2.0.0rc2  # pin to a release (use the GA tag once v2.0.0 ships)
   hooks:
     - id: safelint
       additional_dependencies: ['safelint[python]']
