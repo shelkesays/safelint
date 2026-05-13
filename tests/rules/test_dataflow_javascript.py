@@ -6,6 +6,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -533,3 +535,39 @@ def test_js_null_dereference_message_uses_js_syntax(tmp_path: Path) -> None:
     assert "?." in safe803[0].message
     assert "None" not in safe803[0].message
     assert "is not None" not in safe803[0].message
+
+
+# ---------------------------------------------------------------------------
+# Bare-string config typo regressions (the JS-family list keys went through
+# ``frozenset(...)`` directly before — a typo like ``sinks_javascript =
+# "eval"`` was silently coerced into a per-character set rather than raising.
+# Each test asserts the new ``_validated_string_list`` shape: a bare string
+# raises ``TypeError`` naming the offending key.
+# ---------------------------------------------------------------------------
+
+
+def test_sinks_javascript_bare_string_raises_typeerror(tmp_path: Path) -> None:
+    """``sinks_javascript = "eval"`` (note: not a list) must raise on a JS run."""
+    sample = tmp_path / "x.js"
+    sample.write_text("function f(u) { eval(u); }\n", encoding="utf-8")
+    engine = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_javascript": "eval"}}})
+    with pytest.raises(TypeError, match=r"sinks_javascript must be a list of strings"):
+        engine.check_file(str(sample))
+
+
+def test_flagged_calls_javascript_bare_string_raises_typeerror(tmp_path: Path) -> None:
+    """``flagged_calls_javascript = "writeFile"`` (not a list) must raise on a JS run."""
+    sample = tmp_path / "x.js"
+    sample.write_text("function f() { writeFile('a', 'b'); }\n", encoding="utf-8")
+    engine = _enabled_engine("return_value_ignored", {"rules": {"return_value_ignored": {"flagged_calls_javascript": "writeFile"}}})
+    with pytest.raises(TypeError, match=r"flagged_calls_javascript must be a list of strings"):
+        engine.check_file(str(sample))
+
+
+def test_nullable_methods_javascript_bare_string_raises_typeerror(tmp_path: Path) -> None:
+    """``nullable_methods_javascript = "find"`` (not a list) must raise on a JS run."""
+    sample = tmp_path / "x.js"
+    sample.write_text("function f(xs) { return xs.find(x => x).name; }\n", encoding="utf-8")
+    engine = _enabled_engine("null_dereference", {"rules": {"null_dereference": {"nullable_methods_javascript": "find"}}})
+    with pytest.raises(TypeError, match=r"nullable_methods_javascript must be a list of strings"):
+        engine.check_file(str(sample))

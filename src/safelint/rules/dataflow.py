@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from safelint.analysis.dataflow import TaintTracker
 from safelint.analysis.dataflow_javascript import JsTaintTracker
-from safelint.core._validators import get_per_language_config
+from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
@@ -288,9 +288,12 @@ class TaintedSinkRule(BaseRule):
         can override with ``sinks_typescript`` etc. when they want
         different behaviour for ``.ts`` files.
         """
-        sinks = frozenset(get_per_language_config(self.config, "sinks", lang_name, default=[]))
-        sanitizers = frozenset(get_per_language_config(self.config, "sanitizers", lang_name, default=[]))
-        sources = frozenset(get_per_language_config(self.config, "sources", lang_name, default=[]))
+        sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", lang_name, default=[])
+        sinks = frozenset(_validated_string_list(sinks_raw, sinks_key))
+        sanitizers_raw, sanitizers_key = resolve_lang_config_lookup(self.config, "sanitizers", lang_name, default=[])
+        sanitizers = frozenset(_validated_string_list(sanitizers_raw, sanitizers_key))
+        sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", lang_name, default=[])
+        sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
         violations: list[Violation] = []
         for node in walk(tree.root_node):
@@ -361,7 +364,8 @@ class ReturnValueIgnoredRule(BaseRule):
             flagged = frozenset(self.config.get("flagged_calls", self._DEFAULT_FLAGGED))
         else:
             # JS-family (JS / TS): TypeScript inherits the JS list by default.
-            flagged = frozenset(get_per_language_config(self.config, "flagged_calls", lang_name, default=[]))
+            raw, error_key = resolve_lang_config_lookup(self.config, "flagged_calls", lang_name, default=[])
+            flagged = frozenset(_validated_string_list(raw, error_key))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type != EXPRESSION_STATEMENT:
@@ -485,7 +489,8 @@ class NullDereferenceRule(BaseRule):
             deref_hit = self._python_deref_hit
         else:
             # JS-family (JS / TS): TypeScript inherits the JS list by default.
-            nullable = frozenset(get_per_language_config(self.config, "nullable_methods", lang_name, default=[]))
+            raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", lang_name, default=[])
+            nullable = frozenset(_validated_string_list(raw, error_key))
             deref_hit = self._javascript_deref_hit
         violations: list[Violation] = []
         for node in walk(tree.root_node):

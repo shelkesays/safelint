@@ -88,7 +88,7 @@ pip install 'safelint[python,javascript]'
 pip install 'safelint[python,typescript]'
 ```
 
-`pip install safelint` (no extras) installs only the engine. If you run it that way, safelint will emit a one-line hint on first run telling you which extra to add for the files it found. Same story if you mix-and-match — e.g. running safelint with `[python]` installed on a directory containing `.ts` files skips them with a clear `pip install` hint rather than erroring out.
+`pip install safelint` (no extras) installs only the engine. If you run it that way, safelint will emit a one-line hint on first run telling you which extra to add for the files it found. Same story if you mix-and-match — e.g. running safelint with `[python]` installed on a directory containing `.ts` files will skip the `.ts` files with a clear `pip install` hint while continuing to lint the supported (`.py`) files. **If every candidate file ends up skipped** (the typical TS-only / JS-only run against a bare base install), safelint exits with code 2 as a setup error instead so CI / pre-commit can't silently report clean on an un-linted run.
 
 ---
 

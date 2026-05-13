@@ -94,7 +94,7 @@ pip install 'safelint[python,javascript]'   # Python + JS monorepo
 pip install 'safelint[all]'                 # kitchen-sink
 ```
 
-`pip install safelint` (no extras) installs only the engine. safelint will emit `safelint: warning: skipping .py files — install with: pip install 'safelint[python]'` on first run when it finds Python files but the grammar isn't installed — no hard error.
+`pip install safelint` (no extras) installs only the engine. safelint will emit `safelint: warning: skipping .py files — install with: pip install 'safelint[python]'` on first run when it finds Python files but the grammar isn't installed. **Heads-up for CI:** in a Python-only project that pattern means *every* candidate file gets skipped, which fires the [silent-failure guard](../configuration/cli.md#exit-code-2--silent-failure-triggers) and exits with code 2 plus the install hint embedded in the error — so CI / pre-commit can't accidentally report green on an un-linted run.
 
 ## Pre-commit integration
 
