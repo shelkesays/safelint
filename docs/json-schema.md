@@ -42,7 +42,7 @@ Aggregated counts across the whole run. All counts are integers ≥ 0.
 | `violations` | int | Active violations (i.e. `len(top.violations)`). |
 | `errors` | int | Count of active violations with `severity == "error"`. |
 | `warnings` | int | Count of active violations with `severity == "warning"`. |
-| `blocking` | int | Active violations whose severity meets or exceeds the configured `fail_on` threshold. `blocking == 0` ⇔ exit code 0. |
+| `blocking` | int | Active violations whose severity meets or exceeds the configured `fail_on` threshold. `blocking == 0` is necessary for exit code 0 but not sufficient — exit 2 (silent-failure guard) also reports `blocking == 0` when zero files actually got linted because every candidate's grammar was missing. See [Exit codes](configuration/cli.md#exit-codes) for the full mapping. |
 | `fail_on` | `"error"` \| `"warning"` | Effective threshold for this run. |
 | `suppressed.total` | int | Count of violations that fired but were suppressed (`# nosafe` or `per_file_ignores`). |
 | `suppressed.by_code` | `{code: int}` | Per-code breakdown of suppressed violations. Codes are sorted alphabetically; keys are SAFE-codes (e.g. `"SAFE501"`). |
