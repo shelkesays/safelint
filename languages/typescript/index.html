@@ -12,13 +12,13 @@
         <meta name="author" content="Rahul Shelke">
       
       
-        <link rel="canonical" href="https://shelkesays.github.io/safelint/ai-clients/troubleshooting/">
+        <link rel="canonical" href="https://shelkesays.github.io/safelint/languages/typescript/">
       
       
-        <link rel="prev" href="../lifecycle/">
+        <link rel="prev" href="../javascript/">
       
       
-        <link rel="next" href="../clients/claude-code/">
+        <link rel="next" href="../../configuration/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Troubleshooting - SafeLint</title>
+        <title>TypeScript - SafeLint</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#troubleshooting" class="md-skip">
+        <a href="#typescript" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Troubleshooting
+              TypeScript
             
           </span>
         </div>
@@ -248,11 +248,13 @@
   
   
   
+    
+  
   
     
     
-      <li class="md-tabs__item">
-        <a href="../../languages/python/" class="md-tabs__link">
+      <li class="md-tabs__item md-tabs__item--active">
+        <a href="../python/" class="md-tabs__link">
           
   
   
@@ -292,13 +294,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="../" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../../ai-clients/" class="md-tabs__link">
           
   
   
@@ -450,8 +450,10 @@
       
   
   
+    
   
   
+  
     
     
       
@@ -465,19 +467,22 @@
     
     
       
+        
+        
+      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
-          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="">
             
   
   
@@ -495,7 +500,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -513,7 +518,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../languages/python/" class="md-nav__link">
+      <a href="../python/" class="md-nav__link">
         
   
   
@@ -541,7 +546,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../../languages/javascript/" class="md-nav__link">
+      <a href="../javascript/" class="md-nav__link">
         
   
   
@@ -566,10 +571,37 @@
                 
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../../languages/typescript/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -585,6 +617,142 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#file-extensions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        File extensions
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rules-that-fire-on-typescript" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rules that fire on TypeScript
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#typescript-inherits-javascript-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TypeScript inherits JavaScript config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-presets-apply-to-typescript-too" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime presets apply to TypeScript too
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installing-the-typescript-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installing the TypeScript extra
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#pre-commit-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Pre-commit integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#typescript-specific-config-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TypeScript-specific config keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -795,8 +963,6 @@
       
   
   
-    
-  
   
   
     
@@ -820,23 +986,20 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
+            <a href="../../ai-clients/" class="md-nav__link ">
               
   
   
@@ -854,13 +1017,13 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="">
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_4">
             <span class="md-nav__icon md-icon"></span>
             
@@ -880,7 +1043,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../manual-install/" class="md-nav__link">
+      <a href="../../ai-clients/manual-install/" class="md-nav__link">
         
   
   
@@ -908,7 +1071,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../scope/" class="md-nav__link">
+      <a href="../../ai-clients/scope/" class="md-nav__link">
         
   
   
@@ -936,7 +1099,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../lifecycle/" class="md-nav__link">
+      <a href="../../ai-clients/lifecycle/" class="md-nav__link">
         
   
   
@@ -961,37 +1124,10 @@
                 
   
   
-    
   
   
-  
-    <li class="md-nav__item md-nav__item--active">
-      
-      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
-      
-      
-        
-      
-      
-        <label class="md-nav__link md-nav__link--active" for="__toc">
-          
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Troubleshooting
-  
-
-    
-  </span>
-  
-  
-
-          <span class="md-nav__icon md-icon"></span>
-        </label>
-      
-      <a href="./" class="md-nav__link md-nav__link--active">
+    <li class="md-nav__item">
+      <a href="../../ai-clients/troubleshooting/" class="md-nav__link">
         
   
   
@@ -1007,81 +1143,6 @@
   
 
       </a>
-      
-        
-
-<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
-  
-  
-  
-    
-  
-  
-    <label class="md-nav__title" for="__toc">
-      <span class="md-nav__icon md-icon"></span>
-      Table of contents
-    </label>
-    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
-      
-        <li class="md-nav__item">
-  <a href="#could-not-auto-detect-an-ai-client" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "could not auto-detect an AI client"
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#target-already-exists-use-force-to-replace-it" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "target already exists. Use --force to replace it."
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#cursor-doesnt-seem-to-pick-up-the-rule" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Cursor doesn't seem to pick up the rule
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#claude-code-doesnt-seem-to-pick-up-the-skill" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Claude Code doesn't seem to pick up the skill
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#i-want-to-inspect-the-bundled-files-without-installing" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        "I want to inspect the bundled files without installing"
-      
-    </span>
-  </a>
-  
-</li>
-      
-    </ul>
-  
-</nav>
-      
     </li>
   
 
@@ -1126,20 +1187,17 @@
       
       
         
-          
-          
-        
       
     
     
-    <li class="md-nav__item md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
         <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4_6" >
         
           
-          <label class="md-nav__link" for="__nav_4_6" id="__nav_4_6_label" tabindex="">
+          <label class="md-nav__link" for="__nav_4_6" id="__nav_4_6_label" tabindex="0">
             
   
   
@@ -1175,7 +1233,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/claude-code/" class="md-nav__link">
+      <a href="../../ai-clients/clients/claude-code/" class="md-nav__link">
         
   
   
@@ -1203,7 +1261,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/cursor/" class="md-nav__link">
+      <a href="../../ai-clients/clients/cursor/" class="md-nav__link">
         
   
   
@@ -1231,7 +1289,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/github-copilot/" class="md-nav__link">
+      <a href="../../ai-clients/clients/github-copilot/" class="md-nav__link">
         
   
   
@@ -1259,7 +1317,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/gemini/" class="md-nav__link">
+      <a href="../../ai-clients/clients/gemini/" class="md-nav__link">
         
   
   
@@ -1287,7 +1345,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/windsurf/" class="md-nav__link">
+      <a href="../../ai-clients/clients/windsurf/" class="md-nav__link">
         
   
   
@@ -1315,7 +1373,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/codex/" class="md-nav__link">
+      <a href="../../ai-clients/clients/codex/" class="md-nav__link">
         
   
   
@@ -1343,7 +1401,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/continue-dev/" class="md-nav__link">
+      <a href="../../ai-clients/clients/continue-dev/" class="md-nav__link">
         
   
   
@@ -1371,7 +1429,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/cline/" class="md-nav__link">
+      <a href="../../ai-clients/clients/cline/" class="md-nav__link">
         
   
   
@@ -1399,7 +1457,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/aider/" class="md-nav__link">
+      <a href="../../ai-clients/clients/aider/" class="md-nav__link">
         
   
   
@@ -1427,7 +1485,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/trae/" class="md-nav__link">
+      <a href="../../ai-clients/clients/trae/" class="md-nav__link">
         
   
   
@@ -1455,7 +1513,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/antigravity/" class="md-nav__link">
+      <a href="../../ai-clients/clients/antigravity/" class="md-nav__link">
         
   
   
@@ -1483,7 +1541,7 @@
   
   
     <li class="md-nav__item">
-      <a href="../clients/zed/" class="md-nav__link">
+      <a href="../../ai-clients/clients/zed/" class="md-nav__link">
         
   
   
@@ -1858,10 +1916,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#could-not-auto-detect-an-ai-client" class="md-nav__link">
+  <a href="#file-extensions" class="md-nav__link">
     <span class="md-ellipsis">
       
-        "could not auto-detect an AI client"
+        File extensions
       
     </span>
   </a>
@@ -1869,10 +1927,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#target-already-exists-use-force-to-replace-it" class="md-nav__link">
+  <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       
-        "target already exists. Use --force to replace it."
+        Quick start
       
     </span>
   </a>
@@ -1880,10 +1938,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#cursor-doesnt-seem-to-pick-up-the-rule" class="md-nav__link">
+  <a href="#rules-that-fire-on-typescript" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Cursor doesn't seem to pick up the rule
+        Rules that fire on TypeScript
       
     </span>
   </a>
@@ -1891,10 +1949,49 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#claude-code-doesnt-seem-to-pick-up-the-skill" class="md-nav__link">
+  <a href="#configuration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Claude Code doesn't seem to pick up the skill
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#typescript-inherits-javascript-config" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TypeScript inherits JavaScript config
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#runtime-presets-apply-to-typescript-too" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Runtime presets apply to TypeScript too
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#installing-the-typescript-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installing the TypeScript extra
       
     </span>
   </a>
@@ -1902,10 +1999,32 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#i-want-to-inspect-the-bundled-files-without-installing" class="md-nav__link">
+  <a href="#pre-commit-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
-        "I want to inspect the bundled files without installing"
+        Pre-commit integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#typescript-specific-config-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TypeScript-specific config keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#contributing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Contributing
       
     </span>
   </a>
@@ -1929,7 +2048,7 @@
 
 
   
-    <a href="https://github.com/shelkesays/safelint/edit/main/docs/ai-clients/troubleshooting.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/shelkesays/safelint/edit/main/docs/languages/typescript.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1937,24 +2056,199 @@
   
 
 
-<h1 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">#</a></h1>
-<h2 id="could-not-auto-detect-an-ai-client">"could not auto-detect an AI client"<a class="headerlink" href="#could-not-auto-detect-an-ai-client" title="Permanent link">#</a></h2>
-<p>Means neither cwd nor home had any of the registered markers. Either:</p>
-<ol>
-<li>The AI client isn't installed on this machine — install it first, <em>then</em> run <code>safelint skill install</code>.</li>
-<li>You want a specific client regardless of detection — use <code>--client &lt;name&gt;</code> explicitly. The error message lists the exact commands.</li>
-</ol>
-<h2 id="target-already-exists-use-force-to-replace-it">"target already exists. Use --force to replace it."<a class="headerlink" href="#target-already-exists-use-force-to-replace-it" title="Permanent link">#</a></h2>
-<p>A previous install is in the way. Pass <code>--force</code> to replace it. SafeLint refuses to silently overwrite by default to protect against losing a customised skill folder.</p>
-<h2 id="cursor-doesnt-seem-to-pick-up-the-rule">Cursor doesn't seem to pick up the rule<a class="headerlink" href="#cursor-doesnt-seem-to-pick-up-the-rule" title="Permanent link">#</a></h2>
-<p>Cursor reads <code>.cursor/rules/*.mdc</code> files at window load. After installing, you need to <strong>reload the Cursor window</strong> (Command Palette → "Developer: Reload Window") — the rule isn't hot-reloaded.</p>
-<h2 id="claude-code-doesnt-seem-to-pick-up-the-skill">Claude Code doesn't seem to pick up the skill<a class="headerlink" href="#claude-code-doesnt-seem-to-pick-up-the-skill" title="Permanent link">#</a></h2>
-<p>Same idea — Claude Code loads skills on session start. Open a new conversation or restart the app.</p>
-<h2 id="i-want-to-inspect-the-bundled-files-without-installing">"I want to inspect the bundled files without installing"<a class="headerlink" href="#i-want-to-inspect-the-bundled-files-without-installing" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w">                  </span><span class="c1"># Claude skill directory</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w"> </span>--client<span class="w"> </span>cursor<span class="w">  </span><span class="c1"># Cursor MDC file path</span>
+<h1 id="typescript">TypeScript<a class="headerlink" href="#typescript" title="Permanent link">#</a></h1>
+<p>SafeLint analyses TypeScript source for the Holzmann "Power of Ten" safety rules — function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like ESLint don't catch. TypeScript support landed in v2.0.0rc1 and reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; the AST is a superset), with TypeScript-specific handling for the type-only constructs that the JS rules wouldn't otherwise recognise.</p>
+<h2 id="file-extensions">File extensions<a class="headerlink" href="#file-extensions" title="Permanent link">#</a></h2>
+<ul>
+<li><strong><code>.ts</code></strong> — TypeScript (no JSX). Parsed by <code>tree-sitter-typescript</code>'s <code>typescript</code> grammar.</li>
+<li><strong><code>.tsx</code></strong> — TypeScript with JSX / React. Parsed by the separate <code>tsx</code> grammar (the two grammars differ because JSX changes the meaning of <code>&lt;</code>, <code>&gt;</code>, and a few other tokens). From the rule perspective TSX is just TypeScript with JSX nodes added — same logical language name (<code>"typescript"</code>), so a rule's <code>language</code> tuple needs one entry to cover both.</li>
+<li><strong><code>.as</code></strong> — <strong>AssemblyScript</strong> is a TypeScript-syntax subset that compiles to WebAssembly. It parses cleanly with the standard TypeScript grammar; SafeLint treats <code>.as</code> files as TypeScript without special-casing. Rule output uses TypeScript's vocabulary.</li>
+</ul>
+<h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
+<div class="admonition warning">
+<p class="admonition-title">v2.0.0rc1 (pre-release) — pin or pass <code>--pre</code></p>
+<p>Until v2.0.0 GA, an unpinned <code>pip install 'safelint[typescript]'</code> resolves to the latest 1.x release, which doesn't define this extra and won't install the TS grammar. For the RC, pin explicitly: <code>pip install 'safelint[typescript]==2.0.0rc1'</code> (or pass <code>--pre</code>).</p>
+</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[typescript]&#39;</span><span class="w">     </span><span class="c1"># the tool runs on Python; the [typescript] extra adds the TS grammar (and bundles JS too)</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                    </span><span class="c1"># lint a directory (git-modified files by default)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">           </span><span class="c1"># lint everything</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>src/<span class="w">      </span><span class="c1"># machine-readable for editors / CI</span>
 </code></pre></div>
-<p>Useful for <code>cat $(safelint skill path)/SKILL.md</code> to see what the agent is reading.</p>
+<p>If your project doesn't already have a Python toolchain, <code>pipx install 'safelint[typescript]'</code> isolates the install; or add <code>'safelint[typescript]'</code> as a dev dependency through any pip-compatible manager. v2.0.0+ ships every language grammar as an opt-in extra — plain <code>pip install safelint</code> installs only the engine and would skip every <code>.ts</code> / <code>.tsx</code> / <code>.as</code> file with an install hint on first run.</p>
+<h2 id="rules-that-fire-on-typescript">Rules that fire on TypeScript<a class="headerlink" href="#rules-that-fire-on-typescript" title="Permanent link">#</a></h2>
+<p>18 user-facing rules apply to TypeScript — the 17 cross-language rules plus 1 JavaScript-family rule (SAFE305 <code>wide_scope_declaration</code>, which also fires on TS because <code>var</code> is still legal there). The 2 Python-only rules (SAFE201, SAFE301) are skipped automatically by the engine's per-language dispatch.</p>
+<p>The behaviour is identical to JavaScript for almost everything — see <a href="../javascript/">JavaScript notes</a> for the canonical per-rule guidance. The differences below are TypeScript-specific.</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Rule</th>
+<th>TypeScript-specific notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="../../configuration/rules/#safe101-function_length">SAFE101</a></td>
+<td><code>function_length</code></td>
+<td>Same as JS. Type annotations don't inflate line counts — only body lines count. Long type signatures (e.g. <code>function f&lt;T extends Record&lt;string, unknown&gt;&gt;(...)</code>) occupy the same single signature line.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe102-nesting_depth">SAFE102</a></td>
+<td><code>nesting_depth</code></td>
+<td>Same as JS. TypeScript-only constructs (<code>interface</code>, <code>type</code> alias declarations) live at module scope and don't appear inside function bodies, so they don't contribute.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe103-max_arguments">SAFE103</a></td>
+<td><code>max_arguments</code></td>
+<td><strong>Generic type parameters do NOT count.</strong> <code>function f&lt;T, U, V&gt;(a, b)</code> counts as 2 arguments, not 5 — TS keeps type parameters in a separate <code>type_parameters</code> AST node. Default-value and rest parameters count exactly as in JS.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
+<td><code>complexity</code></td>
+<td>Same as JS. Conditional types (<code>T extends string ? A : B</code>) are type-only and don't add cyclomatic complexity.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe202-empty_except">SAFE202</a></td>
+<td><code>empty_except</code></td>
+<td>Same as JS — fires on empty <code>catch</code> blocks.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe203-logging_on_error">SAFE203</a></td>
+<td><code>logging_on_error</code></td>
+<td>Same as JS — requires <code>console.*</code> / <code>logger.*</code> or rethrow in <code>catch</code>.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe302-global_mutation">SAFE302</a></td>
+<td><code>global_mutation</code></td>
+<td>TS-specific pass-through unwrappers: <code>(globalThis as any).counter = 1</code> is recognised as a global write — the <code>as</code> cast and <code>!</code> non-null assertion don't break the receiver-chain walk. <code>declare global { ... }</code> (ambient declarations) doesn't fire because the block contains type declarations only, no runtime assignments.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe303-side_effects_hidden">SAFE303</a></td>
+<td><code>side_effects_hidden</code></td>
+<td>Same as JS. Uses the same <code>io_functions_javascript</code> list by default (TypeScript inherits the JS config; see <a href="../../configuration/toml/#typescript-and-the-_javascript-config-keys">config precedence</a>).</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe304-side_effects">SAFE304</a></td>
+<td><code>side_effects</code></td>
+<td>Same as JS.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305</a></td>
+<td><code>wide_scope_declaration</code></td>
+<td><strong>JavaScript-family only</strong>, but applies to TS too. <code>var</code> is legal in TS and still hazardous (function-scoped, hoisted); the rule fires identically on <code>.ts</code> / <code>.tsx</code> / <code>.as</code> files. Migration: replace with <code>let</code> (if reassigned) or <code>const</code> (if not).</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe401-resource_lifecycle">SAFE401</a></td>
+<td><code>resource_lifecycle</code></td>
+<td>Same as JS — tracked acquirer calls (<code>createReadStream</code>, <code>Worker</code>, …) must be inside <code>try { ... } finally { ... }</code>. Constructor invocations (<code>new Worker(...)</code>) are recognised.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe501-unbounded_loops">SAFE501</a></td>
+<td><code>unbounded_loops</code></td>
+<td>Same as JS.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
+<td><code>missing_assertions</code></td>
+<td>Same as JS. Uses <code>assertion_calls_javascript</code> by default — TS frameworks like Vitest / Jest typically configure the same call names, so no <code>_typescript</code> override is needed. Disabled by default.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe701-test_existence">SAFE701</a></td>
+<td><code>test_existence</code></td>
+<td><strong>Pairs against TS test filenames:</strong> <code>foo.ts</code> looks for <code>foo.test.ts</code> / <code>foo.spec.ts</code> / <code>foo.test.tsx</code> / <code>foo.spec.tsx</code> / <code>foo.test.as</code> / <code>foo.spec.as</code> under <code>test_dirs</code>. NOT <code>foo.test.js</code> — TS source pairs with TS tests (language-family consistency). Disabled by default.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe702-test_coupling">SAFE702</a></td>
+<td><code>test_coupling</code></td>
+<td>Same filename patterns as SAFE701 — if you change <code>src/foo.ts</code>, also change <code>foo.test.ts</code>. Disabled by default.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe801-tainted_sink">SAFE801</a></td>
+<td><code>tainted_sink</code></td>
+<td><strong>TS-only pass-through wrappers preserve taint:</strong> <code>eval(userInput as string)</code>, <code>eval(userInput satisfies T)</code>, and <code>eval(userInput!)</code> all fire — the <code>as</code> / <code>satisfies</code> / <code>!</code> annotations are compile-time-only and don't change the runtime value. Default sinks / sources inherit from <code>_javascript</code> config.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe802-return_value_ignored">SAFE802</a></td>
+<td><code>return_value_ignored</code></td>
+<td>Same as JS. Discarded <code>Promise</code> from async TS functions still fires.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe803-null_dereference">SAFE803</a></td>
+<td><code>null_dereference</code></td>
+<td><strong>Non-null assertion (<code>!</code>) does NOT bypass the rule.</strong> <code>users.find(...)!.name</code> still fires — the <code>!</code> is a TS-only annotation, not a runtime guard. Optional chaining (<code>?.</code>) remains the only correctly-recognised safe form.</td>
+</tr>
+</tbody>
+</table>
+<p>The 2 rules <strong>not registered for TypeScript</strong> (same as for JS):</p>
+<ul>
+<li><a href="../../configuration/rules/#safe201-bare_except">SAFE201 <code>bare_except</code></a> — TS <code>catch</code> always binds the caught error.</li>
+<li><a href="../../configuration/rules/#safe301-global_state">SAFE301 <code>global_state</code></a> — TS has no <code>global</code> keyword.</li>
+</ul>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
+<p>SafeLint config is read from <code>[tool.safelint]</code> in <code>pyproject.toml</code> or from a standalone <code>safelint.toml</code>. TypeScript projects that don't already have a <code>pyproject.toml</code> typically prefer the standalone form.</p>
+<h3 id="typescript-inherits-javascript-config">TypeScript inherits JavaScript config<a class="headerlink" href="#typescript-inherits-javascript-config" title="Permanent link">#</a></h3>
+<p>The runtime is the same (TS compiles to JS), so the threat surface, I/O primitives, global namespaces, etc. are identical. By default, every <code>_javascript</code>-suffixed config key applies to BOTH <code>.js</code> AND <code>.ts</code> files. Setting <code>_typescript</code>-suffixed keys is opt-in — you do it only when you genuinely want different behaviour for <code>.ts</code> files. See <a href="../../configuration/toml/#typescript-and-the-_javascript-config-keys">TypeScript and the <code>_javascript</code> config keys</a> for the full precedence rules.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># safelint.toml (typical TS-only project — no TS-specific config needed)</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;ci&quot;</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">fail_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">[javascript]</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;node&quot;</span><span class="w">             </span><span class="c1"># node / browser / deno / cloudflare-workers / bun</span>
+<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">[rules.tainted_sink]</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Both .js and .ts files use this list. No _typescript override needed.</span>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myCustomDangerousFunction&quot;</span><span class="p">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Rare: stricter TS sinks (legacy JS keeps the JS list)</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">[rules.tainted_sink]</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">]</span><span class="w">                                </span><span class="c1"># legacy JS</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">sinks_typescript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Object.assign&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;innerHTML&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># stricter for TS</span>
+</code></pre></div>
+<h3 id="runtime-presets-apply-to-typescript-too">Runtime presets apply to TypeScript too<a class="headerlink" href="#runtime-presets-apply-to-typescript-too" title="Permanent link">#</a></h3>
+<p><code>[tool.safelint.javascript] runtime = "..."</code> selects which API surface the rule defaults assume — and TS inherits the chosen preset because the runtime is what determines <code>fs</code> vs <code>Deno.*</code> vs Cloudflare KV vs Bun-specific APIs. There is no separate <code>[tool.safelint.typescript]</code> table; TS and JS share the same runtime story. See <a href="../../configuration/toml/#javascript-runtime-presets">JavaScript runtime presets</a> for the per-preset details.</p>
+<h2 id="installing-the-typescript-extra">Installing the TypeScript extra<a class="headerlink" href="#installing-the-typescript-extra" title="Permanent link">#</a></h2>
+<p>TypeScript grammar support ships as an optional extra so Python-only projects don't pay for it. The <code>[typescript]</code> extra also bundles <code>tree-sitter-javascript</code> because almost every TS project has a few <code>.js</code> files (vite/webpack configs, jest setup, etc.) — one install command covers both:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[typescript]&#39;</span><span class="w">    </span><span class="c1"># adds .ts, .tsx, .as (and .js too)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># or kitchen-sink:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span>
+</code></pre></div>
+<p>Without the extra, <code>safelint check</code> skips <code>.ts</code> / <code>.tsx</code> / <code>.as</code> files with a one-line install hint at lint time. If at least one other supported file (e.g. a Python file in a mixed repo) does get linted, the run continues normally. <strong>If every candidate file gets skipped</strong> — the typical case in a TS-only project — the <a href="../../configuration/cli/#exit-code-2--silent-failure-triggers">silent-failure guard</a> fires and SafeLint exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.</p>
+<h2 id="pre-commit-integration">Pre-commit integration<a class="headerlink" href="#pre-commit-integration" title="Permanent link">#</a></h2>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># .pre-commit-config.yaml</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">repos</span><span class="p">:</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0rc1</span><span class="w">       </span><span class="c1"># pin to a release (replace with the GA tag once v2.0.0 ships)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="c1"># TS users add the matching extra so pre-commit&#39;s isolated environment</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="c1"># installs ``tree-sitter-typescript`` (and the bundled JS grammar).</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[typescript]&#39;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="c1"># The published hook&#39;s ``types_or`` already includes python,</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">        </span><span class="c1"># javascript, ts, and tsx. Optional: scope to a directory.</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span>
+</code></pre></div>
+<p><strong>AssemblyScript (<code>.as</code>) users — additional override required.</strong> Pre-commit's <code>identify</code> library has no <code>as</code> filetype tag, so the default <code>types_or: [python, javascript, ts, tsx]</code> won't match <code>.as</code> files. Override <code>types_or</code> with a permissive tag that <code>.as</code> files <em>actually</em> carry (<code>text</code> or <code>file</code>) and use <code>files</code> to scope the match. <code>types_or: []</code> does <strong>not</strong> work — pre-commit treats an empty tag list as "no tag matches" rather than "filter disabled", so the hook never fires.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[typescript]&#39;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">        </span><span class="nt">types_or</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">text</span><span class="p p-Indicator">]</span><span class="w">                              </span><span class="c1"># permissive tag .as files carry; files scopes the match</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/.*\.(ts|tsx|as)$</span><span class="w">                  </span><span class="c1"># explicit extension allow-list</span>
+</code></pre></div>
+<h2 id="typescript-specific-config-keys">TypeScript-specific config keys<a class="headerlink" href="#typescript-specific-config-keys" title="Permanent link">#</a></h2>
+<p>All JS config keys also work as <code>_typescript</code>-suffixed variants when you want TS-specific overrides:</p>
+<ul>
+<li><code>[tool.safelint.rules.side_effects_hidden]</code> — <code>io_functions_typescript</code></li>
+<li><code>[tool.safelint.rules.side_effects]</code> — <code>io_functions_typescript</code></li>
+<li><code>[tool.safelint.rules.global_mutation]</code> — <code>global_namespaces_typescript</code></li>
+<li><code>[tool.safelint.rules.resource_lifecycle]</code> — <code>tracked_functions_typescript</code></li>
+<li><code>[tool.safelint.rules.missing_assertions]</code> — <code>assertion_calls_typescript</code></li>
+<li><code>[tool.safelint.rules.tainted_sink]</code> — <code>sinks_typescript</code>, <code>sanitizers_typescript</code>, <code>sources_typescript</code></li>
+<li><code>[tool.safelint.rules.return_value_ignored]</code> — <code>flagged_calls_typescript</code></li>
+<li><code>[tool.safelint.rules.null_dereference]</code> — <code>nullable_methods_typescript</code></li>
+</ul>
+<p>All accept a list of strings; bare-string typos (<code>sinks_typescript = "eval"</code> instead of <code>["eval"]</code>) raise a clear <code>TypeError</code> instead of silently coercing into a set of characters.</p>
+<h2 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">#</a></h2>
+<p>Want to refine a rule's TypeScript behaviour, add a TS-only handler, or extend AssemblyScript coverage? See <a href="../../contributing/adding-a-language/">Adding a language</a> for the architecture overview, or open an issue / PR against the <a href="https://github.com/shelkesays/safelint">main repo</a>.</p>
 
 
 
@@ -1992,7 +2286,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../lifecycle/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Updating, removing, freshness">
+          <a href="../javascript/" class="md-footer__link md-footer__link--prev" aria-label="Previous: JavaScript">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2002,20 +2296,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Updating, removing, freshness
+                JavaScript
               </div>
             </div>
           </a>
         
         
           
-          <a href="../clients/claude-code/" class="md-footer__link md-footer__link--next" aria-label="Next: Claude Code">
+          <a href="../../configuration/" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Claude Code
+                Overview
               </div>
             </div>
             <div class="md-footer__button md-icon">

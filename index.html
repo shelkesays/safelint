@@ -22,7 +22,7 @@
         
       
       
-      <link rel="icon" href="assets/images/favicon.png">
+      <link rel="icon" href="assets/safelint-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -94,8 +94,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="." title="SafeLint" class="md-header__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="assets/safelint-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -398,8 +397,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="." title="SafeLint" class="md-nav__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="assets/safelint-logo.svg" alt="logo">
 
     </a>
     SafeLint
@@ -486,6 +484,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#currently-supported-languages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Currently supported languages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -534,6 +543,8 @@
   
     
     
+      
+        
       
         
       
@@ -627,6 +638,34 @@
     
   
     JavaScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="languages/typescript/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript
   
 
     
@@ -1798,6 +1837,17 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#currently-supported-languages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Currently supported languages
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1857,16 +1907,55 @@
 
 <h1 id="safelint">SafeLint<a class="headerlink" href="#safelint" title="Permanent link">#</a></h1>
 <blockquote>
-<p>Holzmann "Power of Ten" safety lint rules for modern <strong>Python and JavaScript</strong> — adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint) doesn't reach.</p>
+<p>Holzmann "Power of Ten" safety lint rules for modern <strong>Python, JavaScript, and TypeScript</strong> — adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint) doesn't reach.</p>
 </blockquote>
 <p>SafeLint complements your existing linters. Where ruff handles style and pylint catches general defects, SafeLint enforces a focused set of <em>safety</em> rules — the kind you'd want in code that has to be reviewable, testable, and predictably-terminating. It's a CLI, a pre-commit hook, a JSON / SARIF emitter for editor and CI consumers, and an <a href="ai-clients/">AI-client skill</a> that twelve agents (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) speak.</p>
-<p>Languages: <strong>Python</strong> (<code>.py</code>, <code>.pyw</code>) and <strong>JavaScript</strong> (<code>.js</code>, <code>.mjs</code>, <code>.cjs</code> — runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine; per-runtime <em>defaults</em> are switchable via <a href="configuration/toml/#javascript-runtime-presets"><code>[tool.safelint.javascript] runtime = "..."</code></a>). 17 of the 20 rules apply to both languages; 2 are Python-only (the <code>bare_except</code> and <code>global_state</code> keywords don't have JS equivalents) and 1 is JavaScript-only (the <code>var</code> keyword's function-scoping hazard doesn't exist in Python). <strong>Planned future languages</strong> (in working-priority order, no timelines committed): TypeScript / AssemblyScript, Go, Rust, Java, C, C++, PHP — see the <a href="configuration/rules/#planned">language-coverage roadmap</a>.</p>
+<h2 id="currently-supported-languages">Currently supported languages<a class="headerlink" href="#currently-supported-languages" title="Permanent link">#</a></h2>
+<table>
+<thead>
+<tr>
+<th>Language</th>
+<th>Extensions</th>
+<th>Notes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Python</strong></td>
+<td><code>.py</code>, <code>.pyw</code></td>
+<td>—</td>
+</tr>
+<tr>
+<td><strong>JavaScript</strong></td>
+<td><code>.js</code>, <code>.mjs</code>, <code>.cjs</code></td>
+<td>Runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine. Per-runtime <em>defaults</em> are switchable via <a href="configuration/toml/#javascript-runtime-presets"><code>[tool.safelint.javascript] runtime = "..."</code></a>.</td>
+</tr>
+<tr>
+<td><strong>TypeScript</strong> (including <strong>AssemblyScript</strong>)</td>
+<td><code>.ts</code>, <code>.tsx</code>, <code>.as</code></td>
+<td>Reuses the JS rule implementations end-to-end with TS-specific handling for type-only constructs (generics, <code>as</code> casts, non-null assertions, <code>declare global</code> blocks, etc.). Shares JS runtime presets since TS compiles to JS.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Rule coverage:</strong> 17 rules apply to all three languages; 2 are Python-only (<code>bare_except</code>, <code>global_state</code> — the keywords don't exist in JS/TS) and 1 is JavaScript-family-only (<code>wide_scope_declaration</code> — <code>var</code>'s function-scoping hazard doesn't exist in Python, but applies to both <code>.js</code> and <code>.ts</code>).</p>
+<p><strong>Planned future languages</strong> (in working-priority order, no timelines committed): Go, Rust, Java, C, C++, PHP — see the <a href="configuration/rules/#planned">language-coverage roadmap</a>.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>safelint<span class="w">                  </span><span class="c1"># or: uv add safelint</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                   </span><span class="c1"># lint a directory</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">          </span><span class="c1"># lint everything (default is git-modified only)</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>src/<span class="w">     </span><span class="c1"># machine-readable output for editors / CI</span>
+<div class="admonition warning">
+<p class="admonition-title">v2.0.0rc1 (pre-release) — pin the version or pass <code>--pre</code></p>
+<p>Until v2.0.0 GA, an unpinned <code>pip install 'safelint[&lt;lang&gt;]'</code> resolves to the latest 1.x release, which <strong>doesn't define these per-language extras</strong> and so wouldn't install any grammar. For the RC, pin explicitly: <code>pip install 'safelint[python]==2.0.0rc1'</code> (or pass <code>--pre</code> to any command below).</p>
+</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python]&#39;</span><span class="w">         </span><span class="c1"># adds .py, .pyw</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[javascript]&#39;</span><span class="w">     </span><span class="c1"># adds .js, .mjs, .cjs</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[typescript]&#39;</span><span class="w">     </span><span class="c1"># adds .ts, .tsx, .as (also bundles JS)</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span><span class="w">            </span><span class="c1"># every supported language</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python,javascript]&#39;</span><span class="w">   </span><span class="c1"># multiple extras compose</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># uv add &#39;safelint[typescript]&#39; works the same way.</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                    </span><span class="c1"># lint a directory</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">           </span><span class="c1"># lint everything (default is git-modified only)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>src/<span class="w">      </span><span class="c1"># machine-readable output for editors / CI</span>
 </code></pre></div>
+<p>Pick the extras that match the languages you actually lint — every grammar ships as an opt-in extra so a Python-only project never pays for JavaScript / TypeScript grammars, a Go/JS-only project never pays for the Python grammar, and so on. <code>pip install safelint</code> alone installs only the engine; safelint emits a one-line install hint on first run telling you which extra to add for the files it found.</p>
 <h2 id="where-to-go-from-here">Where to go from here<a class="headerlink" href="#where-to-go-from-here" title="Permanent link">#</a></h2>
 <ul>
 <li><strong><a href="configuration/">Configuration</a></strong> — every CLI flag, every rule, every TOML option. Start here once you've installed.</li>

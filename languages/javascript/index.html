@@ -18,13 +18,13 @@
         <link rel="prev" href="../python/">
       
       
-        <link rel="next" href="../../configuration/">
+        <link rel="next" href="../typescript/">
       
       
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/safelint-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -96,8 +96,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="SafeLint" class="md-header__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/safelint-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -400,8 +399,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="SafeLint" class="md-nav__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/safelint-logo.svg" alt="logo">
 
     </a>
     SafeLint
@@ -458,6 +456,8 @@
   
     
     
+      
+        
       
         
       
@@ -661,6 +661,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#installing-the-javascript-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installing the JavaScript extra
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pre-commit-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -697,6 +708,34 @@
   
 </nav>
       
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../typescript/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
     </li>
   
 
@@ -1915,6 +1954,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#installing-the-javascript-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Installing the JavaScript extra
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#pre-commit-integration" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1975,14 +2025,18 @@
 <h1 id="javascript">JavaScript<a class="headerlink" href="#javascript" title="Permanent link">#</a></h1>
 <p>SafeLint analyses JavaScript source for the Holzmann "Power of Ten" safety rules — function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like ESLint don't catch. JavaScript support landed in v1.13.0 alongside Python; the analysis is runtime-agnostic and runs identically across Node.js, browser, Deno, Cloudflare Workers, Bun, and WASM-hosted JS engines.</p>
 <h2 id="file-extensions">File extensions<a class="headerlink" href="#file-extensions" title="Permanent link">#</a></h2>
-<p><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>. JSX (<code>.jsx</code>) and TypeScript (<code>.ts</code> / <code>.tsx</code>) are not yet registered — see the <a href="../../configuration/rules/#planned">language roadmap</a>.</p>
+<p><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>. JSX (<code>.jsx</code>) is not yet registered — see the <a href="../../configuration/rules/#planned">language roadmap</a>. TypeScript (<code>.ts</code> / <code>.tsx</code> / <code>.as</code>) lives on its own <a href="../typescript/">language page</a> as of v2.0.0.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>safelint<span class="w">              </span><span class="c1"># the tool itself runs on Python; lints any registered language</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">               </span><span class="c1"># lint a directory (git-modified files by default)</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">      </span><span class="c1"># lint everything</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>src/<span class="w"> </span><span class="c1"># machine-readable for editors / CI</span>
+<div class="admonition warning">
+<p class="admonition-title">v2.0.0rc1 (pre-release) — pin or pass <code>--pre</code></p>
+<p>Until v2.0.0 GA, an unpinned <code>pip install 'safelint[javascript]'</code> resolves to the latest 1.x release, which doesn't define this extra. For the RC, pin explicitly: <code>pip install 'safelint[javascript]==2.0.0rc1'</code> (or pass <code>--pre</code>).</p>
+</div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[javascript]&#39;</span><span class="w">    </span><span class="c1"># the tool itself runs on Python; the extra adds the JS grammar</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                   </span><span class="c1"># lint a directory (git-modified files by default)</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">          </span><span class="c1"># lint everything</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>src/<span class="w">     </span><span class="c1"># machine-readable for editors / CI</span>
 </code></pre></div>
-<p>If your project doesn't already have a Python toolchain, the same <code>pip install safelint</code> works through <code>pipx install safelint</code> (isolates the install) or by adding safelint as a dev dependency through any pip-compatible manager.</p>
+<p>If your project doesn't already have a Python toolchain, the same install command works through <code>pipx install 'safelint[javascript]'</code> (isolates the install) or by adding <code>'safelint[javascript]'</code> as a dev dependency through any pip-compatible manager. v2.0.0 ships every language grammar as an opt-in extra; the <code>[javascript]</code> extra installs <code>tree-sitter-javascript</code> alongside the engine.</p>
 <h2 id="rules-that-fire-on-javascript">Rules that fire on JavaScript<a class="headerlink" href="#rules-that-fire-on-javascript" title="Permanent link">#</a></h2>
 <p>18 user-facing rules apply to JavaScript — the 17 cross-language rules plus 1 JavaScript-only rule. The 2 Python-only rules (SAFE201, SAFE301) are skipped automatically by the engine's per-language dispatch.</p>
 <table>
@@ -2168,16 +2222,28 @@
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myCustomDangerousFunction&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p>User-explicit <code>_javascript</code>-suffixed config keys always win over the runtime preset — the preset only changes the <em>default</em> list.</p>
+<h2 id="installing-the-javascript-extra">Installing the JavaScript extra<a class="headerlink" href="#installing-the-javascript-extra" title="Permanent link">#</a></h2>
+<p>JavaScript grammar support ships as an optional extra so Python-only projects don't pay for it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[javascript]&#39;</span><span class="w">    </span><span class="c1"># adds .js, .mjs, .cjs</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># or, for TS projects that also have JS:</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[typescript]&#39;</span><span class="w">    </span><span class="c1"># bundles tree-sitter-javascript too</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># or kitchen-sink:</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span>
+</code></pre></div>
+<p>Without the extra, <code>safelint check</code> skips <code>.js</code> / <code>.mjs</code> / <code>.cjs</code> files with a one-line install hint at lint time. <strong>Heads-up for CI:</strong> if the run discovers JS files but every one is skipped because the grammar isn't installed, safelint exits with code <strong>2</strong> (the silent-failure guard) so a CI pipeline can't accidentally report green when no linting actually happened. If your CI logic distinguishes "lint clean" from "lint setup is broken", branch on exit code 2 — or just install the matching extra and the guard never fires.</p>
 <h2 id="pre-commit-integration">Pre-commit integration<a class="headerlink" href="#pre-commit-integration" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># .pre-commit-config.yaml</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="nt">repos</span><span class="p">:</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/srahul07/safelint</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">&lt;tag&gt;</span><span class="w">             </span><span class="c1"># pin to a release</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="w">        </span><span class="c1"># The published hook lints both python and javascript filetypes</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="w">        </span><span class="c1"># by default. Optional: scope to a directory.</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># .pre-commit-config.yaml</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">repos</span><span class="p">:</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0rc1</span><span class="w">         </span><span class="c1"># pin to a release (replace with the GA tag once v2.0.0 ships)</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="c1"># JS / TS users add the matching extra so pre-commit&#39;s isolated</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="c1"># environment installs the right tree-sitter grammar.</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[javascript]&#39;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="c1"># The published hook&#39;s `types_or` already includes python,</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">        </span><span class="c1"># javascript, ts, and tsx. Optional: scope to a directory.</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span>
 </code></pre></div>
 <p>JavaScript projects don't need a Python interpreter on developer machines — <code>pre-commit</code> itself manages the safelint runtime in an isolated environment. CI integration is the same: drop <code>safelint check</code> into your existing GitHub Actions / GitLab CI / etc.</p>
 <h2 id="javascript-specific-config-keys">JavaScript-specific config keys<a class="headerlink" href="#javascript-specific-config-keys" title="Permanent link">#</a></h2>
@@ -2194,7 +2260,7 @@
 </ul>
 <p>All of these accept a list of strings; bare-string typos like <code>"log"</code> (instead of <code>["log"]</code>) raise a clear <code>TypeError</code> instead of silently coercing into a set of characters.</p>
 <h2 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">#</a></h2>
-<p>Want to refine a rule's JavaScript behaviour, add a runtime preset, or fix a parser edge case? See <a href="../../contributing/adding-a-language/">Adding a language</a> for the architecture overview, or open an issue / PR against the <a href="https://github.com/shelkesays/safelint">main repo</a>. TypeScript support is on the roadmap and will reuse most of this infrastructure — contributions welcome there too.</p>
+<p>Want to refine a rule's JavaScript behaviour, add a runtime preset, or fix a parser edge case? See <a href="../../contributing/adding-a-language/">Adding a language</a> for the architecture overview, or open an issue / PR against the <a href="https://github.com/shelkesays/safelint">main repo</a>. TypeScript (including TSX and AssemblyScript) reuses this infrastructure end-to-end — see the <a href="../typescript/">TypeScript language page</a> for the per-language notes.</p>
 
 
 
@@ -2249,13 +2315,13 @@
         
         
           
-          <a href="../../configuration/" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
+          <a href="../typescript/" class="md-footer__link md-footer__link--next" aria-label="Next: TypeScript">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Overview
+                TypeScript
               </div>
             </div>
             <div class="md-footer__button md-icon">

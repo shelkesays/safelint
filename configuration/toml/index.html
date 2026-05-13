@@ -24,7 +24,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/safelint-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -96,8 +96,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="SafeLint" class="md-header__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/safelint-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -400,8 +399,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="SafeLint" class="md-nav__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/safelint-logo.svg" alt="logo">
 
     </a>
     SafeLint
@@ -456,6 +454,8 @@
   
     
     
+      
+        
       
         
       
@@ -549,6 +549,34 @@
     
   
     JavaScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../languages/typescript/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript
   
 
     
@@ -940,6 +968,23 @@
       
     </span>
   </a>
+  
+    <nav class="md-nav" aria-label="JavaScript runtime presets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#typescript-and-the-_javascript-config-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TypeScript and the _javascript config keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -2124,6 +2169,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="JavaScript runtime presets">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#typescript-and-the-_javascript-config-keys" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        TypeScript and the _javascript config keys
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2585,13 +2647,56 @@
 <a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
 <a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myCustomDangerousFunction&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># overrides the browser preset</span>
 </code></pre></div>
-<p>Unknown runtime names surface a <code>safelint: warning:</code> line on stderr and fall back to <code>node</code>. Pure WebAssembly (<code>.wat</code> / <code>.wasm</code>) and AssemblyScript are out of scope for this configuration — they would land as separate <code>LanguageDefinition</code> registrations, not as JavaScript runtimes.</p>
+<p>Unknown runtime names surface a <code>safelint: warning:</code> line on stderr and fall back to <code>node</code>. Pure WebAssembly (<code>.wat</code> / <code>.wasm</code>) is out of scope for this configuration. <strong>AssemblyScript</strong> (<code>.as</code>) is supported — it parses with the same Tree-sitter grammar as TypeScript and is treated as a TS variant; the runtime preset that applies depends on where the compiled WebAssembly module runs.</p>
 <p>Source-language analysis itself (the parser, the AST walks, the per-rule logic) is identical across runtimes — only the <em>defaults</em> change.</p>
+<h3 id="typescript-and-the-_javascript-config-keys">TypeScript and the <code>_javascript</code> config keys<a class="headerlink" href="#typescript-and-the-_javascript-config-keys" title="Permanent link">#</a></h3>
+<p>TypeScript (<code>.ts</code> / <code>.tsx</code> / <code>.as</code> files) <strong>shares the JavaScript runtime presets</strong> because TS compiles to JS at runtime — the sink lists, taint sources, global namespaces, and I/O primitives are properties of the runtime environment, not the source language.</p>
+<p>By default, every TS file reads the <code>_javascript</code>-suffixed config keys directly:</p>
+<table>
+<thead>
+<tr>
+<th>TS file reads</th>
+<th>when …</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>&lt;key&gt;_typescript</code></td>
+<td>the user has set it explicitly (e.g. <code>sinks_typescript</code>, <code>sanitizers_typescript</code>, <code>sources_typescript</code>)</td>
+</tr>
+<tr>
+<td><code>&lt;key&gt;_javascript</code></td>
+<td><code>&lt;key&gt;_typescript</code> is unset (the default — TS inherits the JS list for every key listed below)</td>
+</tr>
+<tr>
+<td>(the rule's built-in default)</td>
+<td>neither is set</td>
+</tr>
+</tbody>
+</table>
+<p>Same precedence applies to every other <code>_javascript</code>-suffixed key (<code>sanitizers_javascript</code>, <code>sources_javascript</code>, <code>tracked_functions_javascript</code>, <code>global_namespaces_javascript</code>, <code>io_functions_javascript</code>, <code>assertion_calls_javascript</code>, <code>nullable_methods_javascript</code>, <code>flagged_calls_javascript</code>).</p>
+<p><strong>Most projects don't need TS-specific config.</strong> TS inherits JS defaults / overrides automatically — running <code>safelint check src/</code> on a mixed <code>.js</code> / <code>.ts</code> codebase gives the right behaviour out of the box. Set <code>_typescript</code>-suffixed keys only when you have a concrete reason for <code>.ts</code> files to behave differently from <code>.js</code> files in the same project (a stricter sink list for new TS code, a different test-framework's assertion functions, etc.).</p>
+<p><strong>Typical project</strong> — no TS-specific config needed. Both <code>.js</code> and <code>.ts</code> files use the same sink list via the TS → JS fallback:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="k">[tool.safelint.javascript]</span>
+<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;node&quot;</span>
+<a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myCustomDangerousFunction&quot;</span><span class="p">]</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="c1"># .ts files inherit this list automatically — no _typescript key needed.</span>
+</code></pre></div>
+<p><strong>Rare</strong> — a project wants a stricter sink list for TS only, while legacy JS keeps its existing list. Set both keys; the <code>_typescript</code> key is consulted first for <code>.ts</code> files:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">]</span><span class="w">                                </span><span class="c1"># legacy JS</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a><span class="n">sinks_typescript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Object.assign&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;innerHTML&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># stricter for TS</span>
+</code></pre></div>
+<p>(Two separate snippets above — each is a complete, self-contained pyproject excerpt. Don't paste them into the same <code>[tool.safelint.rules.tainted_sink]</code> block: TOML rejects duplicate table headers, and the rule's config is <em>one</em> table no matter how many language-suffixed keys it carries.)</p>
 <h2 id="adoption-path">Adoption path<a class="headerlink" href="#adoption-path" title="Permanent link">#</a></h2>
 <p>If you are adding SafeLint to an existing project with many existing violations, start permissive and tighten over time:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a>Week 1  - mode: local,  fail_on: error    - get used to the tool, fix errors only
-<a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a>Week 4  - mode: ci,     fail_on: warning  - enforce warnings in CI
-<a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a>Later   - enable tainted_sink, return_value_ignored, null_dereference as needed
+<div class="highlight"><pre><span></span><code><a id="__codelineno-19-1" name="__codelineno-19-1" href="#__codelineno-19-1"></a>Week 1  - mode: local,  fail_on: error    - get used to the tool, fix errors only
+<a id="__codelineno-19-2" name="__codelineno-19-2" href="#__codelineno-19-2"></a>Week 4  - mode: ci,     fail_on: warning  - enforce warnings in CI
+<a id="__codelineno-19-3" name="__codelineno-19-3" href="#__codelineno-19-3"></a>Later   - enable tainted_sink, return_value_ignored, null_dereference as needed
 </code></pre></div>
 
 

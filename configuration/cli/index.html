@@ -24,7 +24,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/safelint-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -96,8 +96,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="SafeLint" class="md-header__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/safelint-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -400,8 +399,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="SafeLint" class="md-nav__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/safelint-logo.svg" alt="logo">
 
     </a>
     SafeLint
@@ -456,6 +454,8 @@
   
     
     
+      
+        
       
         
       
@@ -549,6 +549,34 @@
     
   
     JavaScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../languages/typescript/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript
   
 
     
@@ -734,6 +762,34 @@
       
     </span>
   </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#exit-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exit codes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Exit codes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exit-code-2-silent-failure-triggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exit code 2 — silent-failure triggers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
   
 </li>
       
@@ -1849,6 +1905,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#exit-codes" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exit codes
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Exit codes">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#exit-code-2-silent-failure-triggers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Exit code 2 — silent-failure triggers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#safelint-hook-mode-flags-pre-commit" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1911,7 +1995,7 @@
 <h2 id="top-level-commands-and-flags">Top-level commands and flags<a class="headerlink" href="#top-level-commands-and-flags" title="Permanent link">#</a></h2>
 <p>SafeLint's top-level surface mirrors ruff's: every command can be invoked positionally (<code>safelint check ...</code>), and every flag has both a short and a long form where conventional. Help and version are intercepted before any command parsing so they always work, even when no subcommand is given.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$ safelint --help
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>SafeLint: Holzmann-inspired safety lint rules and pre-commit integration for Python and JavaScript.
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>SafeLint: Holzmann-inspired safety lint rules and pre-commit integration for Python, JavaScript, and TypeScript.
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>Usage: safelint [OPTIONS] &lt;COMMAND&gt;
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
@@ -1972,7 +2056,7 @@
 <tr>
 <td><code>--all-files</code></td>
 <td>off</td>
-<td>Scan every supported source file under the target (today: <code>.py</code>, <code>.pyw</code>, <code>.js</code>, <code>.mjs</code>, <code>.cjs</code>). Default (without this flag) is to check only git-modified files.</td>
+<td>Scan every supported source file under the target (today: <code>.py</code>, <code>.pyw</code>, <code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.ts</code>, <code>.tsx</code>, <code>.as</code>). Default (without this flag) is to check only git-modified files.</td>
 </tr>
 <tr>
 <td><code>--fail-on</code></td>
@@ -2032,6 +2116,60 @@
 <li>Running a one-off full audit</li>
 <li><code>pre-commit run --all-files</code> already passes all files directly; the hook mode handles this automatically.</li>
 </ul>
+<h2 id="exit-codes">Exit codes<a class="headerlink" href="#exit-codes" title="Permanent link">#</a></h2>
+<p>SafeLint's exit code tells CI / pre-commit how the run finished:</p>
+<table>
+<thead>
+<tr>
+<th>Code</th>
+<th>Meaning</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>0</code></td>
+<td>Clean run — no blocking violations (suppressed violations don't count).</td>
+</tr>
+<tr>
+<td><code>1</code></td>
+<td>One or more blocking violations found (severity ≥ <code>--fail-on</code>).</td>
+</tr>
+<tr>
+<td><code>2</code></td>
+<td><strong>Silent-failure guard.</strong> Fires in <em>every</em> output mode (pretty / JSON / SARIF) so a CI pipeline can't silently report clean. Three distinct triggers — see below for the exact stderr message each emits.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="exit-code-2-silent-failure-triggers">Exit code 2 — silent-failure triggers<a class="headerlink" href="#exit-code-2-silent-failure-triggers" title="Permanent link">#</a></h3>
+<p>All three triggers print a <code>safelint: error:</code> line to stderr before exiting; pre-commit treats exit 2 as a hook <em>Failed</em> (red), not Passed. Fix by installing the matching grammar extra (<code>pip install 'safelint[python]'</code> etc.) or, for pre-commit users, adding <code>additional_dependencies: ['safelint[&lt;lang&gt;]']</code> to your <code>.pre-commit-config.yaml</code>.</p>
+<table>
+<thead>
+<tr>
+<th>Trigger</th>
+<th>Path</th>
+<th>Stderr message</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Directory mode</strong> (<code>safelint check src/ --all-files</code>) discovers files but none get linted because every grammar is missing</td>
+<td><code>_check_exit_code</code> after <code>_run_check</code>'s lint pass</td>
+<td><code>safelint: error: no files linted — every supported file was skipped because its grammar package isn't installed — install with: pip install 'safelint[&lt;lang&gt;]'</code></td>
+</tr>
+<tr>
+<td><strong>Git-modified mode</strong> (default <code>safelint check src/</code>) — user modified files but every one was dropped by the supported-extensions filter</td>
+<td><code>_handle_no_targets</code> in the no-targets short-circuit</td>
+<td><code>safelint: error: no files linted — every git-modified source file has a grammar that isn't installed — install with: pip install 'safelint[&lt;lang&gt;]'</code></td>
+</tr>
+<tr>
+<td><strong>Hook mode</strong> (pre-commit invokes <code>safelint &lt;files&gt;</code>) — every passed file has an extension whose grammar isn't installed</td>
+<td><code>_guard_hook_silent_failure</code> before the engine runs</td>
+<td><code>safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed — add 'safelint[&lt;lang&gt;]' to additional_dependencies in your .pre-commit-config.yaml</code></td>
+</tr>
+</tbody>
+</table>
+<p>Each error embeds the install hint for the missing extras so the failure is self-explanatory even when no prior warnings were printed (e.g. the no-targets short-circuit, or any machine-output run). The hint phrasing flips between <code>install with: pip install 'safelint[&lt;lang&gt;]'</code> (direct CLI) and <code>add 'safelint[&lt;lang&gt;]' to additional_dependencies in your .pre-commit-config.yaml</code> (pre-commit, detected via <code>PRE_COMMIT=1</code>).</p>
+<p><strong>Per-extension stderr warnings</strong> (one line per missing grammar, listing the affected extensions) are emitted <strong>only in pretty (human) CLI output and in the pre-commit hook flow</strong>. Machine-readable modes — <code>--format json</code> and <code>--format sarif</code> — deliberately suppress those warnings so stderr stays parseable for CI / editor pipelines; the embedded install hint inside the <code>safelint: error:</code> line above is the only signal you get there.</p>
 <h2 id="safelint-hook-mode-flags-pre-commit"><code>safelint</code> hook mode flags (pre-commit)<a class="headerlink" href="#safelint-hook-mode-flags-pre-commit" title="Permanent link">#</a></h2>
 <p>Pre-commit passes the staged files as positional arguments automatically. <code>--fail-on</code>, <code>--mode</code>, and <code>--ignore</code> are all supported here.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># .pre-commit-config.yaml</span>

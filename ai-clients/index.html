@@ -24,7 +24,7 @@
         
       
       
-      <link rel="icon" href="../assets/images/favicon.png">
+      <link rel="icon" href="../assets/safelint-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -96,8 +96,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href=".." title="SafeLint" class="md-header__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../assets/safelint-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -400,8 +399,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href=".." title="SafeLint" class="md-nav__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../assets/safelint-logo.svg" alt="logo">
 
     </a>
     SafeLint
@@ -456,6 +454,8 @@
   
     
     
+      
+        
       
         
       
@@ -549,6 +549,34 @@
     
   
     JavaScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../languages/typescript/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript
   
 
     
@@ -1838,17 +1866,23 @@
 <h1 id="ai-client-integrations">AI client integrations<a class="headerlink" href="#ai-client-integrations" title="Permanent link">#</a></h1>
 <p>SafeLint ships skills / project rules for AI coding clients so you can ask the agent things like <em>"run safelint"</em>, <em>"lint my changes"</em>, or <em>"do a Power-of-Ten review on src/api/auth.py"</em> and have it invoke <code>safelint check</code> correctly, parse the JSON output, and present the violations in a reviewable format.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>safelint<span class="w">            </span><span class="c1"># or: uv add safelint</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w">          </span><span class="c1"># auto-detects which AI client(s) you use</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># Pick the extra matching your project&#39;s language(s) — v2.0.0+</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># ships each grammar separately:</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python]&#39;</span><span class="w">        </span><span class="c1"># or: uv add &#39;safelint[python]&#39;</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># pip install &#39;safelint[javascript]&#39;  # JS / Node</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># pip install &#39;safelint[typescript]&#39;  # TypeScript (bundles JS too)</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># pip install &#39;safelint[all]&#39;         # kitchen-sink</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w">                </span><span class="c1"># auto-detects AI clients AND language grammars</span>
 </code></pre></div>
-<p>That single command:</p>
+<p><code>safelint skill install</code> runs <strong>two</strong> auto-detections back-to-back:</p>
 <ol>
-<li>Looks for AI-client markers in the current directory (<code>CLAUDE.md</code>, <code>.cursor/</code>, etc.).</li>
-<li>If any are present, installs each detected client's skill <strong>project-scoped</strong> under the current directory.</li>
-<li>If the current directory has no markers, looks in your home directory (<code>~/.claude/</code>, <code>~/.cursor/</code>).</li>
-<li>If found there, installs each detected client's skill <strong>user-scoped</strong> under your home directory.</li>
-<li>If nothing is found anywhere, prints an explicit error listing the <code>--client</code> commands you can run instead.</li>
+<li><strong>AI clients</strong> — looks for markers (<code>CLAUDE.md</code>, <code>.cursor/</code>, <code>.github/copilot-instructions.md</code>, etc.) in the current directory or your home directory, then installs each detected client's skill at the matching scope.</li>
+<li><strong>Language grammars</strong> <em>(new in v2.0.0rc1)</em> — walks the project tree for source-file extensions, compares against the extras currently installed, and emits one composed install line if any grammars are missing. Example output for a Python + TypeScript monorepo with neither grammar installed:</li>
 </ol>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>safelint: warning: Detected source files for 2 languages (python, typescript) whose tree-sitter grammar isn&#39;t installed. Run: pip install &#39;safelint[python,typescript]&#39;
+</code></pre></div>
+<p>You run the single composed command and you're set up for every language in the repo. Silent when every needed grammar is already installed.</p>
 <p>After install, restart the AI client (or reload its window) and ask things like <em>"run safelint"</em>.</p>
 <h2 id="supported-clients">Supported clients<a class="headerlink" href="#supported-clients" title="Permanent link">#</a></h2>
 <table>
@@ -1938,28 +1972,28 @@
 <p>The registry in <code>_skill_install.py</code> is open-ended — adding a new client is a one-<code>ClientSpec</code> change. See <a href="../contributing/adding-an-ai-client/">Adding a new AI client</a> for the full walkthrough. If you'd like to see another client supported, file a feature request with the marker convention you've seen in the wild.</p>
 <h2 id="how-auto-detection-works">How auto-detection works<a class="headerlink" href="#how-auto-detection-works" title="Permanent link">#</a></h2>
 <p><code>safelint skill install</code> (no <code>--client</code>) is <code>--client auto</code> under the hood. The detection is two-tier:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>[1] cwd has any client markers?
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>       │
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>       ├── yes ──→  install for each detected client, project-scoped
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>       │
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>       └── no
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a>              │
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>              ▼
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a>   [2] home has any client markers?
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a>       │
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>       ├── yes ──→  install for each detected client, user-scoped
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a>       │
-<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a>       └── no  ──→  error: print explicit --client commands and exit 1
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>[1] cwd has any client markers?
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>       │
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>       ├── yes ──→  install for each detected client, project-scoped
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>       │
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>       └── no
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>              │
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>              ▼
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>   [2] home has any client markers?
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>       │
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>       ├── yes ──→  install for each detected client, user-scoped
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>       │
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>       └── no  ──→  error: print explicit --client commands and exit 1
 </code></pre></div>
 <h3 id="multi-detection">Multi-detection<a class="headerlink" href="#multi-detection" title="Permanent link">#</a></h3>
 <p>If multiple clients are present, <strong>all</strong> of them are installed in the same run. The output prints the detected clients and a per-client success block:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>safelint: detected Claude Code (CLAUDE.md) and Cursor (.cursor) in current directory
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>safelint: Claude Code skill copied to /repo/.claude/skills/safelint (project scope)
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>  → Restart Claude Code (or open a new session) to pick up the skill.
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>  → Then ask Claude Code &quot;run safelint&quot; or &quot;lint with safelint&quot;.
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>safelint: Cursor rule copied to /repo/.cursor/rules/safelint.mdc (project scope)
-<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>  → Restart Cursor (or reload the window) to pick up the new rule.
-<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>  → Then ask Cursor &quot;run safelint&quot; or &quot;lint with safelint&quot;.
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>safelint: detected Claude Code (CLAUDE.md) and Cursor (.cursor) in current directory
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>safelint: Claude Code skill copied to /repo/.claude/skills/safelint (project scope)
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  → Restart Claude Code (or open a new session) to pick up the skill.
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  → Then ask Claude Code &quot;run safelint&quot; or &quot;lint with safelint&quot;.
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>safelint: Cursor rule copied to /repo/.cursor/rules/safelint.mdc (project scope)
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>  → Restart Cursor (or reload the window) to pick up the new rule.
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>  → Then ask Cursor &quot;run safelint&quot; or &quot;lint with safelint&quot;.
 </code></pre></div>
 <h3 id="-project-flag-with-auto"><code>--project</code> flag with auto<a class="headerlink" href="#-project-flag-with-auto" title="Permanent link">#</a></h3>
 <p><code>--client auto --project</code> restricts detection to the current directory only — no home fallback. Useful when you want to commit the skill into your repo but don't want a surprise install at the home location if the cwd happens to have no markers yet.</p>

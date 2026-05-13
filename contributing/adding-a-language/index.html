@@ -24,7 +24,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/safelint-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -96,8 +96,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="SafeLint" class="md-header__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/safelint-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -400,8 +399,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="SafeLint" class="md-nav__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/safelint-logo.svg" alt="logo">
 
     </a>
     SafeLint
@@ -456,6 +454,8 @@
   
     
     
+      
+        
       
         
       
@@ -549,6 +549,34 @@
     
   
     JavaScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../languages/typescript/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript
   
 
     
@@ -1602,10 +1630,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-add-the-tree-sitter-grammar-dependency" class="md-nav__link">
+  <a href="#1-add-the-tree-sitter-grammar-as-an-opt-in-extra" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Add the Tree-sitter grammar dependency
+        1. Add the Tree-sitter grammar as an opt-in extra
       
     </span>
   </a>
@@ -1661,6 +1689,17 @@
     <span class="md-ellipsis">
       
         6. Update CLI / pre-commit plumbing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6b-wire-the-grammar-package-as-an-optional-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6b. Wire the grammar package as an optional extra
       
     </span>
   </a>
@@ -1944,10 +1983,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#1-add-the-tree-sitter-grammar-dependency" class="md-nav__link">
+  <a href="#1-add-the-tree-sitter-grammar-as-an-opt-in-extra" class="md-nav__link">
     <span class="md-ellipsis">
       
-        1. Add the Tree-sitter grammar dependency
+        1. Add the Tree-sitter grammar as an opt-in extra
       
     </span>
   </a>
@@ -2003,6 +2042,17 @@
     <span class="md-ellipsis">
       
         6. Update CLI / pre-commit plumbing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#6b-wire-the-grammar-package-as-an-optional-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6b. Wire the grammar package as an optional extra
       
     </span>
   </a>
@@ -2098,7 +2148,7 @@
 <p>This guide is the cheat sheet for adding support for a new programming language (TypeScript, Go, Rust, etc.) to SafeLint. The architecture was prepared with multi-language in mind; the moving parts you need to understand and the steps you need to follow are below.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Today only Python is registered. The supporting structure (parser hookup, file-discovery loop, suppression parser) is already language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants, and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.</p>
+<p>Today Python, JavaScript, and TypeScript (including TSX and AssemblyScript) are all registered. The supporting structure (parser hookup, file-discovery loop, suppression parser, optional-grammar extras) is fully language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants and gates the grammar import behind the matching <code>[project.optional-dependencies]</code> extra (see Step 1 + Step 6b), and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Bundled AI-client skills also need an update</p>
@@ -2114,15 +2164,24 @@
 <li>Suppressions are parsed via <code>_parse_directives</code> (a single tree walk producing both line-level <code># nosafe</code> and file-level <code># safelint: ignore</code> results) which uses <code>lang.comment_node_type</code> and <code>lang.comment_prefix</code> from the <code>LanguageDefinition</code> — so directives work automatically wherever you point them. <strong>The literal token form</strong> (<code># nosafe</code>, <code>// nosafe</code>, etc.) follows from <code>comment_prefix</code>.</li>
 </ol>
 <h2 id="step-by-step-adding-typescript-as-an-example">Step-by-step: adding TypeScript as an example<a class="headerlink" href="#step-by-step-adding-typescript-as-an-example" title="Permanent link">#</a></h2>
-<h3 id="1-add-the-tree-sitter-grammar-dependency">1. Add the Tree-sitter grammar dependency<a class="headerlink" href="#1-add-the-tree-sitter-grammar-dependency" title="Permanent link">#</a></h3>
-<p>Add the grammar to <code>pyproject.toml</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">    </span><span class="s2">&quot;tree-sitter&gt;=0.23.0&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="s2">&quot;tree-sitter-python&gt;=0.23.0&quot;</span><span class="p">,</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="s2">&quot;tree-sitter-typescript&gt;=0.23.0&quot;</span><span class="p">,</span><span class="w">   </span><span class="c1"># ← new</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="p">]</span>
+<h3 id="1-add-the-tree-sitter-grammar-as-an-opt-in-extra">1. Add the Tree-sitter grammar as an opt-in extra<a class="headerlink" href="#1-add-the-tree-sitter-grammar-as-an-opt-in-extra" title="Permanent link">#</a></h3>
+<p>v2.0.0+ ships every language grammar as a PEP 621 optional extra so projects only install what they need. Grammars go under <code>[project.optional-dependencies]</code> in <code>pyproject.toml</code>, <strong>not</strong> under top-level <code>dependencies</code> (which keeps only <code>tree-sitter</code> itself — the engine that loads grammars at runtime). See Step 6b for the full wiring; the minimal pyproject delta is:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="k">[project]</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="n">dependencies</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="s2">&quot;tree-sitter&gt;=0.23.0&quot;</span><span class="p">,</span><span class="w">        </span><span class="c1"># core engine; required for every install</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="p">]</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="k">[project.optional-dependencies]</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="n">typescript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w">                    </span><span class="c1"># ← new extra named after the language</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">    </span><span class="s2">&quot;tree-sitter-typescript&gt;=0.23.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="p">]</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">all</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="w">                           </span><span class="c1"># append the new grammar to ``[all]`` too</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">    </span><span class="s2">&quot;tree-sitter-python&gt;=0.23.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">    </span><span class="s2">&quot;tree-sitter-javascript&gt;=0.23.0&quot;</span><span class="p">,</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">    </span><span class="s2">&quot;tree-sitter-typescript&gt;=0.23.0&quot;</span><span class="p">,</span><span class="w">   </span><span class="c1"># ← keep in sync with the per-language extra above</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="p">]</span>
 </code></pre></div>
-<p>Run <code>uv sync</code> to pull it.</p>
+<p>Run <code>uv sync --extra dev</code> to pull the new grammar into the dev environment (the <code>dev</code> extra self-references <code>[all]</code>).</p>
 <h3 id="2-create-the-language-module">2. Create the language module<a class="headerlink" href="#2-create-the-language-module" title="Permanent link">#</a></h3>
 <p><code>src/safelint/languages/typescript.py</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="sd">&quot;&quot;&quot;TypeScript language definition for safelint.&quot;&quot;&quot;</span>
@@ -2280,10 +2339,25 @@
 <p>A handful of edges read the supported-language list from the registry; two pre-commit surfaces still need manual edits. The engine's own file-discovery loop, the suppression parser, the cache layer, and the per-rule dispatch are <em>already</em> registry-driven — the new language plugs in via Step 3 alone.</p>
 <p>Update both of these:</p>
 <ul>
-<li><strong><code>.pre-commit-hooks.yaml</code></strong> — <code>types_or: [python]</code> lists the pre-commit filetype tags downstream users of <code>pre-commit-hooks</code> will get matched against. Add the new tag (e.g. <code>- ts</code> for TypeScript) so users who configure the hook in their <code>.pre-commit-config.yaml</code> get the new files passed in. SafeLint itself still drops anything not in <code>supported_extensions()</code> defensively, but pre-commit's own filter happens first and would otherwise hide the new files from the hook.</li>
-<li><strong><code>.pre-commit-config.yaml</code></strong> — this repo's own in-tree <code>safelint (in-tree)</code> hook also has its own <code>types_or: [python]</code> filter. Add the new language's tag there too, or the in-repo hook run will keep excluding that language's files even after the published hook metadata is updated. (The peer hooks in the same file — <code>ty</code>, <code>pytest-cov</code> — are tooling-only and can stay <code>types: [python]</code>.)</li>
+<li><strong><code>.pre-commit-hooks.yaml</code></strong> — <code>types_or</code> lists the pre-commit filetype tags downstream users of <code>pre-commit-hooks</code> will get matched against (today: <code>[python, javascript, ts, tsx]</code>). Append the new tag so users who configure the hook in their <code>.pre-commit-config.yaml</code> get the new files passed in. SafeLint itself still drops anything not in <code>supported_extensions()</code> defensively, but pre-commit's own filter happens first and would otherwise hide the new files from the hook.</li>
+<li><strong><code>.pre-commit-config.yaml</code></strong> — this repo's own in-tree <code>safelint (in-tree)</code> hook also has its own <code>types_or</code> filter (today: <code>[python, javascript]</code>, since the safelint source tree itself is Python + JS only). Add the new language's tag there too if the in-repo source tree starts containing that language. (The peer hooks in the same file — <code>ty</code>, <code>pytest-cov</code> — are tooling-only and can stay <code>types: [python]</code>.)</li>
 </ul>
 <p>The CLI's git-status filters (<code>_collect_all_supported_files</code>, <code>_filter_supported_files</code> in <code>cli.py</code>, plus the hook-mode pre-filter at the bottom of <code>main()</code>) call <code>supported_extensions()</code> directly and need no edit.</p>
+<h3 id="6b-wire-the-grammar-package-as-an-optional-extra">6b. Wire the grammar package as an optional extra<a class="headerlink" href="#6b-wire-the-grammar-package-as-an-optional-extra" title="Permanent link">#</a></h3>
+<p>Tree-sitter grammar packages ship as <strong>optional extras</strong> so a Python-only project never pays for a grammar it'll never use. Adding a new language means adding a new extra alongside <code>[javascript]</code> / <code>[typescript]</code> / <code>[all]</code>:</p>
+<ol>
+<li>
+<p><strong><code>pyproject.toml</code></strong> — add a <code>&lt;lang&gt; = ["tree-sitter-&lt;lang&gt;&gt;=…"]</code> entry under <code>[project.optional-dependencies]</code>. If the new language is <em>typically</em> paired with another (the way TS is paired with JS), include the paired grammar in the same extra. Append the new grammar package(s) to the existing <code>all</code> extra so <code>pip install 'safelint[all]'</code> continues to cover the whole supported set. Also add them to <code>dev</code> so <code>uv sync --extra dev</code> keeps the full test suite working.</p>
+</li>
+<li>
+<p><strong><code>src/safelint/languages/&lt;lang&gt;.py</code></strong> — gate the grammar import with <code>try</code> / <code>except ImportError</code>, mirroring <code>javascript.py</code> / <code>typescript.py</code>. Set a <code>_GRAMMAR_AVAILABLE</code> flag and a <code>GRAMMAR_INSTALL_HINT</code> module-level string (e.g. <code>"pip install 'safelint[go]'"</code>). The parser-factory function raises <code>ImportError</code> with that same hint when invoked without the grammar installed.</p>
+</li>
+<li>
+<p><strong><code>src/safelint/languages/__init__.py</code></strong> — gate the new language's registry entry on <code>&lt;lang&gt;_mod._GRAMMAR_AVAILABLE</code>, mirroring the JS / TS blocks. When the grammar isn't installed, register the extensions in <code>_UNAVAILABLE_EXTENSIONS</code> (mapped to the hint string) so the CLI can surface a per-language install hint at lint time.</p>
+</li>
+</ol>
+<p>The user-facing flow then becomes: <code>pip install 'safelint[python]'</code> (or <code>pip install 'safelint[all]'</code>) → <code>pip install 'safelint[go]'</code> to add Go → the CLI emits <code>safelint: warning: skipping .go files — install with: pip install 'safelint[go]'</code> if the user has <code>.go</code> files but hasn't installed the extra yet.</p>
+<p>The CLI's missing-grammar hint helpers (<code>_emit_missing_grammar_warnings</code>, <code>_emit_hook_grammar_warnings</code>, <code>_scan_for_unavailable_extensions</code>) are language-agnostic — they read directly from <code>unavailable_extensions()</code> and need no edit when a new language lands.</p>
 <h4 id="optional-runtime-presets">Optional: runtime presets<a class="headerlink" href="#optional-runtime-presets" title="Permanent link">#</a></h4>
 <p>Some languages have meaningfully different default API surfaces depending on where the code runs — JavaScript is the canonical example: the same <code>.js</code> source can target Node.js (with <code>fs</code> / <code>child_process</code> / <code>process</code>), browsers (with DOM / Web APIs), Deno (<code>Deno.*</code>), Cloudflare Workers (Web APIs + KV / R2), or Bun. SafeLint exposes this via the <code>[tool.safelint.javascript] runtime = "..."</code> config table and a <code>_JS_RUNTIME_PRESETS</code> dict in <code>core/config.py</code>.</p>
 <p>If your new language has the same kind of runtime fragmentation, mirror the pattern:</p>

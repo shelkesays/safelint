@@ -24,7 +24,7 @@
         
       
       
-      <link rel="icon" href="../../assets/images/favicon.png">
+      <link rel="icon" href="../../assets/safelint-icon.svg">
       <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
@@ -96,8 +96,7 @@
   <nav class="md-header__inner md-grid" aria-label="Header">
     <a href="../.." title="SafeLint" class="md-header__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/safelint-logo.svg" alt="logo">
 
     </a>
     <label class="md-header__button md-icon" for="__drawer">
@@ -400,8 +399,7 @@
   <label class="md-nav__title" for="__drawer">
     <a href="../.." title="SafeLint" class="md-nav__button md-logo" aria-label="SafeLint" data-md-component="logo">
       
-  
-  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+  <img src="../../assets/safelint-logo.svg" alt="logo">
 
     </a>
     SafeLint
@@ -456,6 +454,8 @@
   
     
     
+      
+        
       
         
       
@@ -549,6 +549,34 @@
     
   
     JavaScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../languages/typescript/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript
   
 
     
@@ -2715,7 +2743,7 @@
 <li>A <strong>name</strong> — the key used in config files.</li>
 <li>An <strong>enabled</strong> flag — set to <code>false</code> to turn the rule off.</li>
 <li>A <strong>severity</strong> — <code>"error"</code> blocks the commit; <code>"warning"</code> is informational.</li>
-<li>A <strong>language scope</strong> — most rules apply to both Python and JavaScript; a few are language-specific (see below).</li>
+<li>A <strong>language scope</strong> — most rules apply to Python, JavaScript, and TypeScript; a few are language-specific (see below).</li>
 <li>Rule-specific options documented below.</li>
 </ul>
 <p>For top-level config keys (<code>mode</code>, <code>ignore</code>, <code>per_file_ignores</code>, …) see the <a href="../toml/">Configuration file</a>. For inline / file-level suppression see <a href="../suppression/">Suppression mechanisms</a>. JavaScript projects may also want to set a <a href="../toml/#javascript-runtime-presets">runtime preset</a> so rule defaults match the deployment target (browser / Deno / Cloudflare Workers / Bun).</p>
@@ -2724,11 +2752,11 @@
 <ul>
 <li><strong>Python</strong> (<code>.py</code>, <code>.pyw</code>).</li>
 <li><strong>JavaScript</strong> (<code>.js</code>, <code>.mjs</code>, <code>.cjs</code>) — source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime <em>defaults</em> (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the <a href="../toml/#javascript-runtime-presets"><code>[tool.safelint.javascript] runtime = "..."</code></a> preset — the source-language rules themselves don't change.</li>
+<li><strong>TypeScript</strong> (<code>.ts</code>, <code>.tsx</code>) — and <strong>AssemblyScript</strong> (<code>.as</code> — TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, <code>as</code> casts, non-null assertions, <code>declare global</code> ambient declarations, etc.). Shares the JavaScript runtime presets — TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See <a href="../../languages/typescript/">TypeScript</a> for the full language reference.</li>
 </ul>
 <h3 id="planned">Planned<a class="headerlink" href="#planned" title="Permanent link">#</a></h3>
 <p>Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see <a href="../../contributing/adding-a-language/">Adding a language</a>) makes each new language incremental — community contributions for any of these are welcome.</p>
 <ol>
-<li><strong>TypeScript</strong> (<code>.ts</code>, <code>.tsx</code>) — likely shares most parser / dispatch infrastructure with the existing JavaScript support. The same registration will also cover <strong>AssemblyScript</strong> (<code>.as</code> — TypeScript-syntax language that compiles to WebAssembly), since AS source parses with the TypeScript grammar.</li>
 <li><strong>Go</strong> (<code>.go</code>).</li>
 <li><strong>Rust</strong> (<code>.rs</code>).</li>
 <li><strong>Java</strong> (<code>.java</code>).</li>
@@ -2747,23 +2775,23 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>Cross-language</strong> (Python and JavaScript)</td>
+<td><strong>Cross-language</strong> (Python, JavaScript, TypeScript)</td>
 <td>17</td>
 <td>SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE302, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803</td>
 </tr>
 <tr>
 <td><strong>Python-only</strong></td>
 <td>2</td>
-<td>SAFE201 (<code>bare_except</code> — JS catches always bind the error; no <code>KeyboardInterrupt</code> hijack hazard), SAFE301 (<code>global_state</code> — JS has no <code>global</code> keyword; SAFE302 covers JS's "writes to module-level state" cases)</td>
+<td>SAFE201 (<code>bare_except</code> — JS / TS catches always bind the error; no <code>KeyboardInterrupt</code> hijack hazard), SAFE301 (<code>global_state</code> — JS / TS have no <code>global</code> keyword; SAFE302 covers their "writes to module-level state" cases)</td>
 </tr>
 <tr>
-<td><strong>JavaScript-only</strong></td>
+<td><strong>JavaScript-family-only</strong> (JS and TS)</td>
 <td>1</td>
-<td>SAFE305 (<code>wide_scope_declaration</code> — Python has no <code>var</code> / <code>let</code> / <code>const</code> distinction)</td>
+<td>SAFE305 (<code>wide_scope_declaration</code> — Python has no <code>var</code> / <code>let</code> / <code>const</code> distinction; <code>var</code> is still legal in TS and the same scope-hoisting hazard applies, so the rule fires on both <code>.js</code> and <code>.ts</code>)</td>
 </tr>
 </tbody>
 </table>
-<p>The engine's per-language dispatch automatically skips rules whose <code>language</code> tuple doesn't include the active file's language. There's no manual configuration to do — drop a <code>.py</code> file in a JS project (or vice versa) and the right rules fire on each.</p>
+<p>The engine's per-language dispatch automatically skips rules whose <code>language</code> tuple doesn't include the active file's language. There's no manual configuration to do — drop a <code>.py</code> file in a JS / TS project (or vice versa) and the right rules fire on each.</p>
 <h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">#</a></h2>
 <p>The table below is generated from the live rule registry (<code>safelint.rules.ALL_RULES</code>) and the per-rule defaults in <code>safelint.core.config.DEFAULTS</code> — it can't drift from the implementation. Click any code to jump to the detailed section below.</p>
 <!-- Auto-generated by scripts/prepare_docs.py — do not edit by hand. -->
@@ -3225,7 +3253,7 @@
 <a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
 </code></pre></div>
 <h3 id="safe302-global_mutation">SAFE302 — <code>global_mutation</code><a class="headerlink" href="#safe302-global_mutation" title="Permanent link">#</a></h3>
-<p><strong>What it flags:</strong> writes to module-level state from inside a function. Cross-language — the <em>intent</em> is the same in Python and JavaScript, but the syntactic shape differs.</p>
+<p><strong>What it flags:</strong> writes to module-level state from inside a function. Cross-language — the <em>intent</em> is the same in Python, JavaScript, and TypeScript, but the syntactic shape differs.</p>
 <p><strong>Python:</strong> by default, functions that declare <code>global x</code> and then assign to <code>x</code>. With <code>strict = true</code>, <em>any</em> <code>global</code> declaration is flagged regardless of whether a write follows. This is stricter than <code>SAFE301</code>. The default behaviour is more nuanced than ruff's <code>PLW0603</code> (which fires on any <code>global</code>); set <code>strict = true</code> if your team's policy is to ban the keyword entirely.</p>
 <p><strong>JavaScript:</strong> function-body writes — <code>assignment_expression</code>, <code>augmented_assignment_expression</code>, or <code>update_expression</code> (<code>++</code> / <code>--</code>) — whose target is a <code>member_expression</code> or <code>subscript_expression</code> rooted in a configured global namespace. The receiver chain is walked leftward — <code>process.env.NODE_ENV = '...'</code>, <code>process.env['NODE_ENV'] = '...'</code>, and <code>process.exitCode++</code> all resolve to <code>process</code> and fire. Bracket-notation writes (<code>globalThis['x'] = 1</code>, <code>window["config"] = {}</code>) work the same way as dot access. The default namespace list (<code>global_namespaces_javascript</code>) is <code>["globalThis", "window", "global", "self", "process"]</code>; runtime presets adjust this (browser drops <code>process</code>, adds <code>document</code>; Deno adds <code>Deno</code>, drops <code>window</code> and <code>process</code>). Module-level (top-of-file) writes do NOT fire — that's setup, not the bug pattern. Reading a global (<code>return globalThis.env;</code>) does NOT fire — only writes.</p>
 <table>
