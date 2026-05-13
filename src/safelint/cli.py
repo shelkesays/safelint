@@ -515,21 +515,26 @@ def _filter_supported_files(raw: set[str], git_root: Path, target_abs: Path) -> 
 
 
 def _filter_modified_under_target(raw: set[str], git_root: Path, target_abs: Path) -> set[str]:
-    """Return git-relative paths in *raw* whose resolved location is under *target_abs*.
+    """Return git-relative paths in *raw* whose resolved location is under *target_abs* AND still exists on disk.
 
-    Matches the target-restriction logic of :func:`_filter_supported_files`
-    but does *not* filter by supported extension — the silent-failure
-    guard needs to see ``.ts`` files modified under the requested target
-    even when the TS grammar isn't installed (those wouldn't reach
-    ``_filter_supported_files`` because its extension filter drops them).
-    Returns the git-relative form (same as *raw*) so downstream callers
-    that key off ``Path(...).suffix`` work the same as they did against
-    the un-filtered set.
+    Matches the target-restriction *and* existence check of
+    :func:`_filter_supported_files`, but does *not* filter by supported
+    extension — the silent-failure guard needs to see ``.ts`` files
+    modified under the requested target even when the TS grammar isn't
+    installed (those wouldn't reach ``_filter_supported_files`` because
+    its extension filter drops them). The existence check matters
+    because ``git diff --name-only HEAD`` reports *deleted* files too;
+    without it, a deleted ``.ts`` under target would tip
+    ``_handle_no_targets`` into exit 2 ("install the typescript extra")
+    even though the user has no remaining ``.ts`` file to lint. Returns
+    the git-relative form (same as *raw*) so downstream callers that
+    key off ``Path(...).suffix`` work the same as they did against the
+    un-filtered set.
     """
     out: set[str] = set()
     for rel in raw:
         abs_path = (git_root / rel).resolve()
-        if _is_under_target(abs_path, target_abs):
+        if abs_path.exists() and _is_under_target(abs_path, target_abs):
             out.add(rel)
     return out
 
@@ -768,10 +773,7 @@ def _dir_matches_exclude(path: Path, exclude_paths: list[str]) -> bool:
     """
     bare = path.as_posix().rstrip("/")
     with_slash = bare + "/"
-    return any(
-        fnmatch.fnmatchcase(bare, pattern) or fnmatch.fnmatchcase(with_slash, pattern)
-        for pattern in exclude_paths
-    )
+    return any(fnmatch.fnmatchcase(bare, pattern) or fnmatch.fnmatchcase(with_slash, pattern) for pattern in exclude_paths)
 
 
 def _scan_for_unavailable_extensions(
@@ -814,15 +816,8 @@ def _walk_unavailable_extensions(
     target_set = set(unavailable)
     for dirpath, dirnames, filenames in os.walk(target, followlinks=False):
         dir_path = Path(dirpath)
-        dirnames[:] = [
-            d for d in dirnames
-            if d not in _GRAMMAR_SCAN_EXCLUDED_DIRS
-            and not (excludes and _dir_matches_exclude(dir_path / d, excludes))
-        ]
-        kept = (
-            filenames if not excludes
-            else [f for f in filenames if not _path_matches_exclude(dir_path / f, excludes)]
-        )
+        dirnames[:] = [d for d in dirnames if d not in _GRAMMAR_SCAN_EXCLUDED_DIRS and not (excludes and _dir_matches_exclude(dir_path / d, excludes))]
+        kept = filenames if not excludes else [f for f in filenames if not _path_matches_exclude(dir_path / f, excludes)]
         seen.update(_matching_suffixes(kept, unavailable))
         if seen == target_set:
             return seen

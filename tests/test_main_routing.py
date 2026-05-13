@@ -449,6 +449,26 @@ def test_filter_modified_under_target_keeps_only_extension_in_target_when_off_ta
     assert result == set(), "off-target .ts must not leak into the considered-modified set"
 
 
+def test_filter_modified_under_target_drops_deleted_paths(tmp_path: Path) -> None:
+    """A path git reports as modified but that no longer exists on disk (e.g. a staged delete) must NOT trip the silent-failure guard.
+
+    Regression for the bug where ``git diff --name-only HEAD`` reports
+    deleted files, ``_filter_modified_under_target`` kept them in
+    ``considered_modified``, and ``_handle_no_targets`` then exited 2
+    telling the user to install the grammar for a file they had just
+    deleted. The fix mirrors ``_filter_supported_files``'s existence
+    check.
+    """
+    (tmp_path / "src" / "python").mkdir(parents=True)
+    # Do NOT create src/python/old_module.ts — simulates a deletion that's
+    # still in git's diff output.
+    raw = {"src/python/old_module.ts"}
+    target_abs = (tmp_path / "src" / "python").resolve()
+    result = cli._filter_modified_under_target(raw, tmp_path, target_abs)
+
+    assert result == set(), "deleted (no-longer-on-disk) paths must not appear in the considered-modified set"
+
+
 def test_normalize_path_falls_back_to_absolute_for_paths_outside_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """``_normalize_path`` returns the absolute string when the path is
     outside the cwd (the ``relative_to`` fallback path)."""
