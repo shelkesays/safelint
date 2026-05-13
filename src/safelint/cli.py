@@ -26,6 +26,7 @@ from __future__ import annotations
 import argparse
 from collections import Counter
 from dataclasses import dataclass
+import fnmatch
 import functools
 import os
 from pathlib import Path
@@ -752,29 +753,88 @@ def _matching_suffixes(filenames: list[str], unavailable: dict[str, str]) -> set
     return found
 
 
-def _scan_for_unavailable_extensions(target: Path, unavailable: dict[str, str]) -> set[str]:
+def _path_matches_exclude(path: Path, exclude_paths: list[str]) -> bool:
+    """Mirror of ``SafetyEngine._is_excluded`` as a free function for the pre-scan."""
+    posix = path.as_posix()
+    return any(fnmatch.fnmatchcase(posix, pattern) for pattern in exclude_paths)
+
+
+def _dir_matches_exclude(path: Path, exclude_paths: list[str]) -> bool:
+    """Mirror of ``SafetyEngine._is_excluded_dir`` as a free function for the pre-scan.
+
+    Tests both the bare and trailing-slash forms so ``foo/**`` globs prune
+    the ``foo`` directory at descent time, the same way the engine's walk
+    does.
+    """
+    bare = path.as_posix().rstrip("/")
+    with_slash = bare + "/"
+    return any(
+        fnmatch.fnmatchcase(bare, pattern) or fnmatch.fnmatchcase(with_slash, pattern)
+        for pattern in exclude_paths
+    )
+
+
+def _scan_for_unavailable_extensions(
+    target: Path,
+    unavailable: dict[str, str],
+    exclude_paths: list[str] | None = None,
+) -> set[str]:
     """Return the subset of *unavailable* extensions found under *target*.
 
     Early-exits once every unavailable extension has been seen at least
     once. Walks with the same default dir-name exclusions safelint uses
     for its built-in ``exclude_paths`` so vendored ``node_modules`` /
     ``.venv`` etc. don't trigger the hint spuriously.
+
+    When *exclude_paths* is non-empty (resolved from the user's config
+    via ``SafetyEngine._resolve_exclude_paths``), the walk also applies
+    the engine's exclusion logic at both file and directory granularity.
+    Files in user-excluded subtrees (e.g. ``generated/**``) don't show
+    up in the unavailable-extension set, mirroring the engine's
+    behaviour: a file safelint won't actually lint shouldn't trigger a
+    missing-grammar warning or the silent-failure guard.
     """
+    excludes = exclude_paths or []
     if target.is_file():
+        if excludes and _path_matches_exclude(target, excludes):
+            return set()
         return {target.suffix} if target.suffix in unavailable else set()
     if not target.is_dir():
         return set()
+    return _walk_unavailable_extensions(target, unavailable, excludes)
+
+
+def _walk_unavailable_extensions(
+    target: Path,
+    unavailable: dict[str, str],
+    excludes: list[str],
+) -> set[str]:
+    """Directory-walk half of :func:`_scan_for_unavailable_extensions`."""
     seen: set[str] = set()
     target_set = set(unavailable)
-    for _dirpath, dirnames, filenames in os.walk(target, followlinks=False):
-        dirnames[:] = [d for d in dirnames if d not in _GRAMMAR_SCAN_EXCLUDED_DIRS]
-        seen.update(_matching_suffixes(filenames, unavailable))
+    for dirpath, dirnames, filenames in os.walk(target, followlinks=False):
+        dir_path = Path(dirpath)
+        dirnames[:] = [
+            d for d in dirnames
+            if d not in _GRAMMAR_SCAN_EXCLUDED_DIRS
+            and not (excludes and _dir_matches_exclude(dir_path / d, excludes))
+        ]
+        kept = (
+            filenames if not excludes
+            else [f for f in filenames if not _path_matches_exclude(dir_path / f, excludes)]
+        )
+        seen.update(_matching_suffixes(kept, unavailable))
         if seen == target_set:
             return seen
     return seen
 
 
-def _emit_missing_grammar_warnings(target: Path, *, silent: bool = False) -> set[str]:
+def _emit_missing_grammar_warnings(
+    target: Path,
+    *,
+    silent: bool = False,
+    exclude_paths: list[str] | None = None,
+) -> set[str]:
     """Walk *target*, return the set of unavailable extensions found; emit warnings unless *silent*.
 
     The walk and the set-return run unconditionally — that's what the
@@ -785,7 +845,10 @@ def _emit_missing_grammar_warnings(target: Path, *, silent: bool = False) -> set
     parsing pipelines (matching the changelog claim).
 
     Set ``silent=True`` for machine output modes; leave default for
-    interactive runs.
+    interactive runs. Pass *exclude_paths* (the resolved user-config
+    list) so files in excluded subtrees neither produce a warning nor
+    trip the silent-failure guard — a file safelint won't actually
+    lint shouldn't fail the run with "no grammar installed".
 
     No-op (returns empty set) when every grammar extra is installed
     or when the target tree contains no unavailable-extension files.
@@ -793,7 +856,7 @@ def _emit_missing_grammar_warnings(target: Path, *, silent: bool = False) -> set
     unavailable = unavailable_extensions()
     if not unavailable:
         return set()
-    seen_exts = _scan_for_unavailable_extensions(target, unavailable)
+    seen_exts = _scan_for_unavailable_extensions(target, unavailable, exclude_paths=exclude_paths)
     if not seen_exts or silent:
         return seen_exts
     grouped: dict[str, list[str]] = {}
@@ -1027,6 +1090,19 @@ def _emit_skill_freshness_warnings() -> None:
         _diagnostics.print_warning(warning)
 
 
+def _load_config_and_excludes(target: Path, config_path: str | None) -> tuple[dict, list[str]]:
+    """Load config from the right directory and resolve its exclude-path list.
+
+    The missing-grammar pre-scan needs the exclude list so an excluded
+    ``generated/**`` directory full of ``.ts`` files doesn't trip the
+    silent-failure guard or spuriously warn. Calling this *before* the
+    pre-scan keeps the guard semantics aligned with what would actually
+    be linted.
+    """
+    config = load_config(_config_dir(Path(config_path) if config_path else None, target))
+    return config, SafetyEngine._resolve_exclude_paths(config)
+
+
 def _run_check(args: argparse.Namespace) -> int:
     """Execute directory/file scan mode."""
     if getattr(args, "check_skill_freshness", False):
@@ -1035,14 +1111,19 @@ def _run_check(args: argparse.Namespace) -> int:
     target = Path(args.target)
     output_format: str = getattr(args, "output_format", "pretty")
 
+    config, exclude_paths = _load_config_and_excludes(target, config_path)
+
     # Compute the unavailable-extension set in every output mode so the
     # silent-failure guard fires for JSON / SARIF runs too. Stderr
     # warnings are pretty-mode only — JSON / SARIF consumers expect a
     # quiet stderr alongside the parseable stdout document.
-    unavailable_found = _emit_missing_grammar_warnings(target, silent=(output_format != "pretty"))
+    unavailable_found = _emit_missing_grammar_warnings(
+        target,
+        silent=(output_format != "pretty"),
+        exclude_paths=exclude_paths,
+    )
 
     changed_files, files, no_targets, considered_modified = _resolve_check_targets(args, target, output_format)
-    config = load_config(_config_dir(Path(config_path) if config_path else None, target))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
 
     if no_targets:
