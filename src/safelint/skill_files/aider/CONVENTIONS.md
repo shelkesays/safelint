@@ -71,7 +71,8 @@ safelint check <target> --format json [--all-files]
 ```
 
 Notes:
-- Exit 0 means no blocking violations; exit 1 means at least one. **Either way the JSON document is on stdout** — keep parsing it.
+- **Exit 0** = no blocking violations; **exit 1** = at least one blocking violation — the JSON document is on stdout in both cases, keep parsing it.
+- **Exit 2** = setup error: safelint linted zero files because every candidate's grammar isn't installed (silent-failure guard). The stderr will name the extra to install (e.g. `add 'safelint[typescript]' to additional_dependencies …` under pre-commit, or `install with: pip install 'safelint[typescript]'` direct). The JSON on stdout will look clean (zero violations) — **do not report this as "lint clean"**; surface the stderr install hint to the user.
 - Stderr may contain config warnings (typo guards, oversize-skip notes). Surface those to the user only if non-empty.
 - If `safelint` itself crashes (bug), say so and include the stderr verbatim.
 
