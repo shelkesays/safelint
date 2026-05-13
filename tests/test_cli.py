@@ -289,6 +289,56 @@ def test_scan_for_unavailable_extensions_handles_nonexistent_target(tmp_path: Pa
     assert _scan_for_unavailable_extensions(missing, {".ts": "hint"}) == set()
 
 
+def test_scan_for_unavailable_extensions_honours_user_exclude_paths(tmp_path: Path) -> None:
+    """Files in user-excluded subtrees don't show up in the unavailable-extension set.
+
+    Regression for the bug where ``safelint check src/`` against a config
+    that excludes ``generated/**`` would still pick up ``.ts`` files in
+    ``src/generated/`` and either trip the silent-failure guard or
+    spuriously warn. The pre-scan now mirrors the engine's
+    ``_is_excluded`` / ``_is_excluded_dir`` logic.
+    """
+    generated = tmp_path / "generated"
+    generated.mkdir()
+    (generated / "auto.ts").write_text("x = 1;\n", encoding="utf-8")
+    (tmp_path / "main.py").write_text("x = 1\n", encoding="utf-8")
+    # User has excluded the generated/ subtree via config.
+    found = _scan_for_unavailable_extensions(
+        tmp_path,
+        {".ts": "hint-ts"},
+        exclude_paths=[f"{tmp_path.as_posix()}/generated/**"],
+    )
+    assert found == set(), "excluded generated/ should not contribute .ts to the unavailable set"
+
+
+def test_scan_for_unavailable_extensions_excludes_match_single_file_target(tmp_path: Path) -> None:
+    """When the target IS a single file and it matches an exclude pattern, the scan returns empty."""
+    excluded = tmp_path / "generated.ts"
+    excluded.write_text("x = 1;\n", encoding="utf-8")
+    found = _scan_for_unavailable_extensions(
+        excluded,
+        {".ts": "hint-ts"},
+        exclude_paths=[excluded.as_posix()],
+    )
+    assert found == set()
+
+
+def test_scan_for_unavailable_extensions_excludes_dont_block_unrelated_files(tmp_path: Path) -> None:
+    """An exclude pattern aimed at one subtree doesn't suppress unavailable files in *another* subtree."""
+    excluded_dir = tmp_path / "generated"
+    excluded_dir.mkdir()
+    (excluded_dir / "auto.ts").write_text("x = 1;\n", encoding="utf-8")
+    kept_dir = tmp_path / "ui"
+    kept_dir.mkdir()
+    (kept_dir / "widget.ts").write_text("x = 1;\n", encoding="utf-8")
+    found = _scan_for_unavailable_extensions(
+        tmp_path,
+        {".ts": "hint-ts"},
+        exclude_paths=[f"{tmp_path.as_posix()}/generated/**"],
+    )
+    assert found == {".ts"}, "non-excluded .ts files should still surface"
+
+
 def test_emit_missing_grammar_warnings_silent_when_no_unavailable_extensions(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
     """When every grammar is installed, the helper is a no-op (no stderr noise)."""
     mocker.patch("safelint.cli.unavailable_extensions", return_value={})
