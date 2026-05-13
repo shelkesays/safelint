@@ -8,6 +8,10 @@ SafeLint analyses JavaScript source for the Holzmann "Power of Ten" safety rules
 
 ## Quick start
 
+!!! warning "v2.0.0rc1 (pre-release) — pin or pass `--pre`"
+
+    Until v2.0.0 GA, an unpinned `pip install 'safelint[javascript]'` resolves to the latest 1.x release, which doesn't define this extra. For the RC, pin explicitly: `pip install 'safelint[javascript]==2.0.0rc1'` (or pass `--pre`).
+
 ```bash
 pip install 'safelint[javascript]'    # the tool itself runs on Python; the extra adds the JS grammar
 safelint check src/                   # lint a directory (git-modified files by default)

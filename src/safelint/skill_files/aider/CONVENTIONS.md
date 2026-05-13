@@ -10,7 +10,7 @@ read:
   - CONVENTIONS.md
 ```
 
-Then `aider` (with no flags) loads this file as part of its system context. Language-specific addendums live in the bundled package and can be located via `safelint skill path` (the addendums sit at `<that path>/languages/<lang>.md`). The JSON output schema lives in the safelint repo at `docs/JSON_SCHEMA.md` — it is *not* shipped inside the wheel.
+Then `aider` (with no flags) loads this file as part of its system context. Language-specific addendums live in the bundled package and can be located via `safelint skill path` (the addendums sit at `<that path>/languages/<lang>.md`). The JSON output schema lives in the safelint repo at `docs/json-schema.md` — it is *not* shipped inside the wheel.
 
 When the user asks for a "safelint check", "lint with safelint", "safety review", "Power-of-Ten review", or similar request for safelint's specific rule set, follow the steps below in order. For generic linting use the project's configured tools (ruff, eslint, etc.) instead — safelint is the safety-rule layer on top.
 
@@ -78,7 +78,7 @@ Notes:
 
 ## Step 5 — Parse the JSON
 
-The schema is documented in [`docs/JSON_SCHEMA.md`](https://github.com/shelkesays/safelint/blob/main/docs/JSON_SCHEMA.md) inside the safelint repo. It's stable since v1.5.0. The shape:
+The schema is documented in [`docs/json-schema.md`](https://github.com/shelkesays/safelint/blob/main/docs/json-schema.md) inside the safelint repo. It's stable since v1.5.0. The shape:
 
 ```json
 {

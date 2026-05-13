@@ -2,7 +2,7 @@
 
 These instructions tell Continue.dev how to run the `safelint` static-analysis CLI on this project and present its violations. safelint enforces Holzmann's "Power of Ten" safety rules adapted from C/C++ aerospace conventions to modern languages — function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and similar. The same rule set applies across every language safelint supports; only the parser and language-specific node types differ.
 
-This file is a sibling to the Anthropic Claude Code skill (`SKILL.md`), the Cursor project rule (`cursor/safelint.mdc`), the GitHub Copilot instructions (`copilot/copilot-instructions.md`), the Gemini instructions (`gemini/GEMINI.md`), the Windsurf rules (`windsurf/safelint-rules.md`), and the codex instructions (`codex/instructions.md`) that ship in the same package — every supported AI client reads the same workflow so behaviour stays consistent. Continue.dev reads `.continue/rules/safelint.md` (project) or `~/.continue/rules/safelint.md` (user-global) and auto-loads each rule for the active workspace. Language-specific addendums live in the bundled package and can be located via `safelint skill path` (the addendums sit at `<that path>/languages/<lang>.md`). The JSON output schema lives in the safelint repo at `docs/JSON_SCHEMA.md` — it is *not* shipped inside the wheel.
+This file is a sibling to the Anthropic Claude Code skill (`SKILL.md`), the Cursor project rule (`cursor/safelint.mdc`), the GitHub Copilot instructions (`copilot/copilot-instructions.md`), the Gemini instructions (`gemini/GEMINI.md`), the Windsurf rules (`windsurf/safelint-rules.md`), and the codex instructions (`codex/instructions.md`) that ship in the same package — every supported AI client reads the same workflow so behaviour stays consistent. Continue.dev reads `.continue/rules/safelint.md` (project) or `~/.continue/rules/safelint.md` (user-global) and auto-loads each rule for the active workspace. Language-specific addendums live in the bundled package and can be located via `safelint skill path` (the addendums sit at `<that path>/languages/<lang>.md`). The JSON output schema lives in the safelint repo at `docs/json-schema.md` — it is *not* shipped inside the wheel.
 
 When the user asks for a "safelint check", "lint with safelint", "safety review", "Power-of-Ten review", or similar request for safelint's specific rule set, follow the steps below in order. For generic linting use the project's configured tools (ruff, eslint, etc.) instead — safelint is the safety-rule layer on top.
 
@@ -70,7 +70,7 @@ Notes:
 
 ## Step 5 — Parse the JSON
 
-The schema is documented in [`docs/JSON_SCHEMA.md`](https://github.com/shelkesays/safelint/blob/main/docs/JSON_SCHEMA.md) inside the safelint repo. It's stable since v1.5.0. The shape:
+The schema is documented in [`docs/json-schema.md`](https://github.com/shelkesays/safelint/blob/main/docs/json-schema.md) inside the safelint repo. It's stable since v1.5.0. The shape:
 
 ```json
 {

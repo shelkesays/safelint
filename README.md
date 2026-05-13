@@ -77,6 +77,8 @@ SafeLint also ships several rules that go beyond Holzmann's original ten — mod
 
 SafeLint ships **every** per-language grammar as an opt-in extra. The base install includes only the engine — no grammars — so a Python-only project doesn't pay for JS/TS grammars, a Go/JS project doesn't pay for the Python grammar, and so on. Pick the extras that match the languages you actually lint:
 
+> **v2.0.0rc1 (pre-release):** Until v2.0.0 GA, pin the version explicitly — e.g. `pip install 'safelint[python]==2.0.0rc1'` — or pass `--pre` to any of the commands below. An unpinned `pip install 'safelint[...]'` will resolve to the latest 1.x release, which doesn't define these per-language extras and so wouldn't install any grammar at all.
+
 ```bash
 pip install 'safelint[python]'         # adds .py, .pyw
 pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs
@@ -186,7 +188,7 @@ repos:
 
 ### One hook, every language
 
-The same `id: safelint` handles Python, JavaScript, and TypeScript — there's no `safelint-python` / `safelint-js` / `safelint-ts` split. The published hook spec sets `types_or: [python, javascript, ts, tsx]` so pre-commit automatically routes the right files to safelint; the engine then dispatches each file to its language-specific rule implementations based on extension. **Every flag (`--fail-on`, `--mode`, `--ignore`, `--format`, `--statistics`) and every config option behaves identically across languages.** The only per-project lever is the `additional_dependencies` extra — that's what tells pre-commit which tree-sitter grammar(s) to install into the hook's isolated environment.
+The same `id: safelint` handles Python, JavaScript, and TypeScript — there's no `safelint-python` / `safelint-js` / `safelint-ts` split. The published hook spec sets `types_or: [python, javascript, ts, tsx]` so pre-commit automatically routes the right files to safelint; the engine then dispatches each file to its language-specific rule implementations based on extension. **AssemblyScript `.as` files are not matched by that default `types_or` list** — pre-commit's `identify` library has no `as` filetype tag, so AS users must override both `types_or` and `files` in their `.pre-commit-config.yaml` (e.g. `types: [text]`, `types_or: []`, `files: \.as$`) to route `.as` files to the hook. **Every flag (`--fail-on`, `--mode`, `--ignore`, `--format`, `--statistics`) and every config option behaves identically across languages.** The only per-project lever is the `additional_dependencies` extra — that's what tells pre-commit which tree-sitter grammar(s) to install into the hook's isolated environment.
 
 ### What happens if you forget the extra
 

@@ -18,6 +18,10 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 
 ## Quick start
 
+!!! warning "v2.0.0rc1 (pre-release) — pin the version or pass `--pre`"
+
+    Until v2.0.0 GA, an unpinned `pip install 'safelint[<lang>]'` resolves to the latest 1.x release, which **doesn't define these per-language extras** and so wouldn't install any grammar. For the RC, pin explicitly: `pip install 'safelint[python]==2.0.0rc1'` (or pass `--pre` to any command below).
+
 ```bash
 pip install 'safelint[python]'         # adds .py, .pyw
 pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs

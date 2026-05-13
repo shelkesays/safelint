@@ -10,6 +10,10 @@ SafeLint analyses TypeScript source for the Holzmann "Power of Ten" safety rules
 
 ## Quick start
 
+!!! warning "v2.0.0rc1 (pre-release) — pin or pass `--pre`"
+
+    Until v2.0.0 GA, an unpinned `pip install 'safelint[typescript]'` resolves to the latest 1.x release, which doesn't define this extra and won't install the TS grammar. For the RC, pin explicitly: `pip install 'safelint[typescript]==2.0.0rc1'` (or pass `--pre`).
+
 ```bash
 pip install 'safelint[typescript]'     # the tool runs on Python; the [typescript] extra adds the TS grammar (and bundles JS too)
 safelint check src/                    # lint a directory (git-modified files by default)
@@ -111,6 +115,16 @@ repos:
         # The published hook's ``types_or`` already includes python,
         # javascript, ts, and tsx. Optional: scope to a directory.
         files: ^src/
+```
+
+**AssemblyScript (`.as`) users — additional override required.** Pre-commit's `identify` library has no `as` filetype tag, so the default `types_or: [python, javascript, ts, tsx]` won't match `.as` files. Override the tag list and constrain `files` to route `.as` to the hook:
+
+```yaml
+      - id: safelint
+        additional_dependencies: ['safelint[typescript]']
+        types: [text]                                 # drop the default [file] check
+        types_or: []                                  # replace the manifest's tag list
+        files: ^src/.*\.(ts|tsx|as)$                  # explicit extension allow-list
 ```
 
 ## TypeScript-specific config keys
