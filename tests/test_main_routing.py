@@ -410,6 +410,45 @@ def test_is_under_target_returns_false_for_unrelated_path(tmp_path: Path) -> Non
     assert cli._is_under_target(a, b) is False
 
 
+def test_filter_modified_under_target_excludes_paths_outside_target(tmp_path: Path) -> None:
+    """``_filter_modified_under_target`` restricts the raw set to paths under *target*.
+
+    Regression for the bug where ``_handle_no_targets`` received the
+    *repo-wide* raw set: a ``.ts`` file modified outside the requested
+    target (e.g. ``safelint check src/python/`` while the only
+    modification was to ``ui/widget.ts``) would trip the silent-failure
+    guard even though nothing under the requested target was actually
+    skipped. The new helper filters the git output to *target* before
+    the guard consults it, so the guard fires only for files the
+    invocation would have considered.
+    """
+    (tmp_path / "src" / "python").mkdir(parents=True)
+    (tmp_path / "ui").mkdir()
+    in_target = tmp_path / "src" / "python" / "app.py"
+    off_target = tmp_path / "ui" / "widget.ts"
+    in_target.write_text("", encoding="utf-8")
+    off_target.write_text("", encoding="utf-8")
+
+    raw = {"src/python/app.py", "ui/widget.ts"}
+    target_abs = (tmp_path / "src" / "python").resolve()
+    result = cli._filter_modified_under_target(raw, tmp_path, target_abs)
+
+    assert result == {"src/python/app.py"}, f"Expected only files under target; got {result}"
+
+
+def test_filter_modified_under_target_keeps_only_extension_in_target_when_off_target_is_unavailable(tmp_path: Path) -> None:
+    """An off-target ``.ts`` (with TS grammar missing) must NOT appear in the considered set when running against a Python-only subdir."""
+    (tmp_path / "src" / "python").mkdir(parents=True)
+    (tmp_path / "ui").mkdir()
+    (tmp_path / "ui" / "widget.ts").write_text("", encoding="utf-8")
+
+    raw = {"ui/widget.ts"}
+    target_abs = (tmp_path / "src" / "python").resolve()
+    result = cli._filter_modified_under_target(raw, tmp_path, target_abs)
+
+    assert result == set(), "off-target .ts must not leak into the considered-modified set"
+
+
 def test_normalize_path_falls_back_to_absolute_for_paths_outside_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """``_normalize_path`` returns the absolute string when the path is
     outside the cwd (the ``relative_to`` fallback path)."""

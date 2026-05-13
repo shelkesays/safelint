@@ -513,6 +513,26 @@ def _filter_supported_files(raw: set[str], git_root: Path, target_abs: Path) -> 
     return sorted(results)
 
 
+def _filter_modified_under_target(raw: set[str], git_root: Path, target_abs: Path) -> set[str]:
+    """Return git-relative paths in *raw* whose resolved location is under *target_abs*.
+
+    Matches the target-restriction logic of :func:`_filter_supported_files`
+    but does *not* filter by supported extension — the silent-failure
+    guard needs to see ``.ts`` files modified under the requested target
+    even when the TS grammar isn't installed (those wouldn't reach
+    ``_filter_supported_files`` because its extension filter drops them).
+    Returns the git-relative form (same as *raw*) so downstream callers
+    that key off ``Path(...).suffix`` work the same as they did against
+    the un-filtered set.
+    """
+    out: set[str] = set()
+    for rel in raw:
+        abs_path = (git_root / rel).resolve()
+        if _is_under_target(abs_path, target_abs):
+            out.add(rel)
+    return out
+
+
 def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
     """Run git diff + ls-files and return the union of all changed paths, or None on error."""
     diff_proc = subprocess.run(  # noqa: S603
@@ -545,13 +565,13 @@ def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
 
 
 def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str], set[str]] | None:
-    """Return changed supported-source-file lists + the raw git-modified set, or ``None`` on git failure.
+    """Return changed supported-source-file lists + the considered-modified set, or ``None`` on git failure.
 
     Filtering is registry-driven via :func:`safelint.languages.supported_extensions`,
     so any language registered in ``safelint.languages`` is included. Includes
     staged, unstaged, and untracked files.
 
-    Returns ``(all_changed, in_target, raw_modified)`` where:
+    Returns ``(all_changed, in_target, considered_modified)`` where:
 
     * *all_changed* — every changed supported-source file across the whole repo.
       Paths are relative to cwd when possible, otherwise absolute.
@@ -559,11 +579,13 @@ def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str
       so cross-file rules (e.g. ``test_coupling``) see the full diff context.
     * *in_target* — the subset of those files that fall under *target*.
       Same path format as *all_changed*. These are the files actually linted.
-    * *raw_modified* — the *un-filtered* set of paths git reported as
-      modified (staged + unstaged + untracked, relative to ``git_root``).
-      Lets callers detect "user modified files but they were all dropped
-      by the supported-extensions filter" — the silent-pass scenario the
-      missing-grammar guard needs to catch when ``in_target`` is empty.
+    * *considered_modified* — paths git reported as modified under
+      *target* (git-relative, **no** supported-extension filter). Lets
+      callers detect "user modified files under target but all dropped
+      by the supported-extensions filter" — the silent-pass case the
+      missing-grammar guard catches when ``in_target`` is empty.
+      Restricted to *target*: a ``.ts`` modified elsewhere must NOT
+      trip the guard when the user ran ``safelint check src/python/``.
 
     Returns ``None`` when git is unavailable, the path is outside a git
     repository, or any git command fails — callers should fall back to
@@ -592,7 +614,11 @@ def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str
         raw = _get_raw_changed_files(git_bin, git_root)
         if raw is None:
             return None
-        return _collect_all_supported_files(raw, git_root), _filter_supported_files(raw, git_root, target_abs), raw
+        return (
+            _collect_all_supported_files(raw, git_root),
+            _filter_supported_files(raw, git_root, target_abs),
+            _filter_modified_under_target(raw, git_root, target_abs),
+        )
 
     # Any git-side failure (no git, not a repo, timeout) means we fall back
     # to scanning all files — that's a documented behaviour, not an error.
@@ -608,7 +634,7 @@ def _config_dir(config_path: Path | None, target: Path) -> Path:
 
 
 def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format: str) -> tuple[list[str] | None, list[str] | None, bool, set[str]]:
-    """Resolve the (changed_files, files, no_targets, raw_modified) tuple for ``check`` mode.
+    """Resolve the (changed_files, files, no_targets, considered_modified) tuple for ``check`` mode.
 
     Returns a 4-tuple:
 
@@ -618,13 +644,17 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
       that's been git-modified), or None to fall back to directory discovery.
     * ``no_targets`` — True when git reported no modified files under
       *target* and the caller should short-circuit with an empty result.
-    * ``raw_modified`` — the un-filtered set of paths git reported as
-      modified (relative to ``git_root``). Empty set when ``--all-files``
-      / git unavailable / git reported nothing. Callers use this to
-      detect the silent-pass case where the user modified files but
-      every one was filtered out by missing-grammar extensions —
-      ``no_targets`` would be True in that case, but the appropriate
-      exit code is 2 (configuration error), not 0.
+    * ``considered_modified`` — the set of paths git reported as modified
+      that fall under *target*, with the supported-extension filter NOT
+      applied (paths are relative to ``git_root``). Empty when ``--all-files``
+      / git unavailable / git reported nothing under target. Callers use
+      this to detect the silent-pass case where the user modified files
+      under target but every one was dropped by the missing-grammar
+      filter — ``no_targets`` would be True in that case, but the
+      appropriate exit code is 2 (configuration error), not 0.
+      Restricting to *target* matters: a ``.ts`` file modified elsewhere
+      in the repo must NOT trip the guard when the user ran
+      ``safelint check src/python/``.
     """
     if getattr(args, "all_files", False) or not target.is_dir():
         return None, None, False, set()
@@ -643,8 +673,8 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
             output_format=output_format,
         )
         return None, None, True, modified[2]
-    changed_files, files, raw = modified
-    return changed_files, files, False, raw
+    changed_files, files, considered = modified
+    return changed_files, files, False, considered
 
 
 # Default dir-name exclusions for the missing-grammar walk. Kept narrow —
@@ -814,18 +844,43 @@ def _check_exit_code(
     Three cases:
 
     * **Silent-failure** — file discovery saw unavailable-grammar files
-      AND nothing got linted. The run is reporting "clean" only because
-      no files were processed; surface this as exit 2 (configuration
-      error) so pre-commit / CI shows the hook as failed.
+      AND no file actually got linted (every entry in *results* either
+      doesn't exist or was an empty placeholder for a file whose grammar
+      isn't installed). The run is reporting "clean" only because no
+      files were processed; surface this as exit 2 (configuration error)
+      so pre-commit / CI shows the hook as failed. The "no file got
+      linted" check must look past raw list length because ``check_path``
+      on a single ``.ts`` target with the TS grammar missing returns
+      ``[LintResult(path='foo.ts')]`` — a 1-element list whose lone
+      entry was actually skipped at language-lookup time. Treat any
+      result whose path's suffix is in *unavailable_found* as skipped.
     * **Blocking violations** — exit 1.
     * **Clean / advisory only** — exit 0.
     """
-    if not results and unavailable_found:
+    if unavailable_found and not _any_result_was_linted(results, unavailable_found):
         action = _install_action_for_extensions(unavailable_found)
         suffix = f" — {action}" if action else ""
         _diagnostics.print_error(f"no files linted — every supported file was skipped because its grammar package isn't installed{suffix}")
         return 2
     return 1 if all_blocking else 0
+
+
+def _any_result_was_linted(results: list, unavailable_found: set[str]) -> bool:
+    """Return True if any ``LintResult`` in *results* corresponds to a file safelint actually linted.
+
+    An entry is considered "actually linted" when its path's suffix is
+    NOT in *unavailable_found*. Mirrors :func:`_matching_suffixes`'s
+    ``Path.suffix``-style semantics (``rfind(".") > 0`` — leading-dot
+    basenames like ``.gitignore`` have no suffix). Short-circuits over
+    the list so the typical clean run is O(1).
+    """
+    for r in results:
+        name = Path(r.path).name
+        idx = name.rfind(".")
+        suffix = name[idx:] if idx > 0 else ""
+        if suffix not in unavailable_found:
+            return True
+    return False
 
 
 def _guard_hook_silent_failure(passed: list[str], filtered: list[str], unavailable_in_passed: set[str]) -> int:
@@ -924,24 +979,27 @@ def _emit_skill_install_grammar_hint(target: Path) -> None:
     _diagnostics.print_warning(f"Detected source files for {len(needed_extras)} language{plural} ({extras_list}) whose tree-sitter grammar isn't installed. Run: {install}")
 
 
-def _handle_no_targets(output_format: str, fail_on: str, raw_modified: set[str]) -> int:
+def _handle_no_targets(output_format: str, fail_on: str, considered_modified: set[str]) -> int:
     """Resolve the exit code for the ``_resolve_check_targets`` no-targets short-circuit.
 
     Two distinct cases land here and the exit code differs:
 
-    * **Genuine clean run** — user truly hasn't modified anything
-      (``raw_modified`` is empty). Print the empty results document
-      and exit 0. Machine output modes still need a parseable empty
-      document on stdout so downstream CI uploaders / SARIF consumers
-      don't choke on empty input.
-    * **Silent-pass** — user modified files but every one was dropped
-      by the supported-extensions filter because its grammar isn't
-      installed. ``raw_modified`` intersects ``unavailable_extensions()``.
-      Print the empty document AND a stderr error AND exit 2 so
-      pre-commit / CI shows the run as Failed rather than silently
-      Passed.
+    * **Genuine clean run / nothing under target** — the current
+      invocation has no modified files to consider
+      (``considered_modified`` is empty — either the user truly hasn't
+      modified anything, or the only modified files live outside the
+      requested target). Print the empty results document and exit 0.
+      Machine output modes still need a parseable empty document on
+      stdout so downstream CI uploaders / SARIF consumers don't choke
+      on empty input.
+    * **Silent-pass** — files under target were modified, but every one
+      was dropped by the supported-extensions filter because its grammar
+      isn't installed. ``considered_modified`` intersects
+      ``unavailable_extensions()``. Print the empty document AND a stderr
+      error AND exit 2 so pre-commit / CI shows the run as Failed rather
+      than silently Passed.
     """
-    unavailable_in_modified = _matching_suffixes(list(raw_modified), unavailable_extensions())
+    unavailable_in_modified = _matching_suffixes(list(considered_modified), unavailable_extensions())
     _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, options=_PrintOptions(silent_on_clean=True))
     if unavailable_in_modified:
         action = _install_action_for_extensions(unavailable_in_modified)
@@ -983,12 +1041,12 @@ def _run_check(args: argparse.Namespace) -> int:
     # quiet stderr alongside the parseable stdout document.
     unavailable_found = _emit_missing_grammar_warnings(target, silent=(output_format != "pretty"))
 
-    changed_files, files, no_targets, raw_modified = _resolve_check_targets(args, target, output_format)
+    changed_files, files, no_targets, considered_modified = _resolve_check_targets(args, target, output_format)
     config = load_config(_config_dir(Path(config_path) if config_path else None, target))
     fail_on, fail_threshold = _resolve_fail_on(args, config)
 
     if no_targets:
-        return _handle_no_targets(output_format, fail_on, raw_modified)
+        return _handle_no_targets(output_format, fail_on, considered_modified)
 
     results = run(
         target,
