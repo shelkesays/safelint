@@ -526,9 +526,11 @@ def test_run_check_json_emits_empty_doc_when_no_modified_files(
     empty stream)."""
     import json  # noqa: PLC0415
 
-    # 3-tuple per v2.0.0+ signature: (all_changed, in_target, raw_modified).
-    # Empty raw_modified means "user genuinely modified nothing" — distinct
-    # from "modified but all filtered out" which is the silent-pass case.
+    # 3-tuple per v2.0.0+ signature: (all_changed, in_target, considered_modified).
+    # ``considered_modified`` is the set of git-modified paths under target
+    # (no supported-extension filter applied); empty means "user genuinely
+    # modified nothing under target" — distinct from "modified but all
+    # filtered out by missing-grammar extensions" which is the silent-pass case.
     mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=([], [], set()))
     args = argparse.Namespace(
         target=tmp_path,
@@ -622,13 +624,15 @@ def test_run_check_returns_2_when_only_modified_files_have_unavailable_grammar(t
     consulting the unavailable-extension state — exactly the worst-
     case CI scenario.
 
-    Fix plumbs the *raw* (un-filtered) git-modified set through, so
-    the no-targets path can distinguish "user modified nothing" from
-    "user modified .ts files but TS grammar isn't installed".
+    Fix plumbs the ``considered_modified`` set (git-modified paths under
+    target, **no** supported-extension filter applied) through, so the
+    no-targets path can distinguish "user modified nothing under target"
+    from "user modified .ts files under target but TS grammar isn't installed".
     """
-    # Simulate: user modified app.ts. TS grammar not installed.
-    # Raw set has the modification; filtered (supported-extensions)
-    # set is empty because .ts isn't in supported_extensions().
+    # Simulate: user modified app.ts under target. TS grammar not installed.
+    # ``considered_modified`` carries the .ts entry (extension filter is NOT
+    # applied to this set); ``in_target`` (the supported-only list) is empty
+    # because .ts isn't in supported_extensions() without the [typescript] extra.
     mocker.patch.object(
         cli,
         "_get_git_modified_supported_files",
@@ -651,15 +655,15 @@ def test_run_check_returns_2_when_only_modified_files_have_unavailable_grammar(t
         output_format="pretty",
     )
     rc = cli._run_check(args)
-    assert rc == 2, f"Expected exit 2 (silent-pass guard) when raw git output has unavailable-grammar files but post-filter is empty; got {rc}"
+    assert rc == 2, f"Expected exit 2 (silent-pass guard) when considered_modified has unavailable-grammar files but the supported-extension list is empty; got {rc}"
 
 
 def test_run_check_returns_0_when_genuinely_no_modifications(tmp_path: Path, mocker: MockerFixture) -> None:
-    """Negative control: empty raw set (user truly modified nothing) → exit 0, no false silent-pass alarm."""
+    """Negative control: empty ``considered_modified`` (user truly modified nothing under target) → exit 0, no false silent-pass alarm."""
     mocker.patch.object(
         cli,
         "_get_git_modified_supported_files",
-        return_value=([], [], set()),  # empty raw — genuine clean
+        return_value=([], [], set()),  # empty considered set — genuine clean
     )
     mocker.patch.object(
         cli,
@@ -678,4 +682,4 @@ def test_run_check_returns_0_when_genuinely_no_modifications(tmp_path: Path, moc
         output_format="pretty",
     )
     rc = cli._run_check(args)
-    assert rc == 0, f"Expected exit 0 (genuine clean run) when raw git set is empty; got {rc}"
+    assert rc == 0, f"Expected exit 0 (genuine clean run) when considered_modified is empty; got {rc}"
