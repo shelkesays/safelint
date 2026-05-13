@@ -42,21 +42,16 @@ _UNAVAILABLE_EXTRA_NAMES: dict[str, str] = {}
 
 
 # Python — only register if ``tree-sitter-python`` is installed (i.e.
-# the ``[python]`` or ``[all]`` extra was selected).
+# the ``[python]`` or ``[all]`` extra was selected). Otherwise, record
+# both the install hint and the extra name so the CLI can suggest
+# single- or multi-language install commands. Same shape as the JS /
+# TS blocks below — keep them parallel so future drift is grep-able.
 if _python_mod._GRAMMAR_AVAILABLE:
     for _ext in PYTHON.file_extensions:
         _REGISTRY[_ext] = PYTHON
 else:
     for _ext in PYTHON.file_extensions:
         _UNAVAILABLE_EXTENSIONS[_ext] = _python_mod.GRAMMAR_INSTALL_HINT
-
-# Python — only register if ``tree-sitter-python`` is installed (i.e.
-# the ``[python]`` or ``[all]`` extra was selected). The first ``if``
-# block above already wired this up; we additionally populate the
-# extra-name map here so the CLI can compose multi-language install
-# commands like ``pip install 'safelint[python,typescript]'``.
-if not _python_mod._GRAMMAR_AVAILABLE:
-    for _ext in PYTHON.file_extensions:
         _UNAVAILABLE_EXTRA_NAMES[_ext] = _python_mod.EXTRA_NAME
 
 # JavaScript — only register if ``tree-sitter-javascript`` is installed.
