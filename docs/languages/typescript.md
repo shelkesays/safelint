@@ -117,13 +117,12 @@ repos:
         files: ^src/
 ```
 
-**AssemblyScript (`.as`) users — additional override required.** Pre-commit's `identify` library has no `as` filetype tag, so the default `types_or: [python, javascript, ts, tsx]` won't match `.as` files. Override the tag list and constrain `files` to route `.as` to the hook:
+**AssemblyScript (`.as`) users — additional override required.** Pre-commit's `identify` library has no `as` filetype tag, so the default `types_or: [python, javascript, ts, tsx]` won't match `.as` files. Override `types_or` with a permissive tag that `.as` files *actually* carry (`text` or `file`) and use `files` to scope the match. `types_or: []` does **not** work — pre-commit treats an empty tag list as "no tag matches" rather than "filter disabled", so the hook never fires.
 
 ```yaml
       - id: safelint
         additional_dependencies: ['safelint[typescript]']
-        types: [text]                                 # drop the default [file] check
-        types_or: []                                  # replace the manifest's tag list
+        types_or: [text]                              # permissive tag .as files carry; files scopes the match
         files: ^src/.*\.(ts|tsx|as)$                  # explicit extension allow-list
 ```
 
