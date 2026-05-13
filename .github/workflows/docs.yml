@@ -19,6 +19,11 @@ on:
       - "uv.lock"
       # Build hook lives here — changes to it should redeploy docs:
       - "scripts/**"
+      # ``scripts/prepare_docs.py`` imports ``safelint.rules.ALL_RULES``
+      # to regenerate the rules-at-a-glance snippet, so a rule add /
+      # rename / removal needs to redeploy docs even if no other
+      # listed path changed.
+      - "src/safelint/rules/**"
       # Repo-root files that get copied into docs/ at build time:
       - "README.md"
       - "CHANGELOG.md"
