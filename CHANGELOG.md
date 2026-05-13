@@ -19,6 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Migration from v1.13.0
 
+> **While v2.0.0 is in RC, the "New command" column needs a pin or `--pre`.** Either append `==2.0.0rc1` (e.g. `pip install 'safelint[python]==2.0.0rc1'`) or pass `--pre` to any of the commands below. An unpinned `pip install 'safelint[python]'` resolves to the latest 1.x release on PyPI — which doesn't define these per-language extras and would install only the engine with no grammar. Drop the pin once v2.0.0 GA ships.
+
 | Your setup | Old command (v1.13.0) | New command (v2.0.0) |
 |---|---|---|
 | Python-only project | `pip install safelint` | `pip install 'safelint[python]'` |
