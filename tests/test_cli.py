@@ -425,6 +425,28 @@ def test_check_exit_code_returns_2_when_all_files_skipped_for_missing_grammar() 
     assert _check_exit_code(results=[], unavailable_found={".py"}, all_blocking=[]) == 2
 
 
+def test_check_exit_code_returns_2_for_single_file_target_with_unavailable_grammar() -> None:
+    """``safelint check foo.ts`` (TS grammar missing) must exit 2, not 0.
+
+    Regression for the bug where ``check_path`` returns ``[LintResult(path="foo.ts")]``
+    — a 1-element list whose lone entry was an empty placeholder produced
+    at language-lookup time. The old guard only checked ``not results``,
+    so the 1-element list bypassed it and the run exited 0 with a
+    misleading "clean" verdict on a file that was never actually linted.
+    The new guard treats any result whose suffix is in *unavailable_found*
+    as skipped.
+    """
+    skipped_result = LintResult(path="path/to/foo.ts")
+    assert _check_exit_code(results=[skipped_result], unavailable_found={".ts"}, all_blocking=[]) == 2
+
+
+def test_check_exit_code_returns_0_when_at_least_one_result_was_actually_linted() -> None:
+    """Mixed-extension run with one lintable file → exit 0 even when other paths had missing grammars."""
+    skipped = LintResult(path="ui/widget.ts")
+    linted = LintResult(path="api/server.py")  # .py is supported
+    assert _check_exit_code(results=[skipped, linted], unavailable_found={".ts"}, all_blocking=[]) == 0
+
+
 def test_check_exit_code_returns_1_when_blocking_violations_present() -> None:
     """Normal failure: at least one blocking violation → exit 1."""
     fake_violation = object()  # type doesn't matter for the boolean test
