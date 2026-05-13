@@ -52,6 +52,12 @@ Issues = "https://github.com/shelkesays/safelint/issues"
 # Multiple extras compose: ``pip install 'safelint[python,javascript]'``
 # for a Python+JS monorepo, etc. As more languages land (Go, Rust, Java,
 # C, C++, PHP), each gets its own extra and is folded into ``[all]``.
+#
+# While ``version`` above is still ``2.0.0rc1``, pin the RC explicitly
+# (e.g. ``pip install 'safelint[python]==2.0.0rc1'``) or pass ``--pre``
+# — an unpinned ``pip install 'safelint[<lang>]'`` resolves to the latest
+# stable 1.x release on PyPI, which doesn't define these extras. Drop
+# the pin once v2.0.0 GA ships.
 python = [
     "tree-sitter-python>=0.23.0",
 ]
