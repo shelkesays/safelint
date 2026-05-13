@@ -75,7 +75,7 @@ Notes:
 
 ## Step 5 — Parse the JSON
 
-The schema is documented in [`docs/json-schema.md`](../../docs/json-schema.md). It's stable since v1.5.0. The shape:
+The schema is documented in [`docs/json-schema.md`](https://github.com/shelkesays/safelint/blob/main/docs/json-schema.md) inside the safelint repo. It's stable since v1.5.0. The shape:
 
 ```json
 {

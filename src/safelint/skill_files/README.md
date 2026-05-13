@@ -2,7 +2,7 @@
 
 A bundled skill / project-rule that lets twelve AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/` — currently Python, JavaScript, and TypeScript (mirroring safelint's `src/safelint/languages/` package layout).
 
-> **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](../../AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
+> **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](https://github.com/shelkesays/safelint/blob/main/AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
 
 Twelve clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
 
@@ -269,7 +269,7 @@ The skill never auto-fixes — every edit goes through a confirmation step.
 
 When safelint adds support for a new language, the skill needs a matching addendum. The workflow:
 
-1. **In safelint itself** — follow [`ADDING_A_LANGUAGE.md`](../../ADDING_A_LANGUAGE.md). Register the language in `src/safelint/languages/__init__.py`, add the parser factory, expose node-type constants.
+1. **In safelint itself** — follow [`ADDING_A_LANGUAGE.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_A_LANGUAGE.md). Register the language in `src/safelint/languages/__init__.py`, add the parser factory, expose node-type constants.
 2. **In this skill** — create `languages/<lang>.md` modelled on `languages/python.md`. Cover at minimum:
    - Install nuance specific to that ecosystem (if any).
    - File extensions safelint will pick up.
@@ -285,8 +285,8 @@ The skill is just Markdown. Edit `SKILL.md` to tune wording, swap the suggested 
 
 ## See also
 
-- **AI client integrations guide:** [`AI_CLIENTS.md`](../../AI_CLIENTS.md) — the comprehensive user doc (auto-detection, per-client setup, troubleshooting)
-- **Adding a new AI client:** [`ADDING_AN_AI_CLIENT.md`](../../ADDING_AN_AI_CLIENT.md) — contributor walkthrough for shipping a new client integration
-- The main safelint docs: [`README.md`](../../README.md), [`CONFIGURATION.md`](../../CONFIGURATION.md)
-- JSON output schema: [`docs/json-schema.md`](../../docs/json-schema.md)
-- Adding a new language to safelint: [`ADDING_A_LANGUAGE.md`](../../ADDING_A_LANGUAGE.md)
+- **AI client integrations guide:** [`AI_CLIENTS.md`](https://github.com/shelkesays/safelint/blob/main/AI_CLIENTS.md) — the comprehensive user doc (auto-detection, per-client setup, troubleshooting)
+- **Adding a new AI client:** [`ADDING_AN_AI_CLIENT.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_AN_AI_CLIENT.md) — contributor walkthrough for shipping a new client integration
+- The main safelint docs: [`README.md`](https://github.com/shelkesays/safelint/blob/main/README.md), [`CONFIGURATION.md`](https://github.com/shelkesays/safelint/blob/main/CONFIGURATION.md)
+- JSON output schema: [`docs/json-schema.md`](https://github.com/shelkesays/safelint/blob/main/docs/json-schema.md)
+- Adding a new language to safelint: [`ADDING_A_LANGUAGE.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_A_LANGUAGE.md)
