@@ -30,7 +30,7 @@ Once installed, ask the agent things like:
 
 ## Install
 
-> **v2.0.0rc1 (pre-release):** Until v2.0.0 GA, an unpinned `pip install 'safelint[<lang>]'` resolves to the latest 1.x release on PyPI, which **doesn't define these per-language extras** and would install only the engine with no grammar. Either pin explicitly (`pip install 'safelint[python]==2.0.0rc1'`) or pass `--pre` to any of the commands below. Drop the pin once v2.0.0 GA ships.
+> **v2.0.0rc2 (pre-release):** Until v2.0.0 GA, an unpinned `pip install 'safelint[<lang>]'` resolves to the latest 1.x release on PyPI, which **doesn't define these per-language extras** and would install only the engine with no grammar. Either pin explicitly (`pip install 'safelint[python]==2.0.0rc2'`) or pass `--pre` to any of the commands below. Drop the pin once v2.0.0 GA ships.
 
 ```bash
 # Pick the extra matching your project's language(s) — v2.0.0+ ships
@@ -238,7 +238,7 @@ The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint 
 
 ## Requirements
 
-- `safelint` 2.0.0rc1 or later on `PATH`. Notable history:
+- `safelint` 2.0.0rc2 or later on `PATH`. Notable history:
   - `safelint skill install` and the bundled skill files were added in **v1.6.0**.
   - `--client cursor` (Cursor support) and the auto-detection default for `--client` arrived in **v1.8.0**.
   - `safelint skill status` and `safelint check --check-skill-freshness` (drift detection between bundled and installed skills) arrived in **v1.9.0**.

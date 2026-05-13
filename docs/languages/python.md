@@ -8,9 +8,9 @@ SafeLint analyses Python source for the Holzmann "Power of Ten" safety rules —
 
 ## Quick start
 
-!!! warning "v2.0.0rc1 (pre-release) — pin or pass `--pre`"
+!!! warning "v2.0.0rc2 (pre-release) — pin or pass `--pre`"
 
-    Until v2.0.0 GA, an unpinned `pip install 'safelint[python]'` resolves to the latest 1.x release, which doesn't define this extra. For the RC, pin explicitly: `pip install 'safelint[python]==2.0.0rc1'` (or pass `--pre`).
+    Until v2.0.0 GA, an unpinned `pip install 'safelint[python]'` resolves to the latest 1.x release, which doesn't define this extra. For the RC, pin explicitly: `pip install 'safelint[python]==2.0.0rc2'` (or pass `--pre`).
 
 ```bash
 pip install 'safelint[python]'    # or: uv add 'safelint[python]'
@@ -106,7 +106,7 @@ pip install 'safelint[all]'                 # kitchen-sink
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.0.0rc1         # pin to a release (replace with the GA tag once v2.0.0 ships)
+    rev: v2.0.0rc2         # pin to a release (replace with the GA tag once v2.0.0 ships)
     hooks:
       - id: safelint
         # Every safelint hook needs an extra in v2.0.0+ — including Python-only projects.

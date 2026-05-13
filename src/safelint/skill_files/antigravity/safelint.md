@@ -14,7 +14,7 @@ If either check returns non-zero (or the shell reports "command not found" / "is
 
 - safelint is a Python package regardless of the language being linted, but **v2.0.0+ ships language grammars as opt-in extras** — the install command needs a `[<lang>]` suffix matching the project's language(s). Glance at file extensions in the project tree, then suggest:
 
-  > **v2.0.0rc1 (pre-release):** Until v2.0.0 GA, pin explicitly with `==2.0.0rc1` (e.g. `pip install 'safelint[python]==2.0.0rc1'`) or pass `--pre` to any command in the table below. Unpinned installs resolve to the latest 1.x release which doesn't define these per-language extras.
+  > **v2.0.0rc2 (pre-release):** Until v2.0.0 GA, pin explicitly with `==2.0.0rc2` (e.g. `pip install 'safelint[python]==2.0.0rc2'`) or pass `--pre` to any command in the table below. Unpinned installs resolve to the latest 1.x release which doesn't define these per-language extras.
 
   | Project contains | Install command |
   |---|---|

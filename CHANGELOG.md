@@ -7,6 +7,35 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0rc2] - 2026-05-13
+
+**Iteration on the v2.0.0 RC** — bug fixes and UX polish discovered during real-world testing of `2.0.0rc1`. No feature changes; same packaging story, same extras, same rule coverage. Install with `pip install 'safelint[<lang>]==2.0.0rc2'` (or pass `--pre`); pre-commit users update `rev: v2.0.0rc1` → `rev: v2.0.0rc2`.
+
+### Fixed
+
+- **Pre-commit silent-failure noise.** Hook mode emitted both a per-extension warning AND the silent-failure error per invocation, each carrying the same install hint. Pre-commit batches files across N invocations (one per ~120 KB of argv to stay under OS limits), so an `--all-files` run against a large repo with a missing grammar produced 2 × N near-identical lines of stderr. The error already carries the actionable install hint, so the preceding warning is pure duplication in the silent-failure case. `_dispatch_hook_mode` now detects the silent-failure case *before* emitting per-extension warnings — mixed runs (some files lint, others skipped) still get the warning as actionable context; all-skipped runs get only the error. Halves the noise per invocation. Users on still-noisy runs can additionally set `require_serial: true` on the hook to force pre-commit to a single invocation.
+- **`_emit_hook_grammar_warnings` now respects `--format`.** Hook mode unconditionally emitted per-extension stderr warnings even under `safelint --format json <files>`. Editor plugins / CI driving safelint in hook mode and parsing JSON now get clean stderr. Symmetric with the directory-walk variant's existing `silent` kwarg gating.
+- **Missing-grammar pre-scan now honours user `exclude_paths` / `extend_exclude_paths`.** Previously the pre-scan ran *before* config load, so an excluded `generated/**` directory full of `.ts` files would either spuriously warn or (worse) trip the silent-failure guard into exit 2 — for files safelint would never have linted anyway. Config is now loaded first and the resolved exclude list is threaded through `_emit_missing_grammar_warnings` / `_scan_for_unavailable_extensions`, mirroring the engine's `_is_excluded` / `_is_excluded_dir` semantics.
+- **`_filter_modified_under_target` no longer keeps deleted paths.** `git diff --name-only HEAD` reports deleted files; the helper was leaving them in `considered_modified`, so a setup like "deleted the only `.ts` file in `src/python/`, TS grammar unavailable" would trip exit 2 telling the user to install the TS grammar for a file they had just deleted. Mirrors the existence check `_filter_supported_files` already had.
+- **Single-file unsupported runs now correctly exit 2.** `safelint check foo.ts` with the TS grammar missing returned `[LintResult(path="foo.ts")]` — a 1-element list whose lone entry was an empty placeholder produced at language-lookup time. The silent-failure guard only fired when `not results`, so the truthy 1-element list bypassed it and the run exited 0 with a "clean" verdict on a file safelint never actually linted. The guard now treats any result whose path-suffix is in `unavailable_found` as skipped.
+- **`_handle_no_targets` no longer over-fires on off-target diffs.** The third tuple element of `_get_git_modified_supported_files` was the *repo-wide* raw git-modified set, so `safelint check src/python/` would exit 2 because a `.ts` file modified elsewhere in the repo had an unavailable grammar. Renamed to `considered_modified` and filtered to under-target via new `_filter_modified_under_target` helper.
+- **Dataflow string-list config typos now raise instead of silently matching per-character.** `sinks_typescript = "eval"` (note: bare string, not a list) was being coerced into `{'e', 'v', 'a', 'l'}` by `frozenset(...)` and the rule silently stopped matching `eval`. The three JS-family sites in `dataflow.py` (`sinks` / `sanitizers` / `sources`, `flagged_calls`, `nullable_methods`) now route through the established `resolve_lang_config_lookup` + `_validated_string_list` pattern that names the offending key in the `TypeError`.
+
+### Changed
+
+- **JSON schema docs path correction across skill files.** The 12 per-client AI-client skill files referenced `docs/JSON_SCHEMA.md`; the file was renamed to `docs/json-schema.md` for the mkdocs site. URLs were 404s on GitHub. Now consistent.
+- **`SKILL.md` / `skill_files/README.md` cross-doc links** flipped from `../../<doc>.md` (which resolved to `src/<doc>.md` — wrong by one parent) to absolute GitHub URLs. Works in both source view AND wheel-installed locations (`~/.claude/skills/safelint/`).
+- **CI gains a `safelint check src/ --all-files --fail-on=error` step** so a push that bypasses pre-commit can't merge with safelint violations. Matches the local pre-commit hook's args.
+- **docs.yml** triggers on `src/safelint/rules/**` so rule add/rename/remove now redeploys the docs site automatically (the rules-at-a-glance snippet is generated from `ALL_RULES`).
+- **CI matrix** extends to Python 3.14 alongside 3.11 / 3.12 / 3.13, exercising the implicit support claim from `requires-python = ">=3.11"`.
+- **`WideScopeDeclarationRule` docstring** corrected to describe the rule as JS-family (JavaScript and TypeScript), matching the actual `language = ("javascript", "typescript")` class attribute.
+- **AssemblyScript pre-commit override recipe** updated across `README.md`, `docs/languages/typescript.md`, and `.pre-commit-hooks.yaml` — the original `types_or: []` form silently never fired because pre-commit treats an empty tag list as "no tag matches" rather than "filter disabled". The working form is `types_or: [text]` plus `files: \.(ts|tsx|as)$`.
+
+### Internal
+
+- **Python grammar registration** in `safelint.languages.__init__` collapsed into a single `if/else` block mirroring the JS / TS shape, reducing future-drift risk when adding a new language.
+- 12 new regression tests across `tests/test_cli.py`, `tests/test_main_routing.py`, and `tests/rules/test_dataflow_javascript.py` covering each of the bug fixes above. Total now 980 tests at 97.20% coverage.
+
 ## [2.0.0rc1] - 2026-05-12
 
 **v2.0.0 ships TypeScript / AssemblyScript support _and_ restructures packaging so every grammar is an opt-in extra.** The TypeScript work that was prepped as `1.14.0rc1` ships here instead, bundled with the packaging change because both shift the install story. Net behaviour: `pip install safelint` alone installs only the engine — every language grammar (including Python) ships as a separate extra. Users opt in to whichever languages their project actually contains: `pip install 'safelint[python]'`, `pip install 'safelint[javascript]'`, `pip install 'safelint[typescript]'`, `pip install 'safelint[python,javascript]'` for a monorepo, `pip install 'safelint[all]'` for the kitchen sink. Files whose grammar isn't installed are skipped at lint time with a one-line stderr install hint — no hard error *as long as at least one other file gets linted*. When **every** candidate file gets skipped (the typical TS-only or JS-only project against a base install), the silent-failure guard exits with code 2 so CI / pre-commit can't silently report clean.
@@ -489,7 +518,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.0.0rc1...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.0.0rc2...HEAD
+[2.0.0rc2]: https://github.com/shelkesays/safelint/compare/v2.0.0rc1...v2.0.0rc2
 [2.0.0rc1]: https://github.com/shelkesays/safelint/compare/v1.13.0...v2.0.0rc1
 [1.13.0]: https://github.com/shelkesays/safelint/compare/v1.12.2...v1.13.0
 [1.12.2]: https://github.com/shelkesays/safelint/compare/v1.12.1...v1.12.2
