@@ -94,7 +94,7 @@ pip install 'safelint[typescript]'    # adds .ts, .tsx, .as (and .js too)
 pip install 'safelint[all]'
 ```
 
-Without the extra, `safelint check` skips `.ts` / `.tsx` / `.as` files with a one-line install hint at lint time — no hard error.
+Without the extra, `safelint check` skips `.ts` / `.tsx` / `.as` files with a one-line install hint at lint time. If at least one other supported file (e.g. a Python file in a mixed repo) does get linted, the run continues normally. **If every candidate file gets skipped** — the typical case in a TS-only project — the [silent-failure guard](../configuration/cli.md#exit-code-2--silent-failure-triggers) fires and SafeLint exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.
 
 ## Pre-commit integration
 
