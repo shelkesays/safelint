@@ -1,16 +1,16 @@
 """Tests for the optional-grammar / extras packaging model.
 
 v2.0.0 split **every** tree-sitter grammar package out of the base
-install into per-language extras — ``[python]`` / ``[javascript]`` /
+install into per-language extras - ``[python]`` / ``[javascript]`` /
 ``[typescript]`` / ``[all]``. The base ``pip install safelint`` ships
 the engine only (``tree-sitter>=0.23.0``) and zero grammars; users opt
 in to whichever languages their project contains. Python is treated
-*symmetrically* with the other languages — there is no always-installed
+*symmetrically* with the other languages - there is no always-installed
 "core" grammar.
 
 The registry must therefore:
 
-1. Skip every language whose grammar package isn't importable —
+1. Skip every language whose grammar package isn't importable -
    including Python, when ``tree-sitter-python`` isn't installed.
 2. Keep those extensions reachable via :func:`unavailable_extensions`
    so the CLI can surface a clear install hint for each one (Python
@@ -157,7 +157,7 @@ def test_registry_skips_typescript_when_grammar_unavailable(monkeypatch: pytest.
 def test_install_hint_for_returns_none_for_supported_extension() -> None:
     """``install_hint_for(".py")`` returns None when the Python grammar is installed.
 
-    In v2.0.0+ Python is *not* in core deps — it's an opt-in extra
+    In v2.0.0+ Python is *not* in core deps - it's an opt-in extra
     like every other language. This test returns None because the
     dev / test environment has the ``[python]`` extra installed (via
     the ``dev`` extra that self-references ``[all]``); when the
@@ -205,6 +205,6 @@ def test_dev_install_has_every_grammar() -> None:
     """Sanity: the dev environment must have every grammar so the test suite covers every code path.
 
     If this test fails, ``uv sync --extra dev`` is missing one of the
-    grammar deps — fix ``pyproject.toml`` rather than the test.
+    grammar deps - fix ``pyproject.toml`` rather than the test.
     """
     assert unavailable_extensions() == {}, f"Dev install should have every grammar. Missing: {set(unavailable_extensions())}. Run `uv sync --extra dev`."

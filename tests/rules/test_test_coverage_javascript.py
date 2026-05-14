@@ -206,7 +206,7 @@ def test_js_inline_test_file_outside_test_dir_does_not_fire(tmp_path: Path) -> N
     """Inline test (``src/foo/foo.test.js``) is recognised by filename pattern.
 
     Some projects collocate tests next to source rather than using a
-    dedicated ``tests/`` tree — the filename match catches those even
+    dedicated ``tests/`` tree - the filename match catches those even
     when path-component lookup wouldn't.
     """
     with _cd(tmp_path):
@@ -218,7 +218,7 @@ def test_js_inline_test_file_outside_test_dir_does_not_fire(tmp_path: Path) -> N
 
 
 def test_js_nested_test_dir_recognises_helpers(tmp_path: Path) -> None:
-    """``test_dirs = ["tests/unit"]`` (multi-component) — helpers under it are recognised as test files.
+    """``test_dirs = ["tests/unit"]`` (multi-component) - helpers under it are recognised as test files.
 
     Regression guard for the path-component subsequence match: a naive
     ``td in path.parts`` check fails on multi-component entries
@@ -268,7 +268,7 @@ def test_js_relative_filepath_against_absolute_test_dir_recognised(tmp_path: Pat
     path-component comparison, a relative filepath like
     ``tests/conftest.js`` (common when SafetyEngine is run on a relative
     target) would never match an absolute ``test_dirs`` entry like
-    ``/abs/project/tests`` — its parts are ``("tests", "conftest.js")``
+    ``/abs/project/tests`` - its parts are ``("tests", "conftest.js")``
     while the test_dir parts are ``("/", "abs", "project", "tests")``,
     so the subsequence check would fail and SAFE701 would mis-classify
     ``conftest.js`` as a source file.

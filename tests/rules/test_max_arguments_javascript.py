@@ -51,7 +51,7 @@ def test_js_rest_param_counts_as_one(tmp_path: Path) -> None:
 
 
 def test_js_destructured_param_counts_as_one(tmp_path: Path) -> None:
-    """``{a, b, c}`` is *one* parameter — that's the whole point of using a config object."""
+    """``{a, b, c}`` is *one* parameter - that's the whole point of using a config object."""
     # 7 named + 1 destructured = 8 total → fires; but the destructured object
     # contributes 1 to the count, not 3.
     sample = tmp_path / "destruct.js"
@@ -77,9 +77,9 @@ def test_js_arrow_function_too_many_params_fires(tmp_path: Path) -> None:
 
 
 def test_js_method_with_many_params_fires(tmp_path: Path) -> None:
-    """Class methods are linted. Unlike Python, JS has no ``self`` to exclude — every named param counts."""
+    """Class methods are linted. Unlike Python, JS has no ``self`` to exclude - every named param counts."""
     sample = tmp_path / "method.js"
-    # 8 params on the method — exceeds default cap of 7.
+    # 8 params on the method - exceeds default cap of 7.
     sample.write_text(
         "class C { method(a, b, c, d, e, f, g, h) { return a; } }\n",
         encoding="utf-8",
@@ -90,13 +90,13 @@ def test_js_method_with_many_params_fires(tmp_path: Path) -> None:
 
 
 def test_js_no_self_or_cls_skip(tmp_path: Path) -> None:
-    """Method ``self`` or ``cls`` parameters are NOT special-cased on JS — they count.
+    """Method ``self`` or ``cls`` parameters are NOT special-cased on JS - they count.
 
     JS doesn't have a ``self`` / ``cls`` convention; if a developer
     happens to name a parameter ``self``, it's just a regular parameter.
     """
     sample = tmp_path / "selflike.js"
-    # 7 params; one happens to be named "self". Stays at 7 — under the cap.
+    # 7 params; one happens to be named "self". Stays at 7 - under the cap.
     sample.write_text(
         "class C { method(self, a, b, c, d, e, f) { return a; } }\n",
         encoding="utf-8",
@@ -105,7 +105,7 @@ def test_js_no_self_or_cls_skip(tmp_path: Path) -> None:
     # Under the cap (7 == max_args=7).
     assert not any(v.code == "SAFE103" for v in result.violations)
 
-    # Now 8 params — fires; ``self`` is just a regular param so the count is 8, not 7.
+    # Now 8 params - fires; ``self`` is just a regular param so the count is 8, not 7.
     sample = tmp_path / "selflike8.js"
     sample.write_text(
         "class C { method(self, a, b, c, d, e, f, g) { return a; } }\n",

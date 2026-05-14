@@ -1,4 +1,4 @@
-"""Tests for inline # nosafe suppression — parsing, filtering, and fail_fast interaction."""
+"""Tests for inline # nosafe suppression - parsing, filtering, and fail_fast interaction."""
 
 from __future__ import annotations
 
@@ -35,7 +35,7 @@ def _suppressions(source: str) -> dict[int, set[str] | None]:
 
 
 # ---------------------------------------------------------------------------
-# _parse_suppressions — unit tests against the Tree-sitter comment-node parser
+# _parse_suppressions - unit tests against the Tree-sitter comment-node parser
 # ---------------------------------------------------------------------------
 
 
@@ -99,7 +99,7 @@ def test_parse_nosafe_only_on_annotated_line() -> None:
 
 
 # ---------------------------------------------------------------------------
-# _check_suppressed_marking_used — unit tests for the matching predicate
+# _check_suppressed_marking_used - unit tests for the matching predicate
 #
 # This is the single source of truth for inline-directive matching since
 # the prior ``_is_suppressed`` helper was removed (it had no remaining
@@ -115,7 +115,7 @@ def _v(rule: str, code: str, lineno: int, severity: str = "error") -> Violation:
 
 
 def _matches(violation: Violation, suppressions: dict[int, set[str] | None]) -> bool:
-    """Wrapper that returns just the bool — drops the bookkeeping side effect."""
+    """Wrapper that returns just the bool - drops the bookkeeping side effect."""
     return _check_suppressed_marking_used(violation, suppressions, set())
 
 
@@ -168,7 +168,7 @@ def test_bare_nosafe_suppresses_violation_on_that_line(tmp_path: Path) -> None:
 
 def test_selective_suppression_by_code_suppresses_that_code(tmp_path: Path) -> None:
     """Selective suppression by code suppresses violations with that specific code."""
-    # bare except (SAFE201) on line 4 — should be suppressed due to the nosafe comment
+    # bare except (SAFE201) on line 4 - should be suppressed due to the nosafe comment
     source = textwrap.dedent("""\
         def foo():
             try:
@@ -200,7 +200,7 @@ def test_selective_suppression_by_rule_name(tmp_path: Path) -> None:
 
 def test_unsuppressed_violations_still_reported(tmp_path: Path) -> None:
     """Violations on lines without # nosafe are reported normally."""
-    # bare except with no nosafe comment — must remain in violations
+    # bare except with no nosafe comment - must remain in violations
     source = textwrap.dedent("""\
         def foo():
             try:
@@ -271,7 +271,7 @@ def test_fail_fast_does_not_stop_on_suppressed_violation(tmp_path: Path) -> None
     config = deep_merge(DEFAULTS, {"execution": {"fail_fast": True}})
     result = SafetyEngine(config).check_file(str(sample))
 
-    # function_length suppressed — must not appear
+    # function_length suppressed - must not appear
     assert not any(v.rule == "function_length" for v in result.violations)
     # bare_except must still have been checked and reported
     assert any(v.rule == "bare_except" for v in result.violations)
@@ -307,7 +307,7 @@ def test_fail_fast_stops_after_first_unsuppressed_rule(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# SAFE004 — unused_suppression (1.8.0)
+# SAFE004 - unused_suppression (1.8.0)
 # ---------------------------------------------------------------------------
 
 
@@ -383,7 +383,7 @@ def test_safe004_skips_self_referential_directive(tmp_path: Path) -> None:
 
 
 def test_safe004_partial_unused_in_multi_code_directive(tmp_path: Path) -> None:
-    """`# nosafe: SAFE201, SAFE304` — if only SAFE201 fires, SAFE304 is flagged unused."""
+    """`# nosafe: SAFE201, SAFE304` - if only SAFE201 fires, SAFE304 is flagged unused."""
     sample = tmp_path / "u5.py"
     sample.write_text(
         "def f():\n    try:\n        pass\n    except:  # nosafe: SAFE201, SAFE304\n        pass\n",
@@ -400,7 +400,7 @@ def test_safe004_silent_when_directive_lists_both_code_and_rule_name_aliases(tmp
 
     The directive uses both the SAFE-code and the rule-name forms of
     the same rule. When a SAFE201 violation fires on that line, the
-    matcher must record both aliases as "used" — otherwise the
+    matcher must record both aliases as "used" - otherwise the
     alias that didn't trigger the early-return surfaces a false
     SAFE004. Regression for an early-return bug in
     ``_check_suppressed_marking_used`` that only marked the first
@@ -414,7 +414,7 @@ def test_safe004_silent_when_directive_lists_both_code_and_rule_name_aliases(tmp
     result = SafetyEngine(DEFAULTS).check_file(str(sample))
     # bare_except violation is suppressed (so absent from active).
     assert not any(v.rule == "bare_except" for v in result.violations)
-    # And no SAFE004 fires on either alias — both were consumed by
+    # And no SAFE004 fires on either alias - both were consumed by
     # the matching violation.
     safe004s = [v for v in result.violations if v.code == "SAFE004"]
     assert not safe004s, f"unexpected SAFE004 emission(s): {[v.message for v in safe004s]}"
@@ -442,7 +442,7 @@ def test_safe004_multi_code_unused_directive_emits_in_sorted_order(tmp_path: Pat
 
 
 def test_safe004_not_emitted_when_fail_fast_short_circuits_rule_loop(tmp_path: Path) -> None:
-    """fail_fast that breaks the rule loop must skip SAFE004 — used_suppressions is incomplete.
+    """fail_fast that breaks the rule loop must skip SAFE004 - used_suppressions is incomplete.
 
     With fail_fast on, ``_run_rules`` exits as soon as the first rule
     produces an active violation. Later rules never run, so
@@ -454,7 +454,7 @@ def test_safe004_not_emitted_when_fail_fast_short_circuits_rule_loop(tmp_path: P
     early) AND has a ``# nosafe: SAFE401`` for resource_lifecycle
     (later rule, never runs because fail_fast stops the loop). Without
     the stopped-early guard, SAFE004 would warn about the SAFE401
-    directive — but resource_lifecycle didn't even get to evaluate it.
+    directive - but resource_lifecycle didn't even get to evaluate it.
     """
     long_body = "    x = 1\n" * 65
     source = "def foo():\n" + long_body + "    f = open('x.txt')  # nosafe: SAFE401\n"
@@ -466,7 +466,7 @@ def test_safe004_not_emitted_when_fail_fast_short_circuits_rule_loop(tmp_path: P
 
     # function_length (first rule) fires.
     assert any(v.rule == "function_length" for v in result.violations)
-    # No SAFE004 — fail_fast made the SAFE401 directive's "usedness"
+    # No SAFE004 - fail_fast made the SAFE401 directive's "usedness"
     # unknowable, so the engine intentionally stays silent.
     assert not any(v.code == "SAFE004" for v in result.violations)
 
@@ -481,7 +481,7 @@ def test_safe004_still_emitted_without_fail_fast(tmp_path: Path) -> None:
     result = SafetyEngine(config).check_file(str(sample))
 
     # SAFE401 didn't fire (no resource acquisition), so its directive
-    # is genuinely unused — SAFE004 must surface it.
+    # is genuinely unused - SAFE004 must surface it.
     assert any(v.code == "SAFE004" and "SAFE401" in v.message for v in result.violations)
 
 

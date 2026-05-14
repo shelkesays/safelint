@@ -224,7 +224,7 @@ def test_tainted_sink_self_cls_not_tainted():
 
 
 # ---------------------------------------------------------------------------
-# Taint flow through string formatting (1.8.0 — locking in the contract)
+# Taint flow through string formatting (1.8.0 - locking in the contract)
 # ---------------------------------------------------------------------------
 
 
@@ -344,7 +344,7 @@ def test_tainted_sink_assume_taint_preserving_rejects_string_value():
     """``assume_taint_preserving = "false"`` (string, e.g. TOML quote typo) raises TypeError.
 
     Without strict isinstance validation, ``bool("false")`` is ``True``
-    in Python — a non-empty string is truthy — so the user's
+    in Python - a non-empty string is truthy - so the user's
     misconfiguration would silently flip the rule into the *opposite*
     mode they intended (taint-preserving instead of taint-dropping).
     The validation catches the typo as a clear TypeError when the

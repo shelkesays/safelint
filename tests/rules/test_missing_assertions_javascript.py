@@ -48,7 +48,7 @@ def test_js_function_with_node_assert_does_not_fire(tmp_path: Path) -> None:
 
 
 def test_js_function_with_assert_equal_does_not_fire(tmp_path: Path) -> None:
-    """``assert.equal(a, b)`` — call_name resolves to ``equal`` which is in the default list."""
+    """``assert.equal(a, b)`` - call_name resolves to ``equal`` which is in the default list."""
     sample = tmp_path / "assert_equal.js"
     sample.write_text(
         "function add(a, b) {\n  assert.equal(typeof a, 'number');\n  return a + b;\n}\n",
@@ -70,7 +70,7 @@ def test_js_function_with_console_assert_does_not_fire(tmp_path: Path) -> None:
 
 
 def test_js_function_with_jest_expect_does_not_fire(tmp_path: Path) -> None:
-    """``expect(x).toBe(y)`` (Jest / Chai) — call_name finds ``expect`` in the default list."""
+    """``expect(x).toBe(y)`` (Jest / Chai) - call_name finds ``expect`` in the default list."""
     sample = tmp_path / "jest.js"
     sample.write_text(
         "function testStuff(x) {\n  expect(x).toBe(42);\n}\n",
@@ -112,7 +112,7 @@ def test_js_assertion_in_nested_function_does_not_credit_outer(tmp_path: Path) -
     safe601 = [v for v in result.violations if v.code == "SAFE601"]
     # ``outer`` should fire (no own assert); ``helper`` (anonymous arrow)
     # would normally also fire but its parameters are not validated and
-    # its body has the assert — so helper is fine.
+    # its body has the assert - so helper is fine.
     assert any("outer" in v.message for v in safe601)
 
 
@@ -121,7 +121,7 @@ def test_js_assertion_calls_javascript_must_be_list_not_string(tmp_path: Path) -
 
     ``assertion_calls_javascript = "assert"`` would otherwise be
     coerced to ``{'a', 's', 'e', 'r', 't'}`` and silently break
-    SAFE601 detection — fail loud instead. Same validation shape as
+    SAFE601 detection - fail loud instead. Same validation shape as
     ``io_functions_javascript`` (SAFE303 / SAFE304) and
     ``global_namespaces_javascript`` (SAFE302).
     """

@@ -41,7 +41,7 @@ def test_js_function_declaration_too_long_fires_safe101(tmp_path: Path) -> None:
 def test_js_arrow_function_too_long_fires_safe101(tmp_path: Path) -> None:
     """A long arrow function fires SAFE101.
 
-    Arrow functions are anonymous from a name-binding perspective —
+    Arrow functions are anonymous from a name-binding perspective -
     the rule reports them as ``<anonymous>`` because there's no
     ``name`` field on the AST node.
     """
@@ -119,7 +119,7 @@ def test_js_logical_lines_mode_skips_blanks_and_comments(tmp_path: Path) -> None
 
 
 def test_js_statements_mode_raises_clear_error(tmp_path: Path) -> None:
-    """``count_mode = "statements"`` is Python-only today — JS configs hit a clear error."""
+    """``count_mode = "statements"`` is Python-only today - JS configs hit a clear error."""
     source = "function f() { return 1; }\n"
     sample = tmp_path / "stmt.js"
     sample.write_text(source, encoding="utf-8")

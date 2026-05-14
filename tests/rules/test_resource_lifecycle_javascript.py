@@ -43,7 +43,7 @@ def test_js_create_write_stream_outside_try_finally_fires(tmp_path: Path) -> Non
         "function writeData(path, data) {\n"
         "  const stream = fs.createWriteStream(path);\n"
         "  stream.write(data);\n"
-        "  stream.end();\n"  # explicit cleanup, but rule is strict — no try/finally
+        "  stream.end();\n"  # explicit cleanup, but rule is strict - no try/finally
         "}\n",
         encoding="utf-8",
     )
@@ -82,7 +82,7 @@ def test_js_open_sync_outside_try_finally_fires(tmp_path: Path) -> None:
 
 
 def test_js_create_read_stream_inside_try_finally_does_not_fire(tmp_path: Path) -> None:
-    """Wrapped in ``try { ... } finally { ... }`` — clean."""
+    """Wrapped in ``try { ... } finally { ... }`` - clean."""
     sample = tmp_path / "wrapped.js"
     sample.write_text(
         "function readData(path) {\n  let stream;\n  try {\n    stream = fs.createReadStream(path);\n    return processStream(stream);\n  } finally {\n    if (stream) stream.close();\n  }\n}\n",
@@ -148,7 +148,7 @@ def test_js_user_can_extend_tracked_list(tmp_path: Path) -> None:
         "function f() { const handle = acquireHandle(); return handle; }\n",
         encoding="utf-8",
     )
-    # Default: ``acquireHandle`` not tracked — no fire.
+    # Default: ``acquireHandle`` not tracked - no fire.
     result = _engine().check_file(str(sample))
     assert not any(v.code == "SAFE401" for v in result.violations)
 
@@ -164,7 +164,7 @@ def test_js_user_can_extend_tracked_list(tmp_path: Path) -> None:
 def test_js_acquirer_in_nested_function_does_not_inherit_outer_try_finally(tmp_path: Path) -> None:
     """A resource acquirer in a nested function isn't guarded by the OUTER function's try/finally.
 
-    The outer ``finally`` runs when the outer function returns —
+    The outer ``finally`` runs when the outer function returns -
     not when ``setTimeout`` (or any other deferred caller) eventually
     invokes the nested function. The inner stream needs its own
     ``try/finally`` (or its own ``using`` declaration) to be safe.
@@ -226,7 +226,7 @@ def test_js_new_worker_outside_try_finally_fires(tmp_path: Path) -> None:
 
     Regression guard: the runtime presets populate
     ``tracked_functions_javascript`` with constructor names
-    (``Worker``, ``WebSocket``, ``MutationObserver``, ...) — invoked
+    (``Worker``, ``WebSocket``, ``MutationObserver``, ...) - invoked
     via ``new`` rather than as plain calls. A call-only walk would
     silently miss every browser preset entry.
     """
@@ -243,13 +243,13 @@ def test_js_new_worker_outside_try_finally_fires(tmp_path: Path) -> None:
     safe401 = [v for v in result.violations if v.code == "SAFE401"]
     assert len(safe401) == 1
     # Message must show the constructor form (``new Worker()``) so
-    # users grep'ing for ``Worker(`` find the actual call site —
+    # users grep'ing for ``Worker(`` find the actual call site -
     # ``Worker()`` alone wouldn't match ``new Worker(...)`` in source.
     assert "new Worker()" in safe401[0].message
 
 
 def test_js_new_member_constructor_fires(tmp_path: Path) -> None:
-    """``new fs.WriteStream(...)`` — ``call_name`` resolves member_expression constructors."""
+    """``new fs.WriteStream(...)`` - ``call_name`` resolves member_expression constructors."""
     sample = tmp_path / "new_member.js"
     sample.write_text(
         "function start() {\n  const s = new fs.WriteStream(path);\n  return s;\n}\n",
@@ -282,7 +282,7 @@ def test_js_acquirer_inside_finally_block_fires(tmp_path: Path) -> None:
     """A resource acquired inside a ``finally { ... }`` is NOT guarded.
 
     Walking up the parent chain naively reaches the same try_statement
-    whose ``finally`` is the *enclosing* block — so without the
+    whose ``finally`` is the *enclosing* block - so without the
     finally-self check, ``try { ... } finally { fs.createReadStream(...) }``
     would be silently accepted. There's no subsequent finally to
     guarantee the cleanup of THIS resource, so the rule must fire.
@@ -310,7 +310,7 @@ def test_js_acquirer_inside_outer_finally_with_inner_try_finally_does_not_fire(t
 
     The outer ``finally`` doesn't guard *itself*, but the inner
     ``try { acquire() } finally { close() }`` inside the outer finally
-    does — so this case must be clean.
+    does - so this case must be clean.
     """
     sample = tmp_path / "nested_finally_safe.js"
     sample.write_text(
@@ -338,7 +338,7 @@ def test_js_acquirer_inside_catch_block_remains_guarded(tmp_path: Path) -> None:
 
     The finally clause runs after the catch handler, so resources opened
     in the catch arm are cleaned up by the same try's finally. This is
-    the positive control for the finally-self check — only the finally
+    the positive control for the finally-self check - only the finally
     arm itself is excluded; catch arms remain guarded.
     """
     sample = tmp_path / "in_catch_guarded.js"

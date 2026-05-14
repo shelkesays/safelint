@@ -153,7 +153,7 @@ def test_make_summary_suppressed_clean_run_breaks_down_by_code() -> None:
 def test_make_summary_suppressed_with_violations_surfaces_breakdown_in_fixes_line() -> None:
     """When violations exist, the suppression breakdown rides on the fixes line.
 
-    Updated in 1.8.0 — the line now reads "No suggestions available (safelint
+    Updated in 1.8.0 - the line now reads "No suggestions available (safelint
     does not auto-fix; …)" since "fixes" was renamed to "suggestions" to
     reflect the never-auto-apply policy. The suppression breakdown still
     rides at the end in the canonical "(… suppressed)" form.
@@ -218,7 +218,7 @@ def test_run_hook_no_output_when_clean(tmp_path: Path, capsys: pytest.CaptureFix
 
     captured = capsys.readouterr()
     assert captured.out == ""
-    # A clean hook run shouldn't surface ANY output — including stray
+    # A clean hook run shouldn't surface ANY output - including stray
     # diagnostics on stderr. Pre-commit's contract is silence-on-success.
     assert captured.err == ""
 
@@ -229,7 +229,7 @@ def test_run_hook_silent_on_clean_run_even_with_suppressions(tmp_path: Path, cap
     Previously hook mode printed ``All checks passed. (1 SAFE501
     suppressed)`` on a clean-but-suppressed run. Pre-commit batches
     files across multiple hook invocations, so that became one summary
-    line per batch — each showing a misleading *partial* count. A clean
+    line per batch - each showing a misleading *partial* count. A clean
     hook run is now fully silent (the ruff/ty contract); the summed
     breakdown stays available via ``safelint check`` and ``--format
     json``.
@@ -252,7 +252,7 @@ def test_run_hook_statistics_flag_silent_on_clean_run_with_suppressions(tmp_path
 
     The hook parser accepts ``--statistics``. Without gating, a clean
     pre-commit batch carrying only ``# nosafe`` suppressions would still
-    print the per-rule statistics table — once per batch — bringing back
+    print the per-rule statistics table - once per batch - bringing back
     the exact noise the ``silent_on_clean`` silence is meant to remove.
     ``_print_results`` gates the stats table behind the same clean-run
     silence as the summary line.
@@ -263,7 +263,7 @@ def test_run_hook_statistics_flag_silent_on_clean_run_with_suppressions(tmp_path
     fake_result = LintResult(path=str(clean), violations=[], suppressed=[_v("warning", code="SAFE501")])
     mocker.patch("safelint.cli.SafetyEngine.check_file", return_value=fake_result)
 
-    # _make_args doesn't set ``statistics`` — add it explicitly to mimic a
+    # _make_args doesn't set ``statistics`` - add it explicitly to mimic a
     # hook configured with ``args: [--statistics]``.
     args = _make_args()
     args.statistics = True
@@ -275,7 +275,7 @@ def test_run_hook_statistics_flag_silent_on_clean_run_with_suppressions(tmp_path
 
 
 # ---------------------------------------------------------------------------
-# v2.0.0 — missing-grammar hint
+# v2.0.0 - missing-grammar hint
 # ---------------------------------------------------------------------------
 
 
@@ -303,19 +303,19 @@ def test_scan_for_unavailable_extensions_skips_excluded_dirs(tmp_path: Path) -> 
     venv.mkdir()
     (venv / "dep.ts").write_text("x = 1;\n", encoding="utf-8")
     (tmp_path / "main.py").write_text("x = 1\n", encoding="utf-8")
-    # Walker should report nothing — vendored dirs are filtered.
+    # Walker should report nothing - vendored dirs are filtered.
     assert _scan_for_unavailable_extensions(tmp_path, {".ts": "hint-ts", ".js": "hint-js"}) == set()
 
 
 def test_scan_for_unavailable_extensions_handles_single_file_target(tmp_path: Path) -> None:
-    """Target may be a file (not just a directory) — single-file path is exercised."""
+    """Target may be a file (not just a directory) - single-file path is exercised."""
     single = tmp_path / "lone.ts"
     single.write_text("x = 1;\n", encoding="utf-8")
     assert _scan_for_unavailable_extensions(single, {".ts": "hint"}) == {".ts"}
 
 
 def test_scan_for_unavailable_extensions_handles_nonexistent_target(tmp_path: Path) -> None:
-    """Target that doesn't exist (and isn't a file or dir) returns empty — no crash."""
+    """Target that doesn't exist (and isn't a file or dir) returns empty - no crash."""
     missing = tmp_path / "does-not-exist"
     assert _scan_for_unavailable_extensions(missing, {".ts": "hint"}) == set()
 
@@ -399,7 +399,7 @@ def test_emit_missing_grammar_warnings_emits_per_hint(tmp_path: Path, capsys: py
 
 
 def test_emit_hook_grammar_warnings_emits_only_for_passed_files(capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
-    """Hook-mode helper takes the explicit file list — no directory walk."""
+    """Hook-mode helper takes the explicit file list - no directory walk."""
     mocker.patch(
         "safelint.cli.unavailable_extensions",
         return_value={".ts": "pip install 'safelint[typescript]'"},
@@ -484,7 +484,7 @@ def test_format_install_action_outside_precommit_uses_pip_install_phrasing(monke
 def test_format_install_action_under_precommit_uses_additional_dependencies_phrasing(monkeypatch: pytest.MonkeyPatch) -> None:
     """With ``PRE_COMMIT=1``, the hint switches to the additional_dependencies form.
 
-    Pre-commit users can't run ``pip install`` directly — the hook env
+    Pre-commit users can't run ``pip install`` directly - the hook env
     is isolated. ``additional_dependencies`` in ``.pre-commit-config.yaml``
     is the actual lever they have.
     """
@@ -529,7 +529,7 @@ def test_check_exit_code_returns_2_when_all_files_skipped_for_missing_grammar() 
     Regression guard: the silent-failure guard must fire in *every*
     output mode (pretty / json / sarif), since CI pipelines often run
     ``--format sarif`` and a hidden-green run there is the worst case
-    — a code-quality dashboard would show "no issues" when actually no
+    - a code-quality dashboard would show "no issues" when actually no
     linting happened.
     """
     assert _check_exit_code(results=[], unavailable_found={".py"}, all_blocking=[]) == 2
@@ -539,7 +539,7 @@ def test_check_exit_code_returns_2_for_single_file_target_with_unavailable_gramm
     """``safelint check foo.ts`` (TS grammar missing) must exit 2, not 0.
 
     Regression for the bug where ``check_path`` returns ``[LintResult(path="foo.ts")]``
-    — a 1-element list whose lone entry was an empty placeholder produced
+    - a 1-element list whose lone entry was an empty placeholder produced
     at language-lookup time. The old guard only checked ``not results``,
     so the 1-element list bypassed it and the run exited 0 with a
     misleading "clean" verdict on a file that was never actually linted.
@@ -569,7 +569,7 @@ def test_check_exit_code_returns_0_on_clean_run() -> None:
 
 
 def test_check_exit_code_returns_0_when_no_files_and_no_unavailable() -> None:
-    """Zero files discovered but no unavailable extensions either — likely an empty dir, not a misconfig. Exit 0."""
+    """Zero files discovered but no unavailable extensions either - likely an empty dir, not a misconfig. Exit 0."""
     assert _check_exit_code(results=[], unavailable_found=set(), all_blocking=[]) == 0
 
 
@@ -580,13 +580,13 @@ def test_guard_hook_silent_failure_returns_2_when_every_passed_file_unavailable(
 
 
 def test_guard_hook_silent_failure_returns_0_when_some_files_linted() -> None:
-    """Mixed run with some lintable files — guard doesn't trigger, returns 0."""
+    """Mixed run with some lintable files - guard doesn't trigger, returns 0."""
     rc = _guard_hook_silent_failure(passed=["app.py", "lib.ts"], filtered=["app.py"], unavailable_in_passed={".ts"})
     assert rc == 0
 
 
 def test_guard_hook_silent_failure_returns_0_when_no_files_passed() -> None:
-    """Pre-commit invokes the hook with no files — not a misconfig, returns 0."""
+    """Pre-commit invokes the hook with no files - not a misconfig, returns 0."""
     rc = _guard_hook_silent_failure(passed=[], filtered=[], unavailable_in_passed=set())
     assert rc == 0
 
@@ -612,7 +612,7 @@ def test_emit_missing_grammar_warnings_silent_mode_suppresses_stderr_keeps_retur
 def test_matching_suffixes_ignores_leading_dot_dotfiles() -> None:
     """Regression: a literal file named ``.ts`` shouldn't trigger the missing-TS-grammar hint.
 
-    Mirrors ``pathlib.Path.suffix`` semantics — dotfiles have no
+    Mirrors ``pathlib.Path.suffix`` semantics - dotfiles have no
     suffix, so the walker must ignore them. Without the ``idx > 0``
     guard (vs ``idx != -1``), ``.ts`` / ``.py`` / ``.gitignore``
     would be misclassified.
@@ -637,13 +637,13 @@ def test_matching_suffixes_ignores_dotfiles_inside_subdirectories() -> None:
         ["src/.ts", "a/b/.py", "src/.gitignore", "src/real.ts", "deep/nested/dir/app.py"],
         {".ts": "hint-ts", ".py": "hint-py"},
     )
-    # Only the real .ts file and the deeply-nested .py file should match —
+    # Only the real .ts file and the deeply-nested .py file should match -
     # all three dotfile-in-subdir cases must be ignored.
     assert found == {".ts", ".py"}, f"expected real files only; got {found}"
 
 
 # ---------------------------------------------------------------------------
-# safelint skill install — language-grammar nudge
+# safelint skill install - language-grammar nudge
 # ---------------------------------------------------------------------------
 
 

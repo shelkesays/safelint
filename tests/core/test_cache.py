@@ -75,7 +75,7 @@ def test_engine_fingerprint_changes_with_engine_internal_ignored() -> None:
     """Toggling ``ignore = ["SAFE004"]`` (engine-internal) shifts the fingerprint.
 
     Engine-internal codes (SAFE000 parse, SAFE004 unused_suppression)
-    aren't part of ``self.rules`` — they're emitted by the engine
+    aren't part of ``self.rules`` - they're emitted by the engine
     itself. Without folding the engine-internal-ignore set into the
     fingerprint, toggling them on/off would silently reuse stale
     cache entries that still carry (or lack) those engine-emitted
@@ -169,7 +169,7 @@ def test_lint_cache_get_is_resilient_to_corrupt_payload(tmp_path: Path) -> None:
 
 def test_lint_cache_get_skips_schema_drift(tmp_path: Path) -> None:
     """A JSON file missing the expected keys (e.g. a future-format entry)
-    is also a miss — schema drift never crashes the run."""
+    is also a miss - schema drift never crashes the run."""
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
     (cache_dir / "weird.json").write_text(json.dumps({"unexpected": []}), encoding="utf-8")
@@ -178,7 +178,7 @@ def test_lint_cache_get_skips_schema_drift(tmp_path: Path) -> None:
 
 
 def test_lint_cache_directory_created_lazily(tmp_path: Path) -> None:
-    """The cache directory is only created on the first put — ``--no-cache``
+    """The cache directory is only created on the first put - ``--no-cache``
     runs that never write don't pollute the project tree with empty dirs."""
     cache_dir = tmp_path / "cache"
     cache = LintCache(cache_dir)
@@ -295,7 +295,7 @@ def test_globally_ignored_engine_internal_is_filtered_to_engine_codes() -> None:
     The field is what feeds the cache fingerprint via
     ``engine_internal_ignored``. Without filtering, adding an unrelated
     ``ignore = ["SAFE101"]`` would shift the engine-internal portion
-    of the fingerprint too — burning the cache for no semantic reason
+    of the fingerprint too - burning the cache for no semantic reason
     (``active_rules`` already invalidates correctly). And typos like
     ``ignore = ["SAFETYP01"]`` (which surface as a stderr warning and
     otherwise do nothing) would invalidate the whole cache pointlessly.
@@ -304,11 +304,11 @@ def test_globally_ignored_engine_internal_is_filtered_to_engine_codes() -> None:
     cfg = {
         **DEFAULTS,
         "ignore": [
-            "SAFE004",  # engine-internal — should be in the set (upper-case)
-            "unused_suppression",  # engine-internal — should be in the set
-            "SAFE101",  # normal rule — should NOT be in the set
-            "function_length",  # normal rule by name — should NOT be in the set
-            "SAFETYP01",  # typo — should NOT be in the set
+            "SAFE004",  # engine-internal - should be in the set (upper-case)
+            "unused_suppression",  # engine-internal - should be in the set
+            "SAFE101",  # normal rule - should NOT be in the set
+            "function_length",  # normal rule by name - should NOT be in the set
+            "SAFETYP01",  # typo - should NOT be in the set
         ],
     }
     engine = SafetyEngine(cfg)
@@ -320,7 +320,7 @@ def test_engine_cache_does_not_invalidate_on_unrelated_typo_ignore(tmp_path: Pat
     """Adding a typo entry like ``ignore = ["SAFETYP01"]`` must not invalidate the cache.
 
     Typo entries surface as a stderr warning and otherwise do nothing
-    — they're not a valid rule, not engine-internal, change no rule
+    - they're not a valid rule, not engine-internal, change no rule
     behaviour. The cache fingerprint should be identical to the
     no-ignore baseline.
     """
@@ -351,7 +351,7 @@ def test_engine_cache_isolates_by_filepath(tmp_path: Path) -> None:
     result_b = engine.check_file(str(sample_b))
 
     cache_files = list(cache_dir.glob("*.json"))
-    # Each path yielded its own cache entry — no cross-file aliasing.
+    # Each path yielded its own cache entry - no cross-file aliasing.
     assert len(cache_files) >= 2
     # Every reported violation points at the file the caller asked about.
     assert all(v.filepath == str(sample_a) for v in result_a.violations)
@@ -365,7 +365,7 @@ def test_engine_cache_invalidates_when_per_file_ignores_added(tmp_path: Path) ->
     """Adding a ``per_file_ignores`` entry between runs invalidates the cache.
 
     Because ``per_file_ignores`` is folded into the engine fingerprint,
-    the second engine has a different cache key — so the cached
+    the second engine has a different cache key - so the cached
     "no-suppression" entry from the first run isn't reused, and the
     fresh lint correctly moves SAFE101 into ``suppressed``.
     """
@@ -380,7 +380,7 @@ def test_engine_cache_invalidates_when_per_file_ignores_added(tmp_path: Path) ->
     assert any(v.rule == "function_length" for v in result_a.violations)
 
     # Run 2: per_file_ignores adds a SAFE101 silence. Different fingerprint,
-    # different cache key — fresh lint correctly suppresses SAFE101.
+    # different cache key - fresh lint correctly suppresses SAFE101.
     cfg_b = {**DEFAULTS, "per_file_ignores": {"**/func.py": ["SAFE101"]}}
     engine_b = SafetyEngine(cfg_b, cache=LintCache(cache_dir))
     result_b = engine_b.check_file(str(sample))
@@ -394,7 +394,7 @@ def test_engine_cache_invalidates_when_per_file_ignores_removed(tmp_path: Path) 
     Regression for a real bug: an earlier implementation kept the cached
     suppressed list as-is on hit and only re-ran the per-file filter
     over the active list. That meant loosening ``per_file_ignores``
-    would wrongly leave previously suppressed violations suppressed —
+    would wrongly leave previously suppressed violations suppressed -
     the user removed the silence in config but kept seeing it applied.
     Folding the patterns into the fingerprint invalidates the entry,
     forcing a fresh lint that correctly returns SAFE101 to active.
@@ -411,7 +411,7 @@ def test_engine_cache_invalidates_when_per_file_ignores_removed(tmp_path: Path) 
     assert all(v.rule != "function_length" for v in result_strict.violations)
 
     # Run 2: user removes the silence. The cache MUST invalidate so the
-    # violation comes back as active — not stay suppressed from cache.
+    # violation comes back as active - not stay suppressed from cache.
     cfg_open = {**DEFAULTS, "per_file_ignores": {}}
     engine_open = SafetyEngine(cfg_open, cache=LintCache(cache_dir))
     result_open = engine_open.check_file(str(sample))

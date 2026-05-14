@@ -24,7 +24,7 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
-# _resolve_javascript_runtime — extracts and validates the runtime selector.
+# _resolve_javascript_runtime - extracts and validates the runtime selector.
 # ---------------------------------------------------------------------------
 
 
@@ -73,12 +73,12 @@ def test_non_table_javascript_section_falls_back(capsys: pytest.CaptureFixture[s
 
 
 # ---------------------------------------------------------------------------
-# _apply_javascript_runtime_preset — modifies defaults in place.
+# _apply_javascript_runtime_preset - modifies defaults in place.
 # ---------------------------------------------------------------------------
 
 
 def test_node_preset_is_a_noop() -> None:
-    """Applying the ``"node"`` preset doesn't change DEFAULTS — it IS the baseline."""
+    """Applying the ``"node"`` preset doesn't change DEFAULTS - it IS the baseline."""
     a = copy.deepcopy(DEFAULTS)
     b = copy.deepcopy(DEFAULTS)
     _apply_javascript_runtime_preset(a, "node")
@@ -244,7 +244,7 @@ def test_node_default_fires_on_node_resource_acquirer(tmp_path: Path) -> None:
 
 
 def test_cloudflare_workers_preset_does_not_track_node_streams(tmp_path: Path) -> None:
-    """Under the workers preset, ``fs.createReadStream`` is NOT in the tracked list — no fire."""
+    """Under the workers preset, ``fs.createReadStream`` is NOT in the tracked list - no fire."""
     sample = tmp_path / "stream.js"
     sample.write_text(
         "function f(p) { return fs.createReadStream(p); }\n",

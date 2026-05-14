@@ -53,7 +53,7 @@ def test_js_for_in_and_switch_count(tmp_path: Path) -> None:
 
 
 def test_js_shallow_function_does_not_fire(tmp_path: Path) -> None:
-    """A function with two-level nesting is exactly at the default limit — no fire."""
+    """A function with two-level nesting is exactly at the default limit - no fire."""
     source = "function f(x) {\n  if (x) {\n    for (let i = 0; i < 10; i++) {\n      console.log(i);\n    }\n  }\n}\n"
     sample = tmp_path / "shallow.js"
     sample.write_text(source, encoding="utf-8")

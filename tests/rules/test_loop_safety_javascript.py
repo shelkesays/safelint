@@ -91,7 +91,7 @@ def test_js_break_in_nested_loop_does_not_save_outer(tmp_path: Path) -> None:
 
 
 def test_js_break_in_inner_function_does_not_save_outer(tmp_path: Path) -> None:
-    """A ``break`` inside a nested function definition is a syntax error in JS — but a return-from-inner-arrow shouldn't either."""
+    """A ``break`` inside a nested function definition is a syntax error in JS - but a return-from-inner-arrow shouldn't either."""
     # Realistic scenario: outer ``while (true)`` with a nested arrow function
     # that early-returns. The outer while still has no break.
     sample = tmp_path / "innerfn.js"
@@ -104,12 +104,12 @@ def test_js_break_in_inner_function_does_not_save_outer(tmp_path: Path) -> None:
 
 
 def test_js_while_double_parens_true_no_break_fires_safe501(tmp_path: Path) -> None:
-    """``while ((true)) { ... }`` — extra formatting parens still detected.
+    """``while ((true)) { ... }`` - extra formatting parens still detected.
 
     The mandatory ``while (...)`` outer paren wraps the condition in a
     ``parenthesized_expression``; extra formatting parens nest another
     layer. Single-layer unwrap left ``is_literal_true`` False on the
-    outer wrapper and silently skipped the no-break check — a real
+    outer wrapper and silently skipped the no-break check - a real
     false-negative that automated reformatters can introduce.
     """
     sample = tmp_path / "double_paren.js"
@@ -123,7 +123,7 @@ def test_js_while_double_parens_true_no_break_fires_safe501(tmp_path: Path) -> N
 
 
 def test_js_while_double_parens_true_with_break_does_not_fire(tmp_path: Path) -> None:
-    """``while ((true))`` with a break is still recognised as bounded — positive control."""
+    """``while ((true))`` with a break is still recognised as bounded - positive control."""
     sample = tmp_path / "double_paren_break.js"
     sample.write_text(
         "function f() { while ((true)) { if (cond) break; work(); } }\n",
@@ -137,7 +137,7 @@ def test_js_while_true_no_break_message_uses_js_syntax(tmp_path: Path) -> None:
     """SAFE501 message on a JS file says ``while (true)``, not ``while True``.
 
     The hazard is the same in both languages but the surface syntax
-    differs — a Python-flavored ``while True`` message in a JS
+    differs - a Python-flavored ``while True`` message in a JS
     violation block would be visually jarring and look like a bug.
     """
     sample = tmp_path / "msg.js"
@@ -153,7 +153,7 @@ def test_js_while_true_no_break_message_uses_js_syntax(tmp_path: Path) -> None:
 
 
 def test_js_labeled_break_from_nested_for_exits_outer_while(tmp_path: Path) -> None:
-    """``outer: while (true) { for (...) { break outer; } }`` — labelled break exits the while.
+    """``outer: while (true) { for (...) { break outer; } }`` - labelled break exits the while.
 
     Regression guard: the pruned walk prunes nested loops wholesale,
     so a labelled break inside a nested ``for`` would otherwise be
@@ -173,7 +173,7 @@ def test_js_labeled_break_from_nested_for_exits_outer_while(tmp_path: Path) -> N
 
 
 def test_js_labeled_break_from_nested_switch_exits_outer_while(tmp_path: Path) -> None:
-    """Same fix applies to labelled breaks from inside a ``switch`` — also a pruned construct."""
+    """Same fix applies to labelled breaks from inside a ``switch`` - also a pruned construct."""
     sample = tmp_path / "labeled_switch.js"
     sample.write_text(
         "function f(token) {\n  outer: while (true) {\n    switch (token.type) {\n      case 'END': break outer;\n      default: token = next(token);\n    }\n  }\n}\n",
@@ -186,7 +186,7 @@ def test_js_labeled_break_from_nested_switch_exits_outer_while(tmp_path: Path) -
 def test_js_labeled_break_to_different_label_still_fires(tmp_path: Path) -> None:
     """A labelled break targeting a *different* label doesn't satisfy our while.
 
-    ``outer: while (true) { inner: for (...) { break inner; } }`` —
+    ``outer: while (true) { inner: for (...) { break inner; } }`` -
     ``break inner`` exits the for, not the while. The outer
     ``while (true)`` has no exit and should still fire SAFE501.
     """
@@ -200,7 +200,7 @@ def test_js_labeled_break_to_different_label_still_fires(tmp_path: Path) -> None
 
 
 def test_js_unlabeled_while_unaffected(tmp_path: Path) -> None:
-    """A ``while (true)`` with no label and no break still fires — the new code path doesn't regress the existing case."""
+    """A ``while (true)`` with no label and no break still fires - the new code path doesn't regress the existing case."""
     sample = tmp_path / "unlabeled.js"
     sample.write_text(
         "function f() { while (true) { work(); } }\n",

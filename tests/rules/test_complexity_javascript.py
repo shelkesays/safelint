@@ -46,7 +46,7 @@ def test_js_high_complexity_function_fires_safe104(tmp_path: Path) -> None:
 
 def test_js_short_circuit_operators_count(tmp_path: Path) -> None:
     """``&&`` / ``||`` / ``??`` each add 1 to complexity."""
-    # Short-circuit ops in a return expression — each counts 1.
+    # Short-circuit ops in a return expression - each counts 1.
     # Complexity = 1 (base) + 11 short-circuits = 12 > 10
     source = "function f(a, b, c, d, e) {\n  return a && b && c && d && e || a || b || c || d || e ?? a;\n}\n"
     sample = tmp_path / "shortcircuit.js"
@@ -64,7 +64,7 @@ def test_js_arithmetic_binary_expr_does_not_count(tmp_path: Path) -> None:
     would get a wildly inflated complexity score. Confirms the filter
     is in place.
     """
-    # 100 ``+`` operators, no branches — should be complexity 1, way under cap.
+    # 100 ``+`` operators, no branches - should be complexity 1, way under cap.
     arithmetic = " + ".join(["a"] * 100)
     source = f"function add(a, b) {{ return {arithmetic}; }}\n"
     sample = tmp_path / "arith.js"
@@ -88,7 +88,7 @@ def test_js_switch_cases_count(tmp_path: Path) -> None:
 
 
 def test_js_simple_function_does_not_fire(tmp_path: Path) -> None:
-    """A function with no branches has complexity 1 — well under the cap."""
+    """A function with no branches has complexity 1 - well under the cap."""
     sample = tmp_path / "simple.js"
     sample.write_text("function add(a, b) { return a + b; }\n", encoding="utf-8")
     result = _engine().check_file(str(sample))

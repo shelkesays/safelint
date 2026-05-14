@@ -5,7 +5,7 @@ parameters, type annotations, ambient declarations, ``as``
 expressions, non-null assertions, decorators) and verify each
 cross-language rule does the right thing on them. Covers the
 TS-specific handling the JS rule implementations would otherwise
-miss — generic type parameters not counting toward
+miss - generic type parameters not counting toward
 ``max_arguments``, ``(globalThis as any).x = 1`` resolving via the
 paren / cast unwrap, taint flowing through ``as`` / ``satisfies``
 / ``!``, etc.
@@ -31,12 +31,12 @@ def _engine(overrides: dict | None = None) -> SafetyEngine:
 
 
 # ---------------------------------------------------------------------------
-# SAFE103 max_arguments — generic type parameters must NOT count as arguments
+# SAFE103 max_arguments - generic type parameters must NOT count as arguments
 # ---------------------------------------------------------------------------
 
 
 def test_ts_generic_type_parameters_do_not_count_toward_max_arguments(tmp_path: Path) -> None:
-    """``function f<T, U, V, W, X, Y, Z>(a: number)`` — 7 type params + 1 value param.
+    """``function f<T, U, V, W, X, Y, Z>(a: number)`` - 7 type params + 1 value param.
 
     Type parameters live in a separate ``type_parameters`` node, not
     inside ``formal_parameters``, so the rule's existing param walk
@@ -63,7 +63,7 @@ def test_ts_value_parameters_still_count(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# SAFE302 global_mutation — declare global and (globalThis as any).foo
+# SAFE302 global_mutation - declare global and (globalThis as any).foo
 # ---------------------------------------------------------------------------
 
 
@@ -71,7 +71,7 @@ def test_ts_declare_global_block_does_not_fire_safe302(tmp_path: Path) -> None:
     """``declare global { interface Window { ... } }`` is a type-only TS block.
 
     Wrapped in an ``ambient_declaration`` node. Contains no
-    ``assignment_expression``, so the rule should not fire — the
+    ``assignment_expression``, so the rule should not fire - the
     block exists at compile time only and has no runtime effect.
     """
     sample = tmp_path / "ambient.ts"
@@ -84,7 +84,7 @@ def test_ts_declare_global_block_does_not_fire_safe302(tmp_path: Path) -> None:
 
 
 def test_ts_runtime_assignment_to_global_via_as_cast_fires(tmp_path: Path) -> None:
-    """``(globalThis as any).counter = 1`` — TS users wrap globalThis in an ``as`` cast.
+    """``(globalThis as any).counter = 1`` - TS users wrap globalThis in an ``as`` cast.
 
     The LHS chain has ``parenthesized_expression`` → ``as_expression`` →
     ``identifier`` (``globalThis``). The rule's leftward walk must
@@ -98,18 +98,18 @@ def test_ts_runtime_assignment_to_global_via_as_cast_fires(tmp_path: Path) -> No
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
-    assert any(v.code == "SAFE302" for v in result.violations), "(globalThis as any).foo = ... should fire — runtime write to a global namespace"
+    assert any(v.code == "SAFE302" for v in result.violations), "(globalThis as any).foo = ... should fire - runtime write to a global namespace"
 
 
 # ---------------------------------------------------------------------------
-# SAFE803 null_dereference — non-null assertion must NOT bypass the check
+# SAFE803 null_dereference - non-null assertion must NOT bypass the check
 # ---------------------------------------------------------------------------
 
 
 def test_ts_non_null_assertion_does_not_bypass_safe803(tmp_path: Path) -> None:
-    """``users.find(...)!.name`` — the ``!`` is a TS compile-time annotation.
+    """``users.find(...)!.name`` - the ``!`` is a TS compile-time annotation.
 
-    At runtime the code is ``users.find(...).name`` — if ``.find()``
+    At runtime the code is ``users.find(...).name`` - if ``.find()``
     returns ``undefined``, accessing ``.name`` crashes. The ``!`` says
     "trust me it's not null" but provides zero runtime safety. SAFE803
     should still fire because the underlying call IS nullable.
@@ -126,11 +126,11 @@ def test_ts_non_null_assertion_does_not_bypass_safe803(tmp_path: Path) -> None:
     )
     cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
     result = SafetyEngine(cfg).check_file(str(sample))
-    assert any(v.code == "SAFE803" for v in result.violations), "users.find(...)!.name should fire — the ``!`` is a TS-only annotation, not a runtime guard"
+    assert any(v.code == "SAFE803" for v in result.violations), "users.find(...)!.name should fire - the ``!`` is a TS-only annotation, not a runtime guard"
 
 
 def test_ts_optional_chaining_still_does_not_fire(tmp_path: Path) -> None:
-    """``users.find(...)?.name`` is the real null-safe form — should NOT fire (positive control)."""
+    """``users.find(...)?.name`` is the real null-safe form - should NOT fire (positive control)."""
     sample = tmp_path / "optchain.ts"
     sample.write_text(
         "function f(users: any[]): string | undefined {\n  return users.find((u: any) => u.id === 1)?.name;\n}\n",
@@ -142,7 +142,7 @@ def test_ts_optional_chaining_still_does_not_fire(tmp_path: Path) -> None:
 
 
 def test_ts_as_cast_does_not_bypass_safe803(tmp_path: Path) -> None:
-    """``(users.find(...) as User).name`` — the ``as`` cast is a compile-time annotation.
+    """``(users.find(...) as User).name`` - the ``as`` cast is a compile-time annotation.
 
     Regression guard: earlier the rule only unwrapped a single
     ``non_null_expression`` wrapper, so ``(call as Type).prop``,
@@ -159,11 +159,11 @@ def test_ts_as_cast_does_not_bypass_safe803(tmp_path: Path) -> None:
     )
     cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
     result = SafetyEngine(cfg).check_file(str(sample))
-    assert any(v.code == "SAFE803" for v in result.violations), "(users.find(...) as User).name should fire — ``as`` is a compile-time annotation, not a runtime guard"
+    assert any(v.code == "SAFE803" for v in result.violations), "(users.find(...) as User).name should fire - ``as`` is a compile-time annotation, not a runtime guard"
 
 
 def test_ts_parenthesized_call_does_not_bypass_safe803(tmp_path: Path) -> None:
-    """``(users.find(...)).name`` — bare parentheses must not bypass SAFE803."""
+    """``(users.find(...)).name`` - bare parentheses must not bypass SAFE803."""
     sample = tmp_path / "parens.ts"
     sample.write_text(
         "function f(users: any[]): string {\n  return (users.find((u: any) => u.id === 1)).name;\n}\n",
@@ -171,11 +171,11 @@ def test_ts_parenthesized_call_does_not_bypass_safe803(tmp_path: Path) -> None:
     )
     cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
     result = SafetyEngine(cfg).check_file(str(sample))
-    assert any(v.code == "SAFE803" for v in result.violations), "(users.find(...)).name should fire — parens are pass-through"
+    assert any(v.code == "SAFE803" for v in result.violations), "(users.find(...)).name should fire - parens are pass-through"
 
 
 def test_ts_satisfies_expression_does_not_bypass_safe803(tmp_path: Path) -> None:
-    """``(users.find(...) satisfies User).name`` — ``satisfies`` is a TS compile-time annotation."""
+    """``(users.find(...) satisfies User).name`` - ``satisfies`` is a TS compile-time annotation."""
     sample = tmp_path / "satisfies.ts"
     sample.write_text(
         "interface User { name: string; }\nfunction f(users: User[]): string {\n  return (users.find((u: User) => u.name === 'a') satisfies User).name;\n}\n",
@@ -183,11 +183,11 @@ def test_ts_satisfies_expression_does_not_bypass_safe803(tmp_path: Path) -> None
     )
     cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
     result = SafetyEngine(cfg).check_file(str(sample))
-    assert any(v.code == "SAFE803" for v in result.violations), "(users.find(...) satisfies User).name should fire — ``satisfies`` is compile-time-only"
+    assert any(v.code == "SAFE803" for v in result.violations), "(users.find(...) satisfies User).name should fire - ``satisfies`` is compile-time-only"
 
 
 def test_ts_combined_wrappers_do_not_bypass_safe803(tmp_path: Path) -> None:
-    """``(users.find(...) as User)!.name`` — paren + ``as`` + ``!`` stacked should still fire."""
+    """``(users.find(...) as User)!.name`` - paren + ``as`` + ``!`` stacked should still fire."""
     sample = tmp_path / "combined.ts"
     sample.write_text(
         "interface User { name: string; }\nfunction f(users: User[]): string {\n  return (users.find((u: User) => u.name === 'a') as User)!.name;\n}\n",
@@ -195,14 +195,14 @@ def test_ts_combined_wrappers_do_not_bypass_safe803(tmp_path: Path) -> None:
     )
     cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
     result = SafetyEngine(cfg).check_file(str(sample))
-    assert any(v.code == "SAFE803" for v in result.violations), "stacked wrappers should still fire — all four are zero-runtime-cost"
+    assert any(v.code == "SAFE803" for v in result.violations), "stacked wrappers should still fire - all four are zero-runtime-cost"
 
 
 def test_ts_angle_bracket_cast_does_not_bypass_safe803(tmp_path: Path) -> None:
-    """``(<User>users.find(...)).name`` — older angle-bracket cast syntax must not bypass SAFE803.
+    """``(<User>users.find(...)).name`` - older angle-bracket cast syntax must not bypass SAFE803.
 
     TypeScript's angle-bracket cast (``<Foo>x``) is equivalent to
-    ``x as Foo`` at runtime — both are zero-cost annotations the
+    ``x as Foo`` at runtime - both are zero-cost annotations the
     compiler strips. Tree-sitter parses this as ``type_assertion``
     (NOT ``as_expression``), so SAFE803 needs the node type in its
     pass-through wrapper set or the rule silently passes on plain TS
@@ -217,16 +217,16 @@ def test_ts_angle_bracket_cast_does_not_bypass_safe803(tmp_path: Path) -> None:
     )
     cfg = deep_merge(DEFAULTS, {"rules": {"null_dereference": {"enabled": True}}})
     result = SafetyEngine(cfg).check_file(str(sample))
-    assert any(v.code == "SAFE803" for v in result.violations), "(<User>users.find(...)).name should fire — angle-bracket cast is compile-time-only"
+    assert any(v.code == "SAFE803" for v in result.violations), "(<User>users.find(...)).name should fire - angle-bracket cast is compile-time-only"
 
 
 # ---------------------------------------------------------------------------
-# SAFE801 tainted_sink — `as` cast must not break taint propagation
+# SAFE801 tainted_sink - `as` cast must not break taint propagation
 # ---------------------------------------------------------------------------
 
 
 def test_ts_as_expression_preserves_taint(tmp_path: Path) -> None:
-    """``eval(userInput as string)`` — the ``as`` cast is type-only, taint flows through.
+    """``eval(userInput as string)`` - the ``as`` cast is type-only, taint flows through.
 
     Tree-sitter wraps the cast in ``as_expression(identifier, type)``.
     The JS taint tracker doesn't know this node type, so it would
@@ -240,11 +240,11 @@ def test_ts_as_expression_preserves_taint(tmp_path: Path) -> None:
     )
     cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
     result = SafetyEngine(cfg).check_file(str(sample))
-    assert any(v.code == "SAFE801" for v in result.violations), "eval(userInput as string) should fire — the cast is type-only and taint flows through"
+    assert any(v.code == "SAFE801" for v in result.violations), "eval(userInput as string) should fire - the cast is type-only and taint flows through"
 
 
 def test_ts_satisfies_expression_preserves_taint(tmp_path: Path) -> None:
-    """``eval(userInput satisfies string)`` — ``satisfies`` is another TS-only annotation.
+    """``eval(userInput satisfies string)`` - ``satisfies`` is another TS-only annotation.
 
     Like ``as``, ``satisfies`` is compile-time-only and doesn't change
     the runtime value. Taint must propagate through it.
@@ -260,7 +260,7 @@ def test_ts_satisfies_expression_preserves_taint(tmp_path: Path) -> None:
 
 
 def test_ts_non_null_assertion_preserves_taint(tmp_path: Path) -> None:
-    """``eval(userInput!)`` — non-null assertion preserves taint, same reasoning."""
+    """``eval(userInput!)`` - non-null assertion preserves taint, same reasoning."""
     sample = tmp_path / "nonnull_taint.ts"
     sample.write_text(
         "function run(userInput: string | null): void {\n  eval(userInput!);\n}\n",
@@ -272,12 +272,12 @@ def test_ts_non_null_assertion_preserves_taint(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# SAFE701 test_existence — must recognise *.test.ts / *.spec.ts patterns
+# SAFE701 test_existence - must recognise *.test.ts / *.spec.ts patterns
 # ---------------------------------------------------------------------------
 
 
 def test_ts_test_existence_finds_paired_test_ts_file(tmp_path: Path) -> None:
-    """``src/foo.ts`` paired with ``tests/foo.test.ts`` — SAFE701 must NOT fire.
+    """``src/foo.ts`` paired with ``tests/foo.test.ts`` - SAFE701 must NOT fire.
 
     Currently the rule's ``_candidate_test_filenames`` only generates
     JS-extension patterns (.test.js, .spec.cjs, etc.); it doesn't
@@ -299,11 +299,11 @@ def test_ts_test_existence_finds_paired_test_ts_file(tmp_path: Path) -> None:
         {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(test_dir)]}}},
     )
     result = SafetyEngine(cfg).check_file(str(sample))
-    assert not any(v.code == "SAFE701" for v in result.violations), "src/foo.ts paired with tests/foo.test.ts — SAFE701 should be satisfied"
+    assert not any(v.code == "SAFE701" for v in result.violations), "src/foo.ts paired with tests/foo.test.ts - SAFE701 should be satisfied"
 
 
 def test_ts_test_existence_fires_when_no_paired_test(tmp_path: Path) -> None:
-    """``src/lonely.ts`` with no paired test — SAFE701 SHOULD fire (positive control)."""
+    """``src/lonely.ts`` with no paired test - SAFE701 SHOULD fire (positive control)."""
     src_dir = tmp_path / "src"
     src_dir.mkdir()
     test_dir = tmp_path / "tests"
@@ -326,7 +326,7 @@ def test_ts_test_existence_fires_when_no_paired_test(tmp_path: Path) -> None:
 
 
 def test_ts_decorators_do_not_break_function_dispatch(tmp_path: Path) -> None:
-    """``@Component class Foo`` — decorators are class-level metadata; rules ignore them cleanly.
+    """``@Component class Foo`` - decorators are class-level metadata; rules ignore them cleanly.
 
     A long method inside a decorated class should still fire SAFE101.
     The ``decorator`` node is a child of ``class_declaration`` /
@@ -346,7 +346,7 @@ def test_ts_decorators_do_not_break_function_dispatch(tmp_path: Path) -> None:
 def test_ts_long_type_signature_does_not_inflate_function_length(tmp_path: Path) -> None:
     """A function with a long type signature (one line) and a short body should not fire SAFE101.
 
-    The type annotations are part of the function signature line —
+    The type annotations are part of the function signature line -
     they don't add to the function body's line count regardless of
     whether they're verbose.
     """
@@ -378,7 +378,7 @@ def test_ts_inherits_javascript_config_when_typescript_key_unset(tmp_path: Path)
     )
     cfg = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
     result = SafetyEngine(cfg).check_file(str(sample))
-    assert any(v.code == "SAFE801" for v in result.violations), "TS file with default config should fire SAFE801 — TS inherits sinks_javascript"
+    assert any(v.code == "SAFE801" for v in result.violations), "TS file with default config should fire SAFE801 - TS inherits sinks_javascript"
 
 
 def test_ts_typescript_key_overrides_javascript_when_explicitly_set(tmp_path: Path) -> None:
@@ -400,14 +400,14 @@ def test_ts_typescript_key_overrides_javascript_when_explicitly_set(tmp_path: Pa
             "rules": {
                 "tainted_sink": {
                     "enabled": True,
-                    # Override: TS-specific list — only "myCustomDangerous" is a sink.
+                    # Override: TS-specific list - only "myCustomDangerous" is a sink.
                     "sinks_typescript": ["myCustomDangerous"],
                 }
             }
         },
     )
     result = SafetyEngine(cfg).check_file(str(sample))
-    assert not any(v.code == "SAFE801" for v in result.violations), "sinks_typescript explicit override should replace the JS list — eval should NOT fire"
+    assert not any(v.code == "SAFE801" for v in result.violations), "sinks_typescript explicit override should replace the JS list - eval should NOT fire"
 
 
 def test_ts_typescript_key_used_when_javascript_unset(tmp_path: Path) -> None:
@@ -441,7 +441,7 @@ def test_ts_io_functions_inherits_javascript_default(tmp_path: Path) -> None:
 
     Regression guard: ``side_effects.py:_io_funcs_for_lang`` previously built
     its config key from ``f"io_functions_{lang_name}"``, producing
-    ``io_functions_typescript`` for TS files — which has no default.
+    ``io_functions_typescript`` for TS files - which has no default.
     The TS→JS fallback in ``get_per_language_config`` restores the
     expected behaviour: TS files see the JS I/O primitive list and
     SAFE304 fires correctly.
@@ -454,7 +454,7 @@ def test_ts_io_functions_inherits_javascript_default(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
-    assert any(v.code == "SAFE304" for v in result.violations), "TS file with default config should fire SAFE304 — TS inherits io_functions_javascript"
+    assert any(v.code == "SAFE304" for v in result.violations), "TS file with default config should fire SAFE304 - TS inherits io_functions_javascript"
 
 
 def test_ts_bad_javascript_value_error_message_names_the_javascript_key(tmp_path: Path) -> None:
@@ -463,7 +463,7 @@ def test_ts_bad_javascript_value_error_message_names_the_javascript_key(tmp_path
     Regression guard: rules used to set ``error_key = f"{base}_{lang_name}"``
     unconditionally, so when a TS file resolved a bad ``foo_javascript = "x"``
     value via the TS→JS fallback, the TypeError pointed at
-    ``foo_typescript`` — a key the user never set. The fix is to thread
+    ``foo_typescript`` - a key the user never set. The fix is to thread
     the actual source key through via ``resolve_lang_config_lookup`` so
     diagnostics name the key the user can actually fix.
 
@@ -479,7 +479,7 @@ def test_ts_bad_javascript_value_error_message_names_the_javascript_key(tmp_path
             "rules": {
                 "side_effects": {
                     "enabled": True,
-                    # Bare string — user typo, should have been a list. Fails validation.
+                    # Bare string - user typo, should have been a list. Fails validation.
                     "io_functions_javascript": "log",
                 }
             }

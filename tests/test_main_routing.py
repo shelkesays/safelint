@@ -76,7 +76,7 @@ def test_dispatch_hook_silent_failure_emits_only_error_no_redundant_warning(
     Regression for the UX bug where pre-commit batched files across N
     invocations and each invocation emitted both a per-extension
     warning AND the silent-failure error containing the same install
-    hint — N batches * 2 lines = noisy duplication. The fix detects
+    hint - N batches * 2 lines = noisy duplication. The fix detects
     the silent-failure case *before* emitting per-extension warnings
     and skips the warning since the error already carries the
     actionable install hint.
@@ -119,7 +119,7 @@ def test_dispatch_hook_mixed_run_still_emits_per_extension_warning(
     )
     mocker.patch.object(cli, "supported_extensions", return_value=frozenset({".py"}))
     mocker.patch.object(cli, "_run_hook", return_value=0)
-    # One .py (will lint), one .ts (will be skipped) — mixed case.
+    # One .py (will lint), one .ts (will be skipped) - mixed case.
     monkeypatch.setattr("sys.argv", ["safelint", "app.py", "lib.ts"])
 
     with pytest.raises(SystemExit):
@@ -200,7 +200,7 @@ def test_main_routes_to_hook_when_first_positional_is_a_file(monkeypatch: pytest
 
 
 def test_main_does_not_print_help_when_no_args(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    """Bare ``safelint`` (no args) routes to hook mode and stays silent — it does NOT print help.
+    """Bare ``safelint`` (no args) routes to hook mode and stays silent - it does NOT print help.
 
     This documents the actual behaviour and locks it in: top-level
     help is reached only via ``safelint help`` / ``safelint -h`` /
@@ -277,7 +277,7 @@ def test_main_prints_version_for_version_command(monkeypatch: pytest.MonkeyPatch
 
 
 # ---------------------------------------------------------------------------
-# Help / version scanning is position-independent — global flags placed
+# Help / version scanning is position-independent - global flags placed
 # *before* the help / version marker (``safelint --format json --version``)
 # must still reach the polished top-level renderer rather than falling
 # through to argparse. Locks the contract in so a future early-router
@@ -302,7 +302,7 @@ def test_main_prints_help_after_value_taking_global_flag(monkeypatch: pytest.Mon
     assert exc.value.code == 0
     out = capsys.readouterr().out
     # Polished renderer emits ``Usage: safelint [OPTIONS] <COMMAND>`` and the
-    # ``Commands:`` / ``Global options:`` section headers — argparse's
+    # ``Commands:`` / ``Global options:`` section headers - argparse's
     # auto-generated help has neither.
     assert "Usage: safelint [OPTIONS] <COMMAND>" in out
     assert "Commands:" in out
@@ -321,8 +321,8 @@ def test_main_prints_help_with_short_v_after_global_flag(monkeypatch: pytest.Mon
 def _assert_check_subcommand_help(out: str) -> None:
     """Assert *out* is the ``check`` subcommand's argparse usage banner.
 
-    Tighter than ``"check" in out`` (which the top-level help — which
-    *lists* ``check`` as a command — would also satisfy). The check
+    Tighter than ``"check" in out`` (which the top-level help - which
+    *lists* ``check`` as a command - would also satisfy). The check
     parser's auto-generated help starts with ``usage: safelint
     check`` on its first non-empty line, which the top-level
     polished help (``Usage: safelint [OPTIONS] <COMMAND>``) does not.
@@ -362,10 +362,10 @@ def test_main_routes_help_keyword_with_flags_interleaved(monkeypatch: pytest.Mon
 
 
 def test_main_routes_to_normal_parser_when_subcommand_precedes_help(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
-    """``safelint check --help`` does NOT match the early router — argparse owns subcommand help.
+    """``safelint check --help`` does NOT match the early router - argparse owns subcommand help.
 
     The early scan stops at the first non-``help`` positional (``check``
-    here), so ``--help`` after that point goes to argparse — matching
+    here), so ``--help`` after that point goes to argparse - matching
     the design where each subcommand owns its own usage line.
     """
     monkeypatch.setattr("sys.argv", ["safelint", "check", "--help"])
@@ -391,9 +391,9 @@ def test_first_positional_index_skips_value_taking_options() -> None:
     """``_first_positional_index`` returns the index of the first true positional."""
     assert cli._first_positional_index(["--format", "json", "check", "src"]) == 2
     assert cli._first_positional_index(["--mode", "ci", "--fail-on", "warning", "x"]) == 4
-    # Equals form is one token — no skip.
+    # Equals form is one token - no skip.
     assert cli._first_positional_index(["--format=json", "check"]) == 1
-    # Store-true flag — no skip.
+    # Store-true flag - no skip.
     assert cli._first_positional_index(["--all-files", "src"]) == 1
     # Nothing positional.
     assert cli._first_positional_index(["--format", "json"]) is None
@@ -414,7 +414,7 @@ def test_run_hook_threads_cli_ignore_into_engine_config(tmp_path: Path, mocker: 
     Patches the ``SafetyEngine`` constructor used by ``cli._run_hook`` to
     capture the merged config dict, then asserts ``SAFE999`` (passed via
     ``args.ignore``) ended up in ``config["ignore"]``. Without this
-    assertion the test only proved ``_run_hook`` returned 0 — it didn't
+    assertion the test only proved ``_run_hook`` returned 0 - it didn't
     actually verify the CLI flag was threaded through.
     """
     sample = tmp_path / "f.py"
@@ -525,7 +525,7 @@ def test_filter_modified_under_target_drops_deleted_paths(tmp_path: Path) -> Non
     check.
     """
     (tmp_path / "src" / "python").mkdir(parents=True)
-    # Do NOT create src/python/old_module.ts — simulates a deletion that's
+    # Do NOT create src/python/old_module.ts - simulates a deletion that's
     # still in git's diff output.
     raw = {"src/python/old_module.ts"}
     target_abs = (tmp_path / "src" / "python").resolve()
@@ -594,7 +594,7 @@ def test_print_statistics_emits_per_rule_table(capsys: pytest.CaptureFixture[str
 
 
 def test_print_statistics_silent_when_no_violations(capsys: pytest.CaptureFixture[str]) -> None:
-    """Empty input prints nothing — no header, no table, no blank lines."""
+    """Empty input prints nothing - no header, no table, no blank lines."""
     cli._print_statistics([], [])
     captured = capsys.readouterr()
     assert captured.out == ""
@@ -614,7 +614,7 @@ def test_run_check_json_emits_empty_doc_when_no_modified_files(
     # 3-tuple per v2.0.0+ signature: (all_changed, in_target, considered_modified).
     # ``considered_modified`` is the set of git-modified paths under target
     # (no supported-extension filter applied); empty means "user genuinely
-    # modified nothing under target" — distinct from "modified but all
+    # modified nothing under target" - distinct from "modified but all
     # filtered out by missing-grammar extensions" which is the silent-pass case.
     mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=([], [], set()))
     args = argparse.Namespace(
@@ -706,7 +706,7 @@ def test_run_check_returns_2_when_only_modified_files_have_unavailable_grammar(t
     masking the case where the user DID modify files but every one
     was filtered out because its grammar isn't installed.
     ``no_targets=True`` would then exit 0 (silent pass) without ever
-    consulting the unavailable-extension state — exactly the worst-
+    consulting the unavailable-extension state - exactly the worst-
     case CI scenario.
 
     Fix plumbs the ``considered_modified`` set (git-modified paths under
@@ -748,7 +748,7 @@ def test_run_check_returns_0_when_genuinely_no_modifications(tmp_path: Path, moc
     mocker.patch.object(
         cli,
         "_get_git_modified_supported_files",
-        return_value=([], [], set()),  # empty considered set — genuine clean
+        return_value=([], [], set()),  # empty considered set - genuine clean
     )
     mocker.patch.object(
         cli,
