@@ -38,7 +38,7 @@ def _args(
 
 
 # ---------------------------------------------------------------------------
-# SafetyEngine.check_source — pure unit
+# SafetyEngine.check_source - pure unit
 # ---------------------------------------------------------------------------
 
 
@@ -47,7 +47,7 @@ def test_engine_check_source_lints_in_memory_buffer() -> None:
     a caller-provided string instead of reading from disk."""
     source = "def f():\n    if True:\n        if True:\n            if True:\n                pass\n"
     result = SafetyEngine(DEFAULTS).check_source("<buffer>.py", source)
-    # Three nested ifs — nesting_depth fires.
+    # Three nested ifs - nesting_depth fires.
     assert any(v.rule == "nesting_depth" for v in result.violations)
     # And the violation's filepath is the caller-supplied pseudo-name.
     assert all(v.filepath == "<buffer>.py" for v in result.violations)
@@ -61,7 +61,7 @@ def test_engine_check_source_empty_for_unsupported_extension() -> None:
 
 
 def test_engine_check_source_respects_exclude_paths() -> None:
-    """Exclude patterns still apply to in-memory sources — important for
+    """Exclude patterns still apply to in-memory sources - important for
     editor integrations that lint files in excluded dirs.
 
     Uses ``extend_exclude_paths`` (the documented recommended form,
@@ -84,12 +84,12 @@ def test_engine_check_source_reports_parse_errors() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CLI _run_stdin — integration through the CLI helper
+# CLI _run_stdin - integration through the CLI helper
 # ---------------------------------------------------------------------------
 
 
 def test_run_stdin_pretty_output_for_clean_buffer(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    """A clean buffer exits 0 with no stdout — matches the hook-mode contract
+    """A clean buffer exits 0 with no stdout - matches the hook-mode contract
     (silent on success). Editors can rely on exit code for the success signal."""
     monkeypatch.setattr(sys, "stdin", io.StringIO("x = 1\n"))
     rc = _run_stdin(_args())
@@ -148,12 +148,12 @@ def test_run_stdin_unsupported_extension_returns_zero_with_empty_output(
 
 
 def test_run_stdin_threads_cli_ignore_into_engine(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    """``--ignore`` from the CLI must apply in stdin mode too — same as file mode."""
+    """``--ignore`` from the CLI must apply in stdin mode too - same as file mode."""
     source = "def f():\n    if True:\n        if True:\n            if True:\n                pass\n"
     monkeypatch.setattr(sys, "stdin", io.StringIO(source))
     rc = _run_stdin(_args(ignore=["SAFE102"], stdin_filename="buf.py"))
     # SAFE102 was the only violation that would fire; ignoring it leaves a
-    # clean run — exit 0 with no violations on stdout.
+    # clean run - exit 0 with no violations on stdout.
     assert rc == 0
     out = capsys.readouterr().out
     assert "SAFE102" not in out

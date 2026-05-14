@@ -23,7 +23,7 @@ hooks:
 theme:
   name: material
   language: en
-  # Brand identity — SVGs served from ``docs/assets/`` (committed
+  # Brand identity - SVGs served from ``docs/assets/`` (committed
   # alongside the markdown so mkdocs picks them up via its default
   # static-asset handling). Two separate files: the full wordmark
   # logo for the header, and a stripped-down icon variant for the
@@ -68,7 +68,7 @@ markdown_extensions:
   - admonition                    # !!! note / warning / tip blocks
   - attr_list                     # {.foo} class attributes on elements
   - md_in_html                    # Markdown inside HTML blocks
-  - meta                          # YAML frontmatter — used by prepare_docs.py
+  - meta                          # YAML frontmatter - used by prepare_docs.py
                                   # to set per-page edit_url on the gitignored
                                   # community-health copies
   - tables
@@ -162,7 +162,7 @@ extra:
 #   SUPPORT.md            → docs/project/support.md
 # Plus the rules-at-a-glance snippet at build/snippets/_rules_at_a_glance.md
 # (sourced from ``safelint.rules.ALL_RULES``). All targets are NOT committed
-# (gitignored) — source of truth is the repo-root file (which GitHub also
+# (gitignored) - source of truth is the repo-root file (which GitHub also
 # surfaces in its community-health UI). Because the prep step is wired in
 # as a hook, ``uv run mkdocs serve`` and ``uv run mkdocs build --strict``
-# both regenerate everything automatically — no separate prep command.
+# both regenerate everything automatically - no separate prep command.

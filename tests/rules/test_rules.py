@@ -155,7 +155,7 @@ def test_resource_lifecycle_extend_tracked_functions(tmp_path: Path) -> None:
     )
     violations = SafetyEngine(config).check_file(str(sample)).violations
     assert any(v.rule == "resource_lifecycle" and "acquire_widget" in v.message for v in violations)
-    # And the default ``open`` is still tracked — extension didn't displace it.
+    # And the default ``open`` is still tracked - extension didn't displace it.
     src2 = "f = open('x.txt')\nf.read()\n"
     sample2 = tmp_path / "still_default.py"
     sample2.write_text(src2, encoding="utf-8")
@@ -201,7 +201,7 @@ def test_resource_lifecycle_rejects_string_cleanup_patterns(tmp_path: Path) -> N
 
 
 def test_empty_except_flags_pass_body(tmp_path: Path) -> None:
-    """``except: pass`` is the canonical no-op handler — must fire SAFE202."""
+    """``except: pass`` is the canonical no-op handler - must fire SAFE202."""
     source = textwrap.dedent("""\
         def f():
             try:
@@ -231,7 +231,7 @@ def test_empty_except_flags_ellipsis_body(tmp_path: Path) -> None:
 
 
 def test_empty_except_flags_string_literal_body(tmp_path: Path) -> None:
-    """``except: "TODO"`` — string-as-comment idiom is also a no-op."""
+    """``except: "TODO"`` - string-as-comment idiom is also a no-op."""
     source = textwrap.dedent("""\
         def f():
             try:
@@ -278,7 +278,7 @@ def test_empty_except_does_not_flag_real_handler(tmp_path: Path) -> None:
 
 
 def test_empty_except_does_not_flag_interpolated_fstring_body(tmp_path: Path) -> None:
-    """``except E: f"got {e!r}"`` evaluates ``e!r`` — that's a real side effect.
+    """``except E: f"got {e!r}"`` evaluates ``e!r`` - that's a real side effect.
 
     Regression: an earlier version had ``"string"`` in the literal-types
     set, which caused interpolated f-strings to short-circuit before the
@@ -312,7 +312,7 @@ def test_empty_except_does_not_flag_multi_statement_body(tmp_path: Path) -> None
     sample = tmp_path / "ee_multi.py"
     sample.write_text(source, encoding="utf-8")
     violations = _engine().check_file(str(sample)).violations
-    # Multi-statement body — not flagged by SAFE202 (still flagged by SAFE203
+    # Multi-statement body - not flagged by SAFE202 (still flagged by SAFE203
     # for missing logging call, but that's a separate rule).
     assert not any(v.code == "SAFE202" for v in violations)
 
@@ -359,13 +359,13 @@ def test_bare_except_attaches_replace_with_exception_suggestion(tmp_path: Path) 
     # Range should cover the ``except:`` header on line 4.
     assert edit.start_line == 4
     assert edit.end_line == 4
-    # Column precision: the edit must cover *exactly* the ``except:`` token —
+    # Column precision: the edit must cover *exactly* the ``except:`` token -
     # not the indentation before it, not the trailing newline. Locked in
     # to catch any regression in the suggestion's range computation
     # (off-by-one on either side would break editor-applied edits).
     # On the dedented source, line 4 is ``    except:``; the ``e`` of
     # ``except`` is at 1-based column 5, and the half-open range ends
-    # one past the closing colon — i.e. start_column + len("except:").
+    # one past the closing colon - i.e. start_column + len("except:").
     assert edit.start_column == 5
     assert edit.end_column == edit.start_column + len("except:")
 
@@ -529,7 +529,7 @@ def test_complexity_does_not_double_count_if_branches(tmp_path: Path) -> None:
     child (its named children are identifier/block/elif_clause/else_clause).
     ``if_clause`` only appears inside comprehensions like
     ``[x for x in y if z]``. The rule's set therefore must include
-    ``IF_STATEMENT`` to count plain ``if`` branches at all — removing it
+    ``IF_STATEMENT`` to count plain ``if`` branches at all - removing it
     would silently undercount.
 
     Assertions below use ``max_complexity`` boundaries that fail loudly if
@@ -723,7 +723,7 @@ def test_test_existence_skips_python_test_file_itself(tmp_path: Path) -> None:
     """SAFE701 doesn't fire on a Python test file passed as ``filepath``.
 
     Without the ``_is_test_file`` guard the rule would search for
-    ``test_test_foo.py`` when handed ``tests/test_foo.py`` — pure
+    ``test_test_foo.py`` when handed ``tests/test_foo.py`` - pure
     noise. With ``files: ^src/`` dropped from the published
     pre-commit hook in v1.13.0, the rules now reach test files in
     projects that don't restore the filter locally, so the guard
@@ -779,8 +779,8 @@ def test_test_coupling_ignores_same_basename_outside_test_dirs(tmp_path: Path) -
     (or any other file with the matching basename) would silently
     satisfy the coupling check even though the *actual* paired test
     under ``tests/`` wasn't touched. Restricting the basename match
-    to changed paths under a configured test_dirs entry — the same
-    path-component subsequence logic ``_is_test_file`` uses — fixes
+    to changed paths under a configured test_dirs entry - the same
+    path-component subsequence logic ``_is_test_file`` uses - fixes
     the false-negative.
     """
     src_dir = tmp_path / "src"
@@ -862,13 +862,13 @@ def test_cli_hook_mode_clean_run_with_suppressions_is_silent(
     passed. (N suppressed)``. Under pre-commit's file batching that
     became one such line per invocation, each showing a misleading
     *partial* count. ``silent_on_clean`` now suppresses the summary
-    on any clean run regardless of suppressions — pre-commit already
+    on any clean run regardless of suppressions - pre-commit already
     reports the hook as Passed, and the summed breakdown stays
     available via ``safelint check`` / ``--format json``.
     """
     sample = tmp_path / "suppressed.py"
     # 8 parameters trips SAFE103 (max_arguments, default cap 7); the inline
-    # ``# nosafe`` moves it into ``suppressed`` so the run is otherwise clean —
+    # ``# nosafe`` moves it into ``suppressed`` so the run is otherwise clean -
     # no other rule fires on this body.
     sample.write_text(
         "def fn(a, b, c, d, e, g, h, i):  # nosafe: SAFE103\n    return a\n",
@@ -891,7 +891,7 @@ def test_cli_check_mode_clean_run_with_suppressions_still_shows_breakdown(
 
     Companion to the hook-mode silence test: ``_run_check`` leaves
     ``silent_on_clean=False``, so the interactive user who explicitly
-    ran safelint still gets the summed-per-rule breakdown — issue #50's
+    ran safelint still gets the summed-per-rule breakdown - issue #50's
     fix is scoped to hook / stdin mode only.
     """
     sample = tmp_path / "suppressed.py"
@@ -899,7 +899,7 @@ def test_cli_check_mode_clean_run_with_suppressions_still_shows_breakdown(
         "def fn(a, b, c, d, e, g, h, i):  # nosafe: SAFE103\n    return a\n",
         encoding="utf-8",
     )
-    from safelint import cli as _cli  # noqa: PLC0415 — local import keeps the module-level import list lean
+    from safelint import cli as _cli  # noqa: PLC0415 - local import keeps the module-level import list lean
 
     mocker.patch.object(_cli, "_get_git_modified_supported_files", return_value=None)
     args = argparse.Namespace(
@@ -934,7 +934,7 @@ def test_cli_check_mode_suppression_breakdown_is_collective_and_language_agnosti
     a single per-rule count). ``_run_check`` accumulates ``all_suppressed``
     across every ``LintResult`` regardless of language, and
     ``_format_suppressed_breakdown`` keys the ``Counter`` on the rule
-    code — so the aggregation is structural, not per-language.
+    code - so the aggregation is structural, not per-language.
     """
     py_file = tmp_path / "mod.py"
     py_file.write_text(
@@ -946,7 +946,7 @@ def test_cli_check_mode_suppression_breakdown_is_collective_and_language_agnosti
         "function gn(a, b, c, d, e, g, h, i) {  // nosafe: SAFE103\n  return a;\n}\n",
         encoding="utf-8",
     )
-    from safelint import cli as _cli  # noqa: PLC0415 — local import keeps the module-level import list lean
+    from safelint import cli as _cli  # noqa: PLC0415 - local import keeps the module-level import list lean
 
     mocker.patch.object(_cli, "_get_git_modified_supported_files", return_value=None)
     args = argparse.Namespace(
@@ -964,7 +964,7 @@ def test_cli_check_mode_suppression_breakdown_is_collective_and_language_agnosti
     rc = _run_check(args)
     assert rc == 0
     out = capsys.readouterr().out
-    # Exactly one summary line — not one per file.
+    # Exactly one summary line - not one per file.
     assert out.count("All checks passed.") == 1, f"expected a single collective summary line; got {out!r}"
     # The Python (.py) and TypeScript (.ts) SAFE103 suppressions sum to 2.
     assert "2 SAFE103 suppressed" in out, f"cross-language suppressions must aggregate into one count; got {out!r}"
@@ -1235,7 +1235,7 @@ def test_max_arguments_counts_args_kwargs_splats(tmp_path: Path) -> None:
 
 
 def test_max_arguments_args_only_does_not_fire_under_limit(tmp_path: Path) -> None:
-    """A single *args with no other params is one parameter — should not fire."""
+    """A single *args with no other params is one parameter - should not fire."""
     source = "def variadic(*args):\n    pass\n"
     sample = tmp_path / "variadic.py"
     sample.write_text(source, encoding="utf-8")
@@ -1344,7 +1344,7 @@ def test_unbounded_loops_break_inside_nested_for_does_not_count(tmp_path: Path) 
 
 def test_logging_on_error_ignores_log_call_inside_nested_def(tmp_path: Path) -> None:
     """A logging call buried inside a nested ``def`` defined in the except
-    body must not satisfy SAFE203 — that helper isn't executed when the
+    body must not satisfy SAFE203 - that helper isn't executed when the
     exception fires, so the caller is still effectively swallowing the
     error silently."""
     source = textwrap.dedent("""\
@@ -1416,7 +1416,7 @@ def test_parse_error_reports_location_and_kind(tmp_path: Path) -> None:
     flags a missing-token error. We expect the violation to point at the
     line where the syntax breaks, not lineno=0.
     """
-    # `def foo()` without the closing `:` and a body — Tree-sitter cannot
+    # `def foo()` without the closing `:` and a body - Tree-sitter cannot
     # complete the function_definition rule and reports a missing token.
     source = "x = 1\ndef foo()\n    pass\n"
     sample = tmp_path / "broken.py"
@@ -1438,7 +1438,7 @@ def test_function_length_counts_inclusively(tmp_path: Path) -> None:
     """A function spanning N lines (including its def line) should report length N.
 
     Previously the calculation was ``end_lineno - lineno`` which under-reported
-    by 1 — a 60-line function read as 59. The fix is ``+ 1`` for inclusive
+    by 1 - a 60-line function read as 59. The fix is ``+ 1`` for inclusive
     line counting.
     """
     # 5-line function (def + 4 body lines), max_lines=4 → must fire.
@@ -1542,7 +1542,7 @@ def test_function_length_statement_types_invariant() -> None:
     Locks in the asymmetry exercised by the two behavioural tests
     above. A future change that accidentally adds ``function_definition``
     (or removes ``class_definition``) would slip past the behavioural
-    tests in subtle cases — e.g. a nested ``def`` adding 1 to the
+    tests in subtle cases - e.g. a nested ``def`` adding 1 to the
     outer count would still leave outer under the test's max=3
     threshold. A direct membership assertion on the constant fails
     fast on either parity break.
@@ -1581,7 +1581,7 @@ def test_function_length_statements_counts_nested_class_definition(tmp_path: Pat
 
     Without ``class_definition`` in ``_STATEMENT_TYPES``, a function
     whose body is dominated by a nested class would silently undercount
-    — the rule could miss legitimately large functions in statement
+    - the rule could miss legitimately large functions in statement
     mode. Adding it ensures the class itself contributes 1 (and its
     body's statements also count, matching the complexity-proxy
     intent of the statements mode).
@@ -1754,7 +1754,7 @@ def test_per_file_ignores_rejects_non_string_entries(tmp_path: Path) -> None:
 
 
 def test_ignore_rejects_non_string_entries(tmp_path: Path) -> None:
-    """Top-level ``ignore`` list — same contract as per_file_ignores: every
+    """Top-level ``ignore`` list - same contract as per_file_ignores: every
     entry must be a string. A non-string entry would crash on ``.upper()``
     inside the unknown-entries filter, so we surface the type error early."""
     cfg = deep_merge(DEFAULTS, {"ignore": ["SAFE101", 42]})
@@ -1782,7 +1782,7 @@ def test_load_config_returns_isolated_copy(tmp_path: Path) -> None:
 
 def test_load_config_treats_empty_standalone_safelint_toml_as_present(tmp_path: Path) -> None:
     """An empty ``safelint.toml`` next to a populated ``[tool.safelint]`` blocks
-    fallback to pyproject.toml — the standalone file is the chosen source even
+    fallback to pyproject.toml - the standalone file is the chosen source even
     if it has nothing to say."""
     (tmp_path / "pyproject.toml").write_text("[tool.safelint]\nmode = 'ci'\n", encoding="utf-8")
     (tmp_path / "safelint.toml").write_text("", encoding="utf-8")
@@ -1804,7 +1804,7 @@ def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
 
     Wraps the discovery call in a ``signal.alarm``-based timeout so any
     hang from a regression is interrupted in-place (no leftover work
-    or daemon thread continuing after the test fails). POSIX-only —
+    or daemon thread continuing after the test fails). POSIX-only -
     Windows lacks ``SIGALRM`` and is skipped.
     """
     if not hasattr(os, "symlink"):
@@ -1821,7 +1821,7 @@ def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
         pytest.skip("filesystem does not support directory symlinks")
 
     def _on_alarm(_signum: int, _frame: object) -> None:
-        msg = "discovery did not finish within 5s — symlink-cycle protection regressed"
+        msg = "discovery did not finish within 5s - symlink-cycle protection regressed"
         raise TimeoutError(msg)
 
     previous = signal.signal(signal.SIGALRM, _on_alarm)
@@ -1838,7 +1838,7 @@ def test_discover_files_does_not_loop_on_symlink_cycle(tmp_path: Path) -> None:
 
 
 def test_discover_files_prunes_excluded_subtrees(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    """Excluded directories should be pruned during ``os.walk`` descent —
+    """Excluded directories should be pruned during ``os.walk`` descent -
     not just filtered at the end. Verified by spying on ``Path.is_file``:
     if we ever query a file inside an excluded subtree, the prune logic
     broke and we did the wasted descent.
@@ -1863,7 +1863,7 @@ def test_discover_files_prunes_excluded_subtrees(tmp_path: Path, monkeypatch: py
 
     # Pattern matches the excluded directory's exact path so `_is_excluded`
     # prunes it during descent. ``extend_exclude_paths`` is the documented
-    # recommended form — the pattern goes through the same matcher as
+    # recommended form - the pattern goes through the same matcher as
     # ``exclude_paths``, so this exercises the descent-pruning path users
     # actually hit.
     cfg = deep_merge(DEFAULTS, {"extend_exclude_paths": [str(excluded_dir)]})
@@ -1872,7 +1872,7 @@ def test_discover_files_prunes_excluded_subtrees(tmp_path: Path, monkeypatch: py
     assert any(f.endswith("good.py") for f in files), "real file should still be discovered"
     assert not any("evil.py" in f or "deeper.py" in f for f in files), "files inside excluded subtree must not appear in results"
     # Critical: is_file() must never have been called on anything inside
-    # node_modules — the whole point of pruning is skipping the descent.
+    # node_modules - the whole point of pruning is skipping the descent.
     assert not any("node_modules" in q for q in queried), f"discovery descended into excluded subtree; queried paths: {[q for q in queried if 'node_modules' in q]}"
 
 
@@ -1883,7 +1883,7 @@ def test_discover_files_prunes_glob_pattern_directories(tmp_path: Path, monkeypa
     naive ``_is_excluded(str(dir_path / d))`` check would still descend.
     The fix: compose a directory-form candidate with a trailing slash.
 
-    Verified by spying on ``Path.is_file`` — files inside the
+    Verified by spying on ``Path.is_file`` - files inside the
     ``tests/**``-pruned subtree must never be queried.
     """
     target = tmp_path / "root"
@@ -1921,7 +1921,7 @@ def test_discover_files_prunes_glob_pattern_directories(tmp_path: Path, monkeypa
 
 def test_check_file_skips_non_regular_path(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``check_file`` is invoked directly by the CLI hook mode with an
-    explicit file list — bypassing ``_discover_files``'s regular-file
+    explicit file list - bypassing ``_discover_files``'s regular-file
     filter. Passing a FIFO straight in must not hang ``read_text``; the
     engine must skip it with a stderr warning and return an empty result.
     """
@@ -1946,7 +1946,7 @@ def test_discover_files_skips_non_regular_entries(tmp_path: Path) -> None:
     """``os.walk`` lists FIFOs / device files / broken symlinks alongside
     regular files. Reading a FIFO with ``read_text()`` would block the
     process forever, so discovery must filter to ``is_file()`` matches
-    only — preserving the safety guarantee from the previous
+    only - preserving the safety guarantee from the previous
     ``Path.rglob('*') + is_file()`` implementation.
     """
     if not hasattr(os, "mkfifo"):
@@ -1963,7 +1963,7 @@ def test_discover_files_skips_non_regular_entries(tmp_path: Path) -> None:
 
     files = _engine()._discover_files(target)
     assert str(real_file) in files
-    # FIFO with a `.py` name must NOT be picked up — would block read_text.
+    # FIFO with a `.py` name must NOT be picked up - would block read_text.
     assert str(fifo_path) not in files
 
 
@@ -1977,7 +1977,7 @@ def test_check_file_skips_oversized_input(
 
     Defence-in-depth: monkeypatch ``Path.read_text`` to raise loudly if it
     is invoked. The whole point of the size guard is that the file's
-    contents never enter the process — if we ever regressed and started
+    contents never enter the process - if we ever regressed and started
     reading the file before checking its size, this assertion would
     surface that immediately.
     """
@@ -2011,7 +2011,7 @@ def test_max_file_size_bytes_rejects_non_integer(tmp_path: Path) -> None:
 
 
 def test_max_file_size_bytes_rejects_bool(tmp_path: Path) -> None:
-    """``bool`` is a subclass of ``int`` in Python — explicitly reject it
+    """``bool`` is a subclass of ``int`` in Python - explicitly reject it
     so ``max_file_size_bytes = true`` doesn't silently coerce to ``1``."""
     cfg = deep_merge(DEFAULTS, {"max_file_size_bytes": True})
     with pytest.raises(TypeError, match="max_file_size_bytes must be a non-negative integer"):
@@ -2035,7 +2035,7 @@ def test_check_file_size_bound_zero_falls_back_to_default(tmp_path: Path, capsys
     engine = SafetyEngine(cfg)
 
     # Init-time warning fires. Case-insensitive substring matches keep the
-    # test resilient to small wording tweaks of the warning copy — only the
+    # test resilient to small wording tweaks of the warning copy - only the
     # *behaviour* (warns + falls back) is what's contractually locked in.
     captured = capsys.readouterr()
     err_lower = captured.err.lower()
@@ -2055,7 +2055,7 @@ def test_check_file_size_bound_zero_falls_back_to_default(tmp_path: Path, capsys
 
 
 def test_load_config_treats_empty_safelint_section_as_present(tmp_path: Path) -> None:
-    """An empty ``[tool.safelint]`` is a *present* config — the loader must
+    """An empty ``[tool.safelint]`` is a *present* config - the loader must
     stop at the first directory containing one, not fall through to an
     ancestor's config."""
     # Parent has a real config, child has an empty section. Loader is
@@ -2104,7 +2104,7 @@ def test_nesting_depth_match_statement_counts(tmp_path: Path) -> None:
     """PEP 634 ``match`` is control-flow and contributes to nesting depth.
 
     A ``for`` containing a ``match`` containing an ``if`` is 3 levels
-    deep — without ``match_statement`` in the depth-node set, the rule
+    deep - without ``match_statement`` in the depth-node set, the rule
     would silently miss this and let users exceed the configured depth.
     """
     source = textwrap.dedent("""\
@@ -2444,7 +2444,7 @@ def test_cli_check_only_in_target_files_linted(tmp_path: Path, mocker) -> None:
     empty_proc = _make_proc(mocker, returncode=0, stdout="")
     mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, diff_proc, diff_proc, empty_proc])
 
-    # Target is src/ only — test_mod.py must not be linted
+    # Target is src/ only - test_mod.py must not be linted
     args = argparse.Namespace(target=src_dir, config=None, fail_on="error", mode=None, all_files=False, ignore=None)
     assert _run_check(args) == 0
 
@@ -2488,6 +2488,6 @@ def test_test_coupling_handles_relative_changed_files_against_absolute_test_dirs
     violations = engine.check_file(str(sample)).violations
 
     # The relative ``tests/test_mymodule.py`` must be recognised as
-    # under the absolute ``test_dirs`` entry — coupling satisfied,
+    # under the absolute ``test_dirs`` entry - coupling satisfied,
     # SAFE702 must NOT fire.
     assert not any(v.rule == "test_coupling" for v in violations)

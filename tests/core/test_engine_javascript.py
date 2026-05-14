@@ -6,7 +6,7 @@ surface as ``SAFE000``, and Python-only rules are correctly skipped on
 JS files (the engine's per-language dispatch is exercised here).
 
 Per-rule JavaScript behaviour lives in dedicated test files under
-``tests/rules/test_*_javascript.py`` — this file stays focused on the
+``tests/rules/test_*_javascript.py`` - this file stays focused on the
 cross-language plumbing.
 """
 
@@ -28,7 +28,7 @@ def _engine(overrides: dict | None = None) -> SafetyEngine:
 
 
 # ---------------------------------------------------------------------------
-# Registry plumbing — JS is discoverable end-to-end.
+# Registry plumbing - JS is discoverable end-to-end.
 # ---------------------------------------------------------------------------
 
 
@@ -69,7 +69,7 @@ def test_engine_parses_js_file_with_no_python_rules_firing(tmp_path: Path) -> No
     Sample is small enough that no widened rule fires (function is
     short, has no nesting, no I/O, no taint flow). Verifies the
     engine parses the file and returns no violations rather than
-    crashing on an empty rule list — the per-language dispatch
+    crashing on an empty rule list - the per-language dispatch
     correctly invokes only the rules whose ``language`` tuple
     includes ``"javascript"``.
     """
@@ -108,7 +108,7 @@ def test_engine_parses_cjs_file(tmp_path: Path) -> None:
 def test_engine_emits_safe000_on_unparseable_js(tmp_path: Path) -> None:
     """Tree-sitter parse errors on broken JS surface as SAFE000."""
     sample = tmp_path / "broken.js"
-    # Unterminated function body — Tree-sitter recovers but flags an error.
+    # Unterminated function body - Tree-sitter recovers but flags an error.
     sample.write_text("function broken( {\n", encoding="utf-8")
     result = _engine().check_file(str(sample))
     parse_violations = [v for v in result.violations if v.code == "SAFE000"]
@@ -116,7 +116,7 @@ def test_engine_emits_safe000_on_unparseable_js(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# File discovery — directory walks pick up JS files.
+# File discovery - directory walks pick up JS files.
 # ---------------------------------------------------------------------------
 
 

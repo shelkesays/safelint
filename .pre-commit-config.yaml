@@ -33,7 +33,7 @@ repos:
         # tags but still validates the file's syntax. Needed because
         # ``mkdocs.yml`` wires up the mermaid renderer via
         # ``!!python/object/apply:pymdownx.superfences.fence_code_format``,
-        # which is the documented mkdocs-material idiom — at runtime
+        # which is the documented mkdocs-material idiom - at runtime
         # ``mkdocs build`` uses PyYAML's full loader, so the tag resolves
         # correctly there.
         args: [--unsafe]
@@ -41,11 +41,11 @@ repos:
       - id: end-of-file-fixer
         files: ^src/
       # Repo-wide CRLF → LF normalisation (except ``tests/fixtures/``,
-      # excluded globally at the top of this file — fixture files may
+      # excluded globally at the top of this file - fixture files may
       # carry intentionally weird line endings as test inputs).
       # Deliberately unscoped at the hook level (no ``files:`` selector)
       # so README.md, CHANGELOG.md, .pre-commit-config.yaml, workflows,
-      # examples — anything a Windows contributor might touch — stay LF.
+      # examples - anything a Windows contributor might touch - stay LF.
       # The original Lucas-C remove-crlf/forbid-crlf was scoped to
       # ^src/; we broaden here because the project has no .bat/.cmd/.ps1
       # files (which would legitimately need CRLF) and there's no
@@ -78,20 +78,20 @@ repos:
   # The four Lucas-C/pre-commit-hooks behaviours (remove-tabs, forbid-tabs,
   # remove-crlf, forbid-crlf) are now covered by three separate layers:
   #
-  #   * ``ruff format`` (below) — rewrites tab indentation to spaces in
+  #   * ``ruff format`` (below) - rewrites tab indentation to spaces in
   #     .py files because [tool.ruff.format] sets indent-style = "space".
   #     Replaces remove-tabs / forbid-tabs for Python sources.
   #   * ``mixed-line-ending`` (above, with ``--fix=lf``, no ``files:``
-  #     selector) — normalises CRLF → LF across the whole repo, broader
+  #     selector) - normalises CRLF → LF across the whole repo, broader
   #     than the original Lucas-C scope of ^src/. Replaces remove-crlf /
   #     forbid-crlf.
-  #   * This hook — closes the remaining gap: tabs in *non-Python* text
+  #   * This hook - closes the remaining gap: tabs in *non-Python* text
   #     under src/. Currently catches the skill_files/*.md files that
   #     ship in the wheel, and any future markdown / config we add there.
   #     Scoped to ^src/ on purpose so a future Makefile (which legitimately
   #     uses tab syntax) at the repo root wouldn't trip it.
   #
-  # No external repo dependency — runs the same Python pre-commit already
+  # No external repo dependency - runs the same Python pre-commit already
   # requires, via a portable one-liner.
   # ---------------------------------------------------------------------------
   - repo: local
@@ -128,7 +128,7 @@ repos:
   # not the published release. Avoids drift between hook and source while
   # iterating on safelint itself. Downstream consumers should pin
   # `repo: https://github.com/shelkesays/safelint` with a `rev: vX.Y.Z`
-  # — see README "Pre-commit integration".
+  # - see README "Pre-commit integration".
   #
   # Severity model:
   #   --fail-on=error    only error-severity violations block  ← default (lenient)

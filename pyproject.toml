@@ -22,13 +22,13 @@ classifiers = [
     "Topic :: Software Development :: Quality Assurance",
     "Topic :: Software Development :: Testing",
 ]
-# Core runtime deps — only the engine itself. *Every* language ships
+# Core runtime deps - only the engine itself. *Every* language ships
 # as an opt-in extra under ``[project.optional-dependencies]`` below.
 # This keeps the install minimal for projects that don't lint every
 # supported language: a Python-only repo doesn't pay for the JS / TS
 # grammars (~300 KB), a Go-only repo doesn't pay for the Python
 # grammar (~150 KB), and so on as more languages land. ``pip install
-# safelint`` alone installs the engine but no grammars — the CLI
+# safelint`` alone installs the engine but no grammars - the CLI
 # emits a clear install hint on first run.
 dependencies = [
     "tree-sitter>=0.23.0",
@@ -40,7 +40,7 @@ Repository = "https://github.com/shelkesays/safelint"
 Issues = "https://github.com/shelkesays/safelint/issues"
 
 [project.optional-dependencies]
-# Per-language grammar extras — opt in to whichever languages your
+# Per-language grammar extras - opt in to whichever languages your
 # project actually contains. Every language is its own extra; the base
 # install ships no grammars at all. Pick one (or several) of:
 #
@@ -56,7 +56,7 @@ Issues = "https://github.com/shelkesays/safelint/issues"
 #
 # While ``version`` above is still ``2.0.0rc3``, pin the RC explicitly
 # (e.g. ``pip install 'safelint[python]==2.0.0rc3'``) or pass ``--pre``
-# — an unpinned ``pip install 'safelint[<lang>]'`` resolves to the latest
+# - an unpinned ``pip install 'safelint[<lang>]'`` resolves to the latest
 # stable 1.x release on PyPI, which doesn't define these extras. Drop
 # the pin once v2.0.0 GA ships.
 python = [
@@ -67,7 +67,7 @@ javascript = [
 ]
 # TypeScript bundles ``tree-sitter-javascript`` because almost every TS
 # project also has ``.js`` files (vite/webpack/eslint configs, jest setup,
-# generated declaration shims). The ~150 KB extra is worth the ergonomics —
+# generated declaration shims). The ~150 KB extra is worth the ergonomics -
 # ``pip install 'safelint[typescript]'`` covers the typical TS-project shape
 # without forcing users to write ``[javascript,typescript]``.
 typescript = [
@@ -91,11 +91,11 @@ dev = [
     "ty>=0.0.26",
     # Dev installs lint and test against every supported language.
     # Pull in the full grammar set via the ``[all]`` extra rather than
-    # repeating the tree-sitter package list — single source of truth
+    # repeating the tree-sitter package list - single source of truth
     # for "every grammar"; adding a new language only edits ``[all]``.
     "safelint[all]",
 ]
-# Documentation site — Material-themed MkDocs build that publishes to
+# Documentation site - Material-themed MkDocs build that publishes to
 # https://shelkesays.github.io/safelint/. Install with `uv sync --extra docs`,
 # then `uv run mkdocs serve` for a live preview at http://127.0.0.1:8000.
 docs = [

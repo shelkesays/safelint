@@ -38,7 +38,7 @@ jobs:
 
       - name: Self-lint (safelint must pass itself)
         # CLAUDE.md mandates that ``safelint check src/`` produces zero
-        # blocking violations before merging — pre-commit enforces this
+        # blocking violations before merging - pre-commit enforces this
         # locally, this step enforces it at the CI tier so a push that
         # bypasses pre-commit can't slip through. ``--fail-on=error``
         # matches the CI mode used by the pre-commit hook.

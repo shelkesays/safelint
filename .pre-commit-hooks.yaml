@@ -4,27 +4,27 @@
     Checks source files against safety-critical coding rules inspired by
     Gerard J. Holzmann's Power of Ten (NASA/JPL). Catches oversized functions,
     deep nesting, bare excepts, global mutation, unbounded loops, and more.
-    Every supported language ships as an opt-in extra in v2.0.0+ — pick the
+    Every supported language ships as an opt-in extra in v2.0.0+ - pick the
     matching one via ``additional_dependencies`` in your
     ``.pre-commit-config.yaml``: ``['safelint[python]']``,
     ``['safelint[javascript]']``, ``['safelint[typescript]']``, or
     ``['safelint[all]']``. Without an extra, the hook installs only the
     engine and exits with a clear install hint on first run.
   entry: safelint
-  language: python  # the hook runtime — not the language being linted
+  language: python  # the hook runtime - not the language being linted
   # Files passed to the hook. ``types_or`` lists the source-language
   # filetype tags pre-commit recognises; safelint then drops anything
   # that isn't in ``supported_extensions()``. Add the new tag here
   # when registering a new language. ``ts`` covers ``.ts``; ``tsx``
   # covers ``.tsx``; AssemblyScript (``.as``) is NOT a standard
-  # ``identify`` filetype tag — ``.as`` files only carry the generic
+  # ``identify`` filetype tag - ``.as`` files only carry the generic
   # ``file`` / ``text`` tags. Adding ``files: \.as$`` alone is **not
   # enough**: pre-commit AND-s ``types_or`` with ``files``, so the
   # manifest's ``types_or`` still excludes the file. To lint ``.as``
   # via the published hook, AS users must OVERRIDE ``types_or`` with
   # a permissive tag that ``.as`` files actually carry (``text`` or
   # ``file``) and use ``files`` to scope the match. ``types_or: []``
-  # does NOT work — pre-commit treats an empty tag list as "no tag
+  # does NOT work - pre-commit treats an empty tag list as "no tag
   # matches" rather than "filter disabled", so the hook never fires:
   #
   #     - id: safelint

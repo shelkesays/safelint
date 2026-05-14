@@ -1,4 +1,4 @@
-# safelint configuration — single source of truth for this repository.
+# safelint configuration - single source of truth for this repository.
 #
 # This file is the standalone safelint config (top-level keys, no
 # ``[tool.safelint]`` wrapper). It takes precedence over ``[tool.safelint]``

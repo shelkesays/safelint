@@ -21,7 +21,7 @@ def _engine(overrides: dict | None = None) -> SafetyEngine:
 
 
 # ---------------------------------------------------------------------------
-# side_effects_hidden (SAFE303) — pure-named function doing I/O
+# side_effects_hidden (SAFE303) - pure-named function doing I/O
 # ---------------------------------------------------------------------------
 
 
@@ -66,7 +66,7 @@ def test_js_validate_function_with_fs_readfile_fires_safe303(tmp_path: Path) -> 
 
 def test_js_arrow_function_pure_named_with_io_fires(tmp_path: Path) -> None:
     """Arrow function bound via ``const`` resolves its name through the
-    enclosing ``variable_declarator`` — the pure-prefix check fires."""
+    enclosing ``variable_declarator`` - the pure-prefix check fires."""
     sample = tmp_path / "arrow.js"
     sample.write_text(
         "const getData = () => { console.log('side effect'); return 1; };\n",
@@ -90,7 +90,7 @@ def test_js_io_named_function_with_io_does_not_fire(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# side_effects (SAFE304) — any non-I/O-named function doing I/O
+# side_effects (SAFE304) - any non-I/O-named function doing I/O
 # ---------------------------------------------------------------------------
 
 
@@ -152,7 +152,7 @@ def test_js_user_can_override_io_functions_via_config(tmp_path: Path) -> None:
 
 
 def test_js_python_io_list_does_not_leak_into_js(tmp_path: Path) -> None:
-    """Default Python list ``[open, print, input]`` doesn't fire on JS — JS uses its own list.
+    """Default Python list ``[open, print, input]`` doesn't fire on JS - JS uses its own list.
 
     Regression guard for the per-language defaults: a Python user setting
     ``io_functions = ["error"]`` shouldn't suddenly have every JS
@@ -176,7 +176,7 @@ def test_js_anonymous_arrow_with_io_uses_anonymous_fallback(tmp_path: Path) -> N
     Regression guard: the JS function-defining nodes (``arrow_function``,
     ``function_expression``) have no ``name`` field. Without an explicit
     fallback the message would render as ``Function "" calls I/O primitive
-    "log"`` — unreadable and visually identical to a real bug. The
+    "log"`` - unreadable and visually identical to a real bug. The
     ``<anonymous>`` fallback matches the structural rules' behaviour
     (SAFE101 etc.) and signals the cause directly.
     """
@@ -194,7 +194,7 @@ def test_js_anonymous_arrow_with_io_uses_anonymous_fallback(tmp_path: Path) -> N
 
 
 def test_js_anonymous_function_expression_uses_anonymous_fallback(tmp_path: Path) -> None:
-    """``function () { console.log(...); }`` (anonymous function expression) — same fallback."""
+    """``function () { console.log(...); }`` (anonymous function expression) - same fallback."""
     sample = tmp_path / "anon_fn.js"
     sample.write_text(
         "queue.push(function () { console.log('processing'); });\n",
@@ -207,13 +207,13 @@ def test_js_anonymous_function_expression_uses_anonymous_fallback(tmp_path: Path
 
 
 def test_js_arrow_function_named_via_const_resolves_binding_name(tmp_path: Path) -> None:
-    """``const fetchUser = () => fetch(...);`` — name comes from the enclosing variable_declarator.
+    """``const fetchUser = () => fetch(...);`` - name comes from the enclosing variable_declarator.
 
     Without the ``variable_declarator`` fallback the function would
     render as ``<anonymous>`` AND silently slip past SAFE304's
     io_name_keyword exemption (the lowercase prefix check would never
-    see ``fetch``). This is the most common JS code shape — almost
-    every callback / hook / handler is bound this way — so the
+    see ``fetch``). This is the most common JS code shape - almost
+    every callback / hook / handler is bound this way - so the
     fallback is essential, not cosmetic.
     """
     sample = tmp_path / "named_arrow.js"
@@ -228,7 +228,7 @@ def test_js_arrow_function_named_via_const_resolves_binding_name(tmp_path: Path)
 
 
 def test_js_pure_named_arrow_function_fires_safe303(tmp_path: Path) -> None:
-    """``const getCount = () => fetch(...);`` — pure-prefix match works on the bound name."""
+    """``const getCount = () => fetch(...);`` - pure-prefix match works on the bound name."""
     sample = tmp_path / "pure_arrow.js"
     sample.write_text(
         "const getCount = () => fetch('/count');\n",

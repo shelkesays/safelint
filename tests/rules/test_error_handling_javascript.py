@@ -19,7 +19,7 @@ def _engine(overrides: dict | None = None) -> SafetyEngine:
 
 
 # ---------------------------------------------------------------------------
-# empty_except (SAFE202) — JS empty catch block
+# empty_except (SAFE202) - JS empty catch block
 # ---------------------------------------------------------------------------
 
 
@@ -91,7 +91,7 @@ def test_js_catch_with_template_string_interpolation_does_not_fire(tmp_path: Pat
 
 
 # ---------------------------------------------------------------------------
-# logging_on_error (SAFE203) — JS catch must call console.* / logger.*
+# logging_on_error (SAFE203) - JS catch must call console.* / logger.*
 # ---------------------------------------------------------------------------
 
 
@@ -141,7 +141,7 @@ def test_js_catch_with_logger_library_does_not_fire(tmp_path: Path) -> None:
 
 
 def test_js_catch_with_only_throw_does_not_fire(tmp_path: Path) -> None:
-    """A catch that just rethrows is exempt — the error isn't being swallowed."""
+    """A catch that just rethrows is exempt - the error isn't being swallowed."""
     sample = tmp_path / "rethrow.js"
     sample.write_text(
         "function f() { try { foo(); } catch (e) { throw e; } }\n",
@@ -154,7 +154,7 @@ def test_js_catch_with_only_throw_does_not_fire(tmp_path: Path) -> None:
 def test_js_logging_in_nested_function_does_not_satisfy_outer(tmp_path: Path) -> None:
     """A logging call inside a nested function within a catch block does NOT satisfy the outer catch.
 
-    The nested function isn't actually invoked when the catch fires —
+    The nested function isn't actually invoked when the catch fires -
     so it doesn't log the caught error.
     """
     sample = tmp_path / "nested.js"
@@ -168,7 +168,7 @@ def test_js_logging_in_nested_function_does_not_satisfy_outer(tmp_path: Path) ->
 
 
 def test_js_catch_throw_different_identifier_requires_logging(tmp_path: Path) -> None:
-    """``catch (e) { throw freshError; }`` is NOT a re-raise — logging still required.
+    """``catch (e) { throw freshError; }`` is NOT a re-raise - logging still required.
 
     The original ``e`` is still in scope and could be lost; the rule
     must require logging unless the throw operand is exactly the
@@ -184,7 +184,7 @@ def test_js_catch_throw_different_identifier_requires_logging(tmp_path: Path) ->
 
 
 def test_js_catch_no_binding_throw_requires_logging(tmp_path: Path) -> None:
-    """``catch { throw e; }`` — no caught binding, so any throw is a fresh error."""
+    """``catch { throw e; }`` - no caught binding, so any throw is a fresh error."""
     sample = tmp_path / "throw_no_binding.js"
     sample.write_text(
         "function f() {\n  try {\n    risky();\n  } catch {\n    throw outerErr;\n  }\n}\n",
@@ -195,7 +195,7 @@ def test_js_catch_no_binding_throw_requires_logging(tmp_path: Path) -> None:
 
 
 def test_js_catch_throw_caught_binding_does_not_fire(tmp_path: Path) -> None:
-    """``catch (e) { throw e; }`` — exact binding match is the only legit re-raise."""
+    """``catch (e) { throw e; }`` - exact binding match is the only legit re-raise."""
     sample = tmp_path / "throw_caught.js"
     sample.write_text(
         "function f() {\n  try {\n    risky();\n  } catch (e) {\n    throw e;\n  }\n}\n",

@@ -3,7 +3,7 @@
 Verifies that ``.ts``, ``.tsx``, and ``.as`` files are discovered,
 parsed via the right Tree-sitter grammar, and routed to the
 JavaScript-family rule implementations. Detailed per-rule TS
-behaviour (TS-specific AST shapes — generic type parameters, ``as``
+behaviour (TS-specific AST shapes - generic type parameters, ``as``
 casts, non-null assertions, etc.) is covered by
 ``tests/rules/test_typescript_specific.py``.
 """
@@ -56,7 +56,7 @@ def test_tsx_extension_maps_to_tsx_definition() -> None:
 
 
 def test_typescript_file_function_length_violation_fires(tmp_path: Path) -> None:
-    """A long TS function fires SAFE101 — the JS rule implementation is reused."""
+    """A long TS function fires SAFE101 - the JS rule implementation is reused."""
     long_body = "\n".join(f"  const x{i}: number = {i};" for i in range(65))
     sample = tmp_path / "big.ts"
     sample.write_text(
@@ -68,7 +68,7 @@ def test_typescript_file_function_length_violation_fires(tmp_path: Path) -> None
 
 
 def test_typescript_file_nesting_depth_violation_fires(tmp_path: Path) -> None:
-    """Deeply-nested TS control flow fires SAFE102 — same dispatch path as JS."""
+    """Deeply-nested TS control flow fires SAFE102 - same dispatch path as JS."""
     sample = tmp_path / "deep.ts"
     sample.write_text(
         "function deep(x: number): void {\n  if (x > 0) {\n    for (let i = 0; i < 10; i++) {\n      while (i < x) {\n        process(i);\n      }\n    }\n  }\n}\n",
@@ -79,7 +79,7 @@ def test_typescript_file_nesting_depth_violation_fires(tmp_path: Path) -> None:
 
 
 def test_typescript_var_declaration_fires_safe305(tmp_path: Path) -> None:
-    """``var`` in TS still fires SAFE305 — TS users should prefer ``let`` / ``const``."""
+    """``var`` in TS still fires SAFE305 - TS users should prefer ``let`` / ``const``."""
     sample = tmp_path / "vary.ts"
     sample.write_text(
         "function f(): number {\n  var x: number = 1;\n  return x;\n}\n",
@@ -105,7 +105,7 @@ def test_tsx_file_with_jsx_parses_and_dispatches(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     result = SafetyEngine(DEFAULTS).check_file(str(sample))
-    # No parse errors — TSX grammar handled the JSX.
+    # No parse errors - TSX grammar handled the JSX.
     assert not any(v.code == "SAFE000" for v in result.violations), f"TSX file produced parse errors: {[v for v in result.violations if v.code == 'SAFE000']}"
     # Function-length rule still fires through the JS-family dispatch.
     assert any(v.code == "SAFE101" for v in result.violations)
@@ -115,11 +115,11 @@ def test_assemblyscript_file_parses_as_typescript(tmp_path: Path) -> None:
     """``.as`` files parse with the TypeScript grammar (AssemblyScript is a TS subset)."""
     sample = tmp_path / "math.as"
     sample.write_text(
-        # AssemblyScript-flavoured but valid TS — ``i32`` is a type alias in AS;
+        # AssemblyScript-flavoured but valid TS - ``i32`` is a type alias in AS;
         # the TS grammar doesn't know the alias but accepts it as a normal type ref.
         "export function add(a: i32, b: i32): i32 {\n  return a + b;\n}\n",
         encoding="utf-8",
     )
     result = SafetyEngine(DEFAULTS).check_file(str(sample))
-    # No parse errors — TS grammar handled the AS source.
+    # No parse errors - TS grammar handled the AS source.
     assert not any(v.code == "SAFE000" for v in result.violations)

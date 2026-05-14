@@ -22,14 +22,14 @@ ignore = [
     "D203", "D211", "D212", "D213",
     "DTZ005",
     "EXE002",
-    "G004",    # f-strings in logging — intentional style across codebase
+    "G004",    # f-strings in logging - intentional style across codebase
     "ISC001",
     "PGH003",  # ty (the project's type checker) only supports bare `# type: ignore` without
-               # specific codes — requiring bracketed codes would conflict with ty's suppression
+               # specific codes - requiring bracketed codes would conflict with ty's suppression
     "S101",
     "SLF001",
     "T201",
-    "TRY400",  # 132 logger.error() in except blocks — intentional (was previously suppressed
+    "TRY400",  # 132 logger.error() in except blocks - intentional (was previously suppressed
                # via 130 individual noqa: TRY400 comments; re-added globally after noqa cleanup)
 ]
 select = [
@@ -116,8 +116,8 @@ ignore-overlong-task-comments = true
 [lint.pylint]
 # Migrated and reconciled from [pylint.designs] in setup.cfg
 max-args = 7            # setup.cfg: max-args=7 ✓
-max-branches = 12       # setup.cfg had 10; kept 12 — common.py orchestration needs headroom
-max-returns = 6         # setup.cfg had 4; raised to 6 — razorpay/matcher need it
+max-branches = 12       # setup.cfg had 10; kept 12 - common.py orchestration needs headroom
+max-returns = 6         # setup.cfg had 4; raised to 6 - razorpay/matcher need it
 max-statements = 50     # setup.cfg: max-statements=50 ✓
 allow-magic-value-types = ["str", "bytes", "int"]
 # Note: max-attributes=7, max-parents=7, min-public-methods=2 from setup.cfg have

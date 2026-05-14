@@ -189,7 +189,7 @@ def test_find_config_root_returns_dir_with_standalone(tmp_path: Path) -> None:
 def test_find_config_root_skips_malformed_standalone_and_walks_up(tmp_path: Path) -> None:
     """A malformed ``safelint.toml`` is treated as not-a-config so the walk continues.
 
-    Mirrors :func:`load_config` semantics — a broken file would otherwise
+    Mirrors :func:`load_config` semantics - a broken file would otherwise
     anchor the cache at a directory whose config never actually loads.
     """
     inner = tmp_path / "subdir"

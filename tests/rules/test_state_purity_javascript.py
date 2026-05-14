@@ -86,7 +86,7 @@ def test_js_chained_process_env_fires(tmp_path: Path) -> None:
 
 
 def test_js_augmented_assignment_to_global_fires(tmp_path: Path) -> None:
-    """``globalThis.counter += 1`` is also a write — fires."""
+    """``globalThis.counter += 1`` is also a write - fires."""
     sample = tmp_path / "aug.js"
     sample.write_text(
         "function inc() { globalThis.counter += 1; }\n",
@@ -97,7 +97,7 @@ def test_js_augmented_assignment_to_global_fires(tmp_path: Path) -> None:
 
 
 def test_js_update_expression_on_global_fires(tmp_path: Path) -> None:
-    """``globalThis.counter++`` and ``--window.x`` (update_expression) also fire — they mutate the global.
+    """``globalThis.counter++`` and ``--window.x`` (update_expression) also fire - they mutate the global.
 
     Postfix and prefix ``++`` / ``--`` are unambiguously writes; without
     this branch the rule would silently miss the most concise form of
@@ -141,7 +141,7 @@ def test_js_local_namespace_assignment_does_not_fire(tmp_path: Path) -> None:
 
 
 def test_js_read_global_does_not_fire(tmp_path: Path) -> None:
-    """Reading a global (no write) doesn't fire — only mutations do."""
+    """Reading a global (no write) doesn't fire - only mutations do."""
     sample = tmp_path / "read.js"
     sample.write_text(
         "function getEnv() { return globalThis.env; }\nfunction getUserAgent() { return window.navigator.userAgent; }\n",
@@ -160,7 +160,7 @@ def test_js_nested_function_isolation(tmp_path: Path) -> None:
     )
     result = _engine().check_file(str(sample))
     safe302 = [v for v in result.violations if v.code == "SAFE302"]
-    # Exactly one violation, attributed to ``inner`` — and explicitly
+    # Exactly one violation, attributed to ``inner`` - and explicitly
     # NOT to ``outer``. The negative check guards against a regression
     # where the rule mis-attributes nested-function writes to the
     # enclosing function (would render messages with both names).
@@ -176,7 +176,7 @@ def test_js_user_can_extend_namespace_list(tmp_path: Path) -> None:
         "function f() { customGlobal.x = 1; }\n",
         encoding="utf-8",
     )
-    # Default: ``customGlobal`` not in list — no fire.
+    # Default: ``customGlobal`` not in list - no fire.
     result = _engine().check_file(str(sample))
     assert not any(v.code == "SAFE302" for v in result.violations)
 
@@ -201,7 +201,7 @@ def test_js_arrow_function_fires(tmp_path: Path) -> None:
 
 
 def test_js_subscript_assignment_to_global_fires(tmp_path: Path) -> None:
-    """``globalThis['x'] = 1`` (bracket notation) is also a write — fires."""
+    """``globalThis['x'] = 1`` (bracket notation) is also a write - fires."""
     sample = tmp_path / "sub.js"
     sample.write_text(
         "function set(v) { globalThis['counter'] = v; }\n",
@@ -239,7 +239,7 @@ def test_js_global_namespaces_javascript_must_be_list_not_string(tmp_path: Path)
 
     ``global_namespaces_javascript = "globalThis"`` would otherwise be
     coerced to ``{'g', 'l', 'o', 'b', 'a', 'T', 'h', 'i', 's'}`` and
-    silently stop matching any namespace — fail loud instead.
+    silently stop matching any namespace - fail loud instead.
     """
     sample = tmp_path / "anything.js"
     sample.write_text("function f() { globalThis.x = 1; }\n", encoding="utf-8")
@@ -258,12 +258,12 @@ def test_js_global_namespaces_javascript_rejects_non_string_entries(tmp_path: Pa
 
 
 def test_js_parenthesized_root_fires(tmp_path: Path) -> None:
-    """``(globalThis).x = 1`` — paren-wrapped root still resolves.
+    """``(globalThis).x = 1`` - paren-wrapped root still resolves.
 
     Without the unwrap, the leftward walk would land on the
     ``parenthesized_expression`` node and the bare-identifier check
     at the tail of ``_javascript_global_namespace_root`` would return
-    None — silently skipping the write.
+    None - silently skipping the write.
     """
     sample = tmp_path / "paren_root.js"
     sample.write_text("function f() { (globalThis).x = 1; }\n", encoding="utf-8")
@@ -272,7 +272,7 @@ def test_js_parenthesized_root_fires(tmp_path: Path) -> None:
 
 
 def test_js_nested_parenthesized_chain_fires(tmp_path: Path) -> None:
-    """``((process).env).NODE_ENV = 'prod'`` — parens at every step still resolve to ``process``."""
+    """``((process).env).NODE_ENV = 'prod'`` - parens at every step still resolve to ``process``."""
     sample = tmp_path / "paren_chain.js"
     sample.write_text("function f() { ((process).env).NODE_ENV = 'prod'; }\n", encoding="utf-8")
     result = _engine().check_file(str(sample))
@@ -280,7 +280,7 @@ def test_js_nested_parenthesized_chain_fires(tmp_path: Path) -> None:
 
 
 def test_js_parenthesized_lhs_target_fires(tmp_path: Path) -> None:
-    """``(globalThis.x) = 1`` — paren-wrapped LHS target also recognised.
+    """``(globalThis.x) = 1`` - paren-wrapped LHS target also recognised.
 
     Distinct from the ``(root).x`` cases: here the *outermost* LHS
     node is the parenthesised wrapper, not a member_expression. Without

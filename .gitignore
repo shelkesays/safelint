@@ -154,7 +154,7 @@ venv.bak/
 # mkdocs documentation
 /site
 
-# Build-time copies of repo-root community-health files into docs/ — the
+# Build-time copies of repo-root community-health files into docs/ - the
 # docs.yml workflow does `cp CHANGELOG.md docs/project/changelog.md` etc.
 # before `mkdocs build`. Source of truth stays at the repo root; the copies
 # are ephemeral build artefacts and must never be committed.
@@ -163,7 +163,7 @@ venv.bak/
 /docs/project/support.md
 /docs/contributing/index.md
 # Rules-at-a-glance table generated from ALL_RULES + DEFAULTS by
-# scripts/prepare_docs.py — pulled into docs/configuration/rules.md via
+# scripts/prepare_docs.py - pulled into docs/configuration/rules.md via
 # the snippets extension. Lives outside docs/ so mkdocs doesn't try to
 # render it as a standalone page. Regenerated on every build.
 /build/snippets/
@@ -222,7 +222,7 @@ __marimo__/
 
 .vscode/
 
-# Claude Code local guide — kept out of version control by project convention.
+# Claude Code local guide - kept out of version control by project convention.
 CLAUDE.md
 
 # Safelint per-project lint-result cache

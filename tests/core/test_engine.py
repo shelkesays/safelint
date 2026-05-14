@@ -168,7 +168,7 @@ def test_engine_default_excludes_prune_node_modules(tmp_path: Path) -> None:
 
 
 def test_engine_explicit_empty_exclude_paths_clears_defaults(tmp_path: Path) -> None:
-    """Setting ``exclude_paths = []`` is the documented escape hatch — defaults dropped."""
+    """Setting ``exclude_paths = []`` is the documented escape hatch - defaults dropped."""
     venv = tmp_path / ".venv"
     venv.mkdir()
     inside = venv / "vendor.py"
@@ -213,7 +213,7 @@ def test_engine_extend_exclude_paths_appends_to_defaults(tmp_path: Path, monkeyp
 def test_engine_extend_exclude_paths_combines_with_explicit_exclude_paths(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """``extend_exclude_paths`` appends to a user-set ``exclude_paths`` too (not just defaults).
 
-    Same cwd-based setup as the previous test — exclude patterns
+    Same cwd-based setup as the previous test - exclude patterns
     are matched against walked paths, which are relative when the
     target is relative.
     """
@@ -321,7 +321,7 @@ def test_engine_parse_error_returns_parse_violation(tmp_path: Path) -> None:
 # (non-Python name, but Python's parser internals so the source still
 # parses) and verify the engine skips Python-only rules for files
 # routed through it. This is pre-emptive infrastructure for the
-# second-language work — when TypeScript / Go / … land, contributors
+# second-language work - when TypeScript / Go / … land, contributors
 # widen each rule's ``language`` tuple per-rule; this engine plumbing
 # doesn't need further changes.
 # ---------------------------------------------------------------------------
@@ -370,7 +370,7 @@ def test_engine_runs_python_rules_on_python_files_unchanged(tmp_path: Path) -> N
 
 
 def test_base_rule_default_language_is_python_only() -> None:
-    """``BaseRule.language`` default must be ``("python",)`` — every existing rule inherits it."""
+    """``BaseRule.language`` default must be ``("python",)`` - every existing rule inherits it."""
     assert BaseRule.language == ("python",)
 
 
@@ -404,7 +404,7 @@ _RULES_WIDENED_FOR_JS_FAMILY: frozenset[str] = frozenset(
 
 _RULES_JS_FAMILY_ONLY: frozenset[str] = frozenset(
     {
-        # JS-family-only rules (``language=("javascript", "typescript")``) —
+        # JS-family-only rules (``language=("javascript", "typescript")``) -
         # the hazard has no useful Python translation. ``var`` is
         # legal in TS too, so SAFE305 fires on both.
         "WideScopeDeclarationRule",  # SAFE305: ``var`` keyword (no Python equivalent)
@@ -421,7 +421,7 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
       a new language mid-port without finishing the work). The
       allow-list surfaces that as a test failure rather than letting
       half-ported behaviour ship.
-    * A rule listed here regresses to the default ``("python",)`` —
+    * A rule listed here regresses to the default ``("python",)`` -
       the test fails too, prompting the contributor to remove the entry
       from the allow-list along with the deliberate scope reduction.
     """

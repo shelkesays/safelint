@@ -30,7 +30,7 @@ if TYPE_CHECKING:
 def _make_args(*, project: bool = False, symlink: bool = False, force: bool = False, client: str = "auto") -> argparse.Namespace:
     """Return a Namespace shaped like the install argparser produces.
 
-    The default ``client="auto"`` matches the CLI default — call
+    The default ``client="auto"`` matches the CLI default - call
     sites that need a specific client should pass it explicitly so
     intent is obvious and so changes to auto-detection don't
     accidentally hide regressions in single-client tests.
@@ -88,7 +88,7 @@ def test_install_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path
     assert not target.is_symlink()
     assert (target / "SKILL.md").read_text(encoding="utf-8").startswith("---\nname: safelint")
     assert (target / "languages" / "python.md").is_file()
-    # Peer-client bundles must NOT leak into the Claude install — the
+    # Peer-client bundles must NOT leak into the Claude install - the
     # cursor/ subdirectory under skill_files/ is for Cursor users only.
     assert not (target / "cursor").exists()
     out = capsys.readouterr().out
@@ -119,7 +119,7 @@ def test_install_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     creates a real target directory and symlinks each allowed
     top-level entry inside it. Symlinking the whole skill_files/
     tree would expose the peer ``cursor/`` subdirectory in the
-    Claude install — see :func:`_install_symlink_directory_filtered`.
+    Claude install - see :func:`_install_symlink_directory_filtered`.
     """
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
     rc = _skill_install.run_install(_make_args(client="claude", symlink=True))
@@ -148,7 +148,7 @@ def test_install_symlink_excludes_peer_client_bundles(monkeypatch: pytest.Monkey
     Mirrors the contract enforced by ``test_install_copy_user_scope``
     (``cursor/`` is excluded from the materialised skill folder).
     Symlink mode previously linked the whole skill_files/ directory
-    in one call, which transparently included ``cursor/`` — a leak.
+    in one call, which transparently included ``cursor/`` - a leak.
     The fixed install symlinks per-entry, skipping peer dirs.
     """
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
@@ -383,7 +383,7 @@ def test_bundled_copilot_instructions_exist_in_wheel() -> None:
     path = _skill_install.bundled_skill_path() / "copilot" / "copilot-instructions.md"
     assert path.is_file()
     head = path.read_text(encoding="utf-8")[:200]
-    # Plain Markdown — no MDC frontmatter (Copilot reads ``.github/
+    # Plain Markdown - no MDC frontmatter (Copilot reads ``.github/
     # copilot-instructions.md`` as raw Markdown).
     assert head.startswith("# safelint")
 
@@ -514,7 +514,7 @@ def test_bundled_gemini_instructions_exist_in_wheel() -> None:
     path = _skill_install.bundled_skill_path() / "gemini" / "GEMINI.md"
     assert path.is_file()
     head = path.read_text(encoding="utf-8")[:200]
-    # Plain Markdown — Gemini CLI reads ``GEMINI.md`` as raw Markdown.
+    # Plain Markdown - Gemini CLI reads ``GEMINI.md`` as raw Markdown.
     assert head.startswith("# safelint")
 
 
@@ -647,7 +647,7 @@ def test_install_windsurf_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert target.is_file()
     assert not target.is_symlink()
     # Content matches the bundled file (basename differs but contents
-    # are byte-equal — copy operation is content-preserving).
+    # are byte-equal - copy operation is content-preserving).
     bundled = _skill_install.bundled_skill_path() / "windsurf" / "safelint-rules.md"
     assert target.read_text(encoding="utf-8") == bundled.read_text(encoding="utf-8")
     out = capsys.readouterr().out
@@ -747,7 +747,7 @@ def test_install_copy_excludes_peer_windsurf_dir(monkeypatch: pytest.MonkeyPatch
 
 
 # ---------------------------------------------------------------------------
-# codex client install — primary at .codex/instructions.md, secondary
+# codex client install - primary at .codex/instructions.md, secondary
 # section in AGENTS.md when present
 # ---------------------------------------------------------------------------
 
@@ -766,7 +766,7 @@ def test_install_codex_copy_user_scope_no_agents_md(monkeypatch: pytest.MonkeyPa
     rc = _skill_install.run_install(_make_args(client="codex"))
     assert rc == 0
     assert (home / ".codex" / "instructions.md").is_file()
-    # No AGENTS.md — secondary did not fire.
+    # No AGENTS.md - secondary did not fire.
     assert not (home / "AGENTS.md").exists()
     out = capsys.readouterr().out
     assert "codex instructions" in out
@@ -776,7 +776,7 @@ def test_install_codex_copy_user_scope_no_agents_md(monkeypatch: pytest.MonkeyPa
 def test_install_codex_writes_section_when_agents_md_exists(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """When AGENTS.md already exists, codex install also writes a delimited section into it.
 
-    User content in the file is preserved — only bytes between the
+    User content in the file is preserved - only bytes between the
     safelint markers change.
     """
     _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
@@ -806,7 +806,7 @@ def test_install_codex_writes_section_when_agents_md_exists(monkeypatch: pytest.
 
 
 def test_install_codex_does_not_create_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """codex must NOT auto-create AGENTS.md — secondary only fires when the file exists."""
+    """codex must NOT auto-create AGENTS.md - secondary only fires when the file exists."""
     _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
     rc = _skill_install.run_install(_make_args(client="codex", project=True))
     assert rc == 0
@@ -1576,7 +1576,7 @@ def test_section_body_extraction_round_trips() -> None:
     """``_render_section_body`` and ``_extract_section_body`` round-trip identically (no content mutation)."""
     spec = _skill_install._CODEX_SPEC
     # Narrow the optional ``secondary_install_section_markers`` for the
-    # type checker — codex always sets it (verified by the assert).
+    # type checker - codex always sets it (verified by the assert).
     markers = spec.secondary_install_section_markers
     assert markers is not None, "codex spec must have section markers configured"
     bundled = "line one\nline two with `code`\n"
@@ -1605,7 +1605,7 @@ def test_append_section_handles_file_with_double_trailing_newline() -> None:
 
 
 def test_replace_or_append_handles_malformed_section_with_only_begin_marker() -> None:
-    """A file with only the begin marker (no end) is treated as malformed — section appended instead of repaired."""
+    """A file with only the begin marker (no end) is treated as malformed - section appended instead of repaired."""
     spec = _skill_install._CODEX_SPEC
     existing = "user content\n<!-- safelint:begin -->\noops, no end marker\n"
     out = _skill_install._replace_or_append_section(existing, spec, "fresh body")
@@ -1623,7 +1623,7 @@ def test_strip_section_no_op_when_section_absent() -> None:
 
 
 def test_strip_section_no_op_on_malformed_only_begin_marker() -> None:
-    """A malformed file (begin without end) is left alone — never damaged."""
+    """A malformed file (begin without end) is left alone - never damaged."""
     spec = _skill_install._CODEX_SPEC
     text = "<!-- safelint:begin -->\nbody but no end\n"
     assert _skill_install._strip_section(text, spec) == text
@@ -1636,7 +1636,7 @@ def test_install_secondary_no_op_when_target_missing(monkeypatch: pytest.MonkeyP
 
 
 def test_install_secondary_no_op_when_section_already_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``_install_secondary`` returns False on the second call — section already matches bundle."""
+    """``_install_secondary`` returns False on the second call - section already matches bundle."""
     _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
     (cwd / "AGENTS.md").write_text("user content\n", encoding="utf-8")
     # First install writes the section.
@@ -1693,7 +1693,7 @@ def test_install_codex_refuses_directory_at_agents_md(monkeypatch: pytest.Monkey
     # Primary install still succeeds.
     assert rc == 0
     assert (cwd / ".codex" / "instructions.md").is_file()
-    # Directory and its contents UNCHANGED — refused.
+    # Directory and its contents UNCHANGED - refused.
     assert agents_dir.is_dir()
     assert (agents_dir / "untouched.txt").read_text(encoding="utf-8") == "DO NOT MODIFY\n"
     err = capsys.readouterr().err
@@ -1816,7 +1816,7 @@ def test_install_auto_detects_claude_in_cwd_via_claude_json(monkeypatch: pytest.
     ``.claude.json`` is the Claude Code settings file; some projects
     commit a project-scoped one without an accompanying ``.claude/``
     directory or ``CLAUDE.md``. The detection covers all three forms
-    independently — any one is enough.
+    independently - any one is enough.
     """
     home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
     (cwd / ".claude.json").write_text('{"mcp": {}}', encoding="utf-8")
@@ -1895,7 +1895,7 @@ def test_install_auto_falls_back_to_home_when_cwd_empty(monkeypatch: pytest.Monk
 
 
 def test_install_auto_home_fallback_picks_cursor_when_only_cursor_present(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Home fallback works for Cursor too — ``~/.cursor/`` triggers a user-scoped Cursor install."""
+    """Home fallback works for Cursor too - ``~/.cursor/`` triggers a user-scoped Cursor install."""
     home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
     (home / ".cursor").mkdir()
     rc = _skill_install.run_install(_make_args(client="auto"))
@@ -1921,7 +1921,7 @@ def test_install_auto_errors_when_no_clients_detected_anywhere(monkeypatch: pyte
 
 
 def test_install_auto_with_project_flag_does_not_fall_back_to_home(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """``--client auto --project`` only inspects cwd — refuses the home fallback.
+    """``--client auto --project`` only inspects cwd - refuses the home fallback.
 
     The ``--project`` flag is the user telling us "I want project
     scope, period". If cwd has no markers, error out rather than
@@ -1960,11 +1960,11 @@ def test_install_auto_explicit_client_skips_detection(monkeypatch: pytest.Monkey
     rc = _skill_install.run_install(_make_args(client="claude"))
     assert rc == 0
     # Claude installed at user scope (no --project), not at cwd, even
-    # though cwd has a Cursor marker — explicit beats auto.
+    # though cwd has a Cursor marker - explicit beats auto.
     assert (home / ".claude" / "skills" / "safelint" / "SKILL.md").is_file()
     assert not (cwd / ".cursor" / "rules" / "safelint.mdc").exists()
     out = capsys.readouterr().out
-    # No "detected ... in current directory" notice — that's
+    # No "detected ... in current directory" notice - that's
     # auto-mode-only output.
     assert "detected" not in out
 
@@ -2012,7 +2012,7 @@ def test_client_registry_choices_derive_from_specs() -> None:
     spec_names = tuple(spec.name for spec in _skill_install._CLIENT_SPECS)
     # Install accepts ``auto`` plus every registered client.
     assert ("auto", *spec_names) == _skill_install.INSTALL_CLIENT_CHOICES
-    # Path accepts every registered client (no auto — single-path
+    # Path accepts every registered client (no auto - single-path
     # convention, see the ``run_path`` docstring).
     assert spec_names == _skill_install.PATH_CLIENT_CHOICES
 
@@ -2037,14 +2037,14 @@ def test_cli_skill_rejects_unknown_flag_before_subcommand(monkeypatch: pytest.Mo
 
 
 # ---------------------------------------------------------------------------
-# Documentation drift detection — every registered AI client's bundled
+# Documentation drift detection - every registered AI client's bundled
 # skill must mention every rule and every supported language. Parametrised
 # over ``_CLIENT_SPECS`` so adding a new client (Copilot, codex, windsurf,
 # antigravity, …) automatically inherits these checks.
 #
 # The tests scan the union of each spec's ``documentation_relpaths`` files
-# for membership tokens. They don't enforce a specific format — only that
-# the code / name / extension appears somewhere — so a contributor who
+# for membership tokens. They don't enforce a specific format - only that
+# the code / name / extension appears somewhere - so a contributor who
 # adds a new rule has flexibility about *where* in the doc to put it,
 # without skipping it entirely.
 # ---------------------------------------------------------------------------
@@ -2054,7 +2054,7 @@ def _read_skill_docs(spec: _skill_install.ClientSpec) -> str:
     """Concatenate every bundled doc file declared on *spec*.
 
     Each spec lists the relpaths under ``skill_files/`` whose combined
-    text *must* mention every rule and every supported extension —
+    text *must* mention every rule and every supported extension -
     that's the drift contract enforced by the tests below.
     """
     root = _skill_install.bundled_skill_path()
@@ -2066,13 +2066,13 @@ def _appears_as_token(text: str, token: str) -> bool:
     """Return True if *token* appears in *text* as a standalone token.
 
     Plain ``token in text`` would falsely match ``side_effects`` inside
-    ``side_effects_hidden`` and ``.py`` inside ``.pyw`` — so a doc with
+    ``side_effects_hidden`` and ``.py`` inside ``.pyw`` - so a doc with
     only the longer name / extension would silently pass the drift test
     that's meant to catch the missing shorter one. The boundary check
     rejects matches whose neighbours are identifier characters
     (alphanumeric or underscore).
     """
-    import re  # noqa: PLC0415 — keep the import local to the helper
+    import re  # noqa: PLC0415 - keep the import local to the helper
 
     return re.search(rf"(?<!\w){re.escape(token)}(?!\w)", text) is not None
 
@@ -2084,15 +2084,15 @@ def test_skill_documents_every_active_rule(spec: _skill_install.ClientSpec) -> N
     Drift safety net: when someone adds a new rule, they must update
     each registered AI client's bundled docs. Because the test is
     parametrised over ``_CLIENT_SPECS``, adding a new client to the
-    registry automatically inherits this contract — no per-client
+    registry automatically inherits this contract - no per-client
     test boilerplate.
 
     Engine-internal codes (``SAFE000`` parse, ``SAFE004``
     unused_suppression) are deliberately excluded because they live
-    outside ``ALL_RULES`` — they're emitted by the engine directly,
+    outside ``ALL_RULES`` - they're emitted by the engine directly,
     not registered as ``BaseRule`` subclasses.
     """
-    from safelint.rules import ALL_RULES  # noqa: PLC0415 — local to keep test imports tight
+    from safelint.rules import ALL_RULES  # noqa: PLC0415 - local to keep test imports tight
 
     text = _read_skill_docs(spec)
     missing_codes = [cls.code for cls in ALL_RULES if not _appears_as_token(text, cls.code)]
@@ -2102,7 +2102,7 @@ def test_skill_documents_every_active_rule(spec: _skill_install.ClientSpec) -> N
 
 
 # ---------------------------------------------------------------------------
-# Freshness / drift detection — ``safelint skill status`` and the
+# Freshness / drift detection - ``safelint skill status`` and the
 # ``safelint check --check-skill-freshness`` opt-in flag both delegate
 # to ``_install_status`` / ``stale_install_warnings`` in _skill_install.
 # ---------------------------------------------------------------------------
@@ -2127,7 +2127,7 @@ def test_install_status_differs_when_install_is_modified(monkeypatch: pytest.Mon
     """A locally-modified install reports DIFFERS so the status command can flag it."""
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
     assert _skill_install.run_install(_make_args(client="claude")) == 0
-    # Customise the installed copy — the docs explicitly invite this.
+    # Customise the installed copy - the docs explicitly invite this.
     skill_md = home / ".claude" / "skills" / "safelint" / "SKILL.md"
     skill_md.write_text("# locally customised\n", encoding="utf-8")
     status = _skill_install._install_status(_skill_install._CLAUDE_SPEC, project=False)
@@ -2136,7 +2136,7 @@ def test_install_status_differs_when_install_is_modified(monkeypatch: pytest.Mon
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
 def test_install_status_symlink_is_always_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Symlinked installs are live by construction — always reported as FRESH.
+    """Symlinked installs are live by construction - always reported as FRESH.
 
     A symlink points at the bundled location, so ``pip upgrade safelint``
     is reflected immediately. The status check shouldn't complain.
@@ -2151,7 +2151,7 @@ def test_install_status_symlink_is_always_fresh(monkeypatch: pytest.MonkeyPatch,
 def test_install_status_claude_symlink_directory_is_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """A Claude ``--symlink`` install is reported FRESH despite being a real directory.
 
-    Claude symlink installs aren't symlinks at the target path — they're
+    Claude symlink installs aren't symlinks at the target path - they're
     real directories whose top-level entries are symlinks back to
     bundled. ``target.is_symlink()`` returns False. Without explicit
     handling, the code falls through to tree-hashing and reports DIFFERS
@@ -2192,7 +2192,7 @@ def test_install_status_broken_symlink_is_not_fresh(monkeypatch: pytest.MonkeyPa
     assert not target.exists()  # broken symlink
 
     status = _skill_install._install_status(_skill_install._CURSOR_SPEC, project=False)
-    # A dangling install is neither installed nor current — it must be
+    # A dangling install is neither installed nor current - it must be
     # surfaced as DIFFERS, not silently classified as MISSING (which
     # ``run_status`` and ``stale_install_warnings`` would skip).
     assert status == _skill_install.INSTALL_STATUS_DIFFERS
@@ -2229,8 +2229,8 @@ def test_install_status_claude_symlink_with_broken_inner_link_is_not_fresh(monke
 def test_run_status_surfaces_broken_symlink_install_with_exit_one(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``safelint skill status`` must surface (not silently skip) a broken symlink install.
 
-    A dangling symlink would previously classify as MISSING — and
-    ``run_status`` skips MISSING locations — leaving a broken install
+    A dangling symlink would previously classify as MISSING - and
+    ``run_status`` skips MISSING locations - leaving a broken install
     unreported and exit 0. Locks the contract that broken symlinks
     propagate as DIFFERS through to the user-facing exit code and
     output.
@@ -2270,7 +2270,7 @@ def test_run_status_emits_scope_aware_refresh_hint_per_install(monkeypatch: pyte
     rc = _skill_install.run_status(argparse.Namespace())
     assert rc == 1
     out = capsys.readouterr().out
-    # The exact refresh command — ``skill update``, explicit client,
+    # The exact refresh command - ``skill update``, explicit client,
     # explicit scope (no --project for user).
     assert "Refresh: safelint skill update --client cursor" in out
 
@@ -2361,7 +2361,7 @@ def test_run_status_returns_one_when_install_differs(monkeypatch: pytest.MonkeyP
     assert rc == 1
     out = capsys.readouterr().out
     assert "differs from bundled" in out
-    # Scope-aware refresh command — uses ``skill update`` (the canonical
+    # Scope-aware refresh command - uses ``skill update`` (the canonical
     # shape-preserving refresh) with ``--client cursor`` so the user
     # refreshes the right scope.
     assert "safelint skill update --client cursor" in out
@@ -2391,7 +2391,7 @@ def test_check_with_skill_freshness_flag_calls_stale_check(monkeypatch: pytest.M
 def test_check_without_freshness_flag_skips_stale_check(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, mocker: MockerFixture) -> None:
     """Default ``safelint check`` (no flag) does NOT pay the freshness-check cost.
 
-    Locks the contract that the freshness check is opt-in only —
+    Locks the contract that the freshness check is opt-in only -
     a regression that made it run by default would slow down every
     ``safelint check`` invocation by an FS scan.
     """
@@ -2409,7 +2409,7 @@ def test_check_with_freshness_flag_emits_stderr_warnings_when_stale(monkeypatch:
 
     Drives the full ``safelint check`` path through the CLI and
     confirms the diagnostics-channel warning fires. Doesn't assert
-    the lint exit code — the freshness check is informational only,
+    the lint exit code - the freshness check is informational only,
     so a clean lint run still exits 0 even if a stale install is
     detected.
     """
@@ -2434,7 +2434,7 @@ def test_stale_install_warnings_returns_one_per_stale_install(monkeypatch: pytes
     """The public ``stale_install_warnings`` helper returns one string per stale location.
 
     This is the primitive consumed by ``safelint check --check-skill-freshness``
-    — keeping it exercised in isolation makes the freshness flag's behaviour
+    - keeping it exercised in isolation makes the freshness flag's behaviour
     easy to reason about.
     """
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
@@ -2447,14 +2447,14 @@ def test_stale_install_warnings_returns_one_per_stale_install(monkeypatch: pytes
     assert len(warnings) == 1
     assert "Cursor rule" in warnings[0]
     assert "differs from bundled" in warnings[0]
-    # Scope-aware refresh command — see the dedicated regression
+    # Scope-aware refresh command - see the dedicated regression
     # ``test_stale_install_warnings_carry_scope_aware_refresh_command``
     # for the user-vs-project differentiation.
     assert "safelint skill update --client cursor" in warnings[0]
 
 
 def test_stale_install_warnings_empty_when_all_fresh(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """No installs → empty list (not an error) — matches the ``--check-skill-freshness`` "silent on clean" contract."""
+    """No installs → empty list (not an error) - matches the ``--check-skill-freshness`` "silent on clean" contract."""
     _redirect_home_and_cwd(monkeypatch, tmp_path)
     assert _skill_install.stale_install_warnings() == []
 
@@ -2475,7 +2475,7 @@ def test_run_status_skips_oserror_install(monkeypatch: pytest.MonkeyPatch, tmp_p
         raise OSError(msg)
 
     monkeypatch.setattr(_skill_install, "_install_status", _raise_oserror)
-    # Should NOT raise — the OSError install is treated as missing.
+    # Should NOT raise - the OSError install is treated as missing.
     rc = _skill_install.run_status(argparse.Namespace())
     captured = capsys.readouterr()
     assert rc == 0
@@ -2538,7 +2538,7 @@ def test_run_update_silent_when_all_targets_oserror(monkeypatch: pytest.MonkeyPa
 
     Without the ``any_processed`` gate, a run where every target was
     silently skipped due to permission errors would falsely report
-    "all detected installs are already up to date" — masking a real
+    "all detected installs are already up to date" - masking a real
     I/O failure as a clean run.
     """
     _redirect_home_and_cwd(monkeypatch, tmp_path)
@@ -2576,7 +2576,7 @@ def test_resolve_update_targets_skips_oserror_explicit_client(monkeypatch: pytes
 def test_resolve_remove_candidates_skips_oserror_explicit_client(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """``_resolve_remove_candidates`` skips OSError installs for explicit-client remove.
 
-    Same OSError-tolerance contract as the update path — a transient
+    Same OSError-tolerance contract as the update path - a transient
     I/O error in one scope shouldn't crash ``safelint skill remove
     --client X``.
     """
@@ -2609,7 +2609,7 @@ def test_stale_install_warnings_skips_oserror_install(monkeypatch: pytest.Monkey
         raise OSError(msg)
 
     monkeypatch.setattr(_skill_install, "_install_status", _raise_oserror)
-    # Should NOT raise — returns an empty list because the OSError
+    # Should NOT raise - returns an empty list because the OSError
     # install is treated as not-DIFFERS.
     assert _skill_install.stale_install_warnings() == []
 
@@ -2634,7 +2634,7 @@ def test_skill_documents_every_supported_extension(spec: _skill_install.ClientSp
 
 
 # ---------------------------------------------------------------------------
-# safelint skill update — refresh stale installs (no-op when fresh)
+# safelint skill update - refresh stale installs (no-op when fresh)
 # ---------------------------------------------------------------------------
 
 
@@ -2660,7 +2660,7 @@ def test_update_refreshes_drifted_install(monkeypatch: pytest.MonkeyPatch, tmp_p
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
     assert _skill_install.run_install(_make_args(client="cursor")) == 0
     target = home / ".cursor" / "rules" / "safelint.mdc"
-    target.write_text("# customised — diverges from bundled\n", encoding="utf-8")
+    target.write_text("# customised - diverges from bundled\n", encoding="utf-8")
     capsys.readouterr()
 
     rc = _skill_install.run_update(_make_update_args())
@@ -2674,7 +2674,7 @@ def test_update_refreshes_drifted_install(monkeypatch: pytest.MonkeyPatch, tmp_p
 def test_update_force_refreshes_even_fresh_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--force`` re-installs even when the install is already fresh.
 
-    Useful for reverting a customised install — the customisation
+    Useful for reverting a customised install - the customisation
     would normally pass status as drift, but ``--force`` also covers
     the case where the user wants to reset a fresh install (e.g.
     after manually editing then deciding to revert).
@@ -2706,7 +2706,7 @@ def test_update_auto_uses_install_paths_not_marker_files(monkeypatch: pytest.Mon
 
     A user can have ``.cursor/`` markers in cwd without a Cursor
     install (just installed Cursor today, hasn't run safelint skill
-    install yet) — update auto must report nothing to do, not silently
+    install yet) - update auto must report nothing to do, not silently
     re-trigger an install.
     """
     _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
@@ -2749,7 +2749,7 @@ def test_update_force_preserves_symlink_install_shape(monkeypatch: pytest.Monkey
     """``update --force`` on a symlink install keeps it as a symlink (doesn't convert to copy).
 
     Without explicit ``--symlink``, the user hasn't asked to change
-    the install mode — only to refresh content. Silently flipping a
+    the install mode - only to refresh content. Silently flipping a
     symlink install to copy on every force-refresh would strip the
     user's deliberate live-link guarantee. The fix derives the mode
     from the existing install's shape when ``--symlink`` isn't
@@ -2773,7 +2773,7 @@ def test_update_force_preserves_symlink_install_shape(monkeypatch: pytest.Monkey
 def test_update_force_with_explicit_symlink_switches_copy_to_symlink(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """``update --force --symlink`` on a copy install converts it to symlink.
 
-    Explicit ``--symlink`` is the user's opt-in to switch modes —
+    Explicit ``--symlink`` is the user's opt-in to switch modes -
     must override the shape-preservation default. Symmetric to
     ``install --symlink --force``.
     """
@@ -2944,7 +2944,7 @@ def test_install_codex_refuses_symlinked_agents_md(monkeypatch: pytest.MonkeyPat
     # Primary install still succeeds.
     assert rc == 0
     assert (cwd / ".codex" / "instructions.md").is_file()
-    # Sensitive file UNCHANGED — symlink was refused.
+    # Sensitive file UNCHANGED - symlink was refused.
     assert sensitive.read_text(encoding="utf-8") == "DO NOT MODIFY\n"
     # Warning surfaced to stderr.
     err = capsys.readouterr().err
@@ -3062,7 +3062,7 @@ def test_update_one_handles_namespace_without_force_attribute(monkeypatch: pytes
         _skill_install._update_one(spec, project=False, args=args)
     except AttributeError as e:
         pytest.fail(f"_update_one raised AttributeError on partial Namespace: {e}")
-    # No assertion on rc — partial Namespace may legitimately fail
+    # No assertion on rc - partial Namespace may legitimately fail
     # downstream (e.g. when reading ``symlink``); the contract is
     # simply that the missing-attribute case doesn't blow up at
     # the ``force`` read.
@@ -3091,7 +3091,7 @@ def test_update_project_flag_filters_auto_detect_to_project_scope(monkeypatch: p
     assert rc == 0
     # Project-scope install was refreshed (customisation gone).
     assert "project customised" not in project_target.read_text(encoding="utf-8")
-    # User-scope install was NOT touched — customisation survives.
+    # User-scope install was NOT touched - customisation survives.
     assert "user customised" in user_target.read_text(encoding="utf-8")
 
 
@@ -3115,7 +3115,7 @@ def test_cli_routes_skill_update(monkeypatch: pytest.MonkeyPatch, mocker: Mocker
 
 
 # ---------------------------------------------------------------------------
-# safelint skill remove — delete detected installs
+# safelint skill remove - delete detected installs
 # ---------------------------------------------------------------------------
 
 
@@ -3255,7 +3255,7 @@ def test_remove_explicit_client_without_project_targets_both_scopes(monkeypatch:
 
     Symmetric with ``--client auto``: ``--project`` is the orthogonal
     scope-restriction filter. The destructive nature of remove makes
-    the asymmetric behaviour particularly footgun-y — silently
+    the asymmetric behaviour particularly footgun-y - silently
     leaving a project-scope install alive after the user thought
     they'd cleaned up the client.
     """
@@ -3304,7 +3304,7 @@ def test_remove_symlink_filter_cleans_up_broken_claude_install(monkeypatch: pyte
     The user-facing scenario for the shape-vs-freshness split: the
     bundled source moved (e.g. virtualenv rebuilt, wheel cache cleared),
     leaving the Claude symlink install dangling. ``remove --symlink``
-    must still reach and clean it up — anything else strands the user
+    must still reach and clean it up - anything else strands the user
     with an unusable install they can't easily wipe.
     """
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
@@ -3318,7 +3318,7 @@ def test_remove_symlink_filter_cleans_up_broken_claude_install(monkeypatch: pyte
 
     rc = _skill_install.run_remove(_make_remove_args(symlink=True))
     assert rc == 0
-    # Install directory is gone — user can run ``install`` from a
+    # Install directory is gone - user can run ``install`` from a
     # clean state without manually rm'ing the dangling layout.
     assert not target_dir.exists()
 
@@ -3329,7 +3329,7 @@ def test_remove_project_flag_filters_auto_detect_to_project_scope(monkeypatch: p
     Mirror of the update regression: plant both scopes, run
     ``remove --project``, assert only the project-scope install is
     deleted. Without the scope filter, the user-scope install would
-    be silently nuked too — that's a real footgun on ``remove``
+    be silently nuked too - that's a real footgun on ``remove``
     because it's destructive.
     """
     home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
@@ -3350,7 +3350,7 @@ def test_remove_project_flag_filters_auto_detect_to_project_scope(monkeypatch: p
 def test_remove_explicit_client_with_symlink_filter_skips_copy_install(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``--client cursor --symlink`` skips a Cursor install that's in copy mode.
 
-    Composes the explicit-client path with the symlink filter — the
+    Composes the explicit-client path with the symlink filter - the
     install exists, but its shape doesn't match the filter, so
     ``remove`` reports nothing-installed (and leaves the install
     untouched).

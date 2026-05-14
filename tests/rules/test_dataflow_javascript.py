@@ -82,7 +82,7 @@ def test_js_taint_through_template_string_fires(tmp_path: Path) -> None:
 
 
 def test_js_destructured_param_is_tainted(tmp_path: Path) -> None:
-    """``function f({userInput}) { eval(userInput); }`` — destructured params are taint sources."""
+    """``function f({userInput}) { eval(userInput); }`` - destructured params are taint sources."""
     sample = tmp_path / "destruct.js"
     sample.write_text(
         "function f({userInput, other}) {\n  eval(userInput);\n}\n",
@@ -93,7 +93,7 @@ def test_js_destructured_param_is_tainted(tmp_path: Path) -> None:
 
 
 def test_js_array_destructured_param_is_tainted(tmp_path: Path) -> None:
-    """``function f([userInput, ...rest]) { ... }`` — array-destructured params are tainted."""
+    """``function f([userInput, ...rest]) { ... }`` - array-destructured params are tainted."""
     sample = tmp_path / "array_destruct.js"
     sample.write_text(
         "function f([userInput, ...rest]) {\n  Function(userInput);\n}\n",
@@ -104,7 +104,7 @@ def test_js_array_destructured_param_is_tainted(tmp_path: Path) -> None:
 
 
 def test_js_sanitizer_clears_taint(tmp_path: Path) -> None:
-    """``eval(escape(userInput))`` does NOT fire — escape is a sanitizer."""
+    """``eval(escape(userInput))`` does NOT fire - escape is a sanitizer."""
     sample = tmp_path / "sanitize.js"
     sample.write_text(
         "function f(userInput) {\n  eval(escape(userInput));\n}\n",
@@ -126,7 +126,7 @@ def test_js_dompurify_sanitizer(tmp_path: Path) -> None:
 
 
 def test_js_source_call_injects_taint(tmp_path: Path) -> None:
-    """``prompt()`` is in the default source list — its result is tainted."""
+    """``prompt()`` is in the default source list - its result is tainted."""
     sample = tmp_path / "source.js"
     sample.write_text(
         "function f() {\n  const userInput = prompt('enter:');\n  eval(userInput);\n}\n",
@@ -185,7 +185,7 @@ def test_js_bare_writefile_call_fires_safe802(tmp_path: Path) -> None:
 
 
 def test_js_assigned_writefile_call_does_not_fire(tmp_path: Path) -> None:
-    """Same call but the result is captured — clean."""
+    """Same call but the result is captured - clean."""
     sample = tmp_path / "captured.js"
     sample.write_text(
         "const promise = fs.writeFile('out.txt', 'data');\n",
@@ -223,7 +223,7 @@ def test_js_unrelated_function_does_not_fire(tmp_path: Path) -> None:
 
 
 def test_js_chained_find_method_fires_safe803(tmp_path: Path) -> None:
-    """``arr.find(...).name`` is unsafe — ``find`` returns undefined when no match."""
+    """``arr.find(...).name`` is unsafe - ``find`` returns undefined when no match."""
     sample = tmp_path / "find.js"
     sample.write_text(
         "const name = users.find(u => u.id === 1).name;\n",
@@ -236,7 +236,7 @@ def test_js_chained_find_method_fires_safe803(tmp_path: Path) -> None:
 
 
 def test_js_optional_chaining_does_not_fire(tmp_path: Path) -> None:
-    """``arr.find(...)?.name`` is null-safe by construction — no fire."""
+    """``arr.find(...)?.name`` is null-safe by construction - no fire."""
     sample = tmp_path / "optional.js"
     sample.write_text(
         "const name = users.find(u => u.id === 1)?.name;\n",
@@ -247,7 +247,7 @@ def test_js_optional_chaining_does_not_fire(tmp_path: Path) -> None:
 
 
 def test_js_get_method_chained_fires(tmp_path: Path) -> None:
-    """``map.get(key).value`` is unsafe — ``get`` returns undefined for missing keys."""
+    """``map.get(key).value`` is unsafe - ``get`` returns undefined for missing keys."""
     sample = tmp_path / "mapget.js"
     sample.write_text(
         "const v = cache.get('key').value;\n",
@@ -258,7 +258,7 @@ def test_js_get_method_chained_fires(tmp_path: Path) -> None:
 
 
 def test_js_getelementbyid_chained_fires(tmp_path: Path) -> None:
-    """``document.getElementById(id).value`` is unsafe — DOM lookup may return null."""
+    """``document.getElementById(id).value`` is unsafe - DOM lookup may return null."""
     sample = tmp_path / "dom.js"
     sample.write_text(
         "const v = document.getElementById('x').value;\n",
@@ -269,7 +269,7 @@ def test_js_getelementbyid_chained_fires(tmp_path: Path) -> None:
 
 
 def test_js_subscript_on_pop_fires(tmp_path: Path) -> None:
-    """``arr.pop()[idx]`` is unsafe — ``pop`` returns undefined on empty array."""
+    """``arr.pop()[idx]`` is unsafe - ``pop`` returns undefined on empty array."""
     sample = tmp_path / "pop.js"
     sample.write_text(
         "const v = stack.pop()[0];\n",
@@ -291,7 +291,7 @@ def test_js_safe_method_does_not_fire(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# JsTaintTracker — targeted coverage for taint propagation branches.
+# JsTaintTracker - targeted coverage for taint propagation branches.
 # ---------------------------------------------------------------------------
 
 
@@ -441,7 +441,7 @@ def test_js_template_string_no_substitution(tmp_path: Path) -> None:
 
 
 def test_js_default_value_param_is_tainted(tmp_path: Path) -> None:
-    """``function f(x = 5)`` — the param ``x`` is a taint source via assignment_pattern."""
+    """``function f(x = 5)`` - the param ``x`` is a taint source via assignment_pattern."""
     sample = tmp_path / "default_param.js"
     sample.write_text(
         "function f(userInput = 'fallback') {\n  eval(userInput);\n}\n",
@@ -452,7 +452,7 @@ def test_js_default_value_param_is_tainted(tmp_path: Path) -> None:
 
 
 def test_js_pair_pattern_param_taints_alias(tmp_path: Path) -> None:
-    """``function f({key: alias})`` — the alias is the bound (and tainted) name."""
+    """``function f({key: alias})`` - the alias is the bound (and tainted) name."""
     sample = tmp_path / "pair_pattern.js"
     sample.write_text(
         "function f({raw: userInput}) {\n  eval(userInput);\n}\n",
@@ -463,13 +463,13 @@ def test_js_pair_pattern_param_taints_alias(tmp_path: Path) -> None:
 
 
 def test_js_new_function_with_tainted_arg_fires(tmp_path: Path) -> None:
-    """``new Function(userInput)`` is a sink invocation — the constructor counts.
+    """``new Function(userInput)`` is a sink invocation - the constructor counts.
 
     Regression guard: the default JS sinks list includes ``Function``,
     which is canonically invoked via ``new Function(code)`` (not as
     ``Function(code)``). Without ``new_expression`` handling in the
     taint tracker, ``new Function(userInput)`` would silently slip
-    past SAFE801 — the highest-impact JS taint sink.
+    past SAFE801 - the highest-impact JS taint sink.
     """
     sample = tmp_path / "new_function.js"
     sample.write_text(
@@ -484,11 +484,11 @@ def test_js_new_function_with_tainted_arg_fires(tmp_path: Path) -> None:
 
 
 def test_js_taint_through_await_expression_fires(tmp_path: Path) -> None:
-    """``const x = await transform(input)`` — taint flows through ``await``.
+    """``const x = await transform(input)`` - taint flows through ``await``.
 
     Without ``await_expression`` in the spreading set, awaited values
     silently drop their taint, leaving every async sink reachable via
-    ``await`` invisible to SAFE801 — a major false-negative gap for
+    ``await`` invisible to SAFE801 - a major false-negative gap for
     real-world JS where almost every taint-carrying network call is
     awaited.
     """
@@ -504,7 +504,7 @@ def test_js_taint_through_await_expression_fires(tmp_path: Path) -> None:
 
 
 def test_js_taint_through_destructuring_default_fires(tmp_path: Path) -> None:
-    """``const [a = '', b] = arr`` — default-valued destructuring still binds ``a``."""
+    """``const [a = '', b] = arr`` - default-valued destructuring still binds ``a``."""
     sample = tmp_path / "destructure_default.js"
     sample.write_text(
         "function f(arr) {\n  const [a = '', b] = arr;\n  eval(a);\n}\n",
@@ -539,7 +539,7 @@ def test_js_null_dereference_message_uses_js_syntax(tmp_path: Path) -> None:
 
 # ---------------------------------------------------------------------------
 # Bare-string config typo regressions (the JS-family list keys went through
-# ``frozenset(...)`` directly before — a typo like ``sinks_javascript =
+# ``frozenset(...)`` directly before - a typo like ``sinks_javascript =
 # "eval"`` was silently coerced into a per-character set rather than raising.
 # Each test asserts the new ``_validated_string_list`` shape: a bare string
 # raises ``TypeError`` naming the offending key.

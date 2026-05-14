@@ -38,7 +38,7 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
-# _nosafe_codes — edge cases
+# _nosafe_codes - edge cases
 # ---------------------------------------------------------------------------
 
 
@@ -65,7 +65,7 @@ def test_nosafe_codes_returns_false_for_directive_with_garbage_after_nosafe() ->
 
 
 # ---------------------------------------------------------------------------
-# engine.check_file — non-engine branches
+# engine.check_file - non-engine branches
 # ---------------------------------------------------------------------------
 
 
@@ -102,7 +102,7 @@ def test_check_file_handles_unicode_decode_error(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Per-file ignore — overlapping patterns
+# Per-file ignore - overlapping patterns
 # ---------------------------------------------------------------------------
 
 
@@ -155,7 +155,7 @@ def test_diagnostics_print_error_writes_to_stderr(capsys: pytest.CaptureFixture[
 
 
 # ---------------------------------------------------------------------------
-# runner.run — paths the CLI tests don't naturally hit
+# runner.run - paths the CLI tests don't naturally hit
 # ---------------------------------------------------------------------------
 
 
@@ -220,7 +220,7 @@ def test_call_name_returns_none_for_unresolvable_function() -> None:
 
 def test_state_purity_skips_annotated_assignment_with_non_identifier_target(tmp_path: Path) -> None:
     """``a[0]: int = 1`` (subscript target with annotation) isn't a global
-    assignment target — the rule must return None, not crash."""
+    assignment target - the rule must return None, not crash."""
     source = "x = []\ndef f():\n    global x\n    x[0]: int = 1\n"
     sample = tmp_path / "subscript_ann.py"
     sample.write_text(source, encoding="utf-8")
@@ -258,7 +258,7 @@ def test_resource_lifecycle_with_missing_value_field(tmp_path: Path) -> None:
 def test_error_handling_catch_body_field_present_returns_field() -> None:
     """``_catch_body`` returns the ``body`` field when tree-sitter populates it.
 
-    Real parsing always populates ``body`` on a valid ``except_clause`` —
+    Real parsing always populates ``body`` on a valid ``except_clause`` -
     this is the path every production call takes.
     """
     lang = tree_sitter.Language(tree_sitter_python.language())
@@ -276,7 +276,7 @@ def test_error_handling_catch_body_falls_back_to_last_named_child() -> None:
     falls back to ``named_children[-1]``.
 
     Real tree-sitter always populates the ``body`` field on a parsed
-    ``except_clause``, so the fallback never fires from a real parse —
+    ``except_clause``, so the fallback never fires from a real parse -
     but it exists as a defensive guard for malformed AST shapes that
     upstream callers could encounter, and the previous test for it
     (which used a real parse) silently took the field path instead,
@@ -301,7 +301,7 @@ def test_error_handling_catch_body_falls_back_to_last_named_child() -> None:
 def test_error_handling_catch_body_returns_none_when_no_field_and_empty() -> None:
     """No ``body`` field AND no named children → ``_catch_body`` returns None.
 
-    The empty-list branch of ``named[-1] if named else None`` — completes
+    The empty-list branch of ``named[-1] if named else None`` - completes
     the matrix of fallback shapes alongside the populated case above.
     """
 
@@ -331,14 +331,14 @@ def test_per_file_ignores_rejects_non_list_entries() -> None:
 def test_per_file_ignores_warns_on_unknown_entries(capsys: pytest.CaptureFixture[str]) -> None:
     """Typo'd rule names in ``per_file_ignores`` produce a stderr warning."""
     cfg = deep_merge(DEFAULTS, {"per_file_ignores": {"tests/**": ["SAFFE101"]}})
-    SafetyEngine(cfg)  # init shouldn't raise — just warn
+    SafetyEngine(cfg)  # init shouldn't raise - just warn
     captured = capsys.readouterr()
     assert "safelint: warning:" in captured.err
     assert "SAFFE101" in captured.err
 
 
 def test_per_file_ignores_warns_on_engine_internal_safe000(capsys: pytest.CaptureFixture[str]) -> None:
-    """``per_file_ignores = {"vendor/**" = ["SAFE000"]}`` warns — engine-internal codes can't be per-file-suppressed.
+    """``per_file_ignores = {"vendor/**" = ["SAFE000"]}`` warns - engine-internal codes can't be per-file-suppressed.
 
     SAFE000 (parse) is raised from the parse-error early-return in
     ``_lint_parsed_source`` *before* per-file ignore matching ever
@@ -356,7 +356,7 @@ def test_per_file_ignores_warns_on_engine_internal_safe000(capsys: pytest.Captur
 
 
 def test_per_file_ignores_warns_on_engine_internal_safe004(capsys: pytest.CaptureFixture[str]) -> None:
-    """``per_file_ignores = {"tests/**" = ["SAFE004"]}`` warns — same logic as SAFE000.
+    """``per_file_ignores = {"tests/**" = ["SAFE004"]}`` warns - same logic as SAFE000.
 
     SAFE004 is gated solely on the global ``ignore`` list (via
     ``_engine_internal_ignored``); per-file matching never sees
@@ -386,7 +386,7 @@ def test_per_file_ignore_safe004_does_not_actually_suppress(tmp_path: Path, caps
 
     Locks the documented contract in: SAFE004 is gated solely on the
     *global* ``ignore`` list. The earlier engine routed SAFE004
-    through ``_is_per_file_ignored`` at append time — that's been
+    through ``_is_per_file_ignored`` at append time - that's been
     removed because it contradicted the documented intent and
     surfaced only as accidental behaviour.
 
@@ -397,7 +397,7 @@ def test_per_file_ignore_safe004_does_not_actually_suppress(tmp_path: Path, caps
     sample = tmp_path / "u.py"
     sample.write_text("x = 1  # nosafe: SAFE304\n", encoding="utf-8")
 
-    # ``per_file_ignores`` can't disable SAFE004 — even with a glob
+    # ``per_file_ignores`` can't disable SAFE004 - even with a glob
     # that matches the file under test.
     cfg = deep_merge(DEFAULTS, {"per_file_ignores": {"**": ["SAFE004"]}})
     capsys.readouterr()  # drop the typo-guard warning surfaced at engine init
@@ -405,7 +405,7 @@ def test_per_file_ignore_safe004_does_not_actually_suppress(tmp_path: Path, caps
     assert any(v.code == "SAFE004" for v in result.violations), "per-file SAFE004 must NOT suppress; contract is global ignore only"
 
     # Sanity: global ``ignore = ["SAFE004"]`` still does suppress
-    # (regression — must not accidentally narrow the global path).
+    # (regression - must not accidentally narrow the global path).
     cfg_global = deep_merge(DEFAULTS, {"ignore": ["SAFE004"]})
     capsys.readouterr()
     result_global = SafetyEngine(cfg_global).check_file(str(sample))
@@ -413,9 +413,9 @@ def test_per_file_ignore_safe004_does_not_actually_suppress(tmp_path: Path, caps
 
 
 def test_global_ignore_still_accepts_engine_internal_codes_silently(capsys: pytest.CaptureFixture[str]) -> None:
-    """The global ``ignore`` list continues to accept SAFE000 / SAFE004 — they DO work there.
+    """The global ``ignore`` list continues to accept SAFE000 / SAFE004 - they DO work there.
 
-    Important — only the per-file path narrowed; the global path
+    Important - only the per-file path narrowed; the global path
     still treats engine-internal codes as known and silences them
     correctly via ``_engine_internal_ignored``.
     """
@@ -427,7 +427,7 @@ def test_global_ignore_still_accepts_engine_internal_codes_silently(capsys: pyte
 
 
 def test_test_coverage_rule_no_op_when_no_changed_files(tmp_path: Path) -> None:
-    """``test_coupling`` returns no violations when ``changed_files`` is empty —
+    """``test_coupling`` returns no violations when ``changed_files`` is empty -
     ensures the early-return branch in the rule's check_file is hit."""
     sample = tmp_path / "src" / "mod.py"
     sample.parent.mkdir()
@@ -462,7 +462,7 @@ def test_lint_result_has_violations_property() -> None:
 
 
 def test_run_stdin_handles_empty_buffer(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
-    """An empty stdin buffer is a valid (empty) file — no violations, no errors."""
+    """An empty stdin buffer is a valid (empty) file - no violations, no errors."""
     monkeypatch.setattr("sys.stdin", io.StringIO(""))
     args = argparse.Namespace(
         output_format="json",

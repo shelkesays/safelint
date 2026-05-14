@@ -158,7 +158,7 @@ def test_sarif_skips_description_only_suggestions() -> None:
     SARIF 2.1.0 spec: ``fix.artifactChanges[].replacements`` SHALL
     contain at least one element. A description-only suggestion
     (a hint without a mechanical recipe) would produce an empty
-    ``replacements`` array, violating the spec — so it must be
+    ``replacements`` array, violating the spec - so it must be
     skipped. The same suggestion stays in the JSON output where
     description-only is documented as valid.
     """
@@ -379,7 +379,7 @@ def test_sarif_artifact_uri_falls_back_for_paths_outside_cwd(tmp_path: Path, mon
     out = format_sarif([v], [], blocking_count=1, fail_on="error", files_checked=1)
     doc = json.loads(out)
     uri = doc["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"]
-    # No drive letter, no backslashes — but it's still absolute (starts with /).
+    # No drive letter, no backslashes - but it's still absolute (starts with /).
     assert uri.startswith("/")
     assert "\\" not in uri
 
