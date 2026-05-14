@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0rc3] - 2026-05-14
+
+**Iteration on the v2.0.0 RC.** Bug fixes and a project-wide writing-style cleanup found during testing of `2.0.0rc2`. No feature changes; same packaging story, same extras, same rule coverage. Install with `pip install 'safelint[<lang>]==2.0.0rc3'` (or pass `--pre`); pre-commit users update `rev: v2.0.0rc2` to `rev: v2.0.0rc3`.
+
+### Fixed
+
+- **Issue #50: hook-mode summary line duplicated under pre-commit batching.** A clean run with `# nosafe` suppressions printed `All checks passed. (N suppressed)`; pre-commit batches files across multiple hook invocations, so that became one summary line per batch, each showing a misleading partial count. Hook and stdin mode now honour `silent_on_clean` fully: a clean run emits nothing at all, including the `--statistics` table. The aggregated, language-agnostic suppression breakdown stays available via `safelint check` (interactive) and in every `--format json` / `--format sarif` document.
+- **Hook mode emitted two messages per invocation in the silent-failure case.** When every passed file was skipped for a missing grammar, each batch printed both a per-extension warning and the silent-failure error, both carrying the same install hint. `_dispatch_hook_mode` now detects the silent-failure case before emitting per-extension warnings: all-skipped runs get only the error; mixed runs still get the warning as context.
+
+### Changed
+
+- **Project-wide writing-style cleanup: em-dashes removed.** Em-dashes (`—`) are gone from documentation, the mkdocs site, AI-client skill files, code comments, docstrings, and CLI output strings. Prose was restructured (comma, colon, parentheses, or a sentence split); a plain hyphen is used only where a dash is genuinely needed. The CLI's runtime error / warning / hint strings changed accordingly; tooling that string-matches safelint output should re-check its patterns.
+
 ## [2.0.0rc2] - 2026-05-13
 
 **Iteration on the v2.0.0 RC** — bug fixes and UX polish discovered during real-world testing of `2.0.0rc1`. No feature changes; same packaging story, same extras, same rule coverage. Install with `pip install 'safelint[<lang>]==2.0.0rc2'` (or pass `--pre`); pre-commit users update `rev: v2.0.0rc1` → `rev: v2.0.0rc2`.
@@ -518,7 +531,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.0.0rc2...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.0.0rc3...HEAD
+[2.0.0rc3]: https://github.com/shelkesays/safelint/compare/v2.0.0rc2...v2.0.0rc3
 [2.0.0rc2]: https://github.com/shelkesays/safelint/compare/v2.0.0rc1...v2.0.0rc2
 [2.0.0rc1]: https://github.com/shelkesays/safelint/compare/v1.13.0...v2.0.0rc1
 [1.13.0]: https://github.com/shelkesays/safelint/compare/v1.12.2...v1.13.0
