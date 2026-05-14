@@ -1,4 +1,4 @@
-"""Language registry — maps file extensions to LanguageDefinition instances.
+"""Language registry - maps file extensions to LanguageDefinition instances.
 
 Every supported language's Tree-sitter grammar package ships as an
 **optional extra**: ``[python]``, ``[javascript]``, ``[typescript]``,
@@ -41,11 +41,11 @@ _UNAVAILABLE_EXTENSIONS: dict[str, str] = {}
 _UNAVAILABLE_EXTRA_NAMES: dict[str, str] = {}
 
 
-# Python — only register if ``tree-sitter-python`` is installed (i.e.
+# Python - only register if ``tree-sitter-python`` is installed (i.e.
 # the ``[python]`` or ``[all]`` extra was selected). Otherwise, record
 # both the install hint and the extra name so the CLI can suggest
 # single- or multi-language install commands. Same shape as the JS /
-# TS blocks below — keep them parallel so future drift is grep-able.
+# TS blocks below - keep them parallel so future drift is grep-able.
 if _python_mod._GRAMMAR_AVAILABLE:
     for _ext in PYTHON.file_extensions:
         _REGISTRY[_ext] = PYTHON
@@ -54,9 +54,9 @@ else:
         _UNAVAILABLE_EXTENSIONS[_ext] = _python_mod.GRAMMAR_INSTALL_HINT
         _UNAVAILABLE_EXTRA_NAMES[_ext] = _python_mod.EXTRA_NAME
 
-# JavaScript — only register if ``tree-sitter-javascript`` is installed.
+# JavaScript - only register if ``tree-sitter-javascript`` is installed.
 # Note: ``TYPESCRIPT`` and ``TSX`` share the same ``name="typescript"`` but
-# use different Tree-sitter grammars — ``TYPESCRIPT`` handles ``.ts`` and
+# use different Tree-sitter grammars - ``TYPESCRIPT`` handles ``.ts`` and
 # ``.as`` (AssemblyScript, parsed by the standard TypeScript grammar),
 # ``TSX`` handles ``.tsx``. Both gate on the same grammar package.
 if _javascript_mod._GRAMMAR_AVAILABLE:
@@ -93,7 +93,7 @@ def supported_extensions() -> frozenset[str]:
     """Return the set of file extensions that have a registered, *installed* language.
 
     Each extension includes the leading dot, e.g. ``".py"``. Excludes
-    extensions whose grammar package isn't installed — those appear in
+    extensions whose grammar package isn't installed - those appear in
     :func:`unavailable_extensions` instead. Use this when discovering
     source files in a directory; pair with :func:`get_language_for_file`
     to retrieve the matching definition.
@@ -122,7 +122,7 @@ def install_hint_for(extension: str) -> str | None:
 
     >>> hint = install_hint_for(".ts")
     >>> if hint is not None:
-    ...     print(f"safelint: warning: skipping .ts files — {hint}")
+    ...     print(f"safelint: warning: skipping .ts files - {hint}")
     """
     return _UNAVAILABLE_EXTENSIONS.get(extension)
 

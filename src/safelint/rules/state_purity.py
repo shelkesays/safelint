@@ -1,4 +1,4 @@
-"""State & purity rules: global_state (SAFE301, Python-only), global_mutation (SAFE302), and wide_scope_declaration (SAFE305, JS-family — JavaScript and TypeScript)."""
+"""State & purity rules: global_state (SAFE301, Python-only), global_mutation (SAFE302), and wide_scope_declaration (SAFE305, JS-family - JavaScript and TypeScript)."""
 
 from __future__ import annotations
 
@@ -75,7 +75,7 @@ def _python_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None
 
     tree-sitter-python parses both regular and *annotated* assignments
     (``x = 1`` and ``x: int = 1``) as the same ``assignment`` node type
-    — annotated form just adds ``:`` and ``type`` as inline children.
+    - annotated form just adds ``:`` and ``type`` as inline children.
     ``child_by_field_name("left")`` correctly returns the identifier in
     both cases, so a single branch handles both.
     """
@@ -87,7 +87,7 @@ def _python_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None
 
 #: Node types that are pure compile-time / no-op-at-runtime annotations
 #: in the JS-family AST. Unwrapping them recovers the underlying
-#: ownership-chain expression — `(globalThis as any).x = 1` writes to
+#: ownership-chain expression - `(globalThis as any).x = 1` writes to
 #: the same global as `globalThis.x = 1`, and the `!` non-null
 #: assertion / `satisfies` clause / parens are all the same shape.
 _PASSTHROUGH_WRAPPER_TYPES = frozenset(
@@ -105,7 +105,7 @@ def _unwrap_passthrough_wrappers(node: tree_sitter.Node | None) -> tree_sitter.N
     """Strip every layer of pass-through wrapper around *node*.
 
     Pass-through wrappers in the JS family are nodes that don't change
-    the underlying ownership chain at runtime — parentheses
+    the underlying ownership chain at runtime - parentheses
     (``(globalThis).x``), TypeScript type assertions
     (``(globalThis as any).x``), ``satisfies`` clauses, and non-null
     assertions (``globalThis!.x``). All of them produce the same write
@@ -115,7 +115,7 @@ def _unwrap_passthrough_wrappers(node: tree_sitter.Node | None) -> tree_sitter.N
     wrappers would break the bare-identifier check at the end of
     :func:`_javascript_global_namespace_root` (and the LHS-type filter
     in :meth:`GlobalMutationRule._javascript_violations_for_func`) and
-    silently skip the violation — particularly painful for TypeScript
+    silently skip the violation - particularly painful for TypeScript
     code where the ``(globalThis as any).foo = ...`` pattern is the
     standard escape hatch for adding properties to the global object.
     """
@@ -124,7 +124,7 @@ def _unwrap_passthrough_wrappers(node: tree_sitter.Node | None) -> tree_sitter.N
         # Pick the expression child. Most wrappers
         # (``parenthesized_expression`` / ``as_expression`` /
         # ``satisfies_expression`` / ``non_null_expression``) have the
-        # expression as the FIRST named child — the type (when present)
+        # expression as the FIRST named child - the type (when present)
         # is the second. ``type_assertion`` (TS angle-bracket cast
         # ``<Foo>x``) is the exception: it has the type FIRST and the
         # expression SECOND.
@@ -202,7 +202,7 @@ class GlobalMutationRule(BaseRule):
     Python: fires on ``global x; x = ...`` patterns (or, with ``strict =
     true``, on every ``global`` declaration). JavaScript: fires on
     function-body assignments that target a configured global namespace
-    member — ``globalThis.x = ...``, ``window.x = ...``, ``global.x = ...``
+    member - ``globalThis.x = ...``, ``window.x = ...``, ``global.x = ...``
     (Node), ``self.x = ...`` (Web Workers), or ``process.env.X = ...``.
     The rule's intent ("don't mutate module-level state from inside a
     function") is the same in both languages even though the syntactic
@@ -214,11 +214,11 @@ class GlobalMutationRule(BaseRule):
     language = ("python", "javascript", "typescript")
 
     _DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT: ClassVar[list[str]] = [
-        "globalThis",  # universal — works in browsers, Node, web workers
+        "globalThis",  # universal - works in browsers, Node, web workers
         "window",  # browser
         "global",  # Node
         "self",  # Web Worker / browser fallback
-        "process",  # Node — covers ``process.env.X = ...``, ``process.exitCode = ...``, etc.
+        "process",  # Node - covers ``process.env.X = ...``, ``process.exitCode = ...``, etc.
     ]
 
     @staticmethod
@@ -286,7 +286,7 @@ class GlobalMutationRule(BaseRule):
             # ``--y``) uses ``argument`` for the operand.
             target = node.child_by_field_name("argument") if node.type == "update_expression" else node.child_by_field_name("left")
             # Unwrap a paren-wrapped target so ``(globalThis.x) = 1``
-            # and ``((process).exitCode)++`` are recognised — without
+            # and ``((process).exitCode)++`` are recognised - without
             # this the LHS-type filter would reject the
             # ``parenthesized_expression`` wrapper and skip the write
             # entirely.
@@ -327,7 +327,7 @@ class GlobalMutationRule(BaseRule):
         before building the frozenset. A bare-string typo
         (``global_namespaces_javascript = "globalThis"``) would otherwise
         be silently coerced into a set of single characters and cause
-        SAFE302 to stop matching any namespace — fail loud instead.
+        SAFE302 to stop matching any namespace - fail loud instead.
 
         TypeScript inherits the JS global namespaces by default;
         users can set ``global_namespaces_typescript`` for TS-only overrides.
@@ -346,20 +346,20 @@ class GlobalMutationRule(BaseRule):
 
 
 class WideScopeDeclarationRule(BaseRule):
-    """Reject ``var`` declarations — prefer ``let`` / ``const`` for narrower scope.
+    """Reject ``var`` declarations - prefer ``let`` / ``const`` for narrower scope.
 
     Holzmann's Power-of-Ten Rule 6 ("Declare variables at the smallest
     possible scope") is C-flavoured but maps cleanly to a real
     JavaScript hazard: ``var`` is *function-scoped* and hoists to the
     top of the enclosing function (or module), while ``let`` / ``const``
     are *block-scoped*. A ``var`` declared in one branch is visible
-    in every other branch of the same function — a classic source
+    in every other branch of the same function - a classic source
     of accidental cross-branch reads and TDZ-like bugs that block
     scoping eliminates.
 
     The fix is mechanical: replace ``var`` with ``let`` (when the
     binding is reassigned) or ``const`` (when it isn't). The rule
-    fires once per ``variable_declaration`` node — a multi-binding
+    fires once per ``variable_declaration`` node - a multi-binding
     form like ``var x = 1, y = 2;`` produces a single violation
     (the line is the unit of fix, not each name).
 
@@ -386,7 +386,7 @@ class WideScopeDeclarationRule(BaseRule):
                 self._make_violation_for_node(
                     filepath,
                     node,
-                    "`var` declaration uses function-scope hoisting — replace with `let` or `const` for block scope",
+                    "`var` declaration uses function-scope hoisting - replace with `let` or `const` for block scope",
                 )
             )
         return violations

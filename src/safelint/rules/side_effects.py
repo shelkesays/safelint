@@ -29,7 +29,7 @@ def _io_funcs_for_lang(rule_config: dict, lang_name: str, fallback: list[str]) -
 
     Per-language config is keyed by ``io_functions`` (Python, the default)
     and ``io_functions_<lang>`` for non-Python languages. TypeScript
-    inherits the JavaScript list by default — runtime semantics are
+    inherits the JavaScript list by default - runtime semantics are
     identical (TS compiles to JS), so the same I/O primitives apply.
     Users can override per-language by setting
     ``io_functions_typescript`` explicitly.
@@ -38,7 +38,7 @@ def _io_funcs_for_lang(rule_config: dict, lang_name: str, fallback: list[str]) -
     building the frozenset. A bare-string typo
     (``io_functions_javascript = "log"``) would otherwise be silently
     coerced to a set of single characters and effectively disable
-    detection — fail loud instead.
+    detection - fail loud instead.
     """
     py_default = fallback if lang_name == "python" else []
     raw, error_key = resolve_lang_config_lookup(rule_config, "io_functions", lang_name, default=py_default)
@@ -65,7 +65,7 @@ def _func_display_name(func_node: tree_sitter.Node) -> str:
     are usually bound through a surrounding ``const x = () => ...`` /
     ``let x = function() {}``; in that shape Tree-sitter makes the
     function expression a child of a ``variable_declarator`` whose
-    ``name`` field carries the binding identifier — surface that
+    ``name`` field carries the binding identifier - surface that
     identifier as the effective name. Without this fallback,
     ``const fetchUser = () => ...`` renders as ``<anonymous>`` *and*
     the SAFE303 ``pure_prefixes`` check (which matches against the
@@ -133,7 +133,7 @@ class SideEffectsRule(BaseRule):
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         io_funcs = _io_funcs_for_lang(self.config, lang_name, ["open", "print", "input"])
         # Lowercase BOTH sides so the substring check is genuinely
-        # case-insensitive — mixed-case keywords in config (e.g. ``"Write"``)
+        # case-insensitive - mixed-case keywords in config (e.g. ``"Write"``)
         # still match camelCase function names like ``writeLog``.
         io_keywords: list[str] = [kw.lower() for kw in self.config.get("io_name_keywords", [])]
 

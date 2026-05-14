@@ -1,4 +1,4 @@
-"""Diagnostic output helpers — short messages to stderr.
+"""Diagnostic output helpers - short messages to stderr.
 
 Used for things the user needs to see but that aren't lint violations
 (e.g. typos in their ignore list, malformed config files). Output goes

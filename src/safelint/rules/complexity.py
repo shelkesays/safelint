@@ -38,9 +38,9 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # branch. Python also counts ``elif_clause`` (separate node), comprehension
 # ``if_clause``, and ``boolean_operator`` (a single node containing chained
 # ``and`` / ``or``). JavaScript uses ``binary_expression`` for ``&&`` /
-# ``||`` / ``??`` and the operator must be inspected — see the special
+# ``||`` / ``??`` and the operator must be inspected - see the special
 # branch in ``_cyclomatic_complexity``. TypeScript (``.ts`` / ``.tsx`` /
-# ``.as``) reuses the JavaScript branching set — the type system doesn't
+# ``.as``) reuses the JavaScript branching set - the type system doesn't
 # introduce new branches.
 _JS_BRANCHING_TYPES = frozenset(
     {
@@ -116,7 +116,7 @@ class ComplexityRule(BaseRule):
     ) -> int:
         """Count cyclomatic complexity for *func_node* (McCabe 1976).
 
-        Skips nested function definitions — they are scored separately by the
+        Skips nested function definitions - they are scored separately by the
         outer ``check_file`` walk so their branches must not also count toward
         the parent.
         """
@@ -133,7 +133,7 @@ def _is_branch_node(node: tree_sitter.Node, lang_name: str, branching_types: fro
     Most languages can answer this with a simple node-type set membership.
     JavaScript needs a side check because ``&&`` / ``||`` / ``??`` parse as
     ``binary_expression`` (a node type that also covers ``+``, ``>``, ``-``,
-    etc., which are *not* branches) — we filter on the operator string.
+    etc., which are *not* branches) - we filter on the operator string.
     """
     if node.type in branching_types:
         return True

@@ -38,7 +38,7 @@ def _javascript_has_assertion(func_node: tree_sitter.Node, function_types: froze
 
     JS doesn't have a built-in ``assert`` keyword (``assert`` is just a
     function from the ``assert`` module). The rule looks for *calls* to
-    any name in *assertion_calls* — covering Node's ``assert(...)`` /
+    any name in *assertion_calls* - covering Node's ``assert(...)`` /
     ``assert.equal(...)`` and test-framework idioms like
     ``expect(x).toBe(y)`` (Jest, where ``expect`` is the call name) and
     ``console.assert(...)``.
@@ -67,7 +67,7 @@ class MissingAssertionsRule(BaseRule):
     ``fail``, ``ifError``, ``match``), browser/Node ``console.assert``,
     and the most common test frameworks' entry points (``expect`` for
     Jest / Chai-via-``expect``, ``should`` for Should.js,
-    ``vi.expect`` for Vitest — ``vi`` is the receiver, ``expect`` is
+    ``vi.expect`` for Vitest - ``vi`` is the receiver, ``expect`` is
     the call name). User can override via ``assertion_calls_javascript``
     in TOML config.
     """
@@ -83,7 +83,7 @@ class MissingAssertionsRule(BaseRule):
         before building the frozenset. A bare-string typo
         (``assertion_calls_javascript = "assert"``) would otherwise be
         coerced into ``{'a', 's', 'e', 'r', 't'}`` and silently break
-        detection — fail loud instead. Same shape as the validation
+        detection - fail loud instead. Same shape as the validation
         on ``io_functions_javascript`` and ``global_namespaces_javascript``.
         """
         if lang_name == "python":

@@ -35,7 +35,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 
 # Pass-through wrappers in the JS / TS grammar: nodes whose *runtime
 # value* is identical to their inner expression. SAFE803 must peel
-# these to see whether the underlying expression is a nullable call —
+# these to see whether the underlying expression is a nullable call -
 # without it, TypeScript authors writing ``(foo() as Bar).baz``,
 # ``(foo())!.baz``, or ``(foo()).baz`` would slip past the check
 # even though the underlying call IS nullable. Mirrors the TS subset
@@ -49,7 +49,7 @@ def _peel_js_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | No
     specially because the type comes first and the expression second;
     every other pass-through wrapper has the expression as the first
     named child. AST depth is bounded by Tree-sitter's own depth cap,
-    so the loop doesn't need an explicit counter — ``# nosafe: SAFE501``
+    so the loop doesn't need an explicit counter - ``# nosafe: SAFE501``
     on the while.
     """
     while node is not None and node.type in _JS_PASSTHROUGH_WRAPPER_TYPES and node.named_children:  # nosafe: SAFE501
@@ -63,7 +63,7 @@ _JS_PASSTHROUGH_WRAPPER_TYPES = frozenset(
         "as_expression",
         "satisfies_expression",
         "non_null_expression",
-        # ``<Foo>x`` — older TS angle-bracket cast syntax, equivalent
+        # ``<Foo>x`` - older TS angle-bracket cast syntax, equivalent
         # to ``as`` but discouraged in TSX (collides with JSX). Plain
         # TS files still use it; SAFE803 must peel it the same as the
         # ``as`` cast or ``(call as Foo)!.bar`` would only be partly
@@ -72,7 +72,7 @@ _JS_PASSTHROUGH_WRAPPER_TYPES = frozenset(
     }
 )
 
-# Python parameter shapes — kept in sync with the same set in
+# Python parameter shapes - kept in sync with the same set in
 # safelint.rules.max_arguments to avoid drift.
 _PY_PARAM_TYPES = frozenset(
     {
@@ -131,7 +131,7 @@ def _python_param_node_name(child: tree_sitter.Node) -> str:
 def _python_param_names(func_node: tree_sitter.Node) -> set[str]:
     """Return all parameter names for *func_node* (Python), excluding self / cls."""
     params_node = func_node.child_by_field_name("parameters")
-    if params_node is None:  # pragma: no cover — defensive: valid Python functions always have a parameters list
+    if params_node is None:  # pragma: no cover - defensive: valid Python functions always have a parameters list
         return set()
     names: set[str] = set()
     for child in params_node.named_children:
@@ -147,12 +147,12 @@ def _javascript_param_names(func_node: tree_sitter.Node) -> set[str]:
     """Return all parameter names for *func_node* (JavaScript).
 
     Destructured params (``function f({a, b})``, ``function f([x, y])``)
-    contribute every bound name to the taint set — the destructured
+    contribute every bound name to the taint set - the destructured
     fields are themselves tainted entry points. Rest params (``...args``)
     contribute the rest variable name.
     """
     params_node = func_node.child_by_field_name("parameters")
-    if params_node is None:  # pragma: no cover — defensive: arrow functions and named functions both expose ``parameters``
+    if params_node is None:  # pragma: no cover - defensive: arrow functions and named functions both expose ``parameters``
         return set()
     names: set[str] = set()
     for child in params_node.named_children:
@@ -169,11 +169,11 @@ _JS_DESTRUCTURE_CONTAINER_TYPES = frozenset({"array_pattern", "object_pattern", 
 def _javascript_collect_names(node: tree_sitter.Node) -> set[str]:
     """Walk a JS / TS parameter / pattern node and collect every bound identifier name.
 
-    Dispatches by node-type bucket — leaf identifiers, container patterns
+    Dispatches by node-type bucket - leaf identifiers, container patterns
     (array / object / rest), assignment patterns (``b = 5``), pair
     patterns (``{key: alias}``), and TS typed-parameter wrappers
     (``required_parameter`` / ``optional_parameter`` / ``rest_parameter``)
-    — into small helpers so this function stays under the
+    - into small helpers so this function stays under the
     cyclomatic-complexity cap.
     """
     # TypeScript typed-parameter wrappers: ``required_parameter``,
@@ -205,7 +205,7 @@ def _collect_from_container_pattern(node: tree_sitter.Node) -> set[str]:
 def _collect_from_assignment_pattern(node: tree_sitter.Node) -> set[str]:
     """Collect bound names from ``b = 5`` (default-value parameter)."""
     target = node.named_children[0] if node.named_children else None  # pragma: no branch
-    return _javascript_collect_names(target) if target else set()  # pragma: no cover — defensive
+    return _javascript_collect_names(target) if target else set()  # pragma: no cover - defensive
 
 
 def _collect_from_pair_pattern(node: tree_sitter.Node) -> set[str]:
@@ -284,7 +284,7 @@ class TaintedSinkRule(BaseRule):
         """Run JS-family (JavaScript or TypeScript) taint analysis on every function in *tree*.
 
         TypeScript inherits the JavaScript sink / sanitizer / source
-        lists by default — same runtime, same threat surface. Users
+        lists by default - same runtime, same threat surface. Users
         can override with ``sinks_typescript`` etc. when they want
         different behaviour for ``.ts`` files.
         """
@@ -306,7 +306,7 @@ class TaintedSinkRule(BaseRule):
         return violations
 
     def _format_hits(self, filepath: str, hits: list[tuple[tree_sitter.Node, str, str]]) -> list[Violation]:
-        """Convert tracker hits to Violations — same message format for both languages."""
+        """Convert tracker hits to Violations - same message format for both languages."""
         return [
             self._make_violation_for_node(
                 filepath,
@@ -440,7 +440,7 @@ class NullDereferenceRule(BaseRule):
     def _javascript_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
         """Return the method name if *node* is an unsafe JavaScript dereference, else None.
 
-        ``foo?.bar`` (optional chaining) is null-safe by construction —
+        ``foo?.bar`` (optional chaining) is null-safe by construction -
         any ``optional_chain`` child token in the member / subscript
         node means the rule should NOT fire.
 
@@ -448,22 +448,22 @@ class NullDereferenceRule(BaseRule):
         annotations that the rule must peel before checking whether
         ``obj`` is a call:
 
-        * ``parenthesized_expression`` — ``(foo()).bar``
-        * ``as_expression`` — ``(foo() as Bar).baz``
-        * ``satisfies_expression`` — ``(foo() satisfies Bar).baz``
-        * ``non_null_expression`` — ``foo()!.bar`` (the ``!``
+        * ``parenthesized_expression`` - ``(foo()).bar``
+        * ``as_expression`` - ``(foo() as Bar).baz``
+        * ``satisfies_expression`` - ``(foo() satisfies Bar).baz``
+        * ``non_null_expression`` - ``foo()!.bar`` (the ``!``
           is a compile-time annotation that says "trust me, it's
           not null" but provides zero runtime safety)
 
-        All four are pass-through wrappers — runtime value is
-        identical to the inner expression — so SAFE803 must still
+        All four are pass-through wrappers - runtime value is
+        identical to the inner expression - so SAFE803 must still
         fire when the underlying call IS nullable. Peel them in a
         loop because TS authors freely combine them
         (``(foo() as Bar)!.baz``).
         """
         if node.type not in ("member_expression", "subscript_expression"):
             return None
-        # Optional chaining is the safe form — skip it entirely.
+        # Optional chaining is the safe form - skip it entirely.
         if any(c.type == "optional_chain" for c in node.children):
             return None
         obj = _peel_js_passthrough(node.child_by_field_name("object"))
@@ -477,7 +477,7 @@ class NullDereferenceRule(BaseRule):
 
         Per-language message: Python users get the ``None`` / ``is not None``
         idiom; JavaScript users get the null-or-undefined hazard surfaced
-        with optional chaining (``result?.field`` — the modern guard) and
+        with optional chaining (``result?.field`` - the modern guard) and
         the loose ``!= null`` form (which catches both ``null`` and
         ``undefined``) as the explicit alternative. Same per-language
         wording pattern as ``EmptyExceptRule`` / ``LoggingOnErrorRule``

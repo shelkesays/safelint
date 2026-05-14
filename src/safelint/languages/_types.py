@@ -1,4 +1,4 @@
-"""Language definition dataclass — one instance per supported language."""
+"""Language definition dataclass - one instance per supported language."""
 
 from __future__ import annotations
 

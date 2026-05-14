@@ -42,9 +42,9 @@ def _nosafe_codes(comment: str, prefix: str = "#") -> set[str] | None | Literal[
     """Parse a single comment string and return the nosafe payload.
 
     Returns:
-        ``None``           — bare nosafe (suppress everything on this line)
-        ``set[str]``       — nosafe: CODE, ... (suppress named codes/rules)
-        ``Literal[False]`` — not a nosafe directive, or malformed
+        ``None``           - bare nosafe (suppress everything on this line)
+        ``set[str]``       - nosafe: CODE, ... (suppress named codes/rules)
+        ``Literal[False]`` - not a nosafe directive, or malformed
 
     """
     body = comment[len(prefix) :].strip()
@@ -68,9 +68,9 @@ def _file_ignore_codes(comment_text: str, prefix: str = "#") -> set[str] | None 
     """Parse a comment for ``# safelint: ignore[: codes]`` file-level directives.
 
     Returns:
-        ``None``           — bare ``# safelint: ignore`` (suppress all rules in this file)
-        ``set[str]``       — explicit codes / rule names to suppress file-wide
-        ``Literal[False]`` — not a file-level ignore directive
+        ``None``           - bare ``# safelint: ignore`` (suppress all rules in this file)
+        ``set[str]``       - explicit codes / rule names to suppress file-wide
+        ``Literal[False]`` - not a file-level ignore directive
 
     Mirrors the shape of :func:`_nosafe_codes` but uses the longer
     ``safelint: ignore`` form to distinguish file scope from line scope.
@@ -101,22 +101,22 @@ def _parse_directives(
 
     Production callers (``_lint_parsed_source``) need both the
     line-level ``# nosafe`` map and the file-level ``# safelint: ignore``
-    payload. Walking the tree twice — once per directive type — was
+    payload. Walking the tree twice - once per directive type - was
     measurable on large generated files (a primary use case for
     file-level ignores). This helper folds both into one O(N) pass.
 
     Returns ``(suppressions, file_bare, file_codes)``:
 
-    * ``suppressions`` — ``{lineno: codes_or_None}`` map of every
+    * ``suppressions`` - ``{lineno: codes_or_None}`` map of every
       ``# nosafe`` / ``# nosafe: …`` directive found.
-    * ``file_bare`` — True when at least one bare ``# safelint: ignore``
+    * ``file_bare`` - True when at least one bare ``# safelint: ignore``
       directive (no codes) was seen alone on its line.
-    * ``file_codes`` — union of all codes / names listed in
+    * ``file_codes`` - union of all codes / names listed in
       ``# safelint: ignore: A, B`` directives, considering only
       directives that appear alone on their line.
 
     Pass an empty ``source_lines`` (e.g. ``[]``) when only line-level
-    ``# nosafe`` parsing is needed — the file-level branch then
+    ``# nosafe`` parsing is needed - the file-level branch then
     short-circuits per comment because every line-bounds check fails.
     The thin :func:`_parse_suppressions` and :func:`_parse_file_level_ignores`
     wrappers below use that pattern.
@@ -129,7 +129,7 @@ def _parse_directives(
             continue
         comment_text = node_text(node)
         # Line-level: every comment is eligible (matches existing
-        # ``# nosafe`` semantics — including trailing comments after
+        # ``# nosafe`` semantics - including trailing comments after
         # code, which is the typical placement for line directives).
         nosafe_payload = _nosafe_codes(comment_text, prefix=comment_prefix)
         if nosafe_payload is not False:
@@ -157,7 +157,7 @@ def _parse_suppressions(
 ) -> dict[int, set[str] | None]:
     """Return a {lineno: codes} suppression map for ``# nosafe`` directives.
 
-    Thin wrapper over :func:`_parse_directives` — kept as a standalone
+    Thin wrapper over :func:`_parse_directives` - kept as a standalone
     entry point for the unit tests in ``tests/core/test_suppression.py``
     that focus only on the line-level directive parser. Production
     callers should invoke ``_parse_directives`` directly to also get
@@ -175,13 +175,13 @@ def _parse_file_level_ignores(
 ) -> tuple[bool, set[str]]:
     """Return ``(bare, codes)`` for ``# safelint: ignore`` directives in *tree*.
 
-    Thin wrapper over :func:`_parse_directives` — kept as a standalone
+    Thin wrapper over :func:`_parse_directives` - kept as a standalone
     entry point for callers that only need the file-level result.
     Production code uses ``_parse_directives`` directly to also get
     the inline-suppression map without a second tree walk.
 
     Only comments that appear *alone on their line* (no preceding code)
-    are honoured — trailing comments after code are scope-local and
+    are honoured - trailing comments after code are scope-local and
     use ``# nosafe`` instead. Tree-sitter ensures ``# safelint: ignore``
     literals inside string content are correctly ignored.
     """
@@ -199,7 +199,7 @@ def _check_suppressed_marking_used(
     *used* receives ``(lineno, None)`` for bare ``# nosafe`` hits, or
     ``(lineno, code_or_rule_name)`` for ``# nosafe: <code>`` hits. After
     all rules run, the entries in ``suppressions`` *not* present in
-    *used* are the directives that didn't actually silence anything —
+    *used* are the directives that didn't actually silence anything -
     the engine emits SAFE004 (``unused_suppression``) warnings for those.
 
     This is the single source of truth for inline-directive matching;
@@ -214,7 +214,7 @@ def _check_suppressed_marking_used(
         return True
     # Mark *every* alias of the matching rule that the directive used.
     # A directive like ``# nosafe: SAFE101, function_length`` lists
-    # the same rule under both its code and its rule-name aliases —
+    # the same rule under both its code and its rule-name aliases -
     # both are intentionally consumed by the matching violation.
     # Without this, an early-return after the first match would leave
     # the second alias marked "unused" and surface a false SAFE004.
@@ -232,7 +232,7 @@ def _check_suppressed_marking_used(
 def _is_per_file_ignored(violation: Violation, ignored_names: frozenset[str], ignored_codes: frozenset[str]) -> bool:
     """Return True when *violation* is suppressed by a per-file ignore pattern.
 
-    The ``"*"`` wildcard in *ignored_codes* matches every violation —
+    The ``"*"`` wildcard in *ignored_codes* matches every violation -
     used by the bare ``# safelint: ignore`` file-level directive and by
     ``per_file_ignores`` entries that want to silence everything for a
     given path pattern.
@@ -281,7 +281,7 @@ def _unused_violations_for_line(
         return [_make_unused_suppression(filepath, lineno_, "this `# nosafe` directive did not suppress any violation")]
     # Iterate in sorted order so multiple SAFE004 violations on the
     # same line (e.g. ``# nosafe: SAFE101, SAFE102, SAFE103``) come out
-    # in stable alphabetical sequence — JSON/SARIF consumers rely on
+    # in stable alphabetical sequence - JSON/SARIF consumers rely on
     # deterministic per-run ordering, and ``set[str]`` iteration is
     # hash-randomised across processes.
     return [
@@ -300,7 +300,7 @@ def _is_safe004_self_reference(code: str) -> bool:
     ``unused_suppression`` rule name. Inline ``# nosafe:`` matching,
     including the usage tracking in
     :func:`_check_suppressed_marking_used`, is otherwise
-    *case-sensitive* on codes — the global ``ignore`` config list is
+    *case-sensitive* on codes - the global ``ignore`` config list is
     normalised to upper-case at load time, but per-line inline
     directives are matched verbatim. Treating the SAFE004
     self-reference more leniently is intentional: a directive whose
@@ -360,7 +360,7 @@ class SafetyEngine:
         non_strings = [e for e in raw_ignore if not isinstance(e, str)]
         if non_strings:
             bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
-            msg = f"ignore must contain only strings — got: {bad}"
+            msg = f"ignore must contain only strings - got: {bad}"
             raise TypeError(msg)
         known_names: frozenset[str] = frozenset(cls.name for cls in ALL_RULES) | _ENGINE_INTERNAL_NAMES
         known_codes_upper: frozenset[str] = frozenset(cls.code.upper() for cls in ALL_RULES) | _ENGINE_INTERNAL_CODES
@@ -374,7 +374,7 @@ class SafetyEngine:
         # Per-file ignores can't suppress engine-internal codes (SAFE000
         # fires before per-file matching; SAFE004 only honours the
         # global ``ignore`` list), so validate against the narrower set
-        # — silent acceptance of stale entries is worse than a typo guard.
+        # - silent acceptance of stale entries is worse than a typo guard.
         per_file_known_names = known_names - _ENGINE_INTERNAL_NAMES
         per_file_known_codes_upper = known_codes_upper - _ENGINE_INTERNAL_CODES
         self.per_file_ignores: list[tuple[str, frozenset[str], frozenset[str]]] = self._parse_per_file_ignores(config.get("per_file_ignores", {}), per_file_known_names, per_file_known_codes_upper)
@@ -389,7 +389,7 @@ class SafetyEngine:
         # unrelated ``ignore`` edits or typos that surface as stderr
         # warnings. Rule-based filtering happens in ``_build_active_rules``.
         self._globally_ignored_engine_internal: frozenset[str] = (ignored_codes_upper & _ENGINE_INTERNAL_CODES) | (ignored_names & _ENGINE_INTERNAL_NAMES)
-        # Lazy: only computed when the cache is non-trivial — saves the
+        # Lazy: only computed when the cache is non-trivial - saves the
         # JSON-encode + sha256 round-trip when ``--no-cache`` is in use.
         self._engine_fingerprint: str | None = None
 
@@ -423,10 +423,10 @@ class SafetyEngine:
 
         Two keys participate:
 
-        * ``exclude_paths`` — replaces the built-in defaults entirely.
+        * ``exclude_paths`` - replaces the built-in defaults entirely.
           The standard pattern when a project wants tight control over
           what's linted (or wants to clear defaults with ``[]``).
-        * ``extend_exclude_paths`` — appended to whatever ``exclude_paths``
+        * ``extend_exclude_paths`` - appended to whatever ``exclude_paths``
           resolves to. The standard pattern for projects that want the
           built-in vendor-dir defaults plus a few project-specific
           additions.
@@ -447,7 +447,7 @@ class SafetyEngine:
 
         Rules:
         * Must be a non-negative integer (``bool`` is rejected since it
-          subclasses ``int`` — ``true`` would silently coerce to ``1``).
+          subclasses ``int`` - ``true`` would silently coerce to ``1``).
         * Negative values raise ``ValueError`` with a clear message.
         * ``0`` would defeat the OOM guard entirely; treat it as a likely
           typo, emit a stderr warning, and fall back to the built-in
@@ -463,7 +463,7 @@ class SafetyEngine:
         if raw_max == 0:
             default = DEFAULTS["max_file_size_bytes"]
             _diagnostics.print_warning(
-                f"max_file_size_bytes = 0 is not supported — it would read every file unbounded and defeat "
+                f"max_file_size_bytes = 0 is not supported - it would read every file unbounded and defeat "
                 f"the OOM guard. Falling back to the built-in default of {default:,} bytes. "
                 f"To allow larger files, set a positive value explicitly (e.g. 50_000_000 for 50 MB)."
             )
@@ -488,10 +488,10 @@ class SafetyEngine:
             non_strings = [e for e in entries if not isinstance(e, str)]
             if non_strings:
                 bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
-                msg = f"per_file_ignores[{pattern!r}] must contain only strings — got: {bad}"
+                msg = f"per_file_ignores[{pattern!r}] must contain only strings - got: {bad}"
                 raise TypeError(msg)
             # ``"*"`` is a documented wildcard meaning "suppress every
-            # rule for this path pattern" — short-circuited by
+            # rule for this path pattern" - short-circuited by
             # :func:`_is_per_file_ignored`. Exempt it from the unknown-
             # entry typo guard so users don't get a warning for the
             # exact value the docs tell them to use.
@@ -511,10 +511,10 @@ class SafetyEngine:
 
         Tests the directory candidate in two forms against each pattern:
 
-        * **Without trailing slash** (``"src/legacy"``) — supports patterns
+        * **Without trailing slash** (``"src/legacy"``) - supports patterns
           that name a specific directory exactly, e.g.
           ``exclude_paths = ["src/legacy"]``.
-        * **With trailing slash** (``"src/legacy/"``) — supports the very
+        * **With trailing slash** (``"src/legacy/"``) - supports the very
           common ``/**`` glob, e.g. ``exclude_paths = ["tests/**"]``.
           ``fnmatch.fnmatchcase('tests', 'tests/**')`` is ``False`` because
           the pattern requires a literal ``/`` after ``tests``; appending
@@ -547,7 +547,7 @@ class SafetyEngine:
 
         *bare* and *file_codes* are produced upstream by
         :func:`_parse_directives` in the same single tree walk that
-        builds the line-level ``# nosafe`` map — taking pre-parsed
+        builds the line-level ``# nosafe`` map - taking pre-parsed
         input here means the engine never walks the tree twice for
         directives. Unknown codes/names trigger a typo-guard warning
         on stderr, matching the toml ``per_file_ignores`` validation.
@@ -628,7 +628,7 @@ class SafetyEngine:
             stack.extend(reversed(node.children))
         # Defensive: the outer caller only invokes this when ``has_error``
         # is True, which means at least one ERROR or MISSING node exists
-        # somewhere — but the loop below could in principle skip it if
+        # somewhere - but the loop below could in principle skip it if
         # the parser produces an unusual tree shape. Falling back to None
         # makes the message a generic "could not parse" without a location.
         return None  # pragma: no cover
@@ -677,7 +677,7 @@ class SafetyEngine:
 
         *lang_name* is the active file's :attr:`LanguageDefinition.name`.
         Rules whose ``language`` tuple doesn't include this name are
-        skipped — they were registered for a different language (today
+        skipped - they were registered for a different language (today
         always Python; relevant once a second language lands).
         """
         active: list[Violation] = []
@@ -701,11 +701,11 @@ class SafetyEngine:
         Catches the two pre-read conditions that mean we shouldn't even
         attempt to read the file:
 
-        * **Non-regular path** — FIFOs, device files, broken symlinks.
+        * **Non-regular path** - FIFOs, device files, broken symlinks.
           ``check_file`` is also called via CLI hook mode with an explicit
           file list (bypassing ``_discover_files``'s filter), so a FIFO
           path passed straight in would block ``read_text`` forever.
-        * **Oversize input** — files larger than ``max_file_size_bytes``
+        * **Oversize input** - files larger than ``max_file_size_bytes``
           would OOM the process when fully read.
 
         Stat failures fall through to the read path so the user sees a
@@ -752,7 +752,7 @@ class SafetyEngine:
         try:
             source = path_obj.read_text(encoding="utf-8")
         # Read failures are surfaced to the user as a SAFE000 parse-error
-        # violation — the error is reported, not swallowed.
+        # violation - the error is reported, not swallowed.
         except (OSError, UnicodeDecodeError) as exc:  # nosafe: SAFE203
             return self._parse_error_result(filepath, f"Read error: {exc}")
 
@@ -808,7 +808,7 @@ class SafetyEngine:
                 return LintResult(path=filepath, violations=[], suppressed=[])
             return self._build_parse_error_result(filepath, tree.root_node)
 
-        # Single tree walk — produces both line-level ``# nosafe``
+        # Single tree walk - produces both line-level ``# nosafe``
         # suppressions and file-level ``# safelint: ignore`` payload.
         # Walking twice (separate _parse_suppressions + _parse_file_level_ignores
         # calls) was measurable on large generated files where file-
@@ -839,7 +839,7 @@ class SafetyEngine:
         """Construct the SAFE000 ``LintResult`` for a tree with parse errors.
 
         Parse errors aren't cached: they're typically transient (a file
-        mid-edit), and re-parsing a still-broken buffer is cheap — Tree-sitter
+        mid-edit), and re-parsing a still-broken buffer is cheap - Tree-sitter
         bails on the first ERROR/MISSING node, so the cost saved by caching
         wouldn't be material against the extra read/JSON-parse round-trip.
         """
@@ -862,7 +862,7 @@ class SafetyEngine:
     ) -> None:
         """Generate SAFE004 warnings for unused directives and append them to *active*.
 
-        SAFE004 is gated solely on the global ``ignore`` list — per-file
+        SAFE004 is gated solely on the global ``ignore`` list - per-file
         ignores deliberately don't apply here. Engine-internal codes
         live in a different layer from ``BaseRule`` violations, and
         ``_parse_per_file_ignores`` validates them out with a typo-guard
@@ -883,7 +883,7 @@ class SafetyEngine:
         Engine-internal codes (SAFE000 parse, SAFE004 unused_suppression)
         don't go through the rule-filter path, so the user's ``ignore``
         list is consulted directly here. Both *code* (e.g. ``"SAFE000"``)
-        and *name* (e.g. ``"parse"``) are accepted — the comparison is
+        and *name* (e.g. ``"parse"``) are accepted - the comparison is
         case-insensitive on the code and exact on the name, matching how
         the BaseRule pipeline treats them.
         """
@@ -899,7 +899,7 @@ class SafetyEngine:
 
         For each declared directive, check whether *any* violation hit it. If
         not, emit a warning so the user can clean up stale annotations after
-        a refactor. ``# nosafe: SAFE004`` is special-cased — a directive that
+        a refactor. ``# nosafe: SAFE004`` is special-cased - a directive that
         only mentions SAFE004 is always considered "used" to avoid recursive
         self-reporting.
         """
@@ -914,10 +914,10 @@ class SafetyEngine:
         The cache key folds in everything that affects what gets reported
         for this file:
 
-        * source bytes — inline ``# nosafe`` directives live in source.
-        * filepath — path-dependent rules (``test_existence``,
+        * source bytes - inline ``# nosafe`` directives live in source.
+        * filepath - path-dependent rules (``test_existence``,
           ``test_coupling``) and ``Violation.filepath`` itself.
-        * engine fingerprint — safelint version, schema version, the
+        * engine fingerprint - safelint version, schema version, the
           active rule set + per-rule config (so CLI ``--ignore`` /
           top-level ``ignore`` already invalidate, since they remove
           rules from ``self.rules``), *and* the ``per_file_ignores``
@@ -925,7 +925,7 @@ class SafetyEngine:
           runs invalidates the affected entries).
 
         With all of that in the key, a hit means the cached lists are
-        already correctly partitioned for the current call — no
+        already correctly partitioned for the current call - no
         post-hit re-filter needed. An earlier version re-applied
         ``per_file_ignores`` here, but that was both redundant *and*
         wrong: it only walked the cached active list, never the
@@ -969,13 +969,13 @@ class SafetyEngine:
 
         ``os.walk`` lists every non-directory entry in *filenames*, which
         includes FIFOs, sockets, device files, and broken symlinks. The
-        ``is_file()`` guard drops those — calling ``read_text()`` on a
+        ``is_file()`` guard drops those - calling ``read_text()`` on a
         FIFO would block the process forever, and reading a device file
         is undefined behaviour. The stat cost is bounded to suffix
         matches (the cheap string check runs first).
 
         Excluded subtrees (matching ``exclude_paths`` glob patterns) are
-        pruned during descent by mutating ``dirnames`` in place — saves
+        pruned during descent by mutating ``dirnames`` in place - saves
         the cost of walking large excluded trees like ``node_modules``,
         ``.venv``, or ``build/`` when the user has explicit directory
         excludes. Files matching exclude patterns are still filtered

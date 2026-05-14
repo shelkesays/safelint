@@ -20,7 +20,7 @@ from safelint.rules.base import BaseRule
 # and re-exported because several rules import it from here. It now
 # lives in ``safelint.core._validators`` so core/ and rules/ can
 # share the helper without cross-rule imports. The line above keeps
-# the old import path working — third-party rules / forks doing
+# the old import path working - third-party rules / forks doing
 # ``from safelint.rules.resource_lifecycle import _validated_string_list``
 # don't break.
 
@@ -61,19 +61,19 @@ def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
 
     Walks the parent chain (Tree-sitter Node exposes ``.parent``) and
     short-circuits on the first ``try_statement`` whose children include a
-    ``finally_clause`` — *unless* the call we're checking sits inside that
+    ``finally_clause`` - *unless* the call we're checking sits inside that
     very ``finally_clause`` itself. A resource acquired inside the finally
     block has no subsequent finally to clean up *itself*, so the
     enclosing try/finally that the call lives inside does not count as
     guarding it. Multiple nested try-statements within the same function
     are tolerated: an outer ``try { ... } finally { ... }`` still counts
-    as guarding a deeply-nested call inside that function — provided the
+    as guarding a deeply-nested call inside that function - provided the
     call is not inside the outer finally.
 
     **Stops at function boundaries.** If the walk crosses a JavaScript
     function-defining node (``function_declaration``, ``arrow_function``,
     ``method_definition``, etc.) before finding a guarding ``try_statement``,
-    the call is *not* guarded — the outer function's ``finally`` block
+    the call is *not* guarded - the outer function's ``finally`` block
     runs when the *outer* function returns, not when the inner function
     is invoked later (e.g. via ``setTimeout(callback, 1000)``). Without
     this boundary check the rule would silently miss the most common
@@ -81,7 +81,7 @@ def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
     method nested in an unrelated outer try/finally.
 
     Heuristic: the rule still doesn't verify that the ``finally`` block
-    actually closes the resource — only that *some* finally exists in
+    actually closes the resource - only that *some* finally exists in
     the same function scope. Catches the common "I opened a stream and
     forgot to handle cleanup at all" case while staying simple.
     False positives are possible for try-finally blocks that don't
@@ -93,12 +93,12 @@ def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
     while cur is not None:
         if cur.type in _JS_FUNCTION_TYPES:
             # Walked out of the call's function scope without finding a
-            # guarding try/finally — anything further up belongs to a
+            # guarding try/finally - anything further up belongs to a
             # different function whose ``finally`` doesn't run when this
             # call eventually executes.
             return False
         # ``prev.type != "finally_clause"`` skips a try_statement whose
-        # finally we just came out of — that finally is the *parent* of
+        # finally we just came out of - that finally is the *parent* of
         # the call, not a subsequent cleanup hook for it. Without this
         # check, ``try { ... } finally { fs.createReadStream(p); }``
         # would be silently accepted as "guarded" even though no
@@ -122,12 +122,12 @@ class ResourceLifecycleRule(BaseRule):
 
     Python: the call must appear inside a ``with`` statement (``with
     open(path) as f:``). Bare assignments without ``with`` fire even
-    when paired with manual ``f.close()`` — Python's idiom is
+    when paired with manual ``f.close()`` - Python's idiom is
     context-manager-first.
 
     JavaScript: the call must appear inside a ``try`` block whose
     ``try_statement`` has a ``finally_clause`` somewhere up the
-    ancestor chain. Heuristic-only — the rule doesn't verify that the
+    ancestor chain. Heuristic-only - the rule doesn't verify that the
     ``finally`` block actually closes the specific resource. Captures
     the most common "I created a stream and didn't handle cleanup at
     all" leak. JavaScript's newer ``using`` declarations (Stage 3 /
@@ -143,7 +143,7 @@ class ResourceLifecycleRule(BaseRule):
         # File / stream APIs.
         "createReadStream",
         "createWriteStream",
-        "openSync",  # fs.openSync — returns a raw fd
+        "openSync",  # fs.openSync - returns a raw fd
         # Network / server.
         "createServer",
         "createConnection",  # net.createConnection / db drivers
@@ -171,7 +171,7 @@ class ResourceLifecycleRule(BaseRule):
         extra_tracked = _validated_string_list(self.config.get("extend_tracked_functions", []), "extend_tracked_functions")
         tracked: frozenset[str] = frozenset(base_tracked + extra_tracked)
         # cleanup_patterns has the same string-vs-list footgun as
-        # tracked_functions — ``cleanup_patterns = "close"`` would coerce
+        # tracked_functions - ``cleanup_patterns = "close"`` would coerce
         # to ``frozenset("close")`` = ``{'c','l','o','s','e'}`` and the
         # diagnostic text would render as ``c / e / l / o / s``. Validate
         # it the same way for consistency.
@@ -199,12 +199,12 @@ class ResourceLifecycleRule(BaseRule):
     def _javascript_check(self, filepath: str, tree: tree_sitter.Tree, lang_name: str) -> list[Violation]:
         """Run the JS-family (JavaScript / TypeScript) check (call must be inside ``try { ... } finally { ... }``).
 
-        Walks both ``call_expression`` and ``new_expression`` — the runtime
+        Walks both ``call_expression`` and ``new_expression`` - the runtime
         presets populate ``tracked_functions_javascript`` with constructor
         names (``Worker``, ``WebSocket``, ``MutationObserver``, ...) that
         are typically invoked via ``new``, so a call-only walk would
         miss exactly the cases the browser preset is designed to catch.
-        ``call_name`` resolves both shapes — the rule layer doesn't need
+        ``call_name`` resolves both shapes - the rule layer doesn't need
         to branch.
 
         TypeScript inherits the JS tracked-functions list by default;
@@ -234,7 +234,7 @@ class ResourceLifecycleRule(BaseRule):
             # Distinguish constructor invocations (``new Worker(...)``)
             # from plain calls (``createReadStream(...)``) in the
             # message. Reporting ``Worker()`` for ``new Worker(...)``
-            # would be misleading — the user grep'ing for ``Worker(``
+            # would be misleading - the user grep'ing for ``Worker(``
             # in the source wouldn't find the offending site.
             invocation = f"new {name}()" if node.type == "new_expression" else f"{name}()"
             violations.append(

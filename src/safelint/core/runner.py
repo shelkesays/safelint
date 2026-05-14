@@ -18,7 +18,7 @@ def resolve_cache_dir(search_from: Path, *, no_cache: bool) -> Path | None:
     """Decide where to put the cache (or None to disable).
 
     ``--no-cache`` always disables. Otherwise the cache lives next to the
-    *discovered* config file — i.e. the directory ``find_config_root``
+    *discovered* config file - i.e. the directory ``find_config_root``
     located while walking up from *search_from*. When no config file is
     discoverable, the cache falls back to *search_from* itself (treated
     as the directory if it's a directory, otherwise its parent).

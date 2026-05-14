@@ -37,7 +37,7 @@ _PY_COUNTED_PARAM_TYPES = frozenset(
 # JavaScript ``formal_parameters`` children that count toward the limit.
 # ``identifier``: bare param. ``assignment_pattern``: ``b = 5`` default value.
 # ``rest_pattern``: ``...args``. ``object_pattern`` / ``array_pattern``:
-# destructured params (each destructured group counts as one — that's
+# destructured params (each destructured group counts as one - that's
 # the whole *point* of using a config object, so the count stays low).
 _JS_COUNTED_PARAM_TYPES = frozenset(
     {
@@ -75,7 +75,7 @@ _COUNTED_PARAM_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 def _python_param_identifier(child: tree_sitter.Node) -> str | None:
     """Return the bare identifier name for a Python parameter node, else None.
 
-    Used to detect and skip ``self`` / ``cls`` — which JavaScript doesn't have.
+    Used to detect and skip ``self`` / ``cls`` - which JavaScript doesn't have.
     """
     if child.type == "identifier":
         return node_text(child)

@@ -19,7 +19,7 @@ if TYPE_CHECKING:
 
 # Per-language node-type sets keyed by ``LanguageDefinition.name``.
 # Adding a language widens both tables (or, for stmt-mode, adds an
-# entry — see _STATEMENT_TYPES_BY_LANG).
+# entry - see _STATEMENT_TYPES_BY_LANG).
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
@@ -29,7 +29,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # ``count_mode = "statements"`` is language-aware: each language has a
 # different notion of what counts as a statement node. Python is wired
 # up; JS / TS files use the universal ``lines`` (default) or
-# ``logical_lines`` modes — adding a JS / TS statement-set is possible
+# ``logical_lines`` modes - adding a JS / TS statement-set is possible
 # but the universal modes have proven sufficient in practice. A language
 # not in this table raises a clear error rather than silently miscounting.
 _STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
@@ -38,7 +38,7 @@ _STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # (excluding the function_definition itself and any nested function
     # bodies).
     #
-    # Note: ``yield`` deliberately omitted — Tree-sitter parses ``yield x``
+    # Note: ``yield`` deliberately omitted - Tree-sitter parses ``yield x``
     # as ``expression_statement`` containing a ``yield`` node, so counting
     # both would double-count every yield expression.
     #
@@ -46,7 +46,7 @@ _STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # definition is a (compound) statement, so a function containing a
     # nested class should count the ``class Inner:`` line as 1 toward the
     # enclosing function's statement total. The class body's own
-    # statements are walked too — they contribute to the enclosing
+    # statements are walked too - they contribute to the enclosing
     # function's complexity-proxy count, which matches the rule's intent.
     "python": frozenset(
         {
@@ -90,15 +90,15 @@ class FunctionLengthRule(BaseRule):
 
     Three counting modes are supported via the ``count_mode`` config key:
 
-    * ``"lines"`` (default) — inclusive source line span. Holzmann's
+    * ``"lines"`` (default) - inclusive source line span. Holzmann's
       original "fits on a printed page" framing. Matches what humans
       see in their editor; counts blank lines and comments. Easy to
       understand but game-able by reformatting (split a line, add
       blanks, etc.).
-    * ``"logical_lines"`` — source lines minus blanks and pure-comment
+    * ``"logical_lines"`` - source lines minus blanks and pure-comment
       lines. Closer to what an experienced reviewer would intuitively
       count; less game-able than ``"lines"``.
-    * ``"statements"`` — count statement nodes from the Tree-sitter
+    * ``"statements"`` - count statement nodes from the Tree-sitter
       parse. Equivalent in spirit to ruff's PLR0915
       (``too-many-statements``); robust to formatting choices since
       it ignores whitespace entirely. Statements inside nested
@@ -107,7 +107,7 @@ class FunctionLengthRule(BaseRule):
       non-Python file raises a clear error rather than silently
       mis-counting.
 
-    The default stays ``"lines"`` for backward compatibility — existing
+    The default stays ``"lines"`` for backward compatibility - existing
     configs continue to behave identically. Switch to ``"logical_lines"``
     for cleaner human-readable accounting, or ``"statements"`` for full
     formatting independence (Python only).
@@ -124,7 +124,7 @@ class FunctionLengthRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         # Sourced from the registered ``LanguageDefinition`` rather than
-        # branched per-lang here — adding a new language to the registry
+        # branched per-lang here - adding a new language to the registry
         # then automatically routes the right comment marker without a
         # separate edit to this rule. Falls back to ``"#"`` for the
         # unit-test path where ``filepath`` has no registered extension
@@ -160,7 +160,7 @@ class FunctionLengthRule(BaseRule):
     ) -> int:
         """Return the function's size under the requested counting mode.
 
-        Validates *count_mode* explicitly — silently falling back on a
+        Validates *count_mode* explicitly - silently falling back on a
         typo (e.g. ``"line"`` instead of ``"lines"``) would leave the
         user wondering why their config didn't take effect. Raise
         ``ValueError`` so misconfiguration fails clearly when this rule
@@ -176,7 +176,7 @@ class FunctionLengthRule(BaseRule):
             return FunctionLengthRule._count_logical_lines(func_node, comment_prefix)
         if count_mode == "lines":
             return end_lineno(func_node) - lineno(func_node) + 1
-        msg = f"function_length count_mode must be one of 'lines', 'logical_lines', 'statements' — got {count_mode!r}"
+        msg = f"function_length count_mode must be one of 'lines', 'logical_lines', 'statements' - got {count_mode!r}"
         raise ValueError(msg)
 
     @staticmethod
@@ -202,10 +202,10 @@ class FunctionLengthRule(BaseRule):
         Inline comments (code + trailing comment) still count as one line;
         only lines that are *entirely* blank or comment-only are excluded.
         Comment-prefix is language-specific (``#`` for Python, ``//`` for
-        JavaScript) — taken from the active ``LanguageDefinition``.
+        JavaScript) - taken from the active ``LanguageDefinition``.
         """
         text = node_text(func_node)
-        if not text:  # pragma: no cover — defensive; node_text returns "" only for ERROR nodes
+        if not text:  # pragma: no cover - defensive; node_text returns "" only for ERROR nodes
             return 0
         count = 0
         for raw_line in text.splitlines():

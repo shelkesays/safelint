@@ -7,7 +7,7 @@ dangerous sink the hit is recorded in :attr:`TaintTracker.sink_hits`.
 
 Design goals
 ------------
-* Intra-procedural only — no cross-function call graph needed.
+* Intra-procedural only - no cross-function call graph needed.
 * Assignment propagation: ``x = tainted_y`` makes ``x`` tainted.
 * Sanitizer calls clear taint: ``x = escape(tainted_y)`` → ``x`` clean.
 * Source calls inject taint: ``x = input()`` → ``x`` tainted.
@@ -63,7 +63,7 @@ _SPREADING_TYPES = frozenset(
 
 _CONTAINER_TYPES = frozenset({LIST, TUPLE, SET})
 
-# Splat operators in call argument lists — ``foo(*args, **kwargs)``.
+# Splat operators in call argument lists - ``foo(*args, **kwargs)``.
 # Tree-sitter parses these as single-child wrapper nodes whose only
 # named child is the operand.
 _SPLAT_TYPES = frozenset({"list_splat", "dictionary_splat"})
@@ -78,7 +78,7 @@ class TaintTracker:
     Instantiate with the set of already-tainted parameter names, the sets of
     sink / sanitizer / source call names, then call ``visit(func_node)``.
     Results are in :attr:`sink_hits` as ``(call_node, var_name, sink_name)``
-    triples — the call node is preserved (rather than just its line) so
+    triples - the call node is preserved (rather than just its line) so
     callers can position violations precisely with column ranges.
     """
 
@@ -102,13 +102,13 @@ class TaintTracker:
         unknown call). See CONFIGURATION.md for the full trade-off
         discussion.
 
-        * ``True`` (default) — conservative / taint-preserving.
+        * ``True`` (default) - conservative / taint-preserving.
           Unknown calls propagate taint from any tainted argument:
           ``f(tainted)`` is treated as tainted. Matches the historical
           safelint behaviour and minimises false negatives at the cost
           of potential false positives in codebases with many
           "obviously safe" wrappers.
-        * ``False`` — less conservative / taint-dropping. Unknown
+        * ``False`` - less conservative / taint-dropping. Unknown
           calls drop taint: ``f(tainted)`` is treated as clean. Fewer
           false positives but new false negatives where helper
           functions actually do flow tainted data through to a sink.
@@ -125,7 +125,7 @@ class TaintTracker:
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
 
-        Skips descent into nested ``def`` / ``async def`` bodies — those are
+        Skips descent into nested ``def`` / ``async def`` bodies - those are
         analysed separately by the caller for each function found, with their
         own parameter set. Without this guard, an inner function's body would
         be treated as part of the outer function's flow, leaking taint between
@@ -147,7 +147,7 @@ class TaintTracker:
         Handles destructuring: ``a, b = …``, ``(a, b) = …``, ``[a, b] = …``,
         and starred targets like ``a, *rest = …``. Subscript / attribute
         targets (``a[0] = …``, ``obj.x = …``) are not bare names and are
-        skipped — TaintTracker only tracks identifiers.
+        skipped - TaintTracker only tracks identifiers.
         """
         if target.type == IDENTIFIER:
             yield target
@@ -160,14 +160,14 @@ class TaintTracker:
         """Propagate taint through ``x = value``, including destructuring and chains.
 
         Chained assignments (``a = b = value``) parse as nested ``assignment``
-        nodes — we follow the chain to find the innermost real RHS, then mark
+        nodes - we follow the chain to find the innermost real RHS, then mark
         every LHS target with the same taint state. Destructuring on any of
         those LHS targets is expanded via ``_iter_target_identifiers``.
         """
         targets: list[tree_sitter.Node] = []
         cursor = node
         # Bounded by the depth of nested ``assignment`` nodes in the parse
-        # tree — finite by source structure, not by runtime data.
+        # tree - finite by source structure, not by runtime data.
         while cursor is not None and cursor.type == ASSIGNMENT:  # nosafe: SAFE501
             left = cursor.child_by_field_name("left")
             if left is not None:
@@ -233,7 +233,7 @@ class TaintTracker:
         if node_type == STRING:
             return self._fstring_tainted(node)
         if node_type == "keyword_argument":
-            # foo(name=expr) — only the value carries data flow.
+            # foo(name=expr) - only the value carries data flow.
             value = node.child_by_field_name("value")
             return self._is_tainted(value) if value is not None else False
         # Splats (foo(*x, **y)) and spreading expressions (binary op,

@@ -15,7 +15,7 @@ from safelint.rules.base import BaseRule
 # ``LanguageDefinition``s so the test-file-pattern set stays in sync
 # if the registered extensions ever change. JS and TS extensions are
 # kept separate because a ``.ts`` source pairs with a ``.test.ts``
-# (or ``.test.tsx`` / ``.test.as``) test, NOT a ``.test.js`` — keeping
+# (or ``.test.tsx`` / ``.test.as``) test, NOT a ``.test.js`` - keeping
 # the language-family consistent across source and test is a
 # convention every test runner expects.
 _JS_EXTENSIONS: tuple[str, ...] = tuple(sorted(JAVASCRIPT.file_extensions))
@@ -40,7 +40,7 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
     TypeScript: same ``.test.<ext>`` / ``.spec.<ext>`` patterns but
     using the TS extension set (``.ts`` / ``.tsx`` / ``.as``). A
     ``foo.ts`` source pairs with ``foo.test.ts`` (or ``.tsx`` / ``.as``),
-    NOT ``foo.test.js`` — language-family consistency between source
+    NOT ``foo.test.js`` - language-family consistency between source
     and test is a convention every JS / TS test runner expects.
     """
     if lang_name == "javascript":
@@ -84,7 +84,7 @@ def _path_components_contain(haystack: tuple[str, ...], needle: tuple[str, ...])
     ``test_dirs`` entries. ``Path(td).parts`` produces a tuple per
     component, and matching the whole tuple as a contiguous slice of
     ``Path(filepath).parts`` correctly handles both single-component
-    (``"tests"``) and nested (``"tests/unit"``) forms — a plain
+    (``"tests"``) and nested (``"tests/unit"``) forms - a plain
     ``in path.parts`` membership check would only match the
     single-component case.
     """
@@ -108,7 +108,7 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
     Two checks, OR'd together:
 
     1. **Path-component match.** ``filepath`` lives under any
-       configured ``test_dirs`` entry — covers test files even if
+       configured ``test_dirs`` entry - covers test files even if
        their filenames don't follow the pattern convention
        (``conftest.py``, ``__init__.py``, fixtures, helpers).
        Handles multi-component entries (``"tests/unit"``,
@@ -117,7 +117,7 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
        full ``Path.parts`` tuple as a contiguous subsequence of the
        filepath's parts.
     2. **Filename-pattern match.** The bare filename matches the
-       language's test-file convention — covers tests written
+       language's test-file convention - covers tests written
        inline alongside source (some projects do
        ``src/foo/foo.test.js``).
     """
@@ -125,7 +125,7 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
     # Without this, a relative ``filepath`` (``tests/conftest.js``) wouldn't
     # match against an absolute ``test_dirs`` entry (``/abs/project/tests``)
     # and helper files under the test root would be misclassified as
-    # source — triggering false-positive SAFE701/702 violations. Using
+    # source - triggering false-positive SAFE701/702 violations. Using
     # ``.absolute()`` (not ``.resolve()``) avoids following symlinks, which
     # is what we want for path-component comparison.
     path_parts = Path(filepath).absolute().parts
@@ -161,7 +161,7 @@ class TestExistenceRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:  # noqa: ARG002
         """Return a violation when no matching test file can be found.
 
-        Filename pattern is language-aware — see :func:`_candidate_test_filenames`.
+        Filename pattern is language-aware - see :func:`_candidate_test_filenames`.
         Skips test files themselves (see :func:`_is_test_file`) so we
         don't ask a test to have its own test.
         """
@@ -190,7 +190,7 @@ class TestCouplingRule(BaseRule):
     source you must touch the tests. The engine injects ``_changed_files``
     (the full list of files being checked) into the rule config before running.
 
-    Filename pattern is language-aware — Python source pairs with
+    Filename pattern is language-aware - Python source pairs with
     ``test_<stem>.py``; JavaScript source pairs with any of
     ``<stem>.test.{js,mjs,cjs}`` / ``<stem>.spec.{js,mjs,cjs}``.
     """
@@ -209,7 +209,7 @@ class TestCouplingRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
 
         test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
-        # A test file isn't a source file with a paired test — skip
+        # A test file isn't a source file with a paired test - skip
         # the coupling check rather than asking the test file's own
         # test to also change.
         if _is_test_file(filepath, test_dirs, lang_name):
@@ -230,8 +230,8 @@ class TestCouplingRule(BaseRule):
         # skip SAFE702 even though the paired test under ``tests/``
         # wasn't touched. Restricting the candidate match to changed
         # paths whose components include a ``test_dirs`` entry as a
-        # contiguous subsequence — the same logic ``_is_test_file``
-        # uses — fixes the false-negative.
+        # contiguous subsequence - the same logic ``_is_test_file``
+        # uses - fixes the false-negative.
         #
         # Both sides are normalised via ``.absolute()`` before the
         # parts comparison so a relative ``changed_files`` entry

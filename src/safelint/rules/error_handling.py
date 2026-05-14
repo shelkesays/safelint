@@ -28,7 +28,7 @@ _CATCH_CLAUSE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 }
 
 # Per-language: function-defining node types (used to skip nested
-# function bodies when scanning a catch body — a logging call inside
+# function bodies when scanning a catch body - a logging call inside
 # a nested ``def`` / ``function`` doesn't count as logging the caught
 # error of the enclosing handler).
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
@@ -101,10 +101,10 @@ def _is_noop_body(body_node: tree_sitter.Node | None, lang_name: str) -> bool:
     * Numeric / boolean / null literals as a single statement
       (``except: 0``, ``catch (e) { null; }`` etc.)
     * String-as-comment idiom (``except: "TODO"``, ``catch (e) { "TODO"; }``)
-    * Empty body / no statements at all                  (defensive — shouldn't
+    * Empty body / no statements at all                  (defensive - shouldn't
       happen with valid Tree-sitter output but kept for safety)
 
-    Bodies with multiple statements never match — even if every statement is
+    Bodies with multiple statements never match - even if every statement is
     a literal, two literals signal *some* intentional structure (rare edge
     case, but preferable to false positives).
 
@@ -126,7 +126,7 @@ def _stmt_is_noop(stmt: tree_sitter.Node, lang_name: str) -> bool:
         return False
     # expression_statement may wrap a single inner expression. Reach into it.
     inner = stmt.named_children[0] if stmt.named_children else None
-    if inner is None:  # pragma: no cover — defensive
+    if inner is None:  # pragma: no cover - defensive
         return False
     if inner.type in _LITERAL_EXPR_TYPES_BY_LANG[lang_name]:
         return True
@@ -147,14 +147,14 @@ def _is_string_literal_expression(node: tree_sitter.Node, lang_name: str) -> boo
         if node.type != "string":
             return False
         # Pure string literals (no f-string interpolation) have only string-content
-        # children. f-strings include ``interpolation`` nodes — those carry side
+        # children. f-strings include ``interpolation`` nodes - those carry side
         # effects so we don't treat them as no-ops.
         return all(child.type != "interpolation" for child in node.named_children) and bool(node_text(node))
     if lang_name in ("javascript", "typescript"):
         if node.type not in ("string", "template_string"):
             return False
         # ``template_string`` may contain ``template_substitution`` children
-        # (the ``${expr}`` interpolation form) — treat those as non-empty.
+        # (the ``${expr}`` interpolation form) - treat those as non-empty.
         return all(child.type != "template_substitution" for child in node.named_children) and bool(node_text(node))
     return False
 
@@ -184,7 +184,7 @@ def _catch_body(catch_node: tree_sitter.Node) -> tree_sitter.Node | None:
     """Return the body block of *catch_node*, or None if it has no body.
 
     Both Python ``except_clause`` and JavaScript ``catch_clause`` expose
-    the body via the ``body`` field name — the API is uniform once
+    the body via the ``body`` field name - the API is uniform once
     indirected through ``child_by_field_name``. The fallback (last
     named child) is defensive for AST shapes where the field isn't
     populated; valid source always has a body.
@@ -200,7 +200,7 @@ def _has_typed_exception(except_node: tree_sitter.Node) -> bool:
     """Return True when an *except_clause* (Python) specifies one or more exception types.
 
     JavaScript ``catch_clause`` is *always* "typed" in the sense that
-    the value variable is bound (``catch (e)``) — the Python-only
+    the value variable is bound (``catch (e)``) - the Python-only
     SAFE201 rule (which fires on ``except:`` with no type) doesn't
     map cleanly to JS, so this helper only needs to handle the Python
     grammar.
@@ -213,7 +213,7 @@ def _bare_except_suggestion(except_node: tree_sitter.Node) -> Suggestion | None:
     """Build the "replace with ``except Exception:``" suggestion for a bare except clause.
 
     Returns ``None`` when the AST shape doesn't expose the colon child
-    (defensive — Tree-sitter always produces it for valid Python).
+    (defensive - Tree-sitter always produces it for valid Python).
     """
     # except_clause.children: ['except', ':', block, ...]. Find the ``:``
     # child and use its end_point as the end of the header range.
@@ -238,7 +238,7 @@ class BareExceptRule(BaseRule):
 
     Python-only: JavaScript ``try/catch`` always binds the caught error
     (or uses the optional-binding form ``catch {}`` which has different
-    semantics — no risk of accidentally catching a process-level signal
+    semantics - no risk of accidentally catching a process-level signal
     the way Python's bare ``except:`` does).
     """
 
@@ -279,7 +279,7 @@ class EmptyExceptRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every catch handler whose body is effectively empty."""
         lang_name = resolve_lang_name(filepath)
-        # Match the violation message to the source language's terminology —
+        # Match the violation message to the source language's terminology -
         # JavaScript developers don't write ``except`` blocks. Same
         # Python/JS message-selection pattern as ``LoggingOnErrorRule``.
         message = "Empty catch block - add error handling or a logging call" if lang_name in ("javascript", "typescript") else "Empty except block - add error handling or a logging call"
@@ -330,17 +330,17 @@ class LoggingOnErrorRule(BaseRule):
 
         JavaScript: ``throw <caught-binding>;`` where ``<caught-binding>``
         is the exact identifier introduced by the ``catch (e)`` clause
-        — only ``catch (e) { throw e; }`` counts as a re-raise.
+        - only ``catch (e) { throw e; }`` counts as a re-raise.
         ``catch (e) { throw freshError; }`` is throwing a *different*
         value (the original ``e`` may even still be in scope) and so
         logging is still expected; ``catch { throw x; }`` (no caught
-        binding — ES2019 optional-binding form) can't be a re-raise
+        binding - ES2019 optional-binding form) can't be a re-raise
         of the caught value at all, so any throw there requires
         logging. ``throw new Error(...)`` / ``throw {code: 1}`` etc.
         construct fresh values and are always non-re-raises.
         """
         body_node = _catch_body(except_node)
-        # Defensive — ``_catch_body`` only returns None for malformed AST
+        # Defensive - ``_catch_body`` only returns None for malformed AST
         # that this rule can't sensibly classify anyway.
         if body_node is None:  # pragma: no cover
             return False
@@ -369,8 +369,8 @@ class LoggingOnErrorRule(BaseRule):
 
         Walks only the body block (skipping the exception-type spec) and
         prunes nested function bodies so a logging call inside an inner
-        function definition — which the catch handler never actually
-        executes — does not count as logging the caught error.
+        function definition - which the catch handler never actually
+        executes - does not count as logging the caught error.
         """
         body = _catch_body(except_node)
         if body is None:  # pragma: no cover
@@ -392,7 +392,7 @@ class LoggingOnErrorRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         # Same language-specific terminology as ``EmptyExceptRule.check_file``
-        # — JavaScript developers write ``catch``, not ``except``.
+        # - JavaScript developers write ``catch``, not ``except``.
         message = (
             "Catch block missing logging call - errors must be logged before being swallowed"
             if lang_name in ("javascript", "typescript")
