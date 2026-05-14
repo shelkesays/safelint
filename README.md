@@ -192,12 +192,13 @@ The same `id: safelint` handles Python, JavaScript, and TypeScript — there's n
 
 ### What happens if you forget the extra
 
-The `additional_dependencies` line is genuinely required in v2.0.0+ — including for Python projects, which used to work without it. Forgetting it doesn't silently pass: safelint emits one stderr line per missing grammar with the exact fix and exits with code **2**, which pre-commit reports as **Failed** (red):
+The `additional_dependencies` line is genuinely required in v2.0.0+ — including for Python projects, which used to work without it. Forgetting it doesn't silently pass: safelint exits with code **2**, which pre-commit reports as **Failed** (red). When *every* passed file is skipped for a missing grammar (the usual "forgot the extra" case) it prints a single error line with the exact fix:
 
 ```text
-safelint: warning: skipping .py files — add 'safelint[python]' to additional_dependencies in your .pre-commit-config.yaml
 safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed — add 'safelint[python]' to additional_dependencies in your .pre-commit-config.yaml
 ```
+
+In a *mixed* run — where some files lint successfully and others are skipped for a missing grammar — safelint additionally prints one `safelint: warning: skipping .X files …` line per missing grammar as actionable context for the skipped files. The all-skipped case omits that warning because the error above already carries the same install hint.
 
 See [Exit codes](https://shelkesays.github.io/safelint/configuration/cli/#exit-codes) for the full table.
 
