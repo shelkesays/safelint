@@ -223,8 +223,17 @@ def test_run_hook_no_output_when_clean(tmp_path: Path, capsys: pytest.CaptureFix
     assert captured.err == ""
 
 
-def test_run_hook_prints_summary_when_suppressed(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
-    """_run_hook prints a summary line when there are suppressed violations."""
+def test_run_hook_silent_on_clean_run_even_with_suppressions(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """_run_hook prints NOTHING on a clean run, even when violations were suppressed (issue #50).
+
+    Previously hook mode printed ``All checks passed. (1 SAFE501
+    suppressed)`` on a clean-but-suppressed run. Pre-commit batches
+    files across multiple hook invocations, so that became one summary
+    line per batch — each showing a misleading *partial* count. A clean
+    hook run is now fully silent (the ruff/ty contract); the summed
+    breakdown stays available via ``safelint check`` and ``--format
+    json``.
+    """
     clean = tmp_path / "clean.py"
     clean.write_text("x = 1\n", encoding="utf-8")
 
@@ -235,12 +244,7 @@ def test_run_hook_prints_summary_when_suppressed(tmp_path: Path, capsys: pytest.
 
     captured = capsys.readouterr()
     out = _strip(captured.out)
-    assert "All checks passed." in out
-    assert "1 SAFE501" in out
-    assert "suppressed" in out
-    # Clean run should NOT print the no-suggestions / no-fixes line.
-    assert "No suggestions available" not in out
-    assert "No fixes available" not in out
+    assert out == "", f"hook-mode clean run must be silent on stdout regardless of suppressions; got {out!r}"
 
 
 # ---------------------------------------------------------------------------

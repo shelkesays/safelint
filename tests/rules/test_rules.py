@@ -852,6 +852,75 @@ def test_cli_hook_mode_empty_files_list_exits_0() -> None:
     assert _run_hook(args, []) == 0
 
 
+def test_cli_hook_mode_clean_run_with_suppressions_is_silent(
+    tmp_path: Path,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Hook mode prints NOTHING on a clean run, even when suppressions fired (issue #50).
+
+    A clean ``# nosafe``-suppressed file used to print ``All checks
+    passed. (N suppressed)``. Under pre-commit's file batching that
+    became one such line per invocation, each showing a misleading
+    *partial* count. ``silent_on_clean`` now suppresses the summary
+    on any clean run regardless of suppressions — pre-commit already
+    reports the hook as Passed, and the summed breakdown stays
+    available via ``safelint check`` / ``--format json``.
+    """
+    sample = tmp_path / "suppressed.py"
+    # 8 parameters trips SAFE103 (max_arguments, default cap 7); the inline
+    # ``# nosafe`` moves it into ``suppressed`` so the run is otherwise clean —
+    # no other rule fires on this body.
+    sample.write_text(
+        "def fn(a, b, c, d, e, g, h, i):  # nosafe: SAFE103\n    return a\n",
+        encoding="utf-8",
+    )
+    args = argparse.Namespace(fail_on=None, mode=None, ignore=None)
+    result = _run_hook(args, [str(sample)])
+
+    assert result == 0
+    captured = capsys.readouterr()
+    assert captured.out == "", f"hook-mode clean run must be silent on stdout; got {captured.out!r}"
+
+
+def test_cli_check_mode_clean_run_with_suppressions_still_shows_breakdown(
+    tmp_path: Path,
+    mocker,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """Interactive ``safelint check`` still prints the aggregated ``(N suppressed)`` breakdown.
+
+    Companion to the hook-mode silence test: ``_run_check`` leaves
+    ``silent_on_clean=False``, so the interactive user who explicitly
+    ran safelint still gets the summed-per-rule breakdown — issue #50's
+    fix is scoped to hook / stdin mode only.
+    """
+    sample = tmp_path / "suppressed.py"
+    sample.write_text(
+        "def fn(a, b, c, d, e, g, h, i):  # nosafe: SAFE103\n    return a\n",
+        encoding="utf-8",
+    )
+    from safelint import cli as _cli  # noqa: PLC0415 — local import keeps the module-level import list lean
+
+    mocker.patch.object(_cli, "_get_git_modified_supported_files", return_value=None)
+    args = argparse.Namespace(
+        target=sample,
+        config=None,
+        all_files=True,
+        fail_on=None,
+        mode=None,
+        ignore=None,
+        output_format="pretty",
+        no_cache=True,
+        stdin=False,
+        stdin_filename="",
+    )
+    rc = _run_check(args)
+    assert rc == 0
+    out = capsys.readouterr().out
+    assert "All checks passed." in out
+    assert "SAFE103 suppressed" in out, f"interactive check must keep the suppression breakdown; got {out!r}"
+
+
 def test_cli_check_mode_exits_0_on_clean_directory(tmp_path: Path) -> None:
     """_run_check returns 0 when the scanned directory has no violations."""
 

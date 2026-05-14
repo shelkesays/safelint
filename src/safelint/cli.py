@@ -304,28 +304,28 @@ def _print_results(
 ) -> None:
     """Emit accumulated lint results in the chosen format.
 
-    For ``pretty`` (default), prints the ruff/ty-style summary block; the
-    per-file violations were already streamed during the run. For ``json``
-    and ``sarif``, prints a single machine-readable document on stdout
-    that contains both the violation list and the summary.
+    For ``pretty`` (default), prints the ruff/ty-style summary block (per-file
+    violations were already streamed during the run). For ``json`` / ``sarif``,
+    prints a single machine-readable document on stdout. *options* knobs:
 
-    *options* bundles the optional rendering knobs:
+    * ``silent_on_clean`` — when True, pretty mode emits nothing on a clean
+      run (no violations), *regardless of whether anything was suppressed*.
+      Hook / stdin mode set this so a clean pre-commit run is silent (the
+      ruff/ty contract); ``safelint check`` leaves it False so the interactive
+      user gets ``All checks passed.`` plus the ``(N suppressed)`` breakdown.
+      The breakdown is deliberately *not* printed under ``silent_on_clean``:
+      pre-commit batches files across multiple hook invocations, so printing
+      it per batch produces a stack of lines each showing a misleading
+      *partial* count (issue #50). The summed breakdown stays available via
+      ``safelint check`` and in every ``--format json`` / ``--format sarif``
+      document.
+    * ``statistics`` — when True, append a per-rule violation-count table
+      after the summary. Pretty mode only; ignored in JSON / SARIF.
 
-    * ``silent_on_clean`` — when True, pretty mode emits nothing on a
-      clean run (no violations and no suppressed entries). Hook mode
-      and stdin mode set this so a clean pre-commit run is silent (the
-      long-standing ruff/ty contract); ``safelint check`` leaves it
-      False so the user gets explicit ``All checks passed.``.
-    * ``statistics`` — when True, append a per-rule violation-count
-      table after the summary. Pretty mode only; ignored in JSON / SARIF
-      where consumers can derive the same from ``violations[]``.
-
-    Stderr diagnostics (configuration warnings, oversize-skip messages)
-    are unaffected — they are always written as they are produced,
-    regardless of format.
+    Stderr diagnostics are unaffected — always written as produced.
     """
     if output_format == "pretty":
-        if violations or suppressed or not options.silent_on_clean:
+        if violations or not options.silent_on_clean:
             _print_summary(violations, blocking_count, fail_on, suppressed)
         if options.statistics:
             _print_statistics(violations, suppressed)
