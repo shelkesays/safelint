@@ -77,7 +77,7 @@ SafeLint also ships several rules that go beyond Holzmann's original ten — mod
 
 SafeLint ships **every** per-language grammar as an opt-in extra. The base install includes only the engine — no grammars — so a Python-only project doesn't pay for JS/TS grammars, a Go/JS project doesn't pay for the Python grammar, and so on. Pick the extras that match the languages you actually lint:
 
-> **v2.0.0rc2 (pre-release):** Until v2.0.0 GA, pin the version explicitly — e.g. `pip install 'safelint[python]==2.0.0rc2'` — or pass `--pre` to any of the commands below. An unpinned `pip install 'safelint[...]'` will resolve to the latest 1.x release, which doesn't define these per-language extras and so wouldn't install any grammar at all.
+> **v2.0.0rc3 (pre-release):** Until v2.0.0 GA, pin the version explicitly — e.g. `pip install 'safelint[python]==2.0.0rc3'` — or pass `--pre` to any of the commands below. An unpinned `pip install 'safelint[...]'` will resolve to the latest 1.x release, which doesn't define these per-language extras and so wouldn't install any grammar at all.
 
 ```bash
 pip install 'safelint[python]'         # adds .py, .pyw
@@ -172,7 +172,7 @@ Add this to your `.pre-commit-config.yaml` — pick the `additional_dependencies
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.0.0rc2  # replace with the latest release tag (use the GA tag once v2.0.0 ships)
+    rev: v2.0.0rc3  # replace with the latest release tag (use the GA tag once v2.0.0 ships)
     hooks:
       - id: safelint
         # Required in v2.0.0+ — pick the line for the language(s) your repo lints:
