@@ -15,19 +15,19 @@ safelint skill install --client cursor
 # Cursor, project-scoped (recommended for team-shared repos)
 safelint skill install --client cursor --project
 
-# GitHub Copilot, project-scoped (canonical — auto-loaded by VS Code)
+# GitHub Copilot, project-scoped (canonical: auto-loaded by VS Code)
 safelint skill install --client copilot --project
 
 # GitHub Copilot, user-global (requires VS Code settings to point at ~/.github/copilot-instructions.md)
 safelint skill install --client copilot
 
-# Gemini, project-scoped (canonical — auto-discovered by Gemini CLI)
+# Gemini, project-scoped (canonical: auto-discovered by Gemini CLI)
 safelint skill install --client gemini --project
 
 # Gemini, user-global (requires Gemini CLI configuration to point at ~/GEMINI.md)
 safelint skill install --client gemini
 
-# Windsurf, project-scoped (canonical — auto-loaded by Windsurf)
+# Windsurf, project-scoped (canonical: auto-loaded by Windsurf)
 safelint skill install --client windsurf --project
 
 # Windsurf, user-global rules (merged with project rules at runtime)

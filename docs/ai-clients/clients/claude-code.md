@@ -1,6 +1,6 @@
 # Claude Code
 
-**Markers:** `CLAUDE.md`, `.claude/`, or `.claude.json` in the project root for project-scope; `~/.claude/` or `~/.claude.json` for user-scope. Any one marker is enough — detection picks the first one it finds.
+**Markers:** `CLAUDE.md`, `.claude/`, or `.claude.json` in the project root for project-scope; `~/.claude/` or `~/.claude.json` for user-scope. Any one marker is enough, detection picks the first one it finds.
 
 **Install location:**
 

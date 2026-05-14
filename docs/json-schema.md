@@ -4,7 +4,7 @@
 
 The schema is **stable since v1.5.0**. Field additions are non-breaking (consumers ignore unknown keys); removals or type changes only happen in a major-version bump (none to date). Notable additions since baseline: position fields (`end_lineno`, `column_start`, `column_end`) in 1.7.0, `suggestions[]` in 1.8.0.
 
-> **About "advisory" suggestions:** the `suggestions[]` array carries optional fix candidates the rule offers, but **safelint never auto-applies them**, and consumers (editors, plugins, CI scripts) must not auto-apply them either. Display them as user-confirmable quick-fixes; the user always presses "accept" before any byte is written. This is a permanent design contract — safelint is a review tool, not a refactor tool, and a `--fix` flag will not ship. See the *"Suggestions are advisory only"* section near the end of this page for the full rationale.
+> **About "advisory" suggestions:** the `suggestions[]` array carries optional fix candidates the rule offers, but **safelint never auto-applies them**, and consumers (editors, plugins, CI scripts) must not auto-apply them either. Display them as user-confirmable quick-fixes; the user always presses "accept" before any byte is written. This is a permanent design contract: safelint is a review tool, not a refactor tool, and a `--fix` flag will not ship. See the *"Suggestions are advisory only"* section near the end of this page for the full rationale.
 
 ## Top-level shape
 
@@ -42,14 +42,14 @@ Aggregated counts across the whole run. All counts are integers ≥ 0.
 | `violations` | int | Active violations (i.e. `len(top.violations)`). |
 | `errors` | int | Count of active violations with `severity == "error"`. |
 | `warnings` | int | Count of active violations with `severity == "warning"`. |
-| `blocking` | int | Active violations whose severity meets or exceeds the configured `fail_on` threshold. `blocking == 0` is necessary for exit code 0 but not sufficient — exit 2 (silent-failure guard) also reports `blocking == 0` when zero files actually got linted because every candidate's grammar was missing. See [Exit codes](configuration/cli.md#exit-codes) for the full mapping. |
+| `blocking` | int | Active violations whose severity meets or exceeds the configured `fail_on` threshold. `blocking == 0` is necessary for exit code 0 but not sufficient, exit 2 (silent-failure guard) also reports `blocking == 0` when zero files actually got linted because every candidate's grammar was missing. See [Exit codes](configuration/cli.md#exit-codes) for the full mapping. |
 | `fail_on` | `"error"` \| `"warning"` | Effective threshold for this run. |
 | `suppressed.total` | int | Count of violations that fired but were suppressed (`# nosafe` or `per_file_ignores`). |
 | `suppressed.by_code` | `{code: int}` | Per-code breakdown of suppressed violations. Codes are sorted alphabetically; keys are SAFE-codes (e.g. `"SAFE501"`). |
 
 ### `violations` *(array of Violation)*
 
-Active violations — i.e. violations that the user is expected to act on. Order is the engine's natural order: file-by-file in discovery order, rule-by-rule in execution order within each file.
+Active violations, i.e. violations that the user is expected to act on. Order is the engine's natural order: file-by-file in discovery order, rule-by-rule in execution order within each file.
 
 ### `suppressed` *(array of Violation)*
 
@@ -82,15 +82,15 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 | Field | Type | Notes |
 |---|---|---|
 | `code` | string | The SAFE-code, e.g. `"SAFE101"`. May be empty for synthetic violations (rare); fall back to `rule` when displaying. |
-| `rule` | string | The snake-case rule name, e.g. `"function_length"`. This is the same key users put in their config file to tune the rule — e.g. `[tool.safelint.rules.function_length]` in `pyproject.toml` or `[rules.function_length]` in a standalone `safelint.toml`. The full list of rule names is in [Configuration](configuration/index.md). |
+| `rule` | string | The snake-case rule name, e.g. `"function_length"`. This is the same key users put in their config file to tune the rule, e.g. `[tool.safelint.rules.function_length]` in `pyproject.toml` or `[rules.function_length]` in a standalone `safelint.toml`. The full list of rule names is in [Configuration](configuration/index.md). |
 | `severity` | `"error"` \| `"warning"` | The per-rule severity. Compare against `summary.fail_on` to decide blocking. |
-| `filepath` | string | Path as the user supplied it to the CLI (typically relative to cwd). Not a URI; not percent-encoded. For SARIF output, use `--format sarif` instead — it normalises to RFC 3986 URIs. |
+| `filepath` | string | Path as the user supplied it to the CLI (typically relative to cwd). Not a URI; not percent-encoded. For SARIF output, use `--format sarif` instead, it normalises to RFC 3986 URIs. |
 | `lineno` | int | 1-based start line. `0` for run-level errors with no specific location (rare; only `SAFE000` parse errors emit this). |
 | `end_lineno` | int \| null | *Added in 1.7.0.* 1-based end line. Equal to `lineno` for single-line constructs; greater for multi-line. `null` when no Tree-sitter node was available (synthetic file-level violations). |
 | `column_start` | int \| null | *Added in 1.7.0.* 1-based column on `lineno` where the construct starts. `null` when no Tree-sitter node / position was available. `column_start` and `column_end` are always either both set or both `null`. Editors should treat `null` as "underline the whole line". |
 | `column_end` | int \| null | *Added in 1.7.0.* 1-based column on `end_lineno` (not `lineno`!) where the construct ends. Half-open: the range is `[column_start, column_end)`. `null` when no Tree-sitter node / position was available (paired with a `null` `column_start`). For zero-width markers (parse-error carets), `column_start == column_end` and `end_lineno == lineno`. |
-| `message` | string | Human-readable description. May contain quotes and Unicode; safe for direct display. Don't parse — present verbatim. |
-| `suggestions` | Suggestion[] | *Added in 1.8.0.* Zero or more advisory fixes the rule offers. **NEVER apply automatically** — see the "Suggestions are advisory only" section below. Empty array when the rule has no fix to offer. |
+| `message` | string | Human-readable description. May contain quotes and Unicode; safe for direct display. Don't parse, present verbatim. |
+| `suggestions` | Suggestion[] | *Added in 1.8.0.* Zero or more advisory fixes the rule offers. **NEVER apply automatically**, see the "Suggestions are advisory only" section below. Empty array when the rule has no fix to offer. |
 
 ### Suggestion object
 
@@ -106,7 +106,7 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 | Field | Type | Notes |
 |---|---|---|
 | `description` | string | One-line human-readable label for the suggestion. Suitable as the title of a "Quick Fix" code action. |
-| `edits` | TextEdit[] | Zero or more text edits describing the minimal change that would make the rule pass. Empty when the suggestion is informational only (e.g. "extract a helper function" — too ambiguous to render as a single edit). |
+| `edits` | TextEdit[] | Zero or more text edits describing the minimal change that would make the rule pass. Empty when the suggestion is informational only (e.g. "extract a helper function", too ambiguous to render as a single edit). |
 
 ### TextEdit object
 
@@ -119,12 +119,12 @@ Violations that fired but were suppressed. Same shape as `violations`. Useful fo
 | `start_line` | int | 1-based start line of the range to replace. |
 | `start_column` | int | 1-based start column on `start_line`. |
 | `end_line` | int | 1-based end line of the range to replace. |
-| `end_column` | int | 1-based end column on `end_line` (exclusive — half-open `[start, end)`). |
+| `end_column` | int | 1-based end column on `end_line` (exclusive, half-open `[start, end)`). |
 | `replacement` | string | The literal text that *would* replace the range. May span multiple lines. |
 
 ### Suggestions are advisory only
 
-**SafeLint never auto-applies suggestions.** This is a deliberate design choice — the tool is for *review*, not refactoring. Many of safelint's rules (function decomposition, nesting reduction, side-effect rename) require human judgement on how to restructure; an auto-applied "fix" could make the code pass the rule while not addressing the underlying concern.
+**SafeLint never auto-applies suggestions.** This is a deliberate design choice: the tool is for *review*, not refactoring. Many of safelint's rules (function decomposition, nesting reduction, side-effect rename) require human judgement on how to restructure; an auto-applied "fix" could make the code pass the rule while not addressing the underlying concern.
 
 Editor / CI integrations:
 
@@ -133,9 +133,9 @@ Editor / CI integrations:
 - **MUST** require explicit user confirmation before applying any edit.
 - **MUST NOT** implement "fix on save", "fix all", or any automation that bypasses confirmation.
 
-The CLI **never** ships a `--fix` flag. The pretty-mode summary line uses the word "suggestions" (not "fixes") to reinforce this. SARIF output uses the spec's native `fixes[]` block — SARIF 2.1.0 itself defines this as advisory; consumers (GitHub code scanning, IDE extensions) already implement confirmation flows.
+The CLI **never** ships a `--fix` flag. The pretty-mode summary line uses the word "suggestions" (not "fixes") to reinforce this. SARIF output uses the spec's native `fixes[]` block, SARIF 2.1.0 itself defines this as advisory; consumers (GitHub code scanning, IDE extensions) already implement confirmation flows.
 
-The contract: a violation's `suggestions` array means "here's what I'd consider doing — your call." Nothing more.
+The contract: a violation's `suggestions` array means "here's what I'd consider doing, your call." Nothing more.
 
 ### Range semantics
 
@@ -143,7 +143,7 @@ The four position fields together specify a fully-resolved half-open range, matc
 
 ```typescript
 // VSCode mapping. Subtract 1 for 0-based, but only after normalising
-// every nullable field — naive ``v.column_start - 1`` produces NaN
+// every nullable field, naive ``v.column_start - 1`` produces NaN
 // when the field is null. Synthetic violations (test_existence,
 // missing-file SAFE000) carry null columns / null end_lineno; the
 // fallbacks below render them as a whole-line marker on ``lineno``.
@@ -169,7 +169,7 @@ There are two severities today: `"error"` and `"warning"`. The `--fail-on` / con
 - `fail_on = "error"` (default): only `error` violations block the run.
 - `fail_on = "warning"`: both `error` and `warning` violations block.
 
-The `summary.blocking` count tells you the pre-computed answer for the current run — you don't need to re-derive it from severity comparison.
+The `summary.blocking` count tells you the pre-computed answer for the current run; you don't need to re-derive it from severity comparison.
 
 ## Codes vs rules
 
@@ -179,13 +179,13 @@ The current full list lives in [Configuration](configuration/index.md).
 
 ## Example consumers
 
-### Bash one-liner — count blocking violations
+### Bash one-liner: count blocking violations
 
 ```bash
 safelint check . --format json | jq '.summary.blocking'
 ```
 
-### Python — extract files with errors
+### Python: extract files with errors
 
 ```python
 import json
@@ -199,7 +199,7 @@ doc = json.loads(result.stdout)
 files_with_errors = {v["filepath"] for v in doc["violations"] if v["severity"] == "error"}
 ```
 
-### Node — minimal VSCode-style diagnostics
+### Node: minimal VSCode-style diagnostics
 
 ```typescript
 import { spawn } from "node:child_process";

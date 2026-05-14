@@ -1,8 +1,8 @@
 # Configuration file
 
-SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` in your project root (TOML keys at the top level — no `[tool.safelint]` wrapper). When both files are present, `safelint.toml` wins.
+SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` in your project root (TOML keys at the top level, no `[tool.safelint]` wrapper). When both files are present, `safelint.toml` wins.
 
-All keys are optional — anything you leave out falls back to the built-in defaults.
+All keys are optional, anything you leave out falls back to the built-in defaults.
 
 For per-rule TOML options (`[tool.safelint.rules.<name>]`) see the [Rules reference](rules.md). For in-source suppression (`# nosafe`, `# safelint: ignore`) see [Suppression mechanisms](suppression.md).
 
@@ -12,11 +12,11 @@ For per-rule TOML options (`[tool.safelint.rules.<name>]`) see the [Rules refere
 |---|---|---|
 | `mode` | `"local"` | Sets the default failure threshold. `"local"` = only errors block. `"ci"` = warnings block too. |
 | `fail_on` | `"error"` | Minimum severity that blocks the run. `"error"` or `"warning"`. Overrides `mode`. |
-| `exclude_paths` | (see [defaults](#default-exclude-paths)) | Glob patterns for files / directories to skip entirely. **Setting this in your config REPLACES the built-in defaults** — use `extend_exclude_paths` instead if you want to keep them. |
+| `exclude_paths` | (see [defaults](#default-exclude-paths)) | Glob patterns for files / directories to skip entirely. **Setting this in your config REPLACES the built-in defaults**, use `extend_exclude_paths` instead if you want to keep them. |
 | `extend_exclude_paths` | `[]` | Glob patterns appended to whatever `exclude_paths` resolves to. Use this for project-specific excludes when you want to keep the vendor-dir defaults active. |
 | `ignore` | `[]` | List of rule codes or names to suppress globally across the entire project. |
 | `per_file_ignores` | `{}` | Map of glob pattern → list of codes/names to suppress only for matching files. |
-| `max_file_size_bytes` | `5242880` (5 MiB) | Skip files larger than this many bytes with a `safelint: warning:` diagnostic instead of trying to parse them. Guards against OOM on accidentally-huge inputs (binary blobs masquerading as `.py`, very large generated parsers). To allow larger files, raise the bound explicitly — `0` is rejected as a likely typo and falls back to the default with a warning, since `0` would defeat the OOM guard entirely. Must be a non-negative integer. |
+| `max_file_size_bytes` | `5242880` (5 MiB) | Skip files larger than this many bytes with a `safelint: warning:` diagnostic instead of trying to parse them. Guards against OOM on accidentally-huge inputs (binary blobs masquerading as `.py`, very large generated parsers). To allow larger files, raise the bound explicitly, `0` is rejected as a likely typo and falls back to the default with a warning, since `0` would defeat the OOM guard entirely. Must be a non-negative integer. |
 
 ```toml
 [tool.safelint]
@@ -33,7 +33,7 @@ max_file_size_bytes = 5242880   # 5 MiB; raise explicitly to allow larger files
 
 ## Default exclude paths
 
-SafeLint ships a built-in list of vendor and generated directories that almost no project wants linted. These are pruned during file discovery — `os.walk` doesn't even descend into them, so the cost of having them excluded is essentially free.
+SafeLint ships a built-in list of vendor and generated directories that almost no project wants linted. These are pruned during file discovery, `os.walk` doesn't even descend into them, so the cost of having them excluded is essentially free.
 
 **Built-in defaults** (each name expands to two patterns, `<name>/**` for top-level and `**/<name>/**` for nested occurrences):
 
@@ -43,7 +43,7 @@ SafeLint ships a built-in list of vendor and generated directories that almost n
 - **Python build outputs:** `build`, `dist`
 - **Coverage outputs:** `htmlcov`
 - **JavaScript / Node:** `node_modules`
-- **Site packages:** `site-packages` (defensive — sometimes pip installs into the project tree)
+- **Site packages:** `site-packages` (defensive, sometimes pip installs into the project tree)
 
 ### Two config keys: `exclude_paths` and `extend_exclude_paths`
 
@@ -54,22 +54,22 @@ SafeLint lets you customise which directories are excluded through two TOML keys
 This is the **most common case**. SafeLint keeps excluding `.venv/`, `node_modules/`, `build/`, `dist/`, etc. (the built-in defaults above), and your patterns are added on top. Nothing is lost; everything you specify is added.
 
 ```toml
-# pyproject.toml — common case
+# pyproject.toml: common case
 [tool.safelint]
 # .venv/, node_modules/, build/, dist/, __pycache__/, etc. STILL excluded
 # (built-in defaults preserved). Your additions stack on top.
 extend_exclude_paths = ["tests/**", "generated/**"]
 ```
 
-#### Scenario 2: "I want full control — define exactly what's excluded, ignore the defaults" → use `exclude_paths`
+#### Scenario 2: "I want full control: define exactly what's excluded, ignore the defaults" → use `exclude_paths`
 
 Setting `exclude_paths` **replaces** the built-in defaults entirely. The list you supply IS the final list. SafeLint stops excluding `.venv/`, `node_modules/`, etc. unless you list them yourself.
 
 ```toml
-# pyproject.toml — power-user case
+# pyproject.toml: power-user case
 [tool.safelint]
 # Built-in defaults REPLACED. SafeLint now only excludes what's in this list.
-# Note: .venv/ and node_modules/ are no longer excluded — add them yourself
+# Note: .venv/ and node_modules/ are no longer excluded: add them yourself
 # if you don't want them linted.
 exclude_paths = ["build/**", "dist/**", "**/.venv/**", "**/node_modules/**"]
 ```
@@ -79,14 +79,14 @@ exclude_paths = ["build/**", "dist/**", "**/.venv/**", "**/node_modules/**"]
 Setting `exclude_paths` to an empty list explicitly clears every default. SafeLint walks into everything. Useful when you genuinely want to audit, say, a vendored library inside `.venv/`.
 
 ```toml
-# pyproject.toml — opt out of all defaults
+# pyproject.toml: opt out of all defaults
 [tool.safelint]
 exclude_paths = []   # lints EVERYTHING, including .venv/ if present
 ```
 
 #### Scenario 4: "I want a custom baseline AND personal additions" (advanced) → use both
 
-Real example: a project's checked-in `safelint.toml` defines a baseline via `exclude_paths`, and individual developers (or overlay configs) add their own dev-only excludes via `extend_exclude_paths` without modifying the project's baseline. The two keys compose — your additions stack on top of whatever `exclude_paths` resolves to.
+Real example: a project's checked-in `safelint.toml` defines a baseline via `exclude_paths`, and individual developers (or overlay configs) add their own dev-only excludes via `extend_exclude_paths` without modifying the project's baseline. The two keys compose, your additions stack on top of whatever `exclude_paths` resolves to.
 
 ```toml
 # Project's safelint.toml (checked into git)
@@ -109,14 +109,14 @@ For when you need the exact rule, the resolution is:
 | (unset) | `["generated/**"]` | Defaults + `generated/**` |
 | `["build/**"]` | (unset) | Just `build/**` (defaults dropped) |
 | `["build/**"]` | `["generated/**"]` | `build/**` + `generated/**` (defaults dropped; both user lists active) |
-| `[]` | (unset) | Empty — lints everything |
+| `[]` | (unset) | Empty, lints everything |
 | `[]` | `["generated/**"]` | Just `generated/**` (defaults dropped, only extend active) |
 
 ### Rule of thumb
 
 - **If you can satisfy your needs with `extend_exclude_paths` alone, do that.** Most projects can. You inherit improvements to the built-in defaults automatically (e.g., if a future safelint version adds `.terraform/` to the defaults, your project gets it for free).
 - **Reach for `exclude_paths` only when you have a specific reason** to take control of the baseline (auditing vendored code, project policy requires explicit lists, etc.).
-- **Combine both when a project baseline and a personal overlay are both needed** — they're additive in the documented order.
+- **Combine both when a project baseline and a personal overlay are both needed**, they're additive in the documented order.
 
 ## Global ignore list
 
@@ -129,15 +129,15 @@ ignore = ["SAFE203", "SAFE304", "side_effects_hidden"]
 ```
 
 ```toml
-# safelint.toml (standalone — no [tool.safelint] wrapper)
+# safelint.toml (standalone: no [tool.safelint] wrapper)
 ignore = ["SAFE203", "SAFE304", "side_effects_hidden"]
 ```
 
-Rules in the `ignore` list are skipped entirely — they produce no violations and add no overhead.
+Rules in the `ignore` list are skipped entirely; they produce no violations and add no overhead.
 
-### `extend_ignore` — grow the list without redeclaring it (1.8.0)
+### `extend_ignore`: grow the list without redeclaring it (1.8.0)
 
-When you only want to *add* to the project's existing ignore list (rather than replace it), use `extend_ignore`. SafeLint folds it into `ignore` at config-load time — downstream consumers only see the merged result.
+When you only want to *add* to the project's existing ignore list (rather than replace it), use `extend_ignore`. SafeLint folds it into `ignore` at config-load time, downstream consumers only see the merged result.
 
 ```toml
 [tool.safelint]
@@ -146,11 +146,11 @@ extend_ignore = ["SAFE702", "SAFE801"]   # appended to the above
 # Resolved at runtime → ignore = ["SAFE701", "SAFE702", "SAFE801"]
 ```
 
-This is especially useful in layered configs (e.g. one `safelint.toml` for the project and a developer's local override) — you can extend without losing the baseline.
+This is especially useful in layered configs (e.g. one `safelint.toml` for the project and a developer's local override), you can extend without losing the baseline.
 
 The same pattern applies to per-file ignores: `extend_per_file_ignores` merges into `per_file_ignores` per glob pattern (entries for an existing pattern are concatenated and deduped; new patterns are added).
 
-In `pyproject.toml`, both keys must live under the fully-qualified `[tool.safelint.*]` table — bare `[per_file_ignores]` would be parsed as a top-level table, not as a child of `[tool.safelint]`:
+In `pyproject.toml`, both keys must live under the fully-qualified `[tool.safelint.*]` table, bare `[per_file_ignores]` would be parsed as a top-level table, not as a child of `[tool.safelint]`:
 
 ```toml
 [tool.safelint.per_file_ignores]
@@ -179,15 +179,15 @@ Both achieve the same result, but they serve different purposes:
 | | `ignore` | `enabled: false` |
 |---|---|---|
 | Location | Single top-level list | Inside each rule's own section |
-| Accepts | Code or name | — (the key is the name) |
+| Accepts | Code or name |, (the key is the name) |
 | Best for | Quick, temporary suppression; CI overrides; onboarding | Permanent project policy for a specific rule |
-| `--ignore` CLI flag | Yes — stacks on top of the config list | No CLI equivalent |
+| `--ignore` CLI flag | Yes, stacks on top of the config list | No CLI equivalent |
 
 Use `ignore` (or `--ignore`) when you want to suppress a rule without committing to a permanent config change for that rule. Use `enabled: false` when the rule simply does not apply to your project.
 
 ### `--ignore` CLI flag
 
-Pass codes or names on the command line to suppress rules for a single run. These stack on top of whatever is already in the config file's `ignore` list — they do not replace it.
+Pass codes or names on the command line to suppress rules for a single run. These stack on top of whatever is already in the config file's `ignore` list; they do not replace it.
 
 ```bash
 # Ignore two rules for this run only
@@ -217,24 +217,24 @@ The `per_file_ignores` key suppresses specific rules for files matching a glob p
 "src/legacy/**" = ["SAFE301", "SAFE302", "complexity"]
 ```
 
-Both rule codes (e.g. `SAFE101`) and rule names (e.g. `function_length`) are accepted and can be mixed in the same list. Multiple patterns can match a file — their ignore lists are unioned. Suppressed violations are counted in the end-of-run summary alongside `# nosafe` suppressions.
+Both rule codes (e.g. `SAFE101`) and rule names (e.g. `function_length`) are accepted and can be mixed in the same list. Multiple patterns can match a file, their ignore lists are unioned. Suppressed violations are counted in the end-of-run summary alongside `# nosafe` suppressions.
 
 Patterns are matched via Python's `fnmatch.fnmatchcase`. The match is **anchored at both ends** (the entire path string must match the pattern) and **case-sensitive on all platforms**. The same matcher applies to `exclude_paths` and `extend_exclude_paths`.
 
-Important — `fnmatch` is not segment-aware:
+Important, `fnmatch` is not segment-aware:
 
-- **`*`** matches any sequence of characters, **including `/`**. So `*.py` matches not just `foo.py` but also `deep/nested/foo.py` — the `*` happily spans path separators.
-- **`**`** has no special meaning in `fnmatch` — it's just `*` written twice and behaves identically to a single `*`. **This is a notable departure from gitignore / shell-glob conventions**, where `**` is the explicit "match across directory boundaries" wildcard. In safelint's matcher, `**` is *not* segment-aware; patterns like `.venv/**` work only because the literal `/` before `**` forces a slash to appear at that position (the `**` itself is just matching the rest of the path the same way a plain `*` would).
+- **`*`** matches any sequence of characters, **including `/`**. So `*.py` matches not just `foo.py` but also `deep/nested/foo.py`, the `*` happily spans path separators.
+- **`**`** has no special meaning in `fnmatch`; it's just `*` written twice and behaves identically to a single `*`. **This is a notable departure from gitignore / shell-glob conventions**, where `**` is the explicit "match across directory boundaries" wildcard. In safelint's matcher, `**` is *not* segment-aware; patterns like `.venv/**` work only because the literal `/` before `**` forces a slash to appear at that position (the `**` itself is just matching the rest of the path the same way a plain `*` would).
 - **`?`** matches exactly one character (including `/`).
 - **`[abc]`** matches one character from the set.
 
 Practical consequences:
 
 - `"tests/**"` matches anything starting with `tests/` (the literal `tests/` is anchored, then `**` matches the rest). This is what you want.
-- `"*.py"` matches any `.py` file at any depth — likely NOT what you want if you intended "only at the top level." **There is no reliable `fnmatch` pattern that means "match only files at the top level of the project."** The engine matches against `Path(filepath).as_posix()`, which normalises away any leading `./` (so a hypothetical `"./*.py"` pattern would never match anything), and `*` already spans `/` (so `"*.py"` already matches at any depth). The practical alternatives when you really need a single-level scope are:
+- `"*.py"` matches any `.py` file at any depth, likely NOT what you want if you intended "only at the top level." **There is no reliable `fnmatch` pattern that means "match only files at the top level of the project."** The engine matches against `Path(filepath).as_posix()`, which normalises away any leading `./` (so a hypothetical `"./*.py"` pattern would never match anything), and `*` already spans `/` (so `"*.py"` already matches at any depth). The practical alternatives when you really need a single-level scope are:
     - **Explicitly list the files on the CLI** (e.g. let your shell expand `*.py` to a concrete file list: `safelint check *.py`).
     - **Exclude the subdirectories you don't want** via `exclude_paths` / `extend_exclude_paths` (e.g. exclude `src/**`, `tests/**`, etc. to leave only top-level files).
-- `"**/*.py"` is equivalent to `"*.py"` for the same reason — neither pattern is limited to a single directory level; both match any `.py` file at any depth.
+- `"**/*.py"` is equivalent to `"*.py"` for the same reason, neither pattern is limited to a single directory level; both match any `.py` file at any depth.
 - The vendor-dir defaults ship as `<dir>/**` plus `**/<dir>/**` per entry (see [Default exclude paths](#default-exclude-paths) above) because the literal `/` in each pattern is what does the work, not the `*` / `**` wildcards.
 
 ### How it differs from other suppression mechanisms
@@ -247,7 +247,7 @@ Practical consequences:
 | `# nosafe` | One line | Yes | Yes |
 | `exclude_paths` / `extend_exclude_paths` | Matching files only | No (file skipped) | No |
 
-Use `per_file_ignores` when a rule is valid for production code but noise in a specific context — for example, test files deliberately use many assertions and long helper functions, or legacy files are under active migration and you do not want to fix every violation before merging.
+Use `per_file_ignores` when a rule is valid for production code but noise in a specific context, for example, test files deliberately use many assertions and long helper functions, or legacy files are under active migration and you do not want to fix every violation before merging.
 
 ## Execution options
 
@@ -267,8 +267,8 @@ Every rule has a `severity` setting (`"error"` or `"warning"`). The global `fail
 
 | `fail_on` | Blocks on | Use case |
 |---|---|---|
-| `"error"` | errors only | Default — good for onboarding a team |
-| `"warning"` | errors and warnings | Strict — recommended for CI |
+| `"error"` | errors only | Default, good for onboarding a team |
+| `"warning"` | errors and warnings | Strict, recommended for CI |
 
 The `mode` setting is a shorthand:
 
@@ -279,7 +279,7 @@ CLI `--fail-on` always takes priority over the config file.
 
 ## JavaScript runtime presets
 
-JavaScript source is the same regardless of where it runs (Node.js, browser, Deno, Cloudflare Workers, Bun, WASM-hosted JS engines), but the *APIs* it interacts with differ. The `[tool.safelint.javascript]` table selects which API surface the JavaScript rule defaults assume — sinks for taint analysis, tracked acquirers for resource-lifecycle, global namespaces for globals, etc.
+JavaScript source is the same regardless of where it runs (Node.js, browser, Deno, Cloudflare Workers, Bun, WASM-hosted JS engines), but the *APIs* it interacts with differ. The `[tool.safelint.javascript]` table selects which API surface the JavaScript rule defaults assume, sinks for taint analysis, tracked acquirers for resource-lifecycle, global namespaces for globals, etc.
 
 ```toml
 # pyproject.toml
@@ -287,10 +287,10 @@ JavaScript source is the same regardless of where it runs (Node.js, browser, Den
 runtime = "browser"   # or "node" (default) / "deno" / "cloudflare-workers" / "bun"
 ```
 
-In a standalone `safelint.toml` (no `[tool.safelint]` wrapper), drop the prefix — the table name is just `[javascript]`:
+In a standalone `safelint.toml` (no `[tool.safelint]` wrapper), drop the prefix, the table name is just `[javascript]`:
 
 ```toml
-# safelint.toml (standalone — no [tool.safelint] wrapper)
+# safelint.toml (standalone: no [tool.safelint] wrapper)
 [javascript]
 runtime = "browser"
 ```
@@ -303,7 +303,7 @@ runtime = "browser"
 | `cloudflare-workers` | Cloudflare Workers (V8 isolates); also a reasonable starting point for other Web-API-only edge runtimes | KV / R2 / Durable Object methods (`put` / `delete` / `get` for SAFE802 and SAFE803), `Request` body methods (`json` / `formData` / `arrayBuffer` / `blob`) as taint sources, minimal global-namespace list. No `fs` surface. |
 | `bun` | Bun runtime | Node defaults plus Bun-specific extras (`Bun.serve`, `Bun.spawn`). |
 
-User-explicit `_javascript` config keys still win over the preset — the preset only changes the *default* list, not your overrides:
+User-explicit `_javascript` config keys still win over the preset, the preset only changes the *default* list, not your overrides:
 
 ```toml
 [tool.safelint.javascript]
@@ -313,27 +313,27 @@ runtime = "browser"
 sinks_javascript = ["eval", "Function", "myCustomDangerousFunction"]   # overrides the browser preset
 ```
 
-Unknown runtime names surface a `safelint: warning:` line on stderr and fall back to `node`. Pure WebAssembly (`.wat` / `.wasm`) is out of scope for this configuration. **AssemblyScript** (`.as`) is supported — it parses with the same Tree-sitter grammar as TypeScript and is treated as a TS variant; the runtime preset that applies depends on where the compiled WebAssembly module runs.
+Unknown runtime names surface a `safelint: warning:` line on stderr and fall back to `node`. Pure WebAssembly (`.wat` / `.wasm`) is out of scope for this configuration. **AssemblyScript** (`.as`) is supported, it parses with the same Tree-sitter grammar as TypeScript and is treated as a TS variant; the runtime preset that applies depends on where the compiled WebAssembly module runs.
 
-Source-language analysis itself (the parser, the AST walks, the per-rule logic) is identical across runtimes — only the *defaults* change.
+Source-language analysis itself (the parser, the AST walks, the per-rule logic) is identical across runtimes, only the *defaults* change.
 
 ### TypeScript and the `_javascript` config keys
 
-TypeScript (`.ts` / `.tsx` / `.as` files) **shares the JavaScript runtime presets** because TS compiles to JS at runtime — the sink lists, taint sources, global namespaces, and I/O primitives are properties of the runtime environment, not the source language.
+TypeScript (`.ts` / `.tsx` / `.as` files) **shares the JavaScript runtime presets** because TS compiles to JS at runtime, the sink lists, taint sources, global namespaces, and I/O primitives are properties of the runtime environment, not the source language.
 
 By default, every TS file reads the `_javascript`-suffixed config keys directly:
 
 | TS file reads | when … |
 |---|---|
 | `<key>_typescript` | the user has set it explicitly (e.g. `sinks_typescript`, `sanitizers_typescript`, `sources_typescript`) |
-| `<key>_javascript` | `<key>_typescript` is unset (the default — TS inherits the JS list for every key listed below) |
+| `<key>_javascript` | `<key>_typescript` is unset (the default, TS inherits the JS list for every key listed below) |
 | (the rule's built-in default) | neither is set |
 
 Same precedence applies to every other `_javascript`-suffixed key (`sanitizers_javascript`, `sources_javascript`, `tracked_functions_javascript`, `global_namespaces_javascript`, `io_functions_javascript`, `assertion_calls_javascript`, `nullable_methods_javascript`, `flagged_calls_javascript`).
 
-**Most projects don't need TS-specific config.** TS inherits JS defaults / overrides automatically — running `safelint check src/` on a mixed `.js` / `.ts` codebase gives the right behaviour out of the box. Set `_typescript`-suffixed keys only when you have a concrete reason for `.ts` files to behave differently from `.js` files in the same project (a stricter sink list for new TS code, a different test-framework's assertion functions, etc.).
+**Most projects don't need TS-specific config.** TS inherits JS defaults / overrides automatically, running `safelint check src/` on a mixed `.js` / `.ts` codebase gives the right behaviour out of the box. Set `_typescript`-suffixed keys only when you have a concrete reason for `.ts` files to behave differently from `.js` files in the same project (a stricter sink list for new TS code, a different test-framework's assertion functions, etc.).
 
-**Typical project** — no TS-specific config needed. Both `.js` and `.ts` files use the same sink list via the TS → JS fallback:
+**Typical project**, no TS-specific config needed. Both `.js` and `.ts` files use the same sink list via the TS → JS fallback:
 
 ```toml
 # pyproject.toml
@@ -342,10 +342,10 @@ runtime = "node"
 
 [tool.safelint.rules.tainted_sink]
 sinks_javascript = ["eval", "Function", "myCustomDangerousFunction"]
-# .ts files inherit this list automatically — no _typescript key needed.
+# .ts files inherit this list automatically: no _typescript key needed.
 ```
 
-**Rare** — a project wants a stricter sink list for TS only, while legacy JS keeps its existing list. Set both keys; the `_typescript` key is consulted first for `.ts` files:
+**Rare**, a project wants a stricter sink list for TS only, while legacy JS keeps its existing list. Set both keys; the `_typescript` key is consulted first for `.ts` files:
 
 ```toml
 # pyproject.toml
@@ -354,7 +354,7 @@ sinks_javascript = ["eval", "Function"]                                # legacy 
 sinks_typescript = ["eval", "Function", "Object.assign", "innerHTML"]  # stricter for TS
 ```
 
-(Two separate snippets above — each is a complete, self-contained pyproject excerpt. Don't paste them into the same `[tool.safelint.rules.tainted_sink]` block: TOML rejects duplicate table headers, and the rule's config is *one* table no matter how many language-suffixed keys it carries.)
+(Two separate snippets above, each is a complete, self-contained pyproject excerpt. Don't paste them into the same `[tool.safelint.rules.tainted_sink]` block: TOML rejects duplicate table headers, and the rule's config is *one* table no matter how many language-suffixed keys it carries.)
 
 ## Adoption path
 

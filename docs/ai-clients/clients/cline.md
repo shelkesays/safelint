@@ -4,12 +4,12 @@
 
 **Install location:**
 
-- User-scoped: `~/.clinerules/safelint.md` — Cline auto-loads user-global rules across workspaces.
-- Project-scoped: `<cwd>/.clinerules/safelint.md` — Cline auto-loads any `.md` under `.clinerules/`. **Recommended for team-shared repos — commit the file.**
+- User-scoped: `~/.clinerules/safelint.md`, Cline auto-loads user-global rules across workspaces.
+- Project-scoped: `<cwd>/.clinerules/safelint.md`, Cline auto-loads any `.md` under `.clinerules/`. **Recommended for team-shared repos, commit the file.**
 
 **How to invoke after install:**
 
-Reload your IDE (or restart Cline). The rule is auto-loaded. Then ask Cline *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+Reload your IDE (or restart Cline). The rule is auto-loaded. Then ask Cline *"run safelint"* / *"lint with safelint"*, same prompts as the other clients.
 
 **Manual install:**
 
