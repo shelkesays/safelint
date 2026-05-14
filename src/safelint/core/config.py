@@ -38,7 +38,7 @@ STANDALONE_TOML_FILENAME = "safelint.toml"
 # Default vendor / generated directories pruned from discovery
 # ---------------------------------------------------------------------------
 #
-# Almost no project wants safelint walking into these — they hold
+# Almost no project wants safelint walking into these - they hold
 # third-party code (virtualenvs, ``node_modules``), build outputs
 # (``build/`` / ``dist/``), or generated caches (``__pycache__``,
 # ``.pytest_cache``, etc.). Without these defaults, a fresh
@@ -51,7 +51,7 @@ STANDALONE_TOML_FILENAME = "safelint.toml"
 # with the literal ``/`` before ``<dir>`` in the nested form:
 #
 # * ``<dir>/**`` matches a top-level vendor dir (the most common case
-#   — e.g. ``.venv/foo`` directly under the project root). The
+#   - e.g. ``.venv/foo`` directly under the project root). The
 #   anchored start means this pattern does NOT match a nested
 #   occurrence like ``a/b/.venv/foo``.
 # * ``**/<dir>/**`` matches the same name nested anywhere else
@@ -62,15 +62,15 @@ STANDALONE_TOML_FILENAME = "safelint.toml"
 #
 # Note: fnmatch's ``*`` and ``**`` both match across ``/`` separators
 # (unlike pathspec / git-style globs where ``*`` is single-segment).
-# Verify with ``fnmatch.fnmatchcase("a/b/c", "*")`` — returns ``True``.
+# Verify with ``fnmatch.fnmatchcase("a/b/c", "*")`` - returns ``True``.
 # The reason we need both patterns is the *anchoring + literal slash*,
 # not a "wildcards don't span slashes" limitation.
 #
 # Users can:
 # * **Override completely** by setting ``exclude_paths = []`` in
-#   their config — clears every default, useful for the rare case of
+#   their config - clears every default, useful for the rare case of
 #   wanting safelint to look inside a normally-excluded directory.
-# * **Extend additively** via ``extend_exclude_paths = [...]`` —
+# * **Extend additively** via ``extend_exclude_paths = [...]`` -
 #   keeps the defaults and adds the user's patterns. Recommended for
 #   project-specific excludes (``"generated/**"``, ``"vendor/**"``,
 #   etc.).
@@ -94,7 +94,7 @@ _DEFAULT_EXCLUDE_VENDOR_DIRS: tuple[str, ...] = (
     "htmlcov",
     # JavaScript / Node
     "node_modules",
-    # Site packages (defensive — sometimes installed into the project tree)
+    # Site packages (defensive - sometimes installed into the project tree)
     "site-packages",
 )
 
@@ -174,7 +174,7 @@ DEFAULTS: dict[str, Any] = {
         # JavaScript-only: prefer ``let`` / ``const`` over ``var`` for
         # block scope. Holzmann Power-of-Ten Rule 6 ("declare variables
         # at the smallest possible scope") translated to JS's actual
-        # scope-control mechanism. No Python equivalent — Python lacks
+        # scope-control mechanism. No Python equivalent - Python lacks
         # the var/let/const distinction.
         "wide_scope_declaration": {"enabled": True, "severity": "warning"},
         "side_effects_hidden": {
@@ -183,7 +183,7 @@ DEFAULTS: dict[str, Any] = {
             # Per-language I/O primitive lists. Adding both keys here
             # rather than a single shared list avoids Python false
             # positives on calls like ``logger.error()`` (where
-            # ``call_name`` returns ``"error"``) — the JS list is only
+            # ``call_name`` returns ``"error"``) - the JS list is only
             # consulted on ``.js`` / ``.mjs`` / ``.cjs`` files.
             "io_functions": ["open", "print", "input", "subprocess"],
             "io_functions_javascript": [
@@ -220,7 +220,7 @@ DEFAULTS: dict[str, Any] = {
         "side_effects": {
             "enabled": True,
             "severity": "warning",
-            # Per-language defaults — see the note on ``side_effects_hidden``
+            # Per-language defaults - see the note on ``side_effects_hidden``
             # above. ``io_name_keywords`` and the rule's general structure
             # are language-agnostic; only the I/O primitive list differs.
             "io_functions": ["open", "print", "input"],
@@ -256,7 +256,7 @@ DEFAULTS: dict[str, Any] = {
             # primitives across Python's stdlib + popular libraries. Users can
             # extend (without re-listing) via ``extend_tracked_functions``.
             "tracked_functions": [
-                "open",  # builtins.open — files
+                "open",  # builtins.open - files
                 "connect",  # sqlite3.connect, psycopg2.connect, mysql.connect, …
                 "session",  # requests.session(), sqlalchemy session factories
                 "Session",  # PEP-8-named session classes (requests.Session, sqlalchemy.Session)
@@ -317,7 +317,7 @@ DEFAULTS: dict[str, Any] = {
                 "match",
                 # console.assert (browser + Node)
                 "assert",  # already listed; harmless duplicate
-                # Test frameworks (call-name level — receiver is irrelevant)
+                # Test frameworks (call-name level - receiver is irrelevant)
                 "expect",  # Jest, Chai (when used via expect()), Vitest's vi.expect
                 "should",  # Should.js
             ],
@@ -344,14 +344,14 @@ DEFAULTS: dict[str, Any] = {
             "sanitizers": ["escape", "sanitize", "clean", "validate", "quote", "encode", "bleach"],
             "sources": ["input", "readline", "recv", "recvfrom", "read"],
             # JavaScript source / sanitizer / sink lists. Per-language
-            # to avoid false positives — e.g. ``call_name`` returns
+            # to avoid false positives - e.g. ``call_name`` returns
             # ``"read"`` for both Python's ``file.read()`` (a tainted
             # source) and JavaScript's ``Buffer.read()`` (which has a
             # very different threat model). Adding a new language is
             # additive: drop new ``<key>_<lang>`` lists in here.
             "sinks_javascript": [
                 "eval",
-                "Function",  # ``new Function(code)`` — same risk as eval
+                "Function",  # ``new Function(code)`` - same risk as eval
                 "execScript",  # legacy IE
                 "exec",  # child_process.exec
                 "execSync",
@@ -361,7 +361,7 @@ DEFAULTS: dict[str, Any] = {
                 "execFileSync",
                 "setTimeout",  # only with string arg, but rule can't tell at this level
                 "setInterval",  # same
-                "innerHTML",  # via ``el.innerHTML = tainted`` — assignment-side, not call; documented limitation
+                "innerHTML",  # via ``el.innerHTML = tainted`` - assignment-side, not call; documented limitation
             ],
             "sanitizers_javascript": [
                 "escape",
@@ -382,7 +382,7 @@ DEFAULTS: dict[str, Any] = {
         "return_value_ignored": {
             "enabled": False,
             "severity": "warning",
-            # Python defaults — Python file/network/subprocess functions
+            # Python defaults - Python file/network/subprocess functions
             # whose return value carries success/failure info.
             "flagged_calls": [
                 "run",
@@ -402,7 +402,7 @@ DEFAULTS: dict[str, Any] = {
                 "mkdir",
                 "rmdir",
             ],
-            # JavaScript defaults — Node fs / stream / process methods
+            # JavaScript defaults - Node fs / stream / process methods
             # whose return value (or returned promise) carries
             # success/failure info. Discarded promises in particular
             # silently swallow rejections.
@@ -458,7 +458,7 @@ DEFAULTS: dict[str, Any] = {
 # JavaScript runtime presets
 # ---------------------------------------------------------------------------
 #
-# JavaScript source is JavaScript source — the parser, AST, and rule logic
+# JavaScript source is JavaScript source - the parser, AST, and rule logic
 # are runtime-agnostic. But the *defaults* baked into ``DEFAULTS["rules"]``
 # (sinks / sanitisers / sources / I/O verbs / nullable methods / resource
 # acquirers / global namespaces) are Node-flavoured today: ``fs.readFile``,
@@ -471,7 +471,7 @@ DEFAULTS: dict[str, Any] = {
 #   runtime = "browser"   # or "deno" / "cloudflare-workers" / "bun" / "node"
 #
 # The named preset overrides Node defaults *before* the user's TOML is
-# merged in — so an explicit ``[tool.safelint.rules.tainted_sink]
+# merged in - so an explicit ``[tool.safelint.rules.tainted_sink]
 # sinks_javascript = […]`` in the user's config still wins, even when a
 # runtime is selected. The default runtime is ``"node"`` so existing
 # users see no behaviour change.
@@ -485,11 +485,11 @@ DEFAULTS: dict[str, Any] = {
 _JS_VALID_RUNTIMES: frozenset[str] = frozenset({"node", "browser", "deno", "cloudflare-workers", "bun"})
 
 _JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
-    # ``node`` is the baseline — equal to DEFAULTS, so the preset is empty
+    # ``node`` is the baseline - equal to DEFAULTS, so the preset is empty
     # (no overrides needed). Listed for completeness so unknown-runtime
     # validation can compare against the full set of accepted names.
     "node": {},
-    # ``browser`` — Web APIs (DOM, fetch, localStorage, BroadcastChannel,
+    # ``browser`` - Web APIs (DOM, fetch, localStorage, BroadcastChannel,
     # observers). No Node fs / child_process / process surface.
     "browser": {
         "rules": {
@@ -516,7 +516,7 @@ _JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
                 # browser DOM-mutation / event-registration methods
                 # (``setItem``, ``removeItem``, ``clear``,
                 # ``addEventListener``, ``postMessage``) all return
-                # ``undefined`` — capturing the return value would be
+                # ``undefined`` - capturing the return value would be
                 # meaningless, so flagging them only produces noise.
                 "flagged_calls_javascript": [
                     "dispatchEvent",
@@ -563,7 +563,7 @@ _JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
                     "window",
                     "self",
                     "document",
-                    # Drop ``global`` and ``process`` — Node-only.
+                    # Drop ``global`` and ``process`` - Node-only.
                 ],
             },
             "side_effects_hidden": {
@@ -596,7 +596,7 @@ _JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
             },
         },
     },
-    # ``deno`` — ``Deno.*`` APIs + Web APIs. No Node-style ``fs`` /
+    # ``deno`` - ``Deno.*`` APIs + Web APIs. No Node-style ``fs`` /
     # ``child_process`` / ``process``.
     "deno": {
         "rules": {
@@ -691,7 +691,7 @@ _JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
             },
         },
     },
-    # ``cloudflare-workers`` — Workers Runtime (V8 isolates with Web APIs +
+    # ``cloudflare-workers`` - Workers Runtime (V8 isolates with Web APIs +
     # KV / Durable Objects / R2). No fs surface.
     "cloudflare-workers": {
         "rules": {
@@ -716,7 +716,7 @@ _JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
                     "put",  # KV.put, R2.put
                     "delete",
                     "send",
-                    # ``addEventListener`` deliberately omitted — it
+                    # ``addEventListener`` deliberately omitted - it
                     # returns ``undefined`` and produces only noise
                     # when flagged (same reason as the browser preset).
                 ],
@@ -732,7 +732,7 @@ _JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
                 ],
             },
             "resource_lifecycle": {
-                # Workers has very few resource-lifecycle concerns —
+                # Workers has very few resource-lifecycle concerns -
                 # WebSocket pairs being the main one.
                 "tracked_functions_javascript": [
                     "WebSocketPair",
@@ -772,9 +772,9 @@ _JS_RUNTIME_PRESETS: dict[str, dict[str, Any]] = {
             },
         },
     },
-    # ``bun`` — mostly Node-compatible API surface plus ``Bun.*`` extras.
+    # ``bun`` - mostly Node-compatible API surface plus ``Bun.*`` extras.
     # Defaults equal to Node with a couple of Bun-specific additions
-    # (``Bun.spawn``, ``Bun.serve``, ``Bun.file`` — call names ``spawn``
+    # (``Bun.spawn``, ``Bun.serve``, ``Bun.file`` - call names ``spawn``
     # / ``serve`` / ``file`` mostly already in the Node defaults).
     "bun": {
         "rules": {
@@ -802,7 +802,7 @@ def _apply_javascript_runtime_preset(defaults: dict[str, Any], runtime: str) -> 
     """Modify *defaults* in place to apply the JS runtime preset.
 
     No-op when the runtime is ``"node"`` (defaults already encode that
-    runtime) or when the runtime is unknown — unknown-runtime warnings
+    runtime) or when the runtime is unknown - unknown-runtime warnings
     are emitted by the caller via ``_diagnostics.print_warning``.
 
     The preset's nested shape mirrors ``DEFAULTS``: each key is a path
@@ -816,7 +816,7 @@ def _apply_javascript_runtime_preset(defaults: dict[str, Any], runtime: str) -> 
     # ``deepcopy`` each value before planting it into the defaults dict
     # so downstream callers can't mutate ``_JS_RUNTIME_PRESETS`` by
     # mutating the resolved config (the preset's lists are otherwise
-    # shared by reference). Defensive — current consumers treat the
+    # shared by reference). Defensive - current consumers treat the
     # config as read-only, but the cost is one shallow deepcopy per
     # preset key and the protection is permanent.
     import copy  # noqa: PLC0415
@@ -836,10 +836,10 @@ def _resolve_javascript_runtime(cfg: dict[str, Any]) -> str:
     """
     js_section = cfg.get("javascript", {})
     if not isinstance(js_section, dict):
-        from safelint.core import _diagnostics  # noqa: PLC0415  — circular avoidance
+        from safelint.core import _diagnostics  # noqa: PLC0415  - circular avoidance
 
         _diagnostics.print_warning(
-            f"[tool.safelint.javascript] must be a table, got {type(js_section).__name__} — falling back to runtime='node'",
+            f"[tool.safelint.javascript] must be a table, got {type(js_section).__name__} - falling back to runtime='node'",
         )
         return "node"
     runtime = js_section.get("runtime", "node")
@@ -847,7 +847,7 @@ def _resolve_javascript_runtime(cfg: dict[str, Any]) -> str:
         from safelint.core import _diagnostics  # noqa: PLC0415
 
         _diagnostics.print_warning(
-            f"[tool.safelint.javascript].runtime must be a string, got {type(runtime).__name__} — falling back to 'node'",
+            f"[tool.safelint.javascript].runtime must be a string, got {type(runtime).__name__} - falling back to 'node'",
         )
         return "node"
     if runtime not in _JS_VALID_RUNTIMES:
@@ -855,7 +855,7 @@ def _resolve_javascript_runtime(cfg: dict[str, Any]) -> str:
 
         valid = ", ".join(sorted(_JS_VALID_RUNTIMES))
         _diagnostics.print_warning(
-            f"[tool.safelint.javascript].runtime={runtime!r} is not recognised (valid: {valid}) — falling back to 'node'",
+            f"[tool.safelint.javascript].runtime={runtime!r} is not recognised (valid: {valid}) - falling back to 'node'",
         )
         return "node"
     return runtime
@@ -890,7 +890,7 @@ def _read_toml_file(candidate: Path) -> dict[str, Any] | None:
     # The error IS reported via _diagnostics.print_error; SAFE203's heuristic
     # only recognises stdlib logging method names so it can't see the call.
     except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError) as exc:  # nosafe: SAFE203
-        _diagnostics.print_error(f"failed to parse {candidate}: {exc} — skipping file")
+        _diagnostics.print_error(f"failed to parse {candidate}: {exc} - skipping file")
         return None
 
 
@@ -901,7 +901,7 @@ def _peek_toml_file(candidate: Path) -> dict[str, Any] | None:
     whether a directory contains an active config file *before*
     ``load_config`` runs. Without a quiet variant, a malformed
     ``safelint.toml`` would print the same parse-error diagnostic
-    twice — once from the probe, once from the real load — confusing
+    twice - once from the probe, once from the real load - confusing
     users who'd see the file flagged repeatedly. Real load remains
     the authoritative reporter.
     """
@@ -959,13 +959,13 @@ def _directory_has_config(directory: Path) -> bool:
       at a directory whose config never actually loads, and the user
       would silently get an unexpected ``.safelint_cache/`` placement.
     * ``pyproject.toml`` only counts when it actually has a
-      ``[tool.safelint]`` section — an unrelated ``pyproject.toml``
+      ``[tool.safelint]`` section - an unrelated ``pyproject.toml``
       higher up the tree (e.g. a Python package whose author never
       configured safelint) shouldn't pin the cache there.
 
     Uses :func:`_peek_toml_file` (silent) rather than
     :func:`_read_toml_file` (verbose) so a malformed file's
-    diagnostic is emitted exactly once — by the actual load path
+    diagnostic is emitted exactly once - by the actual load path
     that follows. Otherwise the same broken file would print the
     same parse-error to stderr twice per run.
     """
@@ -989,7 +989,7 @@ def find_config_root(search_from: Path | None = None) -> Path | None:
     2. ``pyproject.toml`` containing a ``[tool.safelint]`` section
 
     Returns ``None`` when no config file is discoverable along the
-    upward walk — the caller can then fall back to a sensible default
+    upward walk - the caller can then fall back to a sensible default
     (e.g. *search_from* itself) for any path that wants to live "next
     to the config".
 
@@ -1009,12 +1009,12 @@ def _validated_str_sequence(value: object, *, field_name: str) -> list[str]:
 
     Two rejections matter equally:
 
-    * **Bare strings** — ``ignore = "SAFE701"`` (missing brackets) would
+    * **Bare strings** - ``ignore = "SAFE701"`` (missing brackets) would
       otherwise unpack into single-character entries via Python's
       iterable-unpacking sugar, silently producing a corrupted list.
       Tested explicitly because ``str`` *is* iterable; a plain
       ``isinstance(value, Iterable)`` check would accept it.
-    * **Non-string elements** — coercing them via ``str(...)`` (the old
+    * **Non-string elements** - coercing them via ``str(...)`` (the old
       behaviour) was wrong: if the user wrote ``[101]`` instead of
       ``["SAFE101"]``, silent coercion produced ``"101"`` and the
       ignore matched nothing.
@@ -1030,7 +1030,7 @@ def _validated_str_sequence(value: object, *, field_name: str) -> list[str]:
     non_strings = [e for e in value if not isinstance(e, str)]
     if non_strings:
         bad = ", ".join(f"{type(e).__name__}({e!r})" for e in non_strings)
-        msg = f"{field_name} must contain only strings — got: {bad}"
+        msg = f"{field_name} must contain only strings - got: {bad}"
         raise TypeError(msg)
     return [e for e in value if isinstance(e, str)]
 
@@ -1092,7 +1092,7 @@ def _merge_one_pfi_pattern(existing_pfi: dict[str, list[str]], pattern: str, ent
 
 # Unique sentinel used by :func:`_apply_extend_keys` to distinguish
 # *absent* from *explicitly-set-to-an-empty-or-falsy-value*. The dict
-# ``.pop(key, None)`` idiom can't tell those apart — an explicit
+# ``.pop(key, None)`` idiom can't tell those apart - an explicit
 # ``extend_ignore = 0`` would silently skip type validation otherwise.
 _MISSING_KEY = object()
 
@@ -1110,7 +1110,7 @@ def _apply_extend_keys(merged: dict[str, Any]) -> dict[str, Any]:
     (engine, runner) only see the canonical ``ignore`` / ``per_file_ignores``.
 
     Sentinel-based detection means an explicitly-set falsy value
-    (``extend_ignore = []`` or ``extend_ignore = 0``) is *not* skipped —
+    (``extend_ignore = []`` or ``extend_ignore = 0``) is *not* skipped -
     empty lists pass through validation cleanly, and bad types like ``0``
     raise a clear :class:`TypeError` instead of being silently dropped.
     """
@@ -1129,7 +1129,7 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
     Searches upward from *search_from* (defaults to cwd). At each directory
     the lookup order is:
 
-    1. ``safelint.toml`` (standalone — keys at top level)
+    1. ``safelint.toml`` (standalone - keys at top level)
     2. ``pyproject.toml`` → ``[tool.safelint]``
 
     Always returns a fresh, deep-copied dict so callers can mutate the
@@ -1140,7 +1140,7 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
     to *grow* the corresponding default lists rather than replace them
     (mirrors ruff's ``extend-select`` / ``extend-ignore``). These keys
     are folded into ``ignore`` / ``per_file_ignores`` and stripped from
-    the returned dict — downstream consumers only see the canonical keys.
+    the returned dict - downstream consumers only see the canonical keys.
 
     Returns a copy of ``DEFAULTS`` when no config file is found.
     """

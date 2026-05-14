@@ -3,7 +3,7 @@
 Registers Python as a supported language and exposes all Python-specific
 Tree-sitter node type constants that rules use for type-checking nodes.
 
-Grammar import is *optional* — Python support ships in the ``[python]``
+Grammar import is *optional* - Python support ships in the ``[python]``
 extra (``pip install 'safelint[python]'``). Module import always
 succeeds; whether ``tree-sitter-python`` is actually loaded depends on
 :data:`_GRAMMAR_AVAILABLE`. This keeps non-Python projects from paying
@@ -26,7 +26,7 @@ try:
 # at lint time via ``_emit_missing_grammar_warnings``. Logging here
 # would noise up every safelint import for users on non-Python extras.
 # Coverage of this branch is excluded via ``except ImportError:`` in
-# ``[tool.coverage.report].exclude_lines`` — the dev environment
+# ``[tool.coverage.report].exclude_lines`` - the dev environment
 # always installs the grammar, so the branch is genuinely unreachable
 # in tests; behaviour is verified via monkeypatching the resulting
 # state in ``tests/core/test_optional_grammars.py``.
@@ -71,7 +71,7 @@ PYTHON: LanguageDefinition = LanguageDefinition(
 )
 
 
-# Node type constants — use these in rules instead of magic strings.
+# Node type constants - use these in rules instead of magic strings.
 
 FUNCTION_DEF = "function_definition"
 ASYNC_FUNCTION_DEF = "async_function_definition"

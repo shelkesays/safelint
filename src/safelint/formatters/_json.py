@@ -34,7 +34,7 @@ Top-level shape::
     }
 
 Design notes:
-* No ANSI escapes anywhere — output is safe to pipe / cat / parse.
+* No ANSI escapes anywhere - output is safe to pipe / cat / parse.
 * Top-level ``version`` is the safelint version producing the document.
 * Counts in ``summary`` mirror what the pretty formatter would have shown.
 * ``violations`` and ``suppressed`` are flat lists ordered as encountered.
@@ -68,13 +68,13 @@ def _violation_to_dict(v: Violation) -> dict[str, Any]:
     whole line".
 
     For multi-line constructs (``end_lineno > lineno``), ``column_end``
-    is the column on ``end_lineno``, not on ``lineno`` — the four
+    is the column on ``end_lineno``, not on ``lineno`` - the four
     fields together specify a half-open ``[start, end)`` range that
     maps cleanly to LSP / VSCode ``Range`` semantics.
 
     *Added in 1.8.0:* the ``suggestions`` array carries advisory
     fixes the rule offers. **Editors and CI tools must never apply
-    these automatically** — every edit goes through user
+    these automatically** - every edit goes through user
     confirmation. Each suggestion has a one-line ``description`` and
     zero or more ``edits`` (range + replacement text). Empty array
     when the rule has no fix to offer.
@@ -97,7 +97,7 @@ def _suggestion_to_dict(s: Suggestion) -> dict[str, Any]:
     """Render a :class:`Suggestion` as a JSON-friendly dict.
 
     Strict attribute access. ``Violation.suggestions`` is always a
-    ``tuple[Suggestion, ...]`` at runtime — the cache pipeline
+    ``tuple[Suggestion, ...]`` at runtime - the cache pipeline
     reconstructs dataclasses on read (see ``core/_cache.py:
     _dict_to_violation``), so by the time a violation reaches the
     formatter, its suggestions are dataclass instances. A non-Suggestion
@@ -114,7 +114,7 @@ def _suggestion_to_dict(s: Suggestion) -> dict[str, Any]:
 def _edit_to_dict(e: TextEdit) -> dict[str, Any]:
     """Render a :class:`TextEdit` as a JSON-friendly dict.
 
-    Strict attribute access — see :func:`_suggestion_to_dict` for the
+    Strict attribute access - see :func:`_suggestion_to_dict` for the
     rationale.
     """
     return {

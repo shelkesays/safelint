@@ -130,7 +130,7 @@ def _print_status(message: str, *, output_format: str = "pretty") -> None:
 
     In ``pretty`` mode the message goes to stdout where the user expects
     it (it's part of the human-readable run summary). In ``json`` /
-    ``sarif`` mode stdout must remain a single, parseable document — so
+    ``sarif`` mode stdout must remain a single, parseable document - so
     status text is redirected to stderr where tools that capture only
     stdout won't be tripped up.
     """
@@ -176,7 +176,7 @@ def _make_summary(
 
     ``fixes_line`` is ``None`` on a clean run (no active violations) so the
     caller can skip printing the no-fixes notice when there is nothing to
-    fix — even if some violations were suppressed. The suppression breakdown
+    fix - even if some violations were suppressed. The suppression breakdown
     is rolled into the all-clear line in that case.
     """
     suppressed = suppressed or []
@@ -196,7 +196,7 @@ def _make_summary(
 def _make_fixes_line(violations: list[Violation], suppressed_note: str) -> str:
     """Build the post-summary 'fixes' notice.
 
-    safelint never auto-applies fixes — that policy is final and
+    safelint never auto-applies fixes - that policy is final and
     deliberate (it's a review tool, not a refactoring tool). What
     *can* exist is *suggestions*: per-violation advisory edits that
     editor integrations may surface as Quick Fix code actions, with
@@ -205,20 +205,20 @@ def _make_fixes_line(violations: list[Violation], suppressed_note: str) -> str:
     """
     suggestion_count = sum(len(v.suggestions) for v in violations)
     if suggestion_count == 0:
-        # No "see --format json" tail when zero suggestions — there's
+        # No "see --format json" tail when zero suggestions - there's
         # nothing for that flag to surface in this run, and dangling
         # the pointer would falsely imply otherwise.
         return f"No suggestions available (safelint does not auto-fix).{suppressed_note}"
     n = "1 advisory suggestion" if suggestion_count == 1 else f"{suggestion_count} advisory suggestions"
     # Suggestions are emitted in both JSON and SARIF (the SARIF
-    # ``fixes[]`` block, advisory by spec) — point at both so users
+    # ``fixes[]`` block, advisory by spec) - point at both so users
     # picking a format don't have to discover SARIF support
     # separately.
-    return f"{n} available — view via --format json or --format sarif (safelint does not auto-apply fixes).{suppressed_note}"
+    return f"{n} available - view via --format json or --format sarif (safelint does not auto-apply fixes).{suppressed_note}"
 
 
 def _file_summary_line(filepath: str, violations: list[Violation]) -> str:
-    """Return a coloured per-file count line: 'path/file.py — 1 error, 3 warnings.'.
+    """Return a coloured per-file count line: 'path/file.py - 1 error, 3 warnings.'.
 
     Raises:
         ValueError: If *violations* is empty.
@@ -286,7 +286,7 @@ class _PrintOptions:
     statistics: bool = False
 
 
-# Module-level singleton for the default ``_print_results(options=...)`` arg —
+# Module-level singleton for the default ``_print_results(options=...)`` arg -
 # avoids the ``B008`` lint that disallows calling a constructor in a default
 # argument expression. Frozen + immutable so accidental mutation is impossible.
 _DEFAULT_PRINT_OPTIONS = _PrintOptions()
@@ -308,8 +308,8 @@ def _print_results(
     violations were already streamed during the run). For ``json`` / ``sarif``,
     prints a single machine-readable document on stdout. *options* knobs:
 
-    * ``silent_on_clean`` — when True, pretty mode emits nothing on a clean
-      run (no violations) — *no summary and no ``--statistics`` table*,
+    * ``silent_on_clean`` - when True, pretty mode emits nothing on a clean
+      run (no violations) - *no summary and no ``--statistics`` table*,
       regardless of suppressions. Hook / stdin mode set this so a clean
       pre-commit run is fully silent (the ruff/ty contract). Rationale:
       pre-commit batches files across hook invocations, so printing the
@@ -317,23 +317,23 @@ def _print_results(
       stack of misleading *partial*-count lines (issue #50). The summed
       breakdown stays available via ``safelint check`` (which leaves this
       False) and in every JSON / SARIF document.
-    * ``statistics`` — when True, append a per-rule violation-count table
+    * ``statistics`` - when True, append a per-rule violation-count table
       after the summary. Pretty mode only; gated by the same clean-run
       silence above.
 
-    Stderr diagnostics are unaffected — always written as produced.
+    Stderr diagnostics are unaffected - always written as produced.
     """
     if output_format == "pretty":
-        # A clean run under ``silent_on_clean`` emits nothing — summary AND
+        # A clean run under ``silent_on_clean`` emits nothing - summary AND
         # the ``--statistics`` table (the hook parser accepts ``--statistics``,
-        # so this gate is what keeps a clean pre-commit batch quiet — issue #50).
+        # so this gate is what keeps a clean pre-commit batch quiet - issue #50).
         emit = bool(violations) or not options.silent_on_clean
         if emit:
             _print_summary(violations, blocking_count, fail_on, suppressed)
         if options.statistics and emit:
             _print_statistics(violations, suppressed)
         return
-    # output_format is "json" or "sarif" here — argparse ``choices`` guarantees
+    # output_format is "json" or "sarif" here - argparse ``choices`` guarantees
     # it, and "pretty" already returned above. Both formatters share the same
     # signature, so a single dispatch covers both machine-readable documents.
     formatter = format_json if output_format == "json" else format_sarif
@@ -375,7 +375,7 @@ def _run_stdin(args: argparse.Namespace) -> int:
     # in an editor produces a slightly different buffer (cache miss
     # every time anyway) and writing to ``.safelint_cache/`` per keystroke
     # would just churn the project tree. ``--no-cache`` is therefore
-    # irrelevant here — caching is unconditionally off.
+    # irrelevant here - caching is unconditionally off.
     engine = SafetyEngine(config, changed_files=[args.stdin_filename], cache=None)
 
     source = sys.stdin.read()
@@ -453,7 +453,7 @@ def _is_under_target(abs_path: Path, target_abs: Path) -> bool:
     if target_abs.is_dir():
         try:
             abs_path.relative_to(target_abs)
-        # ``relative_to`` raising ValueError means "not under" — that's the
+        # ``relative_to`` raising ValueError means "not under" - that's the
         # answer this predicate exists to compute, not an error to log.
         except ValueError:  # nosafe: SAFE203
             return False
@@ -513,7 +513,7 @@ def _filter_modified_under_target(raw: set[str], git_root: Path, target_abs: Pat
 
     Matches the target-restriction *and* existence check of
     :func:`_filter_supported_files`, but does *not* filter by supported
-    extension — the silent-failure guard needs to see ``.ts`` files
+    extension - the silent-failure guard needs to see ``.ts`` files
     modified under the requested target even when the TS grammar isn't
     installed (those wouldn't reach ``_filter_supported_files`` because
     its extension filter drops them). The existence check matters
@@ -573,22 +573,22 @@ def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str
 
     Returns ``(all_changed, in_target, considered_modified)`` where:
 
-    * *all_changed* — every changed supported-source file across the whole repo.
+    * *all_changed* - every changed supported-source file across the whole repo.
       Paths are relative to cwd when possible, otherwise absolute.
       Passed to :class:`~safelint.core.engine.SafetyEngine` as ``changed_files``
       so cross-file rules (e.g. ``test_coupling``) see the full diff context.
-    * *in_target* — the subset of those files that fall under *target*.
+    * *in_target* - the subset of those files that fall under *target*.
       Same path format as *all_changed*. These are the files actually linted.
-    * *considered_modified* — paths git reported as modified under
+    * *considered_modified* - paths git reported as modified under
       *target* (git-relative, **no** supported-extension filter). Lets
       callers detect "user modified files under target but all dropped
-      by the supported-extensions filter" — the silent-pass case the
+      by the supported-extensions filter" - the silent-pass case the
       missing-grammar guard catches when ``in_target`` is empty.
       Restricted to *target*: a ``.ts`` modified elsewhere must NOT
       trip the guard when the user ran ``safelint check src/python/``.
 
     Returns ``None`` when git is unavailable, the path is outside a git
-    repository, or any git command fails — callers should fall back to
+    repository, or any git command fails - callers should fall back to
     scanning all files.
     """
     try:
@@ -621,7 +621,7 @@ def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str
         )
 
     # Any git-side failure (no git, not a repo, timeout) means we fall back
-    # to scanning all files — that's a documented behaviour, not an error.
+    # to scanning all files - that's a documented behaviour, not an error.
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired):  # nosafe: SAFE203
         return None
 
@@ -638,19 +638,19 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
 
     Returns a 4-tuple:
 
-    * ``changed_files`` — the full repo-wide diff list passed to the engine
+    * ``changed_files`` - the full repo-wide diff list passed to the engine
       so cross-file rules see the right context, or None to skip that hint.
-    * ``files`` — the explicit list of files to lint (a subset of *target*
+    * ``files`` - the explicit list of files to lint (a subset of *target*
       that's been git-modified), or None to fall back to directory discovery.
-    * ``no_targets`` — True when git reported no modified files under
+    * ``no_targets`` - True when git reported no modified files under
       *target* and the caller should short-circuit with an empty result.
-    * ``considered_modified`` — the set of paths git reported as modified
+    * ``considered_modified`` - the set of paths git reported as modified
       that fall under *target*, with the supported-extension filter NOT
       applied (paths are relative to ``git_root``). Empty when ``--all-files``
       / git unavailable / git reported nothing under target. Callers use
       this to detect the silent-pass case where the user modified files
       under target but every one was dropped by the missing-grammar
-      filter — ``no_targets`` would be True in that case, but the
+      filter - ``no_targets`` would be True in that case, but the
       appropriate exit code is 2 (configuration error), not 0.
       Restricting to *target* matters: a ``.ts`` file modified elsewhere
       in the repo must NOT trip the guard when the user ran
@@ -661,7 +661,7 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
     modified = _get_git_modified_supported_files(target)
     if modified is None:
         _print_status(
-            "Note: could not determine modified files via git — scanning all files.",
+            "Note: could not determine modified files via git - scanning all files.",
             output_format=output_format,
         )
         return None, None, False, set()
@@ -677,7 +677,7 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
     return changed_files, files, False, considered
 
 
-# Default dir-name exclusions for the missing-grammar walk. Kept narrow —
+# Default dir-name exclusions for the missing-grammar walk. Kept narrow -
 # this is a fast pre-scan whose purpose is to nudge users, not to mirror
 # the engine's full ``exclude_paths`` machinery. The common vendored /
 # generated / dependency trees below are virtually always gitignored; if
@@ -710,7 +710,7 @@ def _format_install_action(install_hint: str) -> str:
 
     *install_hint* is the canonical ``pip install 'safelint[<lang>]'``
     string each language module exports. That command is the right
-    answer for direct CLI users — but useless to a pre-commit-only
+    answer for direct CLI users - but useless to a pre-commit-only
     user, who can't run pip directly because pre-commit manages the
     hook's isolated environment. Detect via the ``PRE_COMMIT`` env
     var pre-commit sets at hook execution time, and re-route the
@@ -826,7 +826,7 @@ def _emit_missing_grammar_warnings(
 ) -> set[str]:
     """Walk *target*, return the set of unavailable extensions found; emit warnings unless *silent*.
 
-    The walk and the set-return run unconditionally — that's what the
+    The walk and the set-return run unconditionally - that's what the
     silent-failure guard in :func:`_check_exit_code` consumes to fire
     exit code 2 in *every* output mode. The stderr warnings, however,
     are gated on *silent*: pretty mode prints them, JSON / SARIF mode
@@ -836,7 +836,7 @@ def _emit_missing_grammar_warnings(
     Set ``silent=True`` for machine output modes; leave default for
     interactive runs. Pass *exclude_paths* (the resolved user-config
     list) so files in excluded subtrees neither produce a warning nor
-    trip the silent-failure guard — a file safelint won't actually
+    trip the silent-failure guard - a file safelint won't actually
     lint shouldn't fail the run with "no grammar installed".
 
     No-op (returns empty set) when every grammar extra is installed
@@ -853,7 +853,7 @@ def _emit_missing_grammar_warnings(
         grouped.setdefault(unavailable[ext], []).append(ext)
     for hint, exts in grouped.items():
         exts_str = ", ".join(exts)
-        _diagnostics.print_warning(f"skipping {exts_str} files — {_format_install_action(hint)}")
+        _diagnostics.print_warning(f"skipping {exts_str} files - {_format_install_action(hint)}")
     return seen_exts
 
 
@@ -864,7 +864,7 @@ def _emit_hook_grammar_warnings(files: list[str], *, silent: bool = False) -> se
     the passed files by their unavailable extension, emit one warning
     per missing grammar, and return the set of unavailable extensions
     actually found among *files*. Callers use the return value to fail
-    loud when every passed file would be skipped — see ``main()`` for
+    loud when every passed file would be skipped - see ``main()`` for
     the silent-failure guard.
 
     The set-return runs unconditionally so the silent-failure guard in
@@ -872,7 +872,7 @@ def _emit_hook_grammar_warnings(files: list[str], *, silent: bool = False) -> se
     output mode. The stderr warnings, however, are gated on *silent*:
     pretty mode prints one ``safelint: warning: skipping .X files …``
     line per missing grammar, JSON / SARIF mode suppresses them so the
-    tooling-consumer stderr stays clean for parsing pipelines —
+    tooling-consumer stderr stays clean for parsing pipelines -
     symmetric with the directory-walk variant.
     """
     unavailable = unavailable_extensions()
@@ -890,12 +890,12 @@ def _emit_hook_grammar_warnings(files: list[str], *, silent: bool = False) -> se
         grouped.setdefault(unavailable[ext], []).append(ext)
     for hint, exts in grouped.items():
         exts_str = ", ".join(exts)
-        _diagnostics.print_warning(f"skipping {exts_str} files — {_format_install_action(hint)}")
+        _diagnostics.print_warning(f"skipping {exts_str} files - {_format_install_action(hint)}")
     return seen_exts
 
 
 def _check_exit_code(
-    results: list,  # list[LintResult] — typed loosely to avoid an import cycle in tests
+    results: list,  # list[LintResult] - typed loosely to avoid an import cycle in tests
     unavailable_found: set[str],
     all_blocking: list,  # list[Violation]
 ) -> int:
@@ -903,7 +903,7 @@ def _check_exit_code(
 
     Three cases:
 
-    * **Silent-failure** — file discovery saw unavailable-grammar files
+    * **Silent-failure** - file discovery saw unavailable-grammar files
       AND no file actually got linted (every entry in *results* either
       doesn't exist or was an empty placeholder for a file whose grammar
       isn't installed). The run is reporting "clean" only because no
@@ -911,16 +911,16 @@ def _check_exit_code(
       so pre-commit / CI shows the hook as failed. The "no file got
       linted" check must look past raw list length because ``check_path``
       on a single ``.ts`` target with the TS grammar missing returns
-      ``[LintResult(path='foo.ts')]`` — a 1-element list whose lone
+      ``[LintResult(path='foo.ts')]`` - a 1-element list whose lone
       entry was actually skipped at language-lookup time. Treat any
       result whose path's suffix is in *unavailable_found* as skipped.
-    * **Blocking violations** — exit 1.
-    * **Clean / advisory only** — exit 0.
+    * **Blocking violations** - exit 1.
+    * **Clean / advisory only** - exit 0.
     """
     if unavailable_found and not _any_result_was_linted(results, unavailable_found):
         action = _install_action_for_extensions(unavailable_found)
-        suffix = f" — {action}" if action else ""
-        _diagnostics.print_error(f"no files linted — every supported file was skipped because its grammar package isn't installed{suffix}")
+        suffix = f" - {action}" if action else ""
+        _diagnostics.print_error(f"no files linted - every supported file was skipped because its grammar package isn't installed{suffix}")
         return 2
     return 1 if all_blocking else 0
 
@@ -930,7 +930,7 @@ def _any_result_was_linted(results: list, unavailable_found: set[str]) -> bool:
 
     An entry is considered "actually linted" when its path's suffix is
     NOT in *unavailable_found*. Mirrors :func:`_matching_suffixes`'s
-    ``Path.suffix``-style semantics (``rfind(".") > 0`` — leading-dot
+    ``Path.suffix``-style semantics (``rfind(".") > 0`` - leading-dot
     basenames like ``.gitignore`` have no suffix). Short-circuits over
     the list so the typical clean run is O(1).
     """
@@ -949,20 +949,20 @@ def _guard_hook_silent_failure(passed: list[str], filtered: list[str], unavailab
     Pre-commit reports the hook as Passed whenever safelint exits 0,
     even if safelint linted zero files because every passed file's
     grammar wasn't installed. That hidden-green run is the worst
-    failure mode — the user thinks safelint is running but nothing is
+    failure mode - the user thinks safelint is running but nothing is
     actually checked. Fail loud so pre-commit shows the hook as Failed
     and the user is directed to ``additional_dependencies`` (the lever
     they actually have in hook-only setups).
 
     Returns the exit code the caller should pass to ``sys.exit``: 0
     when everything is fine, 2 when the silent-failure case fires.
-    Pure function — caller decides whether to actually exit. Makes
+    Pure function - caller decides whether to actually exit. Makes
     the helper unit-testable without monkey-patching ``sys.exit``.
     """
     if passed and not filtered and unavailable_in_passed:
         action = _install_action_for_extensions(unavailable_in_passed)
-        suffix = f" — {action}" if action else ""
-        _diagnostics.print_error(f"no files linted — every file pre-commit passed had a grammar that isn't installed{suffix}")
+        suffix = f" - {action}" if action else ""
+        _diagnostics.print_error(f"no files linted - every file pre-commit passed had a grammar that isn't installed{suffix}")
         return 2
     return 0
 
@@ -988,7 +988,7 @@ def _install_action_for_extensions(exts: set[str]) -> str:
     (machine output modes) or never emitted (the no-targets short-circuit
     where the warning walk hasn't run for those paths).
 
-    Empty string when no extension maps to a known extra — defensive
+    Empty string when no extension maps to a known extra - defensive
     fallback so the caller's error message degrades gracefully rather
     than dangling with a trailing separator.
     """
@@ -1001,7 +1001,7 @@ def _install_action_for_extensions(exts: set[str]) -> str:
 def _emit_skill_install_grammar_hint(target: Path) -> None:
     """After ``safelint skill install``, nudge the user about missing language grammars.
 
-    Symmetric with the existing AI-client auto-detection — ``skill
+    Symmetric with the existing AI-client auto-detection - ``skill
     install`` finds the AI clients in this project and installs the
     skill files; this helper additionally finds the *languages* in
     this project and tells the user which ``safelint[<lang>]`` extras
@@ -1012,11 +1012,11 @@ def _emit_skill_install_grammar_hint(target: Path) -> None:
     (``pip install 'safelint[python,typescript]'``) so the user runs
     one ``pip`` command instead of several. The per-language warnings
     from :func:`_emit_missing_grammar_warnings` are intentionally
-    *not* emitted here — that helper is the runtime-warning surface
+    *not* emitted here - that helper is the runtime-warning surface
     and the duplicate output would just be noise. The skill-install
     surface emits one compact summary line instead.
 
-    Silent when every needed grammar is already installed — the user
+    Silent when every needed grammar is already installed - the user
     asked to install skills, not to be lectured about grammars they
     already have.
     """
@@ -1032,7 +1032,7 @@ def _emit_skill_install_grammar_hint(target: Path) -> None:
         if name is not None:
             needed_extras.add(name)
     if not needed_extras:
-        return  # pragma: no cover — defensive; every unavailable ext has an extra
+        return  # pragma: no cover - defensive; every unavailable ext has an extra
     install = _compose_extras_install_command(needed_extras)
     plural = "" if len(needed_extras) == 1 else "s"
     extras_list = ", ".join(sorted(needed_extras))
@@ -1044,15 +1044,15 @@ def _handle_no_targets(output_format: str, fail_on: str, considered_modified: se
 
     Two distinct cases land here and the exit code differs:
 
-    * **Genuine clean run / nothing under target** — the current
+    * **Genuine clean run / nothing under target** - the current
       invocation has no modified files to consider
-      (``considered_modified`` is empty — either the user truly hasn't
+      (``considered_modified`` is empty - either the user truly hasn't
       modified anything, or the only modified files live outside the
       requested target). Print the empty results document and exit 0.
       Machine output modes still need a parseable empty document on
       stdout so downstream CI uploaders / SARIF consumers don't choke
       on empty input.
-    * **Silent-pass** — files under target were modified, but every one
+    * **Silent-pass** - files under target were modified, but every one
       was dropped by the supported-extensions filter because its grammar
       isn't installed. ``considered_modified`` intersects
       ``unavailable_extensions()``. Print the empty document AND a stderr
@@ -1063,8 +1063,8 @@ def _handle_no_targets(output_format: str, fail_on: str, considered_modified: se
     _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, options=_PrintOptions(silent_on_clean=True))
     if unavailable_in_modified:
         action = _install_action_for_extensions(unavailable_in_modified)
-        suffix = f" — {action}" if action else ""
-        _diagnostics.print_error(f"no files linted — every git-modified source file has a grammar that isn't installed{suffix}")
+        suffix = f" - {action}" if action else ""
+        _diagnostics.print_error(f"no files linted - every git-modified source file has a grammar that isn't installed{suffix}")
         return 2
     return 0
 
@@ -1076,7 +1076,7 @@ def _emit_skill_freshness_warnings() -> None:
     ``--check-skill-freshness``. The function delegates the
     drift detection to ``_skill_install.stale_install_warnings``
     and routes each result through the diagnostics channel
-    (``safelint: warning: …`` on stderr). Doesn't fail the run —
+    (``safelint: warning: …`` on stderr). Doesn't fail the run -
     informational only. Local import avoids paying the
     ``importlib.resources`` cost on the hot path of normal
     ``safelint check`` invocations.
@@ -1112,7 +1112,7 @@ def _run_check(args: argparse.Namespace) -> int:
 
     # Compute the unavailable-extension set in every output mode so the
     # silent-failure guard fires for JSON / SARIF runs too. Stderr
-    # warnings are pretty-mode only — JSON / SARIF consumers expect a
+    # warnings are pretty-mode only - JSON / SARIF consumers expect a
     # quiet stderr alongside the parseable stdout document.
     unavailable_found = _emit_missing_grammar_warnings(
         target,
@@ -1285,7 +1285,7 @@ def _build_check_parser() -> argparse.ArgumentParser:
         default=False,
         help=(
             "Before linting, verify the installed AI-client skill(s) match the bundled version and "
-            "emit a stderr warning per stale install. Informational only — doesn't fail the run. "
+            "emit a stderr warning per stale install. Informational only - doesn't fail the run. "
             "Use ``safelint skill status`` for the dedicated check."
         ),
     )
@@ -1297,7 +1297,7 @@ def _build_hook_parser() -> argparse.ArgumentParser:
     """Build the pre-commit hook-mode parser.
 
     Explicit positional ``files`` (rather than ``parse_known_args``) so an
-    unrecognised *flag* fails loudly — silently dropping ``--formta=json``
+    unrecognised *flag* fails loudly - silently dropping ``--formta=json``
     would let the user think pretty output was a deliberate choice.
     Pre-commit passes everything (Markdown, Makefiles, source files) as
     positional args, so we filter to entries whose extension is in
@@ -1318,7 +1318,7 @@ def _add_skill_install_arguments(install: argparse.ArgumentParser, install_choic
         "--client",
         choices=install_choices,
         default="auto",
-        help="Target AI client: ``auto`` (default — detect from markers in cwd, then home) or one of: " + ", ".join(c for c in install_choices if c != "auto"),
+        help="Target AI client: ``auto`` (default - detect from markers in cwd, then home) or one of: " + ", ".join(c for c in install_choices if c != "auto"),
     )
     install.add_argument(
         "--project",
@@ -1378,7 +1378,7 @@ def _build_skill_parser() -> argparse.ArgumentParser:
         "--client",
         choices=PATH_CLIENT_CHOICES,
         default="claude",
-        help="Which bundled artefact's path to print (default: ``claude`` — skill_files root)",
+        help="Which bundled artefact's path to print (default: ``claude`` - skill_files root)",
     )
 
     sub.add_parser(
@@ -1412,7 +1412,7 @@ def _add_skill_update_arguments(update: argparse.ArgumentParser, install_choices
         "--client",
         choices=install_choices,
         default="auto",
-        help="Target AI client: ``auto`` (default — detect from existing install paths, NOT marker files like ``install``) or one of: " + ", ".join(c for c in install_choices if c != "auto"),
+        help="Target AI client: ``auto`` (default - detect from existing install paths, NOT marker files like ``install``) or one of: " + ", ".join(c for c in install_choices if c != "auto"),
     )
     update.add_argument(
         "--project",
@@ -1440,7 +1440,7 @@ def _add_skill_remove_arguments(remove: argparse.ArgumentParser, install_choices
         "--client",
         choices=install_choices,
         default="auto",
-        help="Target AI client: ``auto`` (default — detect from existing install paths) or one of: " + ", ".join(c for c in install_choices if c != "auto"),
+        help="Target AI client: ``auto`` (default - detect from existing install paths) or one of: " + ", ".join(c for c in install_choices if c != "auto"),
     )
     remove.add_argument(
         "--project",
@@ -1452,7 +1452,7 @@ def _add_skill_remove_arguments(remove: argparse.ArgumentParser, install_choices
         "--symlink",
         action="store_true",
         default=False,
-        help="Filter to symlink-shape installs only — keep copy-mode installs intact (composes with ``--client`` and ``--project``)",
+        help="Filter to symlink-shape installs only - keep copy-mode installs intact (composes with ``--client`` and ``--project``)",
     )
     remove.add_argument(
         "--path",
@@ -1476,7 +1476,7 @@ def _add_skill_remove_arguments(remove: argparse.ArgumentParser, install_choices
 # sees ``json`` as the first positional and falls into hook mode by
 # mistake. The ``--flag=VALUE`` form is unaffected because the ``=`` is
 # part of the same token. Store-true flags (``--all-files``, ``--no-cache``,
-# ``--stdin``) are deliberately omitted — they don't take a separate value.
+# ``--stdin``) are deliberately omitted - they don't take a separate value.
 _VALUE_TAKING_OPTIONS: frozenset[str] = frozenset(
     {
         "--fail-on",
@@ -1514,7 +1514,7 @@ def _first_positional_index(argv: list[str]) -> int | None:
 def _run_skill(args: argparse.Namespace) -> int:
     """Dispatch the ``safelint skill <action>`` subcommands."""
     # Local import keeps importlib.resources off the hot path for
-    # check/hook/stdin invocations — only paid when the user explicitly
+    # check/hook/stdin invocations - only paid when the user explicitly
     # asks for skill management.
     from safelint import _skill_install  # noqa: PLC0415
 
@@ -1525,7 +1525,7 @@ def _run_skill(args: argparse.Namespace) -> int:
         # toward the matching extras. Symmetric with the existing
         # AI-client auto-detection: skill install handles BOTH "which
         # client does this project use" AND "which grammars does this
-        # project need". Only fires on success — a failed install
+        # project need". Only fires on success - a failed install
         # already has its own diagnostics, no point piling on.
         if rc == 0:
             _emit_skill_install_grammar_hint(Path.cwd())
@@ -1538,7 +1538,7 @@ def _run_skill(args: argparse.Namespace) -> int:
         return _skill_install.run_update(args)
     if args.skill_action == "remove":
         return _skill_install.run_remove(args)
-    return 1  # pragma: no cover — argparse rejects unknown actions before this
+    return 1  # pragma: no cover - argparse rejects unknown actions before this
 
 
 # ── help / version (ruff-style top-level CLI surface) ───────────────────────
@@ -1547,7 +1547,7 @@ def _run_skill(args: argparse.Namespace) -> int:
 # ``Commands:``, ``Options:``, and ``Global options:`` sections with bold
 # section headers and cyan command/flag names. Activated *only* via
 # ``safelint help``, ``safelint -h``, or ``safelint --help``. A bare
-# ``safelint`` invocation does NOT show this top-level help — it continues
+# ``safelint`` invocation does NOT show this top-level help - it continues
 # through the normal hook-mode routing (silent on success when no
 # supported source files are passed) so pre-commit's contract is preserved.
 
@@ -1561,7 +1561,7 @@ _HELP_COMMANDS: tuple[tuple[str, str], ...] = (
 
 
 # Mirrors the per-subcommand ``help=`` strings on the ``skill`` subparsers
-# in ``_build_skill_parser``. Listed at the top level for discoverability —
+# in ``_build_skill_parser``. Listed at the top level for discoverability -
 # ``safelint help`` should make the full lifecycle visible without
 # requiring a second ``safelint help skill`` round-trip.
 _HELP_SKILL_SUBCOMMANDS: tuple[tuple[str, str], ...] = (
@@ -1574,7 +1574,7 @@ _HELP_SKILL_SUBCOMMANDS: tuple[tuple[str, str], ...] = (
 
 
 # Common flags shared across the skill subcommands. Each subcommand has
-# its own subset (e.g. ``--dry-run`` is ``remove`` only) — the per-action
+# its own subset (e.g. ``--dry-run`` is ``remove`` only) - the per-action
 # parser is the source of truth. Listed here so users see ``--force``
 # and friends without first running ``safelint help skill <action>``.
 _HELP_SKILL_FLAGS: tuple[tuple[str, str], ...] = (
@@ -1583,7 +1583,7 @@ _HELP_SKILL_FLAGS: tuple[tuple[str, str], ...] = (
         "Target AI client: ``auto`` | ``claude`` | ``cursor`` | ``copilot`` | ``gemini`` | ``windsurf`` | ``codex`` | ``continue`` | ``cline`` | ``aider`` | ``trae`` | ``antigravity`` | ``zed``",
     ),
     ("--project", "Restrict to project-scope installs (``<cwd>/.<client>/...``)"),
-    ("--symlink", "Use symlink mode instead of copying — ``pip upgrade safelint`` then auto-updates the artefact"),
+    ("--symlink", "Use symlink mode instead of copying - ``pip upgrade safelint`` then auto-updates the artefact"),
     ("--force", "``install``: replace existing artefact. ``update``: refresh even when status reports fresh"),
     ("--path <PATH>", "(``remove`` only) Override auto-detect with an explicit install path"),
     ("--dry-run", "(``remove`` only) Preview removals without touching the filesystem"),
@@ -1705,14 +1705,14 @@ def _is_top_level_help_request() -> tuple[bool, str | None]:
     is asking for top-level help, and *sub* is the subcommand to defer to
     (or None for the unfiltered top-level help). The check runs *before*
     argparse so we can intercept ``-h`` / ``--help`` even when no command
-    is supplied — argparse would otherwise produce its own less polished
+    is supplied - argparse would otherwise produce its own less polished
     output.
 
     The scan walks the full argv with the same value-skipping rules as
     :func:`_first_positional_index`, so global flags placed before the
     help marker (``safelint --format json --help``) don't shadow it.
     The scan stops at the first non-``help`` positional, ceding
-    subcommand-specific help (``safelint check --help``) to argparse —
+    subcommand-specific help (``safelint check --help``) to argparse -
     matching the layout where each subcommand owns its own usage line.
     """
     rest = sys.argv[1:]
@@ -1803,7 +1803,7 @@ def main() -> None:
     if idx is not None and rest[idx] == "skill":
         # Drop the ``skill`` token but keep every flag (and its value)
         # before and after it. Pre-skill tokens then fall to the skill
-        # parser, which rejects unknowns — matching the "fail loudly on
+        # parser, which rejects unknowns - matching the "fail loudly on
         # unknown flags" posture of every other branch. Without this,
         # ``safelint --formta=json skill install`` would silently swallow
         # the typo. The skill parser doesn't accept the global formatter
@@ -1826,7 +1826,7 @@ def _dispatch_hook_mode() -> int:
     to :func:`_run_hook`. Extracted from :func:`main` to keep that
     function's cyclomatic complexity below the project's safelint cap.
 
-    **Per-extension warnings are emitted only for *mixed* runs** — runs
+    **Per-extension warnings are emitted only for *mixed* runs** - runs
     where some files lint successfully and others get skipped. In the
     silent-failure case (every file dropped for a missing grammar), the
     error message from :func:`_guard_hook_silent_failure` already
@@ -1850,7 +1850,7 @@ def _dispatch_hook_mode() -> int:
     if will_silent_fail:
         return _guard_hook_silent_failure(args.files, files, unavailable_in_passed)
 
-    # Mixed run (or no missing-grammar files at all) — emit per-extension
+    # Mixed run (or no missing-grammar files at all) - emit per-extension
     # warnings as actionable context for the skipped files, then lint
     # what we have. Machine output modes suppress the warnings to keep
     # stderr parseable; the set-return is not consulted here because

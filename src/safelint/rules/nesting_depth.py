@@ -33,8 +33,8 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 
 # Per-language node-type sets that count as one nesting step.
 # Python: ``if`` / ``for`` / ``while`` / ``with`` / ``try`` / ``match``
-# (PEP 634, Python 3.10+ — safelint requires 3.11+ so the construct is
-# always available). ``elif_clause`` is *not* in this set — in
+# (PEP 634, Python 3.10+ - safelint requires 3.11+ so the construct is
+# always available). ``elif_clause`` is *not* in this set - in
 # Tree-sitter's Python grammar elif is its own node type, so it does
 # not double-count like it did with ``ast``-module representation.
 # JavaScript: same shape plus ``do_statement`` and ``switch_statement``;
@@ -81,7 +81,7 @@ class NestingDepthRule(BaseRule):
     def _max_depth(root: tree_sitter.Node, function_types: frozenset[str], depth_types: frozenset[str]) -> int:
         """Return the maximum control-flow nesting depth rooted at *root*.
 
-        Skips nested function definitions — those are scored as their
+        Skips nested function definitions - those are scored as their
         own functions by the outer ``check_file`` walk and must not inflate
         the parent's nesting count.
         """

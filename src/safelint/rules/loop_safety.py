@@ -1,9 +1,9 @@
 """loop_safety rule - infinite-truthy loops must have a break; others must use comparisons.
 
 Cross-language: Python ``while True:`` and JavaScript ``while (true)``
-are the same hazard — fires when no ``break`` reaches the loop. The
+are the same hazard - fires when no ``break`` reaches the loop. The
 non-comparison-condition heuristic stays Python-only (JS idioms like
-``while (queue.length)`` are commonly bounded — flagging them would
+``while (queue.length)`` are commonly bounded - flagging them would
 be noise).
 """
 
@@ -55,7 +55,7 @@ _TRUE_LITERAL_BY_LANG: dict[str, str] = {
     "typescript": "true",
 }
 
-# Per-language: node types that bound a ``break`` statement's scope —
+# Per-language: node types that bound a ``break`` statement's scope -
 # walking out of an outer ``while`` should *not* see a ``break`` inside
 # a nested loop or function definition (those breaks belong to the
 # inner construct, not the outer ``while`` we're checking).
@@ -81,7 +81,7 @@ def _outer_while_label(while_node: tree_sitter.Node) -> str | None:
     JavaScript ``outer: while (true) { ... }`` parses as a
     ``labeled_statement`` wrapping the ``while_statement``. A
     ``break outer;`` inside a nested loop / switch is the labelled
-    form of breaking out — we need the label name to recognise
+    form of breaking out - we need the label name to recognise
     that break as exiting *this* while. Python has no labelled-
     break construct so this helper returns None on Python (no
     ``labeled_statement`` parent ever appears).
@@ -98,7 +98,7 @@ def _is_unlabelled_break(break_node: tree_sitter.Node, lang_name: str) -> bool:
 
     Python ``break`` is always unlabelled. JavaScript ``break`` may
     carry a ``statement_identifier`` child (the labelled form
-    ``break outer;``) — those count only via the labelled-break
+    ``break outer;``) - those count only via the labelled-break
     path, not the direct-scope path.
     """
     if lang_name not in ("javascript", "typescript"):
@@ -120,8 +120,8 @@ def _has_direct_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
 def _has_labelled_break_to(while_node: tree_sitter.Node, label: str) -> bool:
     """Return True if any ``break <label>;`` inside *while_node* targets *label* (JavaScript).
 
-    Walks without pruning loops / switches — labelled breaks legally
-    cross those — but does prune function bodies, because in JS
+    Walks without pruning loops / switches - labelled breaks legally
+    cross those - but does prune function bodies, because in JS
     labels don't cross function scope (a labelled break inside a
     nested function is a SyntaxError).
     """
@@ -138,9 +138,9 @@ def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
     """Return True if *while_node*'s body contains a break that exits it.
 
     Two cases, OR'd together: an unlabelled break in direct scope
-    (see :func:`_has_direct_break`), or — JavaScript only — a
+    (see :func:`_has_direct_break`), or - JavaScript only - a
     labelled break targeting this while's own label
-    (``outer: while (true) { for (...) { break outer; } }`` —
+    (``outer: while (true) { for (...) { break outer; } }`` -
     see :func:`_has_labelled_break_to`).
     """
     if _has_direct_break(while_node, lang_name):
@@ -165,7 +165,7 @@ class UnboundedLoopRule(BaseRule):
     JavaScript ``while (true)`` without a ``break`` follows the same
     contract. The "non-comparison condition" heuristic is *not*
     applied to JS because idiomatic loops like ``while (queue.length)``
-    or ``while (token)`` are common and intentional — the false-positive
+    or ``while (token)`` are common and intentional - the false-positive
     rate would dwarf the catches.
     """
 
@@ -184,7 +184,7 @@ class UnboundedLoopRule(BaseRule):
         # JavaScript wraps the condition in a ``parenthesized_expression``
         # because of the mandatory ``while (...)`` syntax. Extra formatting
         # parentheses can nest (``while ((true))``, ``while ((((x)))) ``),
-        # so unwrap until we reach the underlying expression — otherwise
+        # so unwrap until we reach the underlying expression - otherwise
         # ``is_literal_true`` would be False on the outer wrapper and the
         # ``while (true)`` check would silently skip.
         while condition.type == "parenthesized_expression" and condition.named_children:  # nosafe: SAFE501
@@ -194,7 +194,7 @@ class UnboundedLoopRule(BaseRule):
         if is_literal_true:
             if not _has_exiting_break(node, lang_name):
                 # Match the violation message to the source language's
-                # surface syntax — Python's ``while True:`` and
+                # surface syntax - Python's ``while True:`` and
                 # JavaScript's ``while (true)`` are the same hazard but
                 # written differently. Same per-language wording pattern
                 # as ``EmptyExceptRule`` / ``LoggingOnErrorRule``.

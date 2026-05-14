@@ -1,7 +1,7 @@
 """Shared configuration-value validators used across core and rules.
 
-Lives in ``core/`` so any layer — engine plumbing, rule modules,
-diagnostics — can import without creating cross-rule import cycles
+Lives in ``core/`` so any layer - engine plumbing, rule modules,
+diagnostics - can import without creating cross-rule import cycles
 (``rules/foo.py`` previously had to ``from safelint.rules.resource_lifecycle
 import _validated_string_list`` which is architecturally backwards;
 core helpers belong in core).
@@ -18,7 +18,7 @@ from typing import Any
 def _validated_string_list(value: object, key_name: str) -> list[str]:
     """Validate that *value* is a list/tuple of strings, return it as a list.
 
-    Raises :class:`TypeError` if *value* is anything else — including a bare
+    Raises :class:`TypeError` if *value* is anything else - including a bare
     ``str``, which Python would otherwise silently coerce into a list of
     individual characters via ``list(...)``. The early raise turns a typo
     like ``tracked_functions = "open"`` (note the missing brackets) into a
@@ -44,7 +44,7 @@ def _validated_string_list(value: object, key_name: str) -> list[str]:
     non_strings = [item for item in value if not isinstance(item, str)]
     if non_strings:
         bad = ", ".join(f"{type(item).__name__}({item!r})" for item in non_strings)
-        msg = f"{key_name} must contain only strings — got: {bad}"
+        msg = f"{key_name} must contain only strings - got: {bad}"
         raise TypeError(msg)
     # Both checks above guarantee every element is a str; the list
     # comprehension is a typing-only re-narrowing for ty/mypy.
@@ -55,7 +55,7 @@ def resolve_lang_config_key(base_key: str, lang_name: str) -> str:
     """Compute the config key name for a per-language rule option.
 
     Python uses bare keys (``io_functions``, ``sinks``, etc.) for
-    historical reasons — Python was the only language for safelint's
+    historical reasons - Python was the only language for safelint's
     first year. JavaScript / TypeScript / future JS-family languages
     use suffixed keys (``io_functions_javascript``,
     ``io_functions_typescript``, etc.) so each language can have its
@@ -77,18 +77,18 @@ def get_per_language_config(
     rule_config: dict[str, Any],
     base_key: str,
     lang_name: str,
-    default: Any = None,  # noqa: ANN401 — config values are intentionally dynamic (lists, strings, bools, etc.)
-) -> Any:  # noqa: ANN401 — see above
+    default: Any = None,  # noqa: ANN401 - config values are intentionally dynamic (lists, strings, bools, etc.)
+) -> Any:  # noqa: ANN401 - see above
     """Get a per-language rule-config value with TypeScript → JavaScript fallback.
 
     Lookup order:
 
-    1. ``rule_config[resolve_lang_config_key(base_key, lang_name)]`` — the
+    1. ``rule_config[resolve_lang_config_key(base_key, lang_name)]`` - the
        language-native key (e.g. ``sinks_typescript`` for a TS file).
     2. **TypeScript-only fallback:** if *lang_name* is ``"typescript"``
        and the TS-specific key is unset, ``rule_config[f"{base_key}_javascript"]``.
        This means TS projects inherit the JavaScript defaults / overrides
-       automatically — TS is syntactic sugar over JS, and the same sink
+       automatically - TS is syntactic sugar over JS, and the same sink
        lists / global namespaces / I/O primitives apply at runtime.
        Users who genuinely want different behaviour for ``.ts`` files
        can set the ``_typescript`` key explicitly.
@@ -107,7 +107,7 @@ def get_per_language_config(
       rules per language can still set ``_typescript`` keys
       explicitly; the fallback only fires when the user hasn't.
 
-    Returns the raw value as found in config — callers are responsible
+    Returns the raw value as found in config - callers are responsible
     for validating type (e.g. via :func:`_validated_string_list` for
     string-list keys) before use. Callers that need the *source key*
     of the resolved value (for example, to surface a precise error
@@ -122,12 +122,12 @@ def resolve_lang_config_lookup(
     rule_config: dict[str, Any],
     base_key: str,
     lang_name: str,
-    default: Any = None,  # noqa: ANN401 — config values are intentionally dynamic
+    default: Any = None,  # noqa: ANN401 - config values are intentionally dynamic
 ) -> tuple[Any, str]:
     """Resolve a per-language rule-config value and return it alongside its source key.
 
     Same lookup semantics as :func:`get_per_language_config`.
-    Returns ``(value, source_key)`` — ``source_key`` is the actual TOML
+    Returns ``(value, source_key)`` - ``source_key`` is the actual TOML
     key the value came from. Useful for error reporting: when a TS file
     inherits a bad ``foo_javascript = "not-a-list"`` value via the
     TS → JS fallback, raising a ``TypeError`` that names
@@ -136,7 +136,7 @@ def resolve_lang_config_lookup(
     them at the offending key directly.
 
     When the lookup falls through to *default*, ``source_key`` is the
-    *primary* key (e.g. ``foo_typescript`` for a TS file) — that's the
+    *primary* key (e.g. ``foo_typescript`` for a TS file) - that's the
     key the user would set to override the default.
     """
     primary_key = resolve_lang_config_key(base_key, lang_name)

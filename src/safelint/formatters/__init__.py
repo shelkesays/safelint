@@ -5,12 +5,12 @@ in :mod:`safelint.cli` and is unchanged. This package provides additional
 machine-readable formats used by editor integrations, CI systems, and the
 upcoming Claude Code skill / VSCode plugin:
 
-* :func:`format_json` — compact JSON with violations, suppressed entries,
+* :func:`format_json` - compact JSON with violations, suppressed entries,
   and a top-level summary.
-* :func:`format_sarif` — SARIF 2.1.0 conformant document for tools that
+* :func:`format_sarif` - SARIF 2.1.0 conformant document for tools that
   speak the OASIS standard (GitHub code scanning, Azure DevOps, etc.).
 
-Both formats are pure functions — they take the lint results and return a
+Both formats are pure functions - they take the lint results and return a
 string. The CLI picks one via ``--format`` and prints the result to stdout.
 """
 

@@ -21,7 +21,7 @@ def walk(
 ) -> Iterator[tree_sitter.Node]:
     """Yield every named node in the subtree rooted at *node*, depth-first.
 
-    Anonymous tokens (punctuation, keyword tokens) are skipped — only the
+    Anonymous tokens (punctuation, keyword tokens) are skipped - only the
     grammar's named nodes are yielded. This is the Tree-sitter analogue
     of the old ``ast.walk()``.
 
@@ -30,7 +30,7 @@ def walk(
 
     ``skip_types`` opts into pruning: any descendant whose ``node.type`` is in
     the set has its subtree skipped. The starting *node* itself is always
-    yielded even when its type matches — this is the natural shape for
+    yielded even when its type matches - this is the natural shape for
     per-function rules that walk a function body but want to avoid descending
     into nested function definitions.
     """
@@ -72,7 +72,7 @@ def column_start(node: tree_sitter.Node) -> int:
 def column_end(node: tree_sitter.Node) -> int:
     """Return the 1-based end column of *node* (exclusive in Tree-sitter terms).
 
-    Tree-sitter's ``end_point`` is *exclusive* — it points one past the
+    Tree-sitter's ``end_point`` is *exclusive* - it points one past the
     last character of the node's span. Returning it as-is (after +1
     normalisation) gives a half-open ``[start, end)`` range that maps
     cleanly to LSP / VSCode ``Range`` semantics.
@@ -81,7 +81,7 @@ def column_end(node: tree_sitter.Node) -> int:
 
 
 def node_range(node: tree_sitter.Node) -> tuple[int, int, int, int]:
-    """Return ``(start_line, end_line, column_start, column_end)`` for *node* — all 1-based.
+    """Return ``(start_line, end_line, column_start, column_end)`` for *node* - all 1-based.
 
     Convenience for rule code building :class:`~safelint.rules.base.Violation`
     objects: avoids the noisy ``node.start_point[0] + 1`` /
@@ -121,7 +121,7 @@ def resolve_lang_name(filepath: str) -> str:
     matches the resolved language, so this helper always returns a known
     language inside engine-driven calls. The fallback exists for direct
     unit-test invocations of ``check_file`` that pass a placeholder
-    filepath with no registered extension — historical tests assume the
+    filepath with no registered extension - historical tests assume the
     Python rule path, so default there.
     """
     # Local import to avoid a cycle: safelint.languages.__init__ imports
@@ -137,17 +137,17 @@ def call_name(call_node: tree_sitter.Node) -> str | None:
 
     Handles five forms across the languages safelint registers:
 
-    * Python ``foo(...)``           — function field is ``identifier`` → ``"foo"``
-    * Python ``obj.method(...)``    — function field is ``attribute``  → ``"method"``
-    * JavaScript ``foo(...)``       — function field is ``identifier`` → ``"foo"``
-    * JavaScript ``obj.method(...)``— function field is ``member_expression`` → ``"method"``
-    * JavaScript ``new Foo(...)``   — *constructor* field on ``new_expression``
+    * Python ``foo(...)``           - function field is ``identifier`` → ``"foo"``
+    * Python ``obj.method(...)``    - function field is ``attribute``  → ``"method"``
+    * JavaScript ``foo(...)``       - function field is ``identifier`` → ``"foo"``
+    * JavaScript ``obj.method(...)``- function field is ``member_expression`` → ``"method"``
+    * JavaScript ``new Foo(...)``   - *constructor* field on ``new_expression``
       (instead of ``function``) → ``"Foo"`` for the identifier form,
       ``"WriteStream"`` for ``new fs.WriteStream(...)``.
 
     Returns ``None`` for callees the rule layer can't resolve to a
     bareword (subscripted calls like ``x[0]()``, immediately-invoked
-    function expressions, etc.) — rules that filter on call name then
+    function expressions, etc.) - rules that filter on call name then
     naturally skip those.
 
     Callers must pass the call node itself (not the function sub-node).
@@ -166,7 +166,7 @@ def call_name(call_node: tree_sitter.Node) -> str | None:
         attr_node = func_node.child_by_field_name("attribute")
         return node_text(attr_node) if attr_node else None
     if func_node.type == "member_expression":
-        # JavaScript: ``obj.method`` (or ``new fs.WriteStream`` — same shape).
+        # JavaScript: ``obj.method`` (or ``new fs.WriteStream`` - same shape).
         # Property is the ``property`` field.
         prop_node = func_node.child_by_field_name("property")
         return node_text(prop_node) if prop_node else None

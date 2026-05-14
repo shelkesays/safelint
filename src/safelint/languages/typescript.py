@@ -3,11 +3,11 @@
 Registers TypeScript as a supported language across two underlying
 Tree-sitter grammars:
 
-* ``typescript`` — for ``.ts`` and ``.as`` (AssemblyScript) files.
+* ``typescript`` - for ``.ts`` and ``.as`` (AssemblyScript) files.
   AssemblyScript is intentionally a TypeScript-syntax subset that
   compiles to WebAssembly; ``tree-sitter-typescript`` parses ``.as``
   cleanly with the standard TypeScript grammar.
-* ``tsx`` — for ``.tsx`` (TypeScript + JSX/TSX) files. The TSX grammar
+* ``tsx`` - for ``.tsx`` (TypeScript + JSX/TSX) files. The TSX grammar
   is a separate parser because JSX changes the meaning of ``<``,
   ``>``, and a few other tokens that would otherwise be ambiguous.
 
@@ -21,7 +21,7 @@ AST plus type-related nodes (``type_annotation``, ``interface_declaration``,
 ``type_alias_declaration``, decorators, generics, etc.). The safety
 rules SafeLint cares about (function length, nesting, complexity,
 error handling, side effects, resource management) don't change
-semantics in TypeScript vs JavaScript — type annotations are
+semantics in TypeScript vs JavaScript - type annotations are
 metadata, not control flow. Most rules dispatch TS files to the
 existing JavaScript rule implementations by reusing the JavaScript
 node-type constants (re-exported below); rules that genuinely need
@@ -32,7 +32,7 @@ tables.
 Comment-prefix scope: line directives only (``// nosafe``,
 ``// safelint: ignore``). Block-comment directives (``/* nosafe */``)
 parse as a single ``comment`` node in Tree-sitter but the existing
-line-style suppression parser doesn't unwrap ``/* … */`` — those are
+line-style suppression parser doesn't unwrap ``/* … */`` - those are
 silently ignored. Same limitation as JavaScript; documented in
 ``docs/contributing/adding-a-language.md``.
 """
@@ -44,7 +44,7 @@ import tree_sitter
 from safelint.languages._types import LanguageDefinition
 
 
-# Grammar import is *optional* — TypeScript support ships in the ``[typescript]``
+# Grammar import is *optional* - TypeScript support ships in the ``[typescript]``
 # extra. Module import always succeeds; parser construction errors with a clear
 # install hint if the grammar package isn't present.
 try:
@@ -110,7 +110,7 @@ TYPESCRIPT: LanguageDefinition = LanguageDefinition(
 
 
 #: TSX language definition for ``.tsx`` files.
-#: Shares the ``name="typescript"`` with :data:`TYPESCRIPT` — the two grammars
+#: Shares the ``name="typescript"`` with :data:`TYPESCRIPT` - the two grammars
 #: are an implementation detail; from the rule perspective TSX is just
 #: TypeScript with JSX nodes added (and a few token disambiguations).
 TSX: LanguageDefinition = LanguageDefinition(
@@ -123,28 +123,28 @@ TSX: LanguageDefinition = LanguageDefinition(
 
 
 # ---------------------------------------------------------------------------
-# Node type constants — TypeScript's AST is a superset of JavaScript's
+# Node type constants - TypeScript's AST is a superset of JavaScript's
 # ---------------------------------------------------------------------------
 #
 # Tree-sitter-typescript reuses most of tree-sitter-javascript's node type
 # names (``call_expression``, ``function_declaration``, ``if_statement``,
 # etc.) and adds type-related nodes on top. Rather than duplicate every
-# constant, we re-export the JavaScript constants below — rules that already
+# constant, we re-export the JavaScript constants below - rules that already
 # import from ``safelint.languages.javascript`` continue to work on TS files
 # without modification.
 #
 # TypeScript-specific nodes (when they become relevant in future slices):
 #
-# * ``type_annotation`` — ``: number`` on a parameter or variable
-# * ``type_alias_declaration`` — ``type Foo = ...``
-# * ``interface_declaration`` — ``interface Foo { ... }``
-# * ``enum_declaration`` — ``enum Foo { A, B }``
-# * ``decorator`` — ``@MyDecorator``
-# * ``as_expression`` — type assertions ``x as Foo``
-# * ``type_parameters`` — generic ``<T, U>``
-# * ``optional_parameter`` — ``function f(x?: number)``
-# * ``rest_parameter`` — ``function f(...args: number[])``
-# * ``ambient_declaration`` — ``declare module ...``
+# * ``type_annotation`` - ``: number`` on a parameter or variable
+# * ``type_alias_declaration`` - ``type Foo = ...``
+# * ``interface_declaration`` - ``interface Foo { ... }``
+# * ``enum_declaration`` - ``enum Foo { A, B }``
+# * ``decorator`` - ``@MyDecorator``
+# * ``as_expression`` - type assertions ``x as Foo``
+# * ``type_parameters`` - generic ``<T, U>``
+# * ``optional_parameter`` - ``function f(x?: number)``
+# * ``rest_parameter`` - ``function f(...args: number[])``
+# * ``ambient_declaration`` - ``declare module ...``
 #
 # These are introduced as constants in later slices when rules need them.
 

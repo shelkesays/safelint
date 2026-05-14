@@ -20,7 +20,7 @@ class TextEdit:
     Half-open ``[start_line:start_column, end_line:end_column)`` range
     using safelint's 1-based line/column convention (matches
     :class:`Violation` position fields). ``replacement`` is the literal
-    text that *would* go in place of the current range — but safelint
+    text that *would* go in place of the current range - but safelint
     never applies it. Editors / Claude Code may surface it as a
     "Quick Fix" code action subject to user confirmation.
     """
@@ -36,18 +36,18 @@ class TextEdit:
 class Suggestion:
     """An advisory fix the rule offers for a violation.
 
-    Suggestions are *never* applied automatically — safelint is a
+    Suggestions are *never* applied automatically - safelint is a
     review tool, not a refactoring tool. Editor integrations and CI
     consumers may surface them as "Quick Fix" code actions, but every
     edit goes through user confirmation.
 
-    * ``description`` — one-line human-readable label for the suggestion
+    * ``description`` - one-line human-readable label for the suggestion
       (shown in editor "Quick Fix" menus). Should fit on one line; the
       rule's ``message`` already explains the *what*, the description
       explains the *fix*.
-    * ``edits`` — zero or more :class:`TextEdit` describing the minimal
+    * ``edits`` - zero or more :class:`TextEdit` describing the minimal
       change that would make the rule pass. Empty when the suggestion
-      is informational only (e.g. "extract a helper function" — too
+      is informational only (e.g. "extract a helper function" - too
       ambiguous to render as a single edit).
     """
 
@@ -62,25 +62,25 @@ class Violation:
     Position fields form a fully-specified ``[start, end)`` range
     matching LSP / VSCode ``Range`` and SARIF ``region`` semantics:
 
-    * ``lineno`` (1-based) — start line. Required, always set.
-    * ``end_lineno`` (1-based) — end line. ``None`` when the violation
+    * ``lineno`` (1-based) - start line. Required, always set.
+    * ``end_lineno`` (1-based) - end line. ``None`` when the violation
       has no meaningful span (parse errors with no node, file-level
       violations like ``test_existence``). When set and equal to
       ``lineno``, the construct is single-line.
-    * ``column_start`` (1-based) — start column on ``lineno``. ``None``
+    * ``column_start`` (1-based) - start column on ``lineno``. ``None``
       when no Tree-sitter node was available.
-    * ``column_end`` (1-based, exclusive) — end column on
+    * ``column_end`` (1-based, exclusive) - end column on
       ``end_lineno``. ``None`` mirrors ``column_start``.
 
     Only the additional position fields (``end_lineno``,
     ``column_start``, ``column_end``) default to ``None``. ``lineno``
     is required and always set. The defaults exist for two reasons:
 
-    * **Backwards-compatible cache replay** — Violations cached by an
+    * **Backwards-compatible cache replay** - Violations cached by an
       older safelint version don't carry these additional fields;
       deserialising via ``Violation(**dict)`` works as long as the
       new fields have defaults.
-    * **Some violations have no span** — synthetic ``SAFE000`` parse
+    * **Some violations have no span** - synthetic ``SAFE000`` parse
       errors with ``lineno == 0`` and missing-file violations have
       no Tree-sitter node to position against.
 
@@ -88,7 +88,7 @@ class Violation:
     data, underline the whole line" and ``column_start == column_end``
     as a zero-width caret (e.g. parse-error markers). For multi-line
     constructs (``end_lineno > lineno``), ``column_end`` is the end
-    column on ``end_lineno``, not on ``lineno`` — earlier 1.7.0 work
+    column on ``end_lineno``, not on ``lineno`` - earlier 1.7.0 work
     omitted ``end_lineno`` and editors mistakenly assumed
     ``column_end`` was on the start line, highlighting the wrong span.
     """
@@ -102,7 +102,7 @@ class Violation:
     column_start: int | None = None
     column_end: int | None = None
     end_lineno: int | None = None
-    # Advisory fixes (never applied automatically — safelint is a review
+    # Advisory fixes (never applied automatically - safelint is a review
     # tool, not a refactoring tool). Editor integrations and CI consumers
     # may surface these as "Quick Fix" code actions subject to user
     # confirmation. Empty tuple = no suggestions for this violation.
@@ -119,7 +119,7 @@ class BaseRule(ABC):
     #: dispatching ``check_file`` and skips the rule entirely for files
     #: whose ``LanguageDefinition.name`` isn't listed.
     #:
-    #: Default ``("python",)`` keeps every existing rule Python-only —
+    #: Default ``("python",)`` keeps every existing rule Python-only -
     #: which is the correct default for today's codebase, where the
     #: rules import Python-specific Tree-sitter node-type constants
     #: from :mod:`safelint.languages.python`. When safelint adds a
@@ -175,8 +175,8 @@ class BaseRule(ABC):
     ) -> Violation:
         """Construct a Violation positioned at *node*.
 
-        Extracts the full 4-coordinate span — start line, end line, start
-        column, end column — so consumers can render the precise range
+        Extracts the full 4-coordinate span - start line, end line, start
+        column, end column - so consumers can render the precise range
         even for multi-line constructs (function definitions, except
         clauses, while loops). All four are 1-based.
         """

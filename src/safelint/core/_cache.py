@@ -10,11 +10,11 @@ Design:
 * **Per-file key** = ``sha256(source_bytes + engine_fingerprint +
   normalised_filepath)``. The engine fingerprint folds in the safelint
   version, an internal cache schema version, and the active rule set +
-  per-rule config — so any semantically meaningful change to *what*
+  per-rule config - so any semantically meaningful change to *what*
   would be reported invalidates the cache automatically. The filepath
   is folded in (with backslashes normalised to forward slashes for
   cross-platform stability) because several rules legitimately depend
-  on the path — ``test_existence`` and ``test_coupling`` look at the
+  on the path - ``test_existence`` and ``test_coupling`` look at the
   test directory layout, ``per_file_ignores`` matches glob patterns
   against the path, and every emitted ``Violation`` carries
   ``filepath`` verbatim. Editing source contents *or* renaming/moving
@@ -24,11 +24,11 @@ Design:
   serialised via ``dataclasses.asdict``. JSON (not pickle) is deliberate:
   cache files are user-readable, never deserialise arbitrary code, and
   survive Python upgrades.
-* **Invalidation** is implicit — old keys simply become unreachable when
+* **Invalidation** is implicit - old keys simply become unreachable when
   the inputs hashing into them change. There is no LRU or TTL; users who
   want to clear the cache delete the directory. ``rm -rf .safelint_cache/``
   is always safe.
-* **Fail-open** — any I/O or deserialisation error is treated as a cache
+* **Fail-open** - any I/O or deserialisation error is treated as a cache
   miss. The cache is a performance optimisation, never a correctness
   requirement, so corrupted entries fall through to a fresh lint
   rather than failing the run.
@@ -53,8 +53,8 @@ if TYPE_CHECKING:
 CACHE_DIR_NAME = ".safelint_cache"
 # Bump when the cache file schema changes in a way old entries can't
 # satisfy. Folded into the key, so old entries become unreachable
-# automatically — no migration code needed.
-_CACHE_SCHEMA_VERSION = "2"  # bumped in v1.8.0 — Violation gained suggestions[]
+# automatically - no migration code needed.
+_CACHE_SCHEMA_VERSION = "2"  # bumped in v1.8.0 - Violation gained suggestions[]
 
 
 def _dict_to_text_edit(d: dict[str, Any]) -> TextEdit:
@@ -83,7 +83,7 @@ def _dict_to_violation(d: dict[str, Any]) -> Violation:
     Handles nested dataclasses (``suggestions`` / ``edits``) which
     ``Violation(**d)`` alone would leave as plain dicts. The cache schema
     version is folded into the key so a payload written by an older
-    safelint version is unreachable rather than mis-parsed — this code
+    safelint version is unreachable rather than mis-parsed - this code
     path therefore only sees current-version payloads.
     """
     suggestions_data = d.get("suggestions", []) or []
@@ -103,18 +103,18 @@ def compute_engine_fingerprint(
     """Return a hex digest summarising the engine state that affects rule output.
 
     *active_rules* is an iterable of ``(name, code, severity, config)``
-    tuples — one per rule that's enabled for this run. Folding the per-rule
+    tuples - one per rule that's enabled for this run. Folding the per-rule
     config in means a user changing e.g. ``max_lines = 60`` to ``70``
     invalidates the cache for every file even though the source is
     unchanged.
 
     *per_file_ignores* is an iterable of ``(pattern, names, codes_upper)``
-    tuples — one per ``[tool.safelint.per_file_ignores]`` entry. It must
+    tuples - one per ``[tool.safelint.per_file_ignores]`` entry. It must
     be folded in because per-file ignore patterns affect *what* is
     reported (they suppress matching violations) but are applied
     post-rule, so they don't change ``self.rules``. Without this, a user
     removing a pattern between runs would still see the previously
-    suppressed violations come back from the cache as suppressed —
+    suppressed violations come back from the cache as suppressed -
     which is the opposite of what they asked for. Including the dict
     means any add/remove/edit invalidates every entry that mentions
     the affected pattern. (Cache regeneration on a per-file-ignores
@@ -122,7 +122,7 @@ def compute_engine_fingerprint(
 
     *engine_internal_ignored* is the merged set (codes upper-cased and
     rule names) of engine-internal codes / names the user has globally
-    suppressed via ``ignore`` — typically ``{"SAFE000", "parse"}`` or
+    suppressed via ``ignore`` - typically ``{"SAFE000", "parse"}`` or
     ``{"SAFE004", "unused_suppression"}`` in some combination.
     Engine-internal violations (parse errors, unused suppressions) are
     emitted by the engine itself, not by a registered ``BaseRule``, so
@@ -152,7 +152,7 @@ def compute_file_key(source: bytes, engine_fingerprint: str, filepath: str) -> s
     r"""Return a hex digest for caching the lint of *source* under this engine.
 
     *filepath* is folded in (after normalising to POSIX form) because several
-    rules legitimately depend on the path — ``test_existence`` and
+    rules legitimately depend on the path - ``test_existence`` and
     ``test_coupling`` look at the test directory layout, ``per_file_ignores``
     matches glob patterns against the path, and every emitted ``Violation``
     carries ``filepath`` verbatim. Without the path in the key, two files
@@ -174,7 +174,7 @@ class LintCache:
     """JSON-on-disk cache for ``(violations, suppressed)`` keyed by file hash.
 
     A ``LintCache(None)`` is a no-op (every ``get`` is a miss, every
-    ``put`` is a no-op) — used for ``--no-cache`` and tests.
+    ``put`` is a no-op) - used for ``--no-cache`` and tests.
     """
 
     def __init__(self, cache_dir: Path | None) -> None:
@@ -187,7 +187,7 @@ class LintCache:
         if self.cache_dir is None:
             return None
         path = self.cache_dir / f"{key}.json"
-        # Any read / parse failure is a miss — cache must be fail-open.
+        # Any read / parse failure is a miss - cache must be fail-open.
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):  # nosafe: SAFE203

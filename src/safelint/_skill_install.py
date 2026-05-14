@@ -1,4 +1,4 @@
-"""``safelint skill install`` subcommand — copy/symlink the bundled skill into the user's AI-client directory.
+"""``safelint skill install`` subcommand - copy/symlink the bundled skill into the user's AI-client directory.
 
 The skill's source files (``SKILL.md`` + ``languages/*.md`` + the
 Cursor ``cursor/safelint.mdc`` rule) ship inside the wheel under
@@ -8,7 +8,7 @@ install location.
 
 Twelve AI clients ship today (Claude Code, Cursor, GitHub Copilot,
 Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity,
-Zed) and the registry in ``_CLIENT_SPECS`` stays open-ended — adding
+Zed) and the registry in ``_CLIENT_SPECS`` stays open-ended - adding
 the next client (JetBrains AI Assistant, etc.) is a matter of
 appending one :class:`ClientSpec` entry. No control flow needs to know
 about the new client; install / detection / output all read from the
@@ -58,7 +58,7 @@ class ClientSpec:
     """A single AI client's install profile.
 
     Adding a new client (Copilot, codex, windsurf, antigravity, …)
-    means appending one :class:`ClientSpec` to ``_CLIENT_SPECS`` —
+    means appending one :class:`ClientSpec` to ``_CLIENT_SPECS`` -
     no control-flow changes elsewhere.
     """
 
@@ -75,7 +75,7 @@ class ClientSpec:
     # ``skill_files/`` whose text must collectively mention every
     # registered rule code / name (``ALL_RULES``) and every supported
     # extension (``supported_extensions()``). Tests parametrised over
-    # ``_CLIENT_SPECS`` enforce this — when a contributor adds a new
+    # ``_CLIENT_SPECS`` enforce this - when a contributor adds a new
     # rule or language, the test fails until the bundled docs for
     # *every* registered client are updated.
     documentation_relpaths: tuple[tuple[str, ...], ...]
@@ -89,7 +89,7 @@ class ClientSpec:
     # in the file is preserved. Remove strips the section; status
     # reports section drift; update re-renders the section.
     #
-    # *Always* a section-based edit, never full-file overwrite — that's
+    # *Always* a section-based edit, never full-file overwrite - that's
     # the contract that makes it safe to share AGENTS.md with other
     # agents. If the secondary file does not exist, the secondary install
     # is a no-op (we never auto-create AGENTS.md just to put a section
@@ -102,7 +102,7 @@ _CLAUDE_SPEC = ClientSpec(
     name="claude",
     display_name="Claude Code",
     artefact_label="skill",
-    # Detection markers, in priority order — the first one that exists
+    # Detection markers, in priority order - the first one that exists
     # is the one we report in the detection notice. ``CLAUDE.md`` and
     # ``.claude/`` are the most common; ``.claude.json`` is the
     # Claude Code settings file (per-user at ``~/.claude.json``,
@@ -140,7 +140,7 @@ _COPILOT_SPEC = ClientSpec(
     # avoid bare ``.github/`` (it shows up in nearly every repo for
     # GitHub Actions) and instead key off the Copilot-specific files
     # / directories. ``.github/copilot-instructions.md`` is the install
-    # destination, so it only matches an existing install — for the
+    # destination, so it only matches an existing install - for the
     # first-time bootstrap users pass ``--client copilot --project``
     # explicitly.
     cwd_markers=(".github/copilot-instructions.md", ".github/copilot", ".github/instructions"),
@@ -159,13 +159,13 @@ _GEMINI_SPEC = ClientSpec(
     artefact_label="instructions",
     # Gemini CLI auto-discovers ``GEMINI.md`` at the repo root and
     # walks up. ``.gemini/`` is the conventional config dir (settings,
-    # auth) — its presence signals a Gemini user. We list both as cwd
+    # auth) - its presence signals a Gemini user. We list both as cwd
     # markers; ``GEMINI.md`` itself only matches when an install
     # already exists.
     cwd_markers=("GEMINI.md", ".gemini"),
     home_markers=(".gemini",),
     # Project-scope canonical: ``<cwd>/GEMINI.md`` (auto-discovered).
-    # User-scope: ``~/GEMINI.md`` — Gemini CLI doesn't auto-discover
+    # User-scope: ``~/GEMINI.md`` - Gemini CLI doesn't auto-discover
     # this; users wanting global instructions configure it explicitly
     # via Gemini CLI settings or symlink it where the CLI looks.
     install_relpath=("GEMINI.md",),
@@ -181,7 +181,7 @@ _WINDSURF_SPEC = ClientSpec(
     display_name="Windsurf",
     artefact_label="rules",
     # Windsurf reads ``.windsurfrules`` (single Markdown-ish file) at
-    # the repo root — its native project-rules convention. ``.codeium``
+    # the repo root - its native project-rules convention. ``.codeium``
     # is the parent product's config dir; its presence signals an
     # active Codeium / Windsurf user even before a project rules file
     # is committed.
@@ -203,7 +203,7 @@ _CONTINUE_SPEC = ClientSpec(
     display_name="Continue.dev",
     artefact_label="rule",
     # Continue.dev's config dir ``.continue/`` is the conventional
-    # signal — a populated workspace has it. Per-rule files live
+    # signal - a populated workspace has it. Per-rule files live
     # under ``rules/``; we install ``safelint.md`` there.
     cwd_markers=(".continue", ".continuerc", ".continuerc.json"),
     home_markers=(".continue",),
@@ -286,7 +286,7 @@ _AIDER_SPEC = ClientSpec(
     artefact_label="conventions",
     # aider's per-project config is ``.aider.conf.yml`` (project) and
     # ``~/.aider.conf.yml`` (user-global). aider does NOT auto-load
-    # the conventions file — users must add a ``read:`` entry to
+    # the conventions file - users must add a ``read:`` entry to
     # ``aider.conf.yml`` pointing at the installed CONVENTIONS.md.
     # The post-install ``usage_hint`` reminds them.
     cwd_markers=(".aider.conf.yml", ".aider.conf.yaml", "CONVENTIONS.md"),
@@ -304,7 +304,7 @@ _CODEX_SPEC = ClientSpec(
     display_name="codex",
     artefact_label="instructions",
     # codex reads from ``.codex/`` (project) or ``~/.codex/`` (user).
-    # ``AGENTS.md`` is the cross-agent shared file convention — its
+    # ``AGENTS.md`` is the cross-agent shared file convention - its
     # presence is also a strong signal for codex usage and triggers
     # the secondary section install (see below).
     cwd_markers=(".codex", "AGENTS.md"),
@@ -316,7 +316,7 @@ _CODEX_SPEC = ClientSpec(
     documentation_relpaths=(("codex", "instructions.md"),),
     # Secondary install: when AGENTS.md already exists at the scope
     # root, also write a delimited section there. AGENTS.md is the
-    # cross-agent shared file (codex, Cursor fallback, others) — using
+    # cross-agent shared file (codex, Cursor fallback, others) - using
     # HTML-comment markers means user-authored content for *other*
     # agents stays untouched. We never auto-create AGENTS.md; the
     # secondary install is opt-in via "the user already has the file".
@@ -325,7 +325,7 @@ _CODEX_SPEC = ClientSpec(
 )
 
 
-# Registry — append to extend. Order matters: detection / multi-install
+# Registry - append to extend. Order matters: detection / multi-install
 # output follows registry order so users see results in a stable sequence.
 _CLIENT_SPECS: tuple[ClientSpec, ...] = (
     _CLAUDE_SPEC,
@@ -379,7 +379,7 @@ def bundled_skill_path() -> Path:
     tree). ``importlib.resources`` abstracts both cases.
 
     Raises:
-        FileNotFoundError: if the bundle is missing — meaning safelint
+        FileNotFoundError: if the bundle is missing - meaning safelint
             was installed without its skill files (very old build, or
             the user removed them by hand).
 
@@ -387,7 +387,7 @@ def bundled_skill_path() -> Path:
     root = _bundled_skill_root()
     with resources.as_file(root) as path:
         if not path.exists():
-            msg = f"bundled skill files not found at {path} — reinstall safelint"
+            msg = f"bundled skill files not found at {path} - reinstall safelint"
             raise FileNotFoundError(msg)
         return Path(path)
 
@@ -447,7 +447,7 @@ def _detected_clients(directory: Path, marker_attr: str) -> list[tuple[ClientSpe
     """Return [(spec, matched_marker), ...] for each spec with at least one marker under *directory*.
 
     *marker_attr* is ``"cwd_markers"`` or ``"home_markers"``. The first
-    matching marker per spec is the one we report — sufficient for
+    matching marker per spec is the one we report - sufficient for
     user-facing detection notices.
     """
     detected: list[tuple[ClientSpec, str]] = []
@@ -465,7 +465,7 @@ def _resolve_install_plan(args: argparse.Namespace) -> tuple[str, list[tuple[Cli
     *notice* is a one-line string to print before installing (or "" if
     no notice is appropriate, e.g. for explicit ``--client``). On
     auto-detect failure, prints a helpful error to stderr and returns
-    None — the caller maps that to exit code 1.
+    None - the caller maps that to exit code 1.
     """
     client = getattr(args, "client", "auto")
     project_flag = bool(getattr(args, "project", False))
@@ -478,7 +478,7 @@ def _resolve_install_plan(args: argparse.Namespace) -> tuple[str, list[tuple[Cli
         return _format_detection_notice(cwd_specs, "current directory"), [(s, True) for s, _ in cwd_specs]
 
     if project_flag:
-        # ``--project`` + auto with empty cwd: don't fall back to home —
+        # ``--project`` + auto with empty cwd: don't fall back to home -
         # the user explicitly asked for project scope.
         _print_no_clients_error(scope_description="current directory (--project specified)")
         return None
@@ -499,7 +499,7 @@ def _format_detection_notice(detected: list[tuple[ClientSpec, str]], where: str)
 
 
 # ---------------------------------------------------------------------------
-# Print helpers — names start with ``_print_`` so SAFE304 (side_effects)
+# Print helpers - names start with ``_print_`` so SAFE304 (side_effects)
 # auto-exempts them. The actual printing is the whole point of these
 # helpers, not an incidental side effect.
 # ---------------------------------------------------------------------------
@@ -602,12 +602,12 @@ def _install_copy(source: Path, target: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Secondary install — section-delimited writes into a shared file like
+# Secondary install - section-delimited writes into a shared file like
 # AGENTS.md. The section-marker pattern preserves *user* content in the
 # shared file: install/update edit only the bytes between the markers,
 # remove strips just the section, and status compares only the section
 # body. The shared file is never auto-created (we don't want to spawn
-# AGENTS.md just to drop a section in it — it has to already exist as
+# AGENTS.md just to drop a section in it - it has to already exist as
 # a signal the user is using a cross-agent workflow).
 # ---------------------------------------------------------------------------
 
@@ -636,7 +636,7 @@ def _extract_section_body(text: str, markers: tuple[str, str]) -> str | None:
     lines, with **all leading and trailing newlines stripped**
     (``str.strip("\n")``). This round-trips cleanly with
     :func:`_render_section_body`, which produces
-    ``"{begin}\n{body}\n{end}\n"`` — the wrapping ``\n`` characters
+    ``"{begin}\n{body}\n{end}\n"`` - the wrapping ``\n`` characters
     are removed on extraction and re-added on render. Note that
     leading whitespace at the start of an inner line is preserved;
     only newline characters at the very edges of the body are
@@ -677,7 +677,7 @@ def _replace_or_append_section(existing_text: str, spec: ClientSpec, bundled_tex
         return _append_section(existing_text, new_section)
     end_idx = existing_text.find(end, begin_idx + len(begin))
     if end_idx == -1:
-        # Begin marker present but no end marker — treat as malformed,
+        # Begin marker present but no end marker - treat as malformed,
         # don't try to repair it. Append a fresh section instead.
         return _append_section(existing_text, new_section)
     after_end = end_idx + len(end)
@@ -698,7 +698,7 @@ def _strip_section(existing_text: str, spec: ClientSpec) -> str:
         return existing_text
     end_idx = existing_text.find(end, begin_idx + len(begin))
     if end_idx == -1:
-        return existing_text  # malformed — don't damage the file
+        return existing_text  # malformed - don't damage the file
     after_end = end_idx + len(end)
     if after_end < len(existing_text) and existing_text[after_end] == "\n":
         after_end += 1
@@ -731,7 +731,7 @@ def _print_secondary_symlink_refused(target: Path) -> None:
     # destination would let an attacker (or a careless user setup) redirect
     # the safelint section into an arbitrary file. We refuse and warn.
     print(
-        f"safelint: warning: refusing to install/remove safelint section through symlink at {target} — remove the symlink first if you want safelint to manage this file directly",
+        f"safelint: warning: refusing to install/remove safelint section through symlink at {target} - remove the symlink first if you want safelint to manage this file directly",
         file=sys.stderr,
     )
 
@@ -739,14 +739,14 @@ def _print_secondary_symlink_refused(target: Path) -> None:
 def _print_secondary_non_file_refused(target: Path) -> None:
     """Stderr warning emitted when the secondary destination exists but is not a regular file.
 
-    Covers directories, FIFOs, sockets, device files, etc. — anything
+    Covers directories, FIFOs, sockets, device files, etc. - anything
     where ``read_text`` / ``write_text`` would raise rather than work
     on the byte stream. We refuse so ``skill install`` / ``update`` /
     ``remove`` don't crash; the user can clear the unexpected entry
     and re-run.
     """
     print(
-        f"safelint: warning: refusing to install/remove safelint section at {target} — "
+        f"safelint: warning: refusing to install/remove safelint section at {target} - "
         "path exists but is not a regular file (directory, FIFO, device, etc.). "
         "Replace it with a regular file (or remove it) if you want safelint to manage this location.",
         file=sys.stderr,
@@ -760,17 +760,17 @@ def _secondary_target_writable_or_warn(spec: ClientSpec, *, project: bool) -> Pa
 
     - The spec has no secondary destination configured.
     - The destination doesn't exist (we never auto-create the shared file).
-    - The destination is a symlink — refused via
+    - The destination is a symlink - refused via
       :func:`_print_secondary_symlink_refused` to avoid following it.
     - The destination exists but isn't a regular file (directory, FIFO,
-      socket, device) — refused via :func:`_print_secondary_non_file_refused`
+      socket, device) - refused via :func:`_print_secondary_non_file_refused`
       so ``read_text`` / ``write_text`` don't blow up later in the flow.
 
     Two lifecycle helpers (:func:`_install_secondary`,
     :func:`_remove_secondary`) route through this helper to share the
     refusal policy and warning text. :func:`_secondary_status`
     deliberately inlines the same checks rather than calling this
-    helper — status is invoked frequently (every ``skill status``
+    helper - status is invoked frequently (every ``skill status``
     run, every ``check --check-skill-freshness``), so it filters
     silently to ``INSTALL_STATUS_MISSING`` on symlink / non-file
     targets instead of printing a warning each time. Keep both code
@@ -793,7 +793,7 @@ def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
 
     Returns True when the secondary file was modified. False when the
     secondary destination is unset, the file doesn't exist (we don't
-    auto-create), the file is a symlink or non-regular file (refused —
+    auto-create), the file is a symlink or non-regular file (refused -
     see security notes), or the file's section already matches the
     bundle.
 
@@ -826,7 +826,7 @@ def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
 def _remove_secondary(spec: ClientSpec, *, project: bool) -> bool:
     """Strip the safelint section from *spec*'s secondary file. Returns True when modified.
 
-    Same refusal contract as :func:`_install_secondary` — we never
+    Same refusal contract as :func:`_install_secondary` - we never
     follow a symlink at the secondary destination, and we refuse if
     the path is a non-regular file (directory, FIFO, etc.).
     """
@@ -849,9 +849,9 @@ def _remove_secondary(spec: ClientSpec, *, project: bool) -> bool:
 def _secondary_status(spec: ClientSpec, *, project: bool) -> str:
     """Return INSTALL_STATUS_* for *spec*'s secondary install.
 
-    MISSING: secondary file doesn't exist, is a symlink (refused —
+    MISSING: secondary file doesn't exist, is a symlink (refused -
     see security note in :func:`_install_secondary`), is not a
-    regular file (directory / FIFO / device — refused), or has no
+    regular file (directory / FIFO / device - refused), or has no
     safelint section.
     FRESH: section body matches bundled content (whitespace-stripped).
     DIFFERS: section present but body has drifted.
@@ -929,11 +929,11 @@ def run_install(args: argparse.Namespace) -> int:
 
 
 def run_path(args: argparse.Namespace) -> int:
-    """Execute ``safelint skill path`` — print the bundled-files location.
+    """Execute ``safelint skill path`` - print the bundled-files location.
 
     Default prints the Claude skill bundle root (the cat-friendly
     single-line form). ``--client cursor`` prints the bundled MDC
-    file path instead. ``auto`` is intentionally not a choice here —
+    file path instead. ``auto`` is intentionally not a choice here -
     a single path is what callers expect from this command.
     """
     client = getattr(args, "client", "claude")
@@ -943,7 +943,7 @@ def run_path(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
-# Freshness / drift detection — compares bundled vs installed
+# Freshness / drift detection - compares bundled vs installed
 # ---------------------------------------------------------------------------
 
 
@@ -965,7 +965,7 @@ def _tree_hash(root: Path) -> str:
     deterministic across filesystems. Each contributing file's
     relative path is hashed alongside its content, so renames and
     same-name moves both invalidate. Entries under
-    :data:`_PEER_CLIENT_DIRS` (e.g. ``cursor/``) are skipped — they
+    :data:`_PEER_CLIENT_DIRS` (e.g. ``cursor/``) are skipped - they
     don't ship in a Claude install and shouldn't influence its
     freshness verdict.
     """
@@ -986,7 +986,7 @@ def _is_symlink_managed_directory(target: Path) -> bool:
     """Return True if *target* is a Claude-style symlink install.
 
     Claude ``--symlink`` installs are NOT symlinks at the target path
-    itself — :func:`_install_symlink_directory_filtered` materialises
+    itself - :func:`_install_symlink_directory_filtered` materialises
     *target* as a real directory and creates per-entry symlinks inside
     it (one for ``SKILL.md``, one for ``languages/``, etc.). For drift
     detection those installs should behave like a single symlink:
@@ -996,7 +996,7 @@ def _is_symlink_managed_directory(target: Path) -> bool:
     A directory qualifies when (a) it actually exists as a directory
     and (b) every relevant top-level entry (peer-client dirs excluded)
     is a working symlink. A broken inner symlink disqualifies the
-    install — same fail-fast posture as the outer broken-symlink check
+    install - same fail-fast posture as the outer broken-symlink check
     in :func:`_install_status`.
     """
     if not target.is_dir():
@@ -1009,13 +1009,13 @@ def _install_status(spec: ClientSpec, *, project: bool) -> str:
     """Return one of :data:`INSTALL_STATUS_MISSING` / ``_FRESH`` / ``_DIFFERS`` for *spec* at *scope*.
 
     A symlink install is reported as fresh only when its target exists
-    — symlinks point at the live bundled location, so ``pip upgrade
+    - symlinks point at the live bundled location, so ``pip upgrade
     safelint`` reflects immediately. Two shapes of symlink install
     qualify: (a) the target itself is a symlink (Cursor's single-file
     install), or (b) the target is a real directory whose top-level
     entries are all working symlinks (Claude's per-entry install via
     :func:`_install_symlink_directory_filtered`). **Broken** symlinks
-    don't qualify — a dangling install is unusable, not "current", and
+    don't qualify - a dangling install is unusable, not "current", and
     is reported as DIFFERS rather than MISSING so the status command
     surfaces it (MISSING is silently skipped). The single-file shape
     short-circuits to that handling explicitly; broken inner symlinks
@@ -1030,7 +1030,7 @@ def _install_status(spec: ClientSpec, *, project: bool) -> str:
     # When the spec opts into a secondary install AND that secondary
     # has actually been written (section present in AGENTS.md or
     # similar), let drift in the section escalate the overall verdict
-    # to DIFFERS. A MISSING secondary doesn't degrade FRESH — secondary
+    # to DIFFERS. A MISSING secondary doesn't degrade FRESH - secondary
     # is opt-in based on the user's shared file existing, not a
     # required install component.
     if primary == INSTALL_STATUS_FRESH and spec.secondary_install_relpath is not None:
@@ -1073,7 +1073,7 @@ def _refresh_command_for(spec: ClientSpec, *, project: bool) -> str:
 
     ``safelint skill update`` is the canonical refresh path because it
     preserves install shape (symlink stays symlink, copy stays copy)
-    and is idempotent — no-op when fresh, refreshes when drifted.
+    and is idempotent - no-op when fresh, refreshes when drifted.
     The explicit ``--client`` / ``--project`` form below pins both
     the client and the scope, regardless of cwd context, so a
     multi-scope drift can be remediated one targeted command at a
@@ -1093,12 +1093,12 @@ def _refresh_command_for(spec: ClientSpec, *, project: bool) -> str:
 
 def _print_status_fresh(spec: ClientSpec, target: Path, scope: str) -> None:
     """Print a single "fresh" line to stdout."""
-    print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) — fresh")
+    print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) - fresh")
 
 
 def _print_status_differs(spec: ClientSpec, target: Path, scope: str, refresh_cmd: str) -> None:
     """Print a single "differs" line plus its scope-specific refresh hint."""
-    print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) — differs from bundled")
+    print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) - differs from bundled")
     print(f"  Refresh: {refresh_cmd}")
 
 
@@ -1116,7 +1116,7 @@ def _print_status_summary(*, any_drift: bool, any_install: bool) -> None:
 
 
 def run_status(_args: argparse.Namespace) -> int:
-    """Execute ``safelint skill status`` — report drift between bundled and installed skills.
+    """Execute ``safelint skill status`` - report drift between bundled and installed skills.
 
     Iterates every registered :class:`ClientSpec` and both scopes
     (user, project). For each install location that exists, reports
@@ -1130,7 +1130,7 @@ def run_status(_args: argparse.Namespace) -> int:
     for spec, project in _iter_install_locations():
         # OSError-tolerant: a single unreadable install location
         # shouldn't crash the whole status walk. None is treated the
-        # same as MISSING — skip and move on.
+        # same as MISSING - skip and move on.
         status = _install_status_or_none(spec, project=project)
         if status is None or status == INSTALL_STATUS_MISSING:
             continue
@@ -1161,7 +1161,7 @@ def _iter_install_locations() -> Iterator[tuple[ClientSpec, bool]]:
 def stale_install_warnings() -> list[str]:
     """Return a list of human-readable warning strings, one per stale install location.
 
-    Public helper — used by ``safelint check --check-skill-freshness``
+    Public helper - used by ``safelint check --check-skill-freshness``
     to surface drift via the diagnostics channel without changing the
     lint exit code. An empty list means every detected install is
     fresh (or no installs exist). Symlinks are always fresh by
@@ -1169,18 +1169,18 @@ def stale_install_warnings() -> list[str]:
     """
     warnings: list[str] = []
     for spec, project in _iter_install_locations():
-        # OSError-tolerant — same fail-safe pattern as ``run_status``.
+        # OSError-tolerant - same fail-safe pattern as ``run_status``.
         if _install_status_or_none(spec, project=project) != INSTALL_STATUS_DIFFERS:
             continue
         target = _spec_target(spec, project=project)
         scope = "project" if project else "user"
         refresh_cmd = _refresh_command_for(spec, project=project)
-        warnings.append(f"{spec.display_name} {spec.artefact_label} at {target} ({scope} scope) differs from bundled — run `{refresh_cmd}` to refresh (or ignore if you've customised it)")
+        warnings.append(f"{spec.display_name} {spec.artefact_label} at {target} ({scope} scope) differs from bundled - run `{refresh_cmd}` to refresh (or ignore if you've customised it)")
     return warnings
 
 
 # ---------------------------------------------------------------------------
-# Update / remove — share install-path-based auto-detection (distinct from
+# Update / remove - share install-path-based auto-detection (distinct from
 # install's marker-file auto-detection: ``install`` asks "what AI client is
 # the user using?", ``update`` / ``remove`` ask "what's actually installed?").
 # ---------------------------------------------------------------------------
@@ -1196,7 +1196,7 @@ def _is_symlink_directory_shape(target: Path) -> bool:
     which requires the inner symlinks to actually resolve.
 
     A directory qualifies when **at least one** top-level entry is a
-    symlink — using ``any`` rather than ``all`` so an install that's
+    symlink - using ``any`` rather than ``all`` so an install that's
     drifted extra real files (e.g. user-added customisation files
     sitting alongside the original symlinked entries) is still
     recognised as symlink-shape. ``--symlink`` cleanup needs to reach
@@ -1231,7 +1231,7 @@ def _install_is_symlink_shape(spec: ClientSpec, *, project: bool) -> bool:
     top-level entries are symlinks (Claude's per-entry install via
     :func:`_install_symlink_directory_filtered`). Broken symlinks still
     qualify here because this predicate is used for cleanup filtering,
-    not freshness checks — ``remove --symlink`` must be able to clean
+    not freshness checks - ``remove --symlink`` must be able to clean
     up a Claude install whose bundled targets have moved or been
     deleted.
     """
@@ -1245,7 +1245,7 @@ def _detected_installed_clients(*, only_symlink: bool = False, project_only: boo
     """Return [(spec, project)] for every existing install across the registry.
 
     Used by ``update`` / ``remove`` to answer "what's currently
-    installed?" — distinct from :func:`_detected_clients` which scans
+    installed?" - distinct from :func:`_detected_clients` which scans
     marker files for "what AI client is the user using?". Iterates
     every spec across both scopes, includes locations whose
     ``_install_status`` is anything other than MISSING.
@@ -1288,7 +1288,7 @@ def _install_status_or_none(spec: ClientSpec, *, project: bool) -> str | None:
 
     Used by auto-discovery paths (``_detected_installed_clients``) so
     a single unreadable install location doesn't abort the whole
-    walk. Callers treat None the same as MISSING — skip and continue.
+    walk. Callers treat None the same as MISSING - skip and continue.
     Permission-denied / transient-IO failures end up as "skip"; the
     user can still target the install explicitly via ``--client X``
     + ``--project`` or ``--path PATH`` if needed.
@@ -1300,7 +1300,7 @@ def _install_status_or_none(spec: ClientSpec, *, project: bool) -> str | None:
 
 
 # ---------------------------------------------------------------------------
-# update — refresh stale installs (no-op when fresh, --force overrides)
+# update - refresh stale installs (no-op when fresh, --force overrides)
 # ---------------------------------------------------------------------------
 
 
@@ -1316,7 +1316,7 @@ def _print_update_all_fresh() -> None:
 
 def _print_update_skipped_fresh(spec: ClientSpec, target: Path, scope: str) -> None:
     """Print the "skipped fresh install" notice emitted by ``update`` without ``--force``."""
-    print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) — already fresh, skipped")
+    print(f"safelint: {spec.display_name} {spec.artefact_label} at {target} ({scope} scope) - already fresh, skipped")
 
 
 def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace, status: str | None = None) -> int:
@@ -1324,13 +1324,13 @@ def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace, st
 
     Reads ``force`` and ``symlink`` via ``getattr`` so library callers
     that construct a partial ``Namespace`` (e.g. tests, programmatic
-    invocations) don't trip ``AttributeError`` — matches the defensive
+    invocations) don't trip ``AttributeError`` - matches the defensive
     pattern used by every other arg-reading helper in this module.
 
     **Shape preservation:** when ``--symlink`` is not explicitly set,
     the refresh inherits the existing install's shape (symlink stays
     symlink, copy stays copy). Without this, ``update --force`` on a
-    symlink-mode install would silently convert it to copy — the user
+    symlink-mode install would silently convert it to copy - the user
     would lose the live-link guarantee they originally opted into.
     Passing ``--symlink`` explicitly still wins, so users can switch
     a copy install to symlink mode mid-flight (the only direction
@@ -1341,7 +1341,7 @@ def _update_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace, st
     already invoked ``_install_status_or_none`` (notably
     :func:`run_update`) pass it through so the directory walk / hash
     runs at most once per install per run. Default ``None`` means
-    "compute it yourself" — keeps the function standalone for direct
+    "compute it yourself" - keeps the function standalone for direct
     callers and tests. After the optional compute, a still-``None``
     status means the location was unreadable (OSError) and we silently
     skip with rc=0, matching ``run_status``.
@@ -1416,7 +1416,7 @@ def _process_update_target(spec: ClientSpec, *, project: bool, args: argparse.Na
 def run_update(args: argparse.Namespace) -> int:
     """Refresh installs whose content has drifted from the bundled wheel.
 
-    Without ``--force``: idempotent — fresh installs are a silent
+    Without ``--force``: idempotent - fresh installs are a silent
     no-op (skipped notice). With ``--force``: re-creates every detected
     install regardless of drift, useful for reverting customised
     installs back to bundled. Inherits ``--client``, ``--project``,
@@ -1448,7 +1448,7 @@ def run_update(args: argparse.Namespace) -> int:
 
 
 # ---------------------------------------------------------------------------
-# remove — delete detected installs (filterable by client / scope / shape)
+# remove - delete detected installs (filterable by client / scope / shape)
 # ---------------------------------------------------------------------------
 
 
@@ -1487,7 +1487,7 @@ def _remove_one(spec: ClientSpec, *, project: bool, dry_run: bool) -> int:
     """Remove one detected install. Returns 0 on success.
 
     Also strips the safelint section from the spec's secondary file
-    (e.g. ``AGENTS.md``) when one is configured and present —
+    (e.g. ``AGENTS.md``) when one is configured and present -
     ``_remove_secondary`` is content-preserving (only the delimited
     safelint section is removed) so the user's other agent
     instructions in the same file stay intact.
@@ -1512,7 +1512,7 @@ def _emit_secondary_remove_notice(spec: ClientSpec, *, project: bool, dry_run: b
     - **Active section** (file present, valid section): print "would
       strip" / "stripped" depending on *dry_run*.
     - **Symlink** (security: refused): warn that we won't follow.
-    - **Non-regular file** (directory / FIFO / device — refused): warn
+    - **Non-regular file** (directory / FIFO / device - refused): warn
       that we won't touch it.
     - **Missing / no section**: silent.
 
@@ -1559,7 +1559,7 @@ def _path_looks_like_safelint_install(path: Path) -> bool:
 def _print_remove_path_unrecognised(path: Path) -> None:
     """Stderr error emitted when ``--path PATH`` doesn't look like a safelint install."""
     print(
-        f"safelint: error: refusing to remove {path} — path does not match any registered safelint "
+        f"safelint: error: refusing to remove {path} - path does not match any registered safelint "
         "install shape (e.g. '.cursor/rules/safelint.mdc', '.codex/instructions.md'). "
         "If this is a legitimate unusual install, remove it manually with `rm` after confirming "
         "the contents.",
@@ -1624,7 +1624,7 @@ def run_remove(args: argparse.Namespace) -> int:
     """Remove detected installs (or one explicit ``--path`` location).
 
     Auto-detect (``--client auto``, default) scans actual install
-    paths — a different question from ``install``'s marker-based
+    paths - a different question from ``install``'s marker-based
     auto-detect. ``--symlink`` filters to symlink-shape installs only,
     leaving copy installs untouched. ``--path`` overrides every other
     flag and removes one specific location. ``--dry-run`` previews

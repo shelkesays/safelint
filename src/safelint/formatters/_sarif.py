@@ -8,10 +8,10 @@ Reference: https://docs.oasis-open.org/sarif/sarif/v2.1.0/sarif-v2.1.0.html
 
 This implementation produces a minimally conformant SARIF document with:
 
-* ``runs[].tool.driver`` — name, version, informationUri.
-* ``runs[].tool.driver.rules`` — one entry per safelint rule that fired in
+* ``runs[].tool.driver`` - name, version, informationUri.
+* ``runs[].tool.driver.rules`` - one entry per safelint rule that fired in
   this run, with ``id`` (the SAFE-code) and ``shortDescription``.
-* ``runs[].results`` — one entry per active violation, with ``ruleId``,
+* ``runs[].results`` - one entry per active violation, with ``ruleId``,
   ``level`` (error / warning), ``message.text``, and a ``physicalLocation``
   pointing at the file + line.
 
@@ -68,7 +68,7 @@ def _artifact_uri(filepath: str) -> str:
       file produced on Linux that's about to be uploaded to GitHub code
       scanning would still leak Windows-style backslashes through.
     * Absolute paths are converted to a path *relative to cwd* when
-      possible — keeps the SARIF artefact list short and consumable
+      possible - keeps the SARIF artefact list short and consumable
       (GitHub code scanning treats ``uri`` as repo-relative). Falls back
       to the absolute POSIX form for paths outside cwd.
     * Special characters (spaces, ``#``, ``?``) are percent-encoded;
@@ -77,7 +77,7 @@ def _artifact_uri(filepath: str) -> str:
     p = Path(filepath.replace("\\", "/"))
     if p.is_absolute():
         with contextlib.suppress(ValueError):
-            # Outside cwd — fall back to the absolute form.
+            # Outside cwd - fall back to the absolute form.
             p = p.relative_to(Path.cwd())
     return quote(p.as_posix(), safe="/")
 
@@ -92,7 +92,7 @@ def _build_region(v: Violation) -> dict[str, Any]:
     ``test_existence`` don't). All values are 1-based, matching
     safelint's convention and SARIF 2.1.0's contract.
 
-    ``endLine`` is omitted when it equals ``startLine`` — per SARIF
+    ``endLine`` is omitted when it equals ``startLine`` - per SARIF
     spec, an absent ``endLine`` defaults to ``startLine``, so emitting
     a redundant value just bloats the output. When emitted, it
     correctly anchors ``endColumn`` to the end-line of multi-line
@@ -114,7 +114,7 @@ def _build_fixes(v: Violation) -> list[dict[str, Any]]:
     """Build SARIF ``fixes[]`` entries from the violation's suggestions.
 
     Each returned item is a SARIF fix object containing both a
-    ``description`` and an ``artifactChanges`` array — the function's
+    ``description`` and an ``artifactChanges`` array - the function's
     output goes straight into a ``result.fixes`` array, one fix per
     *actionable* :class:`Suggestion` on the violation.
 
@@ -122,15 +122,15 @@ def _build_fixes(v: Violation) -> list[dict[str, Any]]:
     skipped: SARIF 2.1.0 spec says ``fix.artifactChanges[].replacements``
     *SHALL* contain at least one element, so emitting a fix with no
     replacements would produce a non-conformant document. The
-    description-only form is still a valid :class:`Suggestion` — a
-    hint without a mechanical recipe — and remains in the JSON
+    description-only form is still a valid :class:`Suggestion` - a
+    hint without a mechanical recipe - and remains in the JSON
     output (see :mod:`safelint.formatters._json`); it just doesn't
     translate cleanly to SARIF's "apply this to fix it" model. If
     every suggestion on a violation is description-only, this
     function returns ``[]`` and the caller omits the ``fixes`` key
     entirely (avoiding an empty ``fixes: []`` array on the result).
 
-    SARIF 2.1.0's ``fixes`` block is *advisory by spec* — the consumer
+    SARIF 2.1.0's ``fixes`` block is *advisory by spec* - the consumer
     decides whether to apply replacements. That matches safelint's
     review-only posture: editor integrations may render these as
     "Quick Fix" code actions, but every edit goes through user
@@ -138,12 +138,12 @@ def _build_fixes(v: Violation) -> list[dict[str, Any]]:
 
     Each actionable suggestion becomes one ``fixes[]`` entry with:
 
-    * ``description.text`` — the suggestion's human-readable summary.
-    * ``artifactChanges[]`` — a single artifact-change entry targeting
+    * ``description.text`` - the suggestion's human-readable summary.
+    * ``artifactChanges[]`` - a single artifact-change entry targeting
       the violation's filepath.
-    * ``artifactChanges[].artifactLocation.uri`` — the violation's
+    * ``artifactChanges[].artifactLocation.uri`` - the violation's
       filepath (URI-normalised via :func:`_artifact_uri`).
-    * ``artifactChanges[].replacements[]`` — one per ``TextEdit``, with
+    * ``artifactChanges[].replacements[]`` - one per ``TextEdit``, with
       a ``deletedRegion`` describing the range to replace and an
       ``insertedContent.text`` with the replacement string.
 
@@ -172,7 +172,7 @@ def _build_fixes(v: Violation) -> list[dict[str, Any]]:
 def _text_edit_to_replacement(edit: TextEdit) -> dict[str, Any]:
     """Render a :class:`TextEdit` as a SARIF ``replacements`` entry.
 
-    Strict attribute access — see :func:`_build_fixes` for
+    Strict attribute access - see :func:`_build_fixes` for
     the rationale. A malformed input fails fast.
     """
     return {
@@ -203,11 +203,11 @@ def _result_for_violation(v: Violation, *, suppressed: bool) -> dict[str, Any]:
     }
     if suppressed:
         # SARIF "inSource" kind covers both inline ``# nosafe`` directives
-        # and per-file ignore patterns — the user-controlled mechanism is
+        # and per-file ignore patterns - the user-controlled mechanism is
         # close enough that one kind is faithful.
         entry["suppressions"] = [{"kind": "inSource"}]
     if v.suggestions:
-        # SARIF ``fixes[]`` is advisory by spec — exactly matches
+        # SARIF ``fixes[]`` is advisory by spec - exactly matches
         # safelint's "review-only, never auto-apply" contract.
         # ``_build_fixes`` skips description-only suggestions (those
         # with empty ``edits``) because SARIF requires ≥1 replacement
@@ -237,7 +237,7 @@ def _rules_descriptor_for(violations: list[Violation], suppressed: list[Violatio
             "name": v.rule,
             "shortDescription": {"text": v.rule.replace("_", " ")},
         }
-    # Sort for determinism — easier to diff SARIF output across runs.
+    # Sort for determinism - easier to diff SARIF output across runs.
     return [seen[k] for k in sorted(seen)]
 
 
@@ -245,9 +245,9 @@ def format_sarif(
     violations: list[Violation],
     suppressed: list[Violation],
     *,
-    blocking_count: int,  # noqa: ARG001 — reserved for future SARIF properties extensions
-    fail_on: str,  # noqa: ARG001 — reserved for future SARIF properties extensions
-    files_checked: int,  # noqa: ARG001 — reserved for future SARIF properties extensions
+    blocking_count: int,  # noqa: ARG001 - reserved for future SARIF properties extensions
+    fail_on: str,  # noqa: ARG001 - reserved for future SARIF properties extensions
+    files_checked: int,  # noqa: ARG001 - reserved for future SARIF properties extensions
     indent: int | None = 2,
 ) -> str:
     """Return a SARIF 2.1.0 JSON document representing the lint run."""

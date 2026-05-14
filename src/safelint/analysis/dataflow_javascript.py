@@ -1,16 +1,16 @@
 r"""Intra-procedural taint analysis for JavaScript (Node) source.
 
 Parallel to :mod:`safelint.analysis.dataflow` (Python). The shape of the
-analysis matches — parameters seed the tainted set; assignments and
+analysis matches - parameters seed the tainted set; assignments and
 ``const`` / ``let`` / ``var`` declarations propagate; sanitizer calls clear
 taint; source calls inject taint; sinks reaching tainted arguments produce
-hits — but the per-language node-type vocabulary differs enough that
+hits - but the per-language node-type vocabulary differs enough that
 keeping a separate module is cleaner than threading ``lang_name`` through
 every helper.
 
 Design goals
 ------------
-* Intra-procedural only — no cross-function call graph needed.
+* Intra-procedural only - no cross-function call graph needed.
 * Variable declarations (``const x = y``) and assignment expressions
   (``x = y``) both propagate taint.
 * Destructuring (``const [a, b] = arr``, ``const {x, y} = obj``,
@@ -40,21 +40,21 @@ if TYPE_CHECKING:
 # Composite expressions whose taint state is the OR of their named children.
 # Mirrors ``_SPREADING_TYPES`` in the Python tracker. ``await_expression``
 # and ``yield_expression`` are included so awaited / yielded values
-# propagate taint — e.g. ``const x = await transform(input);`` keeps
+# propagate taint - e.g. ``const x = await transform(input);`` keeps
 # ``x`` tainted when ``input`` is and ``transform`` is taint-preserving.
 #
-# TypeScript adds four compile-time-only wrappers — all zero-runtime-
+# TypeScript adds four compile-time-only wrappers - all zero-runtime-
 # cost annotations whose runtime value is identical to the inner
 # expression. Without these entries, ``eval(userInput as string)``
 # would silently slip past SAFE801 because the tracker would drop
 # taint on the cast.
 #
-#   * ``as_expression`` — ``x as Foo``
-#   * ``satisfies_expression`` — ``x satisfies Foo``
-#   * ``non_null_expression`` — ``x!``
-#   * ``type_assertion`` — ``<Foo>x`` (older TS angle-bracket cast
+#   * ``as_expression`` - ``x as Foo``
+#   * ``satisfies_expression`` - ``x satisfies Foo``
+#   * ``non_null_expression`` - ``x!``
+#   * ``type_assertion`` - ``<Foo>x`` (older TS angle-bracket cast
 #     syntax; equivalent to ``as`` but discouraged in TSX files
-#     because it collides with JSX. Still legal in plain TS — taint
+#     because it collides with JSX. Still legal in plain TS - taint
 #     must propagate through it the same as through ``as_expression``)
 _SPREADING_TYPES = frozenset(
     {
@@ -77,9 +77,9 @@ _SPREADING_TYPES = frozenset(
 # Container / aggregate literals that carry taint when any element is tainted.
 _CONTAINER_TYPES = frozenset({"array", "object", "pair", "spread_element"})
 
-# Member access shapes (``foo.bar`` / ``foo[idx]``) — taint flows from the
+# Member access shapes (``foo.bar`` / ``foo[idx]``) - taint flows from the
 # receiver. ``optional_chain`` (``foo?.bar``) doesn't change the propagation
-# direction, only the null-safety semantics — handled by SAFE803, not here.
+# direction, only the null-safety semantics - handled by SAFE803, not here.
 _MEMBER_TYPES = frozenset({"member_expression", "subscript_expression"})
 
 
@@ -113,7 +113,7 @@ class JsTaintTracker:
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
 
-        Skips descent into nested function bodies — those are analysed
+        Skips descent into nested function bodies - those are analysed
         separately by the caller for each function found, with their
         own parameter set.
         """
@@ -130,7 +130,7 @@ class JsTaintTracker:
             self._visit_var_declarator(node)
         elif node.type in ("call_expression", "new_expression"):
             # Treat ``new Foo(tainted)`` the same as ``Foo(tainted)`` for
-            # taint tracking — the default JS sinks list includes ``Function``,
+            # taint tracking - the default JS sinks list includes ``Function``,
             # which is canonically invoked via ``new Function(code)``.
             # ``call_name`` resolves both shapes.
             self._visit_call(node)
@@ -140,18 +140,18 @@ class JsTaintTracker:
 
         Handles JS destructuring shapes:
 
-        * ``[a, b]``               — ``array_pattern``
-        * ``{a, b}``               — ``object_pattern`` with
+        * ``[a, b]``               - ``array_pattern``
+        * ``{a, b}``               - ``object_pattern`` with
           ``shorthand_property_identifier_pattern`` children
-        * ``{key: alias}``         — ``object_pattern`` with
+        * ``{key: alias}``         - ``object_pattern`` with
           ``pair_pattern`` children (the alias is bound, not the key)
-        * ``[a, ...rest]``         — ``rest_pattern`` wraps the inner name
-        * ``[a = 1, b]``           — ``assignment_pattern`` wraps the
+        * ``[a, ...rest]``         - ``rest_pattern`` wraps the inner name
+        * ``[a = 1, b]``           - ``assignment_pattern`` wraps the
           binding name on the ``left`` field; the default value on
           ``right`` is irrelevant to which name gets bound.
 
         ``shorthand_property_identifier_pattern`` is treated as an
-        identifier shape — it carries the bound name directly in its
+        identifier shape - it carries the bound name directly in its
         text. Subscript / member targets (``arr[0] = …``, ``obj.x = …``)
         aren't bare names and are skipped.
         """
@@ -159,7 +159,7 @@ class JsTaintTracker:
             yield target
             return
         # ``array_pattern`` / ``object_pattern`` / ``rest_pattern`` all
-        # bind every named child — same recursion shape, so a single
+        # bind every named child - same recursion shape, so a single
         # branch keeps cyclomatic complexity in check.
         if target.type in ("array_pattern", "object_pattern", "rest_pattern"):
             for child in target.named_children:
@@ -168,7 +168,7 @@ class JsTaintTracker:
         # Patterns that bind through a *specific* field name. ``pair_pattern``
         # carries the bound alias on ``value`` (``{key: alias}``);
         # ``assignment_pattern`` carries the binding on ``left``
-        # (``[a = 1]`` / ``function f(a = 1) {}`` — the ``right`` is
+        # (``[a = 1]`` / ``function f(a = 1) {}`` - the ``right`` is
         # the default value, not a binding). Without ``assignment_pattern``
         # taint flowing into a destructuring target with a default would
         # silently drop on the floor.
@@ -184,7 +184,7 @@ class JsTaintTracker:
         """Propagate taint through ``x = value`` (assignment_expression)."""
         left = node.child_by_field_name("left")
         right = node.child_by_field_name("right")
-        if left is None or right is None:  # pragma: no cover — defensive: valid assignments have both sides
+        if left is None or right is None:  # pragma: no cover - defensive: valid assignments have both sides
             return
         is_tainted = self._is_tainted(right)
         for ident in self._iter_target_identifiers(left):
@@ -194,7 +194,7 @@ class JsTaintTracker:
         """Propagate taint through ``x += value``."""
         left = node.child_by_field_name("left")
         right = node.child_by_field_name("right")
-        if left is None or right is None:  # pragma: no cover — defensive: valid aug-assignments have both sides
+        if left is None or right is None:  # pragma: no cover - defensive: valid aug-assignments have both sides
             return
         if self._is_tainted(right):
             self._update_name(left, is_tainted=True)
@@ -261,7 +261,7 @@ class JsTaintTracker:
     def _call_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if this call produces a tainted value.
 
-        Mirrors the Python tracker's :meth:`_call_tainted` exactly —
+        Mirrors the Python tracker's :meth:`_call_tainted` exactly -
         sanitizers clear, sources inject, unknowns either preserve or
         drop based on ``assume_taint_preserving``.
         """
@@ -273,7 +273,7 @@ class JsTaintTracker:
         if not self.assume_taint_preserving:
             return False
         args_node = node.child_by_field_name("arguments")
-        if not args_node:  # pragma: no cover — defensive: every call_expression has an arguments child
+        if not args_node:  # pragma: no cover - defensive: every call_expression has an arguments child
             return False
         return any(self._is_tainted(arg) for arg in args_node.named_children)
 
