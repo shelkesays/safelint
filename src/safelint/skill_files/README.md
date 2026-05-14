@@ -1,23 +1,23 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets twelve AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/` — currently Python, JavaScript, and TypeScript (mirroring safelint's `src/safelint/languages/` package layout).
+A bundled skill / project-rule that lets twelve AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/`, currently Python, JavaScript, and TypeScript (mirroring safelint's `src/safelint/languages/` package layout).
 
-> **For the comprehensive user guide** — auto-detection logic, per-client setup, troubleshooting, adding a new client — see [`AI_CLIENTS.md`](https://github.com/shelkesays/safelint/blob/main/AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
+> **For the comprehensive user guide** (auto-detection logic, per-client setup, troubleshooting, adding a new client) see [`AI_CLIENTS.md`](https://github.com/shelkesays/safelint/blob/main/AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
 
 Twelve clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
 
-- **Claude Code** — installs as a directory skill at `~/.claude/skills/safelint/` containing `SKILL.md` + `languages/`.
-- **Cursor** — installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
-- **GitHub Copilot** — installs as a Markdown instructions file at `.github/copilot-instructions.md` (or `~/.github/copilot-instructions.md` for user-global).
-- **Gemini** — installs as a Markdown instructions file at `<cwd>/GEMINI.md` (canonical, auto-discovered by Gemini CLI) or `~/GEMINI.md` (user-global; requires Gemini CLI config).
-- **Windsurf** — installs as a project rules file at `<cwd>/.windsurfrules` (canonical, auto-loaded by Windsurf) or `~/.windsurfrules` (user-global; merged with project rules at runtime).
-- **codex** — installs the primary instructions at `.codex/instructions.md` and *also* writes a delimited HTML-comment section into `AGENTS.md` when that cross-agent shared file already exists at the scope root. Other content in `AGENTS.md` is preserved.
-- **Continue.dev** — installs as a Markdown rule at `<cwd>/.continue/rules/safelint.md` (canonical, auto-loaded) or `~/.continue/rules/safelint.md` (user-global; loaded across workspaces).
-- **Cline** — installs as a Markdown rule at `<cwd>/.clinerules/safelint.md` (canonical, auto-loaded) or `~/.clinerules/safelint.md` (user-global).
-- **aider** — installs as `<cwd>/CONVENTIONS.md` or `~/CONVENTIONS.md`. **Not auto-loaded** — wire it in by adding `read: [CONVENTIONS.md]` to your `.aider.conf.yml`.
-- **Trae** — installs as a Markdown rule at `<cwd>/.trae/rules/safelint.md` (canonical, auto-loaded) or `~/.trae/rules/safelint.md` (user-global).
-- **Antigravity** — installs as a Markdown rule at `<cwd>/.antigravity/rules/safelint.md` (canonical, auto-loaded) or `~/.antigravity/rules/safelint.md` (user-global).
-- **Zed** — installs as workspace rules at `<cwd>/.rules` (canonical, auto-loaded) or `~/.rules` (user-global).
+- **Claude Code**: installs as a directory skill at `~/.claude/skills/safelint/` containing `SKILL.md` + `languages/`.
+- **Cursor**: installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
+- **GitHub Copilot**: installs as a Markdown instructions file at `.github/copilot-instructions.md` (or `~/.github/copilot-instructions.md` for user-global).
+- **Gemini**: installs as a Markdown instructions file at `<cwd>/GEMINI.md` (canonical, auto-discovered by Gemini CLI) or `~/GEMINI.md` (user-global; requires Gemini CLI config).
+- **Windsurf**: installs as a project rules file at `<cwd>/.windsurfrules` (canonical, auto-loaded by Windsurf) or `~/.windsurfrules` (user-global; merged with project rules at runtime).
+- **codex**: installs the primary instructions at `.codex/instructions.md` and *also* writes a delimited HTML-comment section into `AGENTS.md` when that cross-agent shared file already exists at the scope root. Other content in `AGENTS.md` is preserved.
+- **Continue.dev**: installs as a Markdown rule at `<cwd>/.continue/rules/safelint.md` (canonical, auto-loaded) or `~/.continue/rules/safelint.md` (user-global; loaded across workspaces).
+- **Cline**: installs as a Markdown rule at `<cwd>/.clinerules/safelint.md` (canonical, auto-loaded) or `~/.clinerules/safelint.md` (user-global).
+- **aider**: installs as `<cwd>/CONVENTIONS.md` or `~/CONVENTIONS.md`. **Not auto-loaded** ;  wire it in by adding `read: [CONVENTIONS.md]` to your `.aider.conf.yml`.
+- **Trae**: installs as a Markdown rule at `<cwd>/.trae/rules/safelint.md` (canonical, auto-loaded) or `~/.trae/rules/safelint.md` (user-global).
+- **Antigravity**: installs as a Markdown rule at `<cwd>/.antigravity/rules/safelint.md` (canonical, auto-loaded) or `~/.antigravity/rules/safelint.md` (user-global).
+- **Zed**: installs as workspace rules at `<cwd>/.rules` (canonical, auto-loaded) or `~/.rules` (user-global).
 
 Once installed, ask the agent things like:
 
@@ -33,7 +33,7 @@ Once installed, ask the agent things like:
 > **v2.0.0rc3 (pre-release):** Until v2.0.0 GA, an unpinned `pip install 'safelint[<lang>]'` resolves to the latest 1.x release on PyPI, which **doesn't define these per-language extras** and would install only the engine with no grammar. Either pin explicitly (`pip install 'safelint[python]==2.0.0rc3'`) or pass `--pre` to any of the commands below. Drop the pin once v2.0.0 GA ships.
 
 ```bash
-# Pick the extra matching your project's language(s) — v2.0.0+ ships
+# Pick the extra matching your project's language(s): v2.0.0+ ships
 # each grammar separately. See the project README for the full table.
 pip install 'safelint[python]'            # or: uv add 'safelint[python]'
 # pip install 'safelint[javascript]'      # JS / Node
@@ -44,8 +44,8 @@ safelint skill install                    # auto-detects which AI client(s) you 
 
 `safelint skill install` does **two** auto-detections in one shot:
 
-1. **Which AI client(s) you use** — looks for marker files (`CLAUDE.md`, `.cursor/`, `.github/copilot-instructions.md`, etc.) and installs the skill files into each detected client's config dir.
-2. **Which language grammar(s) your project needs** — walks the project for source-file extensions, compares against installed extras, and if any grammars are missing it emits one composed install line:
+1. **Which AI client(s) you use**, looks for marker files (`CLAUDE.md`, `.cursor/`, `.github/copilot-instructions.md`, etc.) and installs the skill files into each detected client's config dir.
+2. **Which language grammar(s) your project needs**, walks the project for source-file extensions, compares against installed extras, and if any grammars are missing it emits one composed install line:
    ```text
    safelint: warning: Detected source files for 2 languages (python, typescript) whose tree-sitter grammar isn't installed. Run: pip install 'safelint[python,typescript]'
    ```
@@ -77,11 +77,11 @@ safelint skill install --client copilot             # ~/.github/copilot-instruct
 safelint skill install --client copilot --project   # <cwd>/.github/copilot-instructions.md (canonical Copilot location)
 
 # Gemini
-safelint skill install --client gemini --project    # <cwd>/GEMINI.md (canonical — auto-discovered by Gemini CLI)
+safelint skill install --client gemini --project    # <cwd>/GEMINI.md (canonical, auto-discovered by Gemini CLI)
 safelint skill install --client gemini              # ~/GEMINI.md (user-global; requires Gemini CLI config)
 
 # Windsurf
-safelint skill install --client windsurf --project  # <cwd>/.windsurfrules (canonical — auto-loaded)
+safelint skill install --client windsurf --project  # <cwd>/.windsurfrules (canonical, auto-loaded)
 safelint skill install --client windsurf            # ~/.windsurfrules (user-global; merged with project rules)
 
 # codex (also injects section into AGENTS.md when present)
@@ -117,7 +117,7 @@ safelint skill install --client zed                 # ~/.rules (user-global)
 
 | Flag | Effect |
 |---|---|
-| `--client` | Target AI client: `auto` (default — detect from cwd, then home), or one of: `claude`, `cursor`, `copilot`, `gemini`, `windsurf`, `codex`, `continue`, `cline`, `aider`, `trae`, `antigravity`, `zed`. New clients added to the registry extend this list automatically. |
+| `--client` | Target AI client: `auto` (default, detect from cwd, then home), or one of: `claude`, `cursor`, `copilot`, `gemini`, `windsurf`, `codex`, `continue`, `cline`, `aider`, `trae`, `antigravity`, `zed`. New clients added to the registry extend this list automatically. |
 | `--project` | Force project scope (`<cwd>/.<client>/...`). With `--client auto`, restricts detection to cwd and refuses to fall back to home. |
 | `--symlink` | Symlink to the bundled location instead of copying. `pip upgrade safelint` then immediately changes what the AI client sees. Requires symlink support (POSIX, or Windows developer mode). |
 | `--force` | Replace any existing safelint skill / rule at the target. Use this when re-installing after an upgrade. |
@@ -125,7 +125,7 @@ safelint skill install --client zed                 # ~/.rules (user-global)
 ### Examples
 
 ```bash
-# Auto-detect — install for every AI client this project / user uses
+# Auto-detect: install for every AI client this project / user uses
 safelint skill install
 
 # Auto-detect, but only inside this project (no home fallback)
@@ -140,7 +140,7 @@ safelint skill install --force
 # Skill development (changes to bundled files take effect immediately)
 safelint skill install --symlink --force
 
-# Refresh installed skills after pip upgrade (idempotent — no-op when fresh)
+# Refresh installed skills after pip upgrade (idempotent: no-op when fresh)
 safelint skill update
 
 # Force-refresh every install regardless of drift (revert customisations)
@@ -175,7 +175,7 @@ Prints the on-disk location of the skill files inside your active safelint insta
 After `pip install --upgrade safelint`, the bundled files inside the wheel update but your installed skill stays at whatever version was last installed. Two ways to check:
 
 ```bash
-# Dedicated subcommand — exits 1 if any install differs from the bundled version
+# Dedicated subcommand: exits 1 if any install differs from the bundled version
 safelint skill status
 
 # Or, fold the check into a normal lint run (informational stderr warning, doesn't fail the run)
@@ -188,7 +188,7 @@ Pipe-friendly idiom for CI / upgrade scripts:
 safelint skill status || safelint skill update
 ```
 
-`safelint skill status` exits 0 on a clean run and still prints output: one `safelint: <client> <artefact> at <path> (<scope> scope) — fresh` line per detected install plus a final `all detected installs match the bundled version` summary. When something drifts it prints `differs from bundled` for the affected install and a per-install scope-aware refresh command (e.g. `safelint skill update --client cursor --project`); the per-installation hint matters so each diagnostic points at the *exact* install that drifted, even though bare `safelint skill update` will refresh every auto-detected install (project- and user-scope alike) on its own. If you've customised your skill on purpose, ignore the diff — the diagnostic explicitly mentions that case.
+`safelint skill status` exits 0 on a clean run and still prints output: one `safelint: <client> <artefact> at <path> (<scope> scope), fresh` line per detected install plus a final `all detected installs match the bundled version` summary. When something drifts it prints `differs from bundled` for the affected install and a per-install scope-aware refresh command (e.g. `safelint skill update --client cursor --project`); the per-installation hint matters so each diagnostic points at the *exact* install that drifted, even though bare `safelint skill update` will refresh every auto-detected install (project- and user-scope alike) on its own. If you've customised your skill on purpose, ignore the diff, the diagnostic explicitly mentions that case.
 
 ## Layout
 
@@ -222,14 +222,14 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 │   └── safelint.md          # Zed's workspace rules (installed to .rules at scope root)
 └── languages/               # One addendum per supported language
     ├── python.md            # Python-specific install / rationale / idiomatic fixes
-    ├── javascript.md        # JavaScript (Node) — runtime presets, JS-rule notes
-    └── typescript.md        # TypeScript / TSX / AssemblyScript — TS-specific rule handling
+    ├── javascript.md        # JavaScript (Node), runtime presets, JS-rule notes
+    └── typescript.md        # TypeScript / TSX / AssemblyScript, TS-specific rule handling
 ```
 
 **What ends up where after install:**
 
 - Claude install copies `SKILL.md` + `languages/`. All eleven peer-client subdirectories (`cursor/`, `copilot/`, `gemini/`, `windsurf/`, `codex/`, `continue/`, `cline/`, `aider/`, `trae/`, `antigravity/`, `zed/`) are excluded so the materialised Claude skill folder doesn't carry artefacts that don't apply to it.
-- Each non-Claude client copies just its own bundled file to the install destination — e.g. Cursor copies `cursor/safelint.mdc` to `.cursor/rules/safelint.mdc`; Windsurf copies `windsurf/safelint-rules.md` to `.windsurfrules` (renamed at the destination); Zed copies `zed/safelint.md` to `.rules` (renamed); the rest follow the same one-file-in, one-file-out pattern.
+- Each non-Claude client copies just its own bundled file to the install destination, e.g. Cursor copies `cursor/safelint.mdc` to `.cursor/rules/safelint.mdc`; Windsurf copies `windsurf/safelint-rules.md` to `.windsurfrules` (renamed at the destination); Zed copies `zed/safelint.md` to `.rules` (renamed); the rest follow the same one-file-in, one-file-out pattern.
 - codex is the one client that touches *two* destinations: the primary `.codex/instructions.md` and a delimited section inside `AGENTS.md` when that file already exists at the scope root.
 
 All clients can locate the bundled language addendums via `safelint skill path` if they need them at runtime.
@@ -243,7 +243,7 @@ The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint 
   - `--client cursor` (Cursor support) and the auto-detection default for `--client` arrived in **v1.8.0**.
   - `safelint skill status` and `safelint check --check-skill-freshness` (drift detection between bundled and installed skills) arrived in **v1.9.0**.
   - JavaScript (Node) support and runtime presets landed in **v1.13.0**.
-  - **v2.0.0rc1** ships language grammars as opt-in extras (`[python]` / `[javascript]` / `[typescript]` / `[all]`), adds TypeScript / TSX / AssemblyScript, adds the silent-failure exit-code-2 guard, and teaches `safelint skill install` to auto-detect project languages. The bundled skill files in this directory document the v2.0.0+ install story, so a 1.x-era `safelint` on `PATH` won't behave the way the skills describe — bump first.
+  - **v2.0.0rc1** ships language grammars as opt-in extras (`[python]` / `[javascript]` / `[typescript]` / `[all]`), adds TypeScript / TSX / AssemblyScript, adds the silent-failure exit-code-2 guard, and teaches `safelint skill install` to auto-detect project languages. The bundled skill files in this directory document the v2.0.0+ install story, so a 1.x-era `safelint` on `PATH` won't behave the way the skills describe, bump first.
 - A project with at least one source file in a language safelint supports (Python, JavaScript, or TypeScript today; Go / Rust / Java / C / C++ / PHP planned).
 
 ## What the skill does
@@ -256,7 +256,7 @@ The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint 
 6. Prints a one-line headline plus a per-file (and per-language, if multi-language) breakdown.
 7. Offers a single concrete next step.
 
-The skill never auto-fixes — every edit goes through a confirmation step.
+The skill never auto-fixes, every edit goes through a confirmation step.
 
 ## What the skill does NOT do
 
@@ -269,13 +269,13 @@ The skill never auto-fixes — every edit goes through a confirmation step.
 
 When safelint adds support for a new language, the skill needs a matching addendum. The workflow:
 
-1. **In safelint itself** — follow [`ADDING_A_LANGUAGE.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_A_LANGUAGE.md). Register the language in `src/safelint/languages/__init__.py`, add the parser factory, expose node-type constants.
-2. **In this skill** — create `languages/<lang>.md` modelled on `languages/python.md`. Cover at minimum:
+1. **In safelint itself**, follow [`ADDING_A_LANGUAGE.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_A_LANGUAGE.md). Register the language in `src/safelint/languages/__init__.py`, add the parser factory, expose node-type constants.
+2. **In this skill**, create `languages/<lang>.md` modelled on `languages/python.md`. Cover at minimum:
    - Install nuance specific to that ecosystem (if any).
    - File extensions safelint will pick up.
    - Language-specific phrasing for the universal rule rationales (how `bare_except` translates to that language's catch-all idiom, what counts toward `nesting_depth`, etc.).
    - Idiomatic fix patterns for the rules most likely to fire in that language.
-3. **In `SKILL.md`** — add a row to the **Step 2** language registry table pointing at your new addendum.
+3. **In `SKILL.md`**, add a row to the **Step 2** language registry table pointing at your new addendum.
 
 Keep the skill core (`SKILL.md`) language-neutral. Per-language detail belongs in the addendum. If you find yourself adding a language-specific paragraph to the core, that's a signal it should be in the addendum instead.
 
@@ -285,8 +285,8 @@ The skill is just Markdown. Edit `SKILL.md` to tune wording, swap the suggested 
 
 ## See also
 
-- **AI client integrations guide:** [`AI_CLIENTS.md`](https://github.com/shelkesays/safelint/blob/main/AI_CLIENTS.md) — the comprehensive user doc (auto-detection, per-client setup, troubleshooting)
-- **Adding a new AI client:** [`ADDING_AN_AI_CLIENT.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_AN_AI_CLIENT.md) — contributor walkthrough for shipping a new client integration
+- **AI client integrations guide:** [`AI_CLIENTS.md`](https://github.com/shelkesays/safelint/blob/main/AI_CLIENTS.md), the comprehensive user doc (auto-detection, per-client setup, troubleshooting)
+- **Adding a new AI client:** [`ADDING_AN_AI_CLIENT.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_AN_AI_CLIENT.md), contributor walkthrough for shipping a new client integration
 - The main safelint docs: [`README.md`](https://github.com/shelkesays/safelint/blob/main/README.md), [`CONFIGURATION.md`](https://github.com/shelkesays/safelint/blob/main/CONFIGURATION.md)
 - JSON output schema: [`docs/json-schema.md`](https://github.com/shelkesays/safelint/blob/main/docs/json-schema.md)
 - Adding a new language to safelint: [`ADDING_A_LANGUAGE.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_A_LANGUAGE.md)
