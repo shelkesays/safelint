@@ -17,7 +17,7 @@ Reports are handled confidentially. The maintainer will review every report and 
 
 ## Scope
 
-This Code of Conduct applies to all project spaces — issues, pull requests, discussions, code review, commit messages, and any other interaction associated with the project — and to community members representing the project in public spaces.
+This Code of Conduct applies to all project spaces, issues, pull requests, discussions, code review, commit messages, and any other interaction associated with the project, and to community members representing the project in public spaces.
 
 ## Attribution
 

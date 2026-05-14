@@ -12,7 +12,7 @@
 
 </div>
 
-> **📖 Full documentation:** <https://shelkesays.github.io/safelint/> — searchable, navigable, with a per-client install guide for each of the twelve supported AI agents. The README below is the repo home; the docs site is the user reference.
+> **📖 Full documentation:** <https://shelkesays.github.io/safelint/>, searchable, navigable, with a per-client install guide for each of the twelve supported AI agents. The README below is the repo home; the docs site is the user reference.
 
 SafeLint is a configurable static analysis tool that enforces safety-critical coding practices inspired by Gerard J. Holzmann's "Power of Ten" rules at NASA/JPL.
 
@@ -22,13 +22,13 @@ Originally designed for mission-critical systems, these principles apply to any 
 
 | Language | Extensions | Notes |
 |---|---|---|
-| **Python** | `.py`, `.pyw` | — |
+| **Python** | `.py`, `.pyw` |  |
 | **JavaScript** | `.js`, `.mjs`, `.cjs` | Runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine. Per-runtime *defaults* are selectable via [`[tool.safelint.javascript] runtime = "..."`](https://shelkesays.github.io/safelint/configuration/toml/#javascript-runtime-presets). |
 | **TypeScript** (incl. **TSX** + **AssemblyScript**) | `.ts`, `.tsx`, `.as` | Reuses the JS rule implementations end-to-end with TS-specific handling for generics, `as` casts, non-null assertions, `declare global` blocks, etc. Shares JS runtime presets since TS compiles to JS. |
 
 **Rule coverage:** 17 rules apply to all three languages, 2 are Python-only (`bare_except`, `global_state`), and 1 is JavaScript-family-only (`wide_scope_declaration` for `var`).
 
-**Planned future languages** (working-priority order, no timelines committed): Go, Rust, Java, C, C++, PHP. SafeLint's registry-driven design makes each addition incremental — see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
+**Planned future languages** (working-priority order, no timelines committed): Go, Rust, Java, C, C++, PHP. SafeLint's registry-driven design makes each addition incremental; see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
 
 SafeLint integrates with pre-commit and CI pipelines to prevent unsafe code from entering your codebase.
 
@@ -58,10 +58,10 @@ In 1987, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly fo
 |---|---|---|---|
 | 1 | No complex control flow - no `goto`, no deep recursion | `nesting_depth`, `complexity` | [SAFE102](https://shelkesays.github.io/safelint/configuration/rules/#safe102-nesting_depth), [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity) |
 | 2 | All loops must have a fixed upper bound | `unbounded_loops` | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) |
-| 3 | No dynamic memory allocation after startup | `resource_lifecycle` | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) — *adapted: managed runtimes allocate dynamically by default; the rule becomes "acquired resources must have guaranteed cleanup"* |
+| 3 | No dynamic memory allocation after startup | `resource_lifecycle` | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle), *adapted: managed runtimes allocate dynamically by default; the rule becomes "acquired resources must have guaranteed cleanup"* |
 | 4 | Functions must fit on one printed page | `function_length` | [SAFE101](https://shelkesays.github.io/safelint/configuration/rules/#safe101-function_length) |
 | 5 | Use at least two assertions per function | `missing_assertions` | [SAFE601](https://shelkesays.github.io/safelint/configuration/rules/#safe601-missing_assertions) |
-| 6 | Declare variables at the smallest scope | `wide_scope_declaration` | [SAFE305](https://shelkesays.github.io/safelint/configuration/rules/#safe305-wide_scope_declaration) *(JavaScript — `var` → `let` / `const`; Python's lexical scoping handles this natively)* |
+| 6 | Declare variables at the smallest scope | `wide_scope_declaration` | [SAFE305](https://shelkesays.github.io/safelint/configuration/rules/#safe305-wide_scope_declaration) *(JavaScript, `var` → `let` / `const`; Python's lexical scoping handles this natively)* |
 | 7 | Check the return value of every non-void function | `return_value_ignored`, `bare_except`, `empty_except`, `logging_on_error` | [SAFE802](https://shelkesays.github.io/safelint/configuration/rules/#safe802-return_value_ignored), [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except), [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except), [SAFE203](https://shelkesays.github.io/safelint/configuration/rules/#safe203-logging_on_error) |
 | 8 | Limit preprocessor use | - | *(not applicable to Python or JavaScript)* |
 | 9 | Restrict pointer use - no chained indirection | `null_dereference` | [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference) |
@@ -69,15 +69,15 @@ In 1987, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly fo
 
 Original paper: [spinroot.com/gerard/pdf/P10.pdf](https://spinroot.com/gerard/pdf/P10.pdf)
 
-SafeLint also ships several rules that go beyond Holzmann's original ten — modern additions for state purity (`global_state` / `global_mutation` for shared-state writes), hidden side effects (`side_effects_hidden` / `side_effects` for I/O lurking behind pure-sounding names), dataflow taint (`tainted_sink` for unsanitised input reaching `eval` / `exec` / equivalents), and test discipline (`test_existence` / `test_coupling` for paired-test enforcement). See the [full rules reference](https://shelkesays.github.io/safelint/configuration/rules/) for every rule with examples and configuration.
+SafeLint also ships several rules that go beyond Holzmann's original ten: modern additions for state purity (`global_state` / `global_mutation` for shared-state writes), hidden side effects (`side_effects_hidden` / `side_effects` for I/O lurking behind pure-sounding names), dataflow taint (`tainted_sink` for unsanitised input reaching `eval` / `exec` / equivalents), and test discipline (`test_existence` / `test_coupling` for paired-test enforcement). See the [full rules reference](https://shelkesays.github.io/safelint/configuration/rules/) for every rule with examples and configuration.
 
 ---
 
 ## Installation
 
-SafeLint ships **every** per-language grammar as an opt-in extra. The base install includes only the engine — no grammars — so a Python-only project doesn't pay for JS/TS grammars, a Go/JS project doesn't pay for the Python grammar, and so on. Pick the extras that match the languages you actually lint:
+SafeLint ships **every** per-language grammar as an opt-in extra. The base install includes only the engine, no grammars, so a Python-only project doesn't pay for JS/TS grammars, a Go/JS project doesn't pay for the Python grammar, and so on. Pick the extras that match the languages you actually lint:
 
-> **v2.0.0rc3 (pre-release):** Until v2.0.0 GA, pin the version explicitly — e.g. `pip install 'safelint[python]==2.0.0rc3'` — or pass `--pre` to any of the commands below. An unpinned `pip install 'safelint[...]'` will resolve to the latest 1.x release, which doesn't define these per-language extras and so wouldn't install any grammar at all.
+> **v2.0.0rc3 (pre-release):** Until v2.0.0 GA, pin the version explicitly, e.g. `pip install 'safelint[python]==2.0.0rc3'`, or pass `--pre` to any of the commands below. An unpinned `pip install 'safelint[...]'` will resolve to the latest 1.x release, which doesn't define these per-language extras and so wouldn't install any grammar at all.
 
 ```bash
 pip install 'safelint[python]'         # adds .py, .pyw
@@ -85,12 +85,12 @@ pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs
 pip install 'safelint[typescript]'     # adds .ts, .tsx, .as (and bundles JS too)
 pip install 'safelint[all]'            # every supported language
 
-# Multiple extras compose — perfect for monorepos:
+# Multiple extras compose, for monorepos:
 pip install 'safelint[python,javascript]'
 pip install 'safelint[python,typescript]'
 ```
 
-`pip install safelint` (no extras) installs only the engine. If you run it that way, safelint will emit a one-line hint on first run telling you which extra to add for the files it found. Same story if you mix-and-match — e.g. running safelint with `[python]` installed on a directory containing `.ts` files will skip the `.ts` files with a clear `pip install` hint while continuing to lint the supported (`.py`) files. **If every candidate file ends up skipped** (the typical TS-only / JS-only run against a bare base install), safelint exits with code 2 as a setup error instead so CI / pre-commit can't silently report clean on an un-linted run.
+`pip install safelint` (no extras) installs only the engine. If you run it that way, safelint will emit a one-line hint on first run telling you which extra to add for the files it found. Same story if you mix-and-match, e.g. running safelint with `[python]` installed on a directory containing `.ts` files will skip the `.ts` files with a clear `pip install` hint while continuing to lint the supported (`.py`) files. **If every candidate file ends up skipped** (the typical TS-only / JS-only run against a bare base install), safelint exits with code 2 as a setup error instead so CI / pre-commit can't silently report clean on an un-linted run.
 
 ---
 
@@ -104,7 +104,7 @@ safelint help check          # subcommand-specific help
 safelint --version           # or: safelint version, safelint -V
 ```
 
-**Check modified files** (default — only files changed since last commit):
+**Check modified files** (default, only files changed since last commit):
 
 ```bash
 safelint check src/
@@ -167,7 +167,7 @@ By default safelint memoises rule output keyed on `sha256(source + engine config
 
 ## Pre-commit integration
 
-Add this to your `.pre-commit-config.yaml` — pick the `additional_dependencies` line that matches the languages your repo contains:
+Add this to your `.pre-commit-config.yaml`, pick the `additional_dependencies` line that matches the languages your repo contains:
 
 ```yaml
 repos:
@@ -175,7 +175,7 @@ repos:
     rev: v2.0.0rc3  # replace with the latest release tag (use the GA tag once v2.0.0 ships)
     hooks:
       - id: safelint
-        # Required in v2.0.0+ — pick the line for the language(s) your repo lints:
+        # Required in v2.0.0+, pick the line for the language(s) your repo lints:
         additional_dependencies: ['safelint[python]']               # Python-only repo
         # additional_dependencies: ['safelint[javascript]']         # JS-only repo (Node / browser / Deno / Cloudflare Workers / Bun)
         # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles tree-sitter-javascript too)
@@ -183,22 +183,22 @@ repos:
         # additional_dependencies: ['safelint[all]']                # kitchen-sink
 
         args: [--fail-on=error]   # or --fail-on=warning for stricter CI
-        files: ^src/              # optional — scope to a directory
+        files: ^src/              # optional, scope to a directory
 ```
 
 ### One hook, every language
 
-The same `id: safelint` handles Python, JavaScript, and TypeScript — there's no `safelint-python` / `safelint-js` / `safelint-ts` split. The published hook spec sets `types_or: [python, javascript, ts, tsx]` so pre-commit automatically routes the right files to safelint; the engine then dispatches each file to its language-specific rule implementations based on extension. **AssemblyScript `.as` files are not matched by that default `types_or` list** — pre-commit's `identify` library has no `as` filetype tag, so AS users must override `types_or` with a permissive tag `.as` files *actually* carry (e.g. `types_or: [text]`) and use `files: \.(ts|tsx|as)$` to scope the match. (`types_or: []` doesn't work — pre-commit treats an empty list as "no tag matches", not "filter disabled".) **Every flag (`--fail-on`, `--mode`, `--ignore`, `--format`, `--statistics`) and every config option behaves identically across languages.** The only per-project lever is the `additional_dependencies` extra — that's what tells pre-commit which tree-sitter grammar(s) to install into the hook's isolated environment.
+The same `id: safelint` handles Python, JavaScript, and TypeScript, there's no `safelint-python` / `safelint-js` / `safelint-ts` split. The published hook spec sets `types_or: [python, javascript, ts, tsx]` so pre-commit automatically routes the right files to safelint; the engine then dispatches each file to its language-specific rule implementations based on extension. **AssemblyScript `.as` files are not matched by that default `types_or` list**, pre-commit's `identify` library has no `as` filetype tag, so AS users must override `types_or` with a permissive tag `.as` files *actually* carry (e.g. `types_or: [text]`) and use `files: \.(ts|tsx|as)$` to scope the match. (`types_or: []` doesn't work, pre-commit treats an empty list as "no tag matches", not "filter disabled".) **Every flag (`--fail-on`, `--mode`, `--ignore`, `--format`, `--statistics`) and every config option behaves identically across languages.** The only per-project lever is the `additional_dependencies` extra, that's what tells pre-commit which tree-sitter grammar(s) to install into the hook's isolated environment.
 
 ### What happens if you forget the extra
 
-The `additional_dependencies` line is genuinely required in v2.0.0+ — including for Python projects, which used to work without it. Forgetting it doesn't silently pass: safelint exits with code **2**, which pre-commit reports as **Failed** (red). When *every* passed file is skipped for a missing grammar (the usual "forgot the extra" case) it prints a single error line with the exact fix:
+The `additional_dependencies` line is genuinely required in v2.0.0+, including for Python projects, which used to work without it. Forgetting it doesn't silently pass: safelint exits with code **2**, which pre-commit reports as **Failed** (red). When *every* passed file is skipped for a missing grammar (the usual "forgot the extra" case) it prints a single error line with the exact fix:
 
 ```text
-safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed — add 'safelint[python]' to additional_dependencies in your .pre-commit-config.yaml
+safelint: error: no files linted, every file pre-commit passed had a grammar that isn't installed, add 'safelint[python]' to additional_dependencies in your .pre-commit-config.yaml
 ```
 
-In a *mixed* run — where some files lint successfully and others are skipped for a missing grammar — safelint additionally prints one `safelint: warning: skipping .X files …` line per missing grammar as actionable context for the skipped files. The all-skipped case omits that warning because the error above already carries the same install hint.
+In a *mixed* run, where some files lint successfully and others are skipped for a missing grammar, safelint additionally prints one `safelint: warning: skipping .X files …` line per missing grammar as actionable context for the skipped files. The all-skipped case omits that warning because the error above already carries the same install hint.
 
 See [Exit codes](https://shelkesays.github.io/safelint/configuration/cli/#exit-codes) for the full table.
 
@@ -231,11 +231,11 @@ SafeLint ships **20 rules** across the Holzmann safety categories. **14 are on b
 | [SAFE302](https://shelkesays.github.io/safelint/configuration/rules/#safe302-global_mutation) | `global_mutation` | error | Writing to global variables inside functions |
 | [SAFE303](https://shelkesays.github.io/safelint/configuration/rules/#safe303-side_effects_hidden) | `side_effects_hidden` | error | Pure-looking functions that secretly do I/O |
 | [SAFE304](https://shelkesays.github.io/safelint/configuration/rules/#safe304-side_effects) | `side_effects` | warning | Functions that call `print`, `open`, etc. without signalling intent |
-| [SAFE305](https://shelkesays.github.io/safelint/configuration/rules/#safe305-wide_scope_declaration) | `wide_scope_declaration` | warning | `var` declarations — prefer `let` / `const` *(JavaScript / TypeScript only)* |
+| [SAFE305](https://shelkesays.github.io/safelint/configuration/rules/#safe305-wide_scope_declaration) | `wide_scope_declaration` | warning | `var` declarations, prefer `let` / `const` *(JavaScript / TypeScript only)* |
 | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) | `resource_lifecycle` | error | Files or connections opened outside a `with` block (Python) or without paired cleanup (JS / TS) |
 | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) | `unbounded_loops` | warning | `while True` loops with no `break` |
 
-### Opt-in rules (6) — enable via `[tool.safelint.rules.<name>] enabled = true`
+### Opt-in rules (6): enable via `[tool.safelint.rules.<name>] enabled = true`
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|
@@ -246,7 +246,7 @@ SafeLint ships **20 rules** across the Holzmann safety categories. **14 are on b
 | [SAFE802](https://shelkesays.github.io/safelint/configuration/rules/#safe802-return_value_ignored) | `return_value_ignored` | warning | Discarding the return value of calls like `subprocess.run` or `file.write` *(dataflow)* |
 | [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference) | `null_dereference` | error | Chaining methods directly on calls that can return `None`, e.g. `d.get("key").strip()` *(dataflow)* |
 
-Plus **`SAFE004 unused_suppression`** (engine meta-check, on by default) — flags stale `# nosafe` directives that no longer suppress anything. Disable globally via `ignore = ["SAFE004"]` if undesired.
+Plus **`SAFE004 unused_suppression`** (engine meta-check, on by default), flags stale `# nosafe` directives that no longer suppress anything. Disable globally via `ignore = ["SAFE004"]` if undesired.
 
 For per-rule defaults, configuration knobs, and full examples, see the [Rules reference](https://shelkesays.github.io/safelint/configuration/rules/).
 
@@ -279,7 +279,7 @@ def get_data(conn, q, p1, p2, p3, p4, p5, p6):  # nosafe: SAFE101, SAFE103
     ...
 ```
 
-When at least one violation is suppressed, the CLI summary reports a per-code breakdown (e.g. `(2 SAFE501, 1 SAFE304 suppressed)`) so suppressions remain visible and auditable. Use `# nosafe` sparingly — it's for line-level exceptions only. For broader suppression use the config-level options:
+When at least one violation is suppressed, the CLI summary reports a per-code breakdown (e.g. `(2 SAFE501, 1 SAFE304 suppressed)`) so suppressions remain visible and auditable. Use `# nosafe` sparingly, it's for line-level exceptions only. For broader suppression use the config-level options:
 
 ```toml
 # pyproject.toml
@@ -296,19 +296,19 @@ See [Inline suppression](https://shelkesays.github.io/safelint/configuration/sup
 
 ## Configuration
 
-SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` file at your project root. When both exist in the same directory, **`safelint.toml` wins** — its values override anything in `[tool.safelint]` — matching ruff's `ruff.toml` / `pyproject.toml` precedence. See the [Configuration reference](https://shelkesays.github.io/safelint/configuration/) for all options, defaults, and examples.
+SafeLint is configured via `[tool.safelint]` in your `pyproject.toml`, or a standalone `safelint.toml` file at your project root. When both exist in the same directory, **`safelint.toml` wins**, its values override anything in `[tool.safelint]`, matching ruff's `ruff.toml` / `pyproject.toml` precedence. See the [Configuration reference](https://shelkesays.github.io/safelint/configuration/) for all options, defaults, and examples.
 
 Highlights:
 
-- **Incremental ignore lists** — use `extend_ignore` / `extend_per_file_ignores` to grow the defaults instead of replacing them (mirrors ruff's `extend-select` ergonomics).
-- **`--statistics` flag** — print a per-rule violation-count table at the end of a run (`safelint check src/ --statistics`).
-- **`SAFE004 unused_suppression`** — automatically warns about stale `# nosafe` directives that no longer suppress anything. Disable globally via `ignore = ["SAFE004"]` if undesired.
-- **No `--fix` flag** — SafeLint is review-only by design. Editor integrations may surface suggestions as code actions, but every edit is user-confirmed.
+- **Incremental ignore lists**, use `extend_ignore` / `extend_per_file_ignores` to grow the defaults instead of replacing them (mirrors ruff's `extend-select` ergonomics).
+- **`--statistics` flag**, print a per-rule violation-count table at the end of a run (`safelint check src/ --statistics`).
+- **`SAFE004 unused_suppression`**, automatically warns about stale `# nosafe` directives that no longer suppress anything. Disable globally via `ignore = ["SAFE004"]` if undesired.
+- **No `--fix` flag**, SafeLint is review-only by design. Editor integrations may surface suggestions as code actions, but every edit is user-confirmed.
 
 Ready-to-copy samples:
 
-- [examples/sample.pyproject.toml](examples/sample.pyproject.toml) — `[tool.safelint]` block for an existing pyproject.toml
-- [examples/sample.safelint.toml](examples/sample.safelint.toml) — standalone `safelint.toml` (no `[tool.safelint]` wrapper)
+- [examples/sample.pyproject.toml](examples/sample.pyproject.toml), `[tool.safelint]` block for an existing pyproject.toml
+- [examples/sample.safelint.toml](examples/sample.safelint.toml), standalone `safelint.toml` (no `[tool.safelint]` wrapper)
 
 ---
 
@@ -321,7 +321,7 @@ pip install safelint
 safelint skill install          # auto-detects which AI client(s) you use
 ```
 
-**Twelve AI clients are supported today** — every one of them runs through the same `safelint skill` command surface, so you only need to learn one workflow:
+**Twelve AI clients are supported today**, every one of them runs through the same `safelint skill` command surface, so you only need to learn one workflow:
 
 | Client | Marker safelint looks for | Where the skill lands |
 |---|---|---|
@@ -338,11 +338,11 @@ safelint skill install          # auto-detects which AI client(s) you use
 | Antigravity | `.antigravity/` | `.antigravity/rules/safelint.md` |
 | Zed | `.rules`, `.zed/` | `.rules` at repo root |
 
-`safelint skill install` (with no flags) is `--client auto` under the hood: it looks for any of the markers above in your current directory, falls back to your home directory if cwd has none, and installs whatever it finds. If your project uses two clients (e.g. Claude *and* Cursor), it installs both — no flag needed.
+`safelint skill install` (with no flags) is `--client auto` under the hood: it looks for any of the markers above in your current directory, falls back to your home directory if cwd has none, and installs whatever it finds. If your project uses two clients (e.g. Claude *and* Cursor), it installs both, no flag needed.
 
 **After install,** restart the AI client (or reload its window) and ask things like *"run safelint"*, *"lint my changes with safelint"*, or *"do a Power-of-Ten review on src/api/auth.py"*. The skill takes care of the rest: it invokes safelint with structured JSON output, groups violations by file, and offers to walk through fixes.
 
-**After `pip install --upgrade safelint`**, your installed skill files are still the *old* version — the wheel's bundled files moved on without them. To catch up:
+**After `pip install --upgrade safelint`**, your installed skill files are still the *old* version, the wheel's bundled files moved on without them. To catch up:
 
 ```bash
 safelint skill status        # shows fresh / differs per detected install (exit 1 if anything differs)
@@ -350,16 +350,16 @@ safelint skill update        # re-installs only the ones that drifted (no-op if 
 safelint skill remove        # auto-detects and removes every install
 ```
 
-`safelint skill remove` accepts a few filter flags: `--symlink` keeps copy installs and only removes the ones created with `--symlink` (i.e., the skill file is a symlink pointing back at the bundled wheel — handy for skill developers); `--path PATH` removes one specific install location safelint's auto-detect didn't find; `--dry-run` previews everything without touching disk.
+`safelint skill remove` accepts a few filter flags: `--symlink` keeps copy installs and only removes the ones created with `--symlink` (i.e., the skill file is a symlink pointing back at the bundled wheel, handy for skill developers); `--path PATH` removes one specific install location safelint's auto-detect didn't find; `--dry-run` previews everything without touching disk.
 
 For explicit control (`--client <name>` for any of the twelve), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, post-upgrade workflow, and troubleshooting, see the [AI client integrations guide](https://shelkesays.github.io/safelint/ai-clients/). To add support for a new AI client (the registry is open-ended), follow the contributor walkthrough in [Adding a new AI client](https://shelkesays.github.io/safelint/contributing/adding-an-ai-client/).
 
 ### Other integration points
 
-- **Stdin mode** — `safelint --stdin --stdin-filename PATH --format json` lints unsaved buffer contents fed via stdin. Designed for editor extensions (VSCode plugin, custom LSP wrappers).
-- **JSON / SARIF output** — `--format json` and `--format sarif` emit stable, machine-readable documents. The JSON schema is documented in the [JSON output schema](https://shelkesays.github.io/safelint/json-schema/). SARIF output is GitHub code-scanning compatible.
-- **Column-precise positions** — every violation carries `lineno`, `end_lineno`, `column_start`, `column_end` (1-based, half-open). Maps directly to LSP / VSCode `Range` and SARIF `region.endColumn`. Synthetic violations (e.g. `test_existence`) leave column fields `null`; editors should treat that as "underline the whole line".
-- **Advisory suggestions** — every violation may carry a `suggestions` array with one-line descriptions and `TextEdit` ranges. **Editor integrations must never apply these automatically** — every edit goes through user confirmation. SARIF output uses the spec's native `fixes[]` block for the same data. SafeLint will never ship a `--fix` flag.
+- **Stdin mode**, `safelint --stdin --stdin-filename PATH --format json` lints unsaved buffer contents fed via stdin. Designed for editor extensions (VSCode plugin, custom LSP wrappers).
+- **JSON / SARIF output**, `--format json` and `--format sarif` emit stable, machine-readable documents. The JSON schema is documented in the [JSON output schema](https://shelkesays.github.io/safelint/json-schema/). SARIF output is GitHub code-scanning compatible.
+- **Column-precise positions**, every violation carries `lineno`, `end_lineno`, `column_start`, `column_end` (1-based, half-open). Maps directly to LSP / VSCode `Range` and SARIF `region.endColumn`. Synthetic violations (e.g. `test_existence`) leave column fields `null`; editors should treat that as "underline the whole line".
+- **Advisory suggestions**, every violation may carry a `suggestions` array with one-line descriptions and `TextEdit` ranges. **Editor integrations must never apply these automatically**, every edit goes through user confirmation. SARIF output uses the spec's native `fixes[]` block for the same data. SafeLint will never ship a `--fix` flag.
 
 ---
 
@@ -405,7 +405,7 @@ Pushing the version tag triggers `.github/workflows/publish.yml`, which builds a
 
 ## Getting help
 
-If you hit a bug, want a feature, or just don't know which flag to reach for, see [SUPPORT.md](SUPPORT.md) — it lists where to ask each kind of question and what to include in a bug report so we can help quickly.
+If you hit a bug, want a feature, or just don't know which flag to reach for, see [SUPPORT.md](SUPPORT.md), it lists where to ask each kind of question and what to include in a bug report so we can help quickly.
 
 ## Contributing
 
