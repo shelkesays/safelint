@@ -55,9 +55,9 @@ ANSI colour is auto-disabled when stdout is not a TTY (piping to a file produces
 | `--format` | `pretty` | Output format: `pretty` (ruff/ty-style coloured), `json` (stable schema documented in [JSON schema](../json-schema.md)), or `sarif` (SARIF 2.1.0 for GitHub code scanning). |
 | `--statistics` | off | After the run, print a per-rule violation-count table (active + suppressed). Pretty mode only. Useful for CI snapshots and finding the most-fired rules. |
 | `--no-cache` | off | Disable the per-file lint-result cache. By default safelint memoises rule output keyed on `sha256(source + engine config + filepath)` in `.safelint_cache/` next to your config. |
-| `--check-skill-freshness` | off | *Added in 1.9.0.* Before linting, verify each installed AI-client skill (Claude Code at `~/.claude/skills/safelint/`, Cursor at `~/.cursor/rules/safelint.mdc`, project-scoped equivalents) matches the bundled version in the active wheel. Stale installs surface as `safelint: warning: …` lines on stderr. Informational only — doesn't fail the lint. Use `safelint skill status` (also added in 1.9.0; exits 1 if stale) for the dedicated CI-friendly check. |
+| `--check-skill-freshness` | off | *Added in 1.9.0.* Before linting, verify each installed AI-client skill (Claude Code at `~/.claude/skills/safelint/`, Cursor at `~/.cursor/rules/safelint.mdc`, project-scoped equivalents) matches the bundled version in the active wheel. Stale installs surface as `safelint: warning: …` lines on stderr. Informational only, doesn't fail the lint. Use `safelint skill status` (also added in 1.9.0; exits 1 if stale) for the dedicated CI-friendly check. |
 | `--stdin` | off | Read source from stdin instead of from disk. Designed for editor extensions linting un-saved buffers. Pair with `--stdin-filename`. |
-| `--stdin-filename` | (none) | Pseudo-filename for `--stdin` input — drives language detection by extension and is shown as the violation file path. Required when `--stdin` is set. |
+| `--stdin-filename` | (none) | Pseudo-filename for `--stdin` input, drives language detection by extension and is shown as the violation file path. Required when `--stdin` is set. |
 
 **When to use `--all-files`:**
 
@@ -71,23 +71,23 @@ SafeLint's exit code tells CI / pre-commit how the run finished:
 
 | Code | Meaning |
 |------|---------|
-| `0` | Clean run — no blocking violations (suppressed violations don't count). |
+| `0` | Clean run, no blocking violations (suppressed violations don't count). |
 | `1` | One or more blocking violations found (severity ≥ `--fail-on`). |
-| `2` | **Silent-failure guard.** Fires in *every* output mode (pretty / JSON / SARIF) so a CI pipeline can't silently report clean. Three distinct triggers — see below for the exact stderr message each emits. |
+| `2` | **Silent-failure guard.** Fires in *every* output mode (pretty / JSON / SARIF) so a CI pipeline can't silently report clean. Three distinct triggers, see below for the exact stderr message each emits. |
 
-### Exit code 2 — silent-failure triggers
+### Exit code 2: silent-failure triggers
 
 All three triggers print a `safelint: error:` line to stderr before exiting; pre-commit treats exit 2 as a hook *Failed* (red), not Passed. Fix by installing the matching grammar extra (`pip install 'safelint[python]'` etc.) or, for pre-commit users, adding `additional_dependencies: ['safelint[<lang>]']` to your `.pre-commit-config.yaml`.
 
 | Trigger | Path | Stderr message |
 |---|---|---|
-| **Directory mode** (`safelint check src/ --all-files`) discovers files but none get linted because every grammar is missing | `_check_exit_code` after `_run_check`'s lint pass | `safelint: error: no files linted — every supported file was skipped because its grammar package isn't installed — install with: pip install 'safelint[<lang>]'` |
-| **Git-modified mode** (default `safelint check src/`) — user modified files but every one was dropped by the supported-extensions filter | `_handle_no_targets` in the no-targets short-circuit | `safelint: error: no files linted — every git-modified source file has a grammar that isn't installed — install with: pip install 'safelint[<lang>]'` |
-| **Hook mode** (pre-commit invokes `safelint <files>`) — every passed file has an extension whose grammar isn't installed | `_guard_hook_silent_failure` before the engine runs | `safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed — add 'safelint[<lang>]' to additional_dependencies in your .pre-commit-config.yaml` |
+| **Directory mode** (`safelint check src/ --all-files`) discovers files but none get linted because every grammar is missing | `_check_exit_code` after `_run_check`'s lint pass | `safelint: error: no files linted, every supported file was skipped because its grammar package isn't installed, install with: pip install 'safelint[<lang>]'` |
+| **Git-modified mode** (default `safelint check src/`), user modified files but every one was dropped by the supported-extensions filter | `_handle_no_targets` in the no-targets short-circuit | `safelint: error: no files linted, every git-modified source file has a grammar that isn't installed, install with: pip install 'safelint[<lang>]'` |
+| **Hook mode** (pre-commit invokes `safelint <files>`), every passed file has an extension whose grammar isn't installed | `_guard_hook_silent_failure` before the engine runs | `safelint: error: no files linted, every file pre-commit passed had a grammar that isn't installed, add 'safelint[<lang>]' to additional_dependencies in your .pre-commit-config.yaml` |
 
 Each error embeds the install hint for the missing extras so the failure is self-explanatory even when no prior warnings were printed (e.g. the no-targets short-circuit, or any machine-output run). The hint phrasing flips between `install with: pip install 'safelint[<lang>]'` (direct CLI) and `add 'safelint[<lang>]' to additional_dependencies in your .pre-commit-config.yaml` (pre-commit, detected via `PRE_COMMIT=1`).
 
-**Per-extension stderr warnings** (one line per missing grammar, listing the affected extensions) are emitted **only in pretty (human) CLI output and in the pre-commit hook flow**. Machine-readable modes — `--format json` and `--format sarif` — deliberately suppress those warnings so stderr stays parseable for CI / editor pipelines; the embedded install hint inside the `safelint: error:` line above is the only signal you get there.
+**Per-extension stderr warnings** (one line per missing grammar, listing the affected extensions) are emitted **only in pretty (human) CLI output and in the pre-commit hook flow**. Machine-readable modes, `--format json` and `--format sarif`, deliberately suppress those warnings so stderr stays parseable for CI / editor pipelines; the embedded install hint inside the `safelint: error:` line above is the only signal you get there.
 
 ## `safelint` hook mode flags (pre-commit)
 
@@ -108,7 +108,7 @@ Pre-commit passes the staged files as positional arguments automatically. `--fai
 After `pip install --upgrade safelint`, the bundled skill files in the wheel update but copy-mode installs at `~/.claude/skills/safelint/` and `~/.cursor/rules/safelint.mdc` stay frozen at whatever version was last installed. Two commands answer "is my installed skill up to date?":
 
 ```bash
-# Dedicated subcommand — pipe-friendly, exits 1 if any install differs from bundled
+# Dedicated subcommand: pipe-friendly, exits 1 if any install differs from bundled
 safelint skill status
 
 # Or fold the same check into a normal lint run (opt-in stderr warning, doesn't fail the run)
@@ -119,9 +119,9 @@ safelint check --check-skill-freshness --all-files .
 
 A few details worth knowing:
 
-- **Symlink installs** (those created with `safelint skill install --symlink`) always show as fresh, because the installed file is a symlink pointing back at the bundled location inside the wheel. After `pip upgrade safelint`, the upgrade is visible immediately — no `skill update` needed.
+- **Symlink installs** (those created with `safelint skill install --symlink`) always show as fresh, because the installed file is a symlink pointing back at the bundled location inside the wheel. After `pip upgrade safelint`, the upgrade is visible immediately; no `skill update` needed.
 - **Copy installs** are content-compared against the bundled file. If they match byte-for-byte, fresh; otherwise, differs.
-- **Edge case — a symlink install hand-replaced with an identical copy** is reported as fresh (the freshness check compares content, not install mode). The user-visible behaviour is fine *today* because the content matches, but the next `pip upgrade safelint` won't propagate to that location anymore. If you want to re-establish the live link, run `safelint skill update --symlink --force`.
+- **Edge case, a symlink install hand-replaced with an identical copy** is reported as fresh (the freshness check compares content, not install mode). The user-visible behaviour is fine *today* because the content matches, but the next `pip upgrade safelint` won't propagate to that location anymore. If you want to re-establish the live link, run `safelint skill update --symlink --force`.
 
 The canonical CI / upgrade-script idiom is:
 
@@ -129,7 +129,7 @@ The canonical CI / upgrade-script idiom is:
 safelint skill status || safelint skill update
 ```
 
-`safelint check --check-skill-freshness` is the same drift check folded into a normal lint run — emits one `safelint: warning:` line per stale install but doesn't change the lint exit code. Off by default so day-to-day `safelint check` invocations stay fast (no extra FS scan).
+`safelint check --check-skill-freshness` is the same drift check folded into a normal lint run, emits one `safelint: warning:` line per stale install but doesn't change the lint exit code. Off by default so day-to-day `safelint check` invocations stay fast (no extra FS scan).
 
 A locally-customised install will surface as *differs from bundled*; the diagnostic message explicitly mentions that case so customisers can ignore it. See [Updating, removing, freshness checks](../ai-clients/lifecycle.md) for the full workflow.
 
@@ -138,7 +138,7 @@ A locally-customised install will surface as *differs from bundled*; the diagnos
 Two follow-on commands to round out the install lifecycle:
 
 ```bash
-safelint skill update                          # idempotent refresh — no-op when fresh
+safelint skill update                          # idempotent refresh, no-op when fresh
 safelint skill update --force                  # re-install every detected install
 safelint skill remove                          # delete every detected install
 safelint skill remove --symlink                # delete only symlink-shape installs (keep copies)
@@ -148,25 +148,25 @@ safelint skill remove --dry-run                # preview without deleting
 
 Both commands inherit `--client` and `--project` from `install`, but the meaning of `--client auto` is *different* from install's:
 
-- **`install --client auto`** asks: *"which AI client(s) does this user use?"* — and answers that by scanning the cwd for marker files (`CLAUDE.md`, `.cursor/`, etc.).
-- **`update --client auto`** and **`remove --client auto`** ask: *"what's already installed?"* — and answer that by scanning the actual install paths (`~/.claude/skills/safelint/`, etc.).
+- **`install --client auto`** asks: *"which AI client(s) does this user use?"*, and answers that by scanning the cwd for marker files (`CLAUDE.md`, `.cursor/`, etc.).
+- **`update --client auto`** and **`remove --client auto`** ask: *"what's already installed?"*, and answer that by scanning the actual install paths (`~/.claude/skills/safelint/`, etc.).
 
 This distinction matters when the user has marker files but no install yet (only `install` will fire) or has an install but the marker file has been deleted (only `update`/`remove` will fire).
 
-**`update` flag semantics — `--force`:** without `--force`, `update` only re-installs the locations that have actually drifted from the bundle. Running it when everything is fresh is a no-op: it just prints "already fresh" lines and exits 0. That's what makes it safe to run from cron, CI, or pre-commit hooks — calling `update` repeatedly does nothing extra. With `--force`, it re-installs every detected location regardless of drift; useful for reverting a customised install back to the bundled content.
+**`update` flag semantics, `--force`:** without `--force`, `update` only re-installs the locations that have actually drifted from the bundle. Running it when everything is fresh is a no-op: it just prints "already fresh" lines and exits 0. That's what makes it safe to run from cron, CI, or pre-commit hooks, calling `update` repeatedly does nothing extra. With `--force`, it re-installs every detected location regardless of drift; useful for reverting a customised install back to the bundled content.
 
-**`update` flag semantics — `--symlink` and shape preservation:** by default, `update` preserves the existing install's shape. A copy install stays copy after refresh; a symlink install stays symlink. To *switch* a copy install to symlink mode, pass `--symlink` explicitly. There's one wrinkle: if the copy install is already fresh, `update` is normally a no-op — so converting copy → symlink in that case requires `update --force --symlink` to force the re-install. Switching the other way (symlink → copy) isn't supported via `update`; do `remove` followed by `install` (without `--symlink`) instead, so the intent is unambiguous.
+**`update` flag semantics, `--symlink` and shape preservation:** by default, `update` preserves the existing install's shape. A copy install stays copy after refresh; a symlink install stays symlink. To *switch* a copy install to symlink mode, pass `--symlink` explicitly. There's one wrinkle: if the copy install is already fresh, `update` is normally a no-op, so converting copy → symlink in that case requires `update --force --symlink` to force the re-install. Switching the other way (symlink → copy) isn't supported via `update`; do `remove` followed by `install` (without `--symlink`) instead, so the intent is unambiguous.
 
-**`remove` flag semantics:** flags compose orthogonally — the absence of a flag means "no filter", *not* "only the opposite":
+**`remove` flag semantics:** flags compose orthogonally, the absence of a flag means "no filter", *not* "only the opposite":
 
 | Invocation | What gets removed |
 |---|---|
-| `remove` (no flags) | Every detected install — copy + symlink, every client, both scopes |
+| `remove` (no flags) | Every detected install, copy + symlink, every client, both scopes |
 | `remove --symlink` | Only symlink-shape installs (copies survive) |
 | `remove --client cursor` | All detected Cursor installs (both shapes, both scopes) |
 | `remove --project` | All detected project-scope installs (user-scope survives) |
 | `remove --path PATH` | Exactly one location, regardless of every other flag |
 
-In particular, `safelint skill remove` without `--symlink` removes **both** copy and symlink installs — it's not a "remove copies only" command. `--symlink` is a *filter* you can opt into when you want to be selective, not a creation-mode toggle like in `install`.
+In particular, `safelint skill remove` without `--symlink` removes **both** copy and symlink installs; it's not a "remove copies only" command. `--symlink` is a *filter* you can opt into when you want to be selective, not a creation-mode toggle like in `install`.
 
 `remove` only deletes the install location. Bundled files inside `site-packages/` are never touched (`shutil.rmtree` doesn't follow symlinks for deletion, and `unlink` removes the symlink itself, not its bundled target). The worst case for a misfired `remove` is "re-run `install` to get the skill back". See [Updating, removing, freshness checks](../ai-clients/lifecycle.md#removing-an-installed-skill) for the full filesystem-level breakdown.

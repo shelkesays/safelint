@@ -4,12 +4,12 @@
 
 **Install location:**
 
-- User-scoped: `~/.rules` — Zed loads user-global agent rules.
-- Project-scoped: `<cwd>/.rules` — Zed's canonical workspace rules file. **Recommended for team-shared repos — commit the file.**
+- User-scoped: `~/.rules`, Zed loads user-global agent rules.
+- Project-scoped: `<cwd>/.rules`, Zed's canonical workspace rules file. **Recommended for team-shared repos, commit the file.**
 
 **How to invoke after install:**
 
-Reload Zed (or restart the editor). The rules are auto-loaded from `.rules`. Then ask Zed's assistant *"run safelint"* / *"lint with safelint"* — same prompts as the other clients.
+Reload Zed (or restart the editor). The rules are auto-loaded from `.rules`. Then ask Zed's assistant *"run safelint"* / *"lint with safelint"*, same prompts as the other clients.
 
 **Manual install:**
 

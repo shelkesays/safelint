@@ -5,7 +5,7 @@
 **Install location:**
 
 - User-scoped: `~/.cursor/rules/safelint.mdc` (a single MDC project rule)
-- Project-scoped: `<cwd>/.cursor/rules/safelint.mdc` (recommended for team-shared repos — commit the file)
+- Project-scoped: `<cwd>/.cursor/rules/safelint.mdc` (recommended for team-shared repos, commit the file)
 
 **How to invoke after install:**
 
