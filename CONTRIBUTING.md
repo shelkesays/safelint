@@ -9,14 +9,14 @@ By participating in this project you agree to abide by our [Code of Conduct](COD
 ## Getting started
 
 1. Fork the repository and clone your fork.
-2. Install dev dependencies. The project uses [`uv`](https://docs.astral.sh/uv/) for dependency management — most contributors invoke tools through it:
+2. Install dev dependencies. The project uses [`uv`](https://docs.astral.sh/uv/) for dependency management, most contributors invoke tools through it:
    ```bash
    uv sync --extra dev          # recommended (matches CI)
    # or, if you prefer pip:
    pip install -e ".[dev]"
    ```
 3. Create a branch: `git checkout -b your-feature-name`.
-4. Make your changes, then run the full check suite — every command must pass before you open a PR:
+4. Make your changes, then run the full check suite, every command must pass before you open a PR:
    ```bash
    uv run pytest                       # all tests pass; coverage stays at ≥97%
    uv run ruff check src/ tests/       # zero lint errors
@@ -35,10 +35,10 @@ Most contributions to safelint fall into one of three categories. Each has its o
 | You want to add… | Read this | What you'll touch |
 |---|---|---|
 | A new **safety rule** (e.g. another Power-of-Ten check) | The "Adding a new rule" checklist below | `src/safelint/rules/`, `core/config.py`, `CONFIGURATION.md`, every bundled AI-client doc |
-| A new **AI-client integration** (e.g. JetBrains AI Assistant, a brand-new IDE) | [`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md) — full walkthrough with a worked example | `src/safelint/_skill_install.py` (one `ClientSpec` append), `src/safelint/skill_files/<client>/`, `tests/test_skill_install.py`, `AI_CLIENTS.md`, `skill_files/README.md`, `CHANGELOG.md` |
-| A new **language** safelint can lint (e.g. TypeScript, Go) | [`ADDING_A_LANGUAGE.md`](ADDING_A_LANGUAGE.md) — full walkthrough | `src/safelint/languages/<lang>.py`, the Tree-sitter grammar dependency in `pyproject.toml`, per-rule audit, `tests/`, `CONFIGURATION.md`, every bundled AI-client doc |
+| A new **AI-client integration** (e.g. JetBrains AI Assistant, a brand-new IDE) | [`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md), full walkthrough with a worked example | `src/safelint/_skill_install.py` (one `ClientSpec` append), `src/safelint/skill_files/<client>/`, `tests/test_skill_install.py`, `AI_CLIENTS.md`, `skill_files/README.md`, `CHANGELOG.md` |
+| A new **language** safelint can lint (e.g. TypeScript, Go) | [`ADDING_A_LANGUAGE.md`](ADDING_A_LANGUAGE.md), full walkthrough | `src/safelint/languages/<lang>.py`, the Tree-sitter grammar dependency in `pyproject.toml`, per-rule audit, `tests/`, `CONFIGURATION.md`, every bundled AI-client doc |
 
-The architecture for each path is open-ended: rules go into one tuple (`ALL_RULES`), AI clients go into one tuple (`_CLIENT_SPECS`), languages go into one registry (`safelint.languages._REGISTRY`). Drift-detection tests parametrise over those registries automatically — when you add a new rule, the bundled-doc-coverage tests fail until *every* registered AI client mentions the new rule. When you add a new AI client, the parametrised tests fail until *its* bundled doc mentions every existing rule + extension. The architecture pulls you toward consistency rather than relying on memory.
+The architecture for each path is open-ended: rules go into one tuple (`ALL_RULES`), AI clients go into one tuple (`_CLIENT_SPECS`), languages go into one registry (`safelint.languages._REGISTRY`). Drift-detection tests parametrise over those registries automatically, when you add a new rule, the bundled-doc-coverage tests fail until *every* registered AI client mentions the new rule. When you add a new AI client, the parametrised tests fail until *its* bundled doc mentions every existing rule + extension. The architecture pulls you toward consistency rather than relying on memory.
 
 ---
 
@@ -46,31 +46,31 @@ The architecture for each path is open-ended: rules go into one tuple (`ALL_RULE
 
 Each rule lives in its own class inside `src/safelint/rules/`. Follow this checklist:
 
-- Subclass `BaseRule` and implement `check_file(filepath, tree) -> list[Violation]`. The `tree` argument is a Tree-sitter parse tree, not a Python `ast` tree — see existing rules for traversal patterns (`walk`, `lineno`, `node_text` in `safelint.languages._node_utils`).
-- Set a unique `name` (the human-friendly key users put in their config, e.g. `function_length`) and `code` (the short identifier, e.g. `SAFE105` — pick the next free number in the appropriate `SAFE9xx` band).
-- *(Default suffices for now)* Each rule inherits `BaseRule.language = ("python",)`. Leave it alone unless your rule applies to a *non-Python* language too — that's only relevant once a second language is registered (see [`ADDING_A_LANGUAGE.md`](ADDING_A_LANGUAGE.md)). The engine consults this tuple in `_run_rules` and skips rules whose `language` doesn't include the active file's `LanguageDefinition.name`.
-- Add the rule's class to `ALL_RULES` in `src/safelint/rules/__init__.py`. The position in this tuple is the execution order — keep cheap structural rules first, expensive dataflow rules last.
+- Subclass `BaseRule` and implement `check_file(filepath, tree) -> list[Violation]`. The `tree` argument is a Tree-sitter parse tree, not a Python `ast` tree; see existing rules for traversal patterns (`walk`, `lineno`, `node_text` in `safelint.languages._node_utils`).
+- Set a unique `name` (the human-friendly key users put in their config, e.g. `function_length`) and `code` (the short identifier, e.g. `SAFE105`, pick the next free number in the appropriate `SAFE9xx` band).
+- *(Default suffices for now)* Each rule inherits `BaseRule.language = ("python",)`. Leave it alone unless your rule applies to a *non-Python* language too; that's only relevant once a second language is registered (see [`ADDING_A_LANGUAGE.md`](ADDING_A_LANGUAGE.md)). The engine consults this tuple in `_run_rules` and skips rules whose `language` doesn't include the active file's `LanguageDefinition.name`.
+- Add the rule's class to `ALL_RULES` in `src/safelint/rules/__init__.py`. The position in this tuple is the execution order, keep cheap structural rules first, expensive dataflow rules last.
 - Add default config to `DEFAULTS["rules"]` in `src/safelint/core/config.py`. Set `enabled: false` if your rule is expensive or false-positive-prone (the dataflow rules do this).
 - Write tests covering both the violation case *and* the clean case. Coverage must stay at ≥97% (the project's enforced threshold).
 - Document the rule in `CONFIGURATION.md` under the matching category, following the format used by existing rules.
 - Update every bundled AI-client artefact under `src/safelint/skill_files/` to mention the new rule code + name. The drift-detection tests (`test_skill_documents_every_active_rule[<client>]`) parametrise over the registry and will fail CI for every client whose docs are missing the new rule.
 
-**Self-imposed constraints:** safelint runs itself in CI, so your new rule's source code must obey the same rules it enforces — `function_length ≤ 60`, `nesting_depth ≤ 2`, `complexity ≤ 10`, etc. If `safelint check src/` fails on the new rule's own implementation, that's a meta-bug; refactor the rule's code until it passes.
+**Self-imposed constraints:** safelint runs itself in CI, so your new rule's source code must obey the same rules it enforces: `function_length ≤ 60`, `nesting_depth ≤ 2`, `complexity ≤ 10`, etc. If `safelint check src/` fails on the new rule's own implementation, that's a meta-bug; refactor the rule's code until it passes.
 
 ---
 
 ## Adding a new AI client
 
-Twelve clients ship today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is one `ClientSpec` append plus a bundled artefact and ~10 regression tests — no control-flow changes elsewhere. The full walkthrough with a worked example lives in [`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md). The short version:
+Twelve clients ship today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is one `ClientSpec` append plus a bundled artefact and ~10 regression tests, no control-flow changes elsewhere. The full walkthrough with a worked example lives in [`ADDING_AN_AI_CLIENT.md`](ADDING_AN_AI_CLIENT.md). The short version:
 
 - Decide on the bundled artefact shape (single file under `skill_files/<client>/<filename>` is the common case; directory-tree under `skill_files/` is Claude's pattern).
 - Write the bundled file by adapting an existing one (Cursor's `cursor/safelint.mdc` is a clean single-file template). Strip MDC frontmatter if your client doesn't use it.
-- Append one `ClientSpec` entry to `_CLIENT_SPECS` in `src/safelint/_skill_install.py` — fields: `name`, `display_name`, `artefact_label`, `cwd_markers`, `home_markers`, `install_relpath`, `bundled_relpath`, `restart_hint`, `usage_hint`, `documentation_relpaths`. If your client also writes to a *cross-agent* shared file (like codex's `AGENTS.md`), set `secondary_install_relpath` and `secondary_install_section_markers` — the install primitives handle the rest.
+- Append one `ClientSpec` entry to `_CLIENT_SPECS` in `src/safelint/_skill_install.py`, fields: `name`, `display_name`, `artefact_label`, `cwd_markers`, `home_markers`, `install_relpath`, `bundled_relpath`, `restart_hint`, `usage_hint`, `documentation_relpaths`. If your client also writes to a *cross-agent* shared file (like codex's `AGENTS.md`), set `secondary_install_relpath` and `secondary_install_section_markers`, the install primitives handle the rest.
 - Add the new directory name to `_PEER_CLIENT_DIRS` so it doesn't leak into Claude's directory-tree install.
 - Mirror an existing client's test block (10–12 tests covering install / symlink / force / overwrite / auto-detect / CLI routing / path-print / peer-exclusion).
 - Update `AI_CLIENTS.md`, `skill_files/README.md`, and `CHANGELOG.md`.
 
-The security guards (symlink refusal at the secondary destination, `skill remove --path PATH` install-shape validation, etc.) live in `_skill_install.py` and apply to your client automatically — no per-client implementation needed.
+The security guards (symlink refusal at the secondary destination, `skill remove --path PATH` install-shape validation, etc.) live in `_skill_install.py` and apply to your client automatically, no per-client implementation needed.
 
 ---
 

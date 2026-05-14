@@ -1,6 +1,6 @@
 # Configuration reference
 
-This page has moved. The full reference — every CLI flag, every safety rule, every TOML option, suppression mechanisms, diagnostics — now lives on the docs site:
+This page has moved. The full reference, every CLI flag, every safety rule, every TOML option, suppression mechanisms, diagnostics, now lives on the docs site:
 
 > **<https://shelkesays.github.io/safelint/configuration/>**
 
