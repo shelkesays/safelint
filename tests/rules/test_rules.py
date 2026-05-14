@@ -921,6 +921,55 @@ def test_cli_check_mode_clean_run_with_suppressions_still_shows_breakdown(
     assert "SAFE103 suppressed" in out, f"interactive check must keep the suppression breakdown; got {out!r}"
 
 
+def test_cli_check_mode_suppression_breakdown_is_collective_and_language_agnostic(
+    tmp_path: Path,
+    mocker,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``safelint check --all-files`` over a mixed Python + TypeScript tree prints ONE aggregated summary line.
+
+    Issue #50 follow-up: confirm the suppression breakdown is collective
+    (one line for the whole run, not one per file) AND language-agnostic
+    (a ``# nosafe`` in Python and a ``// nosafe`` in TypeScript sum into
+    a single per-rule count). ``_run_check`` accumulates ``all_suppressed``
+    across every ``LintResult`` regardless of language, and
+    ``_format_suppressed_breakdown`` keys the ``Counter`` on the rule
+    code — so the aggregation is structural, not per-language.
+    """
+    py_file = tmp_path / "mod.py"
+    py_file.write_text(
+        "def fn(a, b, c, d, e, g, h, i):  # nosafe: SAFE103\n    return a\n",
+        encoding="utf-8",
+    )
+    ts_file = tmp_path / "mod.ts"
+    ts_file.write_text(
+        "function gn(a, b, c, d, e, g, h, i) {  // nosafe: SAFE103\n  return a;\n}\n",
+        encoding="utf-8",
+    )
+    from safelint import cli as _cli  # noqa: PLC0415 — local import keeps the module-level import list lean
+
+    mocker.patch.object(_cli, "_get_git_modified_supported_files", return_value=None)
+    args = argparse.Namespace(
+        target=tmp_path,
+        config=None,
+        all_files=True,
+        fail_on=None,
+        mode=None,
+        ignore=None,
+        output_format="pretty",
+        no_cache=True,
+        stdin=False,
+        stdin_filename="",
+    )
+    rc = _run_check(args)
+    assert rc == 0
+    out = capsys.readouterr().out
+    # Exactly one summary line — not one per file.
+    assert out.count("All checks passed.") == 1, f"expected a single collective summary line; got {out!r}"
+    # The Python (.py) and TypeScript (.ts) SAFE103 suppressions sum to 2.
+    assert "2 SAFE103 suppressed" in out, f"cross-language suppressions must aggregate into one count; got {out!r}"
+
+
 def test_cli_check_mode_exits_0_on_clean_directory(tmp_path: Path) -> None:
     """_run_check returns 0 when the scanned directory has no violations."""
 
