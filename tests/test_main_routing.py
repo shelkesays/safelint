@@ -98,9 +98,7 @@ def test_dispatch_hook_silent_failure_emits_only_error_no_redundant_warning(
     # Error: present, single line about the missing grammar.
     assert err.count("safelint: error: no files linted") == 1
     # Warning: must NOT be present in silent-failure case (the error covers it).
-    assert "safelint: warning: skipping" not in err, (
-        f"per-extension warning should be suppressed in silent-failure case; got stderr: {err!r}"
-    )
+    assert "safelint: warning: skipping" not in err, f"per-extension warning should be suppressed in silent-failure case; got stderr: {err!r}"
 
 
 def test_dispatch_hook_mixed_run_still_emits_per_extension_warning(
@@ -128,9 +126,7 @@ def test_dispatch_hook_mixed_run_still_emits_per_extension_warning(
         cli.main()
 
     err = capsys.readouterr().err
-    assert "safelint: warning: skipping .ts files" in err, (
-        f"per-extension warning expected in mixed run; got stderr: {err!r}"
-    )
+    assert "safelint: warning: skipping .ts files" in err, f"per-extension warning expected in mixed run; got stderr: {err!r}"
     # No silent-failure error in a mixed run.
     assert "no files linted" not in err
 
