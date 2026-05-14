@@ -309,49 +309,43 @@ def _print_results(
     prints a single machine-readable document on stdout. *options* knobs:
 
     * ``silent_on_clean`` — when True, pretty mode emits nothing on a clean
-      run (no violations), *regardless of whether anything was suppressed*.
-      Hook / stdin mode set this so a clean pre-commit run is silent (the
-      ruff/ty contract); ``safelint check`` leaves it False so the interactive
-      user gets ``All checks passed.`` plus the ``(N suppressed)`` breakdown.
-      The breakdown is deliberately *not* printed under ``silent_on_clean``:
-      pre-commit batches files across multiple hook invocations, so printing
-      it per batch produces a stack of lines each showing a misleading
-      *partial* count (issue #50). The summed breakdown stays available via
-      ``safelint check`` and in every ``--format json`` / ``--format sarif``
-      document.
+      run (no violations) — *no summary and no ``--statistics`` table*,
+      regardless of suppressions. Hook / stdin mode set this so a clean
+      pre-commit run is fully silent (the ruff/ty contract). Rationale:
+      pre-commit batches files across hook invocations, so printing the
+      ``(N suppressed)`` breakdown or the stats table per batch produces a
+      stack of misleading *partial*-count lines (issue #50). The summed
+      breakdown stays available via ``safelint check`` (which leaves this
+      False) and in every JSON / SARIF document.
     * ``statistics`` — when True, append a per-rule violation-count table
-      after the summary. Pretty mode only; ignored in JSON / SARIF.
+      after the summary. Pretty mode only; gated by the same clean-run
+      silence above.
 
     Stderr diagnostics are unaffected — always written as produced.
     """
     if output_format == "pretty":
-        if violations or not options.silent_on_clean:
+        # A clean run under ``silent_on_clean`` emits nothing — summary AND
+        # the ``--statistics`` table (the hook parser accepts ``--statistics``,
+        # so this gate is what keeps a clean pre-commit batch quiet — issue #50).
+        emit = bool(violations) or not options.silent_on_clean
+        if emit:
             _print_summary(violations, blocking_count, fail_on, suppressed)
-        if options.statistics:
+        if options.statistics and emit:
             _print_statistics(violations, suppressed)
         return
-    if output_format == "json":
-        print(
-            format_json(
-                violations,
-                suppressed,
-                blocking_count=blocking_count,
-                fail_on=fail_on,
-                files_checked=files_checked,
-            )
+    # output_format is "json" or "sarif" here — argparse ``choices`` guarantees
+    # it, and "pretty" already returned above. Both formatters share the same
+    # signature, so a single dispatch covers both machine-readable documents.
+    formatter = format_json if output_format == "json" else format_sarif
+    print(
+        formatter(
+            violations,
+            suppressed,
+            blocking_count=blocking_count,
+            fail_on=fail_on,
+            files_checked=files_checked,
         )
-        return
-    if output_format == "sarif":
-        print(
-            format_sarif(
-                violations,
-                suppressed,
-                blocking_count=blocking_count,
-                fail_on=fail_on,
-                files_checked=files_checked,
-            )
-        )
-        return
+    )
 
 
 def _resolve_fail_on(args: argparse.Namespace, config: dict) -> tuple[str, int]:

@@ -247,6 +247,33 @@ def test_run_hook_silent_on_clean_run_even_with_suppressions(tmp_path: Path, cap
     assert out == "", f"hook-mode clean run must be silent on stdout regardless of suppressions; got {out!r}"
 
 
+def test_run_hook_statistics_flag_silent_on_clean_run_with_suppressions(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+    """``--statistics`` does NOT reintroduce per-batch stdout noise on a clean hook run (issue #50 follow-up).
+
+    The hook parser accepts ``--statistics``. Without gating, a clean
+    pre-commit batch carrying only ``# nosafe`` suppressions would still
+    print the per-rule statistics table — once per batch — bringing back
+    the exact noise the ``silent_on_clean`` silence is meant to remove.
+    ``_print_results`` gates the stats table behind the same clean-run
+    silence as the summary line.
+    """
+    clean = tmp_path / "clean.py"
+    clean.write_text("x = 1\n", encoding="utf-8")
+
+    fake_result = LintResult(path=str(clean), violations=[], suppressed=[_v("warning", code="SAFE501")])
+    mocker.patch("safelint.cli.SafetyEngine.check_file", return_value=fake_result)
+
+    # _make_args doesn't set ``statistics`` — add it explicitly to mimic a
+    # hook configured with ``args: [--statistics]``.
+    args = _make_args()
+    args.statistics = True
+    assert _run_hook(args, [str(clean)]) == 0
+
+    captured = capsys.readouterr()
+    out = _strip(captured.out)
+    assert out == "", f"--statistics must stay silent on a clean hook run; got {out!r}"
+
+
 # ---------------------------------------------------------------------------
 # v2.0.0 — missing-grammar hint
 # ---------------------------------------------------------------------------
