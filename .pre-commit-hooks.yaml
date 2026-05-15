@@ -33,3 +33,14 @@
   #       files: \.(ts|tsx|as)$    # restrict to TS-family extensions
   types_or: [python, javascript, ts, tsx]
   args: [--fail-on=error]
+  # Force a single invocation. Without this, pre-commit runs the hook
+  # in parallel batches across files, producing one "Found N errors ...
+  # (M SAFE### suppressed)" summary block per batch with partial counts.
+  # ``require_serial: true`` collapses execution into one process so the
+  # summary aggregates correctly across the whole run (issue #52). Cost:
+  # no parallelism across batches, which is a non-issue for safelint
+  # because the engine is already fast per-file (Tree-sitter parse +
+  # rule walks). On very large repos that exceed the OS argv limit
+  # pre-commit may still split into sequential invocations, but each
+  # batch's summary is then internally consistent.
+  require_serial: true
