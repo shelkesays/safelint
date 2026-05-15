@@ -1373,12 +1373,12 @@ def _build_skill_parser() -> argparse.ArgumentParser:
     )
     _add_skill_install_arguments(install, INSTALL_CLIENT_CHOICES)
 
-    path_parser = sub.add_parser("path", help="Print the on-disk location of a bundled skill / rule / instructions file (use --client to pick which)")
+    path_parser = sub.add_parser("path", help="Print bundled-skill location: no --client prints the bundle root directory; --client prints that client's artefact file")
     path_parser.add_argument(
         "--client",
         choices=PATH_CLIENT_CHOICES,
-        default="claude",
-        help="Which bundled artefact's path to print (default: ``claude`` - skill_files root)",
+        default=None,
+        help="Which client's artefact file path to print. Omit to print the bundle ROOT directory instead (parent of every per-client subdir and the shared ``languages/<lang>.md`` addendums).",
     )
 
     sub.add_parser(

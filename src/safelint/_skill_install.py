@@ -560,24 +560,50 @@ def _remove_existing(target: Path) -> None:
         shutil.rmtree(target)
 
 
-def _cleanup_empty_install_parent(target: Path) -> None:
-    """Remove *target*'s immediate parent directory when it's empty after install removal.
+def _cleanup_empty_install_parent(
+    target: Path,
+    *,
+    install_relpath: tuple[str, ...] | None = None,
+    explicit_path_removal: bool = False,
+) -> None:
+    """Remove *target*'s immediate parent directory when it's safe and empty.
 
     Claude Code's install lives at ``.claude/skills/safelint/SKILL.md`` -
     the ``safelint/`` parent is created specifically for this install
     and serves no purpose once SKILL.md is gone. Cleaning it up leaves
     the user with a tidy ``.claude/skills/`` rather than an empty
-    ``safelint/`` skeleton. Generalises beyond Claude: any spec whose
-    install_relpath has depth >= 2 gets parent cleanup, but only when
-    the parent dir is truly empty (no user-added customisation files,
-    no sibling installs).
+    ``safelint/`` skeleton.
 
-    ``OSError`` is swallowed: the parent might be unwritable or
-    suddenly populated by a concurrent process; either way the
-    primary remove already succeeded, so a clean-up best-effort
-    is the right posture.
+    Several guards prevent the cleanup from reaching the wrong directory:
+
+    - ``explicit_path_removal=True`` (passed from ``--path PATH``) skips
+      cleanup entirely. The user named the exact file they wanted gone;
+      reaching past that to delete the parent would be surprising.
+    - ``install_relpath`` must have length >= 2. Depth-1 installs land
+      directly at the scope root (Gemini's ``GEMINI.md``, aider's
+      ``CONVENTIONS.md``, Windsurf's ``.windsurfrules``, Zed's
+      ``.rules``); their "parent" *is* ``Path.home()`` or ``Path.cwd()``
+      and rmdir'ing that would be catastrophic.
+    - Defensive guard: parent must not equal the filesystem anchor
+      (``/`` on POSIX, drive root on Windows), ``Path.home()``, or
+      ``Path.cwd()``. Belt-and-suspenders against pathological
+      ``install_relpath`` shapes or odd test fixtures.
+
+    ``OSError`` from ``rmdir`` is swallowed: rmdir only succeeds on
+    empty directories - the condition we want - so any non-empty
+    parent (user customisations, sibling installs from other tools
+    sharing the same rules dir like Cursor's ``.cursor/rules/``) and
+    any permissions / I/O failure both produce ``OSError``. The
+    primary remove already succeeded; a best-effort cleanup is the
+    right posture.
     """
+    if explicit_path_removal:
+        return
+    if install_relpath is None or len(install_relpath) < 2:
+        return
     parent = target.parent
+    if parent == Path(parent.anchor) or parent in (Path.home(), Path.cwd()):
+        return
     try:
         # ``Path.rmdir`` only succeeds on empty dirs - exactly the
         # condition we want. ``next(iter(...), None)`` would also work
@@ -933,15 +959,25 @@ def run_install(args: argparse.Namespace) -> int:
 
 
 def run_path(args: argparse.Namespace) -> int:
-    """Execute ``safelint skill path`` - print the bundled-files location.
+    """Execute ``safelint skill path`` - print a bundled-files location.
 
-    Default prints Claude Code's bundled ``claude/SKILL.md`` path (the
-    cat-friendly single-line form). ``--client cursor`` prints the
-    bundled MDC file path instead, and so on for every registered
-    client. ``auto`` is intentionally not a choice here - a single
-    path is what callers expect from this command.
+    With no ``--client``, prints the **bundle root directory** - the
+    parent that contains every per-client subdirectory
+    (``claude/SKILL.md``, ``cursor/safelint.mdc``, ...) plus the
+    shared ``languages/<lang>.md`` addendums every client looks up on
+    demand. This is the form documented in every bundled skill file
+    ("find addendums at ``<that path>/languages/<lang>.md``").
+
+    With ``--client <name>``, prints the **bundled artefact file path**
+    for that specific client (e.g. ``<bundle>/claude/SKILL.md``,
+    ``<bundle>/cursor/safelint.mdc``). ``auto`` is intentionally not a
+    choice here - a single path is what callers expect from this
+    command.
     """
-    client = getattr(args, "client", "claude")
+    client = getattr(args, "client", None)
+    if client is None:
+        _print_bundled_path(bundled_skill_path())
+        return 0
     spec = _spec_by_name(client)
     _print_bundled_path(_spec_bundled_source(spec))
     return 0
@@ -1404,7 +1440,7 @@ def _remove_one(spec: ClientSpec, *, project: bool, dry_run: bool) -> int:
         _emit_secondary_remove_notice(spec, project=project, dry_run=True)
         return 0
     _remove_existing(target)
-    _cleanup_empty_install_parent(target)
+    _cleanup_empty_install_parent(target, install_relpath=spec.install_relpath)
     _print_remove_success(spec, target, scope)
     _emit_secondary_remove_notice(spec, project=project, dry_run=False)
     return 0
@@ -1494,7 +1530,7 @@ def _remove_path(path: Path, *, dry_run: bool) -> int:
         _print_remove_dry_run(None, path, None, shape=shape)
         return 0
     _remove_existing(path)
-    _cleanup_empty_install_parent(path)
+    _cleanup_empty_install_parent(path, explicit_path_removal=True)
     _print_remove_success(None, path, None)
     return 0
 

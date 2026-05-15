@@ -177,14 +177,17 @@ def test_install_with_force_replaces_existing_symlink(monkeypatch: pytest.Monkey
 
 
 def test_run_path_prints_bundled_directory(capsys: pytest.CaptureFixture[str]) -> None:
-    """``safelint skill path`` prints the bundled file for the default client (claude)."""
+    """``safelint skill path`` (no --client) prints the bundle root directory."""
     rc = _skill_install.run_path(argparse.Namespace())
     assert rc == 0
     out = capsys.readouterr().out.strip()
     p = Path(out)
-    assert p.is_file()
-    assert p.name == "SKILL.md"
-    assert p.parent.name == "claude"
+    assert p.is_dir()
+    # Bundle root contains both per-client subdirs and the shared ``languages/``
+    # addendums - this is the path that ``<that path>/languages/<lang>.md`` is
+    # documented against in every client's own bundled doc.
+    assert (p / "claude" / "SKILL.md").is_file()
+    assert (p / "languages" / "python.md").is_file()
 
 
 # ---------------------------------------------------------------------------
