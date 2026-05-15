@@ -149,6 +149,10 @@ repos:
         # from reaching the hook in the first place.
         types_or: [python, javascript]
         files: ^src/
+        # Mirror the published hook spec in ``.pre-commit-hooks.yaml``: one
+        # process per run so the suppression summary aggregates across all
+        # files instead of fragmenting per batch (issue #52).
+        require_serial: true
 
   # ---------------------------------------------------------------------------
   # Local hooks - tools without published pre-commit integrations
