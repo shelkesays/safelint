@@ -35,10 +35,13 @@ For pre-commit integration, set `additional_dependencies` in
 
 Without the extra, an all-TypeScript hook run skips every passed file
 and exits with code 2 (pre-commit shows the hook as **Failed**),
-printing a single error line: `safelint: error: no files linted - every file
-pre-commit passed had a grammar that isn't installed - add
-'safelint[typescript]' to additional_dependencies in your
-.pre-commit-config.yaml`. (Hook mode suppresses the per-extension
+printing a single error line:
+
+```text
+safelint: error: no files linted - every file pre-commit passed had a grammar that isn't installed - add 'safelint[typescript]' to additional_dependencies in your .pre-commit-config.yaml
+```
+
+(Hook mode suppresses the per-extension
 `safelint: warning: skipping …` line when *every* file is skipped,
 the error already carries the install hint; a mixed run that still
 lints some files keeps the warning as context.)

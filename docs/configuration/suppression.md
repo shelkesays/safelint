@@ -9,7 +9,7 @@ SafeLint offers four ways to silence a rule, ranging from one-line surgical to p
 | `[tool.safelint.per_file_ignores]` | A glob pattern | `safelint.toml` / `pyproject.toml` | Project policy: "files under tests/ never need their own tests" |
 | `ignore = [...]` | The whole project | `safelint.toml` / `pyproject.toml` | "We've decided this rule doesn't fit our codebase" |
 
-The narrower-scope forms compose with the broader ones, toml-level ignores still apply on top of file-level directives, and inline `# nosafe` always wins for the specific line it's on. The two TOML-level mechanisms are documented on the [Configuration file](toml.md) page; this page covers the in-source forms (`# nosafe` and `# safelint: ignore`) plus the run-summary diagnostics that surface what got suppressed.
+The narrower-scope forms compose with the broader ones: toml-level ignores still apply on top of file-level directives, and inline `# nosafe` always wins for the specific line it's on. The two TOML-level mechanisms are documented on the [Configuration file](toml.md) page; this page covers the in-source forms (`# nosafe` and `# safelint: ignore`) plus the run-summary diagnostics that surface what got suppressed.
 
 ## Inline `# nosafe`
 
@@ -71,7 +71,7 @@ Prefer **config changes** (adjusting thresholds or disabling rules) over `# nosa
 
 ## File-level `# safelint: ignore`
 
-For cases where a *whole file* is intentionally violating, auto-generated code, code that has to look the way it does to satisfy a vendor protocol, a fixture file, put a directive in the file itself rather than in toml:
+For cases where a *whole file* is intentionally violating (auto-generated code, code that has to look the way it does to satisfy a vendor protocol, a fixture file, and similar), put a directive in the file itself rather than in toml:
 
 ```python
 # safelint: ignore: SAFE101, SAFE304

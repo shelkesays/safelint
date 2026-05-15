@@ -124,14 +124,16 @@ def _slugify_heading(code: str, name: str) -> str:
 
     Rule headings on ``rules.md`` are written like::
 
-        ### SAFE101 - `function_length`
+        ### SAFE101: `function_length`
 
     Python-Markdown's ``toc`` extension (enabled in ``mkdocs.yml`` as the
     plain ``toc:`` entry - *not* ``pymdownx.toc``) lowercases the text,
     drops non-alphanumeric runs, and joins the surviving tokens with
-    single dashes. For the heading ``### SAFE101: `function_length` ``
-    in ``docs/configuration/rules.md``, the colon and the inline-code
-    backticks both fall out, leaving ``safe101-function_length``.
+    single dashes. The actual rule headings in
+    ``docs/configuration/rules.md`` follow the shape
+    ``### SAFE101: `function_length` `` (the rule name wrapped in
+    inline-code backticks). The colon and those backticks both drop
+    out of the slug, leaving ``safe101-function_length``.
     """
     return f"{code.lower()}-{name}"
 
