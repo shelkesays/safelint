@@ -2,9 +2,9 @@
 
 SafeLint is configured in three places, in roughly increasing order of permanence:
 
-1. **The CLI**, `safelint check --fail-on=warning --ignore SAFE801`. One-off overrides, CI knobs, hook flags. See [CLI flags and commands](cli.md).
-2. **In your source files**, `# nosafe` on a line, `# safelint: ignore` at the top of a file. The escape hatch when a violation is intentional. See [Suppression mechanisms](suppression.md).
-3. **A TOML config**, `[tool.safelint]` in `pyproject.toml` or a standalone `safelint.toml`. Project-wide policy: thresholds, per-rule options, glob-scoped ignores. See [Configuration file](toml.md).
+1. **The CLI**: `safelint check --fail-on=warning --ignore SAFE801`. One-off overrides, CI knobs, hook flags. See [CLI flags and commands](cli.md).
+2. **In your source files**: `# nosafe` on a line, `# safelint: ignore` at the top of a file. The escape hatch when a violation is intentional. See [Suppression mechanisms](suppression.md).
+3. **A TOML config**: `[tool.safelint]` in `pyproject.toml` or a standalone `safelint.toml`. Project-wide policy: thresholds, per-rule options, glob-scoped ignores. See [Configuration file](toml.md).
 
 Per-rule options (`max_lines`, `max_depth`, dataflow `sinks`, …) and what each rule actually flags live on the [Rules reference](rules.md).
 

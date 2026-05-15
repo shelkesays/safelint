@@ -74,8 +74,8 @@ def _python_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None
     """Return the bare identifier target of *node* if it is one, else None.
 
     tree-sitter-python parses both regular and *annotated* assignments
-    (``x = 1`` and ``x: int = 1``) as the same ``assignment`` node type
-    - annotated form just adds ``:`` and ``type`` as inline children.
+    (``x = 1`` and ``x: int = 1``) as the same ``assignment`` node type.
+    The annotated form just adds ``:`` and ``type`` as inline children.
     ``child_by_field_name("left")`` correctly returns the identifier in
     both cases, so a single branch handles both.
     """
