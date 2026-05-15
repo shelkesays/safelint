@@ -155,7 +155,7 @@ The rule set is shared across all supported languages. Universal rationale crib 
 | SAFE302 | global_mutation | Reassigning shared state mid-function is a Power-of-Ten violation outright. |
 | SAFE303 | side_effects_hidden | Pure-named functions doing I/O surprise callers. |
 | SAFE304 | side_effects | I/O at unexpected sites makes testing harder; rename or inject. |
-| SAFE305 | wide_scope_declaration | JavaScript ``var`` is function-scoped (hoisted across blocks); ``let`` / ``const`` are block-scoped. The rule fires on every ``var`` declaration; the fix is mechanical (replace with ``let`` if reassigned, ``const`` otherwise). JavaScript-only, with no Python equivalent. |
+| SAFE305 | wide_scope_declaration | JS-family (JavaScript and TypeScript): ``var`` is function-scoped (hoisted across blocks); ``let`` / ``const`` are block-scoped. The rule fires on every ``var`` declaration; the fix is mechanical (replace with ``let`` if reassigned, ``const`` otherwise). TypeScript inherits the same scoping behaviour. No Python equivalent. |
 | SAFE401 | resource_lifecycle | Files, locks, sockets, and similar resources should be acquired inside a `with` block so cleanup is guaranteed even on exception paths. |
 | SAFE501 | unbounded_loops | Every loop should have a bounded iteration count for predictable termination. |
 | SAFE601 | missing_assertions | Functions without internal assertions skip a key opportunity to catch invariant violations close to where they happen. |

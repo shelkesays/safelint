@@ -179,7 +179,7 @@ Both achieve the same result, but they serve different purposes:
 | | `ignore` | `enabled: false` |
 |---|---|---|
 | Location | Single top-level list | Inside each rule's own section |
-| Accepts | Code or name |, (the key is the name) |
+| Accepts | Code or name | (the key is the name) |
 | Best for | Quick, temporary suppression; CI overrides; onboarding | Permanent project policy for a specific rule |
 | `--ignore` CLI flag | Yes, stacks on top of the config list | No CLI equivalent |
 
