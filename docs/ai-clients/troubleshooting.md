@@ -4,7 +4,7 @@
 
 Means neither cwd nor home had any of the registered markers. Either:
 
-1. The AI client isn't installed on this machine, install it first, *then* run `safelint skill install`.
+1. The AI client isn't installed on this machine. Install it first, *then* run `safelint skill install`.
 2. You want a specific client regardless of detection, use `--client <name>` explicitly. The error message lists the exact commands.
 
 ## "target already exists. Use --force to replace it."
