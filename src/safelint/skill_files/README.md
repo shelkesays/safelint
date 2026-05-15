@@ -162,11 +162,12 @@ safelint skill remove --path /unusual/place/.cursor/rules/safelint.mdc
 ### Where are the bundled files?
 
 ```bash
-safelint skill path                  # Claude's claude/SKILL.md (default)
-safelint skill path --client cursor  # Cursor MDC file path
+safelint skill path                  # bundle root directory
+safelint skill path --client claude  # <bundle>/claude/SKILL.md (file)
+safelint skill path --client cursor  # <bundle>/cursor/safelint.mdc (file)
 ```
 
-Prints the on-disk location of the bundled artefact for the chosen client. Pass `--client <name>` to inspect any registered client. The parent directory contains the shared `languages/<lang>.md` addendums every client looks up on demand.
+Without `--client`, prints the bundle root directory: every client looks up the shared addendums at `<that path>/languages/<lang>.md`. With `--client <name>`, prints that specific client's bundled artefact file path instead - useful for inspecting the source of a particular install or as a `cat` target.
 
 ### Is my installed skill up to date?
 
