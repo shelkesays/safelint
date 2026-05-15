@@ -1,6 +1,6 @@
 # Suppression mechanisms
 
-SafeLint offers four ways to silence a rule, ranging from one-line surgical to project-wide. Pick the narrowest scope that matches your intent, broader scopes are easier to forget about.
+SafeLint offers four ways to silence a rule, ranging from one-line surgical to project-wide. Pick the narrowest scope that matches your intent. Broader scopes are easier to forget about.
 
 | Mechanism | Scope | Where it lives | Best for |
 |---|---|---|---|
@@ -30,13 +30,13 @@ Both rule codes (e.g. `SAFE101`) and rule names (e.g. `function_length`) are acc
 
 ### Examples
 
-**Suppress all violations on a line**, use when a line genuinely triggers multiple unrelated rules and fixing each would make the code worse:
+**Suppress all violations on a line.** Use when a line genuinely triggers multiple unrelated rules and fixing each would make the code worse:
 
 ```python
 result = eval(user_input)  # nosafe
 ```
 
-**Suppress a single code**, preferred; makes the intent explicit and leaves other rules active:
+**Suppress a single code.** Preferred; makes the intent explicit and leaves other rules active:
 
 ```python
 while True:  # nosafe: SAFE501
@@ -45,14 +45,14 @@ while True:  # nosafe: SAFE501
         break
 ```
 
-**Suppress by rule name**, identical behaviour to suppressing by code; use whichever is more readable in context:
+**Suppress by rule name.** Identical behaviour to suppressing by code; use whichever is more readable in context:
 
 ```python
 while True:  # nosafe: unbounded_loops
     ...
 ```
 
-**Suppress multiple rules**, keep the list short; a long list is a signal the code needs refactoring:
+**Suppress multiple rules.** Keep the list short; a long list is a signal the code needs refactoring:
 
 ```python
 def get_data(conn, query, p1, p2, p3, p4, p5, p6):  # nosafe: SAFE101, SAFE103
