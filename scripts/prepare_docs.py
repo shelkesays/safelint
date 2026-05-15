@@ -58,7 +58,7 @@ _COPIES: tuple[tuple[str, str, dict[str, str]], ...] = (
             "SUPPORT.md": "../project/support.md",
             "CHANGELOG.md": "../project/changelog.md",
             "README.md": "../index.md",
-            "docs/JSON_SCHEMA.md": "../json-schema.md",
+            "docs/json-schema.md": "../json-schema.md",
         },
     ),
     (
@@ -73,7 +73,7 @@ _COPIES: tuple[tuple[str, str, dict[str, str]], ...] = (
             "CODE_OF_CONDUCT.md": "code-of-conduct.md",
             "SUPPORT.md": "support.md",
             "README.md": "../index.md",
-            "docs/JSON_SCHEMA.md": "../json-schema.md",
+            "docs/json-schema.md": "../json-schema.md",
         },
     ),
     (
@@ -92,7 +92,7 @@ _COPIES: tuple[tuple[str, str, dict[str, str]], ...] = (
             "CONTRIBUTING.md": "../contributing/index.md",
             "CODE_OF_CONDUCT.md": "code-of-conduct.md",
             "README.md": "../index.md",
-            "docs/JSON_SCHEMA.md": "../json-schema.md",
+            "docs/json-schema.md": "../json-schema.md",
         },
     ),
 )
@@ -102,7 +102,7 @@ def _rewrite_links(text: str, mapping: dict[str, str]) -> str:
     """Replace every ``[label](old_url)`` whose old_url is a key of *mapping*."""
     if not mapping:
         return text
-    # Sort keys longest-first so ``docs/JSON_SCHEMA.md`` is replaced before
+    # Sort keys longest-first so ``docs/json-schema.md`` is replaced before
     # the bare ``JSON_SCHEMA.md`` would be - defensive against future link forms.
     for old in sorted(mapping, key=len, reverse=True):
         # Plain string substitution - we anchor on the ``](`` prefix and the

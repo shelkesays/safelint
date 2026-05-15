@@ -227,7 +227,7 @@ def _file_summary_line(filepath: str, violations: list[Violation]) -> str:
     if not violations:
         msg = "violations must be non-empty"
         raise ValueError(msg)
-    return f"{filepath} \u2014 {', '.join(_severity_parts(violations))}."
+    return f"{filepath} - {', '.join(_severity_parts(violations))}."
 
 
 def _print_file_summary(filepath: str, violations: list[Violation]) -> None:

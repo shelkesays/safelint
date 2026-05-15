@@ -61,25 +61,25 @@ def _v(severity: str, code: str = "SAFE999", rule: str = "test_rule") -> Violati
 def test_file_summary_line_error_only() -> None:
     """A single error-severity violation produces '1 error'."""
     line = _strip(_file_summary_line("path/file.py", [_v("error")]))
-    assert line == "path/file.py \u2014 1 error."
+    assert line == "path/file.py - 1 error."
 
 
 def test_file_summary_line_errors_plural() -> None:
     """Multiple errors are pluralised correctly."""
     line = _strip(_file_summary_line("path/file.py", [_v("error"), _v("error")]))
-    assert line == "path/file.py \u2014 2 errors."
+    assert line == "path/file.py - 2 errors."
 
 
 def test_file_summary_line_warning_only() -> None:
     """A single warning-severity violation produces '1 warning'."""
     line = _strip(_file_summary_line("path/file.py", [_v("warning")]))
-    assert line == "path/file.py \u2014 1 warning."
+    assert line == "path/file.py - 1 warning."
 
 
 def test_file_summary_line_warnings_plural() -> None:
     """Multiple warnings are pluralised correctly."""
     line = _strip(_file_summary_line("path/file.py", [_v("warning"), _v("warning")]))
-    assert line == "path/file.py \u2014 2 warnings."
+    assert line == "path/file.py - 2 warnings."
 
 
 def test_file_summary_line_mixed_violations() -> None:
@@ -90,13 +90,13 @@ def test_file_summary_line_mixed_violations() -> None:
             [_v("error"), _v("warning"), _v("warning")],
         )
     )
-    assert line == "path/file.py \u2014 1 error, 2 warnings."
+    assert line == "path/file.py - 1 error, 2 warnings."
 
 
 def test_file_summary_line_unknown_severity_counted_as_error() -> None:
     """Unknown severities are treated as errors, consistent with partition_violations."""
     line = _strip(_file_summary_line("path/file.py", [_v("critical")]))
-    assert line == "path/file.py \u2014 1 error."
+    assert line == "path/file.py - 1 error."
 
 
 def test_file_summary_line_empty_violations_raises() -> None:

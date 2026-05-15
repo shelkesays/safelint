@@ -31,7 +31,7 @@ A bug report with all six items typically gets answered same-day; a report missi
 - [`README.md`](README.md), overview, install, quick start.
 - [`CONFIGURATION.md`](CONFIGURATION.md), every CLI flag, every rule, every config option.
 - [`AI_CLIENTS.md`](AI_CLIENTS.md), the twelve supported AI clients, per-client setup, troubleshooting.
-- [`docs/JSON_SCHEMA.md`](docs/JSON_SCHEMA.md), the `--format json` output schema, for editor / plugin authors.
+- [`docs/json-schema.md`](docs/json-schema.md), the `--format json` output schema, for editor / plugin authors.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md), how to add new rules, AI clients, or languages.
 
 ## Response time expectations
