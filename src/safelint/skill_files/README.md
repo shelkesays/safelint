@@ -6,7 +6,7 @@ A bundled skill / project-rule that lets twelve AI clients (Claude Code, Cursor,
 
 Twelve clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
 
-- **Claude Code**: installs as a directory skill at `~/.claude/skills/safelint/` containing `SKILL.md` + `languages/`.
+- **Claude Code**: installs as a single skill manifest at `~/.claude/skills/safelint/SKILL.md` (or `<cwd>/.claude/skills/safelint/SKILL.md` for project scope). Language-specific addendums are looked up on demand via `safelint skill path`, same as the other clients.
 - **Cursor**: installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
 - **GitHub Copilot**: installs as a Markdown instructions file at `.github/copilot-instructions.md` (or `~/.github/copilot-instructions.md` for user-global).
 - **Gemini**: installs as a Markdown instructions file at `<cwd>/GEMINI.md` (canonical, auto-discovered by Gemini CLI) or `~/GEMINI.md` (user-global; requires Gemini CLI config).
@@ -64,7 +64,7 @@ Skip auto-detection:
 ```bash
 # Claude Code, user-scoped
 safelint skill install --client claude
-safelint skill install --client claude --project    # <cwd>/.claude/skills/safelint/
+safelint skill install --client claude --project    # <cwd>/.claude/skills/safelint/SKILL.md
 
 # Cursor
 safelint skill install --client cursor              # ~/.cursor/rules/safelint.mdc (user)
@@ -162,11 +162,11 @@ safelint skill remove --path /unusual/place/.cursor/rules/safelint.mdc
 ### Where are the bundled files?
 
 ```bash
-safelint skill path                  # Claude skill directory (default)
+safelint skill path                  # Claude's claude/SKILL.md (default)
 safelint skill path --client cursor  # Cursor MDC file path
 ```
 
-Prints the on-disk location of the skill files inside your active safelint install. Useful for inspecting `SKILL.md` / `safelint.mdc` directly, or for debugging install issues.
+Prints the on-disk location of the bundled artefact for the chosen client. Pass `--client <name>` to inspect any registered client. The parent directory contains the shared `languages/<lang>.md` addendums every client looks up on demand.
 
 ### Is my installed skill up to date?
 
@@ -194,8 +194,9 @@ The skill ships *inside* the safelint Python package, under `safelint/skill_file
 
 ```text
 src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill path`
-├── SKILL.md                 # Language-agnostic core (the entry point Claude Code reads)
 ├── README.md                # This file
+├── claude/
+│   └── SKILL.md             # Claude Code's skill manifest (installed to .claude/skills/safelint/SKILL.md)
 ├── cursor/
 │   └── safelint.mdc         # Cursor's native project-rule format (installed to .cursor/rules/)
 ├── copilot/
@@ -226,8 +227,7 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 
 **What ends up where after install:**
 
-- Claude install copies `SKILL.md` + `languages/`. All eleven peer-client subdirectories (`cursor/`, `copilot/`, `gemini/`, `windsurf/`, `codex/`, `continue/`, `cline/`, `aider/`, `trae/`, `antigravity/`, `zed/`) are excluded so the materialised Claude skill folder doesn't carry artefacts that don't apply to it.
-- Each non-Claude client copies just its own bundled file to the install destination, e.g. Cursor copies `cursor/safelint.mdc` to `.cursor/rules/safelint.mdc`; Windsurf copies `windsurf/safelint-rules.md` to `.windsurfrules` (renamed at the destination); Zed copies `zed/safelint.md` to `.rules` (renamed); the rest follow the same one-file-in, one-file-out pattern.
+- Every client copies exactly one bundled file to the install destination, e.g. Claude Code copies `claude/SKILL.md` to `.claude/skills/safelint/SKILL.md`; Cursor copies `cursor/safelint.mdc` to `.cursor/rules/safelint.mdc`; Windsurf copies `windsurf/safelint-rules.md` to `.windsurfrules` (renamed at the destination); Zed copies `zed/safelint.md` to `.rules` (renamed); the rest follow the same one-file-in, one-file-out pattern.
 - codex is the one client that touches *two* destinations: the primary `.codex/instructions.md` and a delimited section inside `AGENTS.md` when that file already exists at the scope root.
 
 All clients can locate the bundled language addendums via `safelint skill path` if they need them at runtime.
@@ -247,7 +247,7 @@ The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint 
 ## What the skill does
 
 1. Verifies `safelint` is installed (cross-platform: `safelint --version`, falling back to a `shutil.which` Python check).
-2. Identifies the language(s) in the project against the registry in `SKILL.md` Step 2.
+2. Identifies the language(s) in the project against the registry in `claude/SKILL.md` Step 2 (or the equivalent step in the peer client's own file).
 3. Picks a target based on what you said (modified files / all files / a specific path).
 4. Runs `safelint check <target> --format json` and parses the result.
 5. Optionally reads `languages/<lang>.md` for deeper language-specific guidance (idiomatic fixes, rule rationale tweaks).
@@ -273,13 +273,13 @@ When safelint adds support for a new language, the skill needs a matching addend
    - File extensions safelint will pick up.
    - Language-specific phrasing for the universal rule rationales (how `bare_except` translates to that language's catch-all idiom, what counts toward `nesting_depth`, etc.).
    - Idiomatic fix patterns for the rules most likely to fire in that language.
-3. **In `SKILL.md`**, add a row to the **Step 2** language registry table pointing at your new addendum.
+3. **In every per-client core file** (`claude/SKILL.md` plus each peer-client file under `<client>/`), add a row to the **Step 2** language registry table pointing at your new addendum.
 
-Keep the skill core (`SKILL.md`) language-neutral. Per-language detail belongs in the addendum. If you find yourself adding a language-specific paragraph to the core, that's a signal it should be in the addendum instead.
+Keep the skill core language-neutral. Per-language detail belongs in the addendum. If you find yourself adding a language-specific paragraph to the core, that's a signal it should be in the addendum instead.
 
 ## Customising
 
-The skill is just Markdown. Edit `SKILL.md` to tune wording, swap the suggested follow-up question, or add project-specific guidance (e.g. "for this repo, always pass `--mode ci`"). Claude Code re-reads the file on each invocation.
+The skill is just Markdown. Edit `claude/SKILL.md` (or the peer client's own file under `<client>/`) at the install destination to tune wording, swap the suggested follow-up question, or add project-specific guidance (e.g. "for this repo, always pass `--mode ci`"). The agent re-reads the file on each invocation.
 
 ## See also
 

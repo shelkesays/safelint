@@ -22,20 +22,13 @@ For the user-facing surface (auto-detection logic, how each client is invoked af
 
 ### 1. Decide on the bundled artefact shape
 
-Two shapes are supported today:
+Every client today installs a **single file** under a per-client subdirectory of the bundle: `src/safelint/skill_files/<client>/<filename>`. Claude Code is `claude/SKILL.md`, Cursor is `cursor/safelint.mdc`, Windsurf would be `windsurf/safelint-rules.md`, and so on. The shared `languages/` and `README.md` at the bundle root are looked up on demand by every client via `safelint skill path`.
 
-| Shape | Example | Bundle layout |
-|---|---|---|
-| **Single file** | Cursor's `.mdc` | `src/safelint/skill_files/<client>/<filename>` |
-| **Directory tree** | Claude Code's skill folder | `src/safelint/skill_files/` (root, with peer-client subdirs excluded) |
-
-Most agents read a single instructions / rules file (the easier shape). Only Claude Code currently uses a directory tree because its skill format requires a `SKILL.md` plus per-language addendums.
-
-For Windsurf, assume single-file like Cursor: `src/safelint/skill_files/windsurf/safelint-rules.md`.
+For Windsurf the bundled artefact lives at `src/safelint/skill_files/windsurf/safelint-rules.md`.
 
 ### 2. Write the bundled artefact
 
-Adapt the existing `SKILL.md` content into the new client's native format. The workflow is the same across clients (verify install → identify language → run with `--format json` → parse → present); only frontmatter and file shape differ.
+Adapt the existing `claude/SKILL.md` content into the new client's native format. The workflow is the same across clients (verify install → identify language → run with `--format json` → parse → present); only frontmatter and file shape differ.
 
 For Windsurf (assume it uses Markdown with no frontmatter):
 
@@ -43,7 +36,7 @@ For Windsurf (assume it uses Markdown with no frontmatter):
 cp src/safelint/skill_files/cursor/safelint.mdc src/safelint/skill_files/windsurf/safelint-rules.md
 ```
 
-Then strip Cursor's MDC frontmatter (the `--- description: ... ---` block) and tweak any client-specific phrasing. The `--- name: safelint description: ... ---` from Claude's `SKILL.md` is also a starting point if you want frontmatter.
+Then strip Cursor's MDC frontmatter (the `--- description: ... ---` block) and tweak any client-specific phrasing. The `--- name: safelint description: ... ---` block at the top of `claude/SKILL.md` is also a starting point if you want frontmatter.
 
 Keep the workflow body language-neutral, language addendums under `skill_files/languages/` are shared rather than duplicated. The new client's instructions should tell its agent how to find them via `safelint skill path` if it needs them.
 
@@ -77,30 +70,13 @@ Field reference:
 | `artefact_label` | Output noun for the artefact, used in *"{display_name} {artefact_label} copied to ..."*. Pick whatever reads naturally: "skill", "rule", "rules", "instructions". |
 | `cwd_markers` | Tuple of relative paths under cwd that signal "this client is used in this project". Detection iterates in order, stops at the first match, surfaces it in the notice. Choose well-known paths users actually have (e.g. config dirs / files Windsurf creates), avoid generic markers that might appear in unrelated projects. |
 | `home_markers` | Same idea, for the home-directory fallback. Typically the user-global config directory for the client. |
-| `install_relpath` | Where the artefact gets installed, relative to scope root (cwd for project-scope, home for user-scope). Tuple of path components, `(".windsurfrules",)` means a single file at `<scope>/.windsurfrules`; `(".claude", "skills", "safelint")` means a directory at `<scope>/.claude/skills/safelint/`. |
-| `bundled_relpath` | Where the source artefact lives under `skill_files/`. Tuple of path components. Use `()` (empty tuple) for the whole `skill_files/` root (Claude pattern). |
+| `install_relpath` | Where the artefact gets installed, relative to scope root (cwd for project-scope, home for user-scope). Tuple of path components; every client today installs a single file, e.g. `(".windsurfrules",)` for Windsurf, `(".cursor", "rules", "safelint.mdc")` for Cursor, `(".claude", "skills", "safelint", "SKILL.md")` for Claude Code. |
+| `bundled_relpath` | Where the source artefact lives under `skill_files/`. Tuple of path components pointing at a single file, e.g. `("windsurf", "safelint-rules.md")`. |
 | `restart_hint` | Printed after a successful install, tells the user how to make the AI client pick up the new artefact. |
 | `usage_hint` | Printed after `restart_hint`, tells the user what to say to the agent next. |
-| `documentation_relpaths` | Tuple of relpaths under `skill_files/` whose combined text *must* mention every rule code/name in `ALL_RULES` and every extension in `supported_extensions()`. Drift-detection tests parametrised over `_CLIENT_SPECS` enforce this, a new rule or language without corresponding bundled-doc updates fails CI. For a single-file client whose bundled artefact lives at `skill_files/windsurf/safelint-rules.md`, set this to `(("windsurf", "safelint-rules.md"),)`. For a directory-tree client like Claude, it points at the entry-point file: `(("SKILL.md",),)`. The outer tuple is a *list* of files; if a client splits its docs across multiple bundled files, list them all and the test treats the union of their text as the searchable surface. |
+| `documentation_relpaths` | Tuple of relpaths under `skill_files/` whose combined text *must* mention every rule code/name in `ALL_RULES` and every extension in `supported_extensions()`. Drift-detection tests parametrised over `_CLIENT_SPECS` enforce this, a new rule or language without corresponding bundled-doc updates fails CI. For a single-file client whose bundled artefact lives at `skill_files/windsurf/safelint-rules.md`, set this to `(("windsurf", "safelint-rules.md"),)`. For Claude Code it points at `(("claude", "SKILL.md"),)`. The outer tuple is a *list* of files; if a client splits its docs across multiple bundled files, list them all and the test treats the union of their text as the searchable surface. |
 
-### 4. (Optional) Update peer-client exclusion
-
-**Background:** Claude Code is the one client that installs as a *whole directory tree* (it copies all of `skill_files/` minus a few subdirectories). Every other client installs just one file from a per-client subdirectory like `skill_files/cursor/`, `skill_files/windsurf/`, etc. Those per-client subdirectories are called *peer-client bundles*, they sit alongside Claude's tree but aren't part of it.
-
-To stop those peer subdirectories from leaking into the materialised Claude install (so `~/.claude/skills/safelint/` doesn't end up containing `cursor/`, `windsurf/`, etc.), each one must be listed in `_PEER_CLIENT_DIRS`:
-
-```python
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "windsurf"})
-```
-
-For a typical new client (single bundled file under `skill_files/<client>/`), always add `<client>` here. You only skip this step in two unusual cases:
-
-1. The bundled file lives at the `skill_files/` *root* (e.g. as a standalone Markdown file), not under a subdirectory.
-2. The new client shares the Claude bundle and shouldn't be excluded from it.
-
-Neither of those applies to any client shipped today, so when in doubt: add it.
-
-### 4b. (Optional) Cross-agent shared file (the "secondary install")
+### 4. (Optional) Cross-agent shared file (the "secondary install")
 
 Some clients read instructions from a *shared* file used by multiple AI tools, codex's `AGENTS.md` is the canonical example. If your client follows this pattern (the file is read by other agents too, so we can't simply overwrite it), use the **secondary-install** mechanism: safelint writes a delimited HTML-comment section into the shared file, leaving any other content the user has authored intact.
 

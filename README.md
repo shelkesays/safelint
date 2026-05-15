@@ -323,7 +323,7 @@ safelint skill install          # auto-detects which AI client(s) you use
 
 | Client | Marker safelint looks for | Where the skill lands |
 |---|---|---|
-| Claude Code | `CLAUDE.md`, `.claude/`, `.claude.json` | `~/.claude/skills/safelint/` (or `<cwd>/...`) |
+| Claude Code | `CLAUDE.md`, `.claude/`, `.claude.json` | `~/.claude/skills/safelint/SKILL.md` (or `<cwd>/...`) |
 | Cursor | `.cursor/`, `.cursorrules` | `~/.cursor/rules/safelint.mdc` (or `<cwd>/...`) |
 | GitHub Copilot | `.github/copilot-instructions.md`, `.github/copilot/`, `.github/instructions/` | `.github/copilot-instructions.md` |
 | Gemini | `GEMINI.md`, `.gemini/` | `GEMINI.md` at repo root |

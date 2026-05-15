@@ -1,6 +1,6 @@
 # safelint skill: Python addendum
 
-Language-specific notes for the Python target. Mirrors `src/safelint/languages/python.py` in the safelint source tree. The skill core (`SKILL.md`) handles the universal flow; this file holds Python-specific detail.
+Language-specific notes for the Python target. Mirrors `src/safelint/languages/python.py` in the safelint source tree. The skill core (`claude/SKILL.md` for Claude Code, each peer client's own file for other agents) handles the universal flow; this file holds Python-specific detail.
 
 ## Install nuance
 
@@ -31,7 +31,7 @@ safelint lints `.py` and `.pyw` files in Python projects. The skill doesn't need
 
 ## Language-specific rule phrasing
 
-When the user asks "why is this flagged?", the universal rationale in the SKILL.md crib sheet is correct, but Python phrasing helps:
+When the user asks "why is this flagged?", the universal rationale in the per-client core (`claude/SKILL.md` or the peer client's equivalent) is correct, but Python phrasing helps:
 
 | Code | Rule | Python-specific notes |
 |---|---|---|

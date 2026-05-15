@@ -4,8 +4,10 @@
 
 **Install location:**
 
-- User-scoped: `~/.claude/skills/safelint/` (a directory containing `SKILL.md`, `README.md`, `languages/python.md`)
-- Project-scoped: `<cwd>/.claude/skills/safelint/` (same layout, just under the repo)
+- User-scoped: `~/.claude/skills/safelint/SKILL.md`
+- Project-scoped: `<cwd>/.claude/skills/safelint/SKILL.md`
+
+Language-specific addendums (`languages/python.md`, etc.) are looked up on demand from the bundled package via `safelint skill path`, the same way every other client does it.
 
 **How to invoke after install:**
 

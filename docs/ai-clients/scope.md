@@ -20,6 +20,6 @@ safelint skill install --symlink
 safelint skill install --client cursor --symlink
 ```
 
-For Claude installs, the symlink is **per-entry**: the install creates a real directory at the target and symlinks each top-level entry (`SKILL.md`, `languages/`, etc.) into it. Peer-client subdirectories like `cursor/` are never symlinked into the Claude install, they're for Cursor's own install path.
+Every client installs a single file, so `--symlink` is one symlink at the install destination pointing at the bundled artefact inside the wheel. ``pip upgrade safelint`` reflects content changes immediately through the link.
 
 Caveat: symlink mode requires symlink support, POSIX shells, or Windows with developer mode enabled. If you hit "operation not permitted", drop the `--symlink` flag and use the default copy mode.

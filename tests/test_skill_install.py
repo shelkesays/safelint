@@ -50,7 +50,7 @@ def _redirect_home_and_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> t
 
 
 # ---------------------------------------------------------------------------
-# bundled_skill_path: locates SKILL.md inside the package
+# bundled_skill_path: locates the skill_files/ root inside the package
 # ---------------------------------------------------------------------------
 
 
@@ -58,7 +58,7 @@ def test_bundled_skill_path_returns_existing_directory() -> None:
     """The bundled skill files ship with the wheel and must exist after install."""
     path = _skill_install.bundled_skill_path()
     assert path.is_dir()
-    assert (path / "SKILL.md").is_file()
+    assert (path / "claude" / "SKILL.md").is_file()
     assert (path / "languages" / "python.md").is_file()
 
 
@@ -79,25 +79,24 @@ def test_bundled_cursor_rule_exists_in_wheel() -> None:
 
 
 def test_install_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """Explicit ``--client claude`` install copies SKILL.md + languages/ into ~/.claude/skills/safelint/."""
+    """Explicit ``--client claude`` install copies the bundled SKILL.md to .claude/skills/safelint/SKILL.md."""
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
     rc = _skill_install.run_install(_make_args(client="claude"))
     assert rc == 0
-    target = home / ".claude" / "skills" / "safelint"
-    assert target.is_dir()
+    target = home / ".claude" / "skills" / "safelint" / "SKILL.md"
+    assert target.is_file()
     assert not target.is_symlink()
-    assert (target / "SKILL.md").read_text(encoding="utf-8").startswith("---\nname: safelint")
-    assert (target / "languages" / "python.md").is_file()
-    # Peer-client bundles must NOT leak into the Claude install - the
-    # cursor/ subdirectory under skill_files/ is for Cursor users only.
-    assert not (target / "cursor").exists()
+    assert target.read_text(encoding="utf-8").startswith("---\nname: safelint")
+    # Single-file install: nothing else lands in the skill directory.
+    skill_dir = target.parent
+    assert sorted(p.name for p in skill_dir.iterdir()) == ["SKILL.md"]
     out = capsys.readouterr().out
     assert "copied" in out
     assert "user scope" in out
 
 
 def test_install_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``--client claude --project`` lands under <cwd>/.claude/skills/safelint/ instead of home."""
+    """``--client claude --project`` lands under <cwd>/.claude/skills/safelint/SKILL.md instead of home."""
     home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
     rc = _skill_install.run_install(_make_args(client="claude", project=True))
     assert rc == 0
@@ -113,49 +112,18 @@ def test_install_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: P
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
 def test_install_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``--symlink`` materialises a per-entry-symlinked directory at the target.
+    """``--symlink`` puts a single symlink at the install target pointing at the bundled SKILL.md.
 
-    For the directory-source case (Claude install), the install
-    creates a real target directory and symlinks each allowed
-    top-level entry inside it. Symlinking the whole skill_files/
-    tree would expose the peer ``cursor/`` subdirectory in the
-    Claude install - see :func:`_install_symlink_directory_filtered`.
+    Single-file install: the symlink resolves into the wheel so ``pip
+    upgrade safelint`` reflects content changes immediately.
     """
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
     rc = _skill_install.run_install(_make_args(client="claude", symlink=True))
     assert rc == 0
-    target = home / ".claude" / "skills" / "safelint"
-    # Target itself is a real directory (not a symlink), populated
-    # with per-entry symlinks.
-    assert target.is_dir()
-    assert not target.is_symlink()
-    # The expected top-level entries are symlinks pointing into the
-    # bundled location, so ``pip upgrade safelint`` still reflects
-    # content changes underneath them.
-    skill_link = target / "SKILL.md"
-    assert skill_link.is_symlink()
+    target = home / ".claude" / "skills" / "safelint" / "SKILL.md"
+    assert target.is_symlink()
     bundled = _skill_install.bundled_skill_path()
-    assert skill_link.resolve() == (bundled / "SKILL.md").resolve()
-    languages_link = target / "languages"
-    assert languages_link.is_symlink()
-    assert languages_link.resolve() == (bundled / "languages").resolve()
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
-def test_install_symlink_excludes_peer_client_bundles(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``--symlink`` install must not expose the peer ``cursor/`` bundle inside the Claude install.
-
-    Mirrors the contract enforced by ``test_install_copy_user_scope``
-    (``cursor/`` is excluded from the materialised skill folder).
-    Symlink mode previously linked the whole skill_files/ directory
-    in one call, which transparently included ``cursor/`` - a leak.
-    The fixed install symlinks per-entry, skipping peer dirs.
-    """
-    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
-    rc = _skill_install.run_install(_make_args(client="claude", symlink=True))
-    assert rc == 0
-    target = home / ".claude" / "skills" / "safelint"
-    assert not (target / "cursor").exists()
+    assert target.resolve() == (bundled / "claude" / "SKILL.md").resolve()
 
 
 # ---------------------------------------------------------------------------
@@ -176,43 +144,30 @@ def test_install_refuses_to_overwrite_existing_without_force(monkeypatch: pytest
     assert "--force" in captured.err
 
 
-def test_install_with_force_replaces_existing_directory(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``--force`` deletes the existing install (file/symlink/dir) before re-installing."""
+def test_install_with_force_replaces_existing_stale_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--force`` overwrites a stale SKILL.md sitting at the install target."""
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
-    target = home / ".claude" / "skills" / "safelint"
-    # Pre-populate with a stale file, then install with --force.
-    target.mkdir(parents=True)
-    (target / "stale.md").write_text("old", encoding="utf-8")
-
-    assert _skill_install.run_install(_make_args(client="claude", force=True)) == 0
-    assert (target / "SKILL.md").is_file()
-    assert not (target / "stale.md").exists()
-
-
-def test_install_with_force_replaces_existing_file(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``--force`` works when the target is a stray file (not a directory)."""
-    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
-    target = home / ".claude" / "skills" / "safelint"
+    target = home / ".claude" / "skills" / "safelint" / "SKILL.md"
     target.parent.mkdir(parents=True)
-    target.write_text("not a directory", encoding="utf-8")
+    target.write_text("stale content from a previous install", encoding="utf-8")
 
     assert _skill_install.run_install(_make_args(client="claude", force=True)) == 0
-    assert target.is_dir()
-    assert (target / "SKILL.md").is_file()
+    assert target.is_file()
+    assert target.read_text(encoding="utf-8").startswith("---\nname: safelint")
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows symlink prerequisites")
 def test_install_with_force_replaces_existing_symlink(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``--force`` correctly unlinks a stale symlink before re-installing."""
+    """``--force`` correctly unlinks a stale symlink at the install target before re-installing."""
     home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
-    target = home / ".claude" / "skills" / "safelint"
+    target = home / ".claude" / "skills" / "safelint" / "SKILL.md"
     target.parent.mkdir(parents=True)
-    decoy = tmp_path / "decoy"
-    decoy.mkdir()
-    target.symlink_to(decoy, target_is_directory=True)
+    decoy = tmp_path / "decoy.md"
+    decoy.write_text("decoy", encoding="utf-8")
+    target.symlink_to(decoy, target_is_directory=False)
 
     assert _skill_install.run_install(_make_args(client="claude", force=True)) == 0
-    assert target.is_dir()
+    assert target.is_file()
     assert not target.is_symlink()
 
 
@@ -222,12 +177,14 @@ def test_install_with_force_replaces_existing_symlink(monkeypatch: pytest.Monkey
 
 
 def test_run_path_prints_bundled_directory(capsys: pytest.CaptureFixture[str]) -> None:
-    """``safelint skill path`` prints the on-disk location of bundled files."""
+    """``safelint skill path`` prints the bundled file for the default client (claude)."""
     rc = _skill_install.run_path(argparse.Namespace())
     assert rc == 0
     out = capsys.readouterr().out.strip()
-    assert Path(out).is_dir()
-    assert (Path(out) / "SKILL.md").is_file()
+    p = Path(out)
+    assert p.is_file()
+    assert p.name == "SKILL.md"
+    assert p.parent.name == "claude"
 
 
 # ---------------------------------------------------------------------------
@@ -351,14 +308,15 @@ def test_run_path_with_client_cursor_prints_mdc_file(capsys: pytest.CaptureFixtu
     assert p.name == "safelint.mdc"
 
 
-def test_run_path_default_client_prints_claude_directory(capsys: pytest.CaptureFixture[str]) -> None:
-    """``safelint skill path`` (no client) prints the Claude skill directory."""
+def test_run_path_default_client_prints_claude_skill_md(capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill path --client claude`` prints the bundled SKILL.md file path."""
     rc = _skill_install.run_path(argparse.Namespace(client="claude"))
     assert rc == 0
     out = capsys.readouterr().out.strip()
     p = Path(out)
-    assert p.is_dir()
-    assert (p / "SKILL.md").is_file()
+    assert p.is_file()
+    assert p.name == "SKILL.md"
+    assert p.parent.name == "claude"
 
 
 def test_cli_routes_skill_install_with_cursor_client(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
@@ -2838,80 +2796,25 @@ def test_detected_installed_clients_skips_oserror_locations(monkeypatch: pytest.
     assert detected == []
 
 
-def test_is_symlink_directory_shape_returns_false_on_oserror(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """``_is_symlink_directory_shape`` fails closed when iterdir raises OSError.
-
-    An unreadable install directory (permission denied, transient
-    I/O) shouldn't crash ``update`` / ``remove --symlink``. Without
-    the OSError catch, the cleanup paths would propagate the
-    exception up to the user. Patches ``iterdir`` on a real
-    directory to raise OSError and asserts the predicate returns
-    False (treating "can't tell" as "not symlink-shape").
-    """
-    real_dir = tmp_path / "claude_install"
-    real_dir.mkdir()
-    # Use monkeypatch on the Path class so the iterdir call inside
-    # the helper hits our patched method.
-    original_iterdir = Path.iterdir
-
-    def _raise_oserror(self: Path) -> object:
-        if self == real_dir:
-            msg = "permission denied (simulated)"
-            raise OSError(msg)
-        return original_iterdir(self)
-
-    monkeypatch.setattr(Path, "iterdir", _raise_oserror)
-    assert _skill_install._is_symlink_directory_shape(real_dir) is False
-
-
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
-def test_is_symlink_directory_shape_true_for_mixed_install(tmp_path: Path) -> None:
-    """An install with at least one symlink entry counts as symlink-shape.
-
-    Originally implemented with ``all(...)``, which meant a single
-    user-added real file (e.g. a notes file dropped alongside the
-    bundled symlinks) silently demoted the install to "not symlink"
-    and made ``remove --symlink`` skip it. The intent is shape-only:
-    *any* symlink at the top level qualifies, so cleanup can still
-    reach a customised install.
-    """
-    install_dir = tmp_path / "claude_skills_safelint"
-    install_dir.mkdir()
-    bundled = _skill_install.bundled_skill_path()
-    (install_dir / "languages").symlink_to(bundled / "languages", target_is_directory=True)
-    # User-added real file alongside the bundled symlink.
-    (install_dir / "NOTES.md").write_text("personal customisation\n", encoding="utf-8")
-
-    assert _skill_install._is_symlink_directory_shape(install_dir) is True
-
-
-@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
-def test_remove_path_dry_run_labels_broken_symlink_directory_as_symlink(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_remove_path_dry_run_labels_broken_symlink_as_symlink(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``remove --path`` shape label uses shape-only predicate, not freshness.
 
-    A Claude-style symlink directory with a broken inner symlink is
-    still symlink-shape; its ``--dry-run`` output should say
-    "symlink", not "copy". The previous implementation used
-    ``_is_symlink_managed_directory`` (working-symlinks-required)
-    for the shape label, mislabelling broken installs as copy.
-
-    Path is built under a Claude-shaped tail
-    (``.claude/skills/safelint``) so the security guard introduced in
-    the v1.11.0 hardening accepts it.
+    A broken symlink at the install target is still symlink-shape; its
+    ``--dry-run`` output should say "symlink", not "copy". The shape
+    predicate is intentionally cleanup-tolerant so ``remove --symlink``
+    can reach installs whose bundle has been moved or deleted.
     """
-    odd_dir = tmp_path / ".claude" / "skills" / "safelint"
-    odd_dir.mkdir(parents=True)
-    # Build a Claude-style symlink directory with a broken inner symlink.
-    bundled = _skill_install.bundled_skill_path()
-    (odd_dir / "languages").symlink_to(bundled / "languages", target_is_directory=True)
-    # Plus a broken inner symlink to trigger the freshness predicate's
-    # working-symlink rejection.
-    (odd_dir / "SKILL.md").symlink_to(tmp_path / "vanished.md")
+    # Path is built under a Claude-shaped tail so the security guard
+    # in ``_path_looks_like_safelint_install`` accepts it.
+    odd_path = tmp_path / ".claude" / "skills" / "safelint" / "SKILL.md"
+    odd_path.parent.mkdir(parents=True)
+    odd_path.symlink_to(tmp_path / "vanished.md")
 
-    rc = _skill_install.run_remove(_make_remove_args(path=odd_dir, dry_run=True))
+    rc = _skill_install.run_remove(_make_remove_args(path=odd_path, dry_run=True))
     assert rc == 0
     out = capsys.readouterr().out
-    assert "(symlink)" in out, "broken Claude-style directory should label as symlink"
+    assert "(symlink)" in out, "broken symlink should label as symlink"
 
 
 # ---------------------------------------------------------------------------

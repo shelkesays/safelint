@@ -55,7 +55,7 @@ ANSI colour is auto-disabled when stdout is not a TTY (piping to a file produces
 | `--format` | `pretty` | Output format: `pretty` (ruff/ty-style coloured), `json` (stable schema documented in [JSON schema](../json-schema.md)), or `sarif` (SARIF 2.1.0 for GitHub code scanning). |
 | `--statistics` | off | After the run, print a per-rule violation-count table (active + suppressed). Pretty mode only. Useful for CI snapshots and finding the most-fired rules. |
 | `--no-cache` | off | Disable the per-file lint-result cache. By default safelint memoises rule output keyed on `sha256(source + engine config + filepath)` in `.safelint_cache/` next to your config. |
-| `--check-skill-freshness` | off | *Added in 1.9.0.* Before linting, verify each installed AI-client skill (Claude Code at `~/.claude/skills/safelint/`, Cursor at `~/.cursor/rules/safelint.mdc`, project-scoped equivalents) matches the bundled version in the active wheel. Stale installs surface as `safelint: warning: …` lines on stderr. Informational only, doesn't fail the lint. Use `safelint skill status` (also added in 1.9.0; exits 1 if stale) for the dedicated CI-friendly check. |
+| `--check-skill-freshness` | off | *Added in 1.9.0.* Before linting, verify each installed AI-client skill (Claude Code at `~/.claude/skills/safelint/SKILL.md`, Cursor at `~/.cursor/rules/safelint.mdc`, project-scoped equivalents) matches the bundled version in the active wheel. Stale installs surface as `safelint: warning: …` lines on stderr. Informational only, doesn't fail the lint. Use `safelint skill status` (also added in 1.9.0; exits 1 if stale) for the dedicated CI-friendly check. |
 | `--stdin` | off | Read source from stdin instead of from disk. Designed for editor extensions linting un-saved buffers. Pair with `--stdin-filename`. |
 | `--stdin-filename` | (none) | Pseudo-filename for `--stdin` input, drives language detection by extension and is shown as the violation file path. Required when `--stdin` is set. |
 
@@ -105,7 +105,7 @@ Pre-commit passes the staged files as positional arguments automatically. `--fai
 
 ## Skill freshness commands (1.9.0)
 
-After `pip install --upgrade safelint`, the bundled skill files in the wheel update but copy-mode installs at `~/.claude/skills/safelint/` and `~/.cursor/rules/safelint.mdc` stay frozen at whatever version was last installed. Two commands answer "is my installed skill up to date?":
+After `pip install --upgrade safelint`, the bundled skill files in the wheel update but copy-mode installs at `~/.claude/skills/safelint/SKILL.md` and `~/.cursor/rules/safelint.mdc` stay frozen at whatever version was last installed. Two commands answer "is my installed skill up to date?":
 
 ```bash
 # Dedicated subcommand: pipe-friendly, exits 1 if any install differs from bundled
@@ -149,7 +149,7 @@ safelint skill remove --dry-run                # preview without deleting
 Both commands inherit `--client` and `--project` from `install`, but the meaning of `--client auto` is *different* from install's:
 
 - **`install --client auto`** asks: *"which AI client(s) does this user use?"*, and answers that by scanning the cwd for marker files (`CLAUDE.md`, `.cursor/`, etc.).
-- **`update --client auto`** and **`remove --client auto`** ask: *"what's already installed?"*, and answer that by scanning the actual install paths (`~/.claude/skills/safelint/`, etc.).
+- **`update --client auto`** and **`remove --client auto`** ask: *"what's already installed?"*, and answer that by scanning the actual install paths (`~/.claude/skills/safelint/SKILL.md`, etc.).
 
 This distinction matters when the user has marker files but no install yet (only `install` will fire) or has an install but the marker file has been deleted (only `update`/`remove` will fire).
 

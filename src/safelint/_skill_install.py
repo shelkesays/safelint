@@ -1,10 +1,13 @@
 """``safelint skill install`` subcommand - copy/symlink the bundled skill into the user's AI-client directory.
 
-The skill's source files (``SKILL.md`` + ``languages/*.md`` + the
-Cursor ``cursor/safelint.mdc`` rule) ship inside the wheel under
+The skill's source files (Claude Code's ``claude/SKILL.md``, the
+shared ``languages/*.md`` addendums, and each peer client's own
+artefact under ``<client>/``) ship inside the wheel at
 ``safelint/skill_files/``. This module locates them via
 :func:`importlib.resources.files` and materialises them at the target
-install location.
+install location. Every client installs a single source file at a
+single destination path; language-specific addendums are looked up
+on demand via ``safelint skill path``.
 
 Twelve AI clients ship today (Claude Code, Cursor, GitHub Copilot,
 Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity,
@@ -68,7 +71,7 @@ class ClientSpec:
     cwd_markers: tuple[str, ...]  # Relative paths under cwd that signal "this client used here"
     home_markers: tuple[str, ...]  # Relative paths under home that signal "this client installed"
     install_relpath: tuple[str, ...]  # Path components, relative to scope root (cwd or home)
-    bundled_relpath: tuple[str, ...]  # Path components under skill_files/ (empty = whole tree)
+    bundled_relpath: tuple[str, ...]  # Path components under skill_files/ to the single bundled file
     restart_hint: str
     usage_hint: str
     # Drift-detection inputs. Each tuple is a relpath under
@@ -109,11 +112,16 @@ _CLAUDE_SPEC = ClientSpec(
     # per-project when committed alongside repo config).
     cwd_markers=("CLAUDE.md", ".claude", ".claude.json"),
     home_markers=(".claude", ".claude.json"),
-    install_relpath=(".claude", "skills", "safelint"),
-    bundled_relpath=(),  # whole skill_files/ tree (minus peer-client dirs)
+    # Claude Code auto-discovers skills under ``.claude/skills/<name>/``
+    # by looking for a ``SKILL.md`` at the root of each skill directory.
+    # We install just that file; language-specific addendums are looked
+    # up via ``safelint skill path`` from the bundled package, matching
+    # every other client's lookup pattern.
+    install_relpath=(".claude", "skills", "safelint", "SKILL.md"),
+    bundled_relpath=("claude", "SKILL.md"),
     restart_hint="Restart Claude Code (or open a new session) to pick up the skill.",
     usage_hint='Then ask Claude Code "run safelint" or "lint with safelint".',
-    documentation_relpaths=(("SKILL.md",),),
+    documentation_relpaths=(("claude", "SKILL.md"),),
 )
 
 
@@ -354,11 +362,6 @@ INSTALL_CLIENT_CHOICES: tuple[str, ...] = ("auto", *_CLIENT_NAMES)
 # expects exactly one path.
 PATH_CLIENT_CHOICES: tuple[str, ...] = _CLIENT_NAMES
 
-# Subdirectories under ``skill_files/`` that hold peer-client bundles.
-# Excluded from a Claude install (copy or symlink) so the materialised
-# skill folder doesn't carry irrelevant peer artefacts.
-_PEER_CLIENT_DIRS: frozenset[str] = frozenset({"cursor", "copilot", "gemini", "windsurf", "codex", "continue", "cline", "aider", "trae", "antigravity", "zed"})
-
 
 # ---------------------------------------------------------------------------
 # Bundled-files lookup
@@ -422,10 +425,10 @@ def _spec_target(spec: ClientSpec, *, project: bool) -> Path:
 def _spec_bundled_source(spec: ClientSpec) -> Path:
     """Return the bundled source path that gets copied/linked for *spec*.
 
-    For Claude (``bundled_relpath = ()``) this is the whole
-    ``skill_files/`` directory; the install primitives prune
-    :data:`_PEER_CLIENT_DIRS` from it. For Cursor it's the single
-    ``cursor/safelint.mdc`` file.
+    Always a single file under ``skill_files/``; e.g. Claude's
+    ``claude/SKILL.md``, Cursor's ``cursor/safelint.mdc``. Shared
+    addendums (``languages/<lang>.md``) are looked up separately via
+    :func:`bundled_skill_path` when an agent needs them.
     """
     return bundled_skill_path().joinpath(*spec.bundled_relpath)
 
@@ -557,48 +560,49 @@ def _remove_existing(target: Path) -> None:
         shutil.rmtree(target)
 
 
-def _install_symlink(source: Path, target: Path) -> None:
-    """Create *target* as a symlink to *source*.
+def _cleanup_empty_install_parent(target: Path) -> None:
+    """Remove *target*'s immediate parent directory when it's empty after install removal.
 
-    Single-file source (e.g. Cursor MDC) → one symlink. Directory source
-    (e.g. Claude skill bundle) → per-entry symlinks via
-    :func:`_install_symlink_directory_filtered` so peer-client
-    subdirectories don't leak into the install.
+    Claude Code's install lives at ``.claude/skills/safelint/SKILL.md`` -
+    the ``safelint/`` parent is created specifically for this install
+    and serves no purpose once SKILL.md is gone. Cleaning it up leaves
+    the user with a tidy ``.claude/skills/`` rather than an empty
+    ``safelint/`` skeleton. Generalises beyond Claude: any spec whose
+    install_relpath has depth >= 2 gets parent cleanup, but only when
+    the parent dir is truly empty (no user-added customisation files,
+    no sibling installs).
+
+    ``OSError`` is swallowed: the parent might be unwritable or
+    suddenly populated by a concurrent process; either way the
+    primary remove already succeeded, so a clean-up best-effort
+    is the right posture.
+    """
+    parent = target.parent
+    try:
+        # ``Path.rmdir`` only succeeds on empty dirs - exactly the
+        # condition we want. ``next(iter(...), None)`` would also work
+        # but lets a TOCTOU-style race slip through; ``rmdir`` is the
+        # atomic check.
+        parent.rmdir()
+    except OSError:  # nosafe: SAFE203
+        return
+
+
+def _install_symlink(source: Path, target: Path) -> None:
+    """Create *target* as a symlink pointing at *source*.
+
+    All bundled artefacts are single files, so this is always a
+    file-to-file symlink. ``pip upgrade safelint`` reflects immediately
+    through the link.
     """
     target.parent.mkdir(parents=True, exist_ok=True)
-    if source.is_file():
-        target.symlink_to(source, target_is_directory=False)
-        return
-    _install_symlink_directory_filtered(source, target)
-
-
-def _install_symlink_directory_filtered(source: Path, target: Path) -> None:
-    """Materialise *target* as a directory and symlink each non-peer entry inside.
-
-    Skips entries matching :data:`_PEER_CLIENT_DIRS`. ``pip upgrade
-    safelint`` still reflects content changes underneath the linked
-    entries; only newly-added top-level entries require re-running
-    ``safelint skill install --symlink --force``.
-    """
-    target.mkdir(parents=True, exist_ok=True)
-    for entry in source.iterdir():
-        if entry.name in _PEER_CLIENT_DIRS:
-            continue
-        link = target / entry.name
-        link.symlink_to(entry, target_is_directory=entry.is_dir())
+    target.symlink_to(source, target_is_directory=False)
 
 
 def _install_copy(source: Path, target: Path) -> None:
-    """Copy *source* (file or directory tree) to *target*.
-
-    Directory copies exclude :data:`_PEER_CLIENT_DIRS` so a Claude
-    install doesn't carry an irrelevant ``cursor/`` sibling.
-    """
+    """Copy *source* to *target* as a single file."""
     target.parent.mkdir(parents=True, exist_ok=True)
-    if source.is_file():
-        shutil.copyfile(source, target)
-        return
-    shutil.copytree(source, target, ignore=shutil.ignore_patterns(*_PEER_CLIENT_DIRS))
+    shutil.copyfile(source, target)
 
 
 # ---------------------------------------------------------------------------
@@ -931,10 +935,11 @@ def run_install(args: argparse.Namespace) -> int:
 def run_path(args: argparse.Namespace) -> int:
     """Execute ``safelint skill path`` - print the bundled-files location.
 
-    Default prints the Claude skill bundle root (the cat-friendly
-    single-line form). ``--client cursor`` prints the bundled MDC
-    file path instead. ``auto`` is intentionally not a choice here -
-    a single path is what callers expect from this command.
+    Default prints Claude Code's bundled ``claude/SKILL.md`` path (the
+    cat-friendly single-line form). ``--client cursor`` prints the
+    bundled MDC file path instead, and so on for every registered
+    client. ``auto`` is intentionally not a choice here - a single
+    path is what callers expect from this command.
     """
     client = getattr(args, "client", "claude")
     spec = _spec_by_name(client)
@@ -958,69 +963,15 @@ def _file_sha256(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _tree_hash(root: Path) -> str:
-    """Stable content hash of a directory tree, excluding peer-client subdirs.
-
-    Walks ``root`` recursively in sorted order so the digest is
-    deterministic across filesystems. Each contributing file's
-    relative path is hashed alongside its content, so renames and
-    same-name moves both invalidate. Entries under
-    :data:`_PEER_CLIENT_DIRS` (e.g. ``cursor/``) are skipped - they
-    don't ship in a Claude install and shouldn't influence its
-    freshness verdict.
-    """
-    digest = hashlib.sha256()
-    for entry in sorted(root.rglob("*"), key=lambda p: p.as_posix()):
-        rel = entry.relative_to(root)
-        if rel.parts and rel.parts[0] in _PEER_CLIENT_DIRS:
-            continue
-        if entry.is_file():
-            digest.update(rel.as_posix().encode("utf-8"))
-            digest.update(b"\0")
-            digest.update(entry.read_bytes())
-            digest.update(b"\0")
-    return digest.hexdigest()
-
-
-def _is_symlink_managed_directory(target: Path) -> bool:
-    """Return True if *target* is a Claude-style symlink install.
-
-    Claude ``--symlink`` installs are NOT symlinks at the target path
-    itself - :func:`_install_symlink_directory_filtered` materialises
-    *target* as a real directory and creates per-entry symlinks inside
-    it (one for ``SKILL.md``, one for ``languages/``, etc.). For drift
-    detection those installs should behave like a single symlink:
-    always fresh, because the symlinks resolve straight back to the
-    bundled location that ``pip upgrade safelint`` mutates in place.
-
-    A directory qualifies when (a) it actually exists as a directory
-    and (b) every relevant top-level entry (peer-client dirs excluded)
-    is a working symlink. A broken inner symlink disqualifies the
-    install - same fail-fast posture as the outer broken-symlink check
-    in :func:`_install_status`.
-    """
-    if not target.is_dir():
-        return False
-    relevant_entries = [entry for entry in target.iterdir() if entry.name not in _PEER_CLIENT_DIRS]
-    return bool(relevant_entries) and all(entry.is_symlink() and entry.exists() for entry in relevant_entries)
-
-
 def _install_status(spec: ClientSpec, *, project: bool) -> str:
     """Return one of :data:`INSTALL_STATUS_MISSING` / ``_FRESH`` / ``_DIFFERS`` for *spec* at *scope*.
 
     A symlink install is reported as fresh only when its target exists
     - symlinks point at the live bundled location, so ``pip upgrade
-    safelint`` reflects immediately. Two shapes of symlink install
-    qualify: (a) the target itself is a symlink (Cursor's single-file
-    install), or (b) the target is a real directory whose top-level
-    entries are all working symlinks (Claude's per-entry install via
-    :func:`_install_symlink_directory_filtered`). **Broken** symlinks
-    don't qualify - a dangling install is unusable, not "current", and
-    is reported as DIFFERS rather than MISSING so the status command
-    surfaces it (MISSING is silently skipped). The single-file shape
-    short-circuits to that handling explicitly; broken inner symlinks
-    in the directory shape fall through to tree-hash comparison and
-    naturally diverge from the bundle, also producing DIFFERS.
+    safelint`` reflects immediately. **Broken** symlinks don't qualify
+    - a dangling install is unusable, not "current", and is reported as
+    DIFFERS rather than MISSING so the status command surfaces it
+    (MISSING is silently skipped).
 
     For copy installs (the default), the bundled artefact and the
     on-disk install are content-hashed and compared.
@@ -1044,8 +995,6 @@ def _primary_install_status(spec: ClientSpec, target: Path) -> str:
     """Return the primary install's status (no secondary aggregation)."""
     if target.is_symlink():
         return INSTALL_STATUS_FRESH if target.exists() else INSTALL_STATUS_DIFFERS
-    if _is_symlink_managed_directory(target):
-        return INSTALL_STATUS_FRESH
     if not target.exists():
         return INSTALL_STATUS_MISSING
     return _content_status(_spec_bundled_source(spec), target)
@@ -1054,18 +1003,14 @@ def _primary_install_status(spec: ClientSpec, target: Path) -> str:
 def _content_status(source: Path, target: Path) -> str:
     """Compare *source* and *target* by content; return FRESH or DIFFERS.
 
-    Helper for :func:`_install_status`. Single-file sources are SHA-256
-    compared; directory sources go through :func:`_tree_hash`. Caller
-    has already confirmed *target* exists; this routine just verifies
-    the shape matches and the bytes line up.
+    Every bundled artefact is a single file, so this is always a
+    SHA-256 byte comparison. Caller has already confirmed *target*
+    exists; this routine just verifies the shape matches and the
+    bytes line up.
     """
-    if source.is_file():
-        if not target.is_file():
-            return INSTALL_STATUS_DIFFERS
-        return INSTALL_STATUS_FRESH if _file_sha256(source) == _file_sha256(target) else INSTALL_STATUS_DIFFERS
-    if not target.is_dir():
+    if not target.is_file():
         return INSTALL_STATUS_DIFFERS
-    return INSTALL_STATUS_FRESH if _tree_hash(source) == _tree_hash(target) else INSTALL_STATUS_DIFFERS
+    return INSTALL_STATUS_FRESH if _file_sha256(source) == _file_sha256(target) else INSTALL_STATUS_DIFFERS
 
 
 def _refresh_command_for(spec: ClientSpec, *, project: bool) -> str:
@@ -1186,59 +1131,18 @@ def stale_install_warnings() -> list[str]:
 # ---------------------------------------------------------------------------
 
 
-def _is_symlink_directory_shape(target: Path) -> bool:
-    """Return True when *target* has the on-disk shape of a symlink install.
-
-    This is intentionally a shape-only check for cleanup / filtering
-    paths such as ``remove --symlink``: top-level entries count as
-    symlinks even when their targets are missing. Freshness / validity
-    is handled separately by :func:`_is_symlink_managed_directory`,
-    which requires the inner symlinks to actually resolve.
-
-    A directory qualifies when **at least one** top-level entry is a
-    symlink - using ``any`` rather than ``all`` so an install that's
-    drifted extra real files (e.g. user-added customisation files
-    sitting alongside the original symlinked entries) is still
-    recognised as symlink-shape. ``--symlink`` cleanup needs to reach
-    those mixed installs; otherwise a single stray file would silently
-    immunise an originally-symlink install against the filter.
-
-    Wraps the ``iterdir`` call in ``try/except OSError`` so that an
-    unreadable install directory (permissions / transient I/O errors)
-    fails closed rather than crashing this shape check itself. Treats
-    such directories as "not symlink-shape", leaving any subsequent
-    cleanup-path behaviour and error handling to the caller.
-    """
-    if not target.is_dir():
-        return False
-    # Fail-closed on iterdir errors: callers (update / remove --symlink)
-    # treat "not symlink-shape" as "skip", so a permission error degrades
-    # gracefully instead of propagating up to the user.
-    try:
-        entries = list(target.iterdir())
-    except OSError:  # nosafe: SAFE203
-        return False
-    if not entries:
-        return False
-    return any(entry.is_symlink() for entry in entries)
-
-
 def _install_is_symlink_shape(spec: ClientSpec, *, project: bool) -> bool:
     """Return True when the install at this scope was created in symlink mode.
 
-    Two qualifying shapes: the target itself is a symlink (Cursor's
-    single-file install), or the target is a real directory whose
-    top-level entries are symlinks (Claude's per-entry install via
-    :func:`_install_symlink_directory_filtered`). Broken symlinks still
-    qualify here because this predicate is used for cleanup filtering,
-    not freshness checks - ``remove --symlink`` must be able to clean
-    up a Claude install whose bundled targets have moved or been
-    deleted.
+    Every bundled artefact is a single file, so the install destination
+    is also a single file. Symlink installs put a symlink at that path
+    (possibly broken, e.g. if the bundle has been moved); copy installs
+    put a regular file. Broken symlinks still qualify here because this
+    predicate is used for cleanup filtering, not freshness checks -
+    ``remove --symlink`` must reach an install whose bundle target has
+    moved or been deleted.
     """
-    target = _spec_target(spec, project=project)
-    if target.is_symlink():
-        return True
-    return _is_symlink_directory_shape(target)
+    return _spec_target(spec, project=project).is_symlink()
 
 
 def _detected_installed_clients(*, only_symlink: bool = False, project_only: bool = False) -> list[tuple[ClientSpec, bool]]:
@@ -1500,6 +1404,7 @@ def _remove_one(spec: ClientSpec, *, project: bool, dry_run: bool) -> int:
         _emit_secondary_remove_notice(spec, project=project, dry_run=True)
         return 0
     _remove_existing(target)
+    _cleanup_empty_install_parent(target)
     _print_remove_success(spec, target, scope)
     _emit_secondary_remove_notice(spec, project=project, dry_run=False)
     return 0
@@ -1584,11 +1489,12 @@ def _remove_path(path: Path, *, dry_run: bool) -> int:
     if not _path_looks_like_safelint_install(path):
         _print_remove_path_unrecognised(path)
         return 1
-    shape = "symlink" if path.is_symlink() or (path.is_dir() and _is_symlink_directory_shape(path)) else "copy"
+    shape = "symlink" if path.is_symlink() else "copy"
     if dry_run:
         _print_remove_dry_run(None, path, None, shape=shape)
         return 0
     _remove_existing(path)
+    _cleanup_empty_install_parent(path)
     _print_remove_success(None, path, None)
     return 0
 

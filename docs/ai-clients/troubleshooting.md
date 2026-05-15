@@ -22,8 +22,8 @@ Same idea, Claude Code loads skills on session start. Open a new conversation or
 ## "I want to inspect the bundled files without installing"
 
 ```bash
-safelint skill path                  # Claude skill directory
+safelint skill path                  # Claude's claude/SKILL.md (default)
 safelint skill path --client cursor  # Cursor MDC file path
 ```
 
-Useful for `cat $(safelint skill path)/SKILL.md` to see what the agent is reading.
+Useful for `cat $(safelint skill path)` to see what the agent is reading. The parent directory contains the shared `languages/<lang>.md` addendums every client looks up on demand.
