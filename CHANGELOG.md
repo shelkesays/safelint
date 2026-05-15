@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - `pyproject.toml` `version` bumped from `2.0.0rc3` to `2.0.0`.
 - The RC-pin comment block in `[project.optional-dependencies]` removed; `pip install 'safelint[<lang>]'` now resolves to `2.0.0` straight from PyPI with no pin or `--pre` flag needed.
-- Pre-release callouts removed from every install surface: `README.md`, `docs/index.md`, the three `docs/languages/*.md` pages, the wheel-bundled `src/safelint/skill_files/README.md`, all 13 AI-client skill files, and the three skill language addendums.
+- Pre-release callouts removed from every install surface: `README.md`, `docs/index.md`, the three `docs/languages/*.md` pages, the wheel-bundled `src/safelint/skill_files/README.md`, all 12 AI-client skill files (`SKILL.md` plus the 11 per-client variants under `src/safelint/skill_files/<client>/`), and the three skill language addendums.
 - Install pins updated: `'safelint[<lang>]==2.0.0rc3'` to bare `'safelint[<lang>]'`; pre-commit `rev: v2.0.0rc3` to `rev: v2.0.0`.
 - `uv.lock` regenerated.
 
@@ -53,7 +53,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **JSON schema docs path correction across skill files.** The 12 per-client AI-client skill files referenced `docs/JSON_SCHEMA.md`; the file was renamed to `docs/json-schema.md` for the mkdocs site. URLs were 404s on GitHub. Now consistent.
+- **JSON schema docs path correction across skill files.** The 11 per-client AI-client skill files plus the wheel-bundled `src/safelint/skill_files/README.md` referenced `docs/JSON_SCHEMA.md`; the file was renamed to `docs/json-schema.md` for the mkdocs site. URLs were 404s on GitHub. Now consistent.
 - **`SKILL.md` / `skill_files/README.md` cross-doc links** flipped from `../../<doc>.md` (which resolved to `src/<doc>.md`, wrong by one parent) to absolute GitHub URLs. Works in both source view AND wheel-installed locations (`~/.claude/skills/safelint/`).
 - **CI gains a `safelint check src/ --all-files --fail-on=error` step** so a push that bypasses pre-commit can't merge with safelint violations. Matches the local pre-commit hook's args.
 - **docs.yml** triggers on `src/safelint/rules/**` so rule add/rename/remove now redeploys the docs site automatically (the rules-at-a-glance snippet is generated from `ALL_RULES`).
