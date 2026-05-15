@@ -140,7 +140,7 @@ def call_name(call_node: tree_sitter.Node) -> str | None:
     * Python ``foo(...)``           - function field is ``identifier`` → ``"foo"``
     * Python ``obj.method(...)``    - function field is ``attribute``  → ``"method"``
     * JavaScript ``foo(...)``       - function field is ``identifier`` → ``"foo"``
-    * JavaScript ``obj.method(...)``- function field is ``member_expression`` → ``"method"``
+    * JavaScript ``obj.method(...)`` - function field is ``member_expression`` → ``"method"``
     * JavaScript ``new Foo(...)``   - *constructor* field on ``new_expression``
       (instead of ``function``) → ``"Foo"`` for the identifier form,
       ``"WriteStream"`` for ``new fs.WriteStream(...)``.
