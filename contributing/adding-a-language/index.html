@@ -2152,7 +2152,7 @@
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Bundled AI-client skills also need an update</p>
-<p>Adding a new language also requires updating the bundled AI-client skills (<code>SKILL.md</code> and <code>cursor/safelint.mdc</code>) to list the new language and its file extensions in their <strong>Step 2</strong> registry tables. The drift-detection test <code>test_skill_documents_every_supported_extension</code> fails the moment a new extension lands in <code>supported_extensions()</code> without the corresponding bundled-doc update, and the test is parametrised over every registered AI client, so you only need to make the additions once per skill file.</p>
+<p>Adding a new language also requires updating the bundled AI-client skills (<code>claude/SKILL.md</code>, <code>cursor/safelint.mdc</code>, and every other per-client file under <code>skill_files/&lt;client&gt;/</code>) to list the new language and its file extensions in their <strong>Step 2</strong> registry tables. The drift-detection test <code>test_skill_documents_every_supported_extension</code> fails the moment a new extension lands in <code>supported_extensions()</code> without the corresponding bundled-doc update, and the test is parametrised over every registered AI client, so you only need to make the additions once per skill file.</p>
 </div>
 <h2 id="the-architecture-in-six-sentences">The architecture, in six sentences<a class="headerlink" href="#the-architecture-in-six-sentences" title="Permanent link">#</a></h2>
 <ol>
@@ -2376,7 +2376,7 @@
 <li><code>CHANGELOG.md</code> gets an entry under <strong>Added</strong>.</li>
 </ul>
 <h3 id="8-update-the-bundled-ai-client-skills">8. Update the bundled AI-client skills<a class="headerlink" href="#8-update-the-bundled-ai-client-skills" title="Permanent link">#</a></h3>
-<p>The bundle at <code>src/safelint/skill_files/</code> ships one Markdown artefact per registered AI client (12 today: Claude Code's <code>SKILL.md</code>, plus a per-client file under each of <code>cursor/</code>, <code>copilot/</code>, <code>gemini/</code>, <code>windsurf/</code>, <code>codex/</code>, <code>continue/</code>, <code>cline/</code>, <code>aider/</code>, <code>trae/</code>, <code>antigravity/</code>, <code>zed/</code>). Every one of them has a <strong>Step 2, Identify the language(s) involved</strong> section with a registry table listing the languages safelint can lint. When you add a new language, all twelve files need a new row in that table.</p>
+<p>The bundle at <code>src/safelint/skill_files/</code> ships one Markdown artefact per registered AI client (12 today, one each under <code>claude/</code>, <code>cursor/</code>, <code>copilot/</code>, <code>gemini/</code>, <code>windsurf/</code>, <code>codex/</code>, <code>continue/</code>, <code>cline/</code>, <code>aider/</code>, <code>trae/</code>, <code>antigravity/</code>, <code>zed/</code>). Every one of them has a <strong>Step 2, Identify the language(s) involved</strong> section with a registry table listing the languages safelint can lint. When you add a new language, all twelve files need a new row in that table.</p>
 <p>You also need to ship a new shared addendum file describing the language. The <code>languages/</code> subdirectory at the bundle root mirrors the <code>safelint/languages/</code> package one-to-one and is <em>shared</em> across every client, there's only one copy of the addendum, and every client references it via <code>safelint skill path</code>.</p>
 <p>Concretely:</p>
 <ol>
@@ -2387,7 +2387,7 @@
 <p><strong>Update every client's Step 2 registry table</strong> with a row pointing at the new addendum. The 12 files to touch:</p>
 </li>
 </ol>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>src/safelint/skill_files/SKILL.md
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>src/safelint/skill_files/claude/SKILL.md
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>src/safelint/skill_files/cursor/safelint.mdc
 <a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>src/safelint/skill_files/copilot/copilot-instructions.md
 <a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>src/safelint/skill_files/gemini/GEMINI.md

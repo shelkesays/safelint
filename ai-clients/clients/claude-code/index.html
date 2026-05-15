@@ -1788,9 +1788,10 @@
 <p><strong>Markers:</strong> <code>CLAUDE.md</code>, <code>.claude/</code>, or <code>.claude.json</code> in the project root for project-scope; <code>~/.claude/</code> or <code>~/.claude.json</code> for user-scope. Any one marker is enough, detection picks the first one it finds.</p>
 <p><strong>Install location:</strong></p>
 <ul>
-<li>User-scoped: <code>~/.claude/skills/safelint/</code> (a directory containing <code>SKILL.md</code>, <code>README.md</code>, <code>languages/python.md</code>)</li>
-<li>Project-scoped: <code>&lt;cwd&gt;/.claude/skills/safelint/</code> (same layout, just under the repo)</li>
+<li>User-scoped: <code>~/.claude/skills/safelint/SKILL.md</code></li>
+<li>Project-scoped: <code>&lt;cwd&gt;/.claude/skills/safelint/SKILL.md</code></li>
 </ul>
+<p>Language-specific addendums (<code>languages/python.md</code>, etc.) are looked up on demand from the bundled package via <code>safelint skill path</code>, the same way every other client does it.</p>
 <p><strong>How to invoke after install:</strong></p>
 <p>Restart Claude Code (or open a new session). The skill registers automatically. Then in any conversation:</p>
 <ul>

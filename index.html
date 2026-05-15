@@ -1940,10 +1940,6 @@
 <p><strong>Rule coverage:</strong> 17 rules apply to all three languages; 2 are Python-only (<code>bare_except</code>, <code>global_state</code>; the keywords don't exist in JS/TS) and 1 is JavaScript-family-only (<code>wide_scope_declaration</code>; <code>var</code>'s function-scoping hazard doesn't exist in Python, but applies to both <code>.js</code> and <code>.ts</code>).</p>
 <p><strong>Planned future languages</strong> (in working-priority order, no timelines committed): Go, Rust, Java, C, C++, PHP. See the <a href="configuration/rules/#planned">language-coverage roadmap</a>.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
-<div class="admonition warning">
-<p class="admonition-title">v2.0.0rc3 (pre-release): pin the version or pass <code>--pre</code></p>
-<p>Until v2.0.0 GA, an unpinned <code>pip install 'safelint[&lt;lang&gt;]'</code> resolves to the latest 1.x release, which <strong>doesn't define these per-language extras</strong> and so wouldn't install any grammar. For the RC, pin explicitly: <code>pip install 'safelint[python]==2.0.0rc3'</code> (or pass <code>--pre</code> to any command below).</p>
-</div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python]&#39;</span><span class="w">         </span><span class="c1"># adds .py, .pyw</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[javascript]&#39;</span><span class="w">     </span><span class="c1"># adds .js, .mjs, .cjs</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[typescript]&#39;</span><span class="w">     </span><span class="c1"># adds .ts, .tsx, .as (also bundles JS)</span>

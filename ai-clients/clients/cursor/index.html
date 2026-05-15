@@ -1793,7 +1793,7 @@
 </ul>
 <p><strong>How to invoke after install:</strong></p>
 <p>Restart Cursor (or reload the window). The MDC rule is auto-loaded as a Project Rule. Then ask the Cursor agent the same prompts as for Claude Code (<em>"run safelint"</em>, <em>"lint my changes"</em>, etc.).</p>
-<p>The MDC bundles the same step-by-step workflow as the Claude SKILL.md. Both clients run <code>safelint check ... --format json</code> and present the result the same way; only the file format differs.</p>
+<p>The MDC bundles the same step-by-step workflow as the Claude <code>claude/SKILL.md</code> (and every other client's own file). All clients run <code>safelint check ... --format json</code> and present the result the same way; only the file format differs.</p>
 <p><strong>Manual install:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>cursor<span class="w">            </span><span class="c1"># user-scoped</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>cursor<span class="w"> </span>--project<span class="w">  </span><span class="c1"># project-scoped</span>

@@ -1713,6 +1713,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#200-2026-05-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.0.0 - 2026-05-15
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#200rc3-2026-05-14" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2755,6 +2766,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#200-2026-05-15" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.0.0 - 2026-05-15
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#200rc3-2026-05-14" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3716,7 +3738,21 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.0.0rc3...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.0.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="200-2026-05-15"><a href="https://github.com/shelkesays/safelint/compare/v2.0.0rc3...v2.0.0">2.0.0</a> - 2026-05-15<a class="headerlink" href="#200-2026-05-15" title="Permanent link">#</a></h2>
+<p><strong>v2.0.0 GA.</strong> The release candidate cycle (rc1 / rc2 / rc3) is closed. RC validation surfaced no blocking issues, so the engine and rule behaviour of v2.0.0 is identical to v2.0.0rc3: every rule check, every Tree-sitter walk, every config-resolution path, every CLI flag, every JSON / SARIF emission produces byte-identical output for byte-identical input. The GA bump also folds in one deliberate <strong>skill-install refactor</strong> so the bundled-skill layout and the Claude install shape land symmetric with every peer client before 2.0.0 freezes that surface for the rest of the 2.x line, the change is internal to the install machinery (CLI surface unchanged; existing v1.x Claude installs continue to report fresh on <code>safelint skill status</code> because the destination <code>SKILL.md</code> path and its bytes both match). The release-time changes are:</p>
+<ul>
+<li><code>pyproject.toml</code> <code>version</code> bumped from <code>2.0.0rc3</code> to <code>2.0.0</code>.</li>
+<li>The RC-pin comment block in <code>[project.optional-dependencies]</code> removed; <code>pip install 'safelint[&lt;lang&gt;]'</code> now resolves to <code>2.0.0</code> straight from PyPI with no pin or <code>--pre</code> flag needed.</li>
+<li>Pre-release callouts removed from every install surface: <code>README.md</code>, <code>docs/index.md</code>, the three <code>docs/languages/*.md</code> pages, the wheel-bundled <code>src/safelint/skill_files/README.md</code>, all 12 AI-client skill files (under <code>src/safelint/skill_files/&lt;client&gt;/</code>), and the three skill language addendums.</li>
+<li>Install pins updated: <code>'safelint[&lt;lang&gt;]==2.0.0rc3'</code> to bare <code>'safelint[&lt;lang&gt;]'</code>; pre-commit <code>rev: v2.0.0rc3</code> to <code>rev: v2.0.0</code>.</li>
+<li><code>uv.lock</code> regenerated.</li>
+<li><strong>Bundled skill-files layout symmetry.</strong> Claude Code's <code>SKILL.md</code> moved from the top of <code>src/safelint/skill_files/</code> into its own subdirectory at <code>src/safelint/skill_files/claude/SKILL.md</code>, joining the per-client siblings (<code>cursor/</code>, <code>copilot/</code>, <code>gemini/</code>, <code>windsurf/</code>, <code>codex/</code>, <code>continue/</code>, <code>cline/</code>, <code>aider/</code>, <code>trae/</code>, <code>antigravity/</code>, <code>zed/</code>). Every client now ships exactly one bundled file under <code>skill_files/&lt;client&gt;/</code>; the shared <code>languages/&lt;lang&gt;.md</code> addendums and <code>README.md</code> stay at the bundle root and are looked up on demand via <code>safelint skill path</code> from every client (Claude included).</li>
+<li><strong>Claude install destination simplified to a single file.</strong> <code>safelint skill install --client claude</code> previously copied a directory tree (<code>SKILL.md</code> + <code>languages/</code> + <code>README.md</code>) to <code>~/.claude/skills/safelint/</code>; it now copies a single file to <code>~/.claude/skills/safelint/SKILL.md</code>, matching the one-file-in, one-file-out shape every other client already used. The CLI surface is unchanged (same <code>--client claude</code>, same <code>--symlink</code> / <code>--force</code> / <code>--project</code> flags, same <code>update</code> / <code>remove</code> / <code>status</code> semantics). Internal Claude-special-case code paths (<code>_install_symlink_directory_filtered</code>, <code>_is_symlink_managed_directory</code>, the tree-hash freshness check, <code>_PEER_CLIENT_DIRS</code>) are gone, the install primitives become single-file across the board. <strong>Upgrading from a v1.x Claude install:</strong> the destination still has <code>SKILL.md</code> at the same path, so <code>safelint skill status</code> reports fresh as long as content matches; only the orphan <code>languages/</code> and <code>README.md</code> next to it stay behind on disk. Cleanest cleanup is <code>safelint skill remove --client claude &amp;&amp; safelint skill install --client claude</code>, but it's optional, the orphans are harmless.</li>
+</ul>
+<p><strong>Cumulative scope since v1.13.0</strong> (the last 1.x release): every supported language ships as an opt-in PEP 621 extra (<code>[python]</code> / <code>[javascript]</code> / <code>[typescript]</code> / <code>[all]</code>); TypeScript / TSX / AssemblyScript are first-class; the silent-failure guard exits with code 2 when a run lints zero files because of a missing grammar; hook mode emits one summary per pre-commit invocation rather than one per batch (see issue #52); skill files cover twelve AI clients; the writing-style baseline drops em-dashes from documentation, mkdocs, skills, code, and CLI output (one rule message text changed as documented in the rc3 entry below).</p>
+<p><strong>Upgrading from v1.x:</strong> see the <em>Migration from v1.13.0</em> table in the <a href="https://github.com/shelkesays/safelint/compare/v1.13.0...v2.0.0rc1">2.0.0rc1</a> entry below; the install-command swap from bare <code>safelint</code> to <code>safelint[&lt;lang&gt;]</code> is the only required change for most users.</p>
+<p><strong>Upgrading from a v2.0.0 RC:</strong> drop any <code>==2.0.0rcN</code> pin or <code>--pre</code> flag; <code>pip install -U 'safelint[&lt;lang&gt;]'</code> is sufficient. Pre-commit users should bump their <code>rev:</code> pin to <code>v2.0.0</code>.</p>
 <h2 id="200rc3-2026-05-14"><a href="https://github.com/shelkesays/safelint/compare/v2.0.0rc2...v2.0.0rc3">2.0.0rc3</a> - 2026-05-14<a class="headerlink" href="#200rc3-2026-05-14" title="Permanent link">#</a></h2>
 <p><strong>Iteration on the v2.0.0 RC.</strong> Bug fixes and a project-wide writing-style cleanup found during testing of <code>2.0.0rc2</code>. No feature changes; same packaging story, same extras, same rule coverage. Install with <code>pip install 'safelint[&lt;lang&gt;]==2.0.0rc3'</code> (or pass <code>--pre</code>); pre-commit users update <code>rev: v2.0.0rc2</code> to <code>rev: v2.0.0rc3</code>.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
@@ -3743,7 +3779,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h3 id="changed_1">Changed<a class="headerlink" href="#changed_1" title="Permanent link">#</a></h3>
 <ul>
-<li><strong>JSON schema docs path correction across skill files.</strong> The 12 per-client AI-client skill files referenced <code>docs/JSON_SCHEMA.md</code>; the file was renamed to <code>docs/json-schema.md</code> for the mkdocs site. URLs were 404s on GitHub. Now consistent.</li>
+<li><strong>JSON schema docs path correction across skill files.</strong> The 11 per-client AI-client skill files plus the wheel-bundled <code>src/safelint/skill_files/README.md</code> referenced <code>docs/JSON_SCHEMA.md</code>; the file was renamed to <code>docs/json-schema.md</code> for the mkdocs site. URLs were 404s on GitHub. Now consistent.</li>
 <li><strong><code>SKILL.md</code> / <code>skill_files/README.md</code> cross-doc links</strong> flipped from <code>../../&lt;doc&gt;.md</code> (which resolved to <code>src/&lt;doc&gt;.md</code>, wrong by one parent) to absolute GitHub URLs. Works in both source view AND wheel-installed locations (<code>~/.claude/skills/safelint/</code>).</li>
 <li><strong>CI gains a <code>safelint check src/ --all-files --fail-on=error</code> step</strong> so a push that bypasses pre-commit can't merge with safelint violations. Matches the local pre-commit hook's args.</li>
 <li><strong>docs.yml</strong> triggers on <code>src/safelint/rules/**</code> so rule add/rename/remove now redeploys the docs site automatically (the rules-at-a-glance snippet is generated from <code>ALL_RULES</code>).</li>

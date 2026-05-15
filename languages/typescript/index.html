@@ -2065,10 +2065,6 @@
 <li><strong><code>.as</code></strong>, <strong>AssemblyScript</strong> is a TypeScript-syntax subset that compiles to WebAssembly. It parses cleanly with the standard TypeScript grammar; SafeLint treats <code>.as</code> files as TypeScript without special-casing. Rule output uses TypeScript's vocabulary.</li>
 </ul>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
-<div class="admonition warning">
-<p class="admonition-title">v2.0.0rc3 (pre-release), pin or pass <code>--pre</code></p>
-<p>Until v2.0.0 GA, an unpinned <code>pip install 'safelint[typescript]'</code> resolves to the latest 1.x release, which doesn't define this extra and won't install the TS grammar. For the RC, pin explicitly: <code>pip install 'safelint[typescript]==2.0.0rc3'</code> (or pass <code>--pre</code>).</p>
-</div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[typescript]&#39;</span><span class="w">     </span><span class="c1"># the tool runs on Python; the [typescript] extra adds the TS grammar (and bundles JS too)</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                    </span><span class="c1"># lint a directory (git-modified files by default)</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">           </span><span class="c1"># lint everything</span>
@@ -2218,7 +2214,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># .pre-commit-config.yaml</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">repos</span><span class="p">:</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0rc3</span><span class="w">       </span><span class="c1"># pin to a release (replace with the GA tag once v2.0.0 ships)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0</span><span class="w">       </span><span class="c1"># pin to a release (replace with the GA tag once v2.0.0 ships)</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="c1"># TS users add the matching extra so pre-commit&#39;s isolated environment</span>

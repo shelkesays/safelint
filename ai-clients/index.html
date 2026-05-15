@@ -1897,8 +1897,8 @@
 <tbody>
 <tr>
 <td><strong><a href="clients/claude-code/">Claude Code</a></strong></td>
-<td>Skill directory (<code>SKILL.md</code> + <code>languages/</code>)</td>
-<td><code>~/.claude/skills/safelint/</code> (user) or <code>&lt;cwd&gt;/.claude/skills/safelint/</code> (project)</td>
+<td>Skill manifest (<code>SKILL.md</code>)</td>
+<td><code>~/.claude/skills/safelint/SKILL.md</code> (user) or <code>&lt;cwd&gt;/.claude/skills/safelint/SKILL.md</code> (project)</td>
 <td><code>CLAUDE.md</code>, <code>.claude/</code>, or <code>.claude.json</code> in cwd; <code>~/.claude/</code> or <code>~/.claude.json</code> for user-scope</td>
 </tr>
 <tr>
@@ -1988,7 +1988,7 @@
 <h3 id="multi-detection">Multi-detection<a class="headerlink" href="#multi-detection" title="Permanent link">#</a></h3>
 <p>If multiple clients are present, <strong>all</strong> of them are installed in the same run. The output prints the detected clients and a per-client success block:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>safelint: detected Claude Code (CLAUDE.md) and Cursor (.cursor) in current directory
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>safelint: Claude Code skill copied to /repo/.claude/skills/safelint (project scope)
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>safelint: Claude Code skill copied to /repo/.claude/skills/safelint/SKILL.md (project scope)
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>  → Restart Claude Code (or open a new session) to pick up the skill.
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>  → Then ask Claude Code &quot;run safelint&quot; or &quot;lint with safelint&quot;.
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>safelint: Cursor rule copied to /repo/.cursor/rules/safelint.mdc (project scope)

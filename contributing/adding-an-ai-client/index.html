@@ -1635,21 +1635,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-optional-update-peer-client-exclusion" class="md-nav__link">
+  <a href="#4-optional-cross-agent-shared-file-the-secondary-install" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. (Optional) Update peer-client exclusion
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4b-optional-cross-agent-shared-file-the-secondary-install" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4b. (Optional) Cross-agent shared file (the "secondary install")
+        4. (Optional) Cross-agent shared file (the "secondary install")
       
     </span>
   </a>
@@ -2049,21 +2038,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#4-optional-update-peer-client-exclusion" class="md-nav__link">
+  <a href="#4-optional-cross-agent-shared-file-the-secondary-install" class="md-nav__link">
     <span class="md-ellipsis">
       
-        4. (Optional) Update peer-client exclusion
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#4b-optional-cross-agent-shared-file-the-secondary-install" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        4b. (Optional) Cross-agent shared file (the "secondary install")
+        4. (Optional) Cross-agent shared file (the "secondary install")
       
     </span>
   </a>
@@ -2230,36 +2208,14 @@
 <p>The walkthrough below uses <em>Windsurf</em> as a worked example because it has a clean, single-file rules convention. Windsurf is now actually shipped (since v1.11.0), feel free to compare this guide against the real implementation in <code>_skill_install.py</code> (<code>_WINDSURF_SPEC</code>) for cross-reference.</p>
 </blockquote>
 <h3 id="1-decide-on-the-bundled-artefact-shape">1. Decide on the bundled artefact shape<a class="headerlink" href="#1-decide-on-the-bundled-artefact-shape" title="Permanent link">#</a></h3>
-<p>Two shapes are supported today:</p>
-<table>
-<thead>
-<tr>
-<th>Shape</th>
-<th>Example</th>
-<th>Bundle layout</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><strong>Single file</strong></td>
-<td>Cursor's <code>.mdc</code></td>
-<td><code>src/safelint/skill_files/&lt;client&gt;/&lt;filename&gt;</code></td>
-</tr>
-<tr>
-<td><strong>Directory tree</strong></td>
-<td>Claude Code's skill folder</td>
-<td><code>src/safelint/skill_files/</code> (root, with peer-client subdirs excluded)</td>
-</tr>
-</tbody>
-</table>
-<p>Most agents read a single instructions / rules file (the easier shape). Only Claude Code currently uses a directory tree because its skill format requires a <code>SKILL.md</code> plus per-language addendums.</p>
-<p>For Windsurf, assume single-file like Cursor: <code>src/safelint/skill_files/windsurf/safelint-rules.md</code>.</p>
+<p>Every client today installs a <strong>single file</strong> under a per-client subdirectory of the bundle: <code>src/safelint/skill_files/&lt;client&gt;/&lt;filename&gt;</code>. Claude Code is <code>claude/SKILL.md</code>, Cursor is <code>cursor/safelint.mdc</code>, Windsurf would be <code>windsurf/safelint-rules.md</code>, and so on. The shared <code>languages/</code> and <code>README.md</code> at the bundle root are looked up on demand by every client via <code>safelint skill path</code>.</p>
+<p>For Windsurf the bundled artefact lives at <code>src/safelint/skill_files/windsurf/safelint-rules.md</code>.</p>
 <h3 id="2-write-the-bundled-artefact">2. Write the bundled artefact<a class="headerlink" href="#2-write-the-bundled-artefact" title="Permanent link">#</a></h3>
-<p>Adapt the existing <code>SKILL.md</code> content into the new client's native format. The workflow is the same across clients (verify install → identify language → run with <code>--format json</code> → parse → present); only frontmatter and file shape differ.</p>
+<p>Adapt the existing <code>claude/SKILL.md</code> content into the new client's native format. The workflow is the same across clients (verify install → identify language → run with <code>--format json</code> → parse → present); only frontmatter and file shape differ.</p>
 <p>For Windsurf (assume it uses Markdown with no frontmatter):</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>cp<span class="w"> </span>src/safelint/skill_files/cursor/safelint.mdc<span class="w"> </span>src/safelint/skill_files/windsurf/safelint-rules.md
 </code></pre></div>
-<p>Then strip Cursor's MDC frontmatter (the <code>--- description: ... ---</code> block) and tweak any client-specific phrasing. The <code>--- name: safelint description: ... ---</code> from Claude's <code>SKILL.md</code> is also a starting point if you want frontmatter.</p>
+<p>Then strip Cursor's MDC frontmatter (the <code>--- description: ... ---</code> block) and tweak any client-specific phrasing. The <code>--- name: safelint description: ... ---</code> block at the top of <code>claude/SKILL.md</code> is also a starting point if you want frontmatter.</p>
 <p>Keep the workflow body language-neutral, language addendums under <code>skill_files/languages/</code> are shared rather than duplicated. The new client's instructions should tell its agent how to find them via <code>safelint skill path</code> if it needs them.</p>
 <h3 id="3-append-a-clientspec-entry">3. Append a <code>ClientSpec</code> entry<a class="headerlink" href="#3-append-a-clientspec-entry" title="Permanent link">#</a></h3>
 <p>In <code>src/safelint/_skill_install.py</code>, define the spec and add it to the registry:</p>
@@ -2309,11 +2265,11 @@
 </tr>
 <tr>
 <td><code>install_relpath</code></td>
-<td>Where the artefact gets installed, relative to scope root (cwd for project-scope, home for user-scope). Tuple of path components, <code>(".windsurfrules",)</code> means a single file at <code>&lt;scope&gt;/.windsurfrules</code>; <code>(".claude", "skills", "safelint")</code> means a directory at <code>&lt;scope&gt;/.claude/skills/safelint/</code>.</td>
+<td>Where the artefact gets installed, relative to scope root (cwd for project-scope, home for user-scope). Tuple of path components; every client today installs a single file, e.g. <code>(".windsurfrules",)</code> for Windsurf, <code>(".cursor", "rules", "safelint.mdc")</code> for Cursor, <code>(".claude", "skills", "safelint", "SKILL.md")</code> for Claude Code.</td>
 </tr>
 <tr>
 <td><code>bundled_relpath</code></td>
-<td>Where the source artefact lives under <code>skill_files/</code>. Tuple of path components. Use <code>()</code> (empty tuple) for the whole <code>skill_files/</code> root (Claude pattern).</td>
+<td>Where the source artefact lives under <code>skill_files/</code>. Tuple of path components pointing at a single file, e.g. <code>("windsurf", "safelint-rules.md")</code>.</td>
 </tr>
 <tr>
 <td><code>restart_hint</code></td>
@@ -2325,36 +2281,25 @@
 </tr>
 <tr>
 <td><code>documentation_relpaths</code></td>
-<td>Tuple of relpaths under <code>skill_files/</code> whose combined text <em>must</em> mention every rule code/name in <code>ALL_RULES</code> and every extension in <code>supported_extensions()</code>. Drift-detection tests parametrised over <code>_CLIENT_SPECS</code> enforce this, a new rule or language without corresponding bundled-doc updates fails CI. For a single-file client whose bundled artefact lives at <code>skill_files/windsurf/safelint-rules.md</code>, set this to <code>(("windsurf", "safelint-rules.md"),)</code>. For a directory-tree client like Claude, it points at the entry-point file: <code>(("SKILL.md",),)</code>. The outer tuple is a <em>list</em> of files; if a client splits its docs across multiple bundled files, list them all and the test treats the union of their text as the searchable surface.</td>
+<td>Tuple of relpaths under <code>skill_files/</code> whose combined text <em>must</em> mention every rule code/name in <code>ALL_RULES</code> and every extension in <code>supported_extensions()</code>. Drift-detection tests parametrised over <code>_CLIENT_SPECS</code> enforce this, a new rule or language without corresponding bundled-doc updates fails CI. For a single-file client whose bundled artefact lives at <code>skill_files/windsurf/safelint-rules.md</code>, set this to <code>(("windsurf", "safelint-rules.md"),)</code>. For Claude Code it points at <code>(("claude", "SKILL.md"),)</code>. The outer tuple is a <em>list</em> of files; if a client splits its docs across multiple bundled files, list them all and the test treats the union of their text as the searchable surface.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="4-optional-update-peer-client-exclusion">4. (Optional) Update peer-client exclusion<a class="headerlink" href="#4-optional-update-peer-client-exclusion" title="Permanent link">#</a></h3>
-<p><strong>Background:</strong> Claude Code is the one client that installs as a <em>whole directory tree</em> (it copies all of <code>skill_files/</code> minus a few subdirectories). Every other client installs just one file from a per-client subdirectory like <code>skill_files/cursor/</code>, <code>skill_files/windsurf/</code>, etc. Those per-client subdirectories are called <em>peer-client bundles</em>, they sit alongside Claude's tree but aren't part of it.</p>
-<p>To stop those peer subdirectories from leaking into the materialised Claude install (so <code>~/.claude/skills/safelint/</code> doesn't end up containing <code>cursor/</code>, <code>windsurf/</code>, etc.), each one must be listed in <code>_PEER_CLIENT_DIRS</code>:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">_PEER_CLIENT_DIRS</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">&quot;cursor&quot;</span><span class="p">,</span> <span class="s2">&quot;windsurf&quot;</span><span class="p">})</span>
-</code></pre></div>
-<p>For a typical new client (single bundled file under <code>skill_files/&lt;client&gt;/</code>), always add <code>&lt;client&gt;</code> here. You only skip this step in two unusual cases:</p>
-<ol>
-<li>The bundled file lives at the <code>skill_files/</code> <em>root</em> (e.g. as a standalone Markdown file), not under a subdirectory.</li>
-<li>The new client shares the Claude bundle and shouldn't be excluded from it.</li>
-</ol>
-<p>Neither of those applies to any client shipped today, so when in doubt: add it.</p>
-<h3 id="4b-optional-cross-agent-shared-file-the-secondary-install">4b. (Optional) Cross-agent shared file (the "secondary install")<a class="headerlink" href="#4b-optional-cross-agent-shared-file-the-secondary-install" title="Permanent link">#</a></h3>
+<h3 id="4-optional-cross-agent-shared-file-the-secondary-install">4. (Optional) Cross-agent shared file (the "secondary install")<a class="headerlink" href="#4-optional-cross-agent-shared-file-the-secondary-install" title="Permanent link">#</a></h3>
 <p>Some clients read instructions from a <em>shared</em> file used by multiple AI tools, codex's <code>AGENTS.md</code> is the canonical example. If your client follows this pattern (the file is read by other agents too, so we can't simply overwrite it), use the <strong>secondary-install</strong> mechanism: safelint writes a delimited HTML-comment section into the shared file, leaving any other content the user has authored intact.</p>
 <p>Two extra <code>ClientSpec</code> fields opt your client into this:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">_YOUR_SPEC</span> <span class="o">=</span> <span class="n">ClientSpec</span><span class="p">(</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="c1"># ... usual fields ...</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">install_relpath</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;.yourclient&quot;</span><span class="p">,</span> <span class="s2">&quot;instructions.md&quot;</span><span class="p">),</span>  <span class="c1"># primary destination, fully owned</span>
-<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">bundled_relpath</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;yourclient&quot;</span><span class="p">,</span> <span class="s2">&quot;instructions.md&quot;</span><span class="p">),</span>
-<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">documentation_relpaths</span><span class="o">=</span><span class="p">((</span><span class="s2">&quot;yourclient&quot;</span><span class="p">,</span> <span class="s2">&quot;instructions.md&quot;</span><span class="p">),),</span>
-<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="c1"># Cross-agent shared file:</span>
-<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a>    <span class="n">secondary_install_relpath</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;AGENTS.md&quot;</span><span class="p">,),</span>
-<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a>    <span class="n">secondary_install_section_markers</span><span class="o">=</span><span class="p">(</span>
-<a id="__codelineno-3-9" name="__codelineno-3-9" href="#__codelineno-3-9"></a>        <span class="s2">&quot;&lt;!-- safelint:begin --&gt;&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-10" name="__codelineno-3-10" href="#__codelineno-3-10"></a>        <span class="s2">&quot;&lt;!-- safelint:end --&gt;&quot;</span><span class="p">,</span>
-<a id="__codelineno-3-11" name="__codelineno-3-11" href="#__codelineno-3-11"></a>    <span class="p">),</span>
-<a id="__codelineno-3-12" name="__codelineno-3-12" href="#__codelineno-3-12"></a><span class="p">)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">_YOUR_SPEC</span> <span class="o">=</span> <span class="n">ClientSpec</span><span class="p">(</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="c1"># ... usual fields ...</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>    <span class="n">install_relpath</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;.yourclient&quot;</span><span class="p">,</span> <span class="s2">&quot;instructions.md&quot;</span><span class="p">),</span>  <span class="c1"># primary destination, fully owned</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>    <span class="n">bundled_relpath</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;yourclient&quot;</span><span class="p">,</span> <span class="s2">&quot;instructions.md&quot;</span><span class="p">),</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>    <span class="n">documentation_relpaths</span><span class="o">=</span><span class="p">((</span><span class="s2">&quot;yourclient&quot;</span><span class="p">,</span> <span class="s2">&quot;instructions.md&quot;</span><span class="p">),),</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>    <span class="c1"># Cross-agent shared file:</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>    <span class="n">secondary_install_relpath</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;AGENTS.md&quot;</span><span class="p">,),</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a>    <span class="n">secondary_install_section_markers</span><span class="o">=</span><span class="p">(</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>        <span class="s2">&quot;&lt;!-- safelint:begin --&gt;&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a>        <span class="s2">&quot;&lt;!-- safelint:end --&gt;&quot;</span><span class="p">,</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>    <span class="p">),</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="p">)</span>
 </code></pre></div>
 <p>When set:</p>
 <ul>
@@ -2374,13 +2319,13 @@
 </ul>
 <h3 id="5-wire-up-file-extensions-in-pyprojecttoml">5. Wire up file extensions in <code>pyproject.toml</code><a class="headerlink" href="#5-wire-up-file-extensions-in-pyprojecttoml" title="Permanent link">#</a></h3>
 <p>If your bundled artefact uses a file extension that isn't already in the package-data glob, extend it. Example for a <code>.txt</code> artefact:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">[tool.setuptools.package-data]</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="n">safelint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">    </span><span class="s2">&quot;py.typed&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="s2">&quot;skill_files/**/*.md&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="s2">&quot;skill_files/**/*.mdc&quot;</span><span class="p">,</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="s2">&quot;skill_files/**/*.txt&quot;</span><span class="p">,</span><span class="w">   </span><span class="c1"># ← new</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">[tool.setuptools.package-data]</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="n">safelint</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">    </span><span class="s2">&quot;py.typed&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">    </span><span class="s2">&quot;skill_files/**/*.md&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="w">    </span><span class="s2">&quot;skill_files/**/*.mdc&quot;</span><span class="p">,</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="w">    </span><span class="s2">&quot;skill_files/**/*.txt&quot;</span><span class="p">,</span><span class="w">   </span><span class="c1"># ← new</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="p">]</span>
 </code></pre></div>
 <p>Without this, the file won't be included in the wheel, <code>safelint skill install</code> would fail at <code>_spec_bundled_source</code>.</p>
 <h3 id="6-add-tests">6. Add tests<a class="headerlink" href="#6-add-tests" title="Permanent link">#</a></h3>
@@ -2391,53 +2336,53 @@
 </ul>
 <p>Run them targeted while iterating: <code>uv run pytest -k "&lt;your-name&gt;"</code>. No per-client test boilerplate to write.</p>
 <p>For client-specific install behaviour, mirror the structure of the Cursor tests:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_bundled_windsurf_artefact_exists_in_wheel</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;The Windsurf rules ship alongside other skills under skill_files/windsurf/.&quot;&quot;&quot;</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">_skill_install</span><span class="o">.</span><span class="n">bundled_skill_path</span><span class="p">()</span> <span class="o">/</span> <span class="s2">&quot;windsurf&quot;</span> <span class="o">/</span> <span class="s2">&quot;safelint-rules.md&quot;</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>    <span class="k">assert</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span>
-<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>
-<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a>
-<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_install_windsurf_copy_user_scope</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">,</span> <span class="n">capsys</span><span class="p">):</span>
-<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;``--client windsurf`` copies the bundled rules to ~/.windsurfrules.&quot;&quot;&quot;</span>
-<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a>    <span class="n">home</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_redirect_home_and_cwd</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">)</span>
-<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>    <span class="n">rc</span> <span class="o">=</span> <span class="n">_skill_install</span><span class="o">.</span><span class="n">run_install</span><span class="p">(</span><span class="n">_make_args</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="s2">&quot;windsurf&quot;</span><span class="p">))</span>
-<a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>    <span class="k">assert</span> <span class="n">rc</span> <span class="o">==</span> <span class="mi">0</span>
-<a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>    <span class="k">assert</span> <span class="p">(</span><span class="n">home</span> <span class="o">/</span> <span class="s2">&quot;.windsurfrules&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span>
-<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>
-<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>
-<a id="__codelineno-5-15" name="__codelineno-5-15" href="#__codelineno-5-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_install_windsurf_copy_project_scope</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">):</span>
-<a id="__codelineno-5-16" name="__codelineno-5-16" href="#__codelineno-5-16"></a>    <span class="n">home</span><span class="p">,</span> <span class="n">cwd</span> <span class="o">=</span> <span class="n">_redirect_home_and_cwd</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">)</span>
-<a id="__codelineno-5-17" name="__codelineno-5-17" href="#__codelineno-5-17"></a>    <span class="n">rc</span> <span class="o">=</span> <span class="n">_skill_install</span><span class="o">.</span><span class="n">run_install</span><span class="p">(</span><span class="n">_make_args</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="s2">&quot;windsurf&quot;</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
-<a id="__codelineno-5-18" name="__codelineno-5-18" href="#__codelineno-5-18"></a>    <span class="k">assert</span> <span class="n">rc</span> <span class="o">==</span> <span class="mi">0</span>
-<a id="__codelineno-5-19" name="__codelineno-5-19" href="#__codelineno-5-19"></a>    <span class="k">assert</span> <span class="p">(</span><span class="n">cwd</span> <span class="o">/</span> <span class="s2">&quot;.windsurfrules&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span>
-<a id="__codelineno-5-20" name="__codelineno-5-20" href="#__codelineno-5-20"></a>
-<a id="__codelineno-5-21" name="__codelineno-5-21" href="#__codelineno-5-21"></a>
-<a id="__codelineno-5-22" name="__codelineno-5-22" href="#__codelineno-5-22"></a><span class="nd">@pytest</span><span class="o">.</span><span class="n">mark</span><span class="o">.</span><span class="n">skipif</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;Windows symlinks need elevated permissions in CI&quot;</span><span class="p">)</span>
-<a id="__codelineno-5-23" name="__codelineno-5-23" href="#__codelineno-5-23"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_install_windsurf_symlink_user_scope</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">):</span>
-<a id="__codelineno-5-24" name="__codelineno-5-24" href="#__codelineno-5-24"></a>    <span class="n">home</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_redirect_home_and_cwd</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">)</span>
-<a id="__codelineno-5-25" name="__codelineno-5-25" href="#__codelineno-5-25"></a>    <span class="n">rc</span> <span class="o">=</span> <span class="n">_skill_install</span><span class="o">.</span><span class="n">run_install</span><span class="p">(</span><span class="n">_make_args</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="s2">&quot;windsurf&quot;</span><span class="p">,</span> <span class="n">symlink</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
-<a id="__codelineno-5-26" name="__codelineno-5-26" href="#__codelineno-5-26"></a>    <span class="k">assert</span> <span class="n">rc</span> <span class="o">==</span> <span class="mi">0</span>
-<a id="__codelineno-5-27" name="__codelineno-5-27" href="#__codelineno-5-27"></a>    <span class="n">target</span> <span class="o">=</span> <span class="n">home</span> <span class="o">/</span> <span class="s2">&quot;.windsurfrules&quot;</span>
-<a id="__codelineno-5-28" name="__codelineno-5-28" href="#__codelineno-5-28"></a>    <span class="k">assert</span> <span class="n">target</span><span class="o">.</span><span class="n">is_symlink</span><span class="p">()</span>
-<a id="__codelineno-5-29" name="__codelineno-5-29" href="#__codelineno-5-29"></a>
-<a id="__codelineno-5-30" name="__codelineno-5-30" href="#__codelineno-5-30"></a>
-<a id="__codelineno-5-31" name="__codelineno-5-31" href="#__codelineno-5-31"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_install_auto_detects_windsurf_in_cwd</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">,</span> <span class="n">capsys</span><span class="p">):</span>
-<a id="__codelineno-5-32" name="__codelineno-5-32" href="#__codelineno-5-32"></a>    <span class="n">home</span><span class="p">,</span> <span class="n">cwd</span> <span class="o">=</span> <span class="n">_redirect_home_and_cwd</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">)</span>
-<a id="__codelineno-5-33" name="__codelineno-5-33" href="#__codelineno-5-33"></a>    <span class="p">(</span><span class="n">cwd</span> <span class="o">/</span> <span class="s2">&quot;.windsurfrules&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="s2">&quot;rules&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
-<a id="__codelineno-5-34" name="__codelineno-5-34" href="#__codelineno-5-34"></a>    <span class="n">rc</span> <span class="o">=</span> <span class="n">_skill_install</span><span class="o">.</span><span class="n">run_install</span><span class="p">(</span><span class="n">_make_args</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">))</span>
-<a id="__codelineno-5-35" name="__codelineno-5-35" href="#__codelineno-5-35"></a>    <span class="k">assert</span> <span class="n">rc</span> <span class="o">==</span> <span class="mi">0</span>
-<a id="__codelineno-5-36" name="__codelineno-5-36" href="#__codelineno-5-36"></a>    <span class="k">assert</span> <span class="p">(</span><span class="n">cwd</span> <span class="o">/</span> <span class="s2">&quot;.windsurfrules&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span>
-<a id="__codelineno-5-37" name="__codelineno-5-37" href="#__codelineno-5-37"></a>    <span class="n">out</span> <span class="o">=</span> <span class="n">capsys</span><span class="o">.</span><span class="n">readouterr</span><span class="p">()</span><span class="o">.</span><span class="n">out</span>
-<a id="__codelineno-5-38" name="__codelineno-5-38" href="#__codelineno-5-38"></a>    <span class="k">assert</span> <span class="s2">&quot;Windsurf (.windsurfrules)&quot;</span> <span class="ow">in</span> <span class="n">out</span>
-<a id="__codelineno-5-39" name="__codelineno-5-39" href="#__codelineno-5-39"></a>
-<a id="__codelineno-5-40" name="__codelineno-5-40" href="#__codelineno-5-40"></a>
-<a id="__codelineno-5-41" name="__codelineno-5-41" href="#__codelineno-5-41"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_cli_routes_skill_install_with_windsurf_client</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">mocker</span><span class="p">):</span>
-<a id="__codelineno-5-42" name="__codelineno-5-42" href="#__codelineno-5-42"></a>    <span class="n">monkeypatch</span><span class="o">.</span><span class="n">setattr</span><span class="p">(</span><span class="s2">&quot;sys.argv&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;safelint&quot;</span><span class="p">,</span> <span class="s2">&quot;skill&quot;</span><span class="p">,</span> <span class="s2">&quot;install&quot;</span><span class="p">,</span> <span class="s2">&quot;--client&quot;</span><span class="p">,</span> <span class="s2">&quot;windsurf&quot;</span><span class="p">])</span>
-<a id="__codelineno-5-43" name="__codelineno-5-43" href="#__codelineno-5-43"></a>    <span class="n">spy</span> <span class="o">=</span> <span class="n">mocker</span><span class="o">.</span><span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="n">_skill_install</span><span class="p">,</span> <span class="s2">&quot;run_install&quot;</span><span class="p">,</span> <span class="n">return_value</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
-<a id="__codelineno-5-44" name="__codelineno-5-44" href="#__codelineno-5-44"></a>    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">raises</span><span class="p">(</span><span class="ne">SystemExit</span><span class="p">):</span>
-<a id="__codelineno-5-45" name="__codelineno-5-45" href="#__codelineno-5-45"></a>        <span class="n">cli</span><span class="o">.</span><span class="n">main</span><span class="p">()</span>
-<a id="__codelineno-5-46" name="__codelineno-5-46" href="#__codelineno-5-46"></a>    <span class="n">args</span> <span class="o">=</span> <span class="n">spy</span><span class="o">.</span><span class="n">call_args</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-<a id="__codelineno-5-47" name="__codelineno-5-47" href="#__codelineno-5-47"></a>    <span class="k">assert</span> <span class="n">args</span><span class="o">.</span><span class="n">client</span> <span class="o">==</span> <span class="s2">&quot;windsurf&quot;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_bundled_windsurf_artefact_exists_in_wheel</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;The Windsurf rules ship alongside other skills under skill_files/windsurf/.&quot;&quot;&quot;</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>    <span class="n">path</span> <span class="o">=</span> <span class="n">_skill_install</span><span class="o">.</span><span class="n">bundled_skill_path</span><span class="p">()</span> <span class="o">/</span> <span class="s2">&quot;windsurf&quot;</span> <span class="o">/</span> <span class="s2">&quot;safelint-rules.md&quot;</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>    <span class="k">assert</span> <span class="n">path</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span>
+<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>
+<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_install_windsurf_copy_user_scope</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">,</span> <span class="n">capsys</span><span class="p">):</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">    </span><span class="sd">&quot;&quot;&quot;``--client windsurf`` copies the bundled rules to ~/.windsurfrules.&quot;&quot;&quot;</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a>    <span class="n">home</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_redirect_home_and_cwd</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">)</span>
+<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a>    <span class="n">rc</span> <span class="o">=</span> <span class="n">_skill_install</span><span class="o">.</span><span class="n">run_install</span><span class="p">(</span><span class="n">_make_args</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="s2">&quot;windsurf&quot;</span><span class="p">))</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a>    <span class="k">assert</span> <span class="n">rc</span> <span class="o">==</span> <span class="mi">0</span>
+<a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a>    <span class="k">assert</span> <span class="p">(</span><span class="n">home</span> <span class="o">/</span> <span class="s2">&quot;.windsurfrules&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span>
+<a id="__codelineno-4-13" name="__codelineno-4-13" href="#__codelineno-4-13"></a>
+<a id="__codelineno-4-14" name="__codelineno-4-14" href="#__codelineno-4-14"></a>
+<a id="__codelineno-4-15" name="__codelineno-4-15" href="#__codelineno-4-15"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_install_windsurf_copy_project_scope</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">):</span>
+<a id="__codelineno-4-16" name="__codelineno-4-16" href="#__codelineno-4-16"></a>    <span class="n">home</span><span class="p">,</span> <span class="n">cwd</span> <span class="o">=</span> <span class="n">_redirect_home_and_cwd</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">)</span>
+<a id="__codelineno-4-17" name="__codelineno-4-17" href="#__codelineno-4-17"></a>    <span class="n">rc</span> <span class="o">=</span> <span class="n">_skill_install</span><span class="o">.</span><span class="n">run_install</span><span class="p">(</span><span class="n">_make_args</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="s2">&quot;windsurf&quot;</span><span class="p">,</span> <span class="n">project</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<a id="__codelineno-4-18" name="__codelineno-4-18" href="#__codelineno-4-18"></a>    <span class="k">assert</span> <span class="n">rc</span> <span class="o">==</span> <span class="mi">0</span>
+<a id="__codelineno-4-19" name="__codelineno-4-19" href="#__codelineno-4-19"></a>    <span class="k">assert</span> <span class="p">(</span><span class="n">cwd</span> <span class="o">/</span> <span class="s2">&quot;.windsurfrules&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span>
+<a id="__codelineno-4-20" name="__codelineno-4-20" href="#__codelineno-4-20"></a>
+<a id="__codelineno-4-21" name="__codelineno-4-21" href="#__codelineno-4-21"></a>
+<a id="__codelineno-4-22" name="__codelineno-4-22" href="#__codelineno-4-22"></a><span class="nd">@pytest</span><span class="o">.</span><span class="n">mark</span><span class="o">.</span><span class="n">skipif</span><span class="p">(</span><span class="n">sys</span><span class="o">.</span><span class="n">platform</span> <span class="o">==</span> <span class="s2">&quot;win32&quot;</span><span class="p">,</span> <span class="n">reason</span><span class="o">=</span><span class="s2">&quot;Windows symlinks need elevated permissions in CI&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-23" name="__codelineno-4-23" href="#__codelineno-4-23"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_install_windsurf_symlink_user_scope</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">):</span>
+<a id="__codelineno-4-24" name="__codelineno-4-24" href="#__codelineno-4-24"></a>    <span class="n">home</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">_redirect_home_and_cwd</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">)</span>
+<a id="__codelineno-4-25" name="__codelineno-4-25" href="#__codelineno-4-25"></a>    <span class="n">rc</span> <span class="o">=</span> <span class="n">_skill_install</span><span class="o">.</span><span class="n">run_install</span><span class="p">(</span><span class="n">_make_args</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="s2">&quot;windsurf&quot;</span><span class="p">,</span> <span class="n">symlink</span><span class="o">=</span><span class="kc">True</span><span class="p">))</span>
+<a id="__codelineno-4-26" name="__codelineno-4-26" href="#__codelineno-4-26"></a>    <span class="k">assert</span> <span class="n">rc</span> <span class="o">==</span> <span class="mi">0</span>
+<a id="__codelineno-4-27" name="__codelineno-4-27" href="#__codelineno-4-27"></a>    <span class="n">target</span> <span class="o">=</span> <span class="n">home</span> <span class="o">/</span> <span class="s2">&quot;.windsurfrules&quot;</span>
+<a id="__codelineno-4-28" name="__codelineno-4-28" href="#__codelineno-4-28"></a>    <span class="k">assert</span> <span class="n">target</span><span class="o">.</span><span class="n">is_symlink</span><span class="p">()</span>
+<a id="__codelineno-4-29" name="__codelineno-4-29" href="#__codelineno-4-29"></a>
+<a id="__codelineno-4-30" name="__codelineno-4-30" href="#__codelineno-4-30"></a>
+<a id="__codelineno-4-31" name="__codelineno-4-31" href="#__codelineno-4-31"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_install_auto_detects_windsurf_in_cwd</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">,</span> <span class="n">capsys</span><span class="p">):</span>
+<a id="__codelineno-4-32" name="__codelineno-4-32" href="#__codelineno-4-32"></a>    <span class="n">home</span><span class="p">,</span> <span class="n">cwd</span> <span class="o">=</span> <span class="n">_redirect_home_and_cwd</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">tmp_path</span><span class="p">)</span>
+<a id="__codelineno-4-33" name="__codelineno-4-33" href="#__codelineno-4-33"></a>    <span class="p">(</span><span class="n">cwd</span> <span class="o">/</span> <span class="s2">&quot;.windsurfrules&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">write_text</span><span class="p">(</span><span class="s2">&quot;rules&quot;</span><span class="p">,</span> <span class="n">encoding</span><span class="o">=</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span>
+<a id="__codelineno-4-34" name="__codelineno-4-34" href="#__codelineno-4-34"></a>    <span class="n">rc</span> <span class="o">=</span> <span class="n">_skill_install</span><span class="o">.</span><span class="n">run_install</span><span class="p">(</span><span class="n">_make_args</span><span class="p">(</span><span class="n">client</span><span class="o">=</span><span class="s2">&quot;auto&quot;</span><span class="p">))</span>
+<a id="__codelineno-4-35" name="__codelineno-4-35" href="#__codelineno-4-35"></a>    <span class="k">assert</span> <span class="n">rc</span> <span class="o">==</span> <span class="mi">0</span>
+<a id="__codelineno-4-36" name="__codelineno-4-36" href="#__codelineno-4-36"></a>    <span class="k">assert</span> <span class="p">(</span><span class="n">cwd</span> <span class="o">/</span> <span class="s2">&quot;.windsurfrules&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">is_file</span><span class="p">()</span>
+<a id="__codelineno-4-37" name="__codelineno-4-37" href="#__codelineno-4-37"></a>    <span class="n">out</span> <span class="o">=</span> <span class="n">capsys</span><span class="o">.</span><span class="n">readouterr</span><span class="p">()</span><span class="o">.</span><span class="n">out</span>
+<a id="__codelineno-4-38" name="__codelineno-4-38" href="#__codelineno-4-38"></a>    <span class="k">assert</span> <span class="s2">&quot;Windsurf (.windsurfrules)&quot;</span> <span class="ow">in</span> <span class="n">out</span>
+<a id="__codelineno-4-39" name="__codelineno-4-39" href="#__codelineno-4-39"></a>
+<a id="__codelineno-4-40" name="__codelineno-4-40" href="#__codelineno-4-40"></a>
+<a id="__codelineno-4-41" name="__codelineno-4-41" href="#__codelineno-4-41"></a><span class="k">def</span><span class="w"> </span><span class="nf">test_cli_routes_skill_install_with_windsurf_client</span><span class="p">(</span><span class="n">monkeypatch</span><span class="p">,</span> <span class="n">mocker</span><span class="p">):</span>
+<a id="__codelineno-4-42" name="__codelineno-4-42" href="#__codelineno-4-42"></a>    <span class="n">monkeypatch</span><span class="o">.</span><span class="n">setattr</span><span class="p">(</span><span class="s2">&quot;sys.argv&quot;</span><span class="p">,</span> <span class="p">[</span><span class="s2">&quot;safelint&quot;</span><span class="p">,</span> <span class="s2">&quot;skill&quot;</span><span class="p">,</span> <span class="s2">&quot;install&quot;</span><span class="p">,</span> <span class="s2">&quot;--client&quot;</span><span class="p">,</span> <span class="s2">&quot;windsurf&quot;</span><span class="p">])</span>
+<a id="__codelineno-4-43" name="__codelineno-4-43" href="#__codelineno-4-43"></a>    <span class="n">spy</span> <span class="o">=</span> <span class="n">mocker</span><span class="o">.</span><span class="n">patch</span><span class="o">.</span><span class="n">object</span><span class="p">(</span><span class="n">_skill_install</span><span class="p">,</span> <span class="s2">&quot;run_install&quot;</span><span class="p">,</span> <span class="n">return_value</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+<a id="__codelineno-4-44" name="__codelineno-4-44" href="#__codelineno-4-44"></a>    <span class="k">with</span> <span class="n">pytest</span><span class="o">.</span><span class="n">raises</span><span class="p">(</span><span class="ne">SystemExit</span><span class="p">):</span>
+<a id="__codelineno-4-45" name="__codelineno-4-45" href="#__codelineno-4-45"></a>        <span class="n">cli</span><span class="o">.</span><span class="n">main</span><span class="p">()</span>
+<a id="__codelineno-4-46" name="__codelineno-4-46" href="#__codelineno-4-46"></a>    <span class="n">args</span> <span class="o">=</span> <span class="n">spy</span><span class="o">.</span><span class="n">call_args</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+<a id="__codelineno-4-47" name="__codelineno-4-47" href="#__codelineno-4-47"></a>    <span class="k">assert</span> <span class="n">args</span><span class="o">.</span><span class="n">client</span> <span class="o">==</span> <span class="s2">&quot;windsurf&quot;</span>
 </code></pre></div>
 <p>The existing Cursor tests are a good template, copy them and substitute paths / markers.</p>
 <h3 id="7-update-documentation">7. Update documentation<a class="headerlink" href="#7-update-documentation" title="Permanent link">#</a></h3>
@@ -2450,11 +2395,11 @@
 <li><strong><a href="../../project/changelog/">Changelog</a></strong>, add an entry under the next release section announcing the support.</li>
 </ol>
 <h3 id="8-run-the-pipeline">8. Run the pipeline<a class="headerlink" href="#8-run-the-pipeline" title="Permanent link">#</a></h3>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-q
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>tests/
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>--check<span class="w"> </span>src/<span class="w"> </span>tests/
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>uv<span class="w"> </span>run<span class="w"> </span>ty<span class="w"> </span>check<span class="w"> </span>src/
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>uv<span class="w"> </span>run<span class="w"> </span>safelint<span class="w"> </span>check<span class="w"> </span>src/
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-q
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>tests/
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>--check<span class="w"> </span>src/<span class="w"> </span>tests/
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>uv<span class="w"> </span>run<span class="w"> </span>ty<span class="w"> </span>check<span class="w"> </span>src/
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a>uv<span class="w"> </span>run<span class="w"> </span>safelint<span class="w"> </span>check<span class="w"> </span>src/
 </code></pre></div>
 <p>All five must pass. The new tests should bring overall coverage in line with the existing 97% threshold.</p>
 <h2 id="choosing-detection-markers">Choosing detection markers<a class="headerlink" href="#choosing-detection-markers" title="Permanent link">#</a></h2>
