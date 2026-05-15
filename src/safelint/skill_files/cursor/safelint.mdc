@@ -43,6 +43,7 @@ Look at the project files in cwd to figure out which languages safelint can lint
 | Python | `.py`, `.pyw` | `languages/python.md` |
 | JavaScript (Node) | `.js`, `.mjs`, `.cjs` | `languages/javascript.md` |
 | TypeScript (also AssemblyScript) | `.ts`, `.tsx`, `.as` | `languages/typescript.md` |
+| Java (vanilla and Spring Boot) | `.java` | `languages/java.md` |
 
 (More languages will land over time. To check the live list, run `python -c "from safelint.languages import supported_extensions; print(sorted(supported_extensions()))"`.)
 
