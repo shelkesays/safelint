@@ -144,11 +144,11 @@ The suppression breakdown surfaces in the hook's per-run summary the same way it
 
 ### "InstallEnvironmentError: pre-commit failed"
 
-Usually means the `additional_dependencies` extra has a typo. Verify the spelling matches one of `[python]`, `[javascript]`, `[typescript]`, or `[all]`. Combined extras use a single bracket pair: `['safelint[python,javascript]']`, not `['safelint[python]', 'safelint[javascript]']`.
+Usually means pre-commit couldn't install one of the `additional_dependencies` entries at all: for example, the requirement string is malformed, the package name / version is wrong, or dependency resolution / download failed. Verify the requirement syntax is valid and that any SafeLint extras use supported names such as `[python]`, `[javascript]`, `[typescript]`, `[python,javascript]`, or `[all]`. A typoed extra name (e.g. `safelint[pythno]`) does *not* fail the install, pip emits a `WARNING: safelint X.Y.Z does not provide the extra 'pythno'` and continues, so the hook env still builds and the typo only shows up at runtime as the missing-grammar / silent-failure case below.
 
 ### Hook runs but lints nothing
 
-Either pre-commit isn't passing files (check `types_or` matches your file extensions, or use `--all-files` to test) or the silent-failure guard is firing (missing grammar, see ["What happens if you forget the extra"](#what-happens-if-you-forget-the-extra) above).
+Either pre-commit isn't passing files (check `types_or` matches your file extensions, or use `--all-files` to test) or the silent-failure guard is firing because the needed grammar wasn't installed (for example, you forgot the extra or typoed an extra name, both of which leave SafeLint installed but without the matching tree-sitter grammar). See ["What happens if you forget the extra"](#what-happens-if-you-forget-the-extra) above for the error message and the fix.
 
 ### Hook is slow on the first run
 
