@@ -12,13 +12,13 @@
         <meta name="author" content="Rahul Shelke">
       
       
-        <link rel="canonical" href="https://shelkesays.github.io/safelint/configuration/">
+        <link rel="canonical" href="https://shelkesays.github.io/safelint/pre-commit/">
       
       
-        <link rel="prev" href="../languages/typescript/">
+        <link rel="prev" href="../configuration/rules/">
       
       
-        <link rel="next" href="cli/">
+        <link rel="next" href="../ai-clients/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Overview - SafeLint</title>
+        <title>Pre-commit - SafeLint</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#configuration" class="md-skip">
+        <a href="#pre-commit-integration" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Overview
+              Pre-commit
             
           </span>
         </div>
@@ -270,13 +270,11 @@
   
   
   
-    
-  
   
     
     
-      <li class="md-tabs__item md-tabs__item--active">
-        <a href="./" class="md-tabs__link">
+      <li class="md-tabs__item">
+        <a href="../configuration/" class="md-tabs__link">
           
   
   
@@ -294,9 +292,11 @@
   
   
   
+    
   
-    <li class="md-tabs__item">
-      <a href="../pre-commit/" class="md-tabs__link">
+  
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
         
   
   
@@ -620,8 +620,6 @@
       
   
   
-    
-  
   
   
     
@@ -643,23 +641,20 @@
     
     
       
-        
-        
-      
       
         
       
     
     
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
         
           
           <div class="md-nav__link md-nav__container">
-            <a href="./" class="md-nav__link md-nav__link--active">
+            <a href="../configuration/" class="md-nav__link ">
               
   
   
@@ -677,13 +672,13 @@
             </a>
             
               
-              <label class="md-nav__link md-nav__link--active" for="__nav_3" id="__nav_3_label" tabindex="">
+              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
           <label class="md-nav__title" for="__nav_3">
             <span class="md-nav__icon md-icon"></span>
             
@@ -703,7 +698,7 @@
   
   
     <li class="md-nav__item">
-      <a href="cli/" class="md-nav__link">
+      <a href="../configuration/cli/" class="md-nav__link">
         
   
   
@@ -731,7 +726,7 @@
   
   
     <li class="md-nav__item">
-      <a href="suppression/" class="md-nav__link">
+      <a href="../configuration/suppression/" class="md-nav__link">
         
   
   
@@ -759,7 +754,7 @@
   
   
     <li class="md-nav__item">
-      <a href="toml/" class="md-nav__link">
+      <a href="../configuration/toml/" class="md-nav__link">
         
   
   
@@ -787,7 +782,7 @@
   
   
     <li class="md-nav__item">
-      <a href="rules/" class="md-nav__link">
+      <a href="../configuration/rules/" class="md-nav__link">
         
   
   
@@ -819,10 +814,37 @@
       
   
   
+    
   
   
-    <li class="md-nav__item">
-      <a href="../pre-commit/" class="md-nav__link">
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pre-commit
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
         
   
   
@@ -838,6 +860,231 @@
   
 
       </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#quick-start" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick start
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-the-additional_dependencies-line-does" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the additional_dependencies line does
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#one-hook-every-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        One hook, every language
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="One hook, every language">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assemblyscript-override-types_or" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssemblyScript: override types_or
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-happens-if-you-forget-the-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What happens if you forget the extra
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-fail-on-and-mode-lenient-vs-strict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --fail-on and --mode: lenient vs strict
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-files-get-to-the-hook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How files get to the hook
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How files get to the hook">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#require_serial-true-issue-52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        require_serial: true (issue #52)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#config-files-inside-the-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config files inside the repo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suppressions-still-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suppressions still work
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#installenvironmenterror-pre-commit-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "InstallEnvironmentError: pre-commit failed"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hook-runs-but-lints-nothing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook runs but lints nothing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hook-is-slow-on-the-first-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook is slow on the first run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ci-reports-passed-but-i-see-errors-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI reports "passed" but I see errors locally
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#as-files-arent-being-linted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .as files aren't being linted
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1799,10 +2046,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#at-a-glance" class="md-nav__link">
+  <a href="#quick-start" class="md-nav__link">
     <span class="md-ellipsis">
       
-        At a glance
+        Quick start
       
     </span>
   </a>
@@ -1810,10 +2057,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#how-to-choose-a-suppression-mechanism" class="md-nav__link">
+  <a href="#what-the-additional_dependencies-line-does" class="md-nav__link">
     <span class="md-ellipsis">
       
-        How to choose a suppression mechanism
+        What the additional_dependencies line does
       
     </span>
   </a>
@@ -1821,10 +2068,182 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#where-to-go-next" class="md-nav__link">
+  <a href="#one-hook-every-language" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Where to go next
+        One hook, every language
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="One hook, every language">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#assemblyscript-override-types_or" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        AssemblyScript: override types_or
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-happens-if-you-forget-the-extra" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What happens if you forget the extra
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#-fail-on-and-mode-lenient-vs-strict" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        --fail-on and --mode: lenient vs strict
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#how-files-get-to-the-hook" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        How files get to the hook
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="How files get to the hook">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#require_serial-true-issue-52" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        require_serial: true (issue #52)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#config-files-inside-the-repo" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Config files inside the repo
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#suppressions-still-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Suppressions still work
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#installenvironmenterror-pre-commit-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "InstallEnvironmentError: pre-commit failed"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hook-runs-but-lints-nothing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook runs but lints nothing
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#hook-is-slow-on-the-first-run" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook is slow on the first run
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ci-reports-passed-but-i-see-errors-locally" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CI reports "passed" but I see errors locally
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#as-files-arent-being-linted" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        .as files aren't being linted
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#see-also" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        See also
       
     </span>
   </a>
@@ -1848,7 +2267,7 @@
 
 
   
-    <a href="https://github.com/shelkesays/safelint/edit/main/docs/configuration/index.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/shelkesays/safelint/edit/main/docs/pre-commit.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -1856,69 +2275,137 @@
   
 
 
-<h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h1>
-<p>SafeLint is configured in three places, in roughly increasing order of permanence:</p>
-<ol>
-<li><strong>The CLI</strong>: <code>safelint check --fail-on=warning --ignore SAFE801</code>. One-off overrides, CI knobs, hook flags. See <a href="cli/">CLI flags and commands</a>.</li>
-<li><strong>In your source files</strong>: <code># nosafe</code> on a line, <code># safelint: ignore</code> at the top of a file. The escape hatch when a violation is intentional. See <a href="suppression/">Suppression mechanisms</a>.</li>
-<li><strong>A TOML config</strong>: <code>[tool.safelint]</code> in <code>pyproject.toml</code> or a standalone <code>safelint.toml</code>. Project-wide policy: thresholds, per-rule options, glob-scoped ignores. See <a href="toml/">Configuration file</a>.</li>
-</ol>
-<p>Per-rule options (<code>max_lines</code>, <code>max_depth</code>, dataflow <code>sinks</code>, …) and what each rule actually flags live on the <a href="rules/">Rules reference</a>.</p>
-<h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># pyproject.toml: every key is optional; defaults match the section below.</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">[tool.safelint]</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;local&quot;</span><span class="w">                            </span><span class="c1"># &quot;local&quot; → fail on errors only; &quot;ci&quot; → fail on warnings too</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">fail_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;error&quot;</span><span class="w">                         </span><span class="c1"># overrides mode if both are set</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="c1"># Append project-specific dirs on top of the built-in vendor-dir</span>
-<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># defaults (.venv/, venv/, node_modules/, build/, dist/, __pycache__/,</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># .pytest_cache/, .ruff_cache/, .mypy_cache/, .tox/, .nox/, htmlcov/,</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># site-packages/). Prefer this over ``exclude_paths`` (which replaces</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># defaults entirely: see the Configuration file reference).</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">extend_exclude_paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;migrations/**&quot;</span><span class="p">]</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE203&quot;</span><span class="p">]</span>
+<h1 id="pre-commit-integration">Pre-commit integration<a class="headerlink" href="#pre-commit-integration" title="Permanent link">#</a></h1>
+<p>SafeLint ships a <a href="https://pre-commit.com/">pre-commit</a> hook so it runs automatically on every <code>git commit</code>, before code lands in your history. The hook is the recommended way to wire SafeLint into a project alongside <code>ruff</code>, <code>ty</code>, <code>eslint</code>, and friends: each tool runs in its own isolated environment, gets the staged files passed in, and blocks the commit if anything fails.</p>
+<p>The hook is <em>the same binary</em> <code>safelint</code> you'd invoke from the command line, just driven by pre-commit's argument-passing and exit-code conventions. Everything you can configure via <code>pyproject.toml</code> / <code>safelint.toml</code> (rules, suppressions, per-file ignores, language-specific options) applies to hook runs identically; the hook is not a separate code path.</p>
+<h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
+<p>Add this block to your <code>.pre-commit-config.yaml</code>. Pick the <code>additional_dependencies</code> line that matches the language(s) your repo contains:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">repos</span><span class="p">:</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0</span><span class="w">  </span><span class="c1"># replace with the latest release tag</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
+<a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">        </span><span class="c1"># Required in v2.0.0+. Pick whichever extras match your project&#39;s languages:</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[python]&#39;</span><span class="p p-Indicator">]</span><span class="w">               </span><span class="c1"># Python-only repo</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[javascript]&#39;]         # JS-only repo</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[typescript]&#39;]         # TypeScript repo (bundles JS too)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[python,javascript]&#39;]  # mixed monorepo</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[all]&#39;]                # every supported language</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="k">[tool.safelint.per_file_ignores]</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="s2">&quot;tests/**&quot;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE101&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;SAFE103&quot;</span><span class="p">]</span>
-<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a>
-<a id="__codelineno-0-16" name="__codelineno-0-16" href="#__codelineno-0-16"></a><span class="k">[tool.safelint.rules.function_length]</span>
-<a id="__codelineno-0-17" name="__codelineno-0-17" href="#__codelineno-0-17"></a><span class="n">max_lines</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">80</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">        </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">--fail-on=error</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># default; use --fail-on=warning for stricter CI</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span><span class="w">              </span><span class="c1"># optional, scope to a directory</span>
 </code></pre></div>
-<p>The same keys at the top level (without the <code>[tool.safelint]</code> wrapper) work in a standalone <code>safelint.toml</code>. When both files are present, <code>safelint.toml</code> wins.</p>
-<h2 id="how-to-choose-a-suppression-mechanism">How to choose a suppression mechanism<a class="headerlink" href="#how-to-choose-a-suppression-mechanism" title="Permanent link">#</a></h2>
-<p>Pick the narrowest scope that matches your intent:</p>
+<p>Then install the hooks:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pre-commit<span class="w"> </span>install
+</code></pre></div>
+<p>SafeLint now runs on every <code>git commit</code> and blocks the commit if it finds blocking violations.</p>
+<h2 id="what-the-additional_dependencies-line-does">What the <code>additional_dependencies</code> line does<a class="headerlink" href="#what-the-additional_dependencies-line-does" title="Permanent link">#</a></h2>
+<p>v2.0.0+ ships every language grammar as an opt-in PEP 621 extra (<code>[python]</code>, <code>[javascript]</code>, <code>[typescript]</code>, <code>[all]</code>). Plain <code>pip install safelint</code> installs only the engine, no grammars. The same applies to the hook: pre-commit creates an isolated virtualenv per hook revision and installs only what you list in <code>additional_dependencies</code>.</p>
+<p><code>safelint[python]</code> pulls <code>tree-sitter-python</code>. <code>safelint[javascript]</code> pulls <code>tree-sitter-javascript</code>. <code>safelint[typescript]</code> pulls both <code>tree-sitter-javascript</code> and <code>tree-sitter-typescript</code> (TypeScript projects almost always have <code>.js</code> files too: vite / webpack / jest configs, generated declaration shims). <code>safelint[all]</code> is the kitchen-sink that pulls every supported grammar in one go.</p>
+<p>You can compose extras: <code>['safelint[python,javascript]']</code> for a Python+JS monorepo is exactly the same as listing both individually, just one fewer string. New languages will get their own extras and be folded into <code>[all]</code> as they land.</p>
+<h2 id="one-hook-every-language">One hook, every language<a class="headerlink" href="#one-hook-every-language" title="Permanent link">#</a></h2>
+<p>The same <code>id: safelint</code> handles Python, JavaScript, and TypeScript. There is no <code>safelint-python</code> / <code>safelint-javascript</code> / <code>safelint-typescript</code> split. The published hook spec sets:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">types_or</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">javascript</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">ts</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tsx</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>so pre-commit's <a href="https://github.com/pre-commit/identify"><code>identify</code></a> library routes the right files to the hook automatically. SafeLint's engine then dispatches each file to its language-specific rule implementations based on the extension, the file-type tag pre-commit attached is just the routing key.</p>
+<p>Every CLI flag (<code>--fail-on</code>, <code>--mode</code>, <code>--ignore</code>, <code>--format</code>, <code>--statistics</code>) and every TOML option behaves identically across languages. The only per-project knob is which <code>additional_dependencies</code> extra you list.</p>
+<h3 id="assemblyscript-override-types_or">AssemblyScript: override <code>types_or</code><a class="headerlink" href="#assemblyscript-override-types_or" title="Permanent link">#</a></h3>
+<p><code>.as</code> files (AssemblyScript) are TypeScript-grammar lintable but pre-commit's <code>identify</code> library has no <code>as</code> filetype tag. They only carry the generic <code>text</code> / <code>file</code> tags. Adding <code>files: \.as$</code> alone is <em>not</em> enough: pre-commit ANDs <code>types_or</code> with <code>files</code>, so the manifest's <code>types_or</code> still excludes the file.</p>
+<p>To lint <code>.as</code> via the published hook, override <code>types_or</code> with a permissive tag <code>.as</code> files actually carry, and use <code>files</code> to scope the match:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="w">  </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[typescript]&#39;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="w">  </span><span class="nt">types_or</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">text</span><span class="p p-Indicator">]</span><span class="w">              </span><span class="c1"># permissive tag .as files actually carry</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="w">  </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">\.(ts|tsx|as)$</span><span class="w">         </span><span class="c1"># restrict to TS-family extensions</span>
+</code></pre></div>
+<p><code>types_or: []</code> does <strong>not</strong> work: pre-commit treats an empty tag list as "no tag matches", not "filter disabled".</p>
+<h2 id="what-happens-if-you-forget-the-extra">What happens if you forget the extra<a class="headerlink" href="#what-happens-if-you-forget-the-extra" title="Permanent link">#</a></h2>
+<p>The <code>additional_dependencies</code> line is genuinely required in v2.0.0+, including for Python projects (which used to work without it in 1.x). Forgetting it doesn't silently pass: SafeLint exits with code <strong>2</strong>, which pre-commit reports as <strong>Failed</strong> (red).</p>
+<p>When <em>every</em> passed file is skipped for a missing grammar (the usual "forgot the extra" case), the hook prints a single error line with the exact fix:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>safelint: error: no files linted, every file pre-commit passed had a grammar that
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>isn&#39;t installed, add &#39;safelint[python]&#39; to additional_dependencies in your
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>.pre-commit-config.yaml
+</code></pre></div>
+<p>In a <em>mixed</em> run, where some files lint successfully and others are skipped, SafeLint additionally prints one <code>safelint: warning: skipping .X files …</code> line per missing grammar as actionable context for the skipped subset. The all-skipped case omits that warning because the error above already carries the same install hint.</p>
+<p>See <a href="../configuration/cli/#exit-codes">Exit codes</a> for the full table of what each exit code means.</p>
+<h2 id="-fail-on-and-mode-lenient-vs-strict"><code>--fail-on</code> and <code>--mode</code>: lenient vs strict<a class="headerlink" href="#-fail-on-and-mode-lenient-vs-strict" title="Permanent link">#</a></h2>
+<p>Two flags govern whether warning-severity violations block the hook:</p>
 <table>
 <thead>
 <tr>
-<th>Want to silence …</th>
-<th>Use</th>
+<th>Flag</th>
+<th>Default</th>
+<th>Behaviour</th>
 </tr>
 </thead>
 <tbody>
 <tr>
-<td>One specific line</td>
-<td><a href="suppression/#inline-nosafe"><code># nosafe</code></a></td>
+<td><code>--fail-on=error</code></td>
+<td>(default)</td>
+<td>Only <code>error</code>-severity violations block. Warnings print to stdout but don't fail the hook.</td>
 </tr>
 <tr>
-<td>One whole file (auto-generated, vendor, fixture)</td>
-<td><a href="suppression/#file-level-safelint-ignore"><code># safelint: ignore</code></a></td>
+<td><code>--fail-on=warning</code></td>
+<td></td>
+<td>Errors AND warnings block. Strictest setting.</td>
 </tr>
 <tr>
-<td>Files matching a glob pattern (e.g. all tests)</td>
-<td><a href="toml/#per-file-ignore-list"><code>per_file_ignores</code> in TOML</a></td>
+<td><code>--mode=local</code></td>
+<td>(default)</td>
+<td>Same as <code>--fail-on=error</code>. The mode flag is a shorthand that also defaults other behaviours appropriately for interactive use.</td>
 </tr>
 <tr>
-<td>The rule everywhere in the project</td>
-<td><a href="toml/#global-ignore-list"><code>ignore</code> in TOML</a> or <code>--ignore</code> on the CLI</td>
+<td><code>--mode=ci</code></td>
+<td></td>
+<td>Same as <code>--fail-on=warning</code>. The mode flag also tunes behaviours suitable for CI environments.</td>
 </tr>
 </tbody>
 </table>
-<p>All four compose: the broader scopes still apply on top of the narrower ones.</p>
-<h2 id="where-to-go-next">Where to go next<a class="headerlink" href="#where-to-go-next" title="Permanent link">#</a></h2>
+<p>Precedence: explicit <code>--fail-on</code> &gt; explicit <code>--mode</code> &gt; built-in default. The published hook ships with <code>args: [--fail-on=error]</code> to match the local-dev expectation; flip to <code>--fail-on=warning</code> in a CI-specific config (e.g. a separate <code>.pre-commit-config.ci.yaml</code>) if you want stricter gating on shared infra.</p>
+<p>See <a href="../configuration/cli/">CLI flags and commands</a> for the full flag reference.</p>
+<h2 id="how-files-get-to-the-hook">How files get to the hook<a class="headerlink" href="#how-files-get-to-the-hook" title="Permanent link">#</a></h2>
+<p>By default, pre-commit passes the staged files. So <code>git commit</code> triggers SafeLint on the subset of files in that commit, not the whole repo. This is intentional: pre-commit hooks should be fast on a commit-by-commit basis.</p>
+<p>For a full-repo lint:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>pre-commit<span class="w"> </span>run<span class="w"> </span>safelint<span class="w"> </span>--all-files
+</code></pre></div>
+<p>This runs the hook against every file in the repo, useful for the initial pre-commit setup or to backfill compliance after a config change.</p>
+<h3 id="require_serial-true-issue-52"><code>require_serial: true</code> (issue <a href="https://github.com/shelkesays/safelint/issues/52">#52</a>)<a class="headerlink" href="#require_serial-true-issue-52" title="Permanent link">#</a></h3>
+<p>The published hook manifest sets <code>require_serial: true</code>. Without it, pre-commit runs the hook in parallel batches across files, producing one <code>Found N errors ... (M SAFE### suppressed)</code> summary block per batch with partial counts. <code>require_serial: true</code> collapses execution into one process so the summary aggregates correctly across the whole run.</p>
+<p><strong>Downstream impact:</strong> anyone consuming the published <code>repo: https://github.com/shelkesays/safelint</code> hook now sees serialised execution (no inter-batch parallelism). SafeLint is fast per-file (Tree-sitter parse plus rule walks), so this is a non-issue in practice. On very large repos that exceed the OS argv limit, pre-commit may still split into sequential invocations, but each batch's summary is then internally consistent.</p>
+<h2 id="config-files-inside-the-repo">Config files inside the repo<a class="headerlink" href="#config-files-inside-the-repo" title="Permanent link">#</a></h2>
+<p>SafeLint reads configuration from (in priority order, highest first):</p>
+<ol>
+<li>A standalone <code>safelint.toml</code> at any parent directory (top-level keys, no wrapper)</li>
+<li>A <code>[tool.safelint]</code> section in <code>pyproject.toml</code> at any parent directory</li>
+<li>Built-in defaults</li>
+</ol>
+<p>The hook respects this lookup the same way the CLI does: drop your config wherever it makes sense for your project layout and the hook picks it up.</p>
+<p>See <a href="../configuration/toml/">Configuration file</a> for the schema and <a href="../configuration/rules/">Rules reference</a> for the per-rule options.</p>
+<h2 id="suppressions-still-work">Suppressions still work<a class="headerlink" href="#suppressions-still-work" title="Permanent link">#</a></h2>
+<p>Every suppression mechanism the CLI honours works identically under the hook:</p>
 <ul>
-<li><strong><a href="cli/">CLI flags and commands</a></strong>, every <code>safelint</code> and <code>safelint skill</code> command, with examples.</li>
-<li><strong><a href="suppression/">Suppression mechanisms</a></strong>, <code># nosafe</code>, <code># safelint: ignore</code>, the end-of-run summary, and stderr diagnostics.</li>
-<li><strong><a href="toml/">Configuration file</a></strong>, top-level keys, ignore lists, per-file ignores, severity model, adoption path.</li>
-<li><strong><a href="rules/">Rules reference</a></strong>: every rule, what it flags, its TOML options.</li>
+<li><strong>Inline <code># nosafe</code></strong> comments suppress one or more rules on a single line.</li>
+<li><strong>In-file <code># safelint: ignore</code></strong> directives suppress rules for the whole file.</li>
+<li><strong><code>[tool.safelint.per_file_ignores]</code></strong> globs suppress rules for matched paths.</li>
+<li><strong>Global <code>ignore</code></strong> lists suppress rules project-wide.</li>
+</ul>
+<p>The suppression breakdown surfaces in the hook's per-run summary the same way it does interactively. See <a href="../configuration/suppression/">Suppression mechanisms</a> for the full model.</p>
+<h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">#</a></h2>
+<h3 id="installenvironmenterror-pre-commit-failed">"InstallEnvironmentError: pre-commit failed"<a class="headerlink" href="#installenvironmenterror-pre-commit-failed" title="Permanent link">#</a></h3>
+<p>Usually means pre-commit couldn't install one of the <code>additional_dependencies</code> entries at all: for example, the requirement string is malformed, the package name / version is wrong, or dependency resolution / download failed. Verify the requirement syntax is valid and that any SafeLint extras use supported names such as <code>[python]</code>, <code>[javascript]</code>, <code>[typescript]</code>, <code>[python,javascript]</code>, or <code>[all]</code>. A typoed extra name (e.g. <code>safelint[pythno]</code>) does <em>not</em> fail the install, pip emits a <code>WARNING: safelint X.Y.Z does not provide the extra 'pythno'</code> and continues, so the hook env still builds and the typo only shows up at runtime as the missing-grammar / silent-failure case below.</p>
+<h3 id="hook-runs-but-lints-nothing">Hook runs but lints nothing<a class="headerlink" href="#hook-runs-but-lints-nothing" title="Permanent link">#</a></h3>
+<p>Either pre-commit isn't passing files (check <code>types_or</code> matches your file extensions, or use <code>--all-files</code> to test) or the silent-failure guard is firing because the needed grammar wasn't installed (for example, you forgot the extra or typoed an extra name, both of which leave SafeLint installed but without the matching tree-sitter grammar). See <a href="#what-happens-if-you-forget-the-extra">"What happens if you forget the extra"</a> above for the error message and the fix.</p>
+<h3 id="hook-is-slow-on-the-first-run">Hook is slow on the first run<a class="headerlink" href="#hook-is-slow-on-the-first-run" title="Permanent link">#</a></h3>
+<p>pre-commit creates an isolated virtualenv per <code>rev:</code> and installs <code>safelint</code> plus its grammar(s) on first invocation. Subsequent commits reuse the cached env. Bump the <code>rev:</code> pin and the first commit after the bump re-installs.</p>
+<h3 id="ci-reports-passed-but-i-see-errors-locally">CI reports "passed" but I see errors locally<a class="headerlink" href="#ci-reports-passed-but-i-see-errors-locally" title="Permanent link">#</a></h3>
+<p>You're probably hitting the <code>--fail-on=error</code> default. Errors are blocking but warnings aren't (severity is per-rule, see <a href="../configuration/rules/">Rules reference</a>). Set <code>args: [--fail-on=warning]</code> in your CI pre-commit config to gate on warnings too.</p>
+<h3 id="as-files-arent-being-linted"><code>.as</code> files aren't being linted<a class="headerlink" href="#as-files-arent-being-linted" title="Permanent link">#</a></h3>
+<p>See <a href="#assemblyscript-override-types_or">AssemblyScript: override <code>types_or</code></a> above. The default <code>types_or</code> list doesn't include <code>.as</code>; you need to override it.</p>
+<h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">#</a></h2>
+<ul>
+<li><strong><a href="../configuration/cli/">CLI flags and commands</a></strong> for the full flag reference, exit codes, and machine-readable output formats.</li>
+<li><strong><a href="../configuration/toml/">Configuration file</a></strong> for the TOML schema and per-rule options.</li>
+<li><strong><a href="../configuration/suppression/">Suppression mechanisms</a></strong> for inline <code># nosafe</code>, in-file <code># safelint: ignore</code>, glob-based <code>per_file_ignores</code>, and global <code>ignore</code>.</li>
+<li><strong><a href="../configuration/rules/">Rules reference</a></strong> for every rule's code, severity, and configurable knobs.</li>
 </ul>
 
 
@@ -1957,7 +2444,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../languages/typescript/" class="md-footer__link md-footer__link--prev" aria-label="Previous: TypeScript">
+          <a href="../configuration/rules/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Rules reference">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -1967,20 +2454,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                TypeScript
+                Rules reference
               </div>
             </div>
           </a>
         
         
           
-          <a href="cli/" class="md-footer__link md-footer__link--next" aria-label="Next: CLI flags and commands">
+          <a href="../ai-clients/" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                CLI flags and commands
+                Overview
               </div>
             </div>
             <div class="md-footer__button md-icon">
