@@ -18,7 +18,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Project-wide writing-style cleanup: em-dashes removed.** Em-dashes (`—`) are gone from documentation, the mkdocs site, AI-client skill files, code comments, docstrings, and CLI output strings. Prose was restructured (comma, colon, parentheses, or a sentence split); a plain hyphen is used only where a dash is genuinely needed. The CLI's runtime error / warning / hint strings changed accordingly; tooling that string-matches safelint output should re-check its patterns.
+- **Project-wide writing-style cleanup: em-dashes removed.** Em-dashes (`—`) are gone from documentation, the mkdocs site, AI-client skill files, code comments, docstrings, and CLI output strings. Prose was restructured (comma, colon, parentheses, or a sentence split); a plain hyphen is used only where a dash is genuinely needed. **Heads-up for downstream tooling that string-matches safelint output:** two surfaces saw character-level changes and patterns may need updating. (1) CLI runtime strings (error / warning / install-hint lines from `_diagnostics`, the per-file summary line, the suggestions-available tail), and (2) one rule violation message: `SAFE305 wide_scope_declaration` now reads ``"`var` declaration uses function-scope hoisting - replace with `let` or `const` for block scope"`` (previously the same text with an em-dash before "replace"). No other rule message strings changed.
 
 ## [2.0.0rc2] - 2026-05-13
 
