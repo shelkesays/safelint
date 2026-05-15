@@ -7,6 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.0.0] - 2026-05-15
+
+**v2.0.0 GA.** The release candidate cycle (rc1 / rc2 / rc3) is closed. RC validation surfaced no blocking issues, so v2.0.0 ships identically to v2.0.0rc3. Functionally there is **nothing new** since rc3; the only changes in this commit are release metadata:
+
+- `pyproject.toml` `version` bumped from `2.0.0rc3` to `2.0.0`.
+- The RC-pin comment block in `[project.optional-dependencies]` removed; `pip install 'safelint[<lang>]'` now resolves to `2.0.0` straight from PyPI with no pin or `--pre` flag needed.
+- Pre-release callouts removed from every install surface: `README.md`, `docs/index.md`, the three `docs/languages/*.md` pages, the wheel-bundled `src/safelint/skill_files/README.md`, all 13 AI-client skill files, and the three skill language addendums.
+- Install pins updated: `'safelint[<lang>]==2.0.0rc3'` to bare `'safelint[<lang>]'`; pre-commit `rev: v2.0.0rc3` to `rev: v2.0.0`.
+- `uv.lock` regenerated.
+
+**Cumulative scope since v1.13.0** (the last 1.x release): every supported language ships as an opt-in PEP 621 extra (`[python]` / `[javascript]` / `[typescript]` / `[all]`); TypeScript / TSX / AssemblyScript are first-class; the silent-failure guard exits with code 2 when a run lints zero files because of a missing grammar; hook mode emits one summary per pre-commit invocation rather than one per batch (see issue #52); skill files cover twelve AI clients; the writing-style baseline drops em-dashes from documentation, mkdocs, skills, code, and CLI output (one rule message text changed as documented in the rc3 entry below).
+
+**Upgrading from v1.x:** see the *Migration from v1.13.0* table in the [2.0.0rc1] entry below; the install-command swap from bare `safelint` to `safelint[<lang>]` is the only required change for most users.
+
+**Upgrading from a v2.0.0 RC:** drop any `==2.0.0rcN` pin or `--pre` flag; `pip install -U 'safelint[<lang>]'` is sufficient. Pre-commit users should bump their `rev:` pin to `v2.0.0`.
+
 ## [2.0.0rc3] - 2026-05-14
 
 **Iteration on the v2.0.0 RC.** Bug fixes and a project-wide writing-style cleanup found during testing of `2.0.0rc2`. No feature changes; same packaging story, same extras, same rule coverage. Install with `pip install 'safelint[<lang>]==2.0.0rc3'` (or pass `--pre`); pre-commit users update `rev: v2.0.0rc2` to `rev: v2.0.0rc3`.
@@ -532,7 +548,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.0.0rc3...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.0.0...HEAD
+[2.0.0]: https://github.com/shelkesays/safelint/compare/v2.0.0rc3...v2.0.0
 [2.0.0rc3]: https://github.com/shelkesays/safelint/compare/v2.0.0rc2...v2.0.0rc3
 [2.0.0rc2]: https://github.com/shelkesays/safelint/compare/v2.0.0rc1...v2.0.0rc2
 [2.0.0rc1]: https://github.com/shelkesays/safelint/compare/v1.13.0...v2.0.0rc1
