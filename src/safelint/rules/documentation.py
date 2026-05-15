@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
+from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASSERT_STATEMENT, ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.rules.base import BaseRule
@@ -21,6 +22,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
+    "java": _JAVA_FUNCTION_TYPES,
 }
 
 
@@ -31,6 +33,34 @@ def _python_has_assertion(func_node: tree_sitter.Node, function_types: frozenset
     for asserts that live inside an inner ``def``.
     """
     return any(c.type == ASSERT_STATEMENT for c in walk(func_node, skip_types=tuple(function_types)) if c is not func_node)
+
+
+def _java_has_assertion(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str]) -> bool:
+    """Return True when the Java method body contains an assert.
+
+    Two recognised forms, OR'd together:
+
+    * **Built-in ``assert`` keyword** (Java 1.4+): ``assert x > 0;`` /
+      ``assert x > 0 : "x positive";`` parses as ``assert_statement``,
+      identical in spirit to Python's ``assert``.
+    * **JUnit / AssertJ / Hamcrest assertion method calls**: ``assertEquals(x, y)``,
+      ``assertThat(x).isEqualTo(y)``, ``assertNotNull(x)``, ``assertThrows(...)``,
+      ``fail("...")``. The rule looks for *calls* matching the configured
+      ``assertion_calls_java`` set; ``call_name`` already strips the
+      receiver (``Assertions.assertEquals`` and ``assertEquals``
+      both resolve to ``"assertEquals"``).
+
+    Skips nested function bodies (inner class methods, lambdas) so the
+    outer method isn't credited for asserts that live in a closure body.
+    """
+    for c in walk(func_node, skip_types=tuple(function_types)):
+        if c is func_node:
+            continue
+        if c.type == "assert_statement":
+            return True
+        if c.type in CALL_TYPES and call_name(c) in assertion_calls:
+            return True
+    return False
 
 
 def _javascript_has_assertion(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str]) -> bool:
@@ -74,12 +104,12 @@ class MissingAssertionsRule(BaseRule):
 
     name = "missing_assertions"
     code = "SAFE601"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     def _has_assertion(self, func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str]) -> bool:
         """Dispatch to the language-appropriate assertion-presence check.
 
-        Validates ``assertion_calls_javascript`` as a list of strings
+        Validates the per-language ``assertion_calls`` list as strings
         before building the frozenset. A bare-string typo
         (``assertion_calls_javascript = "assert"``) would otherwise be
         coerced into ``{'a', 's', 'e', 'r', 't'}`` and silently break
@@ -88,6 +118,14 @@ class MissingAssertionsRule(BaseRule):
         """
         if lang_name == "python":
             return _python_has_assertion(func_node, function_types)
+        if lang_name == "java":
+            # Java accepts BOTH the built-in ``assert`` keyword (handled
+            # inside ``_java_has_assertion``) AND configured JUnit / AssertJ
+            # method-call names. TypeScript inherits the JS list by default
+            # via the TS→JS fallback; Java has its own dedicated set.
+            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", "java", default=[])
+            assertion_calls = frozenset(_validated_string_list(raw, error_key))
+            return _java_has_assertion(func_node, function_types, assertion_calls)
         # JS-family (JS / TS): TypeScript inherits the JS list by default
         # via the TS→JS fallback in ``get_per_language_config``.
         raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", lang_name, default=[])

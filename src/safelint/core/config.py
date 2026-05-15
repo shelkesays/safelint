@@ -180,11 +180,11 @@ DEFAULTS: dict[str, Any] = {
         "side_effects_hidden": {
             "enabled": True,
             "severity": "error",
-            # Per-language I/O primitive lists. Adding both keys here
-            # rather than a single shared list avoids Python false
-            # positives on calls like ``logger.error()`` (where
-            # ``call_name`` returns ``"error"``) - the JS list is only
-            # consulted on ``.js`` / ``.mjs`` / ``.cjs`` files.
+            # Per-language I/O primitive lists. Adding separate keys per
+            # language rather than a single shared list avoids Python
+            # false positives on calls like ``logger.error()`` (where
+            # ``call_name`` returns ``"error"``) - each language's list
+            # is only consulted on its own file extensions.
             "io_functions": ["open", "print", "input", "subprocess"],
             "io_functions_javascript": [
                 "log",  # console.log
@@ -198,6 +198,38 @@ DEFAULTS: dict[str, Any] = {
                 "readFileSync",
                 "writeFileSync",
                 "open",  # fs.open
+            ],
+            "io_functions_java": [
+                # PrintStream / PrintWriter methods - ``System.out.println(...)``
+                # resolves to ``"println"`` after ``call_name`` strips the receiver.
+                "println",
+                "print",
+                "printf",
+                "format",
+                # Java stdin / Scanner methods.
+                "readLine",
+                "nextLine",
+                "nextInt",
+                "next",
+                # File I/O via ``new`` - ``call_name`` on ``object_creation_expression``
+                # returns the simple class name.
+                "FileInputStream",
+                "FileOutputStream",
+                "FileReader",
+                "FileWriter",
+                "BufferedReader",
+                "BufferedWriter",
+                "Scanner",
+                "PrintWriter",
+                # java.nio.file.Files static methods.
+                "readAllBytes",
+                "readAllLines",
+                "readString",
+                "writeString",
+                "write",
+                # Network I/O.
+                "Socket",
+                "HttpClient",
             ],
             "pure_prefixes": [
                 "calculate",
@@ -235,6 +267,22 @@ DEFAULTS: dict[str, Any] = {
                 "writeFile",
                 "readFileSync",
                 "writeFileSync",
+            ],
+            "io_functions_java": [
+                "println",
+                "print",
+                "printf",
+                "readLine",
+                "nextLine",
+                "FileInputStream",
+                "FileOutputStream",
+                "FileReader",
+                "FileWriter",
+                "Scanner",
+                "readAllBytes",
+                "readAllLines",
+                "writeString",
+                "write",
             ],
             "io_name_keywords": [
                 "print",
@@ -320,6 +368,38 @@ DEFAULTS: dict[str, Any] = {
                 # Test frameworks (call-name level - receiver is irrelevant)
                 "expect",  # Jest, Chai (when used via expect()), Vitest's vi.expect
                 "should",  # Should.js
+            ],
+            # Java assertion-method names. Java has the built-in ``assert``
+            # keyword (handled directly by the rule, no config needed for
+            # that path), AND in test code uses JUnit / AssertJ / Hamcrest
+            # method-call assertions. The list below covers JUnit 5
+            # (``Assertions.*``), JUnit 4 (``Assert.*``), AssertJ
+            # (``assertThat``), Hamcrest (``assertThat`` again), and the
+            # ``fail(...)`` short form. ``call_name`` strips the receiver
+            # (``Assertions.assertEquals`` resolves to ``"assertEquals"``).
+            "assertion_calls_java": [
+                # JUnit 5 Assertions
+                "assertEquals",
+                "assertNotEquals",
+                "assertTrue",
+                "assertFalse",
+                "assertNull",
+                "assertNotNull",
+                "assertSame",
+                "assertNotSame",
+                "assertArrayEquals",
+                "assertIterableEquals",
+                "assertLinesMatch",
+                "assertThrows",
+                "assertDoesNotThrow",
+                "assertAll",
+                "assertTimeout",
+                "assertTimeoutPreemptively",
+                "assertInstanceOf",
+                # AssertJ / Hamcrest entry point
+                "assertThat",
+                # Common short forms
+                "fail",
             ],
         },
         "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},

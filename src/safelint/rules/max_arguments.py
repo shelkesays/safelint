@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.rules.base import BaseRule
@@ -20,6 +21,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
+    "java": _JAVA_FUNCTION_TYPES,
 }
 
 _PY_SPLAT_PARAM_TYPES = frozenset({"list_splat_pattern", "dictionary_splat_pattern"})
@@ -65,10 +67,26 @@ _TS_COUNTED_PARAM_TYPES = frozenset(
     }
 )
 
+# Java ``formal_parameters`` children that count toward the limit.
+# ``formal_parameter``: the standard ``Type name`` shape, including
+# annotated parameters like ``@Valid @RequestBody Foo arg`` (annotations
+# live inside the formal_parameter, not as siblings). ``spread_parameter``:
+# varargs ``T... args``. ``receiver_parameter`` (``Foo this``, rare
+# method-on-self idiom) is deliberately excluded - it's an explicit form
+# of the implicit receiver, analogous to Python's ``self`` / ``cls``, and
+# should not count toward user-facing argument count.
+_JAVA_COUNTED_PARAM_TYPES = frozenset(
+    {
+        "formal_parameter",
+        "spread_parameter",
+    }
+)
+
 _COUNTED_PARAM_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": _PY_COUNTED_PARAM_TYPES,
     "javascript": _JS_COUNTED_PARAM_TYPES,
     "typescript": _TS_COUNTED_PARAM_TYPES,
+    "java": _JAVA_COUNTED_PARAM_TYPES,
 }
 
 
@@ -118,7 +136,7 @@ class MaxArgumentsRule(BaseRule):
 
     name = "max_arguments"
     code = "SAFE103"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function with more arguments than max_args."""

@@ -212,6 +212,14 @@ def test_call_name_returns_none_for_unresolvable_function() -> None:
     (a defensive path Tree-sitter rarely reaches but the type signature allows)."""
 
     class _FakeNode:
+        # ``type`` is read by ``call_name`` to dispatch the Java-specific
+        # ``method_invocation`` / ``object_creation_expression`` short-circuits
+        # before falling through to the ``child_by_field_name`` path. Set to
+        # ``"call"`` here so the helper exercises its Python / JS fallthrough
+        # against this fake (which yields None from every field lookup) and
+        # returns None as the test asserts.
+        type = "call"
+
         def child_by_field_name(self, _name: str) -> None:
             return None
 

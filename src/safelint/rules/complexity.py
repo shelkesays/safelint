@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
@@ -31,6 +32,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
+    "java": _JAVA_FUNCTION_TYPES,
 }
 
 # Node types that add 1 to cyclomatic complexity. Both languages: every
@@ -42,6 +44,12 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # branch in ``_cyclomatic_complexity``. TypeScript (``.ts`` / ``.tsx`` /
 # ``.as``) reuses the JavaScript branching set - the type system doesn't
 # introduce new branches.
+# Java: similar shape to JS, with two switch-case node types because
+# Java 14+ added arrow-form switch alongside the colon-form. Each
+# ``switch_block_statement_group`` (old colon form, ``case X: stmt``) and
+# each ``switch_rule`` (new arrow form, ``case X -> stmt``) counts as
+# one branch. ``&&`` / ``||`` add complexity inside ``binary_expression``
+# (same operator-filter pattern as JS); Java does not have ``??``.
 _JS_BRANCHING_TYPES = frozenset(
     {
         "if_statement",
@@ -50,6 +58,19 @@ _JS_BRANCHING_TYPES = frozenset(
         "while_statement",
         "do_statement",
         "switch_case",
+        "catch_clause",
+        "ternary_expression",
+    }
+)
+_JAVA_BRANCHING_TYPES = frozenset(
+    {
+        "if_statement",
+        "for_statement",
+        "enhanced_for_statement",
+        "while_statement",
+        "do_statement",
+        "switch_block_statement_group",  # colon-form ``case X: stmt;``
+        "switch_rule",  # arrow-form ``case X -> stmt;`` (Java 14+)
         "catch_clause",
         "ternary_expression",
     }
@@ -69,6 +90,7 @@ _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     ),
     "javascript": _JS_BRANCHING_TYPES,
     "typescript": _JS_BRANCHING_TYPES,
+    "java": _JAVA_BRANCHING_TYPES,
 }
 
 # JavaScript: ``binary_expression`` covers many operators (``+``, ``>``,
@@ -76,13 +98,17 @@ _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # operators add complexity.
 _JS_BRANCHING_BINARY_OPS = frozenset({"&&", "||", "??"})
 
+# Java: same idea, no ``??`` (Java uses ``Optional`` / ``Objects.requireNonNullElse``
+# for the null-coalescing role; both call expressions, not operators).
+_JAVA_BRANCHING_BINARY_OPS = frozenset({"&&", "||"})
+
 
 class ComplexityRule(BaseRule):
     """Reject functions whose cyclomatic complexity exceeds max_complexity."""
 
     name = "complexity"
     code = "SAFE104"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions whose cyclomatic complexity exceeds the configured maximum."""
@@ -131,15 +157,21 @@ def _is_branch_node(node: tree_sitter.Node, lang_name: str, branching_types: fro
     """Return True if *node* contributes 1 to the enclosing function's cyclomatic complexity.
 
     Most languages can answer this with a simple node-type set membership.
-    JavaScript needs a side check because ``&&`` / ``||`` / ``??`` parse as
-    ``binary_expression`` (a node type that also covers ``+``, ``>``, ``-``,
-    etc., which are *not* branches) - we filter on the operator string.
+    JavaScript / TypeScript / Java need a side check because ``&&`` / ``||``
+    (and ``??`` for JS / TS) parse as ``binary_expression`` (a node type
+    that also covers ``+``, ``>``, ``-``, etc., which are *not* branches) -
+    we filter on the operator string.
     """
     if node.type in branching_types:
         return True
-    if lang_name not in ("javascript", "typescript") or node.type != "binary_expression":
+    if node.type != "binary_expression":
         return False
     op = node.child_by_field_name("operator")
     if op is None or op.text is None:
         return False
-    return op.text.decode("utf-8") in _JS_BRANCHING_BINARY_OPS
+    op_text = op.text.decode("utf-8")
+    if lang_name in ("javascript", "typescript"):
+        return op_text in _JS_BRANCHING_BINARY_OPS
+    if lang_name == "java":
+        return op_text in _JAVA_BRANCHING_BINARY_OPS
+    return False

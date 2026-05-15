@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
@@ -29,6 +30,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
+    "java": _JAVA_FUNCTION_TYPES,
 }
 
 # Per-language node-type sets that count as one nesting step.
@@ -40,10 +42,16 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # JavaScript: same shape plus ``do_statement`` and ``switch_statement``;
 # ``for_in_statement`` covers both ``for...in`` and ``for...of`` in
 # tree-sitter-javascript.
+# Java: ``if`` / ``for`` (C-style) / ``enhanced_for`` (for-each) /
+# ``while`` / ``do`` / ``try`` / ``try_with_resources`` / ``switch_expression``
+# (Java 14+ unified switch). ``synchronized_statement`` is *not* a
+# nesting step in safelint's sense - it adds visual indentation but not
+# a control-flow branch the way an ``if`` does.
 _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({IF_STATEMENT, FOR_STATEMENT, WHILE_STATEMENT, WITH_STATEMENT, TRY_STATEMENT, MATCH_STATEMENT}),
     "javascript": frozenset({"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"}),
     "typescript": frozenset({"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"}),
+    "java": frozenset({"if_statement", "for_statement", "enhanced_for_statement", "while_statement", "do_statement", "try_statement", "try_with_resources_statement", "switch_expression"}),
 }
 
 
@@ -52,7 +60,7 @@ class NestingDepthRule(BaseRule):
 
     name = "nesting_depth"
     code = "SAFE102"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function whose maximum control-flow nesting depth exceeds max_depth."""

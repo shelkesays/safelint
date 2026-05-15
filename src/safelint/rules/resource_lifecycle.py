@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup  # ``_validated_string_list`` re-exported for backwards-compat
 from safelint.languages._node_utils import call_name, resolve_lang_name, walk
+from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import CALL, WITH_ITEM
 from safelint.rules.base import BaseRule
@@ -117,6 +118,46 @@ def _try_statement_has_finally(node: tree_sitter.Node) -> bool:
     return any(child.type == "finally_clause" for child in node.named_children)
 
 
+def _is_inside_java_resource_guard(node: tree_sitter.Node) -> bool:
+    """Return True if *node* has an enclosing Java resource-cleanup scope.
+
+    Java has two idiomatic cleanup forms:
+
+    * **try-with-resources** (``try (Resource r = ...) { ... }``): the JLS
+      guarantees ``close()`` is called on the declared resource when the
+      try block exits, including via exception. This is the modern
+      preferred form for any ``AutoCloseable``.
+    * **try { ... } finally { resource.close(); }**: the older manual
+      form. Still accepted because the rule can't statically prove the
+      finally body actually closes the specific resource.
+
+    Walks the parent chain looking for either form, stopping at function
+    boundaries (method_declaration, constructor_declaration,
+    lambda_expression, static_initializer) so a resource acquired
+    inside a lambda doesn't borrow the enclosing method's
+    try-with-resources for safety.
+
+    The ``prev.type != "finally_clause"`` guard mirrors the JS logic:
+    a resource acquired inside the finally block of a try-statement
+    isn't covered by *that* try's cleanup. tree-sitter-java doesn't
+    use ``finally_clause`` as a child of try_with_resources_statement
+    (auto-cleanup is implicit), so the guard only matters for the
+    manual try/finally form.
+    """
+    prev = node
+    cur = node.parent
+    while cur is not None:
+        if cur.type in _JAVA_FUNCTION_TYPES:
+            return False
+        if cur.type == "try_with_resources_statement":
+            return True
+        if _try_statement_has_finally(cur) and prev.type != "finally_clause":
+            return True
+        prev = cur
+        cur = cur.parent
+    return False
+
+
 class ResourceLifecycleRule(BaseRule):
     """Require tracked resource-acquisition calls to be wrapped in cleanup-guaranteed scope.
 
@@ -137,7 +178,7 @@ class ResourceLifecycleRule(BaseRule):
 
     name = "resource_lifecycle"
     code = "SAFE401"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     _DEFAULT_TRACKED_JAVASCRIPT: ClassVar[list[str]] = [
         # File / stream APIs.
@@ -150,6 +191,33 @@ class ResourceLifecycleRule(BaseRule):
         "connect",  # database drivers, sockets
         # Worker pools.
         "createWorker",
+    ]
+
+    _DEFAULT_TRACKED_JAVA: ClassVar[list[str]] = [
+        # File / stream APIs via ``new`` - ``call_name`` on
+        # ``object_creation_expression`` returns the simple class name.
+        "FileInputStream",
+        "FileOutputStream",
+        "FileReader",
+        "FileWriter",
+        "BufferedReader",
+        "BufferedWriter",
+        "Scanner",
+        "PrintWriter",
+        "RandomAccessFile",
+        # java.nio.file.Files static factory methods.
+        "newBufferedReader",
+        "newBufferedWriter",
+        "newInputStream",
+        "newOutputStream",
+        # Network.
+        "Socket",
+        "ServerSocket",
+        # JDBC.
+        "getConnection",  # DriverManager.getConnection / DataSource.getConnection
+        # Concurrent / IO channels.
+        "FileChannel",
+        "open",  # FileChannel.open(...), Files.newByteChannel surrogate
     ]
 
     @staticmethod
@@ -246,9 +314,47 @@ class ResourceLifecycleRule(BaseRule):
             )
         return violations
 
+    def _java_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run the Java check: call must be inside ``try-with-resources`` or ``try { ... } finally { ... }``.
+
+        Walks both ``method_invocation`` and ``object_creation_expression``
+        - tree-sitter-java's two call shapes. ``call_name`` normalises
+        both: ``new FileInputStream(p)`` resolves to ``"FileInputStream"``,
+        ``Files.newBufferedReader(p)`` resolves to ``"newBufferedReader"``.
+        """
+        raw_tracked, error_key = resolve_lang_config_lookup(
+            self.config,
+            "tracked_functions",
+            "java",
+            default=self._DEFAULT_TRACKED_JAVA,
+        )
+        tracked = frozenset(_validated_string_list(raw_tracked, error_key))
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type not in ("method_invocation", "object_creation_expression"):
+                continue
+            name = call_name(node)
+            if not name or name not in tracked:
+                continue
+            if _is_inside_java_resource_guard(node):
+                continue
+            # Use ``new Foo()`` only for constructor invocations to match
+            # the source surface the user can grep for. ``Files.newBufferedReader``
+            # via ``method_invocation`` renders as ``newBufferedReader()``.
+            invocation = f"new {name}()" if node.type == "object_creation_expression" else f"{name}()"
+            message = (
+                f'"{invocation}" not wrapped in try-with-resources or try/finally - '
+                f"declare in ``try (... = {invocation})`` for automatic cleanup, "
+                "or guard with ``try {{ ... }} finally {{ ... }}``"
+            )
+            violations.append(self._make_violation_for_node(filepath, node, message))
+        return violations
+
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag unguarded calls to tracked resource-acquisition functions."""
         lang_name = resolve_lang_name(filepath)
         if lang_name == "python":
             return self._python_check(filepath, tree)
+        if lang_name == "java":
+            return self._java_check(filepath, tree)
         return self._javascript_check(filepath, tree, lang_name)
