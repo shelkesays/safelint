@@ -32,7 +32,7 @@ After install, restart the AI client (or reload its window) and ask things like 
 
 | Client | Native format | Install destination | Detection markers |
 |---|---|---|---|
-| **[Claude Code](clients/claude-code.md)** | Skill directory (`SKILL.md` + `languages/`) | `~/.claude/skills/safelint/` (user) or `<cwd>/.claude/skills/safelint/` (project) | `CLAUDE.md`, `.claude/`, or `.claude.json` in cwd; `~/.claude/` or `~/.claude.json` for user-scope |
+| **[Claude Code](clients/claude-code.md)** | Skill manifest (`SKILL.md`) | `~/.claude/skills/safelint/SKILL.md` (user) or `<cwd>/.claude/skills/safelint/SKILL.md` (project) | `CLAUDE.md`, `.claude/`, or `.claude.json` in cwd; `~/.claude/` or `~/.claude.json` for user-scope |
 | **[Cursor](clients/cursor.md)** | Project Rule (`.mdc` file) | `~/.cursor/rules/safelint.mdc` (user) or `<cwd>/.cursor/rules/safelint.mdc` (project) | `.cursor/` or `.cursorrules` in cwd; `~/.cursor/` for user-scope |
 | **[GitHub Copilot](clients/github-copilot.md)** | Instructions Markdown | `~/.github/copilot-instructions.md` (user-global) or `<cwd>/.github/copilot-instructions.md` (project, canonical) | `.github/copilot-instructions.md`, `.github/copilot/`, or `.github/instructions/` in cwd; `~/.github/copilot-instructions.md` for user-scope |
 | **[Gemini](clients/gemini.md)** | Instructions Markdown (`GEMINI.md`) | `~/GEMINI.md` (user-global) or `<cwd>/GEMINI.md` (project, canonical, auto-discovered by Gemini CLI) | `GEMINI.md` or `.gemini/` in cwd; `~/.gemini/` for user-scope |
@@ -72,7 +72,7 @@ If multiple clients are present, **all** of them are installed in the same run. 
 
 ```text
 safelint: detected Claude Code (CLAUDE.md) and Cursor (.cursor) in current directory
-safelint: Claude Code skill copied to /repo/.claude/skills/safelint (project scope)
+safelint: Claude Code skill copied to /repo/.claude/skills/safelint/SKILL.md (project scope)
   → Restart Claude Code (or open a new session) to pick up the skill.
   → Then ask Claude Code "run safelint" or "lint with safelint".
 safelint: Cursor rule copied to /repo/.cursor/rules/safelint.mdc (project scope)

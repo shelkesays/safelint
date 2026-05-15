@@ -8,7 +8,7 @@ This guide is the cheat sheet for adding support for a new programming language 
 
 !!! warning "Bundled AI-client skills also need an update"
 
-    Adding a new language also requires updating the bundled AI-client skills (`SKILL.md` and `cursor/safelint.mdc`) to list the new language and its file extensions in their **Step 2** registry tables. The drift-detection test `test_skill_documents_every_supported_extension` fails the moment a new extension lands in `supported_extensions()` without the corresponding bundled-doc update, and the test is parametrised over every registered AI client, so you only need to make the additions once per skill file.
+    Adding a new language also requires updating the bundled AI-client skills (`claude/SKILL.md`, `cursor/safelint.mdc`, and every other per-client file under `skill_files/<client>/`) to list the new language and its file extensions in their **Step 2** registry tables. The drift-detection test `test_skill_documents_every_supported_extension` fails the moment a new extension lands in `supported_extensions()` without the corresponding bundled-doc update, and the test is parametrised over every registered AI client, so you only need to make the additions once per skill file.
 
 ## The architecture, in six sentences
 
@@ -200,7 +200,7 @@ If the new language's API surface is uniform across runtimes (or the runtime fra
 
 ### 8. Update the bundled AI-client skills
 
-The bundle at `src/safelint/skill_files/` ships one Markdown artefact per registered AI client (12 today: Claude Code's `SKILL.md`, plus a per-client file under each of `cursor/`, `copilot/`, `gemini/`, `windsurf/`, `codex/`, `continue/`, `cline/`, `aider/`, `trae/`, `antigravity/`, `zed/`). Every one of them has a **Step 2, Identify the language(s) involved** section with a registry table listing the languages safelint can lint. When you add a new language, all twelve files need a new row in that table.
+The bundle at `src/safelint/skill_files/` ships one Markdown artefact per registered AI client (12 today, one each under `claude/`, `cursor/`, `copilot/`, `gemini/`, `windsurf/`, `codex/`, `continue/`, `cline/`, `aider/`, `trae/`, `antigravity/`, `zed/`). Every one of them has a **Step 2, Identify the language(s) involved** section with a registry table listing the languages safelint can lint. When you add a new language, all twelve files need a new row in that table.
 
 You also need to ship a new shared addendum file describing the language. The `languages/` subdirectory at the bundle root mirrors the `safelint/languages/` package one-to-one and is *shared* across every client, there's only one copy of the addendum, and every client references it via `safelint skill path`.
 
@@ -211,7 +211,7 @@ Concretely:
 2. **Update every client's Step 2 registry table** with a row pointing at the new addendum. The 12 files to touch:
 
    ```text
-   src/safelint/skill_files/SKILL.md
+   src/safelint/skill_files/claude/SKILL.md
    src/safelint/skill_files/cursor/safelint.mdc
    src/safelint/skill_files/copilot/copilot-instructions.md
    src/safelint/skill_files/gemini/GEMINI.md

@@ -45,7 +45,7 @@ Look at the project files in cwd to figure out which languages safelint can lint
 
 If the user's project has files matching one or more registered languages, proceed. If safelint doesn't yet support the language they're working in (e.g. they have only `.rs` files), tell them so plainly; don't run safelint just to report "0 files checked".
 
-For deeper, language-specific guidance (install nuance, idiomatic fixes, language-specific rule notes), read the matching `languages/<lang>.md` file from the same directory as this SKILL.md. Try `~/.claude/skills/safelint/languages/<lang>.md` first (user install) and `<project>/.claude/skills/safelint/languages/<lang>.md` second (project install). Skip the read if the user's request doesn't need that depth (e.g. a simple "run safelint and show me the count").
+For deeper, language-specific guidance (install nuance, idiomatic fixes, language-specific rule notes), read the matching `languages/<lang>.md` file from the bundled skill directory. Locate it with `safelint skill path` (prints the on-disk root); the addendums sit at `<that path>/languages/<lang>.md`. Skip the read if the user's request doesn't need that depth (e.g. a simple "run safelint and show me the count").
 
 ## Step 3: Decide what to lint
 
@@ -166,7 +166,7 @@ The rule set is shared across all supported languages. Universal rationale crib 
 | SAFE802 | return_value_ignored | Discarding the return value of error-signalling functions like `subprocess.run` silently swallows failures. |
 | SAFE803 | null_dereference | Using a value as if non-None after a None check (or where it could be None) is a common crash source. |
 
-For language-specific phrasing (e.g. how `bare_except` translates to `catch (Throwable t)` in another language) read the relevant `languages/<lang>.md` addendum.
+For language-specific phrasing (e.g. how `bare_except` translates to `catch (Throwable t)` in another language) read the relevant `languages/<lang>.md` addendum; locate it via `safelint skill path`.
 
 ## Step 8: Constraints
 

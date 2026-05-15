@@ -1,6 +1,6 @@
 # safelint skill: JavaScript addendum
 
-Language-specific notes for the JavaScript (Node) target. Mirrors `src/safelint/languages/javascript.py` in the safelint source tree. The skill core (`SKILL.md`) handles the universal flow; this file holds JavaScript-specific detail.
+Language-specific notes for the JavaScript (Node) target. Mirrors `src/safelint/languages/javascript.py` in the safelint source tree. The skill core (`claude/SKILL.md` for Claude Code, each peer client's own file for other agents) handles the universal flow; this file holds JavaScript-specific detail.
 
 ## Install nuance
 
