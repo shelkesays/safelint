@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [2.0.0] - 2026-05-15
 
-**v2.0.0 GA.** The release candidate cycle (rc1 / rc2 / rc3) is closed. RC validation surfaced no blocking issues, so the runtime behaviour of v2.0.0 ships identically to v2.0.0rc3. Two release-time changes beyond version metadata:
+**v2.0.0 GA.** The release candidate cycle (rc1 / rc2 / rc3) is closed. RC validation surfaced no blocking issues, so the engine and rule behaviour of v2.0.0 is identical to v2.0.0rc3: every rule check, every Tree-sitter walk, every config-resolution path, every CLI flag, every JSON / SARIF emission produces byte-identical output for byte-identical input. The GA bump also folds in one deliberate **skill-install refactor** so the bundled-skill layout and the Claude install shape land symmetric with every peer client before 2.0.0 freezes that surface for the rest of the 2.x line, the change is internal to the install machinery (CLI surface unchanged; existing v1.x Claude installs continue to report fresh on `safelint skill status` because the destination `SKILL.md` path and its bytes both match). The release-time changes are:
 
 - `pyproject.toml` `version` bumped from `2.0.0rc3` to `2.0.0`.
 - The RC-pin comment block in `[project.optional-dependencies]` removed; `pip install 'safelint[<lang>]'` now resolves to `2.0.0` straight from PyPI with no pin or `--pre` flag needed.
