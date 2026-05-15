@@ -115,6 +115,7 @@ nav:
       - Suppression mechanisms: configuration/suppression.md
       - Configuration file: configuration/toml.md
       - Rules reference: configuration/rules.md
+  - Pre-commit: pre-commit.md
   - AI client integrations:
       - Overview: ai-clients/index.md
       - Manual install: ai-clients/manual-install.md
