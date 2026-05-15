@@ -1788,11 +1788,11 @@
 <p><strong>Markers:</strong> <code>.continue/</code>, <code>.continuerc</code>, or <code>.continuerc.json</code> in the project root for project-scope; <code>~/.continue/</code> for user-scope.</p>
 <p><strong>Install location:</strong></p>
 <ul>
-<li>User-scoped: <code>~/.continue/rules/safelint.md</code> — Continue.dev auto-loads user-global rules across workspaces.</li>
-<li>Project-scoped: <code>&lt;cwd&gt;/.continue/rules/safelint.md</code> — Continue.dev auto-loads workspace rules. <strong>Recommended for team-shared repos — commit the file.</strong></li>
+<li>User-scoped: <code>~/.continue/rules/safelint.md</code>, Continue.dev auto-loads user-global rules across workspaces.</li>
+<li>Project-scoped: <code>&lt;cwd&gt;/.continue/rules/safelint.md</code>, Continue.dev auto-loads workspace rules. <strong>Recommended for team-shared repos, commit the file.</strong></li>
 </ul>
 <p><strong>How to invoke after install:</strong></p>
-<p>Reload your IDE (or restart Continue.dev). The rule is auto-loaded from <code>.continue/rules/</code>. Then ask Continue <em>"run safelint"</em> / <em>"lint with safelint"</em> — same prompts as the other clients.</p>
+<p>Reload your IDE (or restart Continue.dev). The rule is auto-loaded from <code>.continue/rules/</code>. Then ask Continue <em>"run safelint"</em> / <em>"lint with safelint"</em>, same prompts as the other clients.</p>
 <p><strong>Manual install:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span><span class="k">continue</span><span class="w"> </span>--project<span class="w">   </span><span class="c1"># recommended for team-shared repos</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span><span class="k">continue</span><span class="w">             </span><span class="c1"># user-global, loaded across all workspaces</span>

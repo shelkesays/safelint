@@ -1861,13 +1861,13 @@
 <h2 id="getting-started">Getting started<a class="headerlink" href="#getting-started" title="Permanent link">#</a></h2>
 <ol>
 <li>Fork the repository and clone your fork.</li>
-<li>Install dev dependencies. The project uses <a href="https://docs.astral.sh/uv/"><code>uv</code></a> for dependency management — most contributors invoke tools through it:
+<li>Install dev dependencies. The project uses <a href="https://docs.astral.sh/uv/"><code>uv</code></a> for dependency management, most contributors invoke tools through it:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>uv<span class="w"> </span>sync<span class="w"> </span>--extra<span class="w"> </span>dev<span class="w">          </span><span class="c1"># recommended (matches CI)</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or, if you prefer pip:</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;.[dev]&quot;</span>
 </code></pre></div></li>
 <li>Create a branch: <code>git checkout -b your-feature-name</code>.</li>
-<li>Make your changes, then run the full check suite — every command must pass before you open a PR:
+<li>Make your changes, then run the full check suite, every command must pass before you open a PR:
    <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w">                       </span><span class="c1"># all tests pass; coverage stays at ≥97%</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>tests/<span class="w">       </span><span class="c1"># zero lint errors</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>uv<span class="w"> </span>run<span class="w"> </span>ruff<span class="w"> </span>format<span class="w"> </span>--check<span class="w"> </span>src/<span class="w"> </span>tests/<span class="w">   </span><span class="c1"># consistent formatting</span>
@@ -1895,43 +1895,43 @@
 </tr>
 <tr>
 <td>A new <strong>AI-client integration</strong> (e.g. JetBrains AI Assistant, a brand-new IDE)</td>
-<td><a href="adding-an-ai-client/"><code>ADDING_AN_AI_CLIENT.md</code></a> — full walkthrough with a worked example</td>
+<td><a href="adding-an-ai-client/"><code>ADDING_AN_AI_CLIENT.md</code></a>, full walkthrough with a worked example</td>
 <td><code>src/safelint/_skill_install.py</code> (one <code>ClientSpec</code> append), <code>src/safelint/skill_files/&lt;client&gt;/</code>, <code>tests/test_skill_install.py</code>, <code>AI_CLIENTS.md</code>, <code>skill_files/README.md</code>, <code>CHANGELOG.md</code></td>
 </tr>
 <tr>
 <td>A new <strong>language</strong> safelint can lint (e.g. TypeScript, Go)</td>
-<td><a href="adding-a-language/"><code>ADDING_A_LANGUAGE.md</code></a> — full walkthrough</td>
+<td><a href="adding-a-language/"><code>ADDING_A_LANGUAGE.md</code></a>, full walkthrough</td>
 <td><code>src/safelint/languages/&lt;lang&gt;.py</code>, the Tree-sitter grammar dependency in <code>pyproject.toml</code>, per-rule audit, <code>tests/</code>, <code>CONFIGURATION.md</code>, every bundled AI-client doc</td>
 </tr>
 </tbody>
 </table>
-<p>The architecture for each path is open-ended: rules go into one tuple (<code>ALL_RULES</code>), AI clients go into one tuple (<code>_CLIENT_SPECS</code>), languages go into one registry (<code>safelint.languages._REGISTRY</code>). Drift-detection tests parametrise over those registries automatically — when you add a new rule, the bundled-doc-coverage tests fail until <em>every</em> registered AI client mentions the new rule. When you add a new AI client, the parametrised tests fail until <em>its</em> bundled doc mentions every existing rule + extension. The architecture pulls you toward consistency rather than relying on memory.</p>
+<p>The architecture for each path is open-ended: rules go into one tuple (<code>ALL_RULES</code>), AI clients go into one tuple (<code>_CLIENT_SPECS</code>), languages go into one registry (<code>safelint.languages._REGISTRY</code>). Drift-detection tests parametrise over those registries automatically, when you add a new rule, the bundled-doc-coverage tests fail until <em>every</em> registered AI client mentions the new rule. When you add a new AI client, the parametrised tests fail until <em>its</em> bundled doc mentions every existing rule + extension. The architecture pulls you toward consistency rather than relying on memory.</p>
 <hr />
 <h2 id="adding-a-new-rule">Adding a new rule<a class="headerlink" href="#adding-a-new-rule" title="Permanent link">#</a></h2>
 <p>Each rule lives in its own class inside <code>src/safelint/rules/</code>. Follow this checklist:</p>
 <ul>
-<li>Subclass <code>BaseRule</code> and implement <code>check_file(filepath, tree) -&gt; list[Violation]</code>. The <code>tree</code> argument is a Tree-sitter parse tree, not a Python <code>ast</code> tree — see existing rules for traversal patterns (<code>walk</code>, <code>lineno</code>, <code>node_text</code> in <code>safelint.languages._node_utils</code>).</li>
-<li>Set a unique <code>name</code> (the human-friendly key users put in their config, e.g. <code>function_length</code>) and <code>code</code> (the short identifier, e.g. <code>SAFE105</code> — pick the next free number in the appropriate <code>SAFE9xx</code> band).</li>
-<li><em>(Default suffices for now)</em> Each rule inherits <code>BaseRule.language = ("python",)</code>. Leave it alone unless your rule applies to a <em>non-Python</em> language too — that's only relevant once a second language is registered (see <a href="adding-a-language/"><code>ADDING_A_LANGUAGE.md</code></a>). The engine consults this tuple in <code>_run_rules</code> and skips rules whose <code>language</code> doesn't include the active file's <code>LanguageDefinition.name</code>.</li>
-<li>Add the rule's class to <code>ALL_RULES</code> in <code>src/safelint/rules/__init__.py</code>. The position in this tuple is the execution order — keep cheap structural rules first, expensive dataflow rules last.</li>
+<li>Subclass <code>BaseRule</code> and implement <code>check_file(filepath, tree) -&gt; list[Violation]</code>. The <code>tree</code> argument is a Tree-sitter parse tree, not a Python <code>ast</code> tree; see existing rules for traversal patterns (<code>walk</code>, <code>lineno</code>, <code>node_text</code> in <code>safelint.languages._node_utils</code>).</li>
+<li>Set a unique <code>name</code> (the human-friendly key users put in their config, e.g. <code>function_length</code>) and <code>code</code> (the short identifier, e.g. <code>SAFE105</code>, pick the next free number in the appropriate <code>SAFE9xx</code> band).</li>
+<li><em>(Default suffices for now)</em> Each rule inherits <code>BaseRule.language = ("python",)</code>. Leave it alone unless your rule applies to a <em>non-Python</em> language too; that's only relevant once a second language is registered (see <a href="adding-a-language/"><code>ADDING_A_LANGUAGE.md</code></a>). The engine consults this tuple in <code>_run_rules</code> and skips rules whose <code>language</code> doesn't include the active file's <code>LanguageDefinition.name</code>.</li>
+<li>Add the rule's class to <code>ALL_RULES</code> in <code>src/safelint/rules/__init__.py</code>. The position in this tuple is the execution order, keep cheap structural rules first, expensive dataflow rules last.</li>
 <li>Add default config to <code>DEFAULTS["rules"]</code> in <code>src/safelint/core/config.py</code>. Set <code>enabled: false</code> if your rule is expensive or false-positive-prone (the dataflow rules do this).</li>
 <li>Write tests covering both the violation case <em>and</em> the clean case. Coverage must stay at ≥97% (the project's enforced threshold).</li>
 <li>Document the rule in <code>CONFIGURATION.md</code> under the matching category, following the format used by existing rules.</li>
 <li>Update every bundled AI-client artefact under <code>src/safelint/skill_files/</code> to mention the new rule code + name. The drift-detection tests (<code>test_skill_documents_every_active_rule[&lt;client&gt;]</code>) parametrise over the registry and will fail CI for every client whose docs are missing the new rule.</li>
 </ul>
-<p><strong>Self-imposed constraints:</strong> safelint runs itself in CI, so your new rule's source code must obey the same rules it enforces — <code>function_length ≤ 60</code>, <code>nesting_depth ≤ 2</code>, <code>complexity ≤ 10</code>, etc. If <code>safelint check src/</code> fails on the new rule's own implementation, that's a meta-bug; refactor the rule's code until it passes.</p>
+<p><strong>Self-imposed constraints:</strong> safelint runs itself in CI, so your new rule's source code must obey the same rules it enforces: <code>function_length ≤ 60</code>, <code>nesting_depth ≤ 2</code>, <code>complexity ≤ 10</code>, etc. If <code>safelint check src/</code> fails on the new rule's own implementation, that's a meta-bug; refactor the rule's code until it passes.</p>
 <hr />
 <h2 id="adding-a-new-ai-client">Adding a new AI client<a class="headerlink" href="#adding-a-new-ai-client" title="Permanent link">#</a></h2>
-<p>Twelve clients ship today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is one <code>ClientSpec</code> append plus a bundled artefact and ~10 regression tests — no control-flow changes elsewhere. The full walkthrough with a worked example lives in <a href="adding-an-ai-client/"><code>ADDING_AN_AI_CLIENT.md</code></a>. The short version:</p>
+<p>Twelve clients ship today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is one <code>ClientSpec</code> append plus a bundled artefact and ~10 regression tests, no control-flow changes elsewhere. The full walkthrough with a worked example lives in <a href="adding-an-ai-client/"><code>ADDING_AN_AI_CLIENT.md</code></a>. The short version:</p>
 <ul>
 <li>Decide on the bundled artefact shape (single file under <code>skill_files/&lt;client&gt;/&lt;filename&gt;</code> is the common case; directory-tree under <code>skill_files/</code> is Claude's pattern).</li>
 <li>Write the bundled file by adapting an existing one (Cursor's <code>cursor/safelint.mdc</code> is a clean single-file template). Strip MDC frontmatter if your client doesn't use it.</li>
-<li>Append one <code>ClientSpec</code> entry to <code>_CLIENT_SPECS</code> in <code>src/safelint/_skill_install.py</code> — fields: <code>name</code>, <code>display_name</code>, <code>artefact_label</code>, <code>cwd_markers</code>, <code>home_markers</code>, <code>install_relpath</code>, <code>bundled_relpath</code>, <code>restart_hint</code>, <code>usage_hint</code>, <code>documentation_relpaths</code>. If your client also writes to a <em>cross-agent</em> shared file (like codex's <code>AGENTS.md</code>), set <code>secondary_install_relpath</code> and <code>secondary_install_section_markers</code> — the install primitives handle the rest.</li>
+<li>Append one <code>ClientSpec</code> entry to <code>_CLIENT_SPECS</code> in <code>src/safelint/_skill_install.py</code>, fields: <code>name</code>, <code>display_name</code>, <code>artefact_label</code>, <code>cwd_markers</code>, <code>home_markers</code>, <code>install_relpath</code>, <code>bundled_relpath</code>, <code>restart_hint</code>, <code>usage_hint</code>, <code>documentation_relpaths</code>. If your client also writes to a <em>cross-agent</em> shared file (like codex's <code>AGENTS.md</code>), set <code>secondary_install_relpath</code> and <code>secondary_install_section_markers</code>, the install primitives handle the rest.</li>
 <li>Add the new directory name to <code>_PEER_CLIENT_DIRS</code> so it doesn't leak into Claude's directory-tree install.</li>
 <li>Mirror an existing client's test block (10–12 tests covering install / symlink / force / overwrite / auto-detect / CLI routing / path-print / peer-exclusion).</li>
 <li>Update <code>AI_CLIENTS.md</code>, <code>skill_files/README.md</code>, and <code>CHANGELOG.md</code>.</li>
 </ul>
-<p>The security guards (symlink refusal at the secondary destination, <code>skill remove --path PATH</code> install-shape validation, etc.) live in <code>_skill_install.py</code> and apply to your client automatically — no per-client implementation needed.</p>
+<p>The security guards (symlink refusal at the secondary destination, <code>skill remove --path PATH</code> install-shape validation, etc.) live in <code>_skill_install.py</code> and apply to your client automatically, no per-client implementation needed.</p>
 <hr />
 <h2 id="adding-a-new-language">Adding a new language<a class="headerlink" href="#adding-a-new-language" title="Permanent link">#</a></h2>
 <p>One language is registered today (Python). Adding a new one (TypeScript, Go, Rust, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in <a href="adding-a-language/"><code>ADDING_A_LANGUAGE.md</code></a>.</p>

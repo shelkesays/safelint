@@ -1785,14 +1785,14 @@
 
 
 <h1 id="github-copilot">GitHub Copilot<a class="headerlink" href="#github-copilot" title="Permanent link">#</a></h1>
-<p><strong>Markers:</strong> <code>.github/copilot-instructions.md</code>, <code>.github/copilot/</code>, or <code>.github/instructions/</code> in the project root for project-scope; <code>~/.github/copilot-instructions.md</code> for user-scope. Bare <code>.github/</code> alone is <strong>not</strong> a marker — it appears in nearly every repo for GitHub Actions.</p>
+<p><strong>Markers:</strong> <code>.github/copilot-instructions.md</code>, <code>.github/copilot/</code>, or <code>.github/instructions/</code> in the project root for project-scope; <code>~/.github/copilot-instructions.md</code> for user-scope. Bare <code>.github/</code> alone is <strong>not</strong> a marker, it appears in nearly every repo for GitHub Actions.</p>
 <p><strong>Install location:</strong></p>
 <ul>
-<li>User-scoped: <code>~/.github/copilot-instructions.md</code> — VS Code can be configured to read this via the <code>github.copilot.chat.codeGeneration.instructions</code> setting (it isn't auto-discovered like the project file is).</li>
-<li>Project-scoped: <code>&lt;cwd&gt;/.github/copilot-instructions.md</code> — Copilot's canonical instructions location, auto-loaded by VS Code's Copilot Chat. <strong>Recommended for team-shared repos — commit the file.</strong></li>
+<li>User-scoped: <code>~/.github/copilot-instructions.md</code>, VS Code can be configured to read this via the <code>github.copilot.chat.codeGeneration.instructions</code> setting (it isn't auto-discovered like the project file is).</li>
+<li>Project-scoped: <code>&lt;cwd&gt;/.github/copilot-instructions.md</code>, Copilot's canonical instructions location, auto-loaded by VS Code's Copilot Chat. <strong>Recommended for team-shared repos, commit the file.</strong></li>
 </ul>
 <p><strong>How to invoke after install:</strong></p>
-<p>Reload VS Code (or restart Copilot Chat). The instructions file is auto-loaded for the workspace. Then ask Copilot Chat <em>"run safelint"</em> / <em>"lint with safelint"</em> — same prompts as the other clients.</p>
+<p>Reload VS Code (or restart Copilot Chat). The instructions file is auto-loaded for the workspace. Then ask Copilot Chat <em>"run safelint"</em> / <em>"lint with safelint"</em>, same prompts as the other clients.</p>
 <p><strong>First-time bootstrap note:</strong> Copilot's auto-detection signals (<code>.github/copilot-instructions.md</code>, <code>.github/copilot/</code>, <code>.github/instructions/</code>) only match an <em>existing</em> Copilot setup. For first-time installs on a fresh project, pass <code>--client copilot --project</code> explicitly.</p>
 <p><strong>Manual install:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>copilot<span class="w"> </span>--project<span class="w">   </span><span class="c1"># canonical, auto-loaded by VS Code</span>

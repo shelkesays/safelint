@@ -781,7 +781,7 @@
   <a href="#exit-code-2-silent-failure-triggers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Exit code 2 — silent-failure triggers
+        Exit code 2: silent-failure triggers
       
     </span>
   </a>
@@ -1920,7 +1920,7 @@
   <a href="#exit-code-2-silent-failure-triggers" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Exit code 2 — silent-failure triggers
+        Exit code 2: silent-failure triggers
       
     </span>
   </a>
@@ -2096,7 +2096,7 @@
 <tr>
 <td><code>--check-skill-freshness</code></td>
 <td>off</td>
-<td><em>Added in 1.9.0.</em> Before linting, verify each installed AI-client skill (Claude Code at <code>~/.claude/skills/safelint/</code>, Cursor at <code>~/.cursor/rules/safelint.mdc</code>, project-scoped equivalents) matches the bundled version in the active wheel. Stale installs surface as <code>safelint: warning: …</code> lines on stderr. Informational only — doesn't fail the lint. Use <code>safelint skill status</code> (also added in 1.9.0; exits 1 if stale) for the dedicated CI-friendly check.</td>
+<td><em>Added in 1.9.0.</em> Before linting, verify each installed AI-client skill (Claude Code at <code>~/.claude/skills/safelint/</code>, Cursor at <code>~/.cursor/rules/safelint.mdc</code>, project-scoped equivalents) matches the bundled version in the active wheel. Stale installs surface as <code>safelint: warning: …</code> lines on stderr. Informational only, doesn't fail the lint. Use <code>safelint skill status</code> (also added in 1.9.0; exits 1 if stale) for the dedicated CI-friendly check.</td>
 </tr>
 <tr>
 <td><code>--stdin</code></td>
@@ -2106,7 +2106,7 @@
 <tr>
 <td><code>--stdin-filename</code></td>
 <td>(none)</td>
-<td>Pseudo-filename for <code>--stdin</code> input — drives language detection by extension and is shown as the violation file path. Required when <code>--stdin</code> is set.</td>
+<td>Pseudo-filename for <code>--stdin</code> input, drives language detection by extension and is shown as the violation file path. Required when <code>--stdin</code> is set.</td>
 </tr>
 </tbody>
 </table>
@@ -2128,7 +2128,7 @@
 <tbody>
 <tr>
 <td><code>0</code></td>
-<td>Clean run — no blocking violations (suppressed violations don't count).</td>
+<td>Clean run, no blocking violations (suppressed violations don't count).</td>
 </tr>
 <tr>
 <td><code>1</code></td>
@@ -2136,11 +2136,11 @@
 </tr>
 <tr>
 <td><code>2</code></td>
-<td><strong>Silent-failure guard.</strong> Fires in <em>every</em> output mode (pretty / JSON / SARIF) so a CI pipeline can't silently report clean. Three distinct triggers — see below for the exact stderr message each emits.</td>
+<td><strong>Silent-failure guard.</strong> Fires in <em>every</em> output mode (pretty / JSON / SARIF) so a CI pipeline can't silently report clean. Three distinct triggers, see below for the exact stderr message each emits.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="exit-code-2-silent-failure-triggers">Exit code 2 — silent-failure triggers<a class="headerlink" href="#exit-code-2-silent-failure-triggers" title="Permanent link">#</a></h3>
+<h3 id="exit-code-2-silent-failure-triggers">Exit code 2: silent-failure triggers<a class="headerlink" href="#exit-code-2-silent-failure-triggers" title="Permanent link">#</a></h3>
 <p>All three triggers print a <code>safelint: error:</code> line to stderr before exiting; pre-commit treats exit 2 as a hook <em>Failed</em> (red), not Passed. Fix by installing the matching grammar extra (<code>pip install 'safelint[python]'</code> etc.) or, for pre-commit users, adding <code>additional_dependencies: ['safelint[&lt;lang&gt;]']</code> to your <code>.pre-commit-config.yaml</code>.</p>
 <table>
 <thead>
@@ -2154,22 +2154,22 @@
 <tr>
 <td><strong>Directory mode</strong> (<code>safelint check src/ --all-files</code>) discovers files but none get linted because every grammar is missing</td>
 <td><code>_check_exit_code</code> after <code>_run_check</code>'s lint pass</td>
-<td><code>safelint: error: no files linted — every supported file was skipped because its grammar package isn't installed — install with: pip install 'safelint[&lt;lang&gt;]'</code></td>
+<td><code>safelint: error: no files linted, every supported file was skipped because its grammar package isn't installed, install with: pip install 'safelint[&lt;lang&gt;]'</code></td>
 </tr>
 <tr>
-<td><strong>Git-modified mode</strong> (default <code>safelint check src/</code>) — user modified files but every one was dropped by the supported-extensions filter</td>
+<td><strong>Git-modified mode</strong> (default <code>safelint check src/</code>), user modified files but every one was dropped by the supported-extensions filter</td>
 <td><code>_handle_no_targets</code> in the no-targets short-circuit</td>
-<td><code>safelint: error: no files linted — every git-modified source file has a grammar that isn't installed — install with: pip install 'safelint[&lt;lang&gt;]'</code></td>
+<td><code>safelint: error: no files linted, every git-modified source file has a grammar that isn't installed, install with: pip install 'safelint[&lt;lang&gt;]'</code></td>
 </tr>
 <tr>
-<td><strong>Hook mode</strong> (pre-commit invokes <code>safelint &lt;files&gt;</code>) — every passed file has an extension whose grammar isn't installed</td>
+<td><strong>Hook mode</strong> (pre-commit invokes <code>safelint &lt;files&gt;</code>), every passed file has an extension whose grammar isn't installed</td>
 <td><code>_guard_hook_silent_failure</code> before the engine runs</td>
-<td><code>safelint: error: no files linted — every file pre-commit passed had a grammar that isn't installed — add 'safelint[&lt;lang&gt;]' to additional_dependencies in your .pre-commit-config.yaml</code></td>
+<td><code>safelint: error: no files linted, every file pre-commit passed had a grammar that isn't installed, add 'safelint[&lt;lang&gt;]' to additional_dependencies in your .pre-commit-config.yaml</code></td>
 </tr>
 </tbody>
 </table>
 <p>Each error embeds the install hint for the missing extras so the failure is self-explanatory even when no prior warnings were printed (e.g. the no-targets short-circuit, or any machine-output run). The hint phrasing flips between <code>install with: pip install 'safelint[&lt;lang&gt;]'</code> (direct CLI) and <code>add 'safelint[&lt;lang&gt;]' to additional_dependencies in your .pre-commit-config.yaml</code> (pre-commit, detected via <code>PRE_COMMIT=1</code>).</p>
-<p><strong>Per-extension stderr warnings</strong> (one line per missing grammar, listing the affected extensions) are emitted <strong>only in pretty (human) CLI output and in the pre-commit hook flow</strong>. Machine-readable modes — <code>--format json</code> and <code>--format sarif</code> — deliberately suppress those warnings so stderr stays parseable for CI / editor pipelines; the embedded install hint inside the <code>safelint: error:</code> line above is the only signal you get there.</p>
+<p><strong>Per-extension stderr warnings</strong> (one line per missing grammar, listing the affected extensions) are emitted <strong>only in pretty (human) CLI output and in the pre-commit hook flow</strong>. Machine-readable modes, <code>--format json</code> and <code>--format sarif</code>, deliberately suppress those warnings so stderr stays parseable for CI / editor pipelines; the embedded install hint inside the <code>safelint: error:</code> line above is the only signal you get there.</p>
 <h2 id="safelint-hook-mode-flags-pre-commit"><code>safelint</code> hook mode flags (pre-commit)<a class="headerlink" href="#safelint-hook-mode-flags-pre-commit" title="Permanent link">#</a></h2>
 <p>Pre-commit passes the staged files as positional arguments automatically. <code>--fail-on</code>, <code>--mode</code>, and <code>--ignore</code> are all supported here.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># .pre-commit-config.yaml</span>
@@ -2182,7 +2182,7 @@
 </code></pre></div>
 <h2 id="skill-freshness-commands-190">Skill freshness commands (1.9.0)<a class="headerlink" href="#skill-freshness-commands-190" title="Permanent link">#</a></h2>
 <p>After <code>pip install --upgrade safelint</code>, the bundled skill files in the wheel update but copy-mode installs at <code>~/.claude/skills/safelint/</code> and <code>~/.cursor/rules/safelint.mdc</code> stay frozen at whatever version was last installed. Two commands answer "is my installed skill up to date?":</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Dedicated subcommand — pipe-friendly, exits 1 if any install differs from bundled</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Dedicated subcommand: pipe-friendly, exits 1 if any install differs from bundled</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>status
 <a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
 <a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Or fold the same check into a normal lint run (opt-in stderr warning, doesn&#39;t fail the run)</span>
@@ -2191,18 +2191,18 @@
 <p><code>safelint skill status</code> walks every registered AI client × both scopes (user / project) and prints one line per detected install showing whether it's <em>fresh</em> (matches the bundled version) or <em>differs from bundled</em>. Exit code is 0 when everything matches, 1 when anything differs.</p>
 <p>A few details worth knowing:</p>
 <ul>
-<li><strong>Symlink installs</strong> (those created with <code>safelint skill install --symlink</code>) always show as fresh, because the installed file is a symlink pointing back at the bundled location inside the wheel. After <code>pip upgrade safelint</code>, the upgrade is visible immediately — no <code>skill update</code> needed.</li>
+<li><strong>Symlink installs</strong> (those created with <code>safelint skill install --symlink</code>) always show as fresh, because the installed file is a symlink pointing back at the bundled location inside the wheel. After <code>pip upgrade safelint</code>, the upgrade is visible immediately; no <code>skill update</code> needed.</li>
 <li><strong>Copy installs</strong> are content-compared against the bundled file. If they match byte-for-byte, fresh; otherwise, differs.</li>
-<li><strong>Edge case — a symlink install hand-replaced with an identical copy</strong> is reported as fresh (the freshness check compares content, not install mode). The user-visible behaviour is fine <em>today</em> because the content matches, but the next <code>pip upgrade safelint</code> won't propagate to that location anymore. If you want to re-establish the live link, run <code>safelint skill update --symlink --force</code>.</li>
+<li><strong>Edge case, a symlink install hand-replaced with an identical copy</strong> is reported as fresh (the freshness check compares content, not install mode). The user-visible behaviour is fine <em>today</em> because the content matches, but the next <code>pip upgrade safelint</code> won't propagate to that location anymore. If you want to re-establish the live link, run <code>safelint skill update --symlink --force</code>.</li>
 </ul>
 <p>The canonical CI / upgrade-script idiom is:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>status<span class="w"> </span><span class="o">||</span><span class="w"> </span>safelint<span class="w"> </span>skill<span class="w"> </span>update
 </code></pre></div>
-<p><code>safelint check --check-skill-freshness</code> is the same drift check folded into a normal lint run — emits one <code>safelint: warning:</code> line per stale install but doesn't change the lint exit code. Off by default so day-to-day <code>safelint check</code> invocations stay fast (no extra FS scan).</p>
+<p><code>safelint check --check-skill-freshness</code> is the same drift check folded into a normal lint run, emits one <code>safelint: warning:</code> line per stale install but doesn't change the lint exit code. Off by default so day-to-day <code>safelint check</code> invocations stay fast (no extra FS scan).</p>
 <p>A locally-customised install will surface as <em>differs from bundled</em>; the diagnostic message explicitly mentions that case so customisers can ignore it. See <a href="../../ai-clients/lifecycle/">Updating, removing, freshness checks</a> for the full workflow.</p>
 <h2 id="skill-update-remove-commands-1100">Skill update + remove commands (1.10.0)<a class="headerlink" href="#skill-update-remove-commands-1100" title="Permanent link">#</a></h2>
 <p>Two follow-on commands to round out the install lifecycle:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>update<span class="w">                          </span><span class="c1"># idempotent refresh — no-op when fresh</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>update<span class="w">                          </span><span class="c1"># idempotent refresh, no-op when fresh</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>update<span class="w"> </span>--force<span class="w">                  </span><span class="c1"># re-install every detected install</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w">                          </span><span class="c1"># delete every detected install</span>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w"> </span>--symlink<span class="w">                </span><span class="c1"># delete only symlink-shape installs (keep copies)</span>
@@ -2211,13 +2211,13 @@
 </code></pre></div>
 <p>Both commands inherit <code>--client</code> and <code>--project</code> from <code>install</code>, but the meaning of <code>--client auto</code> is <em>different</em> from install's:</p>
 <ul>
-<li><strong><code>install --client auto</code></strong> asks: <em>"which AI client(s) does this user use?"</em> — and answers that by scanning the cwd for marker files (<code>CLAUDE.md</code>, <code>.cursor/</code>, etc.).</li>
-<li><strong><code>update --client auto</code></strong> and <strong><code>remove --client auto</code></strong> ask: <em>"what's already installed?"</em> — and answer that by scanning the actual install paths (<code>~/.claude/skills/safelint/</code>, etc.).</li>
+<li><strong><code>install --client auto</code></strong> asks: <em>"which AI client(s) does this user use?"</em>, and answers that by scanning the cwd for marker files (<code>CLAUDE.md</code>, <code>.cursor/</code>, etc.).</li>
+<li><strong><code>update --client auto</code></strong> and <strong><code>remove --client auto</code></strong> ask: <em>"what's already installed?"</em>, and answer that by scanning the actual install paths (<code>~/.claude/skills/safelint/</code>, etc.).</li>
 </ul>
 <p>This distinction matters when the user has marker files but no install yet (only <code>install</code> will fire) or has an install but the marker file has been deleted (only <code>update</code>/<code>remove</code> will fire).</p>
-<p><strong><code>update</code> flag semantics — <code>--force</code>:</strong> without <code>--force</code>, <code>update</code> only re-installs the locations that have actually drifted from the bundle. Running it when everything is fresh is a no-op: it just prints "already fresh" lines and exits 0. That's what makes it safe to run from cron, CI, or pre-commit hooks — calling <code>update</code> repeatedly does nothing extra. With <code>--force</code>, it re-installs every detected location regardless of drift; useful for reverting a customised install back to the bundled content.</p>
-<p><strong><code>update</code> flag semantics — <code>--symlink</code> and shape preservation:</strong> by default, <code>update</code> preserves the existing install's shape. A copy install stays copy after refresh; a symlink install stays symlink. To <em>switch</em> a copy install to symlink mode, pass <code>--symlink</code> explicitly. There's one wrinkle: if the copy install is already fresh, <code>update</code> is normally a no-op — so converting copy → symlink in that case requires <code>update --force --symlink</code> to force the re-install. Switching the other way (symlink → copy) isn't supported via <code>update</code>; do <code>remove</code> followed by <code>install</code> (without <code>--symlink</code>) instead, so the intent is unambiguous.</p>
-<p><strong><code>remove</code> flag semantics:</strong> flags compose orthogonally — the absence of a flag means "no filter", <em>not</em> "only the opposite":</p>
+<p><strong><code>update</code> flag semantics, <code>--force</code>:</strong> without <code>--force</code>, <code>update</code> only re-installs the locations that have actually drifted from the bundle. Running it when everything is fresh is a no-op: it just prints "already fresh" lines and exits 0. That's what makes it safe to run from cron, CI, or pre-commit hooks, calling <code>update</code> repeatedly does nothing extra. With <code>--force</code>, it re-installs every detected location regardless of drift; useful for reverting a customised install back to the bundled content.</p>
+<p><strong><code>update</code> flag semantics, <code>--symlink</code> and shape preservation:</strong> by default, <code>update</code> preserves the existing install's shape. A copy install stays copy after refresh; a symlink install stays symlink. To <em>switch</em> a copy install to symlink mode, pass <code>--symlink</code> explicitly. There's one wrinkle: if the copy install is already fresh, <code>update</code> is normally a no-op, so converting copy → symlink in that case requires <code>update --force --symlink</code> to force the re-install. Switching the other way (symlink → copy) isn't supported via <code>update</code>; do <code>remove</code> followed by <code>install</code> (without <code>--symlink</code>) instead, so the intent is unambiguous.</p>
+<p><strong><code>remove</code> flag semantics:</strong> flags compose orthogonally, the absence of a flag means "no filter", <em>not</em> "only the opposite":</p>
 <table>
 <thead>
 <tr>
@@ -2228,7 +2228,7 @@
 <tbody>
 <tr>
 <td><code>remove</code> (no flags)</td>
-<td>Every detected install — copy + symlink, every client, both scopes</td>
+<td>Every detected install, copy + symlink, every client, both scopes</td>
 </tr>
 <tr>
 <td><code>remove --symlink</code></td>
@@ -2248,7 +2248,7 @@
 </tr>
 </tbody>
 </table>
-<p>In particular, <code>safelint skill remove</code> without <code>--symlink</code> removes <strong>both</strong> copy and symlink installs — it's not a "remove copies only" command. <code>--symlink</code> is a <em>filter</em> you can opt into when you want to be selective, not a creation-mode toggle like in <code>install</code>.</p>
+<p>In particular, <code>safelint skill remove</code> without <code>--symlink</code> removes <strong>both</strong> copy and symlink installs; it's not a "remove copies only" command. <code>--symlink</code> is a <em>filter</em> you can opt into when you want to be selective, not a creation-mode toggle like in <code>install</code>.</p>
 <p><code>remove</code> only deletes the install location. Bundled files inside <code>site-packages/</code> are never touched (<code>shutil.rmtree</code> doesn't follow symlinks for deletion, and <code>unlink</code> removes the symlink itself, not its bundled target). The worst case for a misfired <code>remove</code> is "re-run <code>install</code> to get the skill back". See <a href="../../ai-clients/lifecycle/#removing-an-installed-skill">Updating, removing, freshness checks</a> for the full filesystem-level breakdown.</p>
 
 

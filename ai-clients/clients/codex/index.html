@@ -1785,22 +1785,22 @@
 
 
 <h1 id="codex">codex<a class="headerlink" href="#codex" title="Permanent link">#</a></h1>
-<p><strong>Markers:</strong> <code>.codex/</code> or <code>AGENTS.md</code> in the project root for project-scope; <code>~/.codex/</code> for user-scope. <code>AGENTS.md</code> is intentionally a marker because it's the cross-agent shared file convention — its presence is a strong signal codex is in use.</p>
+<p><strong>Markers:</strong> <code>.codex/</code> or <code>AGENTS.md</code> in the project root for project-scope; <code>~/.codex/</code> for user-scope. <code>AGENTS.md</code> is intentionally a marker because it's the cross-agent shared file convention, its presence is a strong signal codex is in use.</p>
 <p><strong>Install location:</strong></p>
 <ul>
-<li>Primary (always written): <code>~/.codex/instructions.md</code> (user) or <code>&lt;cwd&gt;/.codex/instructions.md</code> (project — canonical, auto-discovered by codex).</li>
-<li>Secondary (only when <code>AGENTS.md</code> already exists at the scope root): <code>&lt;scope&gt;/AGENTS.md</code> gets a delimited HTML-comment section (<code>safelint:begin</code> / <code>safelint:end</code>) injected. <strong>Other content in <code>AGENTS.md</code> — your hand-written notes, instructions for other agents — is preserved untouched.</strong> safelint never auto-creates <code>AGENTS.md</code>; the secondary install is opt-in via "the user already has the file".</li>
+<li>Primary (always written): <code>~/.codex/instructions.md</code> (user) or <code>&lt;cwd&gt;/.codex/instructions.md</code> (project, canonical, auto-discovered by codex).</li>
+<li>Secondary (only when <code>AGENTS.md</code> already exists at the scope root): <code>&lt;scope&gt;/AGENTS.md</code> gets a delimited HTML-comment section (<code>safelint:begin</code> / <code>safelint:end</code>) injected. <strong>Other content in <code>AGENTS.md</code>, your hand-written notes, instructions for other agents, is preserved untouched.</strong> safelint never auto-creates <code>AGENTS.md</code>; the secondary install is opt-in via "the user already has the file".</li>
 </ul>
 <p><strong>Lifecycle of the secondary section:</strong></p>
 <ul>
-<li><code>install</code> — writes the section into <code>AGENTS.md</code> if the file exists.</li>
-<li><code>update</code> — re-renders the section in place when content drifts (or unchanged when fresh).</li>
-<li><code>status</code> — reports DIFFERS when the section content has drifted from bundled, even if the primary file is fresh.</li>
-<li><code>remove</code> — strips just the section from <code>AGENTS.md</code>. Other content is preserved. If <code>AGENTS.md</code> ends up empty (only safelint content was ever there), the empty file is removed too.</li>
+<li><code>install</code>, writes the section into <code>AGENTS.md</code> if the file exists.</li>
+<li><code>update</code>, re-renders the section in place when content drifts (or unchanged when fresh).</li>
+<li><code>status</code>, reports DIFFERS when the section content has drifted from bundled, even if the primary file is fresh.</li>
+<li><code>remove</code>, strips just the section from <code>AGENTS.md</code>. Other content is preserved. If <code>AGENTS.md</code> ends up empty (only safelint content was ever there), the empty file is removed too.</li>
 </ul>
 <p><strong>Symlink safety:</strong> safelint refuses to follow a symlink at the <code>AGENTS.md</code> destination. If your <code>AGENTS.md</code> is a symlink (intentional or accidental), <code>install</code> / <code>update</code> / <code>remove</code> skip the secondary write entirely and print a <code>safelint: warning: refusing to install/remove safelint section through symlink at ...</code> line on stderr. The primary <code>.codex/instructions.md</code> install is unaffected. Replace the symlink with a real file if you want safelint to manage that location directly.</p>
 <p><strong>How to invoke after install:</strong></p>
-<p>Restart codex (or your codex-aware editor). The primary <code>.codex/instructions.md</code> is auto-discovered. Then ask codex <em>"run safelint"</em> / <em>"lint with safelint"</em> — same prompts as the other clients.</p>
+<p>Restart codex (or your codex-aware editor). The primary <code>.codex/instructions.md</code> is auto-discovered. Then ask codex <em>"run safelint"</em> / <em>"lint with safelint"</em>, same prompts as the other clients.</p>
 <p><strong>Manual install:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>codex<span class="w"> </span>--project<span class="w">   </span><span class="c1"># canonical .codex/instructions.md; also injects section into AGENTS.md if present</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>codex<span class="w">             </span><span class="c1"># user-global</span>

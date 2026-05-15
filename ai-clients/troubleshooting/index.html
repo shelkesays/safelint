@@ -1941,15 +1941,15 @@
 <h2 id="could-not-auto-detect-an-ai-client">"could not auto-detect an AI client"<a class="headerlink" href="#could-not-auto-detect-an-ai-client" title="Permanent link">#</a></h2>
 <p>Means neither cwd nor home had any of the registered markers. Either:</p>
 <ol>
-<li>The AI client isn't installed on this machine — install it first, <em>then</em> run <code>safelint skill install</code>.</li>
-<li>You want a specific client regardless of detection — use <code>--client &lt;name&gt;</code> explicitly. The error message lists the exact commands.</li>
+<li>The AI client isn't installed on this machine. Install it first, <em>then</em> run <code>safelint skill install</code>.</li>
+<li>You want a specific client regardless of detection. Use <code>--client &lt;name&gt;</code> explicitly; the error message lists the exact commands.</li>
 </ol>
 <h2 id="target-already-exists-use-force-to-replace-it">"target already exists. Use --force to replace it."<a class="headerlink" href="#target-already-exists-use-force-to-replace-it" title="Permanent link">#</a></h2>
 <p>A previous install is in the way. Pass <code>--force</code> to replace it. SafeLint refuses to silently overwrite by default to protect against losing a customised skill folder.</p>
 <h2 id="cursor-doesnt-seem-to-pick-up-the-rule">Cursor doesn't seem to pick up the rule<a class="headerlink" href="#cursor-doesnt-seem-to-pick-up-the-rule" title="Permanent link">#</a></h2>
-<p>Cursor reads <code>.cursor/rules/*.mdc</code> files at window load. After installing, you need to <strong>reload the Cursor window</strong> (Command Palette → "Developer: Reload Window") — the rule isn't hot-reloaded.</p>
+<p>Cursor reads <code>.cursor/rules/*.mdc</code> files at window load. After installing, you need to <strong>reload the Cursor window</strong> (Command Palette → "Developer: Reload Window"), the rule isn't hot-reloaded.</p>
 <h2 id="claude-code-doesnt-seem-to-pick-up-the-skill">Claude Code doesn't seem to pick up the skill<a class="headerlink" href="#claude-code-doesnt-seem-to-pick-up-the-skill" title="Permanent link">#</a></h2>
-<p>Same idea — Claude Code loads skills on session start. Open a new conversation or restart the app.</p>
+<p>Same idea, Claude Code loads skills on session start. Open a new conversation or restart the app.</p>
 <h2 id="i-want-to-inspect-the-bundled-files-without-installing">"I want to inspect the bundled files without installing"<a class="headerlink" href="#i-want-to-inspect-the-bundled-files-without-installing" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w">                  </span><span class="c1"># Claude skill directory</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w"> </span>--client<span class="w"> </span>cursor<span class="w">  </span><span class="c1"># Cursor MDC file path</span>

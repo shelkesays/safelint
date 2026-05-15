@@ -1991,7 +1991,7 @@
 
 
 <h1 id="suppression-mechanisms">Suppression mechanisms<a class="headerlink" href="#suppression-mechanisms" title="Permanent link">#</a></h1>
-<p>SafeLint offers four ways to silence a rule, ranging from one-line surgical to project-wide. Pick the narrowest scope that matches your intent — broader scopes are easier to forget about.</p>
+<p>SafeLint offers four ways to silence a rule, ranging from one-line surgical to project-wide. Pick the narrowest scope that matches your intent. Broader scopes are easier to forget about.</p>
 <table>
 <thead>
 <tr>
@@ -2012,7 +2012,7 @@
 <td><code># safelint: ignore</code></td>
 <td>One file</td>
 <td>The file (own-line comment)</td>
-<td>"This whole file is intentional" — generated code, fixtures, vendor stuff</td>
+<td>"This whole file is intentional", generated code, fixtures, vendor stuff</td>
 </tr>
 <tr>
 <td><code>[tool.safelint.per_file_ignores]</code></td>
@@ -2028,7 +2028,7 @@
 </tr>
 </tbody>
 </table>
-<p>The narrower-scope forms compose with the broader ones — toml-level ignores still apply on top of file-level directives, and inline <code># nosafe</code> always wins for the specific line it's on. The two TOML-level mechanisms are documented on the <a href="../toml/">Configuration file</a> page; this page covers the in-source forms (<code># nosafe</code> and <code># safelint: ignore</code>) plus the run-summary diagnostics that surface what got suppressed.</p>
+<p>The narrower-scope forms compose with the broader ones: toml-level ignores still apply on top of file-level directives, and inline <code># nosafe</code> always wins for the specific line it's on. The two TOML-level mechanisms are documented on the <a href="../toml/">Configuration file</a> page; this page covers the in-source forms (<code># nosafe</code> and <code># safelint: ignore</code>) plus the run-summary diagnostics that surface what got suppressed.</p>
 <h2 id="inline-nosafe">Inline <code># nosafe</code><a class="headerlink" href="#inline-nosafe" title="Permanent link">#</a></h2>
 <p>Add a <code># nosafe</code> comment to the end of any line to suppress violations on that specific line. This is the escape hatch for the rare case where a violation is a deliberate, justified choice.</p>
 <p>Suppressed violations do not appear in output and do not count toward the blocking total, but a per-code breakdown of what was suppressed is always reported at the end of the run so suppressions remain auditable.</p>
@@ -2061,20 +2061,20 @@
 </table>
 <p>Both rule codes (e.g. <code>SAFE101</code>) and rule names (e.g. <code>function_length</code>) are accepted and can be mixed in the same comment.</p>
 <h3 id="examples">Examples<a class="headerlink" href="#examples" title="Permanent link">#</a></h3>
-<p><strong>Suppress all violations on a line</strong> — use when a line genuinely triggers multiple unrelated rules and fixing each would make the code worse:</p>
+<p><strong>Suppress all violations on a line.</strong> Use when a line genuinely triggers multiple unrelated rules and fixing each would make the code worse:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="n">result</span> <span class="o">=</span> <span class="nb">eval</span><span class="p">(</span><span class="n">user_input</span><span class="p">)</span>  <span class="c1"># nosafe</span>
 </code></pre></div>
-<p><strong>Suppress a single code</strong> — preferred; makes the intent explicit and leaves other rules active:</p>
+<p><strong>Suppress a single code.</strong> Preferred; makes the intent explicit and leaves other rules active:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="k">while</span> <span class="kc">True</span><span class="p">:</span>  <span class="c1"># nosafe: SAFE501</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">item</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>     <span class="c1"># blocking poll — bounded by the caller&#39;s timeout</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>    <span class="n">item</span> <span class="o">=</span> <span class="n">queue</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>     <span class="c1"># blocking poll, bounded by the caller&#39;s timeout</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>    <span class="k">if</span> <span class="n">item</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>        <span class="k">break</span>
 </code></pre></div>
-<p><strong>Suppress by rule name</strong> — identical behaviour to suppressing by code; use whichever is more readable in context:</p>
+<p><strong>Suppress by rule name.</strong> Identical behaviour to suppressing by code; use whichever is more readable in context:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">while</span> <span class="kc">True</span><span class="p">:</span>  <span class="c1"># nosafe: unbounded_loops</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>    <span class="o">...</span>
 </code></pre></div>
-<p><strong>Suppress multiple rules</strong> — keep the list short; a long list is a signal the code needs refactoring:</p>
+<p><strong>Suppress multiple rules.</strong> Keep the list short; a long list is a signal the code needs refactoring:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">get_data</span><span class="p">(</span><span class="n">conn</span><span class="p">,</span> <span class="n">query</span><span class="p">,</span> <span class="n">p1</span><span class="p">,</span> <span class="n">p2</span><span class="p">,</span> <span class="n">p3</span><span class="p">,</span> <span class="n">p4</span><span class="p">,</span> <span class="n">p5</span><span class="p">,</span> <span class="n">p6</span><span class="p">):</span>  <span class="c1"># nosafe: SAFE101, SAFE103</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="o">...</span>
 </code></pre></div>
@@ -2087,9 +2087,9 @@
 </ul>
 <p>Prefer <strong>config changes</strong> (adjusting thresholds or disabling rules) over <code># nosafe</code> when the exception applies to the entire project. For a single file or whole-file scope, see the file-level directive below.</p>
 <h2 id="file-level-safelint-ignore">File-level <code># safelint: ignore</code><a class="headerlink" href="#file-level-safelint-ignore" title="Permanent link">#</a></h2>
-<p>For cases where a <em>whole file</em> is intentionally violating — auto-generated code, code that has to look the way it does to satisfy a vendor protocol, a fixture file — put a directive in the file itself rather than in toml:</p>
+<p>For cases where a <em>whole file</em> is intentionally violating (auto-generated code, code that has to look the way it does to satisfy a vendor protocol, a fixture file, and similar), put a directive in the file itself rather than in toml:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># safelint: ignore: SAFE101, SAFE304</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># Auto-generated by openapi-codegen 4.2.1 — do not edit by hand.</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1"># Auto-generated by openapi-codegen 4.2.1: do not edit by hand.</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="kn">import</span><span class="w"> </span><span class="nn">requests</span>   <span class="c1"># ... 800 lines of generated I/O ...</span>
 </code></pre></div>
@@ -2120,7 +2120,7 @@
 </tr>
 </tbody>
 </table>
-<p><strong>Placement:</strong> the directive must be a comment <strong>alone on its line</strong> (no preceding code). Trailing comments after code are scope-local and use <code># nosafe</code> instead — putting a <code># safelint: ignore</code> after code on the same line is silently skipped, which prevents accidental file-wide scope creep from what was meant as a per-line suppression.</p>
+<p><strong>Placement:</strong> the directive must be a comment <strong>alone on its line</strong> (no preceding code). Trailing comments after code are scope-local and use <code># nosafe</code> instead, putting a <code># safelint: ignore</code> after code on the same line is silently skipped, which prevents accidental file-wide scope creep from what was meant as a per-line suppression.</p>
 <p><strong>String-literal safety:</strong> the parser uses Tree-sitter, so a literal <code># safelint: ignore</code> inside a docstring or string is correctly ignored.</p>
 <p><strong>Typo guard:</strong> unknown codes / rule names trigger a <code>safelint: warning:</code> line on stderr, same as the toml-config typo guard. The run continues; the bogus entry is just noted.</p>
 <p><strong>Suppressed violations stay auditable:</strong> they go into <code>LintResult.suppressed</code> and surface in the per-code breakdown the CLI prints at the end of the run, so file-level suppressions are visible without grepping the codebase.</p>
@@ -2135,13 +2135,13 @@ emitted advisory suggestions for those violations (added in 1.8.0):</p>
 <a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>No suggestions available (safelint does not auto-fix). (2 SAFE501, 1 SAFE304 suppressed)
 </code></pre></div>
 <p>If at least one violation has a suggestion, the line reads
-<code>N advisory suggestion(s) available — view via --format json or --format sarif
+<code>N advisory suggestion(s) available, view via --format json or --format sarif
 (safelint does not auto-apply fixes).</code> followed by the same suppression
 breakdown. Suggestions are emitted in both JSON output and the SARIF
-<code>fixes[]</code> block (advisory by spec). SafeLint never auto-applies —
+<code>fixes[]</code> block (advisory by spec). SafeLint never auto-applies,
 the line is informational.</p>
 <p>When the run is otherwise clean (no active violations), only the all-clear
-line is printed — the suggestion / no-suggestion line is omitted:</p>
+line is printed, the suggestion / no-suggestion line is omitted:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>All checks passed. (2 SAFE501, 1 SAFE304 suppressed)
 </code></pre></div>
 <p>A fully clean run with no suppressions prints a single line in bold green to
@@ -2149,16 +2149,16 @@ match <code>ruff</code> / <code>ty</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>All checks passed.
 </code></pre></div>
 <h2 id="diagnostic-output">Diagnostic output<a class="headerlink" href="#diagnostic-output" title="Permanent link">#</a></h2>
-<p>Lint violations and the run summary are written to <strong>stdout</strong> in the ruff/ty multi-line format. Issues that aren't lint violations — typos in your <code>ignore</code> list, malformed TOML, files skipped because they exceed <code>max_file_size_bytes</code>, etc. — are written to <strong>stderr</strong> as single-line <code>safelint: warning:</code> / <code>safelint: error:</code> messages so they stay out of the violation stream and are captured separately by pre-commit, CI, and editor integrations.</p>
+<p>Lint violations and the run summary are written to <strong>stdout</strong> in the ruff/ty multi-line format. Issues that aren't lint violations, typos in your <code>ignore</code> list, malformed TOML, files skipped because they exceed <code>max_file_size_bytes</code>, etc., are written to <strong>stderr</strong> as single-line <code>safelint: warning:</code> / <code>safelint: error:</code> messages so they stay out of the violation stream and are captured separately by pre-commit, CI, and editor integrations.</p>
 <p>Examples:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a>safelint: warning: unknown entries in ignore list (typo or stale rule?): SAFFE101
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>safelint: error: failed to parse /path/to/pyproject.toml: Expected &#39;=&#39; after a key in a key/value pair (at line 5, column 12) — skipping file
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>safelint: error: failed to parse /path/to/pyproject.toml: Expected &#39;=&#39; after a key in a key/value pair (at line 5, column 12), skipping file
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a>safelint: warning: skipping /path/to/huge_generated.py (12,345,678 bytes exceeds max_file_size_bytes=5,242,880)
 </code></pre></div>
 <p>Diagnostics fall into two timing buckets:</p>
 <ul>
-<li><strong>Config-load / engine-construction time</strong> — typos in <code>ignore</code> / <code>per_file_ignores</code>, malformed TOML, the <code>max_file_size_bytes = 0</code> fallback warning. These are emitted once, up front, before any file is linted. None of them fails the run on their own — safelint falls back to defaults and continues.</li>
-<li><strong>Per-file runtime</strong> — <code>max_file_size_bytes</code> skip warnings fire from <code>SafetyEngine.check_file()</code> as the engine walks the file list, so they are interleaved with lint output (one warning per oversize file, just before that file's spot in the run). The skipped file produces no violations and does not affect exit status.</li>
+<li><strong>Config-load / engine-construction time</strong>: typos in <code>ignore</code> / <code>per_file_ignores</code>, malformed TOML, the <code>max_file_size_bytes = 0</code> fallback warning. These are emitted once, up front, before any file is linted. None of them fails the run on their own; safelint falls back to defaults and continues.</li>
+<li><strong>Per-file runtime</strong>, <code>max_file_size_bytes</code> skip warnings fire from <code>SafetyEngine.check_file()</code> as the engine walks the file list, so they are interleaved with lint output (one warning per oversize file, just before that file's spot in the run). The skipped file produces no violations and does not affect exit status.</li>
 </ul>
 
 

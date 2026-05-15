@@ -1789,16 +1789,16 @@
 <p><strong>Install location:</strong></p>
 <ul>
 <li>User-scoped: <code>~/CONVENTIONS.md</code></li>
-<li>Project-scoped: <code>&lt;cwd&gt;/CONVENTIONS.md</code> — <strong>Recommended for team-shared repos — commit the file.</strong></li>
+<li>Project-scoped: <code>&lt;cwd&gt;/CONVENTIONS.md</code>, <strong>Recommended for team-shared repos, commit the file.</strong></li>
 </ul>
 <p><strong>One-time setup (mandatory):</strong> aider does <strong>not</strong> auto-load <code>CONVENTIONS.md</code>. Wire it in by adding a <code>read:</code> entry to your <code>.aider.conf.yml</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># .aider.conf.yml (project) or ~/.aider.conf.yml (user-global)</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="nt">read</span><span class="p">:</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">CONVENTIONS.md</span>
 </code></pre></div>
-<p>The post-install message reminds you of this — without the <code>read:</code> entry, aider won't see safelint's conventions.</p>
+<p>The post-install message reminds you of this, without the <code>read:</code> entry, aider won't see safelint's conventions.</p>
 <p><strong>How to invoke after install:</strong></p>
-<p>Once <code>read:</code> is wired up, run <code>aider</code> (no flags). The conventions are loaded as part of aider's system context. Then ask aider <em>"run safelint"</em> / <em>"lint with safelint"</em> — same prompts as the other clients.</p>
+<p>Once <code>read:</code> is wired up, run <code>aider</code> (no flags). The conventions are loaded as part of aider's system context. Then ask aider <em>"run safelint"</em> / <em>"lint with safelint"</em>, same prompts as the other clients.</p>
 <p><strong>Manual install:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>aider<span class="w"> </span>--project<span class="w">   </span><span class="c1"># then wire `read: [CONVENTIONS.md]` into .aider.conf.yml</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>aider<span class="w">             </span><span class="c1"># user-global</span>

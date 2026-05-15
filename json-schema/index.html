@@ -1646,7 +1646,7 @@
   <a href="#bash-one-liner-count-blocking-violations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bash one-liner — count blocking violations
+        Bash one-liner: count blocking violations
       
     </span>
   </a>
@@ -1657,7 +1657,7 @@
   <a href="#python-extract-files-with-errors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Python — extract files with errors
+        Python: extract files with errors
       
     </span>
   </a>
@@ -1668,7 +1668,7 @@
   <a href="#node-minimal-vscode-style-diagnostics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Node — minimal VSCode-style diagnostics
+        Node: minimal VSCode-style diagnostics
       
     </span>
   </a>
@@ -2181,7 +2181,7 @@
   <a href="#bash-one-liner-count-blocking-violations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Bash one-liner — count blocking violations
+        Bash one-liner: count blocking violations
       
     </span>
   </a>
@@ -2192,7 +2192,7 @@
   <a href="#python-extract-files-with-errors" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Python — extract files with errors
+        Python: extract files with errors
       
     </span>
   </a>
@@ -2203,7 +2203,7 @@
   <a href="#node-minimal-vscode-style-diagnostics" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Node — minimal VSCode-style diagnostics
+        Node: minimal VSCode-style diagnostics
       
     </span>
   </a>
@@ -2255,7 +2255,7 @@
 <p><code>safelint check --format json</code> and <code>safelint --stdin --format json</code> both emit a single JSON document on stdout describing the lint run. This page documents that contract so plugin authors (Claude Code skill, VSCode extension, CI scripts) can rely on a stable shape.</p>
 <p>The schema is <strong>stable since v1.5.0</strong>. Field additions are non-breaking (consumers ignore unknown keys); removals or type changes only happen in a major-version bump (none to date). Notable additions since baseline: position fields (<code>end_lineno</code>, <code>column_start</code>, <code>column_end</code>) in 1.7.0, <code>suggestions[]</code> in 1.8.0.</p>
 <blockquote>
-<p><strong>About "advisory" suggestions:</strong> the <code>suggestions[]</code> array carries optional fix candidates the rule offers, but <strong>safelint never auto-applies them</strong>, and consumers (editors, plugins, CI scripts) must not auto-apply them either. Display them as user-confirmable quick-fixes; the user always presses "accept" before any byte is written. This is a permanent design contract — safelint is a review tool, not a refactor tool, and a <code>--fix</code> flag will not ship. See the <em>"Suggestions are advisory only"</em> section near the end of this page for the full rationale.</p>
+<p><strong>About "advisory" suggestions:</strong> the <code>suggestions[]</code> array carries optional fix candidates the rule offers, but <strong>safelint never auto-applies them</strong>, and consumers (editors, plugins, CI scripts) must not auto-apply them either. Display them as user-confirmable quick-fixes; the user always presses "accept" before any byte is written. This is a permanent design contract: safelint is a review tool, not a refactor tool, and a <code>--fix</code> flag will not ship. See the <em>"Suggestions are advisory only"</em> section near the end of this page for the full rationale.</p>
 </blockquote>
 <h2 id="top-level-shape">Top-level shape<a class="headerlink" href="#top-level-shape" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="p">{</span>
@@ -2312,7 +2312,7 @@
 <tr>
 <td><code>blocking</code></td>
 <td>int</td>
-<td>Active violations whose severity meets or exceeds the configured <code>fail_on</code> threshold. <code>blocking == 0</code> is necessary for exit code 0 but not sufficient — exit 2 (silent-failure guard) also reports <code>blocking == 0</code> when zero files actually got linted because every candidate's grammar was missing. See <a href="../configuration/cli/#exit-codes">Exit codes</a> for the full mapping.</td>
+<td>Active violations whose severity meets or exceeds the configured <code>fail_on</code> threshold. <code>blocking == 0</code> is necessary for exit code 0 but not sufficient, exit 2 (silent-failure guard) also reports <code>blocking == 0</code> when zero files actually got linted because every candidate's grammar was missing. See <a href="../configuration/cli/#exit-codes">Exit codes</a> for the full mapping.</td>
 </tr>
 <tr>
 <td><code>fail_on</code></td>
@@ -2332,7 +2332,7 @@
 </tbody>
 </table>
 <h3 id="violations-array-of-violation"><code>violations</code> <em>(array of Violation)</em><a class="headerlink" href="#violations-array-of-violation" title="Permanent link">#</a></h3>
-<p>Active violations — i.e. violations that the user is expected to act on. Order is the engine's natural order: file-by-file in discovery order, rule-by-rule in execution order within each file.</p>
+<p>Active violations, i.e. violations that the user is expected to act on. Order is the engine's natural order: file-by-file in discovery order, rule-by-rule in execution order within each file.</p>
 <h3 id="suppressed-array-of-violation"><code>suppressed</code> <em>(array of Violation)</em><a class="headerlink" href="#suppressed-array-of-violation" title="Permanent link">#</a></h3>
 <p>Violations that fired but were suppressed. Same shape as <code>violations</code>. Useful for showing users "what's being silenced" or for auditing <code># nosafe</code> directives.</p>
 <h2 id="violation-object">Violation object<a class="headerlink" href="#violation-object" title="Permanent link">#</a></h2>
@@ -2373,7 +2373,7 @@
 <tr>
 <td><code>rule</code></td>
 <td>string</td>
-<td>The snake-case rule name, e.g. <code>"function_length"</code>. This is the same key users put in their config file to tune the rule — e.g. <code>[tool.safelint.rules.function_length]</code> in <code>pyproject.toml</code> or <code>[rules.function_length]</code> in a standalone <code>safelint.toml</code>. The full list of rule names is in <a href="../configuration/">Configuration</a>.</td>
+<td>The snake-case rule name, e.g. <code>"function_length"</code>. This is the same key users put in their config file to tune the rule, e.g. <code>[tool.safelint.rules.function_length]</code> in <code>pyproject.toml</code> or <code>[rules.function_length]</code> in a standalone <code>safelint.toml</code>. The full list of rule names is in <a href="../configuration/">Configuration</a>.</td>
 </tr>
 <tr>
 <td><code>severity</code></td>
@@ -2383,7 +2383,7 @@
 <tr>
 <td><code>filepath</code></td>
 <td>string</td>
-<td>Path as the user supplied it to the CLI (typically relative to cwd). Not a URI; not percent-encoded. For SARIF output, use <code>--format sarif</code> instead — it normalises to RFC 3986 URIs.</td>
+<td>Path as the user supplied it to the CLI (typically relative to cwd). Not a URI; not percent-encoded. For SARIF output, use <code>--format sarif</code> instead, it normalises to RFC 3986 URIs.</td>
 </tr>
 <tr>
 <td><code>lineno</code></td>
@@ -2408,12 +2408,12 @@
 <tr>
 <td><code>message</code></td>
 <td>string</td>
-<td>Human-readable description. May contain quotes and Unicode; safe for direct display. Don't parse — present verbatim.</td>
+<td>Human-readable description. May contain quotes and Unicode; safe for direct display. Don't parse, present verbatim.</td>
 </tr>
 <tr>
 <td><code>suggestions</code></td>
 <td>Suggestion[]</td>
-<td><em>Added in 1.8.0.</em> Zero or more advisory fixes the rule offers. <strong>NEVER apply automatically</strong> — see the "Suggestions are advisory only" section below. Empty array when the rule has no fix to offer.</td>
+<td><em>Added in 1.8.0.</em> Zero or more advisory fixes the rule offers. <strong>NEVER apply automatically</strong>, see the "Suggestions are advisory only" section below. Empty array when the rule has no fix to offer.</td>
 </tr>
 </tbody>
 </table>
@@ -2442,7 +2442,7 @@
 <tr>
 <td><code>edits</code></td>
 <td>TextEdit[]</td>
-<td>Zero or more text edits describing the minimal change that would make the rule pass. Empty when the suggestion is informational only (e.g. "extract a helper function" — too ambiguous to render as a single edit).</td>
+<td>Zero or more text edits describing the minimal change that would make the rule pass. Empty when the suggestion is informational only (e.g. "extract a helper function", too ambiguous to render as a single edit).</td>
 </tr>
 </tbody>
 </table>
@@ -2476,7 +2476,7 @@
 <tr>
 <td><code>end_column</code></td>
 <td>int</td>
-<td>1-based end column on <code>end_line</code> (exclusive — half-open <code>[start, end)</code>).</td>
+<td>1-based end column on <code>end_line</code> (exclusive, half-open <code>[start, end)</code>).</td>
 </tr>
 <tr>
 <td><code>replacement</code></td>
@@ -2486,7 +2486,7 @@
 </tbody>
 </table>
 <h3 id="suggestions-are-advisory-only">Suggestions are advisory only<a class="headerlink" href="#suggestions-are-advisory-only" title="Permanent link">#</a></h3>
-<p><strong>SafeLint never auto-applies suggestions.</strong> This is a deliberate design choice — the tool is for <em>review</em>, not refactoring. Many of safelint's rules (function decomposition, nesting reduction, side-effect rename) require human judgement on how to restructure; an auto-applied "fix" could make the code pass the rule while not addressing the underlying concern.</p>
+<p><strong>SafeLint never auto-applies suggestions.</strong> This is a deliberate design choice: the tool is for <em>review</em>, not refactoring. Many of safelint's rules (function decomposition, nesting reduction, side-effect rename) require human judgement on how to restructure; an auto-applied "fix" could make the code pass the rule while not addressing the underlying concern.</p>
 <p>Editor / CI integrations:</p>
 <ul>
 <li><strong>MAY</strong> render suggestions as Quick Fix code actions, hover hints, or "lightbulb" suggestions.</li>
@@ -2494,12 +2494,12 @@
 <li><strong>MUST</strong> require explicit user confirmation before applying any edit.</li>
 <li><strong>MUST NOT</strong> implement "fix on save", "fix all", or any automation that bypasses confirmation.</li>
 </ul>
-<p>The CLI <strong>never</strong> ships a <code>--fix</code> flag. The pretty-mode summary line uses the word "suggestions" (not "fixes") to reinforce this. SARIF output uses the spec's native <code>fixes[]</code> block — SARIF 2.1.0 itself defines this as advisory; consumers (GitHub code scanning, IDE extensions) already implement confirmation flows.</p>
-<p>The contract: a violation's <code>suggestions</code> array means "here's what I'd consider doing — your call." Nothing more.</p>
+<p>The CLI <strong>never</strong> ships a <code>--fix</code> flag. The pretty-mode summary line uses the word "suggestions" (not "fixes") to reinforce this. SARIF output uses the spec's native <code>fixes[]</code> block, SARIF 2.1.0 itself defines this as advisory; consumers (GitHub code scanning, IDE extensions) already implement confirmation flows.</p>
+<p>The contract: a violation's <code>suggestions</code> array means "here's what I'd consider doing, your call." Nothing more.</p>
 <h3 id="range-semantics">Range semantics<a class="headerlink" href="#range-semantics" title="Permanent link">#</a></h3>
 <p>The four position fields together specify a fully-resolved half-open range, matching LSP / VSCode <code>Range</code> and SARIF <code>region</code> semantics:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1">// VSCode mapping. Subtract 1 for 0-based, but only after normalising</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">// every nullable field — naive ``v.column_start - 1`` produces NaN</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="c1">// every nullable field, naive ``v.column_start - 1`` produces NaN</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="c1">// when the field is null. Synthetic violations (test_existence,</span>
 <a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="c1">// missing-file SAFE000) carry null columns / null end_lineno; the</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="c1">// fallbacks below render them as a whole-line marker on ``lineno``.</span>
@@ -2519,15 +2519,15 @@
 <li><code>fail_on = "error"</code> (default): only <code>error</code> violations block the run.</li>
 <li><code>fail_on = "warning"</code>: both <code>error</code> and <code>warning</code> violations block.</li>
 </ul>
-<p>The <code>summary.blocking</code> count tells you the pre-computed answer for the current run — you don't need to re-derive it from severity comparison.</p>
+<p>The <code>summary.blocking</code> count tells you the pre-computed answer for the current run; you don't need to re-derive it from severity comparison.</p>
 <h2 id="codes-vs-rules">Codes vs rules<a class="headerlink" href="#codes-vs-rules" title="Permanent link">#</a></h2>
 <p>Every rule has both a stable <code>code</code> (e.g. <code>SAFE101</code>) and a stable <code>name</code> (e.g. <code>function_length</code>). They form a fixed mapping; safelint will not rename either across major versions. Use <code>code</code> for short display, <code>name</code> for config keys.</p>
 <p>The current full list lives in <a href="../configuration/">Configuration</a>.</p>
 <h2 id="example-consumers">Example consumers<a class="headerlink" href="#example-consumers" title="Permanent link">#</a></h2>
-<h3 id="bash-one-liner-count-blocking-violations">Bash one-liner — count blocking violations<a class="headerlink" href="#bash-one-liner-count-blocking-violations" title="Permanent link">#</a></h3>
+<h3 id="bash-one-liner-count-blocking-violations">Bash one-liner: count blocking violations<a class="headerlink" href="#bash-one-liner-count-blocking-violations" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>safelint<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.summary.blocking&#39;</span>
 </code></pre></div>
-<h3 id="python-extract-files-with-errors">Python — extract files with errors<a class="headerlink" href="#python-extract-files-with-errors" title="Permanent link">#</a></h3>
+<h3 id="python-extract-files-with-errors">Python: extract files with errors<a class="headerlink" href="#python-extract-files-with-errors" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
 <a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="kn">import</span><span class="w"> </span><span class="nn">subprocess</span>
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>
@@ -2538,7 +2538,7 @@
 <a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a><span class="n">doc</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">stdout</span><span class="p">)</span>
 <a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a><span class="n">files_with_errors</span> <span class="o">=</span> <span class="p">{</span><span class="n">v</span><span class="p">[</span><span class="s2">&quot;filepath&quot;</span><span class="p">]</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">doc</span><span class="p">[</span><span class="s2">&quot;violations&quot;</span><span class="p">]</span> <span class="k">if</span> <span class="n">v</span><span class="p">[</span><span class="s2">&quot;severity&quot;</span><span class="p">]</span> <span class="o">==</span> <span class="s2">&quot;error&quot;</span><span class="p">}</span>
 </code></pre></div>
-<h3 id="node-minimal-vscode-style-diagnostics">Node — minimal VSCode-style diagnostics<a class="headerlink" href="#node-minimal-vscode-style-diagnostics" title="Permanent link">#</a></h3>
+<h3 id="node-minimal-vscode-style-diagnostics">Node: minimal VSCode-style diagnostics<a class="headerlink" href="#node-minimal-vscode-style-diagnostics" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="k">import</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="nx">spawn</span><span class="w"> </span><span class="p">}</span><span class="w"> </span><span class="kr">from</span><span class="w"> </span><span class="s2">&quot;node:child_process&quot;</span><span class="p">;</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="kd">interface</span><span class="w"> </span><span class="nx">Violation</span><span class="w"> </span><span class="p">{</span>

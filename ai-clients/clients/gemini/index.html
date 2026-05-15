@@ -1788,11 +1788,11 @@
 <p><strong>Markers:</strong> <code>GEMINI.md</code> or <code>.gemini/</code> in the project root for project-scope; <code>~/.gemini/</code> for user-scope.</p>
 <p><strong>Install location:</strong></p>
 <ul>
-<li>User-scoped: <code>~/GEMINI.md</code> — Gemini CLI does not auto-discover this. Users wanting a global file configure Gemini CLI to read it explicitly (or symlink it where the CLI looks).</li>
-<li>Project-scoped: <code>&lt;cwd&gt;/GEMINI.md</code> — Gemini CLI's canonical instructions file, auto-discovered when invoked from the repo. <strong>Recommended for team-shared repos — commit the file.</strong></li>
+<li>User-scoped: <code>~/GEMINI.md</code>, Gemini CLI does not auto-discover this. Users wanting a global file configure Gemini CLI to read it explicitly (or symlink it where the CLI looks).</li>
+<li>Project-scoped: <code>&lt;cwd&gt;/GEMINI.md</code>, Gemini CLI's canonical instructions file, auto-discovered when invoked from the repo. <strong>Recommended for team-shared repos, commit the file.</strong></li>
 </ul>
 <p><strong>How to invoke after install:</strong></p>
-<p>Restart Gemini CLI (or your IDE's Gemini integration). The <code>GEMINI.md</code> file is auto-discovered for the workspace. Then ask Gemini <em>"run safelint"</em> / <em>"lint with safelint"</em> — same prompts as the other clients.</p>
+<p>Restart Gemini CLI (or your IDE's Gemini integration). The <code>GEMINI.md</code> file is auto-discovered for the workspace. Then ask Gemini <em>"run safelint"</em> / <em>"lint with safelint"</em>, same prompts as the other clients.</p>
 <p><strong>Manual install:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>gemini<span class="w"> </span>--project<span class="w">   </span><span class="c1"># canonical, auto-discovered by Gemini CLI</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>gemini<span class="w">             </span><span class="c1"># user-global, requires CLI configuration</span>

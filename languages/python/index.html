@@ -2001,22 +2001,22 @@
 
 
 <h1 id="python">Python<a class="headerlink" href="#python" title="Permanent link">#</a></h1>
-<p>SafeLint analyses Python source for the Holzmann "Power of Ten" safety rules — function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like ruff don't catch. Python is SafeLint's original target language and stays the most fully covered.</p>
+<p>SafeLint analyses Python source for the Holzmann "Power of Ten" safety rules, function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like ruff don't catch. Python is SafeLint's original target language and stays the most fully covered.</p>
 <h2 id="file-extensions">File extensions<a class="headerlink" href="#file-extensions" title="Permanent link">#</a></h2>
 <p><code>.py</code>, <code>.pyw</code>. Both are picked up by <code>safelint check</code> (directory mode, <code>--all-files</code> mode, and the pre-commit hook). Notebook formats (<code>.ipynb</code>) are not yet registered.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
 <div class="admonition warning">
-<p class="admonition-title">v2.0.0rc2 (pre-release) — pin or pass <code>--pre</code></p>
-<p>Until v2.0.0 GA, an unpinned <code>pip install 'safelint[python]'</code> resolves to the latest 1.x release, which doesn't define this extra. For the RC, pin explicitly: <code>pip install 'safelint[python]==2.0.0rc2'</code> (or pass <code>--pre</code>).</p>
+<p class="admonition-title">v2.0.0rc3 (pre-release), pin or pass <code>--pre</code></p>
+<p>Until v2.0.0 GA, an unpinned <code>pip install 'safelint[python]'</code> resolves to the latest 1.x release, which doesn't define this extra. For the RC, pin explicitly: <code>pip install 'safelint[python]==2.0.0rc3'</code> (or pass <code>--pre</code>).</p>
 </div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python]&#39;</span><span class="w">    </span><span class="c1"># or: uv add &#39;safelint[python]&#39;</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">               </span><span class="c1"># lint a directory (git-modified files by default)</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">      </span><span class="c1"># lint everything</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>src/<span class="w"> </span><span class="c1"># machine-readable for editors / CI</span>
 </code></pre></div>
-<p>v2.0.0 ships every language grammar as an opt-in extra — the <code>[python]</code> extra installs <code>tree-sitter-python</code> alongside the engine. Plain <code>pip install safelint</code> installs only the engine and emits an install hint on first run.</p>
+<p>v2.0.0 ships every language grammar as an opt-in extra, the <code>[python]</code> extra installs <code>tree-sitter-python</code> alongside the engine. Plain <code>pip install safelint</code> installs only the engine and emits an install hint on first run.</p>
 <h2 id="rules-that-fire-on-python">Rules that fire on Python<a class="headerlink" href="#rules-that-fire-on-python" title="Permanent link">#</a></h2>
-<p>All 19 user-facing rules apply to Python — the 17 cross-language rules plus the 2 Python-only rules. The 1 JavaScript-only rule (SAFE305 <code>wide_scope_declaration</code>) is skipped automatically by the engine's per-language dispatch.</p>
+<p>All 19 user-facing rules apply to Python, the 17 cross-language rules plus the 2 Python-only rules. The 1 JavaScript-only rule (SAFE305 <code>wide_scope_declaration</code>) is skipped automatically by the engine's per-language dispatch.</p>
 <table>
 <thead>
 <tr>
@@ -2044,12 +2044,12 @@
 <tr>
 <td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
 <td><code>complexity</code></td>
-<td>Cyclomatic complexity — every <code>if</code> / <code>elif</code> / <code>for</code> / <code>while</code> / <code>except</code> / <code>case</code> / ternary / <code>and</code> / <code>or</code> adds one. Default cap 10.</td>
+<td>Cyclomatic complexity, every <code>if</code> / <code>elif</code> / <code>for</code> / <code>while</code> / <code>except</code> / <code>case</code> / ternary / <code>and</code> / <code>or</code> adds one. Default cap 10.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe201-bare_except">SAFE201</a></td>
 <td><code>bare_except</code></td>
-<td><strong>Python-only.</strong> Fires on <code>except:</code> with no exception type — catches <code>KeyboardInterrupt</code> and <code>SystemExit</code>.</td>
+<td><strong>Python-only.</strong> Fires on <code>except:</code> with no exception type, catches <code>KeyboardInterrupt</code> and <code>SystemExit</code>.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe202-empty_except">SAFE202</a></td>
@@ -2089,7 +2089,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe501-unbounded_loops">SAFE501</a></td>
 <td><code>unbounded_loops</code></td>
-<td><code>while True:</code> with no <code>break</code>. Also fires on <code>while &lt;non-comparison&gt;:</code> — a heuristic that stays Python-only.</td>
+<td><code>while True:</code> with no <code>break</code>. Also fires on <code>while &lt;non-comparison&gt;:</code>, a heuristic that stays Python-only.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
@@ -2114,16 +2114,16 @@
 <tr>
 <td><a href="../../configuration/rules/#safe802-return_value_ignored">SAFE802</a></td>
 <td><code>return_value_ignored</code></td>
-<td>Bare calls to <code>subprocess.run</code>, <code>f.write</code>, <code>socket.send</code>, <code>os.rename</code>, etc. — return value carries success/failure. Disabled by default.</td>
+<td>Bare calls to <code>subprocess.run</code>, <code>f.write</code>, <code>socket.send</code>, <code>os.rename</code>, etc., return value carries success/failure. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe803-null_dereference">SAFE803</a></td>
 <td><code>null_dereference</code></td>
-<td><code>config.get("k").strip()</code> — dereferencing a call that can return <code>None</code>. Disabled by default.</td>
+<td><code>config.get("k").strip()</code>, dereferencing a call that can return <code>None</code>. Disabled by default.</td>
 </tr>
 </tbody>
 </table>
-<p>The 1 rule <strong>not registered for Python:</strong> <a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305 <code>wide_scope_declaration</code></a> — JavaScript-only; Python has no <code>var</code> / <code>let</code> / <code>const</code> distinction.</p>
+<p>The 1 rule <strong>not registered for Python:</strong> <a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305 <code>wide_scope_declaration</code></a>, JavaScript-only; Python has no <code>var</code> / <code>let</code> / <code>const</code> distinction.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
 <p>SafeLint reads its config from <code>[tool.safelint]</code> in <code>pyproject.toml</code>, or from a standalone <code>safelint.toml</code> at the project root. Standalone wins when both are present.</p>
 <p><strong><code>pyproject.toml</code>:</strong></p>
@@ -2155,33 +2155,33 @@
 </code></pre></div>
 <p>See <a href="../../configuration/toml/">Configuration file</a> for the full list of top-level keys and <a href="../../configuration/rules/">Rules reference</a> for every per-rule option.</p>
 <h2 id="installing-the-python-extra">Installing the Python extra<a class="headerlink" href="#installing-the-python-extra" title="Permanent link">#</a></h2>
-<p>v2.0.0 ships every language grammar — Python included — as an opt-in extra so projects only install what they actually lint:</p>
+<p>v2.0.0 ships every language grammar, Python included, as an opt-in extra so projects only install what they actually lint:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python]&#39;</span><span class="w">              </span><span class="c1"># Python-only project</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python,javascript]&#39;</span><span class="w">   </span><span class="c1"># Python + JS monorepo</span>
 <a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span><span class="w">                 </span><span class="c1"># kitchen-sink</span>
 </code></pre></div>
-<p><code>pip install safelint</code> (no extras) installs only the engine. safelint will emit <code>safelint: warning: skipping .py files — install with: pip install 'safelint[python]'</code> on first run when it finds Python files but the grammar isn't installed. <strong>Heads-up for CI:</strong> in a Python-only project that pattern means <em>every</em> candidate file gets skipped, which fires the <a href="../../configuration/cli/#exit-code-2--silent-failure-triggers">silent-failure guard</a> and exits with code 2 plus the install hint embedded in the error — so CI / pre-commit can't accidentally report green on an un-linted run.</p>
+<p><code>pip install safelint</code> (no extras) installs only the engine. safelint will emit <code>safelint: warning: skipping .py files, install with: pip install 'safelint[python]'</code> on first run when it finds Python files but the grammar isn't installed. <strong>Heads-up for CI:</strong> in a Python-only project that pattern means <em>every</em> candidate file gets skipped, which fires the <a href="../../configuration/cli/#exit-code-2--silent-failure-triggers">silent-failure guard</a> and exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.</p>
 <h2 id="pre-commit-integration">Pre-commit integration<a class="headerlink" href="#pre-commit-integration" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># .pre-commit-config.yaml</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">repos</span><span class="p">:</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0rc2</span><span class="w">         </span><span class="c1"># pin to a release (replace with the GA tag once v2.0.0 ships)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0rc3</span><span class="w">         </span><span class="c1"># pin to a release (replace with the GA tag once v2.0.0 ships)</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="c1"># Every safelint hook needs an extra in v2.0.0+ — including Python-only projects.</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="c1"># Every safelint hook needs an extra in v2.0.0+, including Python-only projects.</span>
 <a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[python]&#39;</span><span class="p p-Indicator">]</span>
 <a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="c1"># Optional: scope to a directory</span>
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span>
 </code></pre></div>
-<p>The published hook spec sets <code>types_or: [python, javascript, ts, tsx]</code> and no <code>files:</code> filter — add your own <code>files:</code> / <code>exclude:</code> keys to scope it. Mixed-language projects compose extras: <code>additional_dependencies: ['safelint[python,javascript]']</code> (or <code>[all]</code>).</p>
+<p>The published hook spec sets <code>types_or: [python, javascript, ts, tsx]</code> and no <code>files:</code> filter, add your own <code>files:</code> / <code>exclude:</code> keys to scope it. Mixed-language projects compose extras: <code>additional_dependencies: ['safelint[python,javascript]']</code> (or <code>[all]</code>).</p>
 <h2 id="python-specific-config-keys">Python-specific config keys<a class="headerlink" href="#python-specific-config-keys" title="Permanent link">#</a></h2>
 <p>Most rule options work uniformly across languages, but a few are Python-only:</p>
 <ul>
-<li><strong><code>[tool.safelint.rules.function_length]</code></strong> — <code>count_mode = "statements"</code> (counts AST statement nodes) is Python-only. JavaScript files use <code>lines</code> (default) or <code>logical_lines</code>.</li>
-<li><strong><code>[tool.safelint.rules.global_mutation]</code></strong> — <code>strict = true</code> (fire on every <code>global</code> declaration regardless of write) is Python-only.</li>
-<li><strong><code>[tool.safelint.rules.side_effects_hidden]</code></strong> — <code>pure_prefixes</code> defaults match Python <code>snake_case</code> (<code>calculate_</code>, <code>get_</code>, <code>is_</code>, <code>has_</code>, <code>find_</code>). For mixed-language repos the same list applies to both — the substring check is case-insensitive.</li>
-<li><strong><code>[tool.safelint.rules.resource_lifecycle]</code></strong> — <code>tracked_functions</code>, <code>extend_tracked_functions</code>, and <code>cleanup_patterns</code> are Python-only keys. The JavaScript equivalent is <code>tracked_functions_javascript</code>.</li>
-<li><strong><code>[tool.safelint.rules.tainted_sink]</code></strong> — <code>sinks</code>, <code>sanitizers</code>, <code>sources</code> default to Python's threat surface (<code>eval</code>, <code>exec</code>, <code>subprocess</code>, …). The <code>_javascript</code>-suffixed equivalents are independent lists.</li>
+<li><strong><code>[tool.safelint.rules.function_length]</code></strong>, <code>count_mode = "statements"</code> (counts AST statement nodes) is Python-only. JavaScript files use <code>lines</code> (default) or <code>logical_lines</code>.</li>
+<li><strong><code>[tool.safelint.rules.global_mutation]</code></strong>, <code>strict = true</code> (fire on every <code>global</code> declaration regardless of write) is Python-only.</li>
+<li><strong><code>[tool.safelint.rules.side_effects_hidden]</code></strong>, <code>pure_prefixes</code> defaults match Python <code>snake_case</code> (<code>calculate_</code>, <code>get_</code>, <code>is_</code>, <code>has_</code>, <code>find_</code>). For mixed-language repos the same list applies to both, the substring check is case-insensitive.</li>
+<li><strong><code>[tool.safelint.rules.resource_lifecycle]</code></strong>, <code>tracked_functions</code>, <code>extend_tracked_functions</code>, and <code>cleanup_patterns</code> are Python-only keys. The JavaScript equivalent is <code>tracked_functions_javascript</code>.</li>
+<li><strong><code>[tool.safelint.rules.tainted_sink]</code></strong>, <code>sinks</code>, <code>sanitizers</code>, <code>sources</code> default to Python's threat surface (<code>eval</code>, <code>exec</code>, <code>subprocess</code>, …). The <code>_javascript</code>-suffixed equivalents are independent lists.</li>
 </ul>
 <h2 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">#</a></h2>
 <p>Want to refine a rule's Python behaviour, add a Python-specific config option, or fix a Python parser edge case? See <a href="../../contributing/adding-a-language/">Adding a language</a> for the architecture overview, or open an issue / PR against the <a href="https://github.com/shelkesays/safelint">main repo</a>.</p>

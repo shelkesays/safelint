@@ -1884,12 +1884,12 @@
 </table>
 <p>For the exact install path each client uses at each scope, see the per-client guide linked from the <a href="../">AI clients overview</a>.</p>
 <h2 id="symlink-mode-developer-loop">Symlink mode (developer loop)<a class="headerlink" href="#symlink-mode-developer-loop" title="Permanent link">#</a></h2>
-<p><code>--symlink</code> links to the bundled location instead of copying. After <code>pip upgrade safelint</code>, the skill / rule reflects the new content immediately — no <code>safelint skill install --force</code> needed.</p>
+<p><code>--symlink</code> links to the bundled location instead of copying. After <code>pip upgrade safelint</code>, the skill / rule reflects the new content immediately, no <code>safelint skill install --force</code> needed.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--symlink
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>cursor<span class="w"> </span>--symlink
 </code></pre></div>
-<p>For Claude installs, the symlink is <strong>per-entry</strong>: the install creates a real directory at the target and symlinks each top-level entry (<code>SKILL.md</code>, <code>languages/</code>, etc.) into it. Peer-client subdirectories like <code>cursor/</code> are never symlinked into the Claude install — they're for Cursor's own install path.</p>
-<p>Caveat: symlink mode requires symlink support — POSIX shells, or Windows with developer mode enabled. If you hit "operation not permitted", drop the <code>--symlink</code> flag and use the default copy mode.</p>
+<p>For Claude installs, the symlink is <strong>per-entry</strong>: the install creates a real directory at the target and symlinks each top-level entry (<code>SKILL.md</code>, <code>languages/</code>, etc.) into it. Peer-client subdirectories like <code>cursor/</code> are never symlinked into the Claude install, they're for Cursor's own install path.</p>
+<p>Caveat: symlink mode requires symlink support, POSIX shells, or Windows with developer mode enabled. If you hit "operation not permitted", drop the <code>--symlink</code> flag and use the default copy mode.</p>
 
 
 

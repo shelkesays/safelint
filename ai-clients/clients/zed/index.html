@@ -1788,11 +1788,11 @@
 <p><strong>Markers:</strong> <code>.rules</code> or <code>.zed/</code> in the project root for project-scope; <code>~/.rules</code> or <code>~/.zed/</code> for user-scope.</p>
 <p><strong>Install location:</strong></p>
 <ul>
-<li>User-scoped: <code>~/.rules</code> — Zed loads user-global agent rules.</li>
-<li>Project-scoped: <code>&lt;cwd&gt;/.rules</code> — Zed's canonical workspace rules file. <strong>Recommended for team-shared repos — commit the file.</strong></li>
+<li>User-scoped: <code>~/.rules</code>, Zed loads user-global agent rules.</li>
+<li>Project-scoped: <code>&lt;cwd&gt;/.rules</code>, Zed's canonical workspace rules file. <strong>Recommended for team-shared repos, commit the file.</strong></li>
 </ul>
 <p><strong>How to invoke after install:</strong></p>
-<p>Reload Zed (or restart the editor). The rules are auto-loaded from <code>.rules</code>. Then ask Zed's assistant <em>"run safelint"</em> / <em>"lint with safelint"</em> — same prompts as the other clients.</p>
+<p>Reload Zed (or restart the editor). The rules are auto-loaded from <code>.rules</code>. Then ask Zed's assistant <em>"run safelint"</em> / <em>"lint with safelint"</em>, same prompts as the other clients.</p>
 <p><strong>Manual install:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>zed<span class="w"> </span>--project<span class="w">   </span><span class="c1"># recommended for team-shared repos</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>zed<span class="w">             </span><span class="c1"># user-global</span>

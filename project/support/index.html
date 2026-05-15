@@ -1923,19 +1923,19 @@
 <tbody>
 <tr>
 <td><strong>Report a bug</strong> (false positive, missed violation, crash, unexpected output)</td>
-<td><a href="https://github.com/shelkesays/safelint/issues/new">Open an issue</a> — please include the safelint version (<code>safelint --version</code>), the rule code involved (e.g. <code>SAFE101</code>), and a minimal code snippet that reproduces it</td>
+<td><a href="https://github.com/shelkesays/safelint/issues/new">Open an issue</a>. Please include the safelint version (<code>safelint --version</code>), the rule code involved (e.g. <code>SAFE101</code>), and a minimal code snippet that reproduces it</td>
 </tr>
 <tr>
 <td><strong>Request a new feature</strong> (a new rule, a new AI client, a new language)</td>
-<td>Open an issue describing the use case. For new AI clients, include the marker convention you've seen in the wild (cwd / home paths) — that's what we need to add a new <code>ClientSpec</code>.</td>
+<td>Open an issue describing the use case. For new AI clients, include the marker convention you've seen in the wild (cwd / home paths); that's what we need to add a new <code>ClientSpec</code>.</td>
 </tr>
 <tr>
 <td><strong>Ask "how do I do X with safelint"</strong></td>
-<td>Check <a href="../../"><code>README.md</code></a>, <a href="../../configuration/"><code>CONFIGURATION.md</code></a>, and <a href="../../ai-clients/"><code>AI_CLIENTS.md</code></a> first — most usage questions are covered there. If still stuck, open a question issue</td>
+<td>Check <a href="../../"><code>README.md</code></a>, <a href="../../configuration/"><code>CONFIGURATION.md</code></a>, and <a href="../../ai-clients/"><code>AI_CLIENTS.md</code></a> first; most usage questions are covered there. If still stuck, open a question issue</td>
 </tr>
 <tr>
 <td><strong>Contribute a fix or new feature</strong></td>
-<td>See <a href="../../contributing/"><code>CONTRIBUTING.md</code></a> — three contribution paths (rule / AI client / language) are documented with checklists</td>
+<td>See <a href="../../contributing/"><code>CONTRIBUTING.md</code></a>; three contribution paths (rule / AI client / language) are documented with checklists</td>
 </tr>
 <tr>
 <td><strong>Report a security vulnerability</strong></td>
@@ -1950,24 +1950,24 @@
 <h2 id="what-to-include-in-a-bug-report">What to include in a bug report<a class="headerlink" href="#what-to-include-in-a-bug-report" title="Permanent link">#</a></h2>
 <p>The faster you give us reproducible context, the faster we can help:</p>
 <ol>
-<li><strong>safelint version</strong> — <code>safelint --version</code> or <code>pip show safelint</code>.</li>
-<li><strong>The rule code that fired</strong> — e.g. <code>SAFE101</code> (or "no rule fired" if your bug is "this should have flagged but didn't").</li>
-<li><strong>Minimal code snippet</strong> — the smallest Python file that reproduces the behaviour. Strip everything that isn't load-bearing.</li>
+<li><strong>safelint version</strong>: <code>safelint --version</code> or <code>pip show safelint</code>.</li>
+<li><strong>The rule code that fired</strong>: e.g. <code>SAFE101</code> (or "no rule fired" if your bug is "this should have flagged but didn't").</li>
+<li><strong>Minimal code snippet</strong>: the smallest Python file that reproduces the behaviour. Strip everything that isn't load-bearing.</li>
 <li><strong>What you expected</strong> vs. <strong>what you saw</strong>.</li>
-<li><strong>Your config</strong>, if you have a <code>safelint.toml</code> / <code>pyproject.toml</code> <code>[tool.safelint]</code> block — paste the relevant rule's config.</li>
-<li><strong>Your invocation</strong> — the exact <code>safelint check ...</code> command you ran.</li>
+<li><strong>Your config</strong>: if you have a <code>safelint.toml</code> / <code>pyproject.toml</code> <code>[tool.safelint]</code> block, paste the relevant rule's config.</li>
+<li><strong>Your invocation</strong>: the exact <code>safelint check ...</code> command you ran.</li>
 </ol>
 <p>A bug report with all six items typically gets answered same-day; a report missing the repro almost always gets a "could you share a minimal example?" reply first.</p>
 <h2 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">#</a></h2>
 <ul>
-<li><a href="../../"><code>README.md</code></a> — overview, install, quick start.</li>
-<li><a href="../../configuration/"><code>CONFIGURATION.md</code></a> — every CLI flag, every rule, every config option.</li>
-<li><a href="../../ai-clients/"><code>AI_CLIENTS.md</code></a> — the twelve supported AI clients, per-client setup, troubleshooting.</li>
-<li><a href="../../json-schema/"><code>docs/JSON_SCHEMA.md</code></a> — the <code>--format json</code> output schema, for editor / plugin authors.</li>
-<li><a href="../../contributing/"><code>CONTRIBUTING.md</code></a> — how to add new rules, AI clients, or languages.</li>
+<li><a href="../../"><code>README.md</code></a>, overview, install, quick start.</li>
+<li><a href="../../configuration/"><code>CONFIGURATION.md</code></a>, every CLI flag, every rule, every config option.</li>
+<li><a href="../../ai-clients/"><code>AI_CLIENTS.md</code></a>, the twelve supported AI clients, per-client setup, troubleshooting.</li>
+<li><a href="../../json-schema/"><code>docs/json-schema.md</code></a>, the <code>--format json</code> output schema, for editor / plugin authors.</li>
+<li><a href="../../contributing/"><code>CONTRIBUTING.md</code></a>, how to add new rules, AI clients, or languages.</li>
 </ul>
 <h2 id="response-time-expectations">Response time expectations<a class="headerlink" href="#response-time-expectations" title="Permanent link">#</a></h2>
-<p>This is a personal-time open-source project. Issues are typically read within a few days; substantive responses can take a week or two depending on complexity. <strong>There's no SLA.</strong> If something is genuinely urgent for you, the fastest path is usually to send a PR — that's far more likely to land quickly than a wait-for-fix issue.</p>
+<p>This is a personal-time open-source project. Issues are typically read within a few days; substantive responses can take a week or two depending on complexity. <strong>There's no SLA.</strong> If something is genuinely urgent for you, the fastest path is usually to send a PR; that's far more likely to land quickly than a wait-for-fix issue.</p>
 
 
 

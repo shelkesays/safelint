@@ -1813,13 +1813,13 @@
 <h1 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h1>
 <p>SafeLint is configured in three places, in roughly increasing order of permanence:</p>
 <ol>
-<li><strong>The CLI</strong> — <code>safelint check --fail-on=warning --ignore SAFE801</code>. One-off overrides, CI knobs, hook flags. See <a href="cli/">CLI flags and commands</a>.</li>
-<li><strong>In your source files</strong> — <code># nosafe</code> on a line, <code># safelint: ignore</code> at the top of a file. The escape hatch when a violation is intentional. See <a href="suppression/">Suppression mechanisms</a>.</li>
-<li><strong>A TOML config</strong> — <code>[tool.safelint]</code> in <code>pyproject.toml</code> or a standalone <code>safelint.toml</code>. Project-wide policy: thresholds, per-rule options, glob-scoped ignores. See <a href="toml/">Configuration file</a>.</li>
+<li><strong>The CLI</strong>: <code>safelint check --fail-on=warning --ignore SAFE801</code>. One-off overrides, CI knobs, hook flags. See <a href="cli/">CLI flags and commands</a>.</li>
+<li><strong>In your source files</strong>: <code># nosafe</code> on a line, <code># safelint: ignore</code> at the top of a file. The escape hatch when a violation is intentional. See <a href="suppression/">Suppression mechanisms</a>.</li>
+<li><strong>A TOML config</strong>: <code>[tool.safelint]</code> in <code>pyproject.toml</code> or a standalone <code>safelint.toml</code>. Project-wide policy: thresholds, per-rule options, glob-scoped ignores. See <a href="toml/">Configuration file</a>.</li>
 </ol>
 <p>Per-rule options (<code>max_lines</code>, <code>max_depth</code>, dataflow <code>sinks</code>, …) and what each rule actually flags live on the <a href="rules/">Rules reference</a>.</p>
 <h2 id="at-a-glance">At a glance<a class="headerlink" href="#at-a-glance" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># pyproject.toml — every key is optional; defaults match the section below.</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="c1"># pyproject.toml: every key is optional; defaults match the section below.</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="k">[tool.safelint]</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;local&quot;</span><span class="w">                            </span><span class="c1"># &quot;local&quot; → fail on errors only; &quot;ci&quot; → fail on warnings too</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="n">fail_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;error&quot;</span><span class="w">                         </span><span class="c1"># overrides mode if both are set</span>
@@ -1827,7 +1827,7 @@
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="c1"># defaults (.venv/, venv/, node_modules/, build/, dist/, __pycache__/,</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="c1"># .pytest_cache/, .ruff_cache/, .mypy_cache/, .tox/, .nox/, htmlcov/,</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="c1"># site-packages/). Prefer this over ``exclude_paths`` (which replaces</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># defaults entirely — see the Configuration file reference).</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># defaults entirely: see the Configuration file reference).</span>
 <a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="n">extend_exclude_paths</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;migrations/**&quot;</span><span class="p">]</span>
 <a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="n">ignore</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;SAFE203&quot;</span><span class="p">]</span>
 <a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
@@ -1869,10 +1869,10 @@
 <p>All four compose: the broader scopes still apply on top of the narrower ones.</p>
 <h2 id="where-to-go-next">Where to go next<a class="headerlink" href="#where-to-go-next" title="Permanent link">#</a></h2>
 <ul>
-<li><strong><a href="cli/">CLI flags and commands</a></strong> — every <code>safelint</code> and <code>safelint skill</code> command, with examples.</li>
-<li><strong><a href="suppression/">Suppression mechanisms</a></strong> — <code># nosafe</code>, <code># safelint: ignore</code>, the end-of-run summary, and stderr diagnostics.</li>
-<li><strong><a href="toml/">Configuration file</a></strong> — top-level keys, ignore lists, per-file ignores, severity model, adoption path.</li>
-<li><strong><a href="rules/">Rules reference</a></strong> — every rule, what it flags, its TOML options.</li>
+<li><strong><a href="cli/">CLI flags and commands</a></strong>, every <code>safelint</code> and <code>safelint skill</code> command, with examples.</li>
+<li><strong><a href="suppression/">Suppression mechanisms</a></strong>, <code># nosafe</code>, <code># safelint: ignore</code>, the end-of-run summary, and stderr diagnostics.</li>
+<li><strong><a href="toml/">Configuration file</a></strong>, top-level keys, ignore lists, per-file ignores, severity model, adoption path.</li>
+<li><strong><a href="rules/">Rules reference</a></strong>: every rule, what it flags, its TOML options.</li>
 </ul>
 
 

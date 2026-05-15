@@ -2023,13 +2023,13 @@
 
 
 <h1 id="javascript">JavaScript<a class="headerlink" href="#javascript" title="Permanent link">#</a></h1>
-<p>SafeLint analyses JavaScript source for the Holzmann "Power of Ten" safety rules — function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like ESLint don't catch. JavaScript support landed in v1.13.0 alongside Python; the analysis is runtime-agnostic and runs identically across Node.js, browser, Deno, Cloudflare Workers, Bun, and WASM-hosted JS engines.</p>
+<p>SafeLint analyses JavaScript source for the Holzmann "Power of Ten" safety rules, function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like ESLint don't catch. JavaScript support landed in v1.13.0 alongside Python; the analysis is runtime-agnostic and runs identically across Node.js, browser, Deno, Cloudflare Workers, Bun, and WASM-hosted JS engines.</p>
 <h2 id="file-extensions">File extensions<a class="headerlink" href="#file-extensions" title="Permanent link">#</a></h2>
-<p><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>. JSX (<code>.jsx</code>) is not yet registered — see the <a href="../../configuration/rules/#planned">language roadmap</a>. TypeScript (<code>.ts</code> / <code>.tsx</code> / <code>.as</code>) lives on its own <a href="../typescript/">language page</a> as of v2.0.0.</p>
+<p><code>.js</code>, <code>.mjs</code>, <code>.cjs</code>. JSX (<code>.jsx</code>) is not yet registered, see the <a href="../../configuration/rules/#planned">language roadmap</a>. TypeScript (<code>.ts</code> / <code>.tsx</code> / <code>.as</code>) lives on its own <a href="../typescript/">language page</a> as of v2.0.0.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
 <div class="admonition warning">
-<p class="admonition-title">v2.0.0rc2 (pre-release) — pin or pass <code>--pre</code></p>
-<p>Until v2.0.0 GA, an unpinned <code>pip install 'safelint[javascript]'</code> resolves to the latest 1.x release, which doesn't define this extra. For the RC, pin explicitly: <code>pip install 'safelint[javascript]==2.0.0rc2'</code> (or pass <code>--pre</code>).</p>
+<p class="admonition-title">v2.0.0rc3 (pre-release), pin or pass <code>--pre</code></p>
+<p>Until v2.0.0 GA, an unpinned <code>pip install 'safelint[javascript]'</code> resolves to the latest 1.x release, which doesn't define this extra. For the RC, pin explicitly: <code>pip install 'safelint[javascript]==2.0.0rc3'</code> (or pass <code>--pre</code>).</p>
 </div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[javascript]&#39;</span><span class="w">    </span><span class="c1"># the tool itself runs on Python; the extra adds the JS grammar</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                   </span><span class="c1"># lint a directory (git-modified files by default)</span>
@@ -2038,7 +2038,7 @@
 </code></pre></div>
 <p>If your project doesn't already have a Python toolchain, the same install command works through <code>pipx install 'safelint[javascript]'</code> (isolates the install) or by adding <code>'safelint[javascript]'</code> as a dev dependency through any pip-compatible manager. v2.0.0 ships every language grammar as an opt-in extra; the <code>[javascript]</code> extra installs <code>tree-sitter-javascript</code> alongside the engine.</p>
 <h2 id="rules-that-fire-on-javascript">Rules that fire on JavaScript<a class="headerlink" href="#rules-that-fire-on-javascript" title="Permanent link">#</a></h2>
-<p>18 user-facing rules apply to JavaScript — the 17 cross-language rules plus 1 JavaScript-only rule. The 2 Python-only rules (SAFE201, SAFE301) are skipped automatically by the engine's per-language dispatch.</p>
+<p>18 user-facing rules apply to JavaScript, the 17 cross-language rules plus 1 JavaScript-only rule. The 2 Python-only rules (SAFE201, SAFE301) are skipped automatically by the engine's per-language dispatch.</p>
 <table>
 <thead>
 <tr>
@@ -2051,7 +2051,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe101-function_length">SAFE101</a></td>
 <td><code>function_length</code></td>
-<td>Default cap 60 lines. Counts function declarations, function expressions, arrow functions, generators, and class methods uniformly. <code>count_mode = "statements"</code> is Python-only — JS files use <code>lines</code> (default) or <code>logical_lines</code>.</td>
+<td>Default cap 60 lines. Counts function declarations, function expressions, arrow functions, generators, and class methods uniformly. <code>count_mode = "statements"</code> is Python-only, JS files use <code>lines</code> (default) or <code>logical_lines</code>.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe102-nesting_depth">SAFE102</a></td>
@@ -2066,7 +2066,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
 <td><code>complexity</code></td>
-<td>Cyclomatic complexity — every <code>if</code> / <code>else if</code> / <code>for</code> / <code>while</code> / <code>case</code> / <code>catch</code> / ternary / <code>&amp;&amp;</code> / <code>||</code> / <code>??</code> adds one. Default cap 10.</td>
+<td>Cyclomatic complexity, every <code>if</code> / <code>else if</code> / <code>for</code> / <code>while</code> / <code>case</code> / <code>catch</code> / ternary / <code>&amp;&amp;</code> / <code>||</code> / <code>??</code> adds one. Default cap 10.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe202-empty_except">SAFE202</a></td>
@@ -2091,12 +2091,12 @@
 <tr>
 <td><a href="../../configuration/rules/#safe304-side_effects">SAFE304</a></td>
 <td><code>side_effects</code></td>
-<td>Any function calling an I/O primitive whose name doesn't signal I/O (no <code>log</code> / <code>write</code> / <code>read</code> / <code>fetch</code> / <code>send</code> / <code>load</code> substring — case-insensitive, so it matches <code>fetchUser</code>).</td>
+<td>Any function calling an I/O primitive whose name doesn't signal I/O (no <code>log</code> / <code>write</code> / <code>read</code> / <code>fetch</code> / <code>send</code> / <code>load</code> substring, case-insensitive, so it matches <code>fetchUser</code>).</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305</a></td>
 <td><code>wide_scope_declaration</code></td>
-<td><strong>JavaScript-only.</strong> Fires on every <code>var</code> declaration — <code>var</code> is function-scoped (hoisted), <code>let</code> / <code>const</code> are block-scoped.</td>
+<td><strong>JavaScript-only.</strong> Fires on every <code>var</code> declaration, <code>var</code> is function-scoped (hoisted), <code>let</code> / <code>const</code> are block-scoped.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe401-resource_lifecycle">SAFE401</a></td>
@@ -2106,7 +2106,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe501-unbounded_loops">SAFE501</a></td>
 <td><code>unbounded_loops</code></td>
-<td><code>while (true)</code> with no <code>break</code>. Nested parens (<code>while ((true))</code>) are handled. The non-comparison-condition heuristic stays Python-only — JS idioms like <code>while (queue.length)</code> are commonly bounded.</td>
+<td><code>while (true)</code> with no <code>break</code>. Nested parens (<code>while ((true))</code>) are handled. The non-comparison-condition heuristic stays Python-only, JS idioms like <code>while (queue.length)</code> are commonly bounded.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
@@ -2121,7 +2121,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe702-test_coupling">SAFE702</a></td>
 <td><code>test_coupling</code></td>
-<td>Same pattern as SAFE701 — if you change <code>src/foo.js</code>, you must also change <code>foo.test.js</code> in the same commit. Disabled by default.</td>
+<td>Same pattern as SAFE701: if you change <code>src/foo.js</code>, you must also change <code>foo.test.js</code> in the same commit. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe801-tainted_sink">SAFE801</a></td>
@@ -2131,22 +2131,22 @@
 <tr>
 <td><a href="../../configuration/rules/#safe802-return_value_ignored">SAFE802</a></td>
 <td><code>return_value_ignored</code></td>
-<td>Bare calls to <code>fs.writeFile</code>, <code>stream.write</code>, <code>dispatchEvent</code>, etc. — the returned Promise / boolean / handle carries information that's being discarded. Disabled by default.</td>
+<td>Bare calls to <code>fs.writeFile</code>, <code>stream.write</code>, <code>dispatchEvent</code>, etc., the returned Promise / boolean / handle carries information that's being discarded. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe803-null_dereference">SAFE803</a></td>
 <td><code>null_dereference</code></td>
-<td><code>document.getElementById("id").textContent</code> — DOM lookups / array <code>find</code> / collection <code>get</code> can return <code>null</code> or <code>undefined</code>. Optional chaining (<code>?.</code>) is recognised as a safe form. Disabled by default.</td>
+<td><code>document.getElementById("id").textContent</code>, DOM lookups / array <code>find</code> / collection <code>get</code> can return <code>null</code> or <code>undefined</code>. Optional chaining (<code>?.</code>) is recognised as a safe form. Disabled by default.</td>
 </tr>
 </tbody>
 </table>
 <p>The 2 rules <strong>not registered for JavaScript:</strong></p>
 <ul>
-<li><a href="../../configuration/rules/#safe201-bare_except">SAFE201 <code>bare_except</code></a> — JavaScript <code>catch</code> clauses always bind the caught error and don't have the <code>KeyboardInterrupt</code> / <code>SystemExit</code> hijack hazard, so there's no equivalent rule to fire.</li>
-<li><a href="../../configuration/rules/#safe301-global_state">SAFE301 <code>global_state</code></a> — JavaScript has no <code>global</code> read-only declaration form; on JS this would always be a strict subset of SAFE302 (<code>global_mutation</code>).</li>
+<li><a href="../../configuration/rules/#safe201-bare_except">SAFE201 <code>bare_except</code></a>, JavaScript <code>catch</code> clauses always bind the caught error and don't have the <code>KeyboardInterrupt</code> / <code>SystemExit</code> hijack hazard, so there's no equivalent rule to fire.</li>
+<li><a href="../../configuration/rules/#safe301-global_state">SAFE301 <code>global_state</code></a>, JavaScript has no <code>global</code> read-only declaration form; on JS this would always be a strict subset of SAFE302 (<code>global_mutation</code>).</li>
 </ul>
 <h2 id="runtime-presets">Runtime presets<a class="headerlink" href="#runtime-presets" title="Permanent link">#</a></h2>
-<p>JavaScript source is the same regardless of where it runs, but the <em>APIs</em> it interacts with differ. The <code>[tool.safelint.javascript]</code> table selects which API surface the JavaScript rule defaults assume — sinks for taint analysis, tracked acquirers for resource-lifecycle, global namespaces for SAFE302, etc.</p>
+<p>JavaScript source is the same regardless of where it runs, but the <em>APIs</em> it interacts with differ. The <code>[tool.safelint.javascript]</code> table selects which API surface the JavaScript rule defaults assume, sinks for taint analysis, tracked acquirers for resource-lifecycle, global namespaces for SAFE302, etc.</p>
 <table>
 <thead>
 <tr>
@@ -2183,7 +2183,7 @@
 </tr>
 </tbody>
 </table>
-<p>WASM-hosted JS engines (QuickJS-WASM, Boa, V8 in WASM, etc.) execute the same JS source — pick whichever preset matches the <em>API surface</em> the engine exposes (typically <code>browser</code> if the host provides Web APIs, or a minimal subset if it only exposes ECMAScript built-ins). Source-language analysis itself is identical across all runtimes — only the <em>defaults</em> change.</p>
+<p>WASM-hosted JS engines (QuickJS-WASM, Boa, V8 in WASM, etc.) execute the same JS source, pick whichever preset matches the <em>API surface</em> the engine exposes (typically <code>browser</code> if the host provides Web APIs, or a minimal subset if it only exposes ECMAScript built-ins). Source-language analysis itself is identical across all runtimes, only the <em>defaults</em> change.</p>
 <p>See <a href="../../configuration/toml/#javascript-runtime-presets">JavaScript runtime presets</a> for the per-preset config details.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
 <p>SafeLint reads its config from <code>[tool.safelint]</code> in <code>pyproject.toml</code>, or from a standalone <code>safelint.toml</code> at the project root. JavaScript projects that don't already have a <code>pyproject.toml</code> typically prefer the standalone form.</p>
@@ -2221,7 +2221,7 @@
 <a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myCustomDangerousFunction&quot;</span><span class="p">]</span>
 </code></pre></div>
-<p>User-explicit <code>_javascript</code>-suffixed config keys always win over the runtime preset — the preset only changes the <em>default</em> list.</p>
+<p>User-explicit <code>_javascript</code>-suffixed config keys always win over the runtime preset, the preset only changes the <em>default</em> list.</p>
 <h2 id="installing-the-javascript-extra">Installing the JavaScript extra<a class="headerlink" href="#installing-the-javascript-extra" title="Permanent link">#</a></h2>
 <p>JavaScript grammar support ships as an optional extra so Python-only projects don't pay for it:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[javascript]&#39;</span><span class="w">    </span><span class="c1"># adds .js, .mjs, .cjs</span>
@@ -2230,12 +2230,12 @@
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="c1"># or kitchen-sink:</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span>
 </code></pre></div>
-<p>Without the extra, <code>safelint check</code> skips <code>.js</code> / <code>.mjs</code> / <code>.cjs</code> files with a one-line install hint at lint time. <strong>Heads-up for CI:</strong> if the run discovers JS files but every one is skipped because the grammar isn't installed, safelint exits with code <strong>2</strong> (the silent-failure guard) so a CI pipeline can't accidentally report green when no linting actually happened. If your CI logic distinguishes "lint clean" from "lint setup is broken", branch on exit code 2 — or just install the matching extra and the guard never fires.</p>
+<p>Without the extra, <code>safelint check</code> skips <code>.js</code> / <code>.mjs</code> / <code>.cjs</code> files with a one-line install hint at lint time. <strong>Heads-up for CI:</strong> if the run discovers JS files but every one is skipped because the grammar isn't installed, safelint exits with code <strong>2</strong> (the silent-failure guard) so a CI pipeline can't accidentally report green when no linting actually happened. If your CI logic distinguishes "lint clean" from "lint setup is broken", branch on exit code 2, or just install the matching extra and the guard never fires.</p>
 <h2 id="pre-commit-integration">Pre-commit integration<a class="headerlink" href="#pre-commit-integration" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># .pre-commit-config.yaml</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">repos</span><span class="p">:</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0rc2</span><span class="w">         </span><span class="c1"># pin to a release (replace with the GA tag once v2.0.0 ships)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0rc3</span><span class="w">         </span><span class="c1"># pin to a release (replace with the GA tag once v2.0.0 ships)</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="c1"># JS / TS users add the matching extra so pre-commit&#39;s isolated</span>
@@ -2245,22 +2245,22 @@
 <a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">        </span><span class="c1"># javascript, ts, and tsx. Optional: scope to a directory.</span>
 <a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span>
 </code></pre></div>
-<p>JavaScript projects don't need a Python interpreter on developer machines — <code>pre-commit</code> itself manages the safelint runtime in an isolated environment. CI integration is the same: drop <code>safelint check</code> into your existing GitHub Actions / GitLab CI / etc.</p>
+<p>JavaScript projects don't need a Python interpreter on developer machines, <code>pre-commit</code> itself manages the safelint runtime in an isolated environment. CI integration is the same: drop <code>safelint check</code> into your existing GitHub Actions / GitLab CI / etc.</p>
 <h2 id="javascript-specific-config-keys">JavaScript-specific config keys<a class="headerlink" href="#javascript-specific-config-keys" title="Permanent link">#</a></h2>
 <p>Each rule that runs on JS has a <code>_javascript</code>-suffixed config key parallel to its Python counterpart. Setting these explicitly overrides the active runtime preset.</p>
 <ul>
-<li><strong><code>[tool.safelint.rules.side_effects_hidden]</code></strong> — <code>io_functions_javascript</code> (e.g. <code>["log", "error", "fetch", "writeFile"]</code>)</li>
-<li><strong><code>[tool.safelint.rules.side_effects]</code></strong> — <code>io_functions_javascript</code></li>
-<li><strong><code>[tool.safelint.rules.global_mutation]</code></strong> — <code>global_namespaces_javascript</code> (default depends on preset)</li>
-<li><strong><code>[tool.safelint.rules.resource_lifecycle]</code></strong> — <code>tracked_functions_javascript</code></li>
-<li><strong><code>[tool.safelint.rules.missing_assertions]</code></strong> — <code>assertion_calls_javascript</code></li>
-<li><strong><code>[tool.safelint.rules.tainted_sink]</code></strong> — <code>sinks_javascript</code>, <code>sanitizers_javascript</code>, <code>sources_javascript</code></li>
-<li><strong><code>[tool.safelint.rules.return_value_ignored]</code></strong> — <code>flagged_calls_javascript</code></li>
-<li><strong><code>[tool.safelint.rules.null_dereference]</code></strong> — <code>nullable_methods_javascript</code></li>
+<li><strong><code>[tool.safelint.rules.side_effects_hidden]</code></strong>, <code>io_functions_javascript</code> (e.g. <code>["log", "error", "fetch", "writeFile"]</code>)</li>
+<li><strong><code>[tool.safelint.rules.side_effects]</code></strong>, <code>io_functions_javascript</code></li>
+<li><strong><code>[tool.safelint.rules.global_mutation]</code></strong>, <code>global_namespaces_javascript</code> (default depends on preset)</li>
+<li><strong><code>[tool.safelint.rules.resource_lifecycle]</code></strong>, <code>tracked_functions_javascript</code></li>
+<li><strong><code>[tool.safelint.rules.missing_assertions]</code></strong>, <code>assertion_calls_javascript</code></li>
+<li><strong><code>[tool.safelint.rules.tainted_sink]</code></strong>, <code>sinks_javascript</code>, <code>sanitizers_javascript</code>, <code>sources_javascript</code></li>
+<li><strong><code>[tool.safelint.rules.return_value_ignored]</code></strong>, <code>flagged_calls_javascript</code></li>
+<li><strong><code>[tool.safelint.rules.null_dereference]</code></strong>, <code>nullable_methods_javascript</code></li>
 </ul>
 <p>All of these accept a list of strings; bare-string typos like <code>"log"</code> (instead of <code>["log"]</code>) raise a clear <code>TypeError</code> instead of silently coercing into a set of characters.</p>
 <h2 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">#</a></h2>
-<p>Want to refine a rule's JavaScript behaviour, add a runtime preset, or fix a parser edge case? See <a href="../../contributing/adding-a-language/">Adding a language</a> for the architecture overview, or open an issue / PR against the <a href="https://github.com/shelkesays/safelint">main repo</a>. TypeScript (including TSX and AssemblyScript) reuses this infrastructure end-to-end — see the <a href="../typescript/">TypeScript language page</a> for the per-language notes.</p>
+<p>Want to refine a rule's JavaScript behaviour, add a runtime preset, or fix a parser edge case? See <a href="../../contributing/adding-a-language/">Adding a language</a> for the architecture overview, or open an issue / PR against the <a href="https://github.com/shelkesays/safelint">main repo</a>. TypeScript (including TSX and AssemblyScript) reuses this infrastructure end-to-end, see the <a href="../typescript/">TypeScript language page</a> for the per-language notes.</p>
 
 
 

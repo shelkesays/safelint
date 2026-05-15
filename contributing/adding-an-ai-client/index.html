@@ -2211,23 +2211,23 @@
 
 
 <h1 id="adding-a-new-ai-client-to-safelint">Adding a new AI client to SafeLint<a class="headerlink" href="#adding-a-new-ai-client-to-safelint" title="Permanent link">#</a></h1>
-<p>This guide is the cheat sheet for adding support for a new AI coding client (GitHub Copilot, codex, windsurf, antigravity, etc.) to SafeLint's <code>safelint skill install</code> command. The architecture was built for this — the moving parts you need to understand and the steps you need to follow are below.</p>
+<p>This guide is the cheat sheet for adding support for a new AI coding client (GitHub Copilot, codex, windsurf, antigravity, etc.) to SafeLint's <code>safelint skill install</code> command. The architecture was built for this, the moving parts you need to understand and the steps you need to follow are below.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Twelve clients are registered today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is a one-<code>ClientSpec</code> change plus a bundled artefact and tests. No control-flow changes elsewhere — install / detection / CLI choices / output all read from the registry.</p>
+<p>Twelve clients are registered today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is a one-<code>ClientSpec</code> change plus a bundled artefact and tests. No control-flow changes elsewhere, install / detection / CLI choices / output all read from the registry.</p>
 </div>
 <p>For the user-facing surface (auto-detection logic, how each client is invoked after install, troubleshooting), see <a href="../../ai-clients/">AI client integrations</a>. This file is for contributors <em>adding</em> a new entry to the registry.</p>
 <h2 id="the-architecture-in-five-sentences">The architecture, in five sentences<a class="headerlink" href="#the-architecture-in-five-sentences" title="Permanent link">#</a></h2>
 <ol>
 <li><code>safelint._skill_install.ClientSpec</code> is a frozen dataclass holding everything the engine needs about an AI client: detection markers, install destination, bundled artefact location, output wording.</li>
 <li>Adding a client = appending one <code>ClientSpec</code> instance to <code>_CLIENT_SPECS</code> and shipping the bundled artefact under <code>src/safelint/skill_files/</code>.</li>
-<li>The auto-detection scanner walks the registry in order, looking for each spec's <code>cwd_markers</code> (then <code>home_markers</code> if cwd is empty) — the matching specs drive the install.</li>
-<li>The install primitives (<code>_install_copy</code>, <code>_install_symlink</code>, <code>_install_symlink_directory_filtered</code>) are client-agnostic — they handle file vs. directory sources from the spec's <code>bundled_relpath</code> without caring which client it's for.</li>
+<li>The auto-detection scanner walks the registry in order, looking for each spec's <code>cwd_markers</code> (then <code>home_markers</code> if cwd is empty), the matching specs drive the install.</li>
+<li>The install primitives (<code>_install_copy</code>, <code>_install_symlink</code>, <code>_install_symlink_directory_filtered</code>) are client-agnostic, they handle file vs. directory sources from the spec's <code>bundled_relpath</code> without caring which client it's for.</li>
 <li>CLI <code>--client</code> choices on both <code>install</code> and <code>path</code> subcommands are derived from the registry, so argparse stays in sync automatically the moment a new spec lands.</li>
 </ol>
 <h2 id="step-by-step-adding-a-new-client">Step-by-step: adding a new client<a class="headerlink" href="#step-by-step-adding-a-new-client" title="Permanent link">#</a></h2>
 <blockquote>
-<p>The walkthrough below uses <em>Windsurf</em> as a worked example because it has a clean, single-file rules convention. Windsurf is now actually shipped (since v1.11.0) — feel free to compare this guide against the real implementation in <code>_skill_install.py</code> (<code>_WINDSURF_SPEC</code>) for cross-reference.</p>
+<p>The walkthrough below uses <em>Windsurf</em> as a worked example because it has a clean, single-file rules convention. Windsurf is now actually shipped (since v1.11.0), feel free to compare this guide against the real implementation in <code>_skill_install.py</code> (<code>_WINDSURF_SPEC</code>) for cross-reference.</p>
 </blockquote>
 <h3 id="1-decide-on-the-bundled-artefact-shape">1. Decide on the bundled artefact shape<a class="headerlink" href="#1-decide-on-the-bundled-artefact-shape" title="Permanent link">#</a></h3>
 <p>Two shapes are supported today:</p>
@@ -2260,7 +2260,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>cp<span class="w"> </span>src/safelint/skill_files/cursor/safelint.mdc<span class="w"> </span>src/safelint/skill_files/windsurf/safelint-rules.md
 </code></pre></div>
 <p>Then strip Cursor's MDC frontmatter (the <code>--- description: ... ---</code> block) and tweak any client-specific phrasing. The <code>--- name: safelint description: ... ---</code> from Claude's <code>SKILL.md</code> is also a starting point if you want frontmatter.</p>
-<p>Keep the workflow body language-neutral — language addendums under <code>skill_files/languages/</code> are shared rather than duplicated. The new client's instructions should tell its agent how to find them via <code>safelint skill path</code> if it needs them.</p>
+<p>Keep the workflow body language-neutral, language addendums under <code>skill_files/languages/</code> are shared rather than duplicated. The new client's instructions should tell its agent how to find them via <code>safelint skill path</code> if it needs them.</p>
 <h3 id="3-append-a-clientspec-entry">3. Append a <code>ClientSpec</code> entry<a class="headerlink" href="#3-append-a-clientspec-entry" title="Permanent link">#</a></h3>
 <p>In <code>src/safelint/_skill_install.py</code>, define the spec and add it to the registry:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="n">_WINDSURF_SPEC</span> <span class="o">=</span> <span class="n">ClientSpec</span><span class="p">(</span>
@@ -2297,11 +2297,11 @@
 </tr>
 <tr>
 <td><code>artefact_label</code></td>
-<td>Output noun for the artefact — used in <em>"{display_name} {artefact_label} copied to ..."</em>. Pick whatever reads naturally: "skill", "rule", "rules", "instructions".</td>
+<td>Output noun for the artefact, used in <em>"{display_name} {artefact_label} copied to ..."</em>. Pick whatever reads naturally: "skill", "rule", "rules", "instructions".</td>
 </tr>
 <tr>
 <td><code>cwd_markers</code></td>
-<td>Tuple of relative paths under cwd that signal "this client is used in this project". Detection iterates in order, stops at the first match, surfaces it in the notice. Choose well-known paths users actually have (e.g. config dirs / files Windsurf creates) — avoid generic markers that might appear in unrelated projects.</td>
+<td>Tuple of relative paths under cwd that signal "this client is used in this project". Detection iterates in order, stops at the first match, surfaces it in the notice. Choose well-known paths users actually have (e.g. config dirs / files Windsurf creates), avoid generic markers that might appear in unrelated projects.</td>
 </tr>
 <tr>
 <td><code>home_markers</code></td>
@@ -2309,7 +2309,7 @@
 </tr>
 <tr>
 <td><code>install_relpath</code></td>
-<td>Where the artefact gets installed, relative to scope root (cwd for project-scope, home for user-scope). Tuple of path components — <code>(".windsurfrules",)</code> means a single file at <code>&lt;scope&gt;/.windsurfrules</code>; <code>(".claude", "skills", "safelint")</code> means a directory at <code>&lt;scope&gt;/.claude/skills/safelint/</code>.</td>
+<td>Where the artefact gets installed, relative to scope root (cwd for project-scope, home for user-scope). Tuple of path components, <code>(".windsurfrules",)</code> means a single file at <code>&lt;scope&gt;/.windsurfrules</code>; <code>(".claude", "skills", "safelint")</code> means a directory at <code>&lt;scope&gt;/.claude/skills/safelint/</code>.</td>
 </tr>
 <tr>
 <td><code>bundled_relpath</code></td>
@@ -2317,20 +2317,20 @@
 </tr>
 <tr>
 <td><code>restart_hint</code></td>
-<td>Printed after a successful install — tells the user how to make the AI client pick up the new artefact.</td>
+<td>Printed after a successful install, tells the user how to make the AI client pick up the new artefact.</td>
 </tr>
 <tr>
 <td><code>usage_hint</code></td>
-<td>Printed after <code>restart_hint</code> — tells the user what to say to the agent next.</td>
+<td>Printed after <code>restart_hint</code>, tells the user what to say to the agent next.</td>
 </tr>
 <tr>
 <td><code>documentation_relpaths</code></td>
-<td>Tuple of relpaths under <code>skill_files/</code> whose combined text <em>must</em> mention every rule code/name in <code>ALL_RULES</code> and every extension in <code>supported_extensions()</code>. Drift-detection tests parametrised over <code>_CLIENT_SPECS</code> enforce this — a new rule or language without corresponding bundled-doc updates fails CI. For a single-file client whose bundled artefact lives at <code>skill_files/windsurf/safelint-rules.md</code>, set this to <code>(("windsurf", "safelint-rules.md"),)</code>. For a directory-tree client like Claude, it points at the entry-point file: <code>(("SKILL.md",),)</code>. The outer tuple is a <em>list</em> of files; if a client splits its docs across multiple bundled files, list them all and the test treats the union of their text as the searchable surface.</td>
+<td>Tuple of relpaths under <code>skill_files/</code> whose combined text <em>must</em> mention every rule code/name in <code>ALL_RULES</code> and every extension in <code>supported_extensions()</code>. Drift-detection tests parametrised over <code>_CLIENT_SPECS</code> enforce this, a new rule or language without corresponding bundled-doc updates fails CI. For a single-file client whose bundled artefact lives at <code>skill_files/windsurf/safelint-rules.md</code>, set this to <code>(("windsurf", "safelint-rules.md"),)</code>. For a directory-tree client like Claude, it points at the entry-point file: <code>(("SKILL.md",),)</code>. The outer tuple is a <em>list</em> of files; if a client splits its docs across multiple bundled files, list them all and the test treats the union of their text as the searchable surface.</td>
 </tr>
 </tbody>
 </table>
 <h3 id="4-optional-update-peer-client-exclusion">4. (Optional) Update peer-client exclusion<a class="headerlink" href="#4-optional-update-peer-client-exclusion" title="Permanent link">#</a></h3>
-<p><strong>Background:</strong> Claude Code is the one client that installs as a <em>whole directory tree</em> (it copies all of <code>skill_files/</code> minus a few subdirectories). Every other client installs just one file from a per-client subdirectory like <code>skill_files/cursor/</code>, <code>skill_files/windsurf/</code>, etc. Those per-client subdirectories are called <em>peer-client bundles</em> — they sit alongside Claude's tree but aren't part of it.</p>
+<p><strong>Background:</strong> Claude Code is the one client that installs as a <em>whole directory tree</em> (it copies all of <code>skill_files/</code> minus a few subdirectories). Every other client installs just one file from a per-client subdirectory like <code>skill_files/cursor/</code>, <code>skill_files/windsurf/</code>, etc. Those per-client subdirectories are called <em>peer-client bundles</em>, they sit alongside Claude's tree but aren't part of it.</p>
 <p>To stop those peer subdirectories from leaking into the materialised Claude install (so <code>~/.claude/skills/safelint/</code> doesn't end up containing <code>cursor/</code>, <code>windsurf/</code>, etc.), each one must be listed in <code>_PEER_CLIENT_DIRS</code>:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="n">_PEER_CLIENT_DIRS</span><span class="p">:</span> <span class="nb">frozenset</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="nb">frozenset</span><span class="p">({</span><span class="s2">&quot;cursor&quot;</span><span class="p">,</span> <span class="s2">&quot;windsurf&quot;</span><span class="p">})</span>
 </code></pre></div>
@@ -2341,11 +2341,11 @@
 </ol>
 <p>Neither of those applies to any client shipped today, so when in doubt: add it.</p>
 <h3 id="4b-optional-cross-agent-shared-file-the-secondary-install">4b. (Optional) Cross-agent shared file (the "secondary install")<a class="headerlink" href="#4b-optional-cross-agent-shared-file-the-secondary-install" title="Permanent link">#</a></h3>
-<p>Some clients read instructions from a <em>shared</em> file used by multiple AI tools — codex's <code>AGENTS.md</code> is the canonical example. If your client follows this pattern (the file is read by other agents too, so we can't simply overwrite it), use the <strong>secondary-install</strong> mechanism: safelint writes a delimited HTML-comment section into the shared file, leaving any other content the user has authored intact.</p>
+<p>Some clients read instructions from a <em>shared</em> file used by multiple AI tools, codex's <code>AGENTS.md</code> is the canonical example. If your client follows this pattern (the file is read by other agents too, so we can't simply overwrite it), use the <strong>secondary-install</strong> mechanism: safelint writes a delimited HTML-comment section into the shared file, leaving any other content the user has authored intact.</p>
 <p>Two extra <code>ClientSpec</code> fields opt your client into this:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="n">_YOUR_SPEC</span> <span class="o">=</span> <span class="n">ClientSpec</span><span class="p">(</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>    <span class="c1"># ... usual fields ...</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">install_relpath</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;.yourclient&quot;</span><span class="p">,</span> <span class="s2">&quot;instructions.md&quot;</span><span class="p">),</span>  <span class="c1"># primary destination — fully owned</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>    <span class="n">install_relpath</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;.yourclient&quot;</span><span class="p">,</span> <span class="s2">&quot;instructions.md&quot;</span><span class="p">),</span>  <span class="c1"># primary destination, fully owned</span>
 <a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>    <span class="n">bundled_relpath</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;yourclient&quot;</span><span class="p">,</span> <span class="s2">&quot;instructions.md&quot;</span><span class="p">),</span>
 <a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>    <span class="n">documentation_relpaths</span><span class="o">=</span><span class="p">((</span><span class="s2">&quot;yourclient&quot;</span><span class="p">,</span> <span class="s2">&quot;instructions.md&quot;</span><span class="p">),),</span>
 <a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>    <span class="c1"># Cross-agent shared file:</span>
@@ -2358,15 +2358,15 @@
 </code></pre></div>
 <p>When set:</p>
 <ul>
-<li><strong><code>install</code></strong> writes the primary destination as usual <em>and</em>, if the secondary file already exists at the scope root, edits a delimited section into it. The shared file is <strong>never auto-created</strong> — its existence is the user's signal that they want the cross-agent integration.</li>
+<li><strong><code>install</code></strong> writes the primary destination as usual <em>and</em>, if the secondary file already exists at the scope root, edits a delimited section into it. The shared file is <strong>never auto-created</strong>, its existence is the user's signal that they want the cross-agent integration.</li>
 <li><strong><code>update</code></strong> re-renders the section if it has drifted from the bundle.</li>
 <li><strong><code>status</code></strong> escalates the overall verdict to <em>differs</em> when the section drifts (even if the primary is fresh).</li>
 <li><strong><code>remove</code></strong> strips just the section. Other content in the shared file is preserved. If the file ends up empty after stripping, it is removed too.</li>
 </ul>
-<p>All of this is generic — you don't write any of the lifecycle code. The install primitives in <code>_skill_install.py</code> handle every step from your two <code>ClientSpec</code> fields.</p>
-<p><strong>Marker requirements:</strong> pick markers that won't appear in your bundled instructions text or in typical user prose. The HTML-comment form (<code>&lt;!-- safelint:begin --&gt;</code> / <code>&lt;!-- safelint:end --&gt;</code>) is what codex uses; it's invisible in rendered Markdown and unlikely to collide. <strong>Don't quote your literal markers in the bundled instructions text</strong> — that would create a self-referential collision when the section is parsed.</p>
+<p>All of this is generic, you don't write any of the lifecycle code. The install primitives in <code>_skill_install.py</code> handle every step from your two <code>ClientSpec</code> fields.</p>
+<p><strong>Marker requirements:</strong> pick markers that won't appear in your bundled instructions text or in typical user prose. The HTML-comment form (<code>&lt;!-- safelint:begin --&gt;</code> / <code>&lt;!-- safelint:end --&gt;</code>) is what codex uses; it's invisible in rendered Markdown and unlikely to collide. <strong>Don't quote your literal markers in the bundled instructions text</strong>, that would create a self-referential collision when the section is parsed.</p>
 <h3 id="4c-security-guards-you-inherit-for-free">4c. Security guards you inherit for free<a class="headerlink" href="#4c-security-guards-you-inherit-for-free" title="Permanent link">#</a></h3>
-<p>The install / update / remove paths apply several guards that protect against accidental damage. You don't need to implement these in your <code>ClientSpec</code> — they apply to every client automatically:</p>
+<p>The install / update / remove paths apply several guards that protect against accidental damage. You don't need to implement these in your <code>ClientSpec</code>, they apply to every client automatically:</p>
 <ul>
 <li><strong>Symlink refusal at the secondary destination.</strong> If <code>AGENTS.md</code> (or whatever your secondary file is) is a symlink, <code>_install_secondary</code> / <code>_remove_secondary</code> / <code>_secondary_status</code> all refuse to follow it and print a stderr warning. This prevents an attacker (or a careless user setup) from redirecting the safelint section into an arbitrary file via a <code>AGENTS.md → /etc/passwd</code> symlink.</li>
 <li><strong>Non-regular-file refusal at the secondary destination.</strong> If the secondary path exists but is a directory / FIFO / socket / device, the lifecycle paths refuse with a warning rather than crash on <code>read_text</code> / <code>write_text</code>.</li>
@@ -2382,12 +2382,12 @@
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">    </span><span class="s2">&quot;skill_files/**/*.txt&quot;</span><span class="p">,</span><span class="w">   </span><span class="c1"># ← new</span>
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="p">]</span>
 </code></pre></div>
-<p>Without this, the file won't be included in the wheel — <code>safelint skill install</code> would fail at <code>_spec_bundled_source</code>.</p>
+<p>Without this, the file won't be included in the wheel, <code>safelint skill install</code> would fail at <code>_spec_bundled_source</code>.</p>
 <h3 id="6-add-tests">6. Add tests<a class="headerlink" href="#6-add-tests" title="Permanent link">#</a></h3>
 <p>The drift-detection tests in <code>tests/test_skill_install.py</code> are parametrised over <code>_CLIENT_SPECS</code>, so the moment your spec lands the test runner generates two new test instances for it:</p>
 <ul>
-<li><code>test_skill_documents_every_active_rule[&lt;your-name&gt;]</code> — fails until your bundled docs mention every code + name in <code>ALL_RULES</code>.</li>
-<li><code>test_skill_documents_every_supported_extension[&lt;your-name&gt;]</code> — fails until your docs mention every extension in <code>supported_extensions()</code>.</li>
+<li><code>test_skill_documents_every_active_rule[&lt;your-name&gt;]</code>, fails until your bundled docs mention every code + name in <code>ALL_RULES</code>.</li>
+<li><code>test_skill_documents_every_supported_extension[&lt;your-name&gt;]</code>, fails until your docs mention every extension in <code>supported_extensions()</code>.</li>
 </ul>
 <p>Run them targeted while iterating: <code>uv run pytest -k "&lt;your-name&gt;"</code>. No per-client test boilerplate to write.</p>
 <p>For client-specific install behaviour, mirror the structure of the Cursor tests:</p>
@@ -2439,15 +2439,15 @@
 <a id="__codelineno-5-46" name="__codelineno-5-46" href="#__codelineno-5-46"></a>    <span class="n">args</span> <span class="o">=</span> <span class="n">spy</span><span class="o">.</span><span class="n">call_args</span><span class="o">.</span><span class="n">args</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 <a id="__codelineno-5-47" name="__codelineno-5-47" href="#__codelineno-5-47"></a>    <span class="k">assert</span> <span class="n">args</span><span class="o">.</span><span class="n">client</span> <span class="o">==</span> <span class="s2">&quot;windsurf&quot;</span>
 </code></pre></div>
-<p>The existing Cursor tests are a good template — copy them and substitute paths / markers.</p>
+<p>The existing Cursor tests are a good template, copy them and substitute paths / markers.</p>
 <h3 id="7-update-documentation">7. Update documentation<a class="headerlink" href="#7-update-documentation" title="Permanent link">#</a></h3>
 <p>Three places to touch:</p>
 <ol>
-<li><strong><a href="../../ai-clients/">AI client integrations</a></strong> — add a row to the <em>Supported clients</em> table.</li>
-<li><strong>Per-client guide</strong> — add a new page at <code>docs/ai-clients/clients/&lt;client&gt;.md</code> (mirroring the existing per-client pages: markers, install location, how to invoke after install, manual install) and register it under the <code>nav.AI client integrations.Per-client guides</code> entry in <code>mkdocs.yml</code>.</li>
-<li><strong><a href="../../ai-clients/manual-install/">Manual install (<code>--client</code>)</a></strong> — append the <code>--client &lt;name&gt;</code> and <code>--client &lt;name&gt; --project</code> invocations.</li>
-<li><strong><a href="https://github.com/shelkesays/safelint/blob/main/src/safelint/skill_files/README.md"><code>src/safelint/skill_files/README.md</code></a></strong> — extend the supported-clients list at the top; update the install examples if the new client has a non-obvious setup.</li>
-<li><strong><a href="../../project/changelog/">Changelog</a></strong> — add an entry under the next release section announcing the support.</li>
+<li><strong><a href="../../ai-clients/">AI client integrations</a></strong>, add a row to the <em>Supported clients</em> table.</li>
+<li><strong>Per-client guide</strong>, add a new page at <code>docs/ai-clients/clients/&lt;client&gt;.md</code> (mirroring the existing per-client pages: markers, install location, how to invoke after install, manual install) and register it under the <code>nav.AI client integrations.Per-client guides</code> entry in <code>mkdocs.yml</code>.</li>
+<li><strong><a href="../../ai-clients/manual-install/">Manual install (<code>--client</code>)</a></strong>, append the <code>--client &lt;name&gt;</code> and <code>--client &lt;name&gt; --project</code> invocations.</li>
+<li><strong><a href="https://github.com/shelkesays/safelint/blob/main/src/safelint/skill_files/README.md"><code>src/safelint/skill_files/README.md</code></a></strong>, extend the supported-clients list at the top; update the install examples if the new client has a non-obvious setup.</li>
+<li><strong><a href="../../project/changelog/">Changelog</a></strong>, add an entry under the next release section announcing the support.</li>
 </ol>
 <h3 id="8-run-the-pipeline">8. Run the pipeline<a class="headerlink" href="#8-run-the-pipeline" title="Permanent link">#</a></h3>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>uv<span class="w"> </span>run<span class="w"> </span>pytest<span class="w"> </span>-q
@@ -2460,9 +2460,9 @@
 <h2 id="choosing-detection-markers">Choosing detection markers<a class="headerlink" href="#choosing-detection-markers" title="Permanent link">#</a></h2>
 <p>Three things to look for:</p>
 <ol>
-<li><strong>A file or directory the AI client <em>creates</em> automatically</strong> when the user opts into it on a given project — these are reliable "yes this client is in use here" signals.</li>
+<li><strong>A file or directory the AI client <em>creates</em> automatically</strong> when the user opts into it on a given project, these are reliable "yes this client is in use here" signals.</li>
 <li><strong>Don't overload generic paths.</strong> <code>.config/</code> would match too many things; <code>.codeium/</code> is specific.</li>
-<li><strong>Multiple markers are fine.</strong> If the client uses both a file (<code>.windsurfrules</code>) and a directory (<code>.codeium/</code>), include both — detection iterates in order and picks the first match.</li>
+<li><strong>Multiple markers are fine.</strong> If the client uses both a file (<code>.windsurfrules</code>) and a directory (<code>.codeium/</code>), include both, detection iterates in order and picks the first match.</li>
 </ol>
 <p>The detection notice surfaces whichever marker actually fired (e.g. <em>"detected Windsurf (.windsurfrules)"</em>) so users can see which signal triggered the install.</p>
 <h2 id="choosing-the-install-destination">Choosing the install destination<a class="headerlink" href="#choosing-the-install-destination" title="Permanent link">#</a></h2>
@@ -2489,7 +2489,7 @@
 </tr>
 </tbody>
 </table>
-<p>The user shouldn't need to configure the client to find safelint's install — it should "just work" because the install lands where the client looks by default.</p>
+<p>The user shouldn't need to configure the client to find safelint's install, it should "just work" because the install lands where the client looks by default.</p>
 <h2 id="submission-checklist">Submission checklist<a class="headerlink" href="#submission-checklist" title="Permanent link">#</a></h2>
 <p>Before opening a pull request:</p>
 <ul class="task-list">
@@ -2505,16 +2505,16 @@
 <h2 id="things-to-avoid">Things to avoid<a class="headerlink" href="#things-to-avoid" title="Permanent link">#</a></h2>
 <ul>
 <li><strong>Don't add an "auto-install everything" branch that bypasses <code>_resolve_install_plan</code>.</strong> The two-tier (cwd → home) detection is the contract; new clients plug into it via <code>cwd_markers</code> / <code>home_markers</code>, not by routing around it.</li>
-<li><strong>Don't hardcode client checks in print helpers.</strong> All output flows through the spec — adding <code>if client == "windsurf"</code> branches inside <code>_print_install_success</code> defeats the registry pattern.</li>
+<li><strong>Don't hardcode client checks in print helpers.</strong> All output flows through the spec, adding <code>if client == "windsurf"</code> branches inside <code>_print_install_success</code> defeats the registry pattern.</li>
 <li><strong>Don't depend on the AI client itself being installed during testing.</strong> Tests redirect <code>Path.home()</code> / <code>Path.cwd()</code> and create fake markers; the real client doesn't need to exist on the test machine.</li>
-<li><strong>Don't break backwards compatibility for existing clients.</strong> New entries should be additive — if you find yourself wanting to change <code>_CLAUDE_SPEC</code>, that's a separate change with its own discussion.</li>
+<li><strong>Don't break backwards compatibility for existing clients.</strong> New entries should be additive, if you find yourself wanting to change <code>_CLAUDE_SPEC</code>, that's a separate change with its own discussion.</li>
 </ul>
 <h2 id="see-also">See also<a class="headerlink" href="#see-also" title="Permanent link">#</a></h2>
 <ul>
-<li><a href="../../ai-clients/">AI client integrations</a> — user-facing guide for using the AI client integrations</li>
-<li><a href="https://github.com/shelkesays/safelint/blob/main/src/safelint/_skill_install.py"><code>src/safelint/_skill_install.py</code></a> — the registry implementation</li>
-<li><a href="https://github.com/shelkesays/safelint/blob/main/tests/test_skill_install.py"><code>tests/test_skill_install.py</code></a> — the test patterns to mirror</li>
-<li><a href="../adding-a-language/">Adding a new language</a> — adding a new language to safelint itself (a different kind of extension)</li>
+<li><a href="../../ai-clients/">AI client integrations</a>, user-facing guide for using the AI client integrations</li>
+<li><a href="https://github.com/shelkesays/safelint/blob/main/src/safelint/_skill_install.py"><code>src/safelint/_skill_install.py</code></a>, the registry implementation</li>
+<li><a href="https://github.com/shelkesays/safelint/blob/main/tests/test_skill_install.py"><code>tests/test_skill_install.py</code></a>, the test patterns to mirror</li>
+<li><a href="../adding-a-language/">Adding a new language</a>, adding a new language to safelint itself (a different kind of extension)</li>
 </ul>
 
 
