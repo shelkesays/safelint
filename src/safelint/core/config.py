@@ -145,6 +145,11 @@ DEFAULTS: dict[str, Any] = {
             "tainted_sink",
             "return_value_ignored",
             "null_dereference",
+            # Spring Boot framework-aware rules (SAFE9xx, Java-only)
+            "spring_field_injection",
+            "spring_missing_transactional",
+            "spring_unvalidated_input",
+            "spring_async_checked_exception",
         ],
     },
     "rules": {
@@ -681,6 +686,15 @@ DEFAULTS: dict[str, Any] = {
                 # NOT listed here. peek / orElse / orElseGet similarly fine.
             ],
         },
+        # Spring Boot framework-aware rules (SAFE9xx band). Java-only.
+        # Default-disabled under the vanilla preset so non-Spring users
+        # see no behaviour change; the ``[tool.safelint.java] framework
+        # = "spring-boot"`` preset flips ``enabled`` to True for the
+        # whole set via ``_JAVA_FRAMEWORK_PRESETS["spring-boot"]``.
+        "spring_field_injection": {"enabled": False, "severity": "warning"},
+        "spring_missing_transactional": {"enabled": False, "severity": "error"},
+        "spring_unvalidated_input": {"enabled": False, "severity": "error"},
+        "spring_async_checked_exception": {"enabled": False, "severity": "warning"},
     },
 }
 
@@ -1209,6 +1223,16 @@ _JAVA_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                     # when missing; NOT null-returning. NOT listed.
                 ],
             },
+            # Spring-specific structural rules (SAFE901-904) - opt-in
+            # under the vanilla preset, opt-out under spring-boot.
+            # Flipping ``enabled`` to True here is the only knob
+            # users need to get Spring-aware structural checks
+            # (the dataflow rules SAFE801 / SAFE803 are already opt-in
+            # for performance reasons and remain so under spring-boot).
+            "spring_field_injection": {"enabled": True},
+            "spring_missing_transactional": {"enabled": True},
+            "spring_unvalidated_input": {"enabled": True},
+            "spring_async_checked_exception": {"enabled": True},
         },
     },
 }

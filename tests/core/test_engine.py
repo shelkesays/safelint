@@ -423,6 +423,20 @@ _RULES_JS_FAMILY_ONLY: frozenset[str] = frozenset(
     }
 )
 
+_RULES_JAVA_ONLY: frozenset[str] = frozenset(
+    {
+        # Java-only framework-aware rules (SAFE9xx band,
+        # ``language=("java",)``). The hazards are Spring Boot
+        # annotation patterns that have no analogue in Python / JS /
+        # TS. Default-disabled under the vanilla Java preset; flipped
+        # on by ``[tool.safelint.java] framework = "spring-boot"``.
+        "SpringFieldInjectionRule",  # SAFE901
+        "SpringMissingTransactionalRule",  # SAFE902
+        "SpringUnvalidatedInputRule",  # SAFE903
+        "SpringAsyncCheckedExceptionRule",  # SAFE904
+    }
+)
+
 
 def test_widened_rules_match_the_documented_allow_list() -> None:
     """The set of rules with non-default ``language`` matches the documented allow-list.
@@ -440,6 +454,7 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
     cross_lang_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript")}
     cross_lang_with_java_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript", "java")}
     js_family_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("javascript", "typescript")}
+    java_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("java",)}
     assert cross_lang_actual == _RULES_WIDENED_FOR_JS_FAMILY, (
         f"Cross-language allow-list out of sync. Actually ('python', 'javascript', 'typescript'): {sorted(cross_lang_actual)}; documented: {sorted(_RULES_WIDENED_FOR_JS_FAMILY)}"
     )
@@ -451,6 +466,9 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
     assert js_family_only_actual == _RULES_JS_FAMILY_ONLY, (
         f"JS-family-only allow-list out of sync. Actually ('javascript', 'typescript'): {sorted(js_family_only_actual)}; documented: {sorted(_RULES_JS_FAMILY_ONLY)}"
     )
+    assert java_only_actual == _RULES_JAVA_ONLY, (
+        f"Java-only allow-list out of sync. Actually ('java',): {sorted(java_only_actual)}; documented: {sorted(_RULES_JAVA_ONLY)}"
+    )
 
     for cls in ALL_RULES:
         if cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA:
@@ -459,6 +477,8 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
             assert cls.language == ("python", "javascript", "typescript"), f"{cls.__name__} should be ('python', 'javascript', 'typescript'); got {cls.language}"
         elif cls.__name__ in _RULES_JS_FAMILY_ONLY:
             assert cls.language == ("javascript", "typescript"), f"{cls.__name__} should be ('javascript', 'typescript'); got {cls.language}"
+        elif cls.__name__ in _RULES_JAVA_ONLY:
+            assert cls.language == ("java",), f"{cls.__name__} should be ('java',); got {cls.language}"
         else:
-            buckets = "_RULES_WIDENED_FOR_JS_FAMILY, _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA, or _RULES_JS_FAMILY_ONLY"
+            buckets = "_RULES_WIDENED_FOR_JS_FAMILY, _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA, _RULES_JS_FAMILY_ONLY, or _RULES_JAVA_ONLY"
             assert cls.language == ("python",), f"{cls.__name__} has unexpected language={cls.language}; add it to {buckets} if intentional"
