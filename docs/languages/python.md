@@ -102,7 +102,7 @@ pip install 'safelint[all]'                 # kitchen-sink
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.0.0         # pin to a release (replace with the GA tag once v2.0.0 ships)
+    rev: v2.1.0rc1      # pin to a release (use a recent tag; v2.1.0rc1 also unlocks the Java extra if you later add .java files)
     hooks:
       - id: safelint
         # Every safelint hook needs an extra in v2.0.0+, including Python-only projects.

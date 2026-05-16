@@ -102,7 +102,7 @@ Without the extra, `safelint check` skips `.ts` / `.tsx` / `.as` files with a on
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.0.0       # pin to a release (replace with the GA tag once v2.0.0 ships)
+    rev: v2.1.0rc1    # pin to a release (use a recent tag; v2.1.0rc1 also unlocks the Java extra if you later add .java files)
     hooks:
       - id: safelint
         # TS users add the matching extra so pre-commit's isolated environment

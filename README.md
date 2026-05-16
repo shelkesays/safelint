@@ -170,7 +170,7 @@ Add this to your `.pre-commit-config.yaml`, pick the `additional_dependencies` l
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.0.0  # replace with the latest release tag (use the GA tag once v2.0.0 ships)
+    rev: v2.1.0rc1  # replace with the latest release tag (v2.1.0rc1 is required for Java support)
     hooks:
       - id: safelint
         # Required in v2.0.0+, pick the line for the language(s) your repo lints:
