@@ -183,7 +183,7 @@ class SpringFieldInjectionRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every ``@Autowired`` field declaration."""
-        if resolve_lang_name(filepath) != "java":
+        if resolve_lang_name(filepath) != "java":  # pragma: no cover - engine dispatch already filters by language tuple
             return []
         violations: list[Violation] = []
         for node in walk(tree.root_node):
@@ -280,7 +280,7 @@ class SpringMissingTransactionalRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag service-layer methods with multiple writes but no @Transactional."""
-        if resolve_lang_name(filepath) != "java":
+        if resolve_lang_name(filepath) != "java":  # pragma: no cover - engine dispatch already filters by language tuple
             return []
         violations: list[Violation] = []
         for method in walk(tree.root_node):
@@ -401,7 +401,7 @@ class SpringUnvalidatedInputRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag unvalidated @RequestBody / @ModelAttribute parameters in controller methods."""
-        if resolve_lang_name(filepath) != "java":
+        if resolve_lang_name(filepath) != "java":  # pragma: no cover - engine dispatch already filters by language tuple
             return []
         violations: list[Violation] = []
         for method in walk(tree.root_node):
@@ -511,7 +511,7 @@ class SpringAsyncCheckedExceptionRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every @Async method that declares a throws clause."""
-        if resolve_lang_name(filepath) != "java":
+        if resolve_lang_name(filepath) != "java":  # pragma: no cover - engine dispatch already filters by language tuple
             return []
         violations: list[Violation] = []
         for method in walk(tree.root_node):
