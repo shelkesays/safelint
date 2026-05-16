@@ -458,6 +458,89 @@ DEFAULTS: dict[str, Any] = {
                 "stdin",  # process.stdin
                 "input",  # generic input wrappers
             ],
+            # Java stdlib sink / sanitizer / source lists. Spring Boot adds
+            # ``executeQuery`` etc. via the ``framework = "spring-boot"`` preset.
+            "sinks_java": [
+                # Runtime / process execution.
+                "exec",  # Runtime.getRuntime().exec(...)
+                "getRuntime",  # caller usually chains ``.exec(...)`` next
+                "ProcessBuilder",  # ``new ProcessBuilder(tainted)``
+                "loadLibrary",  # System.loadLibrary, Runtime.loadLibrary
+                "load",  # System.load
+                # Reflection - arbitrary class / method invocation by name
+                # is a code-execution sink when ``name`` is user-controlled.
+                "forName",  # Class.forName(tainted)
+                "invoke",  # Method.invoke(receiver, tainted)
+                "newInstance",  # Class.newInstance, Constructor.newInstance
+                # Script engines (JSR 223) - executes arbitrary script source.
+                "eval",  # ScriptEngine.eval
+                # JDBC raw SQL execution. ``executeQuery`` / ``execute`` /
+                # ``executeUpdate`` are sinks when the SQL string is built
+                # from user input. ``PreparedStatement`` users would
+                # parametrise these calls; raw ``Statement`` users
+                # concatenate, which is the hazard.
+                "executeQuery",
+                "execute",
+                "executeUpdate",
+                "executeLargeUpdate",
+                # URL fetch with attacker-controlled host - SSRF surface.
+                "openConnection",  # URL.openConnection
+                "openStream",  # URL.openStream
+            ],
+            "sanitizers_java": [
+                "escape",  # Apache Commons Text StringEscapeUtils.escape*
+                "escapeHtml",
+                "escapeHtml4",
+                "escapeXml",
+                "escapeJava",
+                "escapeJson",
+                "escapeEcmaScript",
+                "encode",  # URLEncoder.encode
+                "encodeURIComponent",  # JavaScript bridge, occasionally Java
+                "quote",  # SQL / shell quoting helpers
+                "sanitize",  # OWASP HtmlPolicyBuilder, generic sanitisers
+                "validate",  # generic input validators
+                "htmlEscape",  # Spring's HtmlUtils.htmlEscape
+                # OWASP Java Encoder: ``Encode.forHtml(s)`` etc. - the
+                # canonical Java escape API for web output. ``call_name``
+                # resolves the static-method form to the bareword.
+                "forHtml",
+                "forHtmlAttribute",
+                "forHtmlContent",
+                "forHtmlUnquotedAttribute",
+                "forJavaScript",
+                "forJavaScriptAttribute",
+                "forJavaScriptBlock",
+                "forJavaScriptSource",
+                "forCssString",
+                "forCssUrl",
+                "forUri",
+                "forUriComponent",
+                "forXml",
+                "forXmlAttribute",
+                "forXmlComment",
+                "forXmlContent",
+            ],
+            "sources_java": [
+                # System / env sources.
+                "getenv",  # System.getenv(name)
+                "getProperty",  # System.getProperty - configurable, often user
+                # Console / Scanner / BufferedReader stdin.
+                "readLine",
+                "nextLine",
+                "next",
+                "nextInt",
+                # Servlet API - HttpServletRequest user-input methods.
+                "getParameter",
+                "getParameterValues",
+                "getHeader",
+                "getHeaders",
+                "getQueryString",
+                "getCookies",
+                "getPathInfo",
+                "getRequestURI",
+                "getRemoteUser",
+            ],
         },
         "return_value_ignored": {
             "enabled": False,
@@ -507,6 +590,47 @@ DEFAULTS: dict[str, Any] = {
                 "spawn",
                 "spawnSync",
             ],
+            # Java methods whose return value carries success / failure
+            # information. ``File.delete()`` / ``.mkdir()`` / ``.renameTo()``
+            # return ``boolean`` (false on failure); ignoring them silently
+            # swallows the failure. ``String`` / ``BigDecimal`` / etc. are
+            # immutable - calling a mutator without using the result is a
+            # common no-op bug.
+            "flagged_calls_java": [
+                # java.io.File: boolean-returning mutators
+                "delete",
+                "mkdir",
+                "mkdirs",
+                "renameTo",
+                "setLastModified",
+                "setReadOnly",
+                "setWritable",
+                "setReadable",
+                "setExecutable",
+                "createNewFile",
+                # String immutables - ignoring the result is always a bug
+                "trim",
+                "strip",
+                "toUpperCase",
+                "toLowerCase",
+                "replace",
+                "replaceAll",
+                "replaceFirst",
+                "substring",
+                "concat",
+                "intern",
+                # BigDecimal / BigInteger immutables
+                "add",
+                "subtract",
+                "multiply",
+                "divide",
+                "remainder",
+                "negate",
+                "abs",
+                # Futures: ignoring ``get()`` discards the awaited result;
+                # ignoring ``cancel()`` discards the success boolean.
+                "cancel",
+            ],
         },
         "null_dereference": {
             "enabled": False,
@@ -528,6 +652,33 @@ DEFAULTS: dict[str, Any] = {
                 "exec",
                 "match",
                 "closest",
+            ],
+            # Java's null-returning stdlib methods. Conservative defaults
+            # covering the most common SAFE803 hazards in vanilla Java;
+            # the Spring Boot preset adds ``find`` (EntityManager.find),
+            # ``findById`` (when not using the Optional-returning
+            # CrudRepository), and the Spring-cache pattern.
+            "nullable_methods_java": [
+                "get",  # Map.get(missing-key) returns null; Properties.get likewise
+                "getOrDefault",  # returns default only when *value* is null, hazardous chain target
+                "remove",  # Map.remove returns the previous value, null if absent
+                "put",  # Map.put returns the previous value, null if no previous
+                "putIfAbsent",  # null when binding succeeded (counterintuitive)
+                # Servlet API - HttpServletRequest reads.
+                "getParameter",
+                "getHeader",
+                "getCookie",
+                "getAttribute",
+                "getSession",  # may return null when ``create=false``
+                # java.util.Properties / System
+                "getProperty",
+                # Reflection - many methods return null when not found.
+                "getAnnotation",
+                "getDeclaredAnnotation",
+                "getEnclosingClass",
+                "getEnclosingMethod",
+                # Stream.findFirst / findAny return Optional, not null - so
+                # NOT listed here. peek / orElse / orElseGet similarly fine.
             ],
         },
     },

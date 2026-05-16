@@ -383,9 +383,6 @@ _RULES_WIDENED_FOR_JS_FAMILY: frozenset[str] = frozenset(
         # The split exists so the drift-detection assertion catches partial
         # ports - a rule's language tuple must always match exactly one of
         # the documented buckets.
-        "TaintedSinkRule",
-        "ReturnValueIgnoredRule",
-        "NullDereferenceRule",
         "GlobalMutationRule",
     }
 )
@@ -411,6 +408,9 @@ _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA: frozenset[str] = frozenset(
         "MissingAssertionsRule",
         "TestExistenceRule",
         "TestCouplingRule",
+        "TaintedSinkRule",
+        "ReturnValueIgnoredRule",
+        "NullDereferenceRule",
     }
 )
 

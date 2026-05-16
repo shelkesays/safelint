@@ -5,9 +5,11 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.analysis.dataflow import TaintTracker
+from safelint.analysis.dataflow_java import JavaTaintTracker
 from safelint.analysis.dataflow_javascript import JsTaintTracker
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
+from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
@@ -21,6 +23,8 @@ from safelint.rules.base import BaseRule
 
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
+
     import tree_sitter
 
     from safelint.rules.base import Violation
@@ -30,6 +34,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
+    "java": _JAVA_FUNCTION_TYPES,
 }
 
 
@@ -71,6 +76,39 @@ _JS_PASSTHROUGH_WRAPPER_TYPES = frozenset(
         "type_assertion",
     }
 )
+
+# Java pass-through wrappers analogous to the JS / TS set above. Both
+# ``parenthesized_expression`` and ``cast_expression`` have the same
+# runtime value as their inner expression, so SAFE803 must peel them
+# before checking whether the underlying receiver is a nullable call.
+# Without these, ``((Foo) map.get(k)).bar`` would slip past the check.
+_JAVA_PASSTHROUGH_WRAPPER_TYPES = frozenset(
+    {
+        "parenthesized_expression",
+        "cast_expression",
+    }
+)
+
+
+def _peel_java_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Descend through Java pass-through wrappers, returning the inner expression.
+
+    ``cast_expression`` exposes the expression on its ``value`` field
+    (the type is on the ``type`` field). ``parenthesized_expression``
+    is a single-child wrapper. The loop is bounded by Tree-sitter's
+    own depth cap so ``# nosafe: SAFE501`` on the while is sufficient.
+    """
+    while node is not None and node.type in _JAVA_PASSTHROUGH_WRAPPER_TYPES:  # nosafe: SAFE501
+        if node.type == "cast_expression":
+            inner = node.child_by_field_name("value")
+        elif node.named_children:
+            inner = node.named_children[0]
+        else:
+            return node
+        if inner is None:
+            return node
+        node = inner
+    return node
 
 # Python parameter shapes - kept in sync with the same set in
 # safelint.rules.max_arguments to avoid drift.
@@ -214,12 +252,85 @@ def _collect_from_pair_pattern(node: tree_sitter.Node) -> set[str]:
     return _javascript_collect_names(value) if value else set()  # pragma: no branch
 
 
+def _java_formal_param_name(child: tree_sitter.Node) -> str | None:
+    """Return the bound name for a Java ``formal_parameter`` (``Type name``), or None."""
+    name_node = child.child_by_field_name("name")
+    if name_node is None or name_node.type != "identifier":
+        return None
+    return node_text(name_node)
+
+
+def _java_spread_param_name(child: tree_sitter.Node) -> str | None:
+    """Return the bound name for a Java ``spread_parameter`` (varargs ``T... args``).
+
+    ``spread_parameter`` wraps a ``variable_declarator`` with the
+    binding name on the ``name`` field; the variadic ellipsis is
+    anonymous.
+    """
+    decl = next((c for c in child.named_children if c.type == "variable_declarator"), None)
+    if decl is None:
+        return None
+    name_node = decl.child_by_field_name("name")
+    if name_node is None or name_node.type != "identifier":
+        return None
+    return node_text(name_node)
+
+
+def _java_param_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return all parameter names for *func_node* (Java).
+
+    Java has three formal parameter shapes inside ``formal_parameters``:
+
+    * ``formal_parameter`` - the standard ``Type name`` form, including
+      annotated parameters (``@Valid @RequestBody Foo arg``). The
+      binding name is on the ``name`` field; the type lives on the
+      ``type`` field; annotations live inside the ``modifiers`` child.
+    * ``spread_parameter`` - varargs ``T... args``. The binding name
+      is on the ``variable_declarator`` child's ``name`` field.
+    * ``receiver_parameter`` - ``Foo this`` (rare; explicit-self
+      method-on-self idiom). The receiver isn't a bound name the way
+      ``self`` / ``cls`` aren't bound names in Python; explicitly
+      skipped.
+
+    Lambda parameters have a different shape (``inferred_parameters``
+    for untyped lambdas like ``(a, b) -> a + b``, ``formal_parameters``
+    for typed) - both are handled by the same field walk because the
+    lambda node also exposes ``parameters`` via the same field name.
+
+    Constructor parameters (``constructor_declaration``) share the
+    ``formal_parameters`` shape with methods, so the same extraction
+    works without special-casing.
+    """
+    params_node = func_node.child_by_field_name("parameters")
+    if params_node is None:  # pragma: no cover - defensive
+        return set()
+    extractors: dict[str, Callable[[tree_sitter.Node], str | None]] = {
+        "formal_parameter": _java_formal_param_name,
+        "spread_parameter": _java_spread_param_name,
+        # ``inferred_parameters`` body (lambda ``(a, b) -> ...``) lists
+        # the parameter identifiers directly as named children. ``node_text``
+        # returns ``""`` (falsy) for malformed AST; the ``if name is not None``
+        # guard below still admits the empty string, which is harmless for
+        # the tainted set lookup.
+        "identifier": node_text,
+    }
+    names: set[str] = set()
+    for child in params_node.named_children:
+        extract = extractors.get(child.type)
+        if extract is None:
+            continue
+        name = extract(child)
+        if name is not None:
+            names.add(name)
+    return names
+
+
 class TaintedSinkRule(BaseRule):
     """Track user-controlled inputs flowing into dangerous sinks."""
 
     name = "tainted_sink"
     code = "SAFE801"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     _DEFAULT_SINKS: ClassVar[list[str]] = [
         "eval",
@@ -305,6 +416,34 @@ class TaintedSinkRule(BaseRule):
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 
+    def _java_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run Java taint analysis on every method / constructor / lambda in *tree*.
+
+        Java's framework preset (``[tool.safelint.java] framework =
+        "spring-boot"``) overrides the default ``sinks_java`` /
+        ``sources_java`` / ``sanitizers_java`` lists in
+        :mod:`safelint.core.config` to add Spring-aware patterns
+        (``executeQuery`` on ``JdbcTemplate``, ``@RequestParam``-bound
+        params as sources, ``HtmlUtils.htmlEscape`` as sanitiser).
+        The vanilla-Java preset uses conservative stdlib defaults.
+        """
+        sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", "java", default=[])
+        sinks = frozenset(_validated_string_list(sinks_raw, sinks_key))
+        sanitizers_raw, sanitizers_key = resolve_lang_config_lookup(self.config, "sanitizers", "java", default=[])
+        sanitizers = frozenset(_validated_string_list(sanitizers_raw, sanitizers_key))
+        sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", "java", default=[])
+        sources = frozenset(_validated_string_list(sources_raw, sources_key))
+        assume = self._resolve_assume_taint_preserving()
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type not in _JAVA_FUNCTION_TYPES:
+                continue
+            params = _java_param_names(node)
+            tracker = JavaTaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker.visit(node)
+            violations.extend(self._format_hits(filepath, tracker.sink_hits))
+        return violations
+
     def _format_hits(self, filepath: str, hits: list[tuple[tree_sitter.Node, str, str]]) -> list[Violation]:
         """Convert tracker hits to Violations - same message format for both languages."""
         return [
@@ -321,6 +460,8 @@ class TaintedSinkRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
         if lang_name in ("javascript", "typescript"):
             return self._javascript_check(filepath, tree, lang_name)
+        if lang_name == "java":
+            return self._java_check(filepath, tree)
         return self._python_check(filepath, tree)
 
 
@@ -336,7 +477,7 @@ class ReturnValueIgnoredRule(BaseRule):
 
     name = "return_value_ignored"
     code = "SAFE802"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
@@ -363,7 +504,8 @@ class ReturnValueIgnoredRule(BaseRule):
         if lang_name == "python":
             flagged = frozenset(self.config.get("flagged_calls", self._DEFAULT_FLAGGED))
         else:
-            # JS-family (JS / TS): TypeScript inherits the JS list by default.
+            # JS-family (JS / TS) inherits via TS→JS fallback in
+            # ``get_per_language_config``; Java has its own dedicated set.
             raw, error_key = resolve_lang_config_lookup(self.config, "flagged_calls", lang_name, default=[])
             flagged = frozenset(_validated_string_list(raw, error_key))
         violations: list[Violation] = []
@@ -397,10 +539,14 @@ def _null_dereference_message(method: str, lang_name: str) -> str:
     that's the modern guard. The two-form JS message also surfaces the
     loose ``!= null`` check because it's the explicit alternative that
     catches both ``null`` and ``undefined`` (the strict ``!== null``
-    misses ``undefined``).
+    misses ``undefined``). Java uses ``null`` (no ``undefined`` axis)
+    and the standard guards are ``if (result != null)`` or wrapping
+    the call in ``Optional.ofNullable(...)``.
     """
     if lang_name in ("javascript", "typescript"):
         return f'Result of "{method}()" is immediately dereferenced without a null check - guard with optional chaining ("result?.field") or "if (result != null)"'
+    if lang_name == "java":
+        return f'Result of "{method}()" is immediately dereferenced without a null check - guard with "if (result != null)" or wrap in Optional.ofNullable(...)'
     return f'Result of "{method}()" is immediately dereferenced without a None check - guard with "if result is not None"'
 
 
@@ -409,7 +555,7 @@ class NullDereferenceRule(BaseRule):
 
     name = "null_dereference"
     code = "SAFE803"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     _DEFAULT_NULLABLE_PYTHON: ClassVar[frozenset[str]] = frozenset(
         {
@@ -433,6 +579,49 @@ class NullDereferenceRule(BaseRule):
         field_name = "object" if node.type == ATTRIBUTE else "value"
         obj = node.child_by_field_name(field_name)
         if obj is None or obj.type != CALL:
+            return None
+        name = call_name(obj)
+        return name if name and name in nullable else None
+
+    _JAVA_DEREF_RECEIVER_FIELDS: ClassVar[dict[str, str]] = {
+        # The Tree-sitter field name to look up for "the value being
+        # dereferenced" depends on the chained-access shape:
+        # ``field_access`` exposes the receiver as ``object``;
+        # ``array_access`` exposes it as ``array``;
+        # ``method_invocation`` exposes the receiver of a chained call
+        # as ``object`` (``foo.bar()`` - ``bar`` is the ``name`` field;
+        # ``foo`` is the ``object`` field).
+        "field_access": "object",
+        "array_access": "array",
+        "method_invocation": "object",
+    }
+
+    def _java_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
+        """Return the method name if *node* is an unsafe Java dereference, else None.
+
+        Java's chained-access shapes (the Java equivalents of JS's
+        ``member_expression`` / ``subscript_expression``):
+
+        * ``field_access`` - ``obj.field`` (Map.get(k).field is the
+          classic SAFE803 case, Map.get returns null on miss).
+        * ``array_access`` - ``arr[i]`` (``getList()[0]`` would surface here).
+        * ``method_invocation`` with chained receiver - ``map.get(k).toString()``
+          is a method-invocation node whose ``object`` field is itself
+          the nullable call. The most natural Java SAFE803 case.
+
+        Java pass-through wrappers (``parenthesized_expression``,
+        ``cast_expression``) are peeled by :func:`_peel_java_passthrough`
+        so ``((Foo) map.get(k)).bar`` is recognised. Java does NOT
+        have an optional-chaining operator analogous to JS's ``?.`` -
+        the only safe guard is an explicit ``!= null`` check or
+        ``Optional.ofNullable(...)``. So unlike the JS branch there's
+        no ``optional_chain`` early-out.
+        """
+        receiver_field = self._JAVA_DEREF_RECEIVER_FIELDS.get(node.type)
+        if receiver_field is None:
+            return None
+        obj = _peel_java_passthrough(node.child_by_field_name(receiver_field))
+        if obj is None or obj.type != "method_invocation":
             return None
         name = call_name(obj)
         return name if name and name in nullable else None
@@ -487,6 +676,10 @@ class NullDereferenceRule(BaseRule):
         if lang_name == "python":
             nullable = self._DEFAULT_NULLABLE_PYTHON | frozenset(self.config.get("nullable_methods", []))
             deref_hit = self._python_deref_hit
+        elif lang_name == "java":
+            raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", "java", default=[])
+            nullable = frozenset(_validated_string_list(raw, error_key))
+            deref_hit = self._java_deref_hit
         else:
             # JS-family (JS / TS): TypeScript inherits the JS list by default.
             raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", lang_name, default=[])
