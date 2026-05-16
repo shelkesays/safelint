@@ -365,7 +365,7 @@ def test_safe901_fires_on_fully_qualified_autowired() -> None:
 
 @pytest.mark.parametrize(
     "stereotype",
-    ["Service", "Component"],
+    ("Service", "Component"),
 )
 def test_safe902_recognises_both_service_stereotypes(stereotype: str) -> None:
     """Both ``@Service`` and ``@Component`` mark a class as service-layer."""
@@ -388,7 +388,7 @@ def test_safe902_recognises_both_service_stereotypes(stereotype: str) -> None:
 
 @pytest.mark.parametrize(
     "stereotype",
-    ["RestController", "Controller"],
+    ("RestController", "Controller"),
 )
 def test_safe903_recognises_both_controller_stereotypes(stereotype: str) -> None:
     """Both ``@RestController`` and ``@Controller`` mark a class as request-handling."""
