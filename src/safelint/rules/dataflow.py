@@ -110,6 +110,7 @@ def _peel_java_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | 
         node = inner
     return node
 
+
 # Python parameter shapes - kept in sync with the same set in
 # safelint.rules.max_arguments to avoid drift.
 _PY_PARAM_TYPES = frozenset(

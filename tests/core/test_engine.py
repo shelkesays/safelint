@@ -466,9 +466,7 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
     assert js_family_only_actual == _RULES_JS_FAMILY_ONLY, (
         f"JS-family-only allow-list out of sync. Actually ('javascript', 'typescript'): {sorted(js_family_only_actual)}; documented: {sorted(_RULES_JS_FAMILY_ONLY)}"
     )
-    assert java_only_actual == _RULES_JAVA_ONLY, (
-        f"Java-only allow-list out of sync. Actually ('java',): {sorted(java_only_actual)}; documented: {sorted(_RULES_JAVA_ONLY)}"
-    )
+    assert java_only_actual == _RULES_JAVA_ONLY, f"Java-only allow-list out of sync. Actually ('java',): {sorted(java_only_actual)}; documented: {sorted(_RULES_JAVA_ONLY)}"
 
     for cls in ALL_RULES:
         if cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA:
