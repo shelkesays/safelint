@@ -1058,6 +1058,222 @@ def _apply_javascript_runtime_preset(defaults: dict[str, Any], runtime: str) -> 
             target[key] = copy.deepcopy(value)
 
 
+# ---------------------------------------------------------------------------
+# Java framework presets
+# ---------------------------------------------------------------------------
+#
+# Same architectural shape as ``_JS_RUNTIME_PRESETS`` above but selected via
+# ``[tool.safelint.java] framework = "..."`` in TOML. The current presets:
+#
+#   * ``vanilla`` (default) - pure-Java stdlib defaults; the lists baked
+#     into ``DEFAULTS["rules"]`` already encode this preset, so the entry
+#     is empty.
+#   * ``spring-boot`` - augments the vanilla defaults with Spring-aware
+#     sinks (``JdbcTemplate``'s ``query`` / ``queryForObject`` / ``update``,
+#     ``RestTemplate``'s ``exchange`` / ``getForObject`` for SSRF) and
+#     nullable methods (``queryForObject`` returns null on zero rows).
+#
+# Source-language analysis is identical across frameworks - same parser,
+# same AST walks, same per-rule logic. Only the *defaults* shift, so a
+# user explicitly setting ``sinks_java = [...]`` in their TOML still
+# wins over the preset.
+#
+# Adding a framework: add an entry below with the same nested shape as
+# ``DEFAULTS["rules"]`` (only the keys you want to override). Adding a
+# new language whose framework varies similarly follows the same pattern
+# with a ``[tool.safelint.<lang>] framework`` selector.
+
+_JAVA_VALID_FRAMEWORKS: frozenset[str] = frozenset({"vanilla", "spring-boot"})
+
+_JAVA_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
+    # ``vanilla`` is the baseline - equal to DEFAULTS, so the preset is
+    # empty. Listed so unknown-framework validation can compare against
+    # the full set of accepted names.
+    "vanilla": {},
+    # ``spring-boot`` - the Spring Web / Spring Data / Spring JDBC
+    # ecosystem. The vanilla Java sinks / sources already cover the
+    # Servlet API (which Spring MVC uses underneath); the preset adds
+    # the framework-level abstractions that sit on top:
+    #
+    #   * ``JdbcTemplate`` - the raw-SQL escape hatch. ``query`` /
+    #     ``queryForObject`` / ``queryForList`` / ``update`` /
+    #     ``batchUpdate`` all take a SQL string the application code
+    #     typically concatenates. Treated as sinks for SAFE801.
+    #   * ``RestTemplate`` / ``WebClient`` - outbound HTTP. SSRF
+    #     surface when the URL is built from user input. ``exchange``
+    #     / ``getForObject`` / ``getForEntity`` / ``postForObject`` /
+    #     ``postForEntity`` / ``put`` / ``delete`` cover the canonical
+    #     methods.
+    #   * ``queryForObject`` returns null when zero rows match (the
+    #     Optional-returning alternatives ``JdbcClient.findOne`` /
+    #     ``JdbcClient.findFirst`` were added in Spring 6.1; older
+    #     code still uses the null-returning form).
+    #
+    # The preset deliberately does NOT touch:
+    #
+    #   * SAFE304 ``side_effects`` - exempting ``@Bean`` factory methods
+    #     from the I/O warning would require annotation-aware rule
+    #     logic the preset can't express through default overrides.
+    #     Users with noisy SAFE304 hits on factory methods can
+    #     suppress via ``# nosafe: SAFE304`` until a future
+    #     ``skip_functions_annotated_with`` knob lands.
+    #   * SAFE401 ``resource_lifecycle`` - Spring-managed resources
+    #     (``JdbcTemplate``-borrowed connections) are typically not
+    #     held in user code at all, so the vanilla tracked-function
+    #     list doesn't fire on them. Raw ``DriverManager.getConnection``
+    #     still fires (correctly) regardless of Spring presence.
+    #   * SAFE203 ``logging_on_error`` - SLF4J / Log4j method names
+    #     (``error`` / ``warn`` / ``info`` / ``debug`` / ``trace``)
+    #     are already in the universal logger-method set.
+    "spring-boot": {
+        "rules": {
+            "tainted_sink": {
+                # Spring sinks layered on top of vanilla Java's stdlib
+                # set. The vanilla list (``exec``, ``executeQuery``, ...)
+                # also fires because the preset REPLACES rather than
+                # extends; we include both vanilla and Spring-specific
+                # entries here so the preset is self-contained. Users
+                # who configure ``[tool.safelint.rules.tainted_sink]
+                # sinks_java = [...]`` in TOML still win - their
+                # explicit list overrides the preset.
+                "sinks_java": [
+                    # Vanilla Java sinks (mirrored from DEFAULTS so the
+                    # preset is a complete replacement, not a partial
+                    # one. Keep these in sync with the vanilla list
+                    # above; a drift-detection test in tests/core/
+                    # test_java_framework_presets.py guards against
+                    # divergence.)
+                    "exec",
+                    "getRuntime",
+                    "ProcessBuilder",
+                    "loadLibrary",
+                    "load",
+                    "forName",
+                    "invoke",
+                    "newInstance",
+                    "eval",
+                    "executeQuery",
+                    "execute",
+                    "executeUpdate",
+                    "executeLargeUpdate",
+                    "openConnection",
+                    "openStream",
+                    # Spring JdbcTemplate raw-SQL methods.
+                    "query",
+                    "queryForObject",
+                    "queryForList",
+                    "queryForMap",
+                    "queryForRowSet",
+                    "update",
+                    "batchUpdate",
+                    # Spring NamedParameterJdbcTemplate - same names,
+                    # same risk. Already covered by the above.
+                    # Spring RestTemplate / WebClient - outbound HTTP,
+                    # SSRF surface when URL contains user input.
+                    "exchange",
+                    "getForObject",
+                    "getForEntity",
+                    "postForObject",
+                    "postForEntity",
+                    "postForLocation",
+                    "put",
+                    "patchForObject",
+                    "delete",
+                ],
+            },
+            "null_dereference": {
+                "nullable_methods_java": [
+                    # Vanilla Java nullable methods (mirrored for the
+                    # same self-contained reason).
+                    "get",
+                    "getOrDefault",
+                    "remove",
+                    "put",
+                    "putIfAbsent",
+                    "getParameter",
+                    "getHeader",
+                    "getCookie",
+                    "getAttribute",
+                    "getSession",
+                    "getProperty",
+                    "getAnnotation",
+                    "getDeclaredAnnotation",
+                    "getEnclosingClass",
+                    "getEnclosingMethod",
+                    # Spring JdbcTemplate.queryForObject(...) returns
+                    # null when no rows match. The newer
+                    # ``JdbcClient.findOne`` returns Optional and is
+                    # deliberately NOT listed.
+                    "queryForObject",
+                    # Spring ApplicationContext.getBean(name) throws
+                    # when missing; NOT null-returning. NOT listed.
+                ],
+            },
+        },
+    },
+}
+
+
+def _apply_java_framework_preset(defaults: dict[str, Any], framework: str) -> None:
+    """Modify *defaults* in place to apply the Java framework preset.
+
+    No-op when the framework is ``"vanilla"`` (defaults already encode
+    that framework) or when the framework is unknown - unknown-framework
+    warnings are emitted by :func:`_resolve_java_framework` before this
+    helper runs.
+
+    The preset's nested shape mirrors ``DEFAULTS``: each key is a path
+    into ``DEFAULTS["rules"][...]``, with values that *replace* the
+    vanilla default for that rule. The user's TOML is then deep-merged
+    on top, so explicit user overrides still win.
+    """
+    preset = _JAVA_FRAMEWORK_PRESETS.get(framework)
+    if not preset:
+        return
+    import copy  # noqa: PLC0415
+
+    for rule_name, rule_overrides in preset.get("rules", {}).items():
+        target = defaults["rules"].setdefault(rule_name, {})
+        for key, value in rule_overrides.items():
+            target[key] = copy.deepcopy(value)
+
+
+def _resolve_java_framework(cfg: dict[str, Any]) -> str:
+    """Extract the Java framework selector from *cfg* (user TOML), defaulting to ``"vanilla"``.
+
+    Validates the value: unknown frameworks surface as a stderr warning
+    via :mod:`safelint.core._diagnostics` and fall back to ``"vanilla"``.
+    Type errors (non-string ``framework``) surface the same way. Mirrors
+    :func:`_resolve_javascript_runtime` exactly - same diagnostic
+    posture, same fallback shape.
+    """
+    java_section = cfg.get("java", {})
+    if not isinstance(java_section, dict):
+        from safelint.core import _diagnostics  # noqa: PLC0415
+
+        _diagnostics.print_warning(
+            f"[tool.safelint.java] must be a table, got {type(java_section).__name__} - falling back to framework='vanilla'",
+        )
+        return "vanilla"
+    framework = java_section.get("framework", "vanilla")
+    if not isinstance(framework, str):
+        from safelint.core import _diagnostics  # noqa: PLC0415
+
+        _diagnostics.print_warning(
+            f"[tool.safelint.java].framework must be a string, got {type(framework).__name__} - falling back to 'vanilla'",
+        )
+        return "vanilla"
+    if framework not in _JAVA_VALID_FRAMEWORKS:
+        from safelint.core import _diagnostics  # noqa: PLC0415
+
+        valid = ", ".join(sorted(_JAVA_VALID_FRAMEWORKS))
+        _diagnostics.print_warning(
+            f"[tool.safelint.java].framework={framework!r} is not recognised (valid: {valid}) - falling back to 'vanilla'",
+        )
+        return "vanilla"
+    return framework
+
+
 def _resolve_javascript_runtime(cfg: dict[str, Any]) -> str:
     """Extract the JS runtime selector from *cfg* (user TOML), defaulting to ``"node"``.
 
@@ -1392,5 +1608,6 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
             # preset via the deep_merge that follows.
             defaults_with_preset = copy.deepcopy(DEFAULTS)
             _apply_javascript_runtime_preset(defaults_with_preset, _resolve_javascript_runtime(cfg))
+            _apply_java_framework_preset(defaults_with_preset, _resolve_java_framework(cfg))
             return _apply_extend_keys(deep_merge(defaults_with_preset, cfg))
     return copy.deepcopy(DEFAULTS)
