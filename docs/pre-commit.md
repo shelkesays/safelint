@@ -18,6 +18,7 @@ repos:
         additional_dependencies: ['safelint[python]']               # Python-only repo
         # additional_dependencies: ['safelint[javascript]']         # JS-only repo
         # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles JS too)
+        # additional_dependencies: ['safelint[java]']               # Java repo (Spring Boot via [tool.safelint.java] framework = "spring-boot")
         # additional_dependencies: ['safelint[python,javascript]']  # mixed monorepo
         # additional_dependencies: ['safelint[all]']                # every supported language
 
@@ -46,7 +47,7 @@ You can compose extras: `['safelint[python,javascript]']` for a Python+JS monore
 The same `id: safelint` handles Python, JavaScript, and TypeScript. There is no `safelint-python` / `safelint-javascript` / `safelint-typescript` split. The published hook spec sets:
 
 ```yaml
-types_or: [python, javascript, ts, tsx]
+types_or: [python, javascript, ts, tsx, java]
 ```
 
 so pre-commit's [`identify`](https://github.com/pre-commit/identify) library routes the right files to the hook automatically. SafeLint's engine then dispatches each file to its language-specific rule implementations based on the extension, the file-type tag pre-commit attached is just the routing key.
@@ -144,7 +145,7 @@ The suppression breakdown surfaces in the hook's per-run summary the same way it
 
 ### "InstallEnvironmentError: pre-commit failed"
 
-Usually means pre-commit couldn't install one of the `additional_dependencies` entries at all: for example, the requirement string is malformed, the package name / version is wrong, or dependency resolution / download failed. Verify the requirement syntax is valid and that any SafeLint extras use supported names such as `[python]`, `[javascript]`, `[typescript]`, `[python,javascript]`, or `[all]`. A typoed extra name (e.g. `safelint[pythno]`) does *not* fail the install, pip emits a `WARNING: safelint X.Y.Z does not provide the extra 'pythno'` and continues, so the hook env still builds and the typo only shows up at runtime as the missing-grammar / silent-failure case below.
+Usually means pre-commit couldn't install one of the `additional_dependencies` entries at all: for example, the requirement string is malformed, the package name / version is wrong, or dependency resolution / download failed. Verify the requirement syntax is valid and that any SafeLint extras use supported names such as `[python]`, `[javascript]`, `[typescript]`, `[java]`, `[python,javascript]`, or `[all]`. A typoed extra name (e.g. `safelint[pythno]`) does *not* fail the install, pip emits a `WARNING: safelint X.Y.Z does not provide the extra 'pythno'` and continues, so the hook env still builds and the typo only shows up at runtime as the missing-grammar / silent-failure case below.
 
 ### Hook runs but lints nothing
 

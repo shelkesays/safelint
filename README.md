@@ -177,6 +177,7 @@ repos:
         additional_dependencies: ['safelint[python]']               # Python-only repo
         # additional_dependencies: ['safelint[javascript]']         # JS-only repo (Node / browser / Deno / Cloudflare Workers / Bun)
         # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles tree-sitter-javascript too)
+        # additional_dependencies: ['safelint[java]']               # Java repo (Spring Boot via [tool.safelint.java] framework = "spring-boot")
         # additional_dependencies: ['safelint[python,javascript]']  # mixed monorepo
         # additional_dependencies: ['safelint[all]']                # kitchen-sink
 
@@ -186,7 +187,7 @@ repos:
 
 ### One hook, every language
 
-The same `id: safelint` handles Python, JavaScript, and TypeScript, there's no `safelint-python` / `safelint-js` / `safelint-ts` split. The published hook spec sets `types_or: [python, javascript, ts, tsx]` so pre-commit automatically routes the right files to safelint; the engine then dispatches each file to its language-specific rule implementations based on extension. **AssemblyScript `.as` files are not matched by that default `types_or` list**, pre-commit's `identify` library has no `as` filetype tag, so AS users must override `types_or` with a permissive tag `.as` files *actually* carry (e.g. `types_or: [text]`) and use `files: \.(ts|tsx|as)$` to scope the match. (`types_or: []` doesn't work, pre-commit treats an empty list as "no tag matches", not "filter disabled".) **Every flag (`--fail-on`, `--mode`, `--ignore`, `--format`, `--statistics`) and every config option behaves identically across languages.** The only per-project lever is the `additional_dependencies` extra, that's what tells pre-commit which tree-sitter grammar(s) to install into the hook's isolated environment.
+The same `id: safelint` handles Python, JavaScript, TypeScript, and Java; there's no `safelint-python` / `safelint-js` / `safelint-ts` / `safelint-java` split. The published hook spec sets `types_or: [python, javascript, ts, tsx, java]` so pre-commit automatically routes the right files to safelint; the engine then dispatches each file to its language-specific rule implementations based on extension. **AssemblyScript `.as` files are not matched by that default `types_or` list**, pre-commit's `identify` library has no `as` filetype tag, so AS users must override `types_or` with a permissive tag `.as` files *actually* carry (e.g. `types_or: [text]`) and use `files: \.(ts|tsx|as)$` to scope the match. (`types_or: []` doesn't work, pre-commit treats an empty list as "no tag matches", not "filter disabled".) **Every flag (`--fail-on`, `--mode`, `--ignore`, `--format`, `--statistics`) and every config option behaves identically across languages.** The only per-project lever is the `additional_dependencies` extra, that's what tells pre-commit which tree-sitter grammar(s) to install into the hook's isolated environment.
 
 ### What happens if you forget the extra
 

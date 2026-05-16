@@ -11,10 +11,11 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 | **Python** | `.py`, `.pyw` | Default language; the rule set was originally designed for Python and ports unchanged. No per-runtime configuration. |
 | **JavaScript** | `.js`, `.mjs`, `.cjs` | Runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine. Per-runtime *defaults* are switchable via [`[tool.safelint.javascript] runtime = "..."`](configuration/toml.md#javascript-runtime-presets). |
 | **TypeScript** (including **AssemblyScript**) | `.ts`, `.tsx`, `.as` | Reuses the JS rule implementations end-to-end with TS-specific handling for type-only constructs (generics, `as` casts, non-null assertions, `declare global` blocks, etc.). Shares JS runtime presets since TS compiles to JS. |
+| **Java** (with **Spring Boot** framework preset) | `.java` | 15 cross-language rules port cleanly; 4 Spring-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* are switchable via [`[tool.safelint.java] framework = "..."`](languages/java.md#framework-presets). |
 
-**Rule coverage:** 17 rules apply to all three languages; 2 are Python-only (`bare_except`, `global_state`; the keywords don't exist in JS/TS) and 1 is JavaScript-family-only (`wide_scope_declaration`; `var`'s function-scoping hazard doesn't exist in Python, but applies to both `.js` and `.ts`).
+**Rule coverage:** 14 rules apply to all four registered languages; 2 are Python-only (`bare_except`, `global_state`; the keywords don't exist in JS / TS / Java), 1 is JavaScript-family-only (`wide_scope_declaration`; `var`'s function-scoping hazard doesn't exist in Python or Java), and 4 are Java + Spring Boot only (`spring_field_injection`, `spring_missing_transactional`, `spring_unvalidated_input`, `spring_async_checked_exception`).
 
-**Planned future languages** (in working-priority order, no timelines committed): Go, Rust, Java, C, C++, PHP. See the [language-coverage roadmap](configuration/rules.md#planned).
+**Planned future languages** (in working-priority order, no timelines committed): Go, Rust, C, C++, PHP. See the [language-coverage roadmap](configuration/rules.md#planned).
 
 ## Quick start
 
@@ -22,8 +23,9 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 pip install 'safelint[python]'         # adds .py, .pyw
 pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs
 pip install 'safelint[typescript]'     # adds .ts, .tsx, .as (also bundles JS)
+pip install 'safelint[java]'           # adds .java (with optional Spring Boot framework preset)
 pip install 'safelint[all]'            # every supported language
-pip install 'safelint[python,javascript]'   # multiple extras compose
+pip install 'safelint[python,java]'    # multiple extras compose
 # uv add 'safelint[typescript]' works the same way.
 
 safelint check src/                    # lint a directory
