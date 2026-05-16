@@ -293,10 +293,18 @@ def _java_param_names(func_node: tree_sitter.Node) -> set[str]:
       ``self`` / ``cls`` aren't bound names in Python; explicitly
       skipped.
 
-    Lambda parameters have a different shape (``inferred_parameters``
-    for untyped lambdas like ``(a, b) -> a + b``, ``formal_parameters``
-    for typed) - both are handled by the same field walk because the
-    lambda node also exposes ``parameters`` via the same field name.
+    Lambda parameters have three shapes:
+
+    * ``formal_parameters`` for typed lambdas (``(String a, int b) -> ...``)
+    * ``inferred_parameters`` for untyped multi-arg lambdas (``(a, b) -> ...``)
+    * **bare ``identifier``** for untyped single-arg lambdas (``a -> ...``).
+      In this shape ``params_node`` IS the identifier itself, not a
+      container; ``params_node.named_children`` is empty. The early
+      ``identifier``-shape branch below seeds the single parameter
+      directly, otherwise common Java stream patterns like
+      ``list.stream().filter(u -> dangerous(u))`` would silently
+      fail to seed ``u`` as tainted and SAFE801 would miss sinks
+      reachable through the lambda body.
 
     Constructor parameters (``constructor_declaration``) share the
     ``formal_parameters`` shape with methods, so the same extraction
@@ -305,6 +313,11 @@ def _java_param_names(func_node: tree_sitter.Node) -> set[str]:
     params_node = func_node.child_by_field_name("parameters")
     if params_node is None:  # pragma: no cover - defensive
         return set()
+    # Untyped single-arg lambda: ``params_node`` IS the bare
+    # ``identifier`` (no wrapping container). Seed the one bound
+    # name directly before falling through to the container path.
+    if params_node.type == "identifier":
+        return {node_text(params_node)}
     extractors: dict[str, Callable[[tree_sitter.Node], str | None]] = {
         "formal_parameter": _java_formal_param_name,
         "spread_parameter": _java_spread_param_name,

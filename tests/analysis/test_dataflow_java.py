@@ -340,6 +340,39 @@ def test_sink_fires_on_tainted_receiver_with_no_arguments() -> None:
     assert tracker.sink_hits[0][1] == "url"
 
 
+def test_single_arg_lambda_seeds_parameter() -> None:
+    """Untyped single-arg lambda ``u -> ...`` seeds ``u`` as tainted.
+
+    tree-sitter-java emits this shape with ``parameters`` field
+    pointing at the bare ``identifier`` itself - no wrapping
+    ``inferred_parameters`` / ``formal_parameters`` container.
+    Common in Java stream chains:
+    ``list.stream().filter(u -> dangerous(u))``. Without the
+    identifier-shape branch in ``_java_param_names``, ``u`` would
+    silently not seed and SAFE801 would miss sinks reachable
+    through the lambda body.
+    """
+    # Mirror the rule's param-extraction path via the helper used
+    # by SAFE801 directly so the test exercises the dispatch.
+    from safelint.rules.dataflow import _java_param_names  # noqa: PLC0415
+
+    tree = _parse(
+        """
+        class C {
+            void m() {
+                things.forEach(u -> dangerous(u));
+            }
+        }
+        """
+    )
+    # Walk to the lambda_expression and confirm _java_param_names
+    # returns the bound identifier.
+    from safelint.languages._node_utils import walk  # noqa: PLC0415
+
+    lambda_node = next(n for n in walk(tree.root_node) if n.type == "lambda_expression")
+    assert _java_param_names(lambda_node) == {"u"}
+
+
 def test_constructor_call_does_not_apply_receiver_check() -> None:
     """``new Foo(...)`` has no receiver; only arguments are inspected.
 

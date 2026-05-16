@@ -1085,7 +1085,11 @@ def _apply_javascript_runtime_preset(defaults: dict[str, Any], runtime: str) -> 
 #   * ``spring-boot`` - augments the vanilla defaults with Spring-aware
 #     sinks (``JdbcTemplate``'s ``query`` / ``queryForObject`` / ``update``,
 #     ``RestTemplate``'s ``exchange`` / ``getForObject`` for SSRF) and
-#     nullable methods (``queryForObject`` returns null on zero rows).
+#     nullable methods (``queryForObject``: zero-rows raises
+#     ``EmptyResultDataAccessException`` rather than returning null,
+#     but RowMapper implementations and nullable column values can
+#     still produce a null result, so the conservative treatment
+#     applies).
 #
 # Source-language analysis is identical across frameworks - same parser,
 # same AST walks, same per-rule logic. Only the *defaults* shift, so a

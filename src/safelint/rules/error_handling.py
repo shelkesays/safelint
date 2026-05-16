@@ -495,10 +495,15 @@ class LoggingOnErrorRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         # Same language-specific terminology as ``EmptyExceptRule.check_file``
-        # - JavaScript developers write ``catch``, not ``except``.
+        # - JavaScript / TypeScript / Java developers write ``catch``,
+        # not ``except``. Keeping the Python wording for non-Python
+        # languages reads as a stale Python-only message and confuses
+        # Java users in particular (Java's catch-clause is far enough
+        # from Python's except-clause that the wording mismatch is
+        # immediately visible).
         message = (
             "Catch block missing logging call - errors must be logged before being swallowed"
-            if lang_name in ("javascript", "typescript")
+            if lang_name in ("javascript", "typescript", "java")
             else "Except block missing logging call - errors must be logged before being swallowed"
         )
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if self._is_unlogged(clause, lang_name, function_types)]

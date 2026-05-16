@@ -111,7 +111,12 @@ def test_spring_boot_preset_overrides_sinks_java() -> None:
 
 
 def test_spring_boot_preset_overrides_nullable_methods_java() -> None:
-    """The ``spring-boot`` preset adds ``queryForObject`` (returns null on zero rows)."""
+    """The ``spring-boot`` preset adds ``queryForObject`` to the nullable list.
+
+    The zero-rows case actually raises ``EmptyResultDataAccessException``;
+    the listing reflects the conservative treatment for RowMapper /
+    nullable-column-value paths that CAN produce a null result.
+    """
     defaults = copy.deepcopy(DEFAULTS)
     _apply_java_framework_preset(defaults, "spring-boot")
     nullable = defaults["rules"]["null_dereference"]["nullable_methods_java"]
