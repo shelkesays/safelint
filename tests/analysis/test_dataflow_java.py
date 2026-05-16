@@ -13,6 +13,7 @@ import textwrap
 from typing import TYPE_CHECKING
 
 from safelint.analysis.dataflow_java import JavaTaintTracker
+from safelint.languages._node_utils import node_text
 from safelint.languages.java import JAVA
 
 
@@ -33,7 +34,7 @@ def _find_method(tree: tree_sitter.Tree, name: str) -> tree_sitter.Node:
         if node.type != "method_declaration":
             continue
         name_node = node.child_by_field_name("name")
-        if name_node is not None and name_node.text.decode("utf-8") == name:
+        if name_node is not None and node_text(name_node) == name:
             return node
     msg = f"method {name!r} not found in tree"
     raise LookupError(msg)
