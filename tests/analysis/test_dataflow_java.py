@@ -280,3 +280,89 @@ def test_cast_expression_passes_through_taint() -> None:
     tracker = _make_tracker()
     tracker.visit(_find_method(tree, "m"))
     assert len(tracker.sink_hits) == 1
+
+
+# ---------------------------------------------------------------------------
+# Method-invocation receiver as a taint input
+# ---------------------------------------------------------------------------
+
+
+def test_method_invocation_receiver_propagates_taint_through_unknown_call() -> None:
+    """``tainted.trim()`` returns a tainted value via ``assume_taint_preserving``.
+
+    Without the receiver-as-input check, ``input.trim()`` would have
+    zero args and silently drop taint, producing false negatives on
+    common Java string transformations.
+    """
+    tree = _parse(
+        """
+        class C {
+            void m(String input) {
+                String s = input.trim();
+                exec(s);
+            }
+        }
+        """
+    )
+    tracker = _make_tracker()
+    tracker.visit(_find_method(tree, "m"))
+    # ``input.trim()`` propagates taint via the receiver; ``s`` is
+    # tainted; the subsequent exec fires.
+    assert len(tracker.sink_hits) == 1
+
+
+def test_sink_fires_on_tainted_receiver_with_no_arguments() -> None:
+    """``url.openStream()`` on a tainted ``url`` fires the sink with zero args.
+
+    Canonical Java SSRF pattern: ``URL url = new URL(userInput);
+    url.openStream();``. ``openStream`` has no arguments, so a
+    args-only sink check would miss the hit entirely. The
+    receiver-as-input check fires correctly.
+    """
+    tree = _parse(
+        """
+        class C {
+            void m(Url url) {
+                url.openStream();
+            }
+        }
+        """
+    )
+    tracker = JavaTaintTracker(
+        params={"url"},
+        sinks=frozenset({"openStream"}),
+        sanitizers=frozenset(),
+        sources=frozenset(),
+    )
+    tracker.visit(_find_method(tree, "m"))
+    assert len(tracker.sink_hits) == 1
+    # The recorded "tainted variable" is the receiver identifier.
+    assert tracker.sink_hits[0][1] == "url"
+
+
+def test_constructor_call_does_not_apply_receiver_check() -> None:
+    """``new Foo(...)`` has no receiver; only arguments are inspected.
+
+    Confirms the receiver-as-input check is gated on
+    ``method_invocation``: ``object_creation_expression`` still
+    follows the args-only path.
+    """
+    tree = _parse(
+        """
+        class C {
+            void m(String input) {
+                FileInputStream s = new FileInputStream(input);
+            }
+        }
+        """
+    )
+    tracker = JavaTaintTracker(
+        params={"input"},
+        sinks=frozenset({"FileInputStream"}),
+        sanitizers=frozenset(),
+        sources=frozenset(),
+    )
+    tracker.visit(_find_method(tree, "m"))
+    # The single tainted arg fires the sink.
+    assert len(tracker.sink_hits) == 1
+    assert tracker.sink_hits[0][1] == "input"

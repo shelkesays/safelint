@@ -11,7 +11,7 @@ Add this block to your `.pre-commit-config.yaml`. Pick the `additional_dependenc
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.0.0  # replace with the latest release tag
+    rev: v2.1.0rc1  # replace with the latest release tag (Java support requires v2.1.0rc1 or later)
     hooks:
       - id: safelint
         # Required in v2.0.0+. Pick whichever extras match your project's languages:
@@ -36,15 +36,15 @@ SafeLint now runs on every `git commit` and blocks the commit if it finds blocki
 
 ## What the `additional_dependencies` line does
 
-v2.0.0+ ships every language grammar as an opt-in PEP 621 extra (`[python]`, `[javascript]`, `[typescript]`, `[all]`). Plain `pip install safelint` installs only the engine, no grammars. The same applies to the hook: pre-commit creates an isolated virtualenv per hook revision and installs only what you list in `additional_dependencies`.
+v2.0.0+ ships every language grammar as an opt-in PEP 621 extra (`[python]`, `[javascript]`, `[typescript]`, `[java]`, `[all]`). Plain `pip install safelint` installs only the engine, no grammars. The same applies to the hook: pre-commit creates an isolated virtualenv per hook revision and installs only what you list in `additional_dependencies`.
 
-`safelint[python]` pulls `tree-sitter-python`. `safelint[javascript]` pulls `tree-sitter-javascript`. `safelint[typescript]` pulls both `tree-sitter-javascript` and `tree-sitter-typescript` (TypeScript projects almost always have `.js` files too: vite / webpack / jest configs, generated declaration shims). `safelint[all]` is the kitchen-sink that pulls every supported grammar in one go.
+`safelint[python]` pulls `tree-sitter-python`. `safelint[javascript]` pulls `tree-sitter-javascript`. `safelint[typescript]` pulls both `tree-sitter-javascript` and `tree-sitter-typescript` (TypeScript projects almost always have `.js` files too: vite / webpack / jest configs, generated declaration shims). `safelint[java]` pulls `tree-sitter-java` and unlocks the optional Spring Boot framework preset configured via `[tool.safelint.java] framework = "spring-boot"`. `safelint[all]` is the kitchen-sink that pulls every supported grammar (`tree-sitter-python`, `tree-sitter-javascript`, `tree-sitter-typescript`, `tree-sitter-java`) in one go.
 
 You can compose extras: `['safelint[python,javascript]']` for a Python+JS monorepo is exactly the same as listing both individually, just one fewer string. New languages will get their own extras and be folded into `[all]` as they land.
 
 ## One hook, every language
 
-The same `id: safelint` handles Python, JavaScript, and TypeScript. There is no `safelint-python` / `safelint-javascript` / `safelint-typescript` split. The published hook spec sets:
+The same `id: safelint` handles Python, JavaScript, TypeScript, and Java. There is no `safelint-python` / `safelint-javascript` / `safelint-typescript` / `safelint-java` split. The published hook spec sets:
 
 ```yaml
 types_or: [python, javascript, ts, tsx, java]

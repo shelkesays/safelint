@@ -27,16 +27,25 @@ public class ResourceUsage {
         }
     }
 
-    // No SAFE401: manual try { ... } finally { ... } with close() in
-    // the finally clause. Older idiom but still legal and accepted
-    // by the rule (the heuristic can't statically prove the finally
-    // closes the *specific* resource - it accepts the shape).
+    // No SAFE401: canonical pre-Java-7 manual try / finally with the
+    // acquirer INSIDE the try block (so the rule's parent walk sees the
+    // try_statement ancestor and accepts it). The null-init dance
+    // ensures the variable is visible in finally even though the
+    // acquirer is scoped to try. Older idiom but still legal and
+    // accepted by the rule. (The acquirer-OUTSIDE-try pattern -
+    // ``FileInputStream in = new FileInputStream(p); try { ... }
+    // finally { in.close(); }`` - is genuinely unguarded under this
+    // heuristic and would correctly fire SAFE401; that's not the
+    // pattern we want to demonstrate as safe.)
     public void safeManualClose(String path) throws IOException {
-        FileInputStream in = new FileInputStream(path);
+        FileInputStream in = null;
         try {
+            in = new FileInputStream(path);
             in.read();
         } finally {
-            in.close();
+            if (in != null) {
+                in.close();
+            }
         }
     }
 

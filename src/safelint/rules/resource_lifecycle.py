@@ -126,10 +126,18 @@ def _is_inside_java_resource_guard(node: tree_sitter.Node) -> bool:
     * **try-with-resources** (``try (Resource r = ...) { ... }``): the JLS
       guarantees ``close()`` is called on the declared resource when the
       try block exits, including via exception. This is the modern
-      preferred form for any ``AutoCloseable``.
+      preferred form for any ``AutoCloseable``. **Only resources declared
+      in the header parens are auto-closed** - an inner ``new
+      FileReader(...)`` inside the try body is NOT covered by the
+      enclosing try-with-resources and would leak. To distinguish the
+      two, the walk only accepts a ``try_with_resources_statement``
+      ancestor when we reached it via the ``resource_specification``
+      child (the header) - if we walked up through the ``block`` child
+      (the body), the call is NOT in the header and isn't auto-closed.
     * **try { ... } finally { resource.close(); }**: the older manual
-      form. Still accepted because the rule can't statically prove the
-      finally body actually closes the specific resource.
+      form. Accepted when the acquirer call sits inside the try block
+      and the try has a finally clause. Mirrors the JS resource-guard
+      check.
 
     Walks the parent chain looking for either form, stopping at function
     boundaries (method_declaration, constructor_declaration,
@@ -149,7 +157,12 @@ def _is_inside_java_resource_guard(node: tree_sitter.Node) -> bool:
     while cur is not None:
         if cur.type in _JAVA_FUNCTION_TYPES:
             return False
-        if cur.type == "try_with_resources_statement":
+        # try-with-resources only auto-closes resources declared in
+        # the header (the ``resource_specification`` child). A call
+        # reached via the ``block`` child is inside the body and is
+        # NOT auto-closed by the enclosing try-with-resources -
+        # treat it like any other unguarded acquirer.
+        if cur.type == "try_with_resources_statement" and prev.type == "resource_specification":
             return True
         if _try_statement_has_finally(cur) and prev.type != "finally_clause":
             return True

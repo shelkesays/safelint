@@ -201,16 +201,34 @@ class JavaTaintTracker:
         self._update_name(name, is_tainted=is_tainted)
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
-        """Check whether this call reaches a sink with tainted arguments."""
+        """Check whether this call reaches a sink with tainted inputs.
+
+        For Java ``method_invocation`` sinks, taint may arrive either via
+        an explicit argument or via the *receiver object* itself. The
+        canonical case is ``url.openStream()`` where the URL was built
+        from user input - the call has zero arguments but the receiver
+        carries the taint. Same posture for the sink check as for the
+        result-taint check in ``_call_tainted``: receiver counts as
+        an input for method invocations only (constructor calls via
+        ``object_creation_expression`` have no receiver).
+        """
         name = call_name(node)
         if name not in self.sinks:
             return
-        args_node = node.child_by_field_name("arguments")
-        if not args_node:  # pragma: no cover - defensive
+        self._record_tainted_arg_hits(node, name)
+        if node.type == "method_invocation":
+            obj = node.child_by_field_name("object")
+            if obj is not None and self._is_tainted(obj):
+                self._record_sink_hit(node, obj, name)
+
+    def _record_tainted_arg_hits(self, call_node: tree_sitter.Node, sink_name: str) -> None:
+        """Record one sink hit per tainted argument on *call_node*."""
+        args_node = call_node.child_by_field_name("arguments")
+        if args_node is None:
             return
         for arg in args_node.named_children:
             if self._is_tainted(arg):
-                self._record_sink_hit(node, arg, name)
+                self._record_sink_hit(call_node, arg, sink_name)
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
@@ -243,9 +261,21 @@ class JavaTaintTracker:
     def _call_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if this call produces a tainted value.
 
-        Mirrors the Python / JS trackers' ``_call_tainted`` exactly -
-        sanitizers clear, sources inject, unknowns either preserve or
-        drop based on ``assume_taint_preserving``.
+        Mirrors the Python / JS trackers' ``_call_tainted`` with one
+        Java-specific extension: for ``method_invocation``, the
+        *receiver object* is treated as an input alongside the
+        explicit arguments when applying ``assume_taint_preserving``.
+        Without this, ``String s = input.trim();`` would silently drop
+        the taint marker because ``trim()`` has zero arguments even
+        though the receiver ``input`` IS tainted - a common Java
+        false-negative pattern. Constructor calls
+        (``object_creation_expression``) have no receiver and only
+        consult arguments.
+
+        Sanitizers clear regardless of input taint state; sources
+        inject regardless of input taint state; unknowns either
+        preserve (default ``assume_taint_preserving=True``) or drop
+        (``False``) based on any input.
         """
         name = call_name(node)
         if name in self.sanitizers:
@@ -255,6 +285,10 @@ class JavaTaintTracker:
         if not self.assume_taint_preserving:
             return False
         args_node = node.child_by_field_name("arguments")
-        if not args_node:  # pragma: no cover - defensive
-            return False
-        return any(self._is_tainted(arg) for arg in args_node.named_children)
+        if args_node and any(self._is_tainted(arg) for arg in args_node.named_children):
+            return True
+        if node.type == "method_invocation":
+            obj = node.child_by_field_name("object")
+            if obj is not None and self._is_tainted(obj):
+                return True
+        return False

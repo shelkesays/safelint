@@ -411,13 +411,16 @@ def test_safe903_recognises_both_controller_stereotypes(stereotype: str) -> None
 # ---------------------------------------------------------------------------
 
 
-def test_safe901_skips_field_with_no_declarator() -> None:
-    """A ``field_declaration`` with no ``variable_declarator`` yields ``<field>`` as the name.
+def test_safe901_message_includes_field_name() -> None:
+    """The SAFE901 message identifies which @Autowired field the violation refers to.
 
-    Defensive path - tree-sitter-java's grammar guarantees at least
-    one declarator on a valid field, but malformed source can land
-    in this branch. The rule still fires (the ``@Autowired`` is
-    present) but the message uses the placeholder.
+    Happy-path coverage of ``_first_field_variable_name`` for a normal
+    ``field_declaration`` with one named ``variable_declarator``. The
+    ``or "<field>"`` fallback in ``check_file`` is genuinely defensive
+    (tree-sitter-java's grammar guarantees at least one declarator on a
+    valid ``field_declaration``); reaching it would require malformed
+    AST that the grammar otherwise rejects, so the branch is annotated
+    for coverage in ``rules/spring.py`` rather than exercised here.
     """
     tree = _parse(
         """
@@ -430,9 +433,6 @@ def test_safe901_skips_field_with_no_declarator() -> None:
     rule = SpringFieldInjectionRule({"enabled": True, "severity": "warning"})
     violations = rule.check_file("Service.java", tree)
     assert len(violations) == 1
-    # Real declarator → real name. The placeholder branch is exercised
-    # via the ``or "<field>"`` fallback in ``check_file``; the test above
-    # is the happy path.
     assert "userRepo" in violations[0].message
 
 
@@ -471,11 +471,19 @@ def test_safe902_skips_method_outside_class() -> None:
     assert rule.check_file("Service.java", tree) == []
 
 
-def test_safe903_skips_method_with_no_parameters_node() -> None:
-    """A controller method with zero parameters yields no SAFE903 hits.
+def test_safe903_skips_method_with_empty_parameters() -> None:
+    """A controller method with zero formal parameters yields no SAFE903 hits.
 
-    Exercises the ``params_node is None`` early return AND the
-    common "no @RequestBody so nothing to validate" path.
+    tree-sitter-java always emits a ``formal_parameters`` node for
+    every ``method_declaration`` (the parens themselves), even when
+    the parameter list is empty - so this test exercises the "loop
+    body never executes because params_node.named_children is empty"
+    path, NOT the defensive ``params_node is None`` branch (that
+    branch fires only on malformed AST that the grammar otherwise
+    rejects and is annotated for coverage purposes separately).
+
+    The negative-control assertion stands either way: zero formal
+    parameters means zero @RequestBody parameters to validate.
     """
     tree = _parse(
         """

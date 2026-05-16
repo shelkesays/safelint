@@ -23,7 +23,7 @@ v2.1.0+ ships every language grammar as an opt-in extra, plain `pip install safe
 
 ## Rules that fire on Java
 
-**19 rules apply to Java**: 15 cross-language rules + 4 Spring Boot framework-specific rules (`SAFE9xx`, enabled by the `spring-boot` preset). 4 rules are deliberately skipped, see the next section.
+**20 rules apply to Java**: 16 cross-language rules + 4 Spring Boot framework-specific rules (`SAFE9xx`, enabled by the `spring-boot` preset). 4 rules are deliberately skipped, see the next section.
 
 | Code | Rule | Notes for Java |
 |---|---|---|

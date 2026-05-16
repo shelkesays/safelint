@@ -203,12 +203,20 @@ class SpringFieldInjectionRule(BaseRule):
 
 
 def _first_field_variable_name(field_node: tree_sitter.Node) -> str | None:
-    """Return the first declared variable name on a ``field_declaration``."""
+    """Return the first declared variable name on a ``field_declaration``.
+
+    Returns ``None`` only on malformed AST that tree-sitter-java's
+    grammar otherwise rejects: a ``field_declaration`` with no
+    ``variable_declarator`` child, or one whose ``name`` field is
+    absent / non-identifier. Callers (currently ``check_file`` in
+    SAFE901) fall back to a ``"<field>"`` placeholder so the
+    violation message stays informative.
+    """
     decl = next((c for c in field_node.named_children if c.type == "variable_declarator"), None)
-    if decl is None:
+    if decl is None:  # pragma: no cover - defensive: valid Java field_declaration always has at least one variable_declarator
         return None
     name_node = decl.child_by_field_name("name")
-    if name_node is None or name_node.type != "identifier":
+    if name_node is None or name_node.type != "identifier":  # pragma: no cover - defensive: valid declarator always has an identifier name
         return None
     return node_text(name_node)
 
@@ -413,7 +421,7 @@ class SpringUnvalidatedInputRule(BaseRule):
     def _check_method(self, filepath: str, method: tree_sitter.Node) -> list[Violation]:
         """Per-method scan for unvalidated request-binding parameters."""
         params_node = method.child_by_field_name("parameters")
-        if params_node is None:
+        if params_node is None:  # pragma: no cover - defensive: tree-sitter-java always emits a formal_parameters node for valid method_declaration
             return []
         method_name = _method_name(method) or "<method>"
         violations: list[Violation] = []
