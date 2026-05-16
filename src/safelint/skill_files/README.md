@@ -223,7 +223,8 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 └── languages/               # One addendum per supported language
     ├── python.md            # Python-specific install / rationale / idiomatic fixes
     ├── javascript.md        # JavaScript (Node), runtime presets, JS-rule notes
-    └── typescript.md        # TypeScript / TSX / AssemblyScript, TS-specific rule handling
+    ├── typescript.md        # TypeScript / TSX / AssemblyScript, TS-specific rule handling
+    └── java.md              # Java + Spring Boot framework preset, Java-rule notes, SAFE901-904
 ```
 
 **What ends up where after install:**
