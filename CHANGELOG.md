@@ -51,7 +51,7 @@ Pre-commit users update ``rev: v2.0.0`` to ``rev: v2.1.0rc1`` and add ``'safelin
 ### Known limitations
 
 - **``SAFE302 global_mutation`` is deliberately NOT registered for Java.** Python's ``global`` keyword and JS's ``globalThis.x = ...`` patterns have no clean Java analogue. The natural Java equivalent (writes to non-final static fields from outside the declaring class's own static initialiser) needs class-scope analysis the rule doesn't yet do. Deferred to a future release pending user feedback.
-- **``SAFE304 side_effects`` does NOT exempt ``@Bean`` factory methods** under the ``spring-boot`` preset. Spring ``@Bean`` factory methods that legitimately create side-effectful resources (DB connections, HTTP clients) trigger the warning today. Suppress with ``# nosafe: SAFE304`` on each factory method until a future ``skip_functions_annotated_with`` config knob lands. The preset's docstring spells this out explicitly so the limitation is auditable.
+- **``SAFE304 side_effects`` does NOT exempt ``@Bean`` factory methods** under the ``spring-boot`` preset. Spring ``@Bean`` factory methods that legitimately create side-effectful resources (DB connections, HTTP clients) trigger the warning today. Suppress with ``// nosafe: SAFE304`` on each factory method until a future ``skip_functions_annotated_with`` config knob lands. The preset's docstring spells this out explicitly so the limitation is auditable.
 - **Java 21+ string templates are treated conservatively as untainted** by the dataflow tracker. tree-sitter-java does not yet expose the template-substitution shape uniformly, so a ``STR."Hello \{name}"`` form won't propagate taint through the template. A future grammar upgrade can lift this without re-architecting the rule.
 
 ### Upgrading from v2.0.0
