@@ -237,9 +237,16 @@ DEFAULTS: dict[str, Any] = {
                 "readString",
                 "writeString",
                 "write",
-                # Network I/O.
+                # Network I/O. ``HttpClient`` is NOT listed: it doesn't expose
+                # a public constructor (the JDK uses static factory methods),
+                # so ``call_name`` never returns ``"HttpClient"`` for the
+                # standard ``HttpClient.newHttpClient()`` / ``newBuilder()``
+                # acquirers. The actual I/O happens through ``send`` /
+                # ``sendAsync`` on the resulting client.
                 "Socket",
-                "HttpClient",
+                "newHttpClient",  # HttpClient.newHttpClient() factory
+                "send",  # HttpClient.send(request, ...)
+                "sendAsync",  # HttpClient.sendAsync(request, ...)
             ],
             "pure_prefixes": [
                 "calculate",
@@ -1141,8 +1148,8 @@ _JAVA_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
     #     from the I/O warning would require annotation-aware rule
     #     logic the preset can't express through default overrides.
     #     Users with noisy SAFE304 hits on factory methods can
-    #     suppress via ``# nosafe: SAFE304`` until a future
-    #     ``skip_functions_annotated_with`` knob lands.
+    #     suppress via ``// nosafe: SAFE304`` (Java's comment prefix)
+    #     until a future ``skip_functions_annotated_with`` knob lands.
     #   * SAFE401 ``resource_lifecycle`` - Spring-managed resources
     #     (``JdbcTemplate``-borrowed connections) are typically not
     #     held in user code at all, so the vanilla tracked-function

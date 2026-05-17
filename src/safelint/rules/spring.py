@@ -429,7 +429,8 @@ class SpringUnvalidatedInputRule(BaseRule):
     value; the former two bind to full deserialised objects where
     skipping validation is the canonical bug. Users who want
     ``@RequestParam`` validation enforced can suppress with
-    ``# nosafe`` or extend via the rule's config (future knob).
+    ``// nosafe`` (Java's comment prefix) or extend via the
+    rule's config (future knob).
 
     Complements SAFE801 ``tainted_sink``: SAFE801 catches user input
     flowing into a dangerous sink via dataflow; SAFE903 catches the

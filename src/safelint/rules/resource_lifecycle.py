@@ -319,19 +319,18 @@ class ResourceLifecycleRule(BaseRule):
         "ServerSocket",
         # JDBC.
         "getConnection",  # DriverManager.getConnection / DataSource.getConnection
-        # Concurrent / IO channels via constructor / factory names only.
-        # NOT listed: bare ``open`` - ``call_name()`` strips the receiver,
-        # so a generic ``"open"`` entry would match ``dialog.open()`` /
-        # ``editor.open()`` / project-local helpers AND the intended
-        # ``FileChannel.open()``. Java users who need ``FileChannel.open``
-        # tracked can override via
+        # NOT listed: ``FileChannel`` / bare ``open`` - ``call_name()`` strips
+        # the receiver, and ``FileChannel`` doesn't expose a public constructor
+        # (the standard acquirer is the static ``FileChannel.open(...)`` which
+        # resolves to bare ``"open"``). A generic ``"open"`` entry would
+        # over-match unrelated ``dialog.open()`` / ``editor.open()`` /
+        # project-local helpers AND the intended ``FileChannel.open()``.
+        # Java users who want ``FileChannel.open`` tracked can opt in via
         # ``[tool.safelint.rules.resource_lifecycle] tracked_functions_java
-        # = ["FileChannel", "FileInputStream", ..., "open"]`` (which fully
-        # replaces this default list). The ``extend_tracked_functions``
-        # config key is Python-only; the Java path uses the
-        # ``tracked_functions_java`` per-language config which replaces
-        # rather than appends.
-        "FileChannel",
+        # = ["FileInputStream", ..., "open"]`` (which fully replaces this
+        # default list). The ``extend_tracked_functions`` config key is
+        # Python-only; the Java path uses the ``tracked_functions_java``
+        # per-language config which replaces rather than appends.
     ]
 
     @staticmethod
