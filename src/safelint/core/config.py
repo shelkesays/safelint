@@ -505,38 +505,34 @@ DEFAULTS: dict[str, Any] = {
                 "openStream",  # URL.openStream
             ],
             "sanitizers_java": [
-                "escape",  # Apache Commons Text StringEscapeUtils.escape*
-                "escapeHtml",
-                "escapeHtml4",
-                "escapeXml",
-                "escapeJava",
-                "escapeJson",
-                "escapeEcmaScript",
-                "encode",  # URLEncoder.encode
-                "encodeURIComponent",  # JavaScript bridge, occasionally Java
-                "quote",  # SQL / shell quoting helpers
-                "sanitize",  # OWASP HtmlPolicyBuilder, generic sanitisers
+                # IMPORTANT: SAFE801 has a SINGLE shared ``sanitizers_java``
+                # set that clears taint for every sink type (SQL,
+                # reflection, shell, SSRF). Context-specific output
+                # encoders - OWASP Java Encoder ``forHtml`` / ``forXml``
+                # / ``forJavaScript`` / ``forCssString``, Apache Commons
+                # ``escapeHtml*`` / ``escapeXml``, Spring ``htmlEscape``
+                # - are deliberately NOT in the defaults because they
+                # do not make input safe for SQL / shell / reflection
+                # sinks even though they make it safe for HTML output.
+                # Including them as universal sanitisers would create
+                # dangerous false negatives like
+                # ``jdbc.query("... " + Encode.forHtml(userInput))``.
+                #
+                # The defaults below are intentionally narrow: generic
+                # validation / quoting helpers and URL encoders that are
+                # at least context-agnostic about which sink they help.
+                # Projects that route every output through one of the
+                # context-specific encoders can opt in by extending
+                # ``[tool.safelint.rules.tainted_sink] sanitizers_java``
+                # in their TOML, ideally after splitting sink categories
+                # via custom rule extension (see CHANGELOG for the
+                # category-aware sanitiser roadmap).
+                "escape",  # generic; legacy Apache Commons + custom helpers
+                "encode",  # URLEncoder.encode - applies to URL contexts
+                "encodeURIComponent",  # URL contexts only
+                "quote",  # SQL / shell quoting helpers (context-aware by name)
+                "sanitize",  # OWASP HtmlPolicyBuilder + generic sanitisers
                 "validate",  # generic input validators
-                "htmlEscape",  # Spring's HtmlUtils.htmlEscape
-                # OWASP Java Encoder: ``Encode.forHtml(s)`` etc. - the
-                # canonical Java escape API for web output. ``call_name``
-                # resolves the static-method form to the bareword.
-                "forHtml",
-                "forHtmlAttribute",
-                "forHtmlContent",
-                "forHtmlUnquotedAttribute",
-                "forJavaScript",
-                "forJavaScriptAttribute",
-                "forJavaScriptBlock",
-                "forJavaScriptSource",
-                "forCssString",
-                "forCssUrl",
-                "forUri",
-                "forUriComponent",
-                "forXml",
-                "forXmlAttribute",
-                "forXmlComment",
-                "forXmlContent",
             ],
             "sources_java": [
                 # System / env sources.

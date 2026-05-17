@@ -279,17 +279,29 @@ def test_spring_rules_all_fire_under_spring_boot_preset() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_owasp_encoder_sanitiser_clears_taint(tmp_path: Path) -> None:
-    """``Encode.forHtml(userInput)`` interposed between source and sink clears SAFE801.
+def test_owasp_html_encoder_does_not_clear_sql_sink_taint(tmp_path: Path) -> None:
+    """``Encode.forHtml(userInput)`` does NOT clear SAFE801 on a SQL ``jdbc.query`` sink.
 
-    This is one of the design contracts of the Java tracker -
-    OWASP Java Encoder method names (``forHtml`` / ``forJavaScript``
-    / etc.) are in the default ``sanitizers_java`` list and clear
-    the taint marker on the value that flows through.
+    SAFE801 has a single shared ``sanitizers_java`` set that clears
+    taint for every sink type. Context-specific output encoders -
+    OWASP Java Encoder ``forHtml`` / ``forXml`` / ``forJavaScript``,
+    Apache Commons ``escapeHtml*``, Spring ``htmlEscape`` - are
+    deliberately NOT in the defaults because they do not make input
+    safe for SQL / shell / reflection sinks. This test locks the
+    behaviour in: an HTML encoder routed into a SQL sink must still
+    fire SAFE801.
+
+    The earlier ``test_owasp_encoder_sanitiser_clears_taint`` test
+    (now removed) asserted the opposite and locked in a dangerous
+    false negative. PR 56 review caught it.
+
+    Projects that DO want HTML encoders treated as universal
+    sanitisers can opt in by extending
+    ``[tool.safelint.rules.tainted_sink] sanitizers_java``
+    in their TOML; the strict default avoids the cross-context
+    confusion by default.
     """
     src = (FIXTURES_DIR / "UserController.java").read_text(encoding="utf-8")
-    # Replace the unsanitised concatenation with a sanitised one to
-    # confirm SAFE801 no longer fires on that specific call.
     sanitised = src.replace(
         'String sql = "SELECT * FROM users WHERE name = \'" + name + "\'";\n        return jdbc.query(sql, new Object[]{});',
         'String safe = org.owasp.encoder.Encode.forHtml(name);\n        String sql = "SELECT * FROM users WHERE name = \'" + safe + "\'";\n        return jdbc.query(sql, new Object[]{});',
@@ -300,12 +312,10 @@ def test_owasp_encoder_sanitiser_clears_taint(tmp_path: Path) -> None:
     engine = SafetyEngine(cfg)
     result = engine.check_file(str(sanitised_file))
     codes = _codes_in(result.violations + result.suppressed)
-    # SAFE801 must no longer fire on the search() method now that
-    # the sanitiser is interposed. The fixture's other SAFE801
-    # triggers (none in this file other than search) would have
-    # left SAFE801 in codes; its absence confirms taint clearing.
     safe801_count = codes.count("SAFE801")
-    assert safe801_count == 0, f"expected SAFE801 to be cleared by Encode.forHtml, got {safe801_count} hits: {codes}"
+    assert safe801_count >= 1, (
+        f"expected SAFE801 to still fire on the SQL sink despite HTML encoding, got {safe801_count} hits: {codes}"
+    )
 
 
 # ---------------------------------------------------------------------------
