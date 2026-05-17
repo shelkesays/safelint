@@ -313,9 +313,7 @@ def test_owasp_html_encoder_does_not_clear_sql_sink_taint(tmp_path: Path) -> Non
     result = engine.check_file(str(sanitised_file))
     codes = _codes_in(result.violations + result.suppressed)
     safe801_count = codes.count("SAFE801")
-    assert safe801_count >= 1, (
-        f"expected SAFE801 to still fire on the SQL sink despite HTML encoding, got {safe801_count} hits: {codes}"
-    )
+    assert safe801_count >= 1, f"expected SAFE801 to still fire on the SQL sink despite HTML encoding, got {safe801_count} hits: {codes}"
 
 
 # ---------------------------------------------------------------------------
