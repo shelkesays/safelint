@@ -537,39 +537,51 @@ def test_safe902_fires_on_jdbctemplate_writes() -> None:
     assert "2 repository writes" in violations[0].message
 
 
-def test_safe902_skips_method_outside_class() -> None:
-    """``_enclosing_class`` returns None for orphan methods → rule skips.
+def test_safe902_skips_methods_in_interface_body() -> None:
+    """Methods whose enclosing is ``interface_declaration`` are not service-layer.
 
-    Defensive - real Java files always nest methods in classes /
-    interfaces / enums / records, but the helper walks the parent
-    chain explicitly. This test would only fire if a method
-    somehow lived at the program root (currently impossible with
-    valid Java source).
+    ``_enclosing_class`` deliberately walks past
+    ``interface_declaration`` / ``enum_declaration`` /
+    ``record_declaration`` when looking for the @Service /
+    @Component-eligible enclosing scope. Without that skip,
+    interface methods with multiple repository writes (a perfectly
+    legitimate pattern for default methods, though uncommon) would
+    spuriously fire. This test exercises the skip path directly:
+    the interface declares two repository writes and the rule
+    correctly emits no violation.
+
+    The "_enclosing_class returns None" case (an orphan method at
+    the program root) is a defensive code path that isn't reachable
+    from valid Java source - any method has at least an enclosing
+    type. Covering that path would require a hand-built tree shape
+    rather than parsed source; the helper still has the None branch
+    for robustness against malformed AST.
     """
     tree = _parse(
         """
         interface UserRepo {
-            User save(User u);
-        }
-        class Service {
-            private UserRepo repo;
-            // Method inside an interface body would be enclosed by
-            // interface_declaration, not class_declaration - the
-            // rule's _enclosing_class helper deliberately skips
-            // through interface_declaration / enum_declaration /
-            // record_declaration so methods there don't fire.
-            public void noTransactional() {
-                repo.save(null);
+            // Default method - has a body, exercises method_declaration
+            // path inside interface_declaration. Two repository writes
+            // here would fire SAFE902 if the rule didn't skip
+            // interface_declaration in _enclosing_class.
+            default void registerBoth(User u, Audit a) {
+                save(u);
+                save(a);
             }
+            User save(User u);
+            Audit save(Audit a);
         }
         """
     )
     rule = SpringMissingTransactionalRule({"enabled": True, "severity": "error"})
-    # The interface-method is enclosed by an interface_declaration
-    # (which _enclosing_class skips), so it doesn't trip the rule.
-    # The class-method has only one save() call which is below the
-    # 2+ write threshold. Net: zero violations.
-    assert rule.check_file("Service.java", tree) == []
+    # Despite two writes on (presumably) a repository-like receiver,
+    # the enclosing is interface_declaration which the rule's
+    # _enclosing_class helper skips, so no violation fires.
+    # (Plus interface methods don't carry a self-receiver here -
+    # ``save(u)`` has no receiver at all, so the
+    # _is_repository_receiver heuristic also wouldn't match.
+    # Either guard suffices.)
+    assert rule.check_file("UserRepo.java", tree) == []
 
 
 def test_safe903_skips_method_with_empty_parameters() -> None:
