@@ -436,6 +436,80 @@ def test_safe901_message_includes_field_name() -> None:
     assert "userRepo" in violations[0].message
 
 
+def test_safe902_does_not_fire_on_non_repository_receivers() -> None:
+    """``file.delete()`` and ``cache.delete()`` are NOT Spring Data writes.
+
+    Reviewer's example: a @Service method calling unrelated ``delete``
+    methods on file / cache objects must not be counted as repository
+    writes. The receiver-name heuristic rejects identifiers that don't
+    contain ``repo`` / ``dao`` / ``template``.
+    """
+    tree = _parse(
+        """
+        @Service
+        class FileCleanupService {
+            private FileHandle file;
+            private CacheManager cache;
+            public void purge() {
+                file.delete();
+                cache.delete();
+            }
+        }
+        """
+    )
+    rule = SpringMissingTransactionalRule({"enabled": True, "severity": "error"})
+    assert rule.check_file("FileCleanupService.java", tree) == [], "Non-repository receivers (file / cache) must not be counted as Spring Data writes"
+
+
+def test_safe902_does_not_fire_on_mixed_repo_and_non_repo_receivers() -> None:
+    """Only the repo-receiver write counts; the non-repo one is ignored.
+
+    Confirms the heuristic is applied per-call rather than aggregated:
+    one ``userRepo.save()`` + one ``file.delete()`` = 1 counted write,
+    below the 2+ threshold, no violation.
+    """
+    tree = _parse(
+        """
+        @Service
+        class MixedService {
+            private UserRepository userRepo;
+            private FileHandle file;
+            public void doStuff(User u) {
+                userRepo.save(u);
+                file.delete();
+            }
+        }
+        """
+    )
+    rule = SpringMissingTransactionalRule({"enabled": True, "severity": "error"})
+    assert rule.check_file("MixedService.java", tree) == []
+
+
+def test_safe902_fires_on_jdbctemplate_writes() -> None:
+    """``jdbcTemplate.update(...)`` matches via the ``template`` receiver pattern.
+
+    JdbcTemplate is the raw-SQL Spring write path that doesn't follow
+    the CrudRepository naming convention but is still genuinely
+    transactional. Two updates without @Transactional should fire.
+    """
+    tree = _parse(
+        """
+        @Service
+        class LegacyService {
+            private JdbcTemplate jdbcTemplate;
+            public void migrate() {
+                jdbcTemplate.update("INSERT INTO audit ...");
+                jdbcTemplate.update("UPDATE user SET ...");
+            }
+        }
+        """
+    )
+    rule = SpringMissingTransactionalRule({"enabled": True, "severity": "error"})
+    violations = rule.check_file("LegacyService.java", tree)
+    assert len(violations) == 1
+    assert "2 repository writes" in violations[0].message
+
+
 def test_safe902_skips_method_outside_class() -> None:
     """``_enclosing_class`` returns None for orphan methods → rule skips.
 

@@ -243,6 +243,21 @@ _SPRING_REPO_WRITE_METHODS: frozenset[str] = frozenset(
     }
 )
 
+# Receiver-name substrings that signal a repository-like object. The
+# rule constrains write-method matching to receivers whose name contains
+# one of these (case-insensitive). Without this guard, ``call_name``
+# strips the receiver and every ``.save(...)`` / ``.delete(...)`` /
+# ``.update(...)`` call in the method body matches - including
+# unrelated calls like ``file.delete()``, ``cache.delete()``, or
+# ``session.update()``. The heuristic accepts the conservative miss
+# (a write on a repository named ``crud`` or ``store`` won't count)
+# in exchange for eliminating the false-positive class.
+#
+# ``template`` is included to catch ``jdbcTemplate.update(...)`` and
+# ``namedJdbcTemplate.update(...)`` - the raw-SQL Spring write paths
+# that don't share the CrudRepository naming convention.
+_SPRING_REPO_RECEIVER_PATTERNS: tuple[str, ...] = ("repo", "dao", "template")
+
 # Class-level annotations that mark a Spring-managed bean carrying
 # transactional business logic. ``@Service`` is the canonical stereotype;
 # ``@Component`` is broader; ``@Repository`` is also a stereotype but
@@ -319,6 +334,22 @@ class SpringMissingTransactionalRule(BaseRule):
         return violations
 
 
+def _is_repository_receiver(call_node: tree_sitter.Node) -> bool:
+    """Return True if the method_invocation's receiver looks like a repository.
+
+    Receiver must be a simple ``identifier`` whose name (lowercased)
+    contains one of ``repo`` / ``dao`` / ``template``. Receivers
+    of any other shape (``this``, ``field_access``, parenthesised
+    expressions, chained ``a.b.c.save()`` calls) are rejected
+    conservatively to avoid wrongly classifying unrelated objects.
+    """
+    obj = call_node.child_by_field_name("object")
+    if obj is None or obj.type != "identifier":
+        return False
+    name = node_text(obj).lower()
+    return any(p in name for p in _SPRING_REPO_RECEIVER_PATTERNS)
+
+
 def _count_repository_writes(method_node: tree_sitter.Node) -> int:
     """Count Spring Data write-method calls in the immediate method body.
 
@@ -326,6 +357,11 @@ def _count_repository_writes(method_node: tree_sitter.Node) -> int:
     anonymous classes, or inner methods don't count toward the
     enclosing method's total - those are separate transactional
     contexts (or no context at all when run on an executor).
+
+    Also requires the receiver to look like a repository (see
+    ``_is_repository_receiver``); without that guard, ``call_name``
+    strips the receiver and unrelated calls like ``file.delete()``
+    or ``cache.delete()`` would be counted as Spring Data writes.
     """
     count = 0
     for node in walk(method_node, skip_types=tuple(_JAVA_FUNCTION_TYPES)):
@@ -333,8 +369,11 @@ def _count_repository_writes(method_node: tree_sitter.Node) -> int:
             continue
         if node.type != "method_invocation":
             continue
-        if call_name(node) in _SPRING_REPO_WRITE_METHODS:
-            count += 1
+        if call_name(node) not in _SPRING_REPO_WRITE_METHODS:
+            continue
+        if not _is_repository_receiver(node):
+            continue
+        count += 1
     return count
 
 
