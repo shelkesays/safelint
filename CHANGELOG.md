@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (Java)
+
+- **``SAFE401 resource_lifecycle``** for Java's manual ``try { ... } finally { ... }`` form is now strict: the finally clause must contain a direct ``<acquired-var>.close()`` invocation for the rule to consider the resource guarded. The previous heuristic (mirroring JS) accepted *any* try with a finally clause, so ``try { in = new FileInputStream(p); } finally { audit(); }`` silently passed even though nothing closed ``in``. Bare-expression acquirers (``try { new FileInputStream(p); } finally { ... }``) now always fire, since there's no variable handle that could ever be closed. **Helper-pattern trade-off:** ``IOUtils.closeQuietly(in)``, ``Try.run(() -> in.close())``, and similar close-via-helper patterns are NOT recognised under the new strict matcher and will fire SAFE401; switch to try-with-resources or suppress with ``// nosafe: SAFE401`` on the acquirer line. The strict path applies to Java only; JavaScript retains its documented heuristic.
+
 ## [2.1.0rc1] - 2026-05-16
 
 **Java is now a supported language, with a dedicated Spring Boot framework preset.** First MINOR release after v2.0.0; ships as a release candidate so the new language can be exercised against real Spring Boot codebases before promoting to GA. Source-language analysis works on every Java file; per-project tuning happens via the new ``[tool.safelint.java] framework = "spring-boot"`` selector that adds Spring-aware taint sinks, nullable methods, and four new structural rules (``SAFE901-904``) covering common Spring Boot misuses. Python / JavaScript / TypeScript users see zero behaviour change.

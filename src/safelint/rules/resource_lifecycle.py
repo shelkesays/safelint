@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup  # ``_validated_string_list`` re-exported for backwards-compat
 from safelint.languages._node_utils import call_name, resolve_lang_name, walk
+from safelint.languages._node_utils import node_text as _node_text
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import CALL, WITH_ITEM
@@ -118,6 +119,73 @@ def _try_statement_has_finally(node: tree_sitter.Node) -> bool:
     return any(child.type == "finally_clause" for child in node.named_children)
 
 
+def _java_acquired_variable_name(call_node: tree_sitter.Node) -> str | None:
+    """Return the simple identifier the acquirer call is assigned to, or None.
+
+    Handles two assignment shapes:
+
+    * ``Resource r = acquirer(...)`` (``variable_declarator`` parent inside a
+      ``local_variable_declaration`` / field) - returns ``"r"``.
+    * ``r = acquirer(...)`` (``assignment_expression`` parent, reassignment
+      of a previously-declared variable) - returns ``"r"``.
+
+    Returns ``None`` for bare-expression acquirers (``new FileInputStream(p);``
+    with no left-hand-side) - those can never be closed because there's no
+    handle, so they're always leaks regardless of try/finally shape.
+
+    The walk transparently skips ``parenthesized_expression`` and
+    ``cast_expression`` wrappers so ``Resource r = (Resource) acquirer(...)``
+    still resolves to ``"r"``.
+    """
+    cur = call_node.parent
+    while cur is not None and cur.type in ("parenthesized_expression", "cast_expression"):
+        cur = cur.parent
+    if cur is None:
+        return None
+    if cur.type == "variable_declarator":
+        name_node = cur.child_by_field_name("name")
+        if name_node is not None and name_node.type == "identifier":
+            return _node_text(name_node)
+        return None
+    if cur.type == "assignment_expression":
+        left = cur.child_by_field_name("left")
+        if left is not None and left.type == "identifier":
+            return _node_text(left)
+    return None
+
+
+def _finally_closes_variable(finally_clause: tree_sitter.Node, var_name: str) -> bool:
+    """Return True if the finally clause contains a ``var_name.close()`` invocation.
+
+    Walks the finally clause body looking for a ``method_invocation`` whose
+    ``object`` field is an ``identifier`` matching ``var_name`` and whose
+    ``name`` field is ``close``. Stops descending into nested function /
+    lambda / class bodies so a nested ``close()`` on a captured copy doesn't
+    spuriously satisfy the check.
+
+    **Strict matching trade-off.** A close routed through a helper -
+    ``IOUtils.closeQuietly(var)`` (Apache Commons IO), ``closeAll()`` with
+    no argument, ``Try.run(() -> var.close())`` - is NOT recognised here
+    and would produce a false-positive SAFE401. The trade-off was accepted
+    deliberately: the dominant real-world leak is ``finally { audit(); }``
+    or similar where nothing closes the resource at all, and a strict
+    matcher catches that without the cross-helper analysis that would
+    otherwise be needed. Users hitting the helper-pattern false positive
+    can suppress with ``// nosafe: SAFE401`` on the acquirer line, or
+    refactor to the modern try-with-resources form.
+    """
+    for descendant in walk(finally_clause, skip_types=_JAVA_FUNCTION_TYPES):
+        if descendant.type != "method_invocation":
+            continue
+        obj = descendant.child_by_field_name("object")
+        if obj is None or obj.type != "identifier" or _node_text(obj) != var_name:
+            continue
+        name_node = descendant.child_by_field_name("name")
+        if name_node is not None and _node_text(name_node) == "close":
+            return True
+    return False
+
+
 def _is_inside_java_resource_guard(node: tree_sitter.Node) -> bool:
     """Return True if *node* has an enclosing Java resource-cleanup scope.
 
@@ -135,9 +203,11 @@ def _is_inside_java_resource_guard(node: tree_sitter.Node) -> bool:
       child (the header) - if we walked up through the ``block`` child
       (the body), the call is NOT in the header and isn't auto-closed.
     * **try { ... } finally { resource.close(); }**: the older manual
-      form. Accepted when the acquirer call sits inside the try block
-      and the try has a finally clause. Mirrors the JS resource-guard
-      check.
+      form. The finally clause must contain a direct
+      ``<acquired-var>.close()`` invocation; bare ``finally { audit(); }``
+      blocks that perform other work but don't close the resource are
+      treated as unguarded (see ``_finally_closes_variable`` for the
+      helper-pattern trade-off).
 
     Walks the parent chain looking for either form, stopping at function
     boundaries (method_declaration, constructor_declaration,
@@ -152,6 +222,7 @@ def _is_inside_java_resource_guard(node: tree_sitter.Node) -> bool:
     (auto-cleanup is implicit), so the guard only matters for the
     manual try/finally form.
     """
+    var_name = _java_acquired_variable_name(node)
     prev = node
     cur = node.parent
     while cur is not None:
@@ -164,8 +235,10 @@ def _is_inside_java_resource_guard(node: tree_sitter.Node) -> bool:
         # treat it like any other unguarded acquirer.
         if cur.type == "try_with_resources_statement" and prev.type == "resource_specification":
             return True
-        if _try_statement_has_finally(cur) and prev.type != "finally_clause":
-            return True
+        if cur.type == "try_statement" and prev.type != "finally_clause" and var_name is not None:
+            finally_clause = next((c for c in cur.named_children if c.type == "finally_clause"), None)
+            if finally_clause is not None and _finally_closes_variable(finally_clause, var_name):
+                return True
         prev = cur
         cur = cur.parent
     return False
