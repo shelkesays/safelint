@@ -207,10 +207,15 @@ DEFAULTS: dict[str, Any] = {
             "io_functions_java": [
                 # PrintStream / PrintWriter methods - ``System.out.println(...)``
                 # resolves to ``"println"`` after ``call_name`` strips the receiver.
+                # ``format`` is deliberately NOT listed: ``call_name`` returns the
+                # bare method name, so an entry would also match the pure
+                # ``String.format(...)`` / ``MessageFormat.format(...)`` / SLF4J's
+                # ``String.format``-wrapped logging calls and produce false
+                # positives. ``printf`` is unambiguous (PrintStream / PrintWriter
+                # only) so it stays in.
                 "println",
                 "print",
                 "printf",
-                "format",
                 # Java stdin / Scanner methods.
                 "readLine",
                 "nextLine",
