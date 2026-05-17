@@ -118,12 +118,41 @@ def _count_args(func_node: tree_sitter.Node, lang_name: str) -> tuple[int, str |
     # with errors, in which case zero args is a safe answer.
     if params_node is None:  # pragma: no cover
         return 0, None
+    if lang_name == "java":
+        return _count_java_args(params_node), None
     counted_types = _COUNTED_PARAM_TYPES_BY_LANG[lang_name]
     counted = [c for c in params_node.named_children if c.type in counted_types]
     first_name: str | None = None
     if counted and lang_name == "python":
         first_name = _python_param_identifier(counted[0])
     return len(counted), first_name
+
+
+def _count_java_args(params_node: tree_sitter.Node) -> int:
+    """Count Java parameters across all three lambda + standard shapes.
+
+    tree-sitter-java exposes the ``parameters`` field with three distinct
+    node types depending on the surface syntax:
+
+    * ``formal_parameters`` - standard method / constructor / lambda with
+      typed params (``(String a, int b) -> ...``). Children are
+      ``formal_parameter`` or ``spread_parameter`` nodes.
+    * ``inferred_parameters`` - untyped multi-arg lambda (``(a, b) -> ...``).
+      Children are bare ``identifier`` nodes.
+    * ``identifier`` - untyped single-arg lambda (``a -> ...``). The
+      ``parameters`` field IS the identifier itself, no container node.
+
+    Without the inferred_parameters / bare-identifier branches, the rule
+    silently treats untyped lambdas as zero-arg and misses
+    over-argument lambdas like
+    ``(a, b, c, d, e, f, g, h) -> ...`` that are increasingly common
+    in stream / reactive pipelines.
+    """
+    if params_node.type == "identifier":
+        return 1
+    if params_node.type == "inferred_parameters":
+        return sum(1 for c in params_node.named_children if c.type == "identifier")
+    return sum(1 for c in params_node.named_children if c.type in _JAVA_COUNTED_PARAM_TYPES)
 
 
 class MaxArgumentsRule(BaseRule):
