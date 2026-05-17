@@ -23,7 +23,7 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 pip install 'safelint[python]'         # adds .py, .pyw
 pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs
 pip install 'safelint[typescript]'     # adds .ts, .tsx, .as (also bundles JS)
-pip install 'safelint[java]'           # adds .java (with optional Spring Boot framework preset)
+pip install 'safelint[java]==2.1.0rc1' # adds .java (with optional Spring Boot framework preset; pin RC until v2.1.0 GA)
 pip install 'safelint[all]'            # every supported language
 pip install 'safelint[python,java]'    # multiple extras compose
 # uv add 'safelint[typescript]' works the same way.

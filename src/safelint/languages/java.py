@@ -5,9 +5,10 @@ constants rules will use for type-checking nodes.
 
 Scope: vanilla Java (any JDK from 11 onwards parses, the grammar is JLS-current).
 Spring Boot awareness ships as a *framework preset* configured via
-``[tool.safelint.java] framework = "spring-boot"`` in TOML; the preset shifts
-rule *defaults* (taint sources, side-effect exemptions, recognised logger
-method names) but does not change parsing. The same ``tree-sitter-java``
+``[tool.safelint.java] framework = "spring-boot"`` in TOML; the preset replaces
+Java taint sinks (adds ``JdbcTemplate`` / ``RestTemplate`` methods) and
+nullable-method defaults, and enables the four Spring-aware structural rules
+(SAFE901-904). It does not change parsing - the same ``tree-sitter-java``
 grammar handles vanilla Java, Spring Boot, Jakarta EE, Android, and any
 other framework.
 

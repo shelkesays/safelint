@@ -71,8 +71,9 @@ typescript = [
 ]
 # Java ships with optional Spring Boot framework awareness via
 # ``[tool.safelint.java] framework = "spring-boot"`` (default ``"vanilla"``).
-# The preset adjusts rule defaults (taint sources, side-effect exemptions,
-# logger method recognition) but is *not* a separate grammar install -
+# The preset replaces Java taint sinks (adds ``JdbcTemplate`` / ``RestTemplate``
+# methods) and nullable-method defaults, and enables the four Spring-aware
+# structural rules (SAFE901-904). It is *not* a separate grammar install -
 # Spring code parses with the same ``tree-sitter-java`` grammar.
 java = [
     "tree-sitter-java>=0.23.0",

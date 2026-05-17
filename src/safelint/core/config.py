@@ -1122,10 +1122,13 @@ _JAVA_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
     #     / ``getForObject`` / ``getForEntity`` / ``postForObject`` /
     #     ``postForEntity`` / ``put`` / ``delete`` cover the canonical
     #     methods.
-    #   * ``queryForObject`` returns null when zero rows match (the
+    #   * ``queryForObject`` raises ``EmptyResultDataAccessException``
+    #     when zero rows match; nullable results come from RowMapper
+    #     implementations and nullable column values, which is why
+    #     the method is included in ``nullable_methods_java``. The
     #     Optional-returning alternatives ``JdbcClient.findOne`` /
-    #     ``JdbcClient.findFirst`` were added in Spring 6.1; older
-    #     code still uses the null-returning form).
+    #     ``JdbcClient.findFirst`` were added in Spring 6.1 for
+    #     unambiguous null-or-present access in newer code.
     #
     # The preset deliberately does NOT touch:
     #
@@ -1218,10 +1221,12 @@ _JAVA_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                     "getDeclaredAnnotation",
                     "getEnclosingClass",
                     "getEnclosingMethod",
-                    # Spring JdbcTemplate.queryForObject(...) returns
-                    # null when no rows match. The newer
-                    # ``JdbcClient.findOne`` returns Optional and is
-                    # deliberately NOT listed.
+                    # Spring JdbcTemplate.queryForObject(...) raises
+                    # ``EmptyResultDataAccessException`` on zero rows;
+                    # null can still surface via RowMapper output or
+                    # nullable column values, hence the conservative
+                    # entry here. The newer ``JdbcClient.findOne``
+                    # returns Optional and is deliberately NOT listed.
                     "queryForObject",
                     # Spring ApplicationContext.getBean(name) throws
                     # when missing; NOT null-returning. NOT listed.

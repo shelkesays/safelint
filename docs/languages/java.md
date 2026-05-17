@@ -11,13 +11,13 @@ Kotlin (`.kt`), Groovy (`.groovy`), and Scala (`.scala`) are NOT yet registered;
 ## Quick start
 
 ```bash
-pip install 'safelint[java]'           # the tool runs on Python; the [java] extra adds the Java grammar
+pip install --pre 'safelint[java]'     # --pre is required until v2.1.0 GA; the [java] extra adds the Java grammar
 safelint check src/                    # lint a directory (git-modified files by default)
 safelint check --all-files .           # lint everything
 safelint check --format json src/      # machine-readable for editors / CI
 ```
 
-If your Java project doesn't already have a Python tool chain, `pipx install 'safelint[java]'` isolates the install. Maven / Gradle plugins are NOT required; safelint is a standalone CLI that reads source files directly.
+The `--pre` flag is needed while v2.1.0rc1 is the current release because pip defaults to stable; v2.0.0 is the latest stable but does not have a `[java]` extra. Drop `--pre` once v2.1.0 GA is published. If your Java project doesn't already have a Python tool chain, `pipx install --pre 'safelint[java]'` isolates the install. Maven / Gradle plugins are NOT required; safelint is a standalone CLI that reads source files directly.
 
 v2.1.0+ ships every language grammar as an opt-in extra, plain `pip install safelint` installs only the engine and would skip every `.java` file with an install hint on first run.
 
@@ -121,9 +121,9 @@ All accept a list of strings; bare-string typos (`sinks_java = "eval"` instead o
 Java grammar support ships as an optional extra so non-Java projects don't pay for it:
 
 ```bash
-pip install 'safelint[java]'              # adds .java only
-pip install 'safelint[python,java]'       # polyglot Python + Java monorepo
-pip install 'safelint[all]'               # kitchen-sink, every supported grammar
+pip install --pre 'safelint[java]'              # adds .java only (--pre needed until v2.1.0 GA)
+pip install --pre 'safelint[python,java]'       # polyglot Python + Java monorepo
+pip install --pre 'safelint[all]'               # kitchen-sink, every supported grammar
 ```
 
 Without the extra, `safelint check` skips `.java` files with a one-line install hint at lint time. If at least one other supported file (e.g. a Python file in a mixed repo) does get linted, the run continues normally. **If every candidate file gets skipped**, the typical case in a Java-only project, the [silent-failure guard](../configuration/cli.md#exit-code-2--silent-failure-triggers) fires and SafeLint exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.

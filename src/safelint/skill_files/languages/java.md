@@ -7,16 +7,18 @@ Language-specific notes for the Java target. Mirrors `src/safelint/languages/jav
 safelint is a Python package, not a Maven / Gradle artefact. v2.1.0+ ships the Java grammar in the `[java]` extra:
 
 ```bash
-pip install 'safelint[java]'
+pip install --pre 'safelint[java]'
 # or, in a project that already uses uv:
 uv add --dev 'safelint[java]'
 # or, kitchen-sink:
-pip install 'safelint[all]'
+pip install --pre 'safelint[all]'
 ```
+
+The `--pre` flag is required while v2.1.0rc1 is the current release; pip otherwise resolves to the latest stable (v2.0.0) which does not have a `[java]` extra. Drop `--pre` once v2.1.0 GA is tagged. (`uv add` honours pre-releases by default for any version request that names one, so no flag needed there.)
 
 After install, `safelint` is on `PATH`. Run it from the Java project's root the same way as for a Python project, it auto-detects the language by file extension. Maven / Gradle plugins are NOT required; safelint is a standalone CLI that reads source files directly.
 
-If you run plain `pip install safelint` (no extra) by mistake, the first run emits `safelint: warning: skipping .java files, install with: pip install 'safelint[java]'` and exits with code 2. Re-install with the extra and retry.
+If you run plain `pip install safelint` (no extra) by mistake, the first run emits `safelint: warning: skipping .java files, install with: pip install --pre 'safelint[java]'` and exits with code 2. Re-install with the extra and retry.
 
 For pre-commit integration, the published hook routes `.java` files via the `java` filetype tag in `types_or` (pre-commit's `identify` library recognises it):
 
