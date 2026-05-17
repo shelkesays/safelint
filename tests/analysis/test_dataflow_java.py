@@ -9,10 +9,14 @@ coverage gaps with direct unit tests against the tracker's public
 
 from __future__ import annotations
 
+from pathlib import Path
+from tempfile import TemporaryDirectory
 import textwrap
 from typing import TYPE_CHECKING
 
 from safelint.analysis.dataflow_java import JavaTaintTracker
+from safelint.core.config import DEFAULTS, deep_merge
+from safelint.core.engine import SafetyEngine
 from safelint.languages._node_utils import node_text
 from safelint.languages.java import JAVA
 
@@ -371,6 +375,44 @@ def test_single_arg_lambda_seeds_parameter() -> None:
 
     lambda_node = next(n for n in walk(tree.root_node) if n.type == "lambda_expression")
     assert _java_param_names(lambda_node) == {"u"}
+
+
+def test_lambda_captures_enclosing_method_param_for_taint() -> None:
+    """A lambda inside ``m(String input)`` that uses ``input`` reaches SAFE801.
+
+    Without seeding the lambda's tracker with the enclosing method's
+    params as captures, the analyser would see the lambda as
+    parameter-less and miss the fact that ``input`` (tainted via the
+    enclosing method's entry seed) reaches the sink ``exec``. This is
+    the over-approximation strategy: treat all enclosing method params
+    as potentially-captured-and-tainted in any nested lambda.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m(String input) {
+                java.util.List.of("a").forEach(s -> exec(input));
+            }
+            void exec(String s) {}
+        }
+        """
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                "sinks_java": ["exec"],
+                "sanitizers_java": [],
+                "sources_java": [],
+            }
+        }
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE801" for v in result.violations), "Lambda capturing enclosing method param ``input`` should reach SAFE801"
 
 
 def test_constructor_call_does_not_apply_receiver_check() -> None:

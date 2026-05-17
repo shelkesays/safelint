@@ -277,6 +277,30 @@ def _java_spread_param_name(child: tree_sitter.Node) -> str | None:
     return node_text(name_node)
 
 
+def _java_enclosing_param_captures(lambda_node: tree_sitter.Node) -> set[str]:
+    """Return the params of the lambda's enclosing function (taint over-approximation).
+
+    Walks the parent chain. The first non-lambda function-defining ancestor
+    (``method_declaration``, ``constructor_declaration``, ``static_initializer``,
+    etc.) contributes its params. Intermediate ``lambda_expression`` ancestors
+    contribute *their* params too, since the captured variables flow through
+    each nested scope.
+
+    Returns an empty set if the lambda has no enclosing function (a malformed
+    or top-level lambda that shouldn't really exist in valid Java).
+    """
+    captures: set[str] = set()
+    cur = lambda_node.parent
+    while cur is not None:
+        if cur.type == "lambda_expression":
+            captures |= _java_param_names(cur)
+        elif cur.type in _JAVA_FUNCTION_TYPES:
+            captures |= _java_param_names(cur)
+            return captures
+        cur = cur.parent
+    return captures
+
+
 def _java_param_names(func_node: tree_sitter.Node) -> set[str]:
     """Return all parameter names for *func_node* (Java).
 
@@ -453,6 +477,16 @@ class TaintedSinkRule(BaseRule):
             if node.type not in _JAVA_FUNCTION_TYPES:
                 continue
             params = _java_param_names(node)
+            if node.type == "lambda_expression":
+                # Lambdas capture enclosing scope. Without seeding the
+                # captured-param taint, ``void m(String input) { run(() ->
+                # exec(input)); }`` would miss SAFE801 because the lambda's
+                # own params are empty and ``input`` looks unbound to the
+                # tracker. Approximate captures as the enclosing function's
+                # full param set (walking up through nested lambdas).
+                # Over-approximation: unused captures cost nothing because
+                # they don't appear in the lambda body.
+                params = params | _java_enclosing_param_captures(node)
             tracker = JavaTaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
             tracker.visit(node)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
