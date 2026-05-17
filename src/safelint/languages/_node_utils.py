@@ -112,10 +112,12 @@ def node_text(node: tree_sitter.Node) -> str:
 #: walk calls without caring about source language.
 #:
 #: * Python: ``call``
-#: * JavaScript / TypeScript: ``call_expression``
+#: * JavaScript / TypeScript: ``call_expression`` (regular calls) and
+#:   ``new_expression`` (``new Foo(...)`` constructor invocations -
+#:   ``call_name`` resolves them via the ``constructor`` field)
 #: * Java: ``method_invocation`` (regular calls) and
 #:   ``object_creation_expression`` (``new Foo(...)``)
-CALL_TYPES: frozenset[str] = frozenset({"call", "call_expression", "method_invocation", "object_creation_expression"})
+CALL_TYPES: frozenset[str] = frozenset({"call", "call_expression", "new_expression", "method_invocation", "object_creation_expression"})
 
 
 def resolve_lang_name(filepath: str) -> str:
