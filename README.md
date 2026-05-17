@@ -177,7 +177,7 @@ repos:
         additional_dependencies: ['safelint[python]']               # Python-only repo
         # additional_dependencies: ['safelint[javascript]']         # JS-only repo (Node / browser / Deno / Cloudflare Workers / Bun)
         # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles tree-sitter-javascript too)
-        # additional_dependencies: ['safelint[java]']               # Java repo (Spring Boot via [tool.safelint.java] framework = "spring-boot")
+        # additional_dependencies: ['safelint[java]==2.1.0rc1']     # Java repo, RC pin until v2.1.0 GA (Spring Boot via [tool.safelint.java] framework = "spring-boot")
         # additional_dependencies: ['safelint[python,javascript]']  # mixed monorepo
         # additional_dependencies: ['safelint[all]']                # kitchen-sink
 

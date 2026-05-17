@@ -139,7 +139,7 @@ repos:
       - id: safelint
         # Java users add the matching extra so pre-commit's isolated
         # environment installs ``tree-sitter-java``.
-        additional_dependencies: ['safelint[java]']
+        additional_dependencies: ['safelint[java]==2.1.0rc1']  # RC pin needed until v2.1.0 GA
         # The published hook's ``types_or`` already includes python,
         # javascript, ts, tsx, and java. Optional: scope to a directory.
         files: ^src/
@@ -149,7 +149,7 @@ For a Maven / Gradle project that organises sources under `src/main/java` and te
 
 ```yaml
       - id: safelint
-        additional_dependencies: ['safelint[java]']
+        additional_dependencies: ['safelint[java]==2.1.0rc1']  # RC pin needed until v2.1.0 GA
         files: ^src/(main|test)/java/
 ```
 
