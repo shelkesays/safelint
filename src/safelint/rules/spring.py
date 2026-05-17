@@ -488,6 +488,21 @@ class SpringUnvalidatedInputRule(BaseRule):
         )
 
 
+def _is_async_method(method: tree_sitter.Node) -> bool:
+    """Return True if *method* is annotated ``@Async`` directly or via its enclosing class.
+
+    Spring honours ``@Async`` at both the method level and the class /
+    type level. A class-level ``@Async class Job { void run() throws
+    IOException { ... } }`` will execute every method asynchronously
+    and silently swallow the checked exception just like a method-level
+    annotation would, so the throws clause is misleading either way.
+    """
+    if _has_annotation(_modifiers_of(method), "Async"):
+        return True
+    enclosing = _enclosing_class(method)
+    return enclosing is not None and _has_annotation(_modifiers_of(enclosing), "Async")
+
+
 def _is_controller_method(node: tree_sitter.Node) -> bool:
     """Return True if *node* is a ``method_declaration`` inside a Spring controller class."""
     if node.type != "method_declaration":
@@ -564,7 +579,7 @@ class SpringAsyncCheckedExceptionRule(BaseRule):
         for method in walk(tree.root_node):
             if method.type != "method_declaration":
                 continue
-            if not _has_annotation(_modifiers_of(method), "Async"):
+            if not _is_async_method(method):
                 continue
             throws_node = next((c for c in method.named_children if c.type == "throws"), None)
             if throws_node is None:

@@ -309,6 +309,33 @@ def test_safe904_does_not_fire_without_throws() -> None:
     assert rule.check_file("JobRunner.java", tree) == []
 
 
+def test_safe904_fires_on_class_level_async() -> None:
+    """``@Async class Job { void run() throws IOException }`` fires.
+
+    Spring honours ``@Async`` at the class / type level too - every
+    method in the class runs asynchronously. The rule must walk to
+    the enclosing class's annotations, not only the method's
+    immediate modifiers, otherwise this whole pattern is silently
+    missed even though Spring will swallow the checked exception
+    just like a method-level annotation would.
+    """
+    tree = _parse(
+        """
+        @Async
+        class Job {
+            public void run() throws java.io.IOException {
+                doWork();
+            }
+        }
+        """
+    )
+    rule = SpringAsyncCheckedExceptionRule({"enabled": True, "severity": "warning"})
+    violations = rule.check_file("Job.java", tree)
+    assert len(violations) == 1, "class-level @Async should propagate to every method"
+    assert "run" in violations[0].message
+    assert "IOException" in violations[0].message
+
+
 def test_safe904_does_not_fire_without_async() -> None:
     """A method with throws but no @Async is fine - the caller will see the exception."""
     tree = _parse(
