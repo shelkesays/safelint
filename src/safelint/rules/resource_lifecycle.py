@@ -138,7 +138,10 @@ def _java_acquired_variable_name(call_node: tree_sitter.Node) -> str | None:
     still resolves to ``"r"``.
     """
     cur = call_node.parent
-    while cur is not None and cur.type in ("parenthesized_expression", "cast_expression"):
+    # Parent chain is finite (terminates at the program root), so the
+    # ``cur is not None`` clause bounds the loop; SAFE501 wants a pure
+    # comparison in the header which this conjunction isn't.
+    while cur is not None and cur.type in ("parenthesized_expression", "cast_expression"):  # nosafe: SAFE501
         cur = cur.parent
     if cur is None:
         return None
@@ -228,20 +231,35 @@ def _is_inside_java_resource_guard(node: tree_sitter.Node) -> bool:
     while cur is not None:
         if cur.type in _JAVA_FUNCTION_TYPES:
             return False
-        # try-with-resources only auto-closes resources declared in
-        # the header (the ``resource_specification`` child). A call
-        # reached via the ``block`` child is inside the body and is
-        # NOT auto-closed by the enclosing try-with-resources -
-        # treat it like any other unguarded acquirer.
-        if cur.type == "try_with_resources_statement" and prev.type == "resource_specification":
+        if _java_ancestor_is_guard(cur, prev, var_name):
             return True
-        if cur.type == "try_statement" and prev.type != "finally_clause" and var_name is not None:
-            finally_clause = next((c for c in cur.named_children if c.type == "finally_clause"), None)
-            if finally_clause is not None and _finally_closes_variable(finally_clause, var_name):
-                return True
         prev = cur
         cur = cur.parent
     return False
+
+
+def _java_ancestor_is_guard(cur: tree_sitter.Node, prev: tree_sitter.Node, var_name: str | None) -> bool:
+    """Return True if *cur* is a try ancestor that guards the acquirer.
+
+    Two acceptances:
+
+    * ``try_with_resources_statement`` reached via the ``resource_specification``
+      child - meaning the acquirer call sat in the header parens, where the
+      JLS guarantees ``close()``. A call reached via the ``block`` child is
+      inside the body and is NOT auto-closed.
+    * ``try_statement`` (manual try/finally) whose finally clause contains a
+      ``<var_name>.close()`` invocation. The ``prev.type != "finally_clause"``
+      guard skips a try whose finally we just walked out of - that finally
+      doesn't run AFTER the acquirer if the acquirer lives inside it.
+      ``var_name is None`` (bare-expression acquirers) always returns False
+      from this branch because there's no handle to close.
+    """
+    if cur.type == "try_with_resources_statement" and prev.type == "resource_specification":
+        return True
+    if cur.type != "try_statement" or prev.type == "finally_clause" or var_name is None:
+        return False
+    finally_clause = next((c for c in cur.named_children if c.type == "finally_clause"), None)
+    return finally_clause is not None and _finally_closes_variable(finally_clause, var_name)
 
 
 class ResourceLifecycleRule(BaseRule):

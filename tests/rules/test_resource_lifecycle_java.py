@@ -133,6 +133,4 @@ def test_java_helper_close_pattern_false_positive(tmp_path: Path) -> None:
         "}\n",
     )
     result = _engine({"rules": {"resource_lifecycle": {"enabled": True}}}).check_file(str(sample))
-    assert len(_safe401_codes(result.violations)) == 1, (
-        "Documented strict-matching trade-off: helper-close patterns are not recognised."
-    )
+    assert len(_safe401_codes(result.violations)) == 1, "Documented strict-matching trade-off: helper-close patterns are not recognised."
