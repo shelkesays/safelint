@@ -134,7 +134,7 @@ Without the extra, `safelint check` skips `.java` files with a one-line install 
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.1.0       # pin to a release (use the latest GA tag)
+    rev: v2.1.0rc1    # pin to a release (RC tag; switch to v2.1.0 once GA is published)
     hooks:
       - id: safelint
         # Java users add the matching extra so pre-commit's isolated
