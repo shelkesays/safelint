@@ -416,9 +416,7 @@ def test_passthrough_unwrap_exercised_by_cast_in_sink_receiver() -> None:
         path.write_text(src)
         engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
         result = engine.check_file(str(path))
-    assert any(v.code == "SAFE801" for v in result.violations), (
-        "Tainted receiver wrapped in cast should still reach the sink"
-    )
+    assert any(v.code == "SAFE801" for v in result.violations), "Tainted receiver wrapped in cast should still reach the sink"
 
 
 def test_safe803_unwraps_cast_around_nullable_receiver() -> None:
@@ -451,9 +449,7 @@ def test_safe803_unwraps_cast_around_nullable_receiver() -> None:
         path.write_text(src)
         engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
         result = engine.check_file(str(path))
-    assert any(v.code == "SAFE803" for v in result.violations), (
-        "Cast wrapping a nullable .get() result should still trigger SAFE803"
-    )
+    assert any(v.code == "SAFE803" for v in result.violations), "Cast wrapping a nullable .get() result should still trigger SAFE803"
 
 
 def test_scoped_object_creation_name_resolves_trailing_identifier() -> None:
@@ -491,9 +487,7 @@ def test_scoped_object_creation_name_resolves_trailing_identifier() -> None:
         path.write_text(src)
         engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
         result = engine.check_file(str(path))
-    assert any(v.code == "SAFE801" for v in result.violations), (
-        "Scoped-type ``new java.io.FileInputStream(input)`` should match the FileInputStream sink"
-    )
+    assert any(v.code == "SAFE801" for v in result.violations), "Scoped-type ``new java.io.FileInputStream(input)`` should match the FileInputStream sink"
 
 
 def test_lambda_captures_enclosing_method_param_for_taint() -> None:
