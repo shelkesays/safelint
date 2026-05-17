@@ -949,3 +949,146 @@ if (el != null) {
   process(el.textContent);
 }
 ```
+
+## Java + Spring Boot rules
+
+`SAFE9xx` rules are Java-only structural checks for common Spring Boot misuses. All four are disabled by default and enabled together by the `spring-boot` framework preset (`[tool.safelint.java] framework = "spring-boot"`). They do not fire on Python / JavaScript / TypeScript files even if explicitly enabled; rule dispatch is gated on file language.
+
+### SAFE901: `spring_field_injection`
+
+**What it flags:** A class field annotated with `@Autowired` (or the fully-qualified `@org.springframework.beans.factory.annotation.Autowired`). Java only.
+
+Spring's reference documentation recommends constructor injection over field injection: constructor-injected dependencies are immutable (`final`), testable without reflection, fail fast on missing beans at construction time, and surface obvious circular dependencies as compile errors. Field-injected dependencies hide all of those properties.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (spring-boot preset) | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```java
+@Service
+public class OrderService {
+    @Autowired
+    private InventoryClient inventory;   // SAFE901
+}
+```
+
+**Good:**
+
+```java
+@Service
+public class OrderService {
+    private final InventoryClient inventory;
+
+    public OrderService(InventoryClient inventory) {
+        this.inventory = inventory;
+    }
+}
+```
+
+### SAFE902: `spring_missing_transactional`
+
+**What it flags:** A `@Service` or `@Component` method that performs two or more Spring Data repository writes (`save` / `saveAll` / `saveAndFlush` / `delete` / `deleteAll` / `deleteAllInBatch` / `deleteById` / `update`) without `@Transactional` on the method or the enclosing class. Java only.
+
+Multi-write methods without `@Transactional` run each write in its own short-lived transaction; a failure between writes leaves the database in a partially-updated state. Single-write methods are exempt because the implicit per-statement transaction is sufficient.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (spring-boot preset) | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```java
+@Service
+public class OrderService {
+    public void placeOrder(Order order) {
+        orderRepo.save(order);
+        inventoryRepo.update(order.itemId(), -1);   // SAFE902: 2 writes, no @Transactional
+    }
+}
+```
+
+**Good:**
+
+```java
+@Service
+public class OrderService {
+    @Transactional
+    public void placeOrder(Order order) {
+        orderRepo.save(order);
+        inventoryRepo.update(order.itemId(), -1);
+    }
+}
+```
+
+### SAFE903: `spring_unvalidated_input`
+
+**What it flags:** A `@RestController` or `@Controller` method parameter annotated with `@RequestBody` or `@ModelAttribute` that is NOT also annotated with `@Valid` or `@Validated`. Java only.
+
+Without `@Valid` / `@Validated`, Bean Validation constraints declared on the DTO (`@NotNull`, `@Size`, `@Email`, etc.) are silently ignored. Malformed or hostile input reaches the controller body. `@PathVariable` and `@RequestParam` are deliberately NOT covered because they typically bind to primitives or simple strings where bean validation is rarely declared.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (spring-boot preset) | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```java
+@RestController
+public class UserController {
+    @PostMapping("/users")
+    public User create(@RequestBody UserDto dto) { ... }   // SAFE903: no @Valid
+}
+```
+
+**Good:**
+
+```java
+@RestController
+public class UserController {
+    @PostMapping("/users")
+    public User create(@Valid @RequestBody UserDto dto) { ... }
+}
+```
+
+### SAFE904: `spring_async_checked_exception`
+
+**What it flags:** A method annotated `@Async` that declares a `throws` clause for a checked exception. Java only.
+
+Spring runs `@Async` methods on a separate thread; checked exceptions declared by the method cannot propagate back to the caller's stack and are silently swallowed by Spring's executor. The `throws` clause misleads the reader into thinking the caller can handle the exception when it cannot. Fix by either catching inside the method body or returning a `CompletableFuture` whose failure state carries the exception (`CompletableFuture.failedFuture(ex)`).
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (spring-boot preset) | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```java
+@Service
+public class IngestService {
+    @Async
+    public void process(File f) throws IOException { ... }   // SAFE904
+}
+```
+
+**Good:**
+
+```java
+@Service
+public class IngestService {
+    @Async
+    public CompletableFuture<Void> process(File f) {
+        try {
+            // ... I/O work
+            return CompletableFuture.completedFuture(null);
+        } catch (IOException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
+}
+```
