@@ -195,7 +195,7 @@ class JavaTaintTracker:
             # No initialiser: ``int x;`` - the binding starts untainted,
             # nothing to record.
             return
-        if name.type != "identifier":
+        if name.type != "identifier":  # pragma: no cover - defensive: variable_declarator name is always an identifier in valid Java
             return
         is_tainted = self._is_tainted(value)
         self._update_name(name, is_tainted=is_tainted)
@@ -224,7 +224,7 @@ class JavaTaintTracker:
     def _record_tainted_arg_hits(self, call_node: tree_sitter.Node, sink_name: str) -> None:
         """Record one sink hit per tainted argument on *call_node*."""
         args_node = call_node.child_by_field_name("arguments")
-        if args_node is None:
+        if args_node is None:  # pragma: no cover - defensive: method_invocation always carries an arguments node
             return
         for arg in args_node.named_children:
             if self._is_tainted(arg):

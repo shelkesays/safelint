@@ -66,7 +66,7 @@ def _create_java_parser() -> tree_sitter.Parser:
     so this error is reached only when something bypasses the registry
     (rare in normal flow).
     """
-    if _JAVA_TS_LANGUAGE is None:
+    if _JAVA_TS_LANGUAGE is None:  # pragma: no cover - exercised only when tree-sitter-java extra is uninstalled
         msg = f"tree-sitter-java is not installed. Run: {GRAMMAR_INSTALL_HINT}"
         raise ImportError(msg)
     return tree_sitter.Parser(_JAVA_TS_LANGUAGE)

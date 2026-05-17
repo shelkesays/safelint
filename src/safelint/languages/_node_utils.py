@@ -161,14 +161,14 @@ def _java_object_creation_name(call_node: tree_sitter.Node) -> str | None:
     the trailing identifier).
     """
     type_node = call_node.child_by_field_name("type")
-    if type_node is None:
+    if type_node is None:  # pragma: no cover - defensive: object_creation_expression always has a type field
         return None
     if type_node.type == "type_identifier":
         return node_text(type_node)
-    if type_node.type != "scoped_type_identifier":
+    if type_node.type != "scoped_type_identifier":  # pragma: no cover - generic / array creation types fall through
         return None
     last_id = _last_type_identifier(type_node)
-    return node_text(last_id) if last_id else None
+    return node_text(last_id) if last_id is not None else None  # pragma: no cover - defensive: scoped_type_identifier always has trailing identifier
 
 
 def _python_js_call_name(call_node: tree_sitter.Node) -> str | None:

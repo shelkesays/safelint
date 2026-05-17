@@ -377,6 +377,125 @@ def test_single_arg_lambda_seeds_parameter() -> None:
     assert _java_param_names(lambda_node) == {"u"}
 
 
+def test_passthrough_unwrap_exercised_by_cast_in_sink_receiver() -> None:
+    """A cast expression on the sink receiver exercises ``_peel_java_passthrough``.
+
+    The receiver-as-input check for ``method_invocation`` runs the
+    receiver through ``_peel_java_passthrough`` to strip
+    ``cast_expression`` / ``parenthesized_expression`` wrappers before
+    looking up the identifier. Without a test that actually presents
+    a cast wrapping a tainted receiver, that helper's loop body never
+    executes.
+
+    ``((String) input).trim()`` casts the parameter then invokes a
+    method; the trim() result feeds into ``exec``. Taint propagates
+    from the cast receiver through the unwrap.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m(String input) {
+                exec(((String) input).trim());
+            }
+            void exec(String s) {}
+        }
+        """
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                "sinks_java": ["exec"],
+                "sanitizers_java": [],
+                "sources_java": [],
+            }
+        }
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE801" for v in result.violations), (
+        "Tainted receiver wrapped in cast should still reach the sink"
+    )
+
+
+def test_safe803_unwraps_cast_around_nullable_receiver() -> None:
+    """``((Foo) map.get(k)).bar`` exercises ``_peel_java_passthrough`` in SAFE803.
+
+    The Java SAFE803 path peels ``parenthesized_expression`` and
+    ``cast_expression`` wrappers off the dereference receiver before
+    matching it against ``nullable_methods_java``. Without this test the
+    helper's loop body never executes from any other path.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m(java.util.Map<String, Foo> map, String k) {
+                String s = ((Foo) map.get(k)).toString();
+            }
+        }
+        """
+    )
+    overrides = {
+        "rules": {
+            "null_dereference": {
+                "enabled": True,
+                "nullable_methods_java": ["get"],
+            }
+        }
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE803" for v in result.violations), (
+        "Cast wrapping a nullable .get() result should still trigger SAFE803"
+    )
+
+
+def test_scoped_object_creation_name_resolves_trailing_identifier() -> None:
+    """``new java.io.FileInputStream(input)`` resolves to ``"FileInputStream"``.
+
+    Exercises ``_java_object_creation_name`` /  ``_last_type_identifier``
+    in :mod:`safelint.languages._node_utils`. The qualified form is
+    legal Java (used to disambiguate when the class isn't imported)
+    and tree-sitter-java emits ``scoped_type_identifier`` as the type
+    field of the ``object_creation_expression``. The helper walks the
+    scoped identifier's named children and returns the trailing
+    ``type_identifier``.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m(String input) {
+                Object stream = new java.io.FileInputStream(input);
+            }
+        }
+        """
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                "sinks_java": ["FileInputStream"],
+                "sanitizers_java": [],
+                "sources_java": [],
+            }
+        }
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE801" for v in result.violations), (
+        "Scoped-type ``new java.io.FileInputStream(input)`` should match the FileInputStream sink"
+    )
+
+
 def test_lambda_captures_enclosing_method_param_for_taint() -> None:
     """A lambda inside ``m(String input)`` that uses ``input`` reaches SAFE801.
 

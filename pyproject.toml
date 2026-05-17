@@ -151,17 +151,7 @@ source = ["src"]
 # Tree-sitter rarely produces). The current bar is set high enough
 # to catch real coverage regressions; raise it as more pragmas
 # are added or genuinely-testable branches get tests.
-# Coverage threshold lowered from 97 to 95 during the v2.1.0rc1 Java
-# language port. The 1.27% gap to the original 97 floor is residual
-# defensive-branch coverage in ``rules/spring.py`` and ``analysis/
-# dataflow_java.py`` (e.g. ``if name_node is None or name_node.type
-# != "identifier": return None`` guards that valid Java grammar
-# doesn't reach). Exercising those branches would need hand-crafted
-# malformed AST that ``tree-sitter-java`` would otherwise reject;
-# pragma annotations would be more honest there. Restore to 97 (or
-# raise) once the remaining defensive branches are either tested or
-# annotated as part of v2.1.0 GA prep.
-fail_under = 95
+fail_under = 97
 precision = 2
 show_missing = true
 skip_covered = true

@@ -109,7 +109,7 @@ def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
             return True
         prev = cur
         cur = cur.parent
-    return False
+    return False  # pragma: no cover - defensive: walks off the tree root
 
 
 def _try_statement_has_finally(node: tree_sitter.Node) -> bool:
@@ -143,13 +143,13 @@ def _java_acquired_variable_name(call_node: tree_sitter.Node) -> str | None:
     # comparison in the header which this conjunction isn't.
     while cur is not None and cur.type in ("parenthesized_expression", "cast_expression"):  # nosafe: SAFE501
         cur = cur.parent
-    if cur is None:
+    if cur is None:  # pragma: no cover - defensive: walked off the tree root
         return None
     if cur.type == "variable_declarator":
         name_node = cur.child_by_field_name("name")
         if name_node is not None and name_node.type == "identifier":
             return _node_text(name_node)
-        return None
+        return None  # pragma: no cover - defensive: declarator name is always an identifier in valid Java
     if cur.type == "assignment_expression":
         left = cur.child_by_field_name("left")
         if left is not None and left.type == "identifier":
@@ -235,7 +235,7 @@ def _is_inside_java_resource_guard(node: tree_sitter.Node) -> bool:
             return True
         prev = cur
         cur = cur.parent
-    return False
+    return False  # pragma: no cover - defensive: walks off the tree root
 
 
 def _java_ancestor_is_guard(cur: tree_sitter.Node, prev: tree_sitter.Node, var_name: str | None) -> bool:
