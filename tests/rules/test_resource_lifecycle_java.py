@@ -134,3 +134,62 @@ def test_java_helper_close_pattern_false_positive(tmp_path: Path) -> None:
     )
     result = _engine({"rules": {"resource_lifecycle": {"enabled": True}}}).check_file(str(sample))
     assert len(_safe401_codes(result.violations)) == 1, "Documented strict-matching trade-off: helper-close patterns are not recognised."
+
+
+def test_java_wrapped_acquirer_inherits_outer_variable_name(tmp_path: Path) -> None:
+    """``br = new BufferedReader(new FileReader(p))`` is clean when ``br.close()`` is in finally.
+
+    The inner ``new FileReader(path)`` is an argument to the outer
+    ``new BufferedReader(...)`` and has no direct ``variable_declarator``
+    parent. Without wrapper-aware resolution the inner FileReader would
+    get ``var_name=None`` and SAFE401 would fire even though closing
+    the BufferedReader wrapper closes the underlying FileReader per the
+    JDK AutoCloseable contract.
+    """
+    sample = tmp_path / "Wrapped.java"
+    sample.write_text(
+        "import java.io.BufferedReader;\n"
+        "import java.io.FileReader;\n"
+        "import java.io.IOException;\n"
+        "public class Wrapped {\n"
+        "    public void read(String path) throws IOException {\n"
+        "        BufferedReader br = null;\n"
+        "        try {\n"
+        "            br = new BufferedReader(new FileReader(path));\n"
+        "            br.readLine();\n"
+        "        } finally {\n"
+        "            if (br != null) {\n"
+        "                br.close();\n"
+        "            }\n"
+        "        }\n"
+        "    }\n"
+        "}\n",
+    )
+    result = _engine({"rules": {"resource_lifecycle": {"enabled": True}}}).check_file(str(sample))
+    assert _safe401_codes(result.violations) == [], "Wrapped inner acquirer should inherit the outer variable name when the outer is closed in finally"
+
+
+def test_java_deeply_nested_wrapped_acquirer_clean(tmp_path: Path) -> None:
+    """``r = new A(new B(new C(stream)))`` style nesting still resolves through to ``r``."""
+    sample = tmp_path / "Nested.java"
+    sample.write_text(
+        "import java.io.BufferedReader;\n"
+        "import java.io.FileReader;\n"
+        "import java.io.LineNumberReader;\n"
+        "import java.io.IOException;\n"
+        "public class Nested {\n"
+        "    public void read(String path) throws IOException {\n"
+        "        LineNumberReader r = null;\n"
+        "        try {\n"
+        "            r = new LineNumberReader(new BufferedReader(new FileReader(path)));\n"
+        "            r.readLine();\n"
+        "        } finally {\n"
+        "            if (r != null) {\n"
+        "                r.close();\n"
+        "            }\n"
+        "        }\n"
+        "    }\n"
+        "}\n",
+    )
+    result = _engine({"rules": {"resource_lifecycle": {"enabled": True}}}).check_file(str(sample))
+    assert _safe401_codes(result.violations) == [], "Three-level nested acquirers should all inherit the outer variable for cleanup"

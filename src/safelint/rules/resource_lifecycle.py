@@ -122,12 +122,20 @@ def _try_statement_has_finally(node: tree_sitter.Node) -> bool:
 def _java_acquired_variable_name(call_node: tree_sitter.Node) -> str | None:
     """Return the simple identifier the acquirer call is assigned to, or None.
 
-    Handles two assignment shapes:
+    Handles the assignment shapes a Java acquirer can sit inside:
 
     * ``Resource r = acquirer(...)`` (``variable_declarator`` parent inside a
       ``local_variable_declaration`` / field) - returns ``"r"``.
     * ``r = acquirer(...)`` (``assignment_expression`` parent, reassignment
       of a previously-declared variable) - returns ``"r"``.
+    * ``BufferedReader br = new BufferedReader(new FileReader(path))``
+      (the *inner* ``new FileReader`` is an argument to an *outer*
+      ``object_creation_expression`` that is itself assigned) - returns
+      ``"br"``. Closing the outer wrapper closes the inner resource per
+      the JDK ``AutoCloseable`` / ``Closeable`` contract, so for cleanup
+      purposes the inner acquirer shares the outer's variable handle.
+      The recursion handles arbitrarily nested wrappers
+      (``new A(new B(new C(stream)))``).
 
     Returns ``None`` for bare-expression acquirers (``new FileInputStream(p);``
     with no left-hand-side) - those can never be closed because there's no
@@ -145,13 +153,32 @@ def _java_acquired_variable_name(call_node: tree_sitter.Node) -> str | None:
         cur = cur.parent
     if cur is None:  # pragma: no cover - defensive: walked off the tree root
         return None
-    if cur.type == "variable_declarator":
-        name_node = cur.child_by_field_name("name")
+    direct = _direct_assigned_name(cur)
+    if direct is not None:
+        return direct
+    # Wrapped-acquirer case: this call is an argument to another
+    # ``object_creation_expression``; recurse on the outer creation
+    # which (if itself assigned) yields the variable that owns cleanup.
+    if cur.type == "argument_list" and cur.parent is not None and cur.parent.type == "object_creation_expression":
+        return _java_acquired_variable_name(cur.parent)
+    return None
+
+
+def _direct_assigned_name(node: tree_sitter.Node) -> str | None:
+    """Return the LHS identifier of *node* if it's a direct declarator / assignment, else None.
+
+    Helper extracted from ``_java_acquired_variable_name`` to keep that
+    function under the complexity threshold. ``node`` is the parent
+    (after passthrough unwrap) of an acquirer call - we just need to
+    pick off the two terminal cases.
+    """
+    if node.type == "variable_declarator":
+        name_node = node.child_by_field_name("name")
         if name_node is not None and name_node.type == "identifier":
             return _node_text(name_node)
         return None  # pragma: no cover - defensive: declarator name is always an identifier in valid Java
-    if cur.type == "assignment_expression":
-        left = cur.child_by_field_name("left")
+    if node.type == "assignment_expression":
+        left = node.child_by_field_name("left")
         if left is not None and left.type == "identifier":
             return _node_text(left)
     return None
