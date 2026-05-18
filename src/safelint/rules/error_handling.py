@@ -68,7 +68,11 @@ _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({"pass_statement", "continue_statement"}),
     "javascript": frozenset({"empty_statement"}),
     "typescript": frozenset({"empty_statement"}),
-    "java": frozenset({"line_comment", "block_comment"}),
+    # Java accepts bare semicolons (``catch (Exception e) { ; }``) as
+    # empty statements, same as JS. ``line_comment`` / ``block_comment``
+    # cover comment-only bodies (tree-sitter-java emits comments as
+    # named block children, unlike JS where they're extras).
+    "java": frozenset({"empty_statement", "line_comment", "block_comment"}),
 }
 
 # Per-language: literal expression node types that count as "comment-like"

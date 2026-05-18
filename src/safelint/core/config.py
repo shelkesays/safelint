@@ -646,8 +646,11 @@ DEFAULTS: dict[str, Any] = {
                 "remainder",
                 "negate",
                 "abs",
-                # Futures: ignoring ``get()`` discards the awaited result;
-                # ignoring ``cancel()`` discards the success boolean.
+                # Futures: ignoring ``cancel()`` discards the success
+                # boolean. ``get()`` is deliberately NOT listed because
+                # ``get`` collides with ``Map.get``, ``Optional.get``,
+                # and many getter-style methods where discarding the
+                # return value is the normal pattern.
                 "cancel",
             ],
         },
@@ -1097,13 +1100,18 @@ def _apply_javascript_runtime_preset(defaults: dict[str, Any], runtime: str) -> 
 #     into ``DEFAULTS["rules"]`` already encode this preset, so the entry
 #     is empty.
 #   * ``spring-boot`` - augments the vanilla defaults with Spring-aware
-#     sinks (``JdbcTemplate``'s ``query`` / ``queryForObject`` / ``update``,
-#     ``RestTemplate``'s ``exchange`` / ``getForObject`` for SSRF) and
-#     nullable methods (``queryForObject``: zero-rows raises
-#     ``EmptyResultDataAccessException`` rather than returning null,
-#     but RowMapper implementations and nullable column values can
-#     still produce a null result, so the conservative treatment
-#     applies).
+#     sinks (``JdbcTemplate``'s ``query`` / ``queryForObject`` / ``queryForList``
+#     / ``queryForMap`` / ``queryForRowSet`` / ``batchUpdate``,
+#     ``RestTemplate``'s ``getForObject`` / ``getForEntity`` / ``postForObject``
+#     / ``postForEntity`` / ``postForLocation`` / ``patchForObject`` for SSRF;
+#     bare ``put`` / ``delete`` / ``update`` / ``exchange`` are deliberately
+#     NOT in the preset because they collide with HashMap / File / project
+#     helpers under SAFE801's single-set design - users who specifically
+#     want them can opt in via TOML) and nullable methods
+#     (``queryForObject``: zero-rows raises ``EmptyResultDataAccessException``
+#     rather than returning null, but RowMapper implementations and
+#     nullable column values can still produce a null result, so the
+#     conservative treatment applies).
 #
 # Source-language analysis is identical across frameworks - same parser,
 # same AST walks, same per-rule logic. Only the *defaults* shift, so a

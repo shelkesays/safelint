@@ -337,17 +337,39 @@ class SpringMissingTransactionalRule(BaseRule):
 def _is_repository_receiver(call_node: tree_sitter.Node) -> bool:
     """Return True if the method_invocation's receiver looks like a repository.
 
-    Receiver must be a simple ``identifier`` whose name (lowercased)
-    contains one of ``repo`` / ``dao`` / ``template``. Receivers
-    of any other shape (``this``, ``field_access``, parenthesised
-    expressions, chained ``a.b.c.save()`` calls) are rejected
-    conservatively to avoid wrongly classifying unrelated objects.
+    Receiver must be either:
+
+    * a simple ``identifier`` (``userRepo.save(...)``) whose name
+      (lowercased) contains one of ``repo`` / ``dao`` / ``template``,
+      OR
+    * a ``field_access`` whose ``field`` is an identifier matching
+      the same pattern (``this.userRepo.save(...)`` /
+      ``self.repo.save(...)``). Service code in real Spring projects
+      uses the ``this.`` qualifier extensively, so requiring a bare
+      identifier would miss the common case.
+
+    Other receiver shapes (parenthesised expressions, chained
+    ``a.b.c.save()`` calls beyond one ``this.field`` level) are
+    still rejected conservatively to avoid wrongly classifying
+    unrelated objects.
     """
     obj = call_node.child_by_field_name("object")
-    if obj is None or obj.type != "identifier":  # pragma: no cover - defensive: rejects this.x / field_access / chained-call receivers
+    if obj is None:
         return False
-    name = node_text(obj).lower()
-    return any(p in name for p in _SPRING_REPO_RECEIVER_PATTERNS)
+    if obj.type == "identifier":
+        return _name_matches_repo_pattern(node_text(obj))
+    if obj.type == "field_access":
+        field_node = obj.child_by_field_name("field")
+        if field_node is None or field_node.type != "identifier":
+            return False
+        return _name_matches_repo_pattern(node_text(field_node))
+    return False
+
+
+def _name_matches_repo_pattern(name: str) -> bool:
+    """Return True if *name* (case-insensitive) contains any repo-receiver pattern."""
+    lowered = name.lower()
+    return any(p in lowered for p in _SPRING_REPO_RECEIVER_PATTERNS)
 
 
 def _count_repository_writes(method_node: tree_sitter.Node) -> int:

@@ -664,3 +664,33 @@ def test_lambda_captures_enclosing_method_local_for_taint() -> None:
         engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
         result = engine.check_file(str(path))
     assert any(v.code == "SAFE801" for v in result.violations), "Lambda capturing enclosing method LOCAL ``dirty`` should reach SAFE801"
+
+
+def test_safe202_empty_statement_in_java_catch_is_noop() -> None:
+    """``catch (Exception e) { ; }`` (bare semicolon) is recognised as empty.
+
+    Java ``empty_statement`` was missing from the noop set, so a
+    semicolon-only catch silently passed even though the equivalent
+    JS ``catch (e) { ; }`` was already classified empty.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m() {
+                try {
+                    work();
+                } catch (Exception e) {
+                    ;
+                }
+            }
+            void work() {}
+        }
+        """
+    )
+    overrides = {"rules": {"empty_except": {"enabled": True}}}
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE202" for v in result.violations), "Java ``empty_statement`` (`;`) in catch should fire SAFE202"

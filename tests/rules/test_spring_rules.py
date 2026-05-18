@@ -646,3 +646,30 @@ def test_safe904_handles_throws_with_scoped_type() -> None:
     violations = rule.check_file("Job.java", tree)
     assert len(violations) == 1
     assert "IOException" in violations[0].message
+
+
+def test_safe902_recognises_this_field_repository_receiver() -> None:
+    """``this.userRepo.save(u)`` field_access receiver is recognised.
+
+    Service code regularly uses ``this.`` qualifier on repository
+    fields; the rule must walk into field_access to find the
+    underlying field name, otherwise SAFE902 silently misses the
+    canonical Spring service pattern.
+    """
+    tree = _parse(
+        """
+        @Service
+        class UserService {
+            private UserRepository userRepo;
+            private AuditRepository auditRepo;
+            public void register(User u, Audit a) {
+                this.userRepo.save(u);
+                this.auditRepo.save(a);
+            }
+        }
+        """
+    )
+    rule = SpringMissingTransactionalRule({"enabled": True, "severity": "error"})
+    violations = rule.check_file("UserService.java", tree)
+    assert len(violations) == 1, f"Expected SAFE902 on this.field repository writes, got: {[v.message for v in violations]}"
+    assert "register" in violations[0].message

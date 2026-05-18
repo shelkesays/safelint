@@ -167,14 +167,19 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
     if lang_name in ("javascript", "typescript"):
         return ".test." in name or ".spec." in name
     if lang_name == "java":
-        # ``Foo.java`` stems ending in ``Test`` / ``Tests`` / ``IT``, or
-        # starting with ``Test``. The stem check (not the full filename)
-        # avoids matching production class names that happen to contain
-        # ``Test`` mid-name like ``RestController`` (the stem is
-        # ``RestController`` which doesn't END with ``Test``, so the
-        # suffix check is safe).
-        stem = Path(filepath).stem
-        return any(stem.endswith(suf) for suf in _JAVA_TEST_SUFFIXES) or stem.startswith("Test")
+        # ``Foo.java`` stems ending in ``Test`` / ``Tests`` / ``IT``.
+        # The legacy ``Test``-prefix form (``TestFoo.java``) is NOT
+        # checked here: production classes like ``TestDataFactory.java``
+        # and ``TestConfig.java`` under ``src/main/java`` use the same
+        # prefix in real Spring Boot codebases and would be wrongly
+        # classified as tests, silently skipping them from SAFE701 /
+        # SAFE702 enforcement. Legitimate JUnit 3 ``Test``-prefix
+        # tests are still picked up via the ``test_dirs`` path-
+        # component check above when they live in the configured
+        # test directory (typically ``src/test/java``); the rule
+        # prefers the false negative on misplaced tests over the
+        # false positive on Test*-named production utilities.
+        return any(Path(filepath).stem.endswith(suf) for suf in _JAVA_TEST_SUFFIXES)
     return name.startswith("test_")
 
 
