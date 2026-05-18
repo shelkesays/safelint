@@ -18,6 +18,7 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 - **Python** (`.py`, `.pyw`).
 - **JavaScript** (`.js`, `.mjs`, `.cjs`), source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime *defaults* (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the [`[tool.safelint.javascript] runtime = "..."`](toml.md#javascript-runtime-presets) preset, the source-language rules themselves don't change.
 - **TypeScript** (`.ts`, `.tsx`), and **AssemblyScript** (`.as`, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, `as` casts, non-null assertions, `declare global` ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See [TypeScript](../languages/typescript.md) for the full language reference.
+- **Java** (`.java`), new in v2.1.0. 16 of the cross-language rules port cleanly plus 4 Spring Boot framework-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* (sinks, nullable methods, structural rule enablement) are switchable via the [`[tool.safelint.java] framework = "..."`](../languages/java.md#framework-presets) preset (`vanilla` / `spring-boot`). See [Java](../languages/java.md) for the full language reference.
 
 ### Planned
 
@@ -25,18 +26,19 @@ Listed in the project's current working priority; no timelines committed. SafeLi
 
 1. **Go** (`.go`).
 2. **Rust** (`.rs`).
-3. **Java** (`.java`).
-4. **C** (`.c`, `.h`), Holzmann's original target language.
-5. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
-6. **PHP** (`.php`).
+3. **C** (`.c`, `.h`), Holzmann's original target language.
+4. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
+5. **PHP** (`.php`).
 
 ### Rule scope (current languages)
 
 | Scope | Count | Codes |
 |---|---|---|
-| **Cross-language** (Python, JavaScript, TypeScript) | 17 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE302, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 |
+| **Cross-language** (Python, JavaScript, TypeScript, Java) | 16 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 |
+| **Python / JS / TS** (not Java) | 1 | SAFE302 (`global_mutation`, Java's natural analogue — non-final static field writes from outside the declaring class's static initialiser — needs class-scope analysis the rule doesn't yet do; deferred to a future release) |
 | **Python-only** | 2 | SAFE201 (`bare_except`, JS / TS catches always bind the error; no `KeyboardInterrupt` hijack hazard), SAFE301 (`global_state`, JS / TS have no `global` keyword; SAFE302 covers their "writes to module-level state" cases) |
-| **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`, Python has no `var` / `let` / `const` distinction; ``var`` is still legal in TS and the same scope-hoisting hazard applies, so the rule fires on both `.js` and `.ts`) |
+| **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`, Python and Java have no `var` / `let` / `const` distinction; `var` is still legal in TS and the same scope-hoisting hazard applies, so the rule fires on both `.js` and `.ts`) |
+| **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`) — all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset |
 
 The engine's per-language dispatch automatically skips rules whose `language` tuple doesn't include the active file's language. There's no manual configuration to do, drop a `.py` file in a JS / TS project (or vice versa) and the right rules fire on each.
 

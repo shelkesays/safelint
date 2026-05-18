@@ -24,7 +24,7 @@ pip install 'safelint[python]'         # adds .py, .pyw
 pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs
 pip install 'safelint[typescript]'     # adds .ts, .tsx, .as (also bundles JS)
 pip install --pre 'safelint[java]==2.1.0rc1'        # adds .java (Spring Boot framework preset available; RC pin needed until v2.1.0 GA)
-pip install 'safelint[all]'                         # every supported language
+pip install --pre 'safelint[all]==2.1.0rc1'         # every supported language (RC pin needed until v2.1.0 GA so [all] includes Java)
 pip install --pre 'safelint[python,java]==2.1.0rc1' # multiple extras compose (Java row needs the same RC pin)
 # uv add 'safelint[typescript]' works the same way.
 

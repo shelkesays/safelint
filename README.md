@@ -25,10 +25,11 @@ Originally designed for mission-critical systems, these principles apply to any 
 | **Python** | `.py`, `.pyw` |  |
 | **JavaScript** | `.js`, `.mjs`, `.cjs` | Runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine. Per-runtime *defaults* are selectable via [`[tool.safelint.javascript] runtime = "..."`](https://shelkesays.github.io/safelint/configuration/toml/#javascript-runtime-presets). |
 | **TypeScript** (incl. **TSX** + **AssemblyScript**) | `.ts`, `.tsx`, `.as` | Reuses the JS rule implementations end-to-end with TS-specific handling for generics, `as` casts, non-null assertions, `declare global` blocks, etc. Shares JS runtime presets since TS compiles to JS. |
+| **Java** (with **Spring Boot** framework preset) | `.java` | 16 cross-language rules port cleanly; 4 Spring-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* are selectable via [`[tool.safelint.java] framework = "..."`](https://shelkesays.github.io/safelint/languages/java/#framework-presets). New in v2.1.0. |
 
-**Rule coverage:** 17 rules apply to all three languages, 2 are Python-only (`bare_except`, `global_state`), and 1 is JavaScript-family-only (`wide_scope_declaration` for `var`).
+**Rule coverage:** 16 cross-language rules apply across all four languages; 2 are Python-only (`bare_except`, `global_state`); 1 applies to Python / JS / TS but not Java (`global_mutation` — Java has no clean analogue, deferred); 1 is JavaScript-family-only (`wide_scope_declaration` for `var`); and 4 are Java + Spring Boot only (`spring_field_injection`, `spring_missing_transactional`, `spring_unvalidated_input`, `spring_async_checked_exception`).
 
-**Planned future languages** (working-priority order, no timelines committed): Go, Rust, Java, C, C++, PHP. SafeLint's registry-driven design makes each addition incremental; see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
+**Planned future languages** (working-priority order, no timelines committed): Go, Rust, C, C++, PHP. SafeLint's registry-driven design makes each addition incremental; see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
 
 SafeLint integrates with pre-commit and CI pipelines to prevent unsafe code from entering your codebase.
 
@@ -52,7 +53,7 @@ SafeLint catches these early, automatically, regardless of who wrote the code.
 
 ## Power of Ten - adapted for modern languages
 
-In 1987, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly four decades later, the same failure patterns appear in every fast-moving codebase. SafeLint is those ten rules, adapted for modern languages (Python, JavaScript, and TypeScript today; further languages in future releases) and automated.
+In 1987, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly four decades later, the same failure patterns appear in every fast-moving codebase. SafeLint is those ten rules, adapted for modern languages (Python, JavaScript, TypeScript, and Java with the Spring Boot framework preset today; further languages in future releases) and automated.
 
 | # | Holzmann's Rule | SafeLint Rule | Code |
 |---|---|---|---|

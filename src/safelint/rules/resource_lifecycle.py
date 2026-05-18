@@ -483,9 +483,7 @@ class ResourceLifecycleRule(BaseRule):
             # via ``method_invocation`` renders as ``newBufferedReader()``.
             invocation = f"new {name}()" if node.type == "object_creation_expression" else f"{name}()"
             message = (
-                f'"{invocation}" not wrapped in try-with-resources or try/finally - '
-                f"declare in ``try (... = {invocation})`` for automatic cleanup, "
-                "or guard with ``try {{ ... }} finally {{ ... }}``"
+                f'"{invocation}" not wrapped in try-with-resources or try/finally - declare in ``try (... = {invocation})`` for automatic cleanup, or guard with ``try {{ ... }} finally {{ ... }}``'
             )
             violations.append(self._make_violation_for_node(filepath, node, message))
         return violations

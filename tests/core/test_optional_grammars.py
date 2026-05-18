@@ -37,6 +37,9 @@ from safelint.languages import (
     unavailable_extensions,
 )
 from safelint.languages import (
+    java as _java_mod,
+)
+from safelint.languages import (
     javascript as _javascript_mod,
 )
 from safelint.languages import (
@@ -44,9 +47,6 @@ from safelint.languages import (
 )
 from safelint.languages import (
     typescript as _typescript_mod,
-)
-from safelint.languages import (
-    java as _java_mod,
 )
 
 
