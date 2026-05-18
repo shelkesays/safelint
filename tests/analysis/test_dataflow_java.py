@@ -624,3 +624,43 @@ def test_safe202_multi_comment_java_catch_is_empty() -> None:
         engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
         result = engine.check_file(str(path))
     assert any(v.code == "SAFE202" for v in result.violations), "Multi-comment catch body should still trigger SAFE202 as empty"
+
+
+def test_lambda_captures_enclosing_method_local_for_taint() -> None:
+    """``String dirty = input; run(() -> exec(dirty));`` reaches SAFE801.
+
+    The reviewer's deeper finding: seeding only enclosing-method params
+    misses tainted LOCALS (``dirty`` is a local, not a param).
+    The two-pass _java_check analyses the enclosing method first, caches
+    its final tainted set (which includes ``dirty`` after the assignment
+    from ``input``), then seeds the lambda's tracker with that set so
+    ``exec(dirty)`` fires.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m(String input) {
+                String dirty = input;
+                java.util.List.of("a").forEach(s -> exec(dirty));
+            }
+            void exec(String s) {}
+            void run(Runnable r) {}
+        }
+        """
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                "sinks_java": ["exec"],
+                "sanitizers_java": [],
+                "sources_java": [],
+            }
+        }
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE801" for v in result.violations), "Lambda capturing enclosing method LOCAL ``dirty`` should reach SAFE801"

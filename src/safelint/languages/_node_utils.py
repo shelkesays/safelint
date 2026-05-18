@@ -162,28 +162,23 @@ def _java_object_creation_name(call_node: tree_sitter.Node) -> str | None:
     * ``scoped_type_identifier`` - qualified ``new java.io.WriteStream(...)``.
       Returns the trailing identifier (``"WriteStream"``).
     * ``generic_type`` - parameterised ``new MyResource<Foo>(...)``. Unwraps
-      to the inner ``type_identifier`` / ``scoped_type_identifier`` and
-      recurses. Otherwise SAFE401 tracked acquirers, SAFE801 constructor
-      sinks, and SAFE303 / SAFE304 I/O constructors would silently miss
-      every generic instantiation.
+      to the inner ``type_identifier`` / ``scoped_type_identifier``.
+      Otherwise SAFE401 tracked acquirers, SAFE801 constructor sinks,
+      and SAFE303 / SAFE304 I/O constructors would silently miss every
+      generic instantiation.
     """
     type_node = call_node.child_by_field_name("type")
     if type_node is None:  # pragma: no cover - defensive: object_creation_expression always has a type field
         return None
+    return _java_type_name(type_node)
+
+
+def _java_type_name(type_node: tree_sitter.Node) -> str | None:
+    """Resolve a Java ``type_identifier`` / ``scoped_type_identifier`` / ``generic_type`` to its simple name."""
     if type_node.type == "generic_type":
-        # tree-sitter-java emits ``generic_type`` as a wrapper around the
-        # underlying type with a ``type_arguments`` sibling. The first
-        # named child is the underlying type; peel it off and recurse so
-        # both ``new Foo<X>(...)`` and ``new pkg.Foo<X>(...)`` resolve.
         if not type_node.named_children:  # pragma: no cover - defensive: generic_type always wraps a type
             return None
-        inner = type_node.named_children[0]
-        if inner.type == "type_identifier":
-            return node_text(inner)
-        if inner.type == "scoped_type_identifier":
-            last_id = _last_type_identifier(inner)
-            return node_text(last_id) if last_id is not None else None  # pragma: no cover - defensive
-        return None  # pragma: no cover - defensive: generic_type wraps unexpected shape
+        return _java_type_name(type_node.named_children[0])
     if type_node.type == "type_identifier":
         return node_text(type_node)
     if type_node.type != "scoped_type_identifier":  # pragma: no cover - array creation etc. falls through

@@ -277,28 +277,28 @@ def _java_spread_param_name(child: tree_sitter.Node) -> str | None:
     return node_text(name_node)
 
 
-def _java_enclosing_param_captures(lambda_node: tree_sitter.Node) -> set[str]:
-    """Return the params of the lambda's enclosing function (taint over-approximation).
+def _java_lambda_enclosing_tainted(lambda_node: tree_sitter.Node, cache: dict[int, set[str]]) -> set[str]:
+    """Return the enclosing function's final tainted set for *lambda_node*.
 
-    Walks the parent chain. The first non-lambda function-defining ancestor
-    (``method_declaration``, ``constructor_declaration``, ``static_initializer``,
-    etc.) contributes its params. Intermediate ``lambda_expression`` ancestors
-    contribute *their* params too, since the captured variables flow through
-    each nested scope.
+    Walks the parent chain looking for the nearest function-defining
+    ancestor (including outer ``lambda_expression`` nodes), then returns
+    that scope's cached tainted set. The cache is populated in pass 1 for
+    non-lambda functions and incrementally in pass 2 for outer lambdas
+    encountered before inner ones (preorder walk guarantees this).
 
-    Returns an empty set if the lambda has no enclosing function (a malformed
-    or top-level lambda that shouldn't really exist in valid Java).
+    Over-approximation: returns the enclosing's *full* tainted set
+    regardless of where the lambda sits textually. A local that becomes
+    tainted AFTER the lambda is constructed will still appear in the
+    lambda's seed - safer than the alternative (missing real bugs) and
+    practically rare. Returns an empty set when the parent chain has
+    no function ancestor (shouldn't happen in valid Java).
     """
-    captures: set[str] = set()
     cur = lambda_node.parent
     while cur is not None:
-        if cur.type == "lambda_expression":  # pragma: no cover - nested lambdas are rare; over-approximation still correct
-            captures |= _java_param_names(cur)
-        elif cur.type in _JAVA_FUNCTION_TYPES:
-            captures |= _java_param_names(cur)
-            return captures
+        if cur.type in _JAVA_FUNCTION_TYPES:
+            return cache.get(cur.id, set())
         cur = cur.parent
-    return captures  # pragma: no cover - defensive: a lambda in valid Java always has an enclosing function
+    return set()  # pragma: no cover - defensive: a lambda in valid Java always has an enclosing function
 
 
 def _java_param_names(func_node: tree_sitter.Node) -> set[str]:
@@ -457,6 +457,14 @@ class TaintedSinkRule(BaseRule):
     def _java_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run Java taint analysis on every method / constructor / lambda in *tree*.
 
+        Two-pass walk so lambdas inherit the enclosing function's FULL
+        tainted set (params plus locals tainted by the body), not just
+        its params. Pass 1 analyses every non-lambda function and
+        caches its final tainted set; pass 2 walks lambdas in tree
+        order (preorder, so outer lambdas resolve before inner ones)
+        and seeds each lambda's tracker with own-params plus the
+        enclosing scope's cached tainted set.
+
         Java's framework preset (``[tool.safelint.java] framework =
         "spring-boot"``) overrides the default ``sinks_java`` /
         ``sources_java`` / ``sanitizers_java`` lists in
@@ -473,22 +481,25 @@ class TaintedSinkRule(BaseRule):
         sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
         violations: list[Violation] = []
+        # Pass 1: analyse non-lambda functions; cache final tainted set
+        # keyed by ``node.id`` (the tree-sitter-stable identifier;
+        # ``id(wrapper)`` differs across wrapper accesses).
+        tainted_cache: dict[int, set[str]] = {}
         for node in walk(tree.root_node):
-            if node.type not in _JAVA_FUNCTION_TYPES:
+            if node.type not in _JAVA_FUNCTION_TYPES or node.type == "lambda_expression":
                 continue
-            params = _java_param_names(node)
-            if node.type == "lambda_expression":
-                # Lambdas capture enclosing scope. Without seeding the
-                # captured-param taint, ``void m(String input) { run(() ->
-                # exec(input)); }`` would miss SAFE801 because the lambda's
-                # own params are empty and ``input`` looks unbound to the
-                # tracker. Approximate captures as the enclosing function's
-                # full param set (walking up through nested lambdas).
-                # Over-approximation: unused captures cost nothing because
-                # they don't appear in the lambda body.
-                params = params | _java_enclosing_param_captures(node)
-            tracker = JavaTaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = JavaTaintTracker(_java_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
             tracker.visit(node)
+            tainted_cache[node.id] = set(tracker.tainted)
+            violations.extend(self._format_hits(filepath, tracker.sink_hits))
+        # Pass 2: lambdas, seeded with enclosing function's final tainted.
+        for node in walk(tree.root_node):
+            if node.type != "lambda_expression":
+                continue
+            seed = _java_param_names(node) | _java_lambda_enclosing_tainted(node, tainted_cache)
+            tracker = JavaTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker.visit(node)
+            tainted_cache[node.id] = set(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 

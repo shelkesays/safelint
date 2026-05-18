@@ -121,7 +121,7 @@ _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 
 
 def _is_noop_body(body_node: tree_sitter.Node | None, lang_name: str) -> bool:
-    """Return True if *body_node* contains only no-op statements.
+    r"""Return True if *body_node* contains only no-op statements.
 
     Catches (varying by language):
 
