@@ -94,19 +94,30 @@ def test_spring_boot_preset_overrides_sinks_java() -> None:
 
     Specifically: the preset list MUST include both the vanilla entries
     (so the preset is a complete replacement, not a partial one) and
-    the Spring-specific additions like ``query`` / ``queryForObject``.
+    the unambiguous Spring-specific additions like ``query`` /
+    ``queryForObject`` / ``postForObject``. Collision-prone bare verbs
+    (``put`` / ``delete`` / ``update`` / ``exchange``) are deliberately
+    excluded - documented in src/safelint/core/config.py.
     """
     defaults = copy.deepcopy(DEFAULTS)
     _apply_java_framework_preset(defaults, "spring-boot")
     sinks = defaults["rules"]["tainted_sink"]["sinks_java"]
-    # Spring-specific JdbcTemplate / RestTemplate sinks present:
+    # Unambiguous Spring-specific JdbcTemplate / RestTemplate sinks present:
     assert "query" in sinks
     assert "queryForObject" in sinks
-    assert "exchange" in sinks
+    assert "queryForList" in sinks
+    assert "batchUpdate" in sinks
+    assert "postForObject" in sinks
+    assert "getForObject" in sinks
     # Vanilla sinks still present (preset includes them so the user
     # doesn't lose stdlib coverage when switching to spring-boot):
     assert "exec" in sinks
     assert "executeQuery" in sinks
+    # Collision-prone bare verbs deliberately excluded:
+    assert "put" not in sinks, "bare 'put' collides with HashMap.put - opt in via TOML"
+    assert "delete" not in sinks, "bare 'delete' collides with File.delete - opt in via TOML"
+    assert "update" not in sinks, "bare 'update' collides with project helpers - opt in via TOML"
+    assert "exchange" not in sinks, "bare 'exchange' collides with domain verbs - opt in via TOML"
     assert "forName" in sinks
 
 
