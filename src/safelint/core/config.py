@@ -507,32 +507,38 @@ DEFAULTS: dict[str, Any] = {
             "sanitizers_java": [
                 # IMPORTANT: SAFE801 has a SINGLE shared ``sanitizers_java``
                 # set that clears taint for every sink type (SQL,
-                # reflection, shell, SSRF). Context-specific output
-                # encoders - OWASP Java Encoder ``forHtml`` / ``forXml``
-                # / ``forJavaScript`` / ``forCssString``, Apache Commons
-                # ``escapeHtml*`` / ``escapeXml``, Spring ``htmlEscape``
-                # - are deliberately NOT in the defaults because they
-                # do not make input safe for SQL / shell / reflection
-                # sinks even though they make it safe for HTML output.
-                # Including them as universal sanitisers would create
-                # dangerous false negatives like
-                # ``jdbc.query("... " + Encode.forHtml(userInput))``.
+                # reflection, shell, SSRF). Context-specific encoders
+                # are deliberately NOT in the defaults:
                 #
-                # The defaults below are intentionally narrow: generic
-                # validation / quoting helpers and URL encoders that are
-                # at least context-agnostic about which sink they help.
-                # Projects that route every output through one of the
-                # context-specific encoders can opt in by extending
-                # ``[tool.safelint.rules.tainted_sink] sanitizers_java``
-                # in their TOML, ideally after splitting sink categories
-                # via custom rule extension (see CHANGELOG for the
-                # category-aware sanitiser roadmap).
-                "escape",  # generic; legacy Apache Commons + custom helpers
-                "encode",  # URLEncoder.encode - applies to URL contexts
-                "encodeURIComponent",  # URL contexts only
-                "quote",  # SQL / shell quoting helpers (context-aware by name)
-                "sanitize",  # OWASP HtmlPolicyBuilder + generic sanitisers
-                "validate",  # generic input validators
+                # * HTML / XML encoders (OWASP ``forHtml`` / ``forXml`` /
+                #   ``forJavaScript`` / ``forCssString``, Apache Commons
+                #   ``escapeHtml*`` / ``escapeXml``, Spring ``htmlEscape``)
+                #   - safe only for HTML output, NOT for SQL / shell /
+                #   reflection. Including them would suppress real SAFE801
+                #   findings like ``jdbc.query(... + forHtml(input))``.
+                #
+                # * URL encoders (``encode`` / ``encodeURIComponent``) -
+                #   safe only for URL contexts. URL-encoding input before
+                #   concatenating into SQL or shell would suppress those
+                #   warnings even though URL encoding doesn't quote SQL
+                #   metacharacters or shell metacharacters.
+                #
+                # Defaults below are limited to names that imply
+                # *validation* (not encoding) or project-level
+                # *wrappers* whose semantics are typically generic.
+                # Even ``sanitize`` / ``quote`` are ambiguous in
+                # principle (OWASP ``HtmlPolicyBuilder.sanitize`` is
+                # HTML-only, SQL ``quote`` is SQL-only) - they're kept
+                # in defaults because they're more commonly used as
+                # project-level generic wrappers than as exact library
+                # call sites. Projects with strict requirements should
+                # configure ``[tool.safelint.rules.tainted_sink]
+                # sanitizers_java`` explicitly, and a category-aware
+                # sanitiser framework is on the v3.x roadmap.
+                "sanitize",  # OWASP HtmlPolicyBuilder + generic wrappers
+                "validate",  # generic input validators (idiomatic name)
+                "quote",  # SQL / shell quoting helpers + generic wrappers
+                "escape",  # generic; project-level wrappers + Apache Commons
             ],
             "sources_java": [
                 # System / env sources.
