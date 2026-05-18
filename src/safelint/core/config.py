@@ -1187,27 +1187,46 @@ _JAVA_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                     "executeLargeUpdate",
                     "openConnection",
                     "openStream",
-                    # Spring JdbcTemplate raw-SQL methods.
+                    # Spring JdbcTemplate raw-SQL methods. Includes ``query``
+                    # which - despite being a common verb - is rarely a
+                    # collision (no standard Java type has a public ``query``
+                    # method in the way HashMap has ``put`` or File has
+                    # ``delete``). ``batchUpdate`` is Spring-only naming.
+                    # Bare ``update`` is deliberately NOT in defaults
+                    # because it collides with ``Hibernate.Session.update``,
+                    # Swing's ``update``, and project-local helpers; users
+                    # who want ``jdbcTemplate.update`` flagged can add
+                    # ``update`` to ``[tool.safelint.rules.tainted_sink]
+                    # sinks_java`` explicitly.
                     "query",
                     "queryForObject",
                     "queryForList",
                     "queryForMap",
                     "queryForRowSet",
-                    "update",
                     "batchUpdate",
                     # Spring NamedParameterJdbcTemplate - same names,
                     # same risk. Already covered by the above.
                     # Spring RestTemplate / WebClient - outbound HTTP,
-                    # SSRF surface when URL contains user input.
-                    "exchange",
+                    # SSRF surface when URL contains user input. The
+                    # ``...For{Object,Entity,Location}`` names are
+                    # unambiguous (no other API uses them). Bare
+                    # ``put`` / ``delete`` / ``exchange`` are
+                    # deliberately NOT in defaults because they collide
+                    # heavily with HashMap.put, File.delete,
+                    # CurrencyExchange.exchange, and many project-local
+                    # helpers. Users who specifically need
+                    # ``restTemplate.put`` / ``.delete`` / ``.exchange``
+                    # SSRF detection can add them via TOML; the SAFE801
+                    # rule has a single-set design without receiver-
+                    # aware matching, so flagging them globally would
+                    # create more noise than signal on typical Java
+                    # code.
                     "getForObject",
                     "getForEntity",
                     "postForObject",
                     "postForEntity",
                     "postForLocation",
-                    "put",
                     "patchForObject",
-                    "delete",
                 ],
             },
             "null_dereference": {
