@@ -208,14 +208,9 @@ def test_every_language_has_its_own_extra() -> None:
     expected = {"python", "javascript", "typescript", "java", "all"}
     missing = expected - language_extras
     unexpected = language_extras - expected
-    assert not missing, (
-        f"v2.x contract: every supported language must have its own opt-in extra. "
-        f"Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"
-    )
+    assert not missing, f"v2.x contract: every supported language must have its own opt-in extra. Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"
     assert not unexpected, (
-        f"Wheel metadata advertises an extra not in the expected set. "
-        f"Either add it to ``expected`` (if it's a new language) or remove it "
-        f"from pyproject.toml. Unexpected: {sorted(unexpected)}"
+        f"Wheel metadata advertises an extra not in the expected set. Either add it to ``expected`` (if it's a new language) or remove it from pyproject.toml. Unexpected: {sorted(unexpected)}"
     )
 
 
