@@ -183,22 +183,40 @@ def test_install_hint_for_returns_hint_when_grammar_unavailable(monkeypatch: pyt
 
 
 def test_every_language_has_its_own_extra() -> None:
-    """v2.0.0's fully-symmetric model: every supported language ships as an opt-in extra.
+    """v2.0.0+'s fully-symmetric model: every supported language ships as an opt-in extra.
 
     None of the per-language grammars are in the base install. Each
     has a matching extra (``[python]``, ``[javascript]``,
-    ``[typescript]``) so users opt in to only the languages their
-    project actually contains. ``[all]`` is a convenience alias for
-    everything.
+    ``[typescript]``, ``[java]``) so users opt in to only the
+    languages their project actually contains. ``[all]`` is a
+    convenience alias for everything.
 
     Verified by reading ``project.optional-dependencies`` straight
-    from the wheel's metadata via :mod:`importlib.metadata`.
+    from the wheel's metadata via :mod:`importlib.metadata`. Add
+    the new extra to ``expected`` when registering a new language
+    (the contract is enforced both directions: any expected entry
+    missing fails the test, and any extra in the wheel that isn't
+    in ``expected`` fails the strict-set assertion below).
     """
     md = metadata("safelint")
     provides_extras = set(md.get_all("Provides-Extra") or [])
-    expected = {"python", "javascript", "typescript", "all"}
-    missing = expected - provides_extras
-    assert not missing, f"v2.0.0 contract: every supported language must have its own opt-in extra. Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"
+    # Drop tooling extras (``dev``, ``docs``, anything else non-language)
+    # before comparing - those aren't part of the per-language contract.
+    # Keep the exclusion list explicit so adding a new tooling extra
+    # forces a deliberate update here.
+    language_extras = provides_extras - {"dev", "docs"}
+    expected = {"python", "javascript", "typescript", "java", "all"}
+    missing = expected - language_extras
+    unexpected = language_extras - expected
+    assert not missing, (
+        f"v2.x contract: every supported language must have its own opt-in extra. "
+        f"Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"
+    )
+    assert not unexpected, (
+        f"Wheel metadata advertises an extra not in the expected set. "
+        f"Either add it to ``expected`` (if it's a new language) or remove it "
+        f"from pyproject.toml. Unexpected: {sorted(unexpected)}"
+    )
 
 
 def test_dev_install_has_every_grammar() -> None:
