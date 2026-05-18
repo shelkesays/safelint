@@ -134,18 +134,28 @@ def _is_noop_body(body_node: tree_sitter.Node | None, lang_name: str) -> bool:
     * Empty body / no statements at all                  (defensive - shouldn't
       happen with valid Tree-sitter output but kept for safety)
 
-    Bodies with multiple statements never match - even if every statement is
-    a literal, two literals signal *some* intentional structure (rare edge
-    case, but preferable to false positives).
+    Multi-statement Java bodies are accepted when **every** statement
+    is a no-op (the all-comments-are-no-op case). tree-sitter-java emits
+    each comment as a named child of the block, so
+    ``catch (Exception e) { // a\n // b\n }`` has two named children
+    (both ``line_comment``). Without the all-no-op variant, that body
+    falls through with False.
 
-    Comments inside the body don't affect the result because Tree-sitter
-    treats comments as separate nodes outside the block.
+    Multi-statement Python / JS / TS bodies are NOT accepted even when
+    every statement is a no-op: two no-op statements there signal some
+    intentional structure (``except: "log msg"; pass`` etc.), and the
+    rule prefers a false negative to flagging legitimate-looking code.
+    Python / JS / TS comments live OUTSIDE the block node in Tree-sitter,
+    so the "multiple comments" scenario doesn't arise for them.
     """
     if body_node is None or not body_node.named_children:
         return True
-    if len(body_node.named_children) != 1:
+    children = body_node.named_children
+    if lang_name == "java":
+        return all(_stmt_is_noop(child, lang_name) for child in children)
+    if len(children) != 1:
         return False
-    return _stmt_is_noop(body_node.named_children[0], lang_name)
+    return _stmt_is_noop(children[0], lang_name)
 
 
 def _stmt_is_noop(stmt: tree_sitter.Node, lang_name: str) -> bool:

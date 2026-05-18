@@ -590,3 +590,37 @@ def test_generic_type_object_creation_resolves_to_trailing_identifier() -> None:
         engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
         result = engine.check_file(str(path))
     assert any(v.code == "SAFE801" for v in result.violations), "Generic-type object creation should match the configured sink name"
+
+
+def test_safe202_multi_comment_java_catch_is_empty() -> None:
+    """tree-sitter-java emits each comment as a named child; multi-comment catch is no-op.
+
+    Previously ``_is_noop_body`` required exactly one child so
+    ``catch (Exception e) { // a\\n  // b\\n }`` (two comments)
+    fell through with False. The all-children-no-op variant
+    correctly classifies multi-comment bodies as empty.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m() {
+                try {
+                    work();
+                } catch (Exception e) {
+                    // todo 1
+                    // todo 2
+                }
+            }
+            void work() {}
+        }
+        """
+    )
+    overrides = {
+        "rules": {"empty_except": {"enabled": True}},
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE202" for v in result.violations), "Multi-comment catch body should still trigger SAFE202 as empty"
