@@ -45,6 +45,9 @@ from safelint.languages import (
 from safelint.languages import (
     typescript as _typescript_mod,
 )
+from safelint.languages import (
+    java as _java_mod,
+)
 
 
 def test_python_parser_factory_raises_when_grammar_missing(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -113,6 +116,25 @@ def test_typescript_install_hint_names_the_right_extra() -> None:
     assert _typescript_mod.GRAMMAR_INSTALL_HINT == "pip install 'safelint[typescript]'"
 
 
+def test_java_parser_factory_raises_when_grammar_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``_create_java_parser`` errors clearly when the grammar isn't installed."""
+    monkeypatch.setattr(_java_mod, "_JAVA_TS_LANGUAGE", None)
+    with pytest.raises(ImportError, match=r"tree-sitter-java is not installed.*safelint\[java\]"):
+        _java_mod._create_java_parser()
+
+
+def test_java_install_hint_names_the_right_extra() -> None:
+    """The Java hint must keep the ``--pre`` + ``==2.1.0rc1`` pin until v2.1.0 GA.
+
+    Pip otherwise resolves the bare ``safelint[java]`` request against
+    the latest stable v2.0.0 which lacks the [java] extra, so the
+    hint would tell users to install a package that still lacks the
+    grammar. When v2.1.0 GA ships, drop both ``--pre`` and the pin
+    from ``GRAMMAR_INSTALL_HINT`` and from this assertion together.
+    """
+    assert _java_mod.GRAMMAR_INSTALL_HINT == "pip install --pre 'safelint[java]==2.1.0rc1'"
+
+
 def test_registry_skips_javascript_when_grammar_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     """When ``_GRAMMAR_AVAILABLE`` is False, ``.js`` is in ``unavailable_extensions``, not ``supported_extensions``.
 
@@ -133,6 +155,21 @@ def test_registry_skips_javascript_when_grammar_unavailable(monkeypatch: pytest.
     finally:
         # Restore the registry so subsequent tests see the dev install state.
         monkeypatch.setattr(_javascript_mod, "_GRAMMAR_AVAILABLE", True)
+        importlib.reload(languages)
+
+
+def test_registry_skips_java_when_grammar_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When ``_GRAMMAR_AVAILABLE`` is False for Java, ``.java`` is unavailable; other languages stay available."""
+    monkeypatch.setattr(_java_mod, "_GRAMMAR_AVAILABLE", False)
+    reloaded = importlib.reload(languages)
+    try:
+        assert ".java" not in reloaded.supported_extensions()
+        assert reloaded.unavailable_extensions()[".java"] == _java_mod.GRAMMAR_INSTALL_HINT
+        # Other languages stay available since their grammars are independent.
+        assert ".py" in reloaded.supported_extensions()
+        assert ".js" in reloaded.supported_extensions()
+    finally:
+        monkeypatch.setattr(_java_mod, "_GRAMMAR_AVAILABLE", True)
         importlib.reload(languages)
 
 
