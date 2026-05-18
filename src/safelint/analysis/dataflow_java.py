@@ -104,6 +104,22 @@ _MEMBER_TYPES = frozenset({"field_access", "array_access"})
 _CALL_TYPES = frozenset({"method_invocation", "object_creation_expression"})
 
 
+def _is_compound_assignment(node: tree_sitter.Node) -> bool:
+    """Return True if *node* is an ``assignment_expression`` with a compound operator.
+
+    tree-sitter-java emits the operator as an anonymous middle child of
+    ``assignment_expression``. The plain assignment uses ``=``; compound
+    forms use ``+=`` / ``-=`` / ``*=`` / ``/=`` / ``%=`` / ``|=`` /
+    ``&=`` / ``^=`` / ``<<=`` / ``>>=`` / ``>>>=``. Any non-``=``
+    operator means the LHS's existing value is read AND combined with
+    the RHS, so the LHS keeps its prior taint regardless of RHS state.
+    """
+    for child in node.children:
+        if not child.is_named:
+            return child.type != "="
+    return False  # pragma: no cover - defensive: every assignment_expression has an operator token
+
+
 class JavaTaintTracker:
     """Track tainted variable flow through a Java method / constructor / lambda body.
 
@@ -149,6 +165,8 @@ class JavaTaintTracker:
             self._visit_assignment(node)
         elif node.type == "variable_declarator":
             self._visit_var_declarator(node)
+        elif node.type == "enhanced_for_statement":
+            self._visit_enhanced_for(node)
         elif node.type in _CALL_TYPES:
             # Treat ``new Foo(tainted)`` the same as ``Foo(tainted)`` for
             # taint tracking - both feed the sink check via ``call_name``.
@@ -165,15 +183,69 @@ class JavaTaintTracker:
 
         Only the identifier case updates the tainted set; field /
         array writes don't change *which names* carry taint.
+
+        Compound assignments (``+=`` / ``-=`` / ``|=`` etc.) preserve
+        the LHS's existing taint: ``sql += " suffix"`` keeps ``sql``
+        tainted even if the RHS is clean, since the new value still
+        contains the original tainted contents. Detected by inspecting
+        the operator token (the anonymous middle child).
+
+        Chained assignments ``a = b = expr`` are an ``assignment_expression``
+        whose ``right`` is another ``assignment_expression``. The
+        innermost RHS taint flows through every LHS in the chain; we
+        recurse on the nested assignment first so ``b`` is updated,
+        then resolve the chained RHS's taint via
+        ``_assignment_chain_tainted`` for the outer ``a``.
         """
         left = node.child_by_field_name("left")
         right = node.child_by_field_name("right")
         if left is None or right is None:  # pragma: no cover - defensive: valid assignments have both sides
             return
+        if right.type == "assignment_expression":
+            self._visit_assignment(right)
         if left.type != "identifier":
             return
-        is_tainted = self._is_tainted(right)
-        self._update_name(left, is_tainted=is_tainted)
+        rhs_tainted = self._assignment_chain_tainted(right)
+        if _is_compound_assignment(node) and self._name_is_tainted(left):
+            rhs_tainted = True
+        self._update_name(left, is_tainted=rhs_tainted)
+
+    def _assignment_chain_tainted(self, node: tree_sitter.Node) -> bool:
+        """Return the innermost-RHS taint state for a (possibly chained) assignment RHS."""
+        cur = node
+        while cur.type == "assignment_expression":
+            inner = cur.child_by_field_name("right")
+            if inner is None:  # pragma: no cover - defensive: valid assignment always has right
+                return False
+            cur = inner
+        return self._is_tainted(cur)
+
+    def _name_is_tainted(self, name_node: tree_sitter.Node) -> bool:
+        """Return True if *name_node* is an identifier that's currently tainted."""
+        return name_node.type == "identifier" and node_text(name_node) in self.tainted
+
+    def _visit_enhanced_for(self, node: tree_sitter.Node) -> None:
+        """Propagate taint through ``for (T x : tainted_iterable) { ... }``.
+
+        Java's enhanced-for binds each element of the iterable to a
+        fresh local, so a tainted iterable taints the loop variable.
+        Without this, ``for (String arg : args) { exec(arg); }`` with
+        tainted ``args`` would silently miss SAFE801 because the loop
+        variable was never added to the tainted set.
+
+        tree-sitter-java's ``enhanced_for_statement`` exposes ``name``
+        (the loop variable identifier) and ``value`` (the iterable
+        expression). Only identifier-shaped loop variables are
+        tracked - destructuring isn't a Java feature, so this covers
+        every case.
+        """
+        name_node = node.child_by_field_name("name")
+        value_node = node.child_by_field_name("value")
+        if name_node is None or value_node is None:  # pragma: no cover - defensive: enhanced_for always has both
+            return
+        if name_node.type != "identifier":  # pragma: no cover - defensive: name field is always identifier in valid Java
+            return
+        self._update_name(name_node, is_tainted=self._is_tainted(value_node))
 
     def _visit_var_declarator(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``Type x = value;``.

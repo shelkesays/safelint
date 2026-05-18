@@ -673,3 +673,29 @@ def test_safe902_recognises_this_field_repository_receiver() -> None:
     violations = rule.check_file("UserService.java", tree)
     assert len(violations) == 1, f"Expected SAFE902 on this.field repository writes, got: {[v.message for v in violations]}"
     assert "register" in violations[0].message
+
+
+def test_safe902_does_not_count_resttemplate_writes() -> None:
+    """``userRepo.save(u)`` + ``restTemplate.delete(url)`` is NOT 2 transactional writes.
+
+    Pre-fix, the receiver pattern ``template`` matched both
+    ``jdbcTemplate`` (DB) and ``restTemplate`` (HTTP), so a service
+    method mixing one DB write with an HTTP call falsely reached
+    the 2-write threshold even though @Transactional cannot make
+    an HTTP call atomic.
+    """
+    tree = _parse(
+        """
+        @Service
+        class MixedService {
+            private UserRepository userRepo;
+            private RestTemplate restTemplate;
+            public void register(User u, String url) {
+                userRepo.save(u);
+                restTemplate.delete(url);
+            }
+        }
+        """
+    )
+    rule = SpringMissingTransactionalRule({"enabled": True, "severity": "error"})
+    assert rule.check_file("MixedService.java", tree) == [], "restTemplate writes must not count as transactional database writes"

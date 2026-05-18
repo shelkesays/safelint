@@ -694,3 +694,116 @@ def test_safe202_empty_statement_in_java_catch_is_noop() -> None:
         engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
         result = engine.check_file(str(path))
     assert any(v.code == "SAFE202" for v in result.violations), "Java ``empty_statement`` (`;`) in catch should fire SAFE202"
+
+
+def test_compound_assignment_preserves_existing_taint() -> None:
+    """``sql += " more"`` keeps ``sql`` tainted even when RHS is clean.
+
+    Pre-fix, ``_visit_assignment`` replaced the LHS state purely from
+    the RHS taint, so an already-tainted ``sql`` was incorrectly
+    cleared by appending a clean literal. The compound-operator check
+    now ORs RHS taint with the LHS's existing taint.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m(String input) {
+                String sql = input;
+                sql += " AND active = 1";
+                exec(sql);
+            }
+            void exec(String s) {}
+        }
+        """
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                "sinks_java": ["exec"],
+                "sanitizers_java": [],
+                "sources_java": [],
+            }
+        }
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE801" for v in result.violations), "Compound assignment must preserve existing taint on the LHS"
+
+
+def test_chained_assignment_propagates_innermost_taint() -> None:
+    """``a = b = source()`` taints both ``a`` and ``b``.
+
+    Pre-fix, the outer ``a = ...`` saw RHS = inner assignment_expression,
+    which ``_is_tainted`` treated as clean (assignment_expression isn't
+    a tracked shape). So only ``b`` ended up tainted and ``exec(a)``
+    silently passed.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m() {
+                String a, b;
+                a = b = readLine();
+                exec(a);
+            }
+            void exec(String s) {}
+        }
+        """
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                "sinks_java": ["exec"],
+                "sanitizers_java": [],
+                "sources_java": ["readLine"],
+            }
+        }
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE801" for v in result.violations), "Chained assignment must propagate inner RHS taint to every LHS in the chain"
+
+
+def test_enhanced_for_taints_loop_variable_from_iterable() -> None:
+    """``for (String arg : args) { exec(arg); }`` taints ``arg`` when ``args`` is tainted.
+
+    Pre-fix, ``_visit_node`` had no dispatcher for ``enhanced_for_statement``
+    so the loop variable was never added to the tainted set. Sinks
+    inside the loop body silently passed.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m(String[] args) {
+                for (String arg : args) {
+                    exec(arg);
+                }
+            }
+            void exec(String s) {}
+        }
+        """
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                "sinks_java": ["exec"],
+                "sanitizers_java": [],
+                "sources_java": [],
+            }
+        }
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE801" for v in result.violations), "Enhanced-for loop variable should inherit taint from the iterable"

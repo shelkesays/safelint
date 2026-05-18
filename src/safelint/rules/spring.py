@@ -253,10 +253,17 @@ _SPRING_REPO_WRITE_METHODS: frozenset[str] = frozenset(
 # (a write on a repository named ``crud`` or ``store`` won't count)
 # in exchange for eliminating the false-positive class.
 #
-# ``template`` is included to catch ``jdbcTemplate.update(...)`` and
-# ``namedJdbcTemplate.update(...)`` - the raw-SQL Spring write paths
-# that don't share the CrudRepository naming convention.
-_SPRING_REPO_RECEIVER_PATTERNS: tuple[str, ...] = ("repo", "dao", "template")
+# ``jdbctemplate`` (case-insensitive substring) catches
+# ``jdbcTemplate.update(...)`` and ``namedParameterJdbcTemplate.update(...)``
+# - the raw-SQL Spring write paths that don't share the CrudRepository
+# naming convention. The bare substring ``template`` was deliberately
+# REPLACED with ``jdbctemplate`` because ``template`` also matched
+# ``restTemplate`` / ``kafkaTemplate`` / ``redisTemplate`` and other
+# non-database Spring templates, making SAFE902 count their writes
+# (``restTemplate.delete(...)`` etc.) toward the 2+ transactional-write
+# threshold even though ``@Transactional`` cannot make a remote HTTP
+# call or message-broker call atomic with a JDBC write.
+_SPRING_REPO_RECEIVER_PATTERNS: tuple[str, ...] = ("repo", "dao", "jdbctemplate")
 
 # Class-level annotations that mark a Spring-managed bean carrying
 # transactional business logic. ``@Service`` is the canonical stereotype;
