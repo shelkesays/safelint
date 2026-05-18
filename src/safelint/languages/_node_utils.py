@@ -156,16 +156,37 @@ def _last_type_identifier(type_node: tree_sitter.Node) -> tree_sitter.Node | Non
 def _java_object_creation_name(call_node: tree_sitter.Node) -> str | None:
     """Return the simple class name from a Java ``object_creation_expression``.
 
-    Handles both ``new Foo(...)`` (``type_identifier``) and qualified
-    ``new java.io.WriteStream(...)`` (``scoped_type_identifier`` - return
-    the trailing identifier).
+    Handles three Java type shapes that can appear in the ``type`` field:
+
+    * ``type_identifier`` - bare ``new Foo(...)``. Returns ``"Foo"``.
+    * ``scoped_type_identifier`` - qualified ``new java.io.WriteStream(...)``.
+      Returns the trailing identifier (``"WriteStream"``).
+    * ``generic_type`` - parameterised ``new MyResource<Foo>(...)``. Unwraps
+      to the inner ``type_identifier`` / ``scoped_type_identifier`` and
+      recurses. Otherwise SAFE401 tracked acquirers, SAFE801 constructor
+      sinks, and SAFE303 / SAFE304 I/O constructors would silently miss
+      every generic instantiation.
     """
     type_node = call_node.child_by_field_name("type")
     if type_node is None:  # pragma: no cover - defensive: object_creation_expression always has a type field
         return None
+    if type_node.type == "generic_type":
+        # tree-sitter-java emits ``generic_type`` as a wrapper around the
+        # underlying type with a ``type_arguments`` sibling. The first
+        # named child is the underlying type; peel it off and recurse so
+        # both ``new Foo<X>(...)`` and ``new pkg.Foo<X>(...)`` resolve.
+        if not type_node.named_children:  # pragma: no cover - defensive: generic_type always wraps a type
+            return None
+        inner = type_node.named_children[0]
+        if inner.type == "type_identifier":
+            return node_text(inner)
+        if inner.type == "scoped_type_identifier":
+            last_id = _last_type_identifier(inner)
+            return node_text(last_id) if last_id is not None else None  # pragma: no cover - defensive
+        return None  # pragma: no cover - defensive: generic_type wraps unexpected shape
     if type_node.type == "type_identifier":
         return node_text(type_node)
-    if type_node.type != "scoped_type_identifier":  # pragma: no cover - generic / array creation types fall through
+    if type_node.type != "scoped_type_identifier":  # pragma: no cover - array creation etc. falls through
         return None
     last_id = _last_type_identifier(type_node)
     return node_text(last_id) if last_id is not None else None  # pragma: no cover - defensive: scoped_type_identifier always has trailing identifier

@@ -554,3 +554,39 @@ def test_constructor_call_does_not_apply_receiver_check() -> None:
     # The single tainted arg fires the sink.
     assert len(tracker.sink_hits) == 1
     assert tracker.sink_hits[0][1] == "input"
+
+
+def test_generic_type_object_creation_resolves_to_trailing_identifier() -> None:
+    """``new MyResource<Foo>(input)`` resolves to ``"MyResource"`` via generic_type unwrap.
+
+    tree-sitter-java emits ``generic_type`` as a wrapper around the
+    underlying type_identifier / scoped_type_identifier; without the
+    unwrap branch, SAFE401 tracked-acquirers / SAFE801 constructor
+    sinks / SAFE303-304 I/O constructors silently miss every generic
+    instantiation.
+    """
+    src = textwrap.dedent(
+        """
+        class C {
+            void m(String input) {
+                Object r = new MyResource<Foo>(input);
+            }
+        }
+        """
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                "sinks_java": ["MyResource"],
+                "sanitizers_java": [],
+                "sources_java": [],
+            }
+        }
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    assert any(v.code == "SAFE801" for v in result.violations), "Generic-type object creation should match the configured sink name"

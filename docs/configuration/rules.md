@@ -1059,9 +1059,11 @@ public class UserController {
 
 ### SAFE904: `spring_async_checked_exception`
 
-**What it flags:** A method annotated `@Async` that declares a `throws` clause for a checked exception. Java only.
+**What it flags:** A method annotated `@Async` that declares a `throws` clause. Java only.
 
-Spring runs `@Async` methods on a separate thread; checked exceptions declared by the method cannot propagate back to the caller's stack and are silently swallowed by Spring's executor. The `throws` clause misleads the reader into thinking the caller can handle the exception when it cannot. Fix by either catching inside the method body or returning a `CompletableFuture` whose failure state carries the exception (`CompletableFuture.failedFuture(ex)`).
+The rule's name and historical framing emphasised checked exceptions, but the implementation flags **any** `throws` clause (checked or unchecked) because distinguishing the two requires class-resolution / type-inference we don't do. The conservative behaviour is justified: Spring's executor swallows whatever the method throws regardless of checked-vs-unchecked, so the `throws` clause is always misleading - it implies the caller can observe the exception when in fact they cannot. Fix by either catching inside the method body or returning a `CompletableFuture` whose failure state carries the exception (`CompletableFuture.failedFuture(ex)`).
+
+If you have a deliberate `throws RuntimeException` on an `@Async` method (rare; the JLS doesn't require it), suppress with `// nosafe: SAFE904` on the method declaration.
 
 | Option | Default | Description |
 |---|---|---|
