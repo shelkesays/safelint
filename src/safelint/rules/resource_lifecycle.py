@@ -189,9 +189,15 @@ def _finally_closes_variable(finally_clause: tree_sitter.Node, var_name: str) ->
 
     Walks the finally clause body looking for a ``method_invocation`` whose
     ``object`` field is an ``identifier`` matching ``var_name`` and whose
-    ``name`` field is ``close``. Stops descending into nested function /
-    lambda / class bodies so a nested ``close()`` on a captured copy doesn't
-    spuriously satisfy the check.
+    ``name`` field is ``close``. Stops descending into nested Java
+    executable bodies covered by ``_JAVA_FUNCTION_TYPES`` (methods,
+    constructors, lambdas, static initializers) so a nested
+    ``close()`` on a captured copy doesn't spuriously satisfy the
+    check. Nested class / interface / record declarations are NOT
+    skipped; a ``close()`` invoked from inside an anonymous inner
+    class declared in the finally would still count, which is
+    the desired behaviour because that anonymous class runs as
+    part of the finally body.
 
     **Strict matching trade-off.** A close routed through a helper -
     ``IOUtils.closeQuietly(var)`` (Apache Commons IO), ``closeAll()`` with

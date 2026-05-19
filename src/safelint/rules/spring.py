@@ -347,7 +347,7 @@ def _is_repository_receiver(call_node: tree_sitter.Node) -> bool:
     Receiver must be either:
 
     * a simple ``identifier`` (``userRepo.save(...)``) whose name
-      (lowercased) contains one of ``repo`` / ``dao`` / ``template``,
+      (lowercased) contains one of ``repo`` / ``dao`` / ``jdbctemplate``,
       OR
     * a ``field_access`` whose ``field`` is an identifier matching
       the same pattern (``this.userRepo.save(...)`` /
