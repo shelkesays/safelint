@@ -467,11 +467,22 @@ class TaintedSinkRule(BaseRule):
 
         Java's framework preset (``[tool.safelint.java] framework =
         "spring-boot"``) overrides the default ``sinks_java`` /
-        ``sources_java`` / ``sanitizers_java`` lists in
-        :mod:`safelint.core.config` to add Spring-aware patterns
-        (``executeQuery`` on ``JdbcTemplate``, ``@RequestParam``-bound
-        params as sources, ``HtmlUtils.htmlEscape`` as sanitiser).
-        The vanilla-Java preset uses conservative stdlib defaults.
+        ``sources_java`` lists in :mod:`safelint.core.config` to add
+        Spring-aware patterns (for example, ``executeQuery`` /
+        ``queryForObject`` on ``JdbcTemplate`` and ``getForObject`` /
+        ``postForObject`` on ``RestTemplate`` as sinks). The preset
+        does NOT extend ``sanitizers_java`` - context-specific output
+        encoders (Spring's ``HtmlUtils.htmlEscape``, Apache Commons
+        ``escapeHtml*`` / ``escapeXml``, OWASP ``forHtml`` /
+        ``forJavaScript`` / ``forCssString``) are deliberately
+        excluded from the global sanitizer set because they only
+        clear taint for their own output context; including them
+        would create false negatives like ``jdbc.query(... +
+        htmlEscape(input))`` where HTML encoding doesn't quote SQL
+        metacharacters. The vanilla-Java preset uses conservative
+        stdlib defaults; both presets share the same narrow
+        ``sanitizers_java`` baseline (``sanitize`` / ``validate`` /
+        ``quote`` / ``escape``).
         """
         sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", "java", default=[])
         sinks = frozenset(_validated_string_list(sinks_raw, sinks_key))
