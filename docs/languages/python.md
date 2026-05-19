@@ -19,7 +19,7 @@ v2.0.0 ships every language grammar as an opt-in extra, the `[python]` extra ins
 
 ## Rules that fire on Python
 
-All 19 user-facing rules apply to Python, the 17 cross-language rules plus the 2 Python-only rules. The 1 JavaScript-only rule (SAFE305 `wide_scope_declaration`) is skipped automatically by the engine's per-language dispatch.
+All 19 user-facing rules apply to Python: the 16 cross-language rules (Python / JS / TS / Java) plus SAFE302 `global_mutation` (Python / JS / TS only, not ported to Java yet) plus the 2 Python-only rules (SAFE201 `bare_except`, SAFE301 `global_state`). The 1 JavaScript-family-only rule (SAFE305 `wide_scope_declaration`) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
 
 | Code | Rule | Notes for Python |
 |---|---|---|

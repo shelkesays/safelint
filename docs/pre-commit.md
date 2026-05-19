@@ -20,7 +20,7 @@ repos:
         # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles JS too)
         # additional_dependencies: ['safelint[java]==2.1.0rc1']     # Java repo, RC pin until v2.1.0 GA (Spring Boot via [tool.safelint.java] framework = "spring-boot")
         # additional_dependencies: ['safelint[python,javascript]']  # mixed monorepo
-        # additional_dependencies: ['safelint[all]']                # every supported language
+        # additional_dependencies: ['safelint[all]==2.1.0rc1']      # every supported language, RC pin until v2.1.0 GA so [all] actually includes Java
 
         args: [--fail-on=error]   # default; use --fail-on=warning for stricter CI
         files: ^src/              # optional, scope to a directory

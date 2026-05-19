@@ -18,7 +18,7 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 - **Python** (`.py`, `.pyw`).
 - **JavaScript** (`.js`, `.mjs`, `.cjs`), source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime *defaults* (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the [`[tool.safelint.javascript] runtime = "..."`](toml.md#javascript-runtime-presets) preset, the source-language rules themselves don't change.
 - **TypeScript** (`.ts`, `.tsx`), and **AssemblyScript** (`.as`, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, `as` casts, non-null assertions, `declare global` ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See [TypeScript](../languages/typescript.md) for the full language reference.
-- **Java** (`.java`), new in v2.1.0. 16 of the cross-language rules port cleanly plus 4 Spring Boot framework-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* (sinks, nullable methods, structural rule enablement) are switchable via the [`[tool.safelint.java] framework = "..."`](../languages/java.md#framework-presets) preset (`vanilla` / `spring-boot`). See [Java](../languages/java.md) for the full language reference.
+- **Java** (`.java`), new in v2.1.0rc1 (release candidate; install with `pip install --pre 'safelint[java]==2.1.0rc1'`). 16 of the cross-language rules port cleanly plus 4 Spring Boot framework-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* (sinks, nullable methods, structural rule enablement) are switchable via the [`[tool.safelint.java] framework = "..."`](../languages/java.md#framework-presets) preset (`vanilla` / `spring-boot`). See [Java](../languages/java.md) for the full language reference.
 
 ### Planned
 
@@ -992,14 +992,16 @@ public class OrderService {
 
 ### SAFE902: `spring_missing_transactional`
 
-**What it flags:** A `@Service` or `@Component` method that performs two or more Spring Data repository writes (`save` / `saveAll` / `saveAndFlush` / `delete` / `deleteAll` / `deleteAllInBatch` / `deleteById` / `update`) without `@Transactional` on the method or the enclosing class. Java only.
+**What it flags:** A `@Service` or `@Component` method that performs two or more Spring Data repository writes (`save` / `saveAll` / `saveAndFlush` / `delete` / `deleteAll` / `deleteAllInBatch` / `deleteAllById` / `deleteAllByIdInBatch` / `deleteById` / `update`) without `@Transactional` on the method or the enclosing class. Java only.
 
 Multi-write methods without `@Transactional` run each write in its own short-lived transaction; a failure between writes leaves the database in a partially-updated state. Single-write methods are exempt because the implicit per-statement transaction is sufficient.
+
+**Receiver-name heuristic:** detection is constrained to method invocations whose receiver name (lowercased) contains `repo` / `dao` / `jdbctemplate` — e.g. `userRepo.save(...)`, `productDao.update(...)`, `jdbcTemplate.update(...)`. Without this guard, `call_name()` strips the receiver and unrelated calls like `file.delete()` / `cache.delete()` / `restTemplate.delete(...)` would be counted. Rename a service-managed field if your convention is `userStore` / `userManager` / etc., or add the matching pattern via `[tool.safelint.rules.spring_missing_transactional]` configuration in a future release (currently the pattern set is fixed at the source level).
 
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `false` (vanilla) / `true` (spring-boot preset) | Toggle the rule |
-| `severity` | `"warning"` | `"error"` or `"warning"` |
+| `severity` | `"error"` | `"error"` or `"warning"` |
 
 **Bad:**
 
@@ -1035,7 +1037,7 @@ Without `@Valid` / `@Validated`, Bean Validation constraints declared on the DTO
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `false` (vanilla) / `true` (spring-boot preset) | Toggle the rule |
-| `severity` | `"warning"` | `"error"` or `"warning"` |
+| `severity` | `"error"` | `"error"` or `"warning"` |
 
 **Bad:**
 

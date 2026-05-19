@@ -19,7 +19,7 @@ If your project doesn't already have a Python toolchain, the same install comman
 
 ## Rules that fire on JavaScript
 
-18 user-facing rules apply to JavaScript, the 17 cross-language rules plus 1 JavaScript-only rule. The 2 Python-only rules (SAFE201, SAFE301) are skipped automatically by the engine's per-language dispatch.
+18 user-facing rules apply to JavaScript: the 16 cross-language rules (Python / JS / TS / Java) plus SAFE302 `global_mutation` (Python / JS / TS only, not ported to Java yet) plus the 1 JavaScript-family rule (SAFE305 `wide_scope_declaration`). The 2 Python-only rules (SAFE201, SAFE301) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
 
 | Code | Rule | Notes for JavaScript |
 |---|---|---|
