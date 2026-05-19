@@ -22,7 +22,7 @@ If either check returns non-zero (or the shell reports "command not found" / "is
   | `.py` / `.pyw` | `uv add 'safelint[python]'` or `pip install 'safelint[python]'` |
   | `.js` / `.mjs` / `.cjs` | `uv add 'safelint[javascript]'` or `pip install 'safelint[javascript]'` |
   | `.ts` / `.tsx` / `.as` | `uv add 'safelint[typescript]'` or `pip install 'safelint[typescript]'` (bundles JS grammar too) |
-  | `.java` | `uv add 'safelint[java]==2.1.0rc1'` or `pip install --pre 'safelint[java]==2.1.0rc1'` (RC pin needed until v2.1.0 GA; Spring Boot via `[tool.safelint.java] framework = "spring-boot"` — see `languages/java.md`) |
+  | `.java` | `uv add 'safelint[java]==2.1.0rc1'` or `pip install --pre 'safelint[java]==2.1.0rc1'` (RC pin needed until v2.1.0 GA; Spring Boot via `[tool.safelint.java] framework = "spring-boot"`, see `languages/java.md`) |
   | Multiple languages | Compose, e.g. `pip install 'safelint[python,javascript]'` |
   | Unsure / kitchen-sink | `pip install 'safelint[all]'` (covers every supported language) |
 

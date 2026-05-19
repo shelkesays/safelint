@@ -35,10 +35,10 @@ Listed in the project's current working priority; no timelines committed. SafeLi
 | Scope | Count | Codes |
 |---|---|---|
 | **Cross-language** (Python, JavaScript, TypeScript, Java) | 16 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 |
-| **Python / JS / TS** (not Java) | 1 | SAFE302 (`global_mutation`, Java's natural analogue — non-final static field writes from outside the declaring class's static initialiser — needs class-scope analysis the rule doesn't yet do; deferred to a future release) |
+| **Python / JS / TS** (not Java) | 1 | SAFE302 (`global_mutation`, where Java's natural analogue (non-final static field writes from outside the declaring class's static initialiser) needs class-scope analysis the rule doesn't yet do; deferred to a future release) |
 | **Python-only** | 2 | SAFE201 (`bare_except`, JS / TS catches always bind the error; no `KeyboardInterrupt` hijack hazard), SAFE301 (`global_state`, JS / TS have no `global` keyword; SAFE302 covers their "writes to module-level state" cases) |
 | **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`, Python and Java have no `var` / `let` / `const` distinction; `var` is still legal in TS and the same scope-hoisting hazard applies, so the rule fires on both `.js` and `.ts`) |
-| **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`) — all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset |
+| **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`); all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset |
 
 The engine's per-language dispatch automatically skips rules whose `language` tuple doesn't include the active file's language. There's no manual configuration to do, drop a `.py` file in a JS / TS project (or vice versa) and the right rules fire on each.
 
@@ -996,7 +996,7 @@ public class OrderService {
 
 Multi-write methods without `@Transactional` run each write in its own short-lived transaction; a failure between writes leaves the database in a partially-updated state. Single-write methods are exempt because the implicit per-statement transaction is sufficient.
 
-**Receiver-name heuristic:** detection is constrained to method invocations whose receiver name (lowercased) contains `repo` / `dao` / `jdbctemplate` — e.g. `userRepo.save(...)`, `productDao.update(...)`, `jdbcTemplate.update(...)`. Without this guard, `call_name()` strips the receiver and unrelated calls like `file.delete()` / `cache.delete()` / `restTemplate.delete(...)` would be counted. Rename a service-managed field if your convention is `userStore` / `userManager` / etc., or add the matching pattern via `[tool.safelint.rules.spring_missing_transactional]` configuration in a future release (currently the pattern set is fixed at the source level).
+**Receiver-name heuristic:** detection is constrained to method invocations whose receiver name (lowercased) contains `repo` / `dao` / `jdbctemplate`, e.g. `userRepo.save(...)`, `productDao.update(...)`, `jdbcTemplate.update(...)`. Without this guard, `call_name()` strips the receiver and unrelated calls like `file.delete()` / `cache.delete()` / `restTemplate.delete(...)` would be counted. Rename a service-managed field if your convention is `userStore` / `userManager` / etc., or add the matching pattern via `[tool.safelint.rules.spring_missing_transactional]` configuration in a future release (currently the pattern set is fixed at the source level).
 
 | Option | Default | Description |
 |---|---|---|
