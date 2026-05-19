@@ -109,7 +109,7 @@ def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
             return True
         prev = cur
         cur = cur.parent
-    return False  # pragma: no cover - defensive: walks off the tree root
+    return False
 
 
 def _try_statement_has_finally(node: tree_sitter.Node) -> bool:
@@ -193,11 +193,17 @@ def _finally_closes_variable(finally_clause: tree_sitter.Node, var_name: str) ->
     executable bodies covered by ``_JAVA_FUNCTION_TYPES`` (methods,
     constructors, lambdas, static initializers) so a nested
     ``close()`` on a captured copy doesn't spuriously satisfy the
-    check. Nested class / interface / record declarations are NOT
-    skipped; a ``close()`` invoked from inside an anonymous inner
-    class declared in the finally would still count, which is
-    the desired behaviour because that anonymous class runs as
-    part of the finally body.
+    check.
+
+    A consequence of pruning ``_JAVA_FUNCTION_TYPES``: a ``close()``
+    invoked from inside an anonymous inner class declared in the
+    finally (``new Runnable() { public void run() { x.close(); } }``)
+    is NOT recognised because the walk yields the inner
+    ``method_declaration`` but does not descend into its body. The
+    same holds for closes routed through a lambda or static
+    initializer. Users hitting this can suppress with
+    ``// nosafe: SAFE401`` or restructure to call ``close()`` directly
+    in the finally body (which is the idiomatic pattern anyway).
 
     **Strict matching trade-off.** A close routed through a helper -
     ``IOUtils.closeQuietly(var)`` (Apache Commons IO), ``closeAll()`` with
@@ -489,7 +495,10 @@ class ResourceLifecycleRule(BaseRule):
             # via ``method_invocation`` renders as ``newBufferedReader()``.
             invocation = f"new {name}()" if node.type == "object_creation_expression" else f"{name}()"
             message = (
-                f'"{invocation}" not wrapped in try-with-resources or try/finally - declare in ``try (... = {invocation})`` for automatic cleanup, or guard with ``try {{ ... }} finally {{ ... }}``'
+                f'"{invocation}" not wrapped in try-with-resources or try/finally; '
+                f"declare it as ``try (var resource = {invocation}) {{ ... }}`` "
+                "(try-with-resources; the JVM auto-closes the resource on exit), "
+                "or guard with ``try {{ ... }} finally {{ resource.close(); }}``"
             )
             violations.append(self._make_violation_for_node(filepath, node, message))
         return violations
