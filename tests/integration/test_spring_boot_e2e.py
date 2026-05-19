@@ -301,13 +301,39 @@ def test_owasp_html_encoder_does_not_clear_sql_sink_taint(tmp_path: Path) -> Non
     in their TOML; the strict default avoids the cross-context
     confusion by default.
     """
-    src = (FIXTURES_DIR / "UserController.java").read_text(encoding="utf-8")
-    sanitised = src.replace(
-        'String sql = "SELECT * FROM users WHERE name = \'" + name + "\'";\n        return jdbc.query(sql, new Object[]{});',
-        'String safe = org.owasp.encoder.Encode.forHtml(name);\n        String sql = "SELECT * FROM users WHERE name = \'" + safe + "\'";\n        return jdbc.query(sql, new Object[]{});',
+    # Build the controller source inline so the assertion is decoupled
+    # from formatting choices in the shared fixture file. Previously this
+    # test did a ``str.replace`` against the full UserController.java
+    # snippet, which broke whenever the fixture was reformatted /
+    # whitespace-shuffled even if SAFE801 behaviour was unchanged.
+    sanitised_source = (
+        "package com.example.petclinic;\n"
+        "\n"
+        "import org.springframework.jdbc.core.JdbcTemplate;\n"
+        "import org.springframework.web.bind.annotation.GetMapping;\n"
+        "import org.springframework.web.bind.annotation.RequestParam;\n"
+        "import org.springframework.web.bind.annotation.RestController;\n"
+        "\n"
+        "@RestController\n"
+        "public class HtmlEncodedSqlController {\n"
+        "    private final JdbcTemplate jdbc;\n"
+        "\n"
+        "    public HtmlEncodedSqlController(JdbcTemplate jdbc) {\n"
+        "        this.jdbc = jdbc;\n"
+        "    }\n"
+        "\n"
+        '    @GetMapping("/search")\n'
+        "    public java.util.List<?> search(@RequestParam String name) {\n"
+        "        // HTML encoding does NOT make ``name`` safe for SQL\n"
+        "        // concatenation; SAFE801 must still fire on jdbc.query.\n"
+        "        String safe = org.owasp.encoder.Encode.forHtml(name);\n"
+        '        String sql = "SELECT * FROM users WHERE name = \'" + safe + "\'";\n'
+        "        return jdbc.query(sql, new Object[]{});\n"
+        "    }\n"
+        "}\n"
     )
-    sanitised_file = tmp_path / "UserController.java"
-    sanitised_file.write_text(sanitised, encoding="utf-8")
+    sanitised_file = tmp_path / "HtmlEncodedSqlController.java"
+    sanitised_file.write_text(sanitised_source, encoding="utf-8")
     cfg = _all_rules_enabled_config("spring-boot")
     engine = SafetyEngine(cfg)
     result = engine.check_file(str(sanitised_file))
