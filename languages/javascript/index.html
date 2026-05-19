@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python and JavaScript">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -482,6 +482,8 @@
       
         
       
+        
+      
     
     
     
@@ -747,6 +749,34 @@
     
   
     TypeScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../java/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Java
   
 
     
@@ -2080,7 +2110,7 @@
 </code></pre></div>
 <p>If your project doesn't already have a Python toolchain, the same install command works through <code>pipx install 'safelint[javascript]'</code> (isolates the install) or by adding <code>'safelint[javascript]'</code> as a dev dependency through any pip-compatible manager. v2.0.0 ships every language grammar as an opt-in extra; the <code>[javascript]</code> extra installs <code>tree-sitter-javascript</code> alongside the engine.</p>
 <h2 id="rules-that-fire-on-javascript">Rules that fire on JavaScript<a class="headerlink" href="#rules-that-fire-on-javascript" title="Permanent link">#</a></h2>
-<p>18 user-facing rules apply to JavaScript, the 17 cross-language rules plus 1 JavaScript-only rule. The 2 Python-only rules (SAFE201, SAFE301) are skipped automatically by the engine's per-language dispatch.</p>
+<p>18 user-facing rules apply to JavaScript: the 16 cross-language rules (Python / JS / TS / Java) plus SAFE302 <code>global_mutation</code> (Python / JS / TS only, not ported to Java yet) plus the 1 JavaScript-family rule (SAFE305 <code>wide_scope_declaration</code>). The 2 Python-only rules (SAFE201, SAFE301) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.</p>
 <table>
 <thead>
 <tr>
@@ -2277,7 +2307,7 @@
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># .pre-commit-config.yaml</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">repos</span><span class="p">:</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0</span><span class="w">         </span><span class="c1"># pin to a release (replace with the GA tag once v2.0.0 ships)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.1.0rc1</span><span class="w">      </span><span class="c1"># pin to a release (use a recent tag; v2.1.0rc1 also unlocks the Java extra if you later add .java files)</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
 <a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="c1"># JS / TS users add the matching extra so pre-commit&#39;s isolated</span>

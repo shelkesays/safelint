@@ -12,13 +12,13 @@
         <meta name="author" content="Rahul Shelke">
       
       
-        <link rel="canonical" href="https://shelkesays.github.io/safelint/languages/typescript/">
+        <link rel="canonical" href="https://shelkesays.github.io/safelint/languages/java/">
       
       
-        <link rel="prev" href="../javascript/">
+        <link rel="prev" href="../typescript/">
       
       
-        <link rel="next" href="../java/">
+        <link rel="next" href="../../configuration/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>TypeScript - SafeLint</title>
+        <title>Java - SafeLint</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#typescript" class="md-skip">
+        <a href="#java" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              TypeScript
+              Java
             
           </span>
         </div>
@@ -592,6 +592,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../typescript/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    TypeScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -611,7 +639,7 @@
   <span class="md-ellipsis">
     
   
-    TypeScript
+    Java
   
 
     
@@ -629,7 +657,7 @@
   <span class="md-ellipsis">
     
   
-    TypeScript
+    Java
   
 
     
@@ -677,10 +705,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rules-that-fire-on-typescript" class="md-nav__link">
+  <a href="#rules-that-fire-on-java" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rules that fire on TypeScript
+        Rules that fire on Java
       
     </span>
   </a>
@@ -700,10 +728,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#typescript-inherits-javascript-config" class="md-nav__link">
+  <a href="#framework-presets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TypeScript inherits JavaScript config
+        Framework presets
       
     </span>
   </a>
@@ -711,10 +739,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#runtime-presets-apply-to-typescript-too" class="md-nav__link">
+  <a href="#per-rule-toml-overrides" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Runtime presets apply to TypeScript too
+        Per-rule TOML overrides
       
     </span>
   </a>
@@ -727,10 +755,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installing-the-typescript-extra" class="md-nav__link">
+  <a href="#installing-the-java-extra" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Installing the TypeScript extra
+        Installing the Java extra
       
     </span>
   </a>
@@ -749,10 +777,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#typescript-specific-config-keys" class="md-nav__link">
+  <a href="#java-specific-config-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TypeScript-specific config keys
+        Java-specific config keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-with-existing-java-tooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration with existing Java tooling
       
     </span>
   </a>
@@ -774,34 +813,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../java/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Java
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -2014,10 +2025,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rules-that-fire-on-typescript" class="md-nav__link">
+  <a href="#rules-that-fire-on-java" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rules that fire on TypeScript
+        Rules that fire on Java
       
     </span>
   </a>
@@ -2037,10 +2048,10 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#typescript-inherits-javascript-config" class="md-nav__link">
+  <a href="#framework-presets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TypeScript inherits JavaScript config
+        Framework presets
       
     </span>
   </a>
@@ -2048,10 +2059,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#runtime-presets-apply-to-typescript-too" class="md-nav__link">
+  <a href="#per-rule-toml-overrides" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Runtime presets apply to TypeScript too
+        Per-rule TOML overrides
       
     </span>
   </a>
@@ -2064,10 +2075,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#installing-the-typescript-extra" class="md-nav__link">
+  <a href="#installing-the-java-extra" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Installing the TypeScript extra
+        Installing the Java extra
       
     </span>
   </a>
@@ -2086,10 +2097,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#typescript-specific-config-keys" class="md-nav__link">
+  <a href="#java-specific-config-keys" class="md-nav__link">
     <span class="md-ellipsis">
       
-        TypeScript-specific config keys
+        Java-specific config keys
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#integration-with-existing-java-tooling" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Integration with existing Java tooling
       
     </span>
   </a>
@@ -2124,7 +2146,7 @@
 
 
   
-    <a href="https://github.com/shelkesays/safelint/edit/main/docs/languages/typescript.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/shelkesays/safelint/edit/main/docs/languages/java.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2132,195 +2154,259 @@
   
 
 
-<h1 id="typescript">TypeScript<a class="headerlink" href="#typescript" title="Permanent link">#</a></h1>
-<p>SafeLint analyses TypeScript source for the Holzmann "Power of Ten" safety rules, function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like ESLint don't catch. TypeScript support landed in v2.0.0rc1 and reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; the AST is a superset), with TypeScript-specific handling for the type-only constructs that the JS rules wouldn't otherwise recognise.</p>
+<h1 id="java">Java<a class="headerlink" href="#java" title="Permanent link">#</a></h1>
+<p>SafeLint analyses Java source for the Holzmann "Power of Ten" safety rules, function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like Checkstyle and PMD don't catch. Java support landed in <strong>v2.1.0rc1</strong> (release candidate; install with <code>pip install --pre 'safelint[java]==2.1.0rc1'</code>, see <a href="#quick-start">Quick start</a> below) alongside a dedicated <strong>Spring Boot framework preset</strong> that adds Spring-aware sinks, nullable methods, and four <code>SAFE9xx</code> framework-specific structural rules. Java does NOT replace SpotBugs / Checkstyle / PMD / ErrorProne, it runs alongside them and covers a different, narrower set focused on Holzmann safety + Spring-specific patterns.</p>
 <h2 id="file-extensions">File extensions<a class="headerlink" href="#file-extensions" title="Permanent link">#</a></h2>
 <ul>
-<li><strong><code>.ts</code></strong>, TypeScript (no JSX). Parsed by <code>tree-sitter-typescript</code>'s <code>typescript</code> grammar.</li>
-<li><strong><code>.tsx</code></strong>, TypeScript with JSX / React. Parsed by the separate <code>tsx</code> grammar (the two grammars differ because JSX changes the meaning of <code>&lt;</code>, <code>&gt;</code>, and a few other tokens). From the rule perspective TSX is just TypeScript with JSX nodes added, same logical language name (<code>"typescript"</code>), so a rule's <code>language</code> tuple needs one entry to cover both.</li>
-<li><strong><code>.as</code></strong>, <strong>AssemblyScript</strong> is a TypeScript-syntax subset that compiles to WebAssembly. It parses cleanly with the standard TypeScript grammar; SafeLint treats <code>.as</code> files as TypeScript without special-casing. Rule output uses TypeScript's vocabulary.</li>
+<li><strong><code>.java</code></strong>, parsed by <code>tree-sitter-java</code>. Picked up by <code>safelint check</code> (directory mode, <code>--all-files</code> mode, and the pre-commit hook).</li>
 </ul>
+<p>Kotlin (<code>.kt</code>), Groovy (<code>.groovy</code>), and Scala (<code>.scala</code>) are NOT yet registered; they would land as separate language modules with their own extras when added.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[typescript]&#39;</span><span class="w">     </span><span class="c1"># the tool runs on Python; the [typescript] extra adds the TS grammar (and bundles JS too)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s1">&#39;safelint[java]==2.1.0rc1&#39;</span><span class="w">    </span><span class="c1"># --pre + RC pin are required until v2.1.0 GA; [java] adds the Java grammar</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                    </span><span class="c1"># lint a directory (git-modified files by default)</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">           </span><span class="c1"># lint everything</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>src/<span class="w">      </span><span class="c1"># machine-readable for editors / CI</span>
 </code></pre></div>
-<p>If your project doesn't already have a Python toolchain, <code>pipx install 'safelint[typescript]'</code> isolates the install; or add <code>'safelint[typescript]'</code> as a dev dependency through any pip-compatible manager. v2.0.0+ ships every language grammar as an opt-in extra, plain <code>pip install safelint</code> installs only the engine and would skip every <code>.ts</code> / <code>.tsx</code> / <code>.as</code> file with an install hint on first run.</p>
-<h2 id="rules-that-fire-on-typescript">Rules that fire on TypeScript<a class="headerlink" href="#rules-that-fire-on-typescript" title="Permanent link">#</a></h2>
-<p>18 user-facing rules apply to TypeScript: the 16 cross-language rules (Python / JS / TS / Java) plus SAFE302 <code>global_mutation</code> (Python / JS / TS only, not ported to Java yet) plus 1 JavaScript-family rule (SAFE305 <code>wide_scope_declaration</code>, which also fires on TS because <code>var</code> is still legal there). The 2 Python-only rules (SAFE201, SAFE301) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.</p>
-<p>The behaviour is identical to JavaScript for almost everything, see <a href="../javascript/">JavaScript notes</a> for the canonical per-rule guidance. The differences below are TypeScript-specific.</p>
+<p>While the RC is the current release, pip needs to know it should pick a pre-release version; by default it resolves to the latest stable (v2.0.0), which does not have a <code>[java]</code> extra. Either of two forms tells pip the right thing:</p>
+<ul>
+<li><strong>Pin only</strong>: <code>pip install 'safelint[java]==2.1.0rc1'</code>. The exact pre-release version pin is itself an explicit pre-release request, so <code>--pre</code> isn't required.</li>
+<li><strong><code>--pre</code> only</strong>: <code>pip install --pre 'safelint[java]'</code>. The flag lets pip choose any pre-release that satisfies the requirement, currently 2.1.0rc1.</li>
+</ul>
+<p>The Quick start above combines both (<code>pip install --pre 'safelint[java]==2.1.0rc1'</code>) for maximum explicitness; the combined form is redundant but harmless. Drop both once v2.1.0 GA is published. If your Java project doesn't already have a Python tool chain, <code>pipx install 'safelint[java]==2.1.0rc1'</code> isolates the install (pipx doesn't accept pip's <code>--pre</code> directly, but the explicit <code>==2.1.0rc1</code> pin lets pipx resolve to the pre-release without needing the flag; for arbitrary pre-release resolution use <code>pipx install --pip-args='--pre' 'safelint[java]'</code>). Maven / Gradle plugins are NOT required; safelint is a standalone CLI that reads source files directly.</p>
+<p>v2.1.0+ ships every language grammar as an opt-in extra, plain <code>pip install safelint</code> installs only the engine and would skip every <code>.java</code> file with an install hint on first run.</p>
+<h2 id="rules-that-fire-on-java">Rules that fire on Java<a class="headerlink" href="#rules-that-fire-on-java" title="Permanent link">#</a></h2>
+<p><strong>20 rules apply to Java</strong>: 16 cross-language rules + 4 Spring Boot framework-specific rules (<code>SAFE9xx</code>, enabled by the <code>spring-boot</code> preset). 4 rules are deliberately skipped, see the next section.</p>
 <table>
 <thead>
 <tr>
 <th>Code</th>
 <th>Rule</th>
-<th>TypeScript-specific notes</th>
+<th>Notes for Java</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><a href="../../configuration/rules/#safe101-function_length">SAFE101</a></td>
 <td><code>function_length</code></td>
-<td>Same as JS. Type annotations don't inflate line counts, only body lines count. Long type signatures (e.g. <code>function f&lt;T extends Record&lt;string, unknown&gt;&gt;(...)</code>) occupy the same single signature line.</td>
+<td>Counts source lines on <code>method_declaration</code> / <code>constructor_declaration</code> / <code>lambda_expression</code> / <code>static_initializer</code>. Default cap is 60. Lambda bodies count toward their own size, not the enclosing method's.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe102-nesting_depth">SAFE102</a></td>
 <td><code>nesting_depth</code></td>
-<td>Same as JS. TypeScript-only constructs (<code>interface</code>, <code>type</code> alias declarations) live at module scope and don't appear inside function bodies, so they don't contribute.</td>
+<td>Counts <code>if</code> / <code>for</code> / <code>enhanced_for</code> (for-each) / <code>while</code> / <code>do</code> / <code>try</code> / <code>try_with_resources</code> / <code>switch_expression</code> (Java 14+). <code>synchronized</code> blocks add visual indent but are NOT counted (no control-flow branch). Default max 2.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe103-max_arguments">SAFE103</a></td>
 <td><code>max_arguments</code></td>
-<td><strong>Generic type parameters do NOT count.</strong> <code>function f&lt;T, U, V&gt;(a, b)</code> counts as 2 arguments, not 5, TS keeps type parameters in a separate <code>type_parameters</code> AST node. Default-value and rest parameters count exactly as in JS.</td>
+<td>Counts <code>formal_parameter</code> and <code>spread_parameter</code> (varargs <code>T... args</code>). The <code>receiver_parameter</code> form (<code>Foo this</code>) is excluded (analogue of Python's <code>self</code>). Default cap 7.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
 <td><code>complexity</code></td>
-<td>Same as JS. Conditional types (<code>T extends string ? A : B</code>) are type-only and don't add cyclomatic complexity.</td>
+<td>Cyclomatic complexity, every <code>if</code> / <code>for</code> / <code>enhanced_for</code> / <code>while</code> / <code>do</code> / <code>catch</code> / ternary adds one. Both Java switch shapes count their cases: colon-form (<code>switch_block_statement_group</code>) and arrow-form (<code>switch_rule</code>, Java 14+). <code>&amp;&amp;</code> / <code>\|\|</code> short-circuit operators inside <code>binary_expression</code> add one each (no <code>??</code>; Java uses <code>Objects.requireNonNullElse</code> for null-coalescing). Default cap 10.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe202-empty_except">SAFE202</a></td>
 <td><code>empty_except</code></td>
-<td>Same as JS, fires on empty <code>catch</code> blocks.</td>
+<td>Fires on <code>catch (Exception e) {}</code> (the bare empty block) and on catch bodies containing only a single comment (<code>{ // todo }</code>, <code>{ /* nope */ }</code>). tree-sitter-java emits comments as named children of blocks (unlike JS where they're extras), so the rule correctly classifies comment-only catch bodies as empty. Bare literals (<code>{ 0; }</code>, <code>{ null; }</code>, <code>{ "TODO"; }</code>) are not valid Java expression statements (only method calls / assignments / object creation / pre/post-increment count as side-effectful statements), so they'd produce a parse error before SAFE202 saw them.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe203-logging_on_error">SAFE203</a></td>
 <td><code>logging_on_error</code></td>
-<td>Same as JS, requires <code>console.*</code> / <code>logger.*</code> or rethrow in <code>catch</code>.</td>
-</tr>
-<tr>
-<td><a href="../../configuration/rules/#safe302-global_mutation">SAFE302</a></td>
-<td><code>global_mutation</code></td>
-<td>TS-specific pass-through unwrappers: <code>(globalThis as any).counter = 1</code> is recognised as a global write, the <code>as</code> cast and <code>!</code> non-null assertion don't break the receiver-chain walk. <code>declare global { ... }</code> (ambient declarations) doesn't fire because the block contains type declarations only, no runtime assignments.</td>
+<td>Requires a logging call in every catch block that doesn't re-raise. Recognised logger method names cover SLF4J / Log4j / java.util.logging: <code>error</code> / <code>warn</code> / <code>info</code> / <code>debug</code> / <code>trace</code> / <code>severe</code> / <code>fine</code> / <code>finer</code> / <code>finest</code> / <code>log</code> / <code>exception</code>. <code>call_name</code> strips the receiver, so <code>logger.error(...)</code> and <code>LoggerFactory.getLogger(Foo.class).error(...)</code> both resolve to <code>"error"</code>. Re-raise pattern <code>catch (Type e) { throw e; }</code> is recognised when the thrown identifier matches the catch-parameter binding.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe303-side_effects_hidden">SAFE303</a></td>
 <td><code>side_effects_hidden</code></td>
-<td>Same as JS. Uses the same <code>io_functions_javascript</code> list by default (TypeScript inherits the JS config; see <a href="../../configuration/toml/#typescript-and-the-_javascript-config-keys">config precedence</a>).</td>
+<td>Fires when a method with a "pure" name prefix (<code>get</code> / <code>compute</code> / <code>is</code> / <code>has</code> / <code>validate</code> / <code>parse</code> / etc.) calls an I/O primitive. Default <code>io_functions_java</code> covers <code>PrintStream</code> (<code>println</code> / <code>print</code> / <code>printf</code>), Scanner / BufferedReader stdin readers, file IO via <code>new</code> (<code>FileInputStream</code> / <code>FileOutputStream</code> / <code>FileReader</code> / <code>FileWriter</code> / <code>Scanner</code> / <code>PrintWriter</code>), <code>java.nio.file.Files</code> static methods (<code>readAllBytes</code> / <code>readAllLines</code> / <code>writeString</code> / <code>write</code>), and network (<code>Socket</code>, plus the JDK HTTP client API methods <code>newHttpClient</code> / <code>send</code> / <code>sendAsync</code>. <code>HttpClient</code> itself is NOT a default because the class has no public constructor, so <code>call_name()</code> resolves the standard <code>HttpClient.newHttpClient()</code> factory to <code>"newHttpClient"</code>).</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe304-side_effects">SAFE304</a></td>
 <td><code>side_effects</code></td>
-<td>Same as JS.</td>
-</tr>
-<tr>
-<td><a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305</a></td>
-<td><code>wide_scope_declaration</code></td>
-<td><strong>JavaScript-family only</strong>, but applies to TS too. <code>var</code> is legal in TS and still hazardous (function-scoped, hoisted); the rule fires identically on <code>.ts</code> / <code>.tsx</code> / <code>.as</code> files. Migration: replace with <code>let</code> (if reassigned) or <code>const</code> (if not).</td>
+<td>Fires on any method whose name doesn't <em>signal</em> I/O. Java default <code>io_functions_java</code> set is a deliberately narrower subset of SAFE303's: <code>println</code> / <code>print</code> / <code>printf</code>, <code>readLine</code> / <code>nextLine</code>, file IO via <code>new</code> (<code>FileInputStream</code> / <code>FileOutputStream</code> / <code>FileReader</code> / <code>FileWriter</code> / <code>Scanner</code>), and <code>java.nio.file.Files</code> static methods (<code>readAllBytes</code> / <code>readAllLines</code> / <code>writeString</code> / <code>write</code>). SAFE303-only entries (<code>BufferedReader</code> / <code>BufferedWriter</code> / <code>PrintWriter</code> / <code>Socket</code> / <code>newHttpClient</code> / <code>send</code> / <code>sendAsync</code>) are NOT in SAFE304's list because they're often legitimately invoked from non-pure helpers where flagging would be noisy. <strong>Spring users:</strong> the <code>spring-boot</code> preset does NOT exempt <code>@Bean</code> factory methods - if you have noisy hits on factory methods that legitimately create side-effectful resources, suppress with <code>// nosafe: SAFE304</code> until a future <code>skip_functions_annotated_with</code> knob lands.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe401-resource_lifecycle">SAFE401</a></td>
 <td><code>resource_lifecycle</code></td>
-<td>Same as JS, tracked acquirer calls (<code>createReadStream</code>, <code>Worker</code>, …) must be inside <code>try { ... } finally { ... }</code>. Constructor invocations (<code>new Worker(...)</code>) are recognised.</td>
+<td>Java's idiom is try-with-resources (<code>try (Resource r = ...) { ... }</code>) which auto-closes any <code>AutoCloseable</code>; the classic <code>try { ... } finally { r.close(); }</code> form is accepted too. Default tracked acquirers: file streams (<code>FileInputStream</code> / <code>FileOutputStream</code> / <code>FileReader</code> / <code>FileWriter</code> / <code>BufferedReader</code> / <code>BufferedWriter</code> / <code>Scanner</code> / <code>PrintWriter</code> / <code>RandomAccessFile</code>), <code>java.nio.file.Files</code> factory methods (<code>newBufferedReader</code> / <code>newBufferedWriter</code> / <code>newInputStream</code> / <code>newOutputStream</code>), network (<code>Socket</code> / <code>ServerSocket</code>), JDBC (<code>getConnection</code>). <code>FileChannel.open</code> is NOT in the default list because <code>call_name()</code> strips the receiver and a bare <code>"open"</code> entry would over-match unrelated <code>*.open()</code> calls (<code>dialog.open()</code>, <code>editor.open()</code>, project-local helpers); add <code>"open"</code> to <code>tracked_functions_java</code> if you accept that trade-off.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe501-unbounded_loops">SAFE501</a></td>
 <td><code>unbounded_loops</code></td>
-<td>Same as JS.</td>
+<td>Fires on <code>while (true)</code> without a <code>break</code>. Java's labelled-break form (<code>outer: while (true) { for (...) { break outer; } }</code>) is recognised via <code>labeled_statement</code> parent traversal. Note: Java uses <code>identifier</code> (NOT JS's <code>statement_identifier</code>) as the label-token type. <code>enhanced_for_statement</code> and <code>switch_expression</code> are break-scope boundaries so a <code>break</code> inside a Java foreach / arrow-switch doesn't count toward an enclosing <code>while</code>.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
 <td><code>missing_assertions</code></td>
-<td>Same as JS. Uses <code>assertion_calls_javascript</code> by default, TS frameworks like Vitest / Jest typically configure the same call names, so no <code>_typescript</code> override is needed. Disabled by default.</td>
+<td><strong>Hybrid Java detection:</strong> counts both the built-in <code>assert</code> keyword (parsed as <code>assert_statement</code>) AND JUnit / AssertJ / Hamcrest method-call assertions. Default <code>assertion_calls_java</code> covers JUnit 5 <code>Assertions.*</code> (assertEquals / assertTrue / assertThrows / assertAll / assertTimeout / assertInstanceOf / etc.), AssertJ / Hamcrest <code>assertThat</code>, and <code>fail</code>. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe701-test_existence">SAFE701</a></td>
 <td><code>test_existence</code></td>
-<td><strong>Pairs against TS test filenames:</strong> <code>foo.ts</code> looks for <code>foo.test.ts</code> / <code>foo.spec.ts</code> / <code>foo.test.tsx</code> / <code>foo.spec.tsx</code> / <code>foo.test.as</code> / <code>foo.spec.as</code> under <code>test_dirs</code>. NOT <code>foo.test.js</code>, TS source pairs with TS tests (language-family consistency). Disabled by default.</td>
+<td>Looks for <code>&lt;ClassName&gt;Test.java</code> (JUnit unit-test default), <code>&lt;ClassName&gt;Tests.java</code> (Spring's preferred form), <code>&lt;ClassName&gt;IT.java</code> (Maven Surefire / Failsafe integration tests), and <code>Test&lt;ClassName&gt;.java</code> (legacy prefix). Default <code>test_dirs</code> is <code>["tests"]</code>; <strong>Maven / Gradle projects should override to <code>["src/test/java"]</code></strong> in their config. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe702-test_coupling">SAFE702</a></td>
 <td><code>test_coupling</code></td>
-<td>Same filename patterns as SAFE701, if you change <code>src/foo.ts</code>, also change <code>foo.test.ts</code>. Disabled by default.</td>
+<td>Same candidate filenames as SAFE701; fires when a source file changes in the commit but no paired test does. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe801-tainted_sink">SAFE801</a></td>
 <td><code>tainted_sink</code></td>
-<td><strong>TS-only pass-through wrappers preserve taint:</strong> <code>eval(userInput as string)</code>, <code>eval(userInput satisfies T)</code>, and <code>eval(userInput!)</code> all fire, the <code>as</code> / <code>satisfies</code> / <code>!</code> annotations are compile-time-only and don't change the runtime value. Default sinks / sources inherit from <code>_javascript</code> config.</td>
+<td>Method parameters are seeded as tainted on function entry (every <code>formal_parameter</code> / <code>spread_parameter</code> name; <code>receiver_parameter</code> <code>Foo this</code> is excluded). Default vanilla sinks: <code>Runtime.exec</code> / <code>ProcessBuilder</code> / <code>forName</code> / <code>invoke</code> / <code>eval</code> (JSR-223) / <code>executeQuery</code> / <code>execute</code> / <code>executeUpdate</code> / <code>openConnection</code> / <code>openStream</code>. Default vanilla sources: <code>getenv</code> / <code>getProperty</code> / <code>readLine</code> / <code>nextLine</code> / Servlet API (<code>getParameter</code> / <code>getHeader</code> / <code>getQueryString</code> / <code>getCookies</code> / <code>getPathInfo</code> / <code>getRemoteUser</code>). Default vanilla sanitizers are limited to generic validators / wrappers: <code>sanitize</code>, <code>validate</code>, <code>quote</code>, <code>escape</code>. Context-specific encoders are intentionally <strong>not</strong> treated as default global sanitizers because SAFE801 uses one shared sanitizer set for SQL / shell / reflection / SSRF and a context-specific encoder doesn't make input safe outside its context. Specifically excluded: URL encoders (<code>encode</code> / <code>encodeURIComponent</code> - URL-only; URL-encoding input before SQL concatenation doesn't quote SQL metacharacters), Apache Commons HTML/XML escapers (<code>escapeHtml*</code> / <code>escapeXml</code> / <code>escapeJava</code> / <code>escapeJson</code>), Spring <code>htmlEscape</code>, and OWASP Java Encoder methods (<code>forHtml</code> / <code>forJavaScript</code> / <code>forCssString</code> / <code>forUri</code> / <code>forXml</code>). Add any of these to <code>[tool.safelint.rules.tainted_sink] sanitizers_java</code> only if your project routes the relevant sinks through the matching encoder. The <code>spring-boot</code> preset adds <code>JdbcTemplate.query</code> / <code>queryForObject</code> / <code>queryForList</code> / <code>queryForMap</code> / <code>queryForRowSet</code> / <code>batchUpdate</code> and <code>RestTemplate.getForObject</code> / <code>getForEntity</code> / <code>postForObject</code> / <code>postForEntity</code> / <code>postForLocation</code> / <code>patchForObject</code>. Bare <code>put</code> / <code>delete</code> / <code>update</code> / <code>exchange</code> are deliberately omitted from defaults because they collide heavily with HashMap / File / project-local helpers under SAFE801's single-set design; add them explicitly via <code>[tool.safelint.rules.tainted_sink] sinks_java</code> if you specifically need RestTemplate.put / .delete / .exchange SSRF coverage or jdbcTemplate.update SQLi coverage. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe802-return_value_ignored">SAFE802</a></td>
 <td><code>return_value_ignored</code></td>
-<td>Same as JS. Discarded <code>Promise</code> from async TS functions still fires.</td>
+<td>Fires on bare expression statements whose call discards a meaningful return. Default vanilla <code>flagged_calls_java</code>: <code>java.io.File</code> boolean-returning mutators (<code>delete</code> / <code>mkdir</code> / <code>mkdirs</code> / <code>renameTo</code> / <code>setLastModified</code> / <code>setReadOnly</code> / <code>setWritable</code> / <code>setReadable</code> / <code>setExecutable</code> / <code>createNewFile</code>), <code>String</code> / <code>BigDecimal</code> / <code>BigInteger</code> immutables (<code>trim</code> / <code>strip</code> / <code>toUpperCase</code> / <code>replace</code> / <code>replaceAll</code> / <code>substring</code> / <code>concat</code> / <code>add</code> / <code>subtract</code> / <code>multiply</code> / etc.), and <code>Future.cancel</code>. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe803-null_dereference">SAFE803</a></td>
 <td><code>null_dereference</code></td>
-<td><strong>Non-null assertion (<code>!</code>) does NOT bypass the rule.</strong> <code>users.find(...)!.name</code> still fires, the <code>!</code> is a TS-only annotation, not a runtime guard. Optional chaining (<code>?.</code>) remains the only correctly-recognised safe form.</td>
+<td>Fires on chained access (<code>field_access</code> / <code>array_access</code> / <code>method_invocation</code> with chained receiver) where the receiver is a nullable-returning call. Default vanilla <code>nullable_methods_java</code>: <code>Map</code> / <code>Properties</code> (<code>get</code> / <code>getOrDefault</code> / <code>remove</code> / <code>put</code> / <code>putIfAbsent</code>), Servlet-request (<code>getParameter</code> / <code>getHeader</code> / <code>getCookie</code> / <code>getAttribute</code> / <code>getSession</code>), <code>System.getProperty</code>, reflection (<code>getAnnotation</code> / <code>getDeclaredAnnotation</code> / <code>getEnclosingClass</code> / <code>getEnclosingMethod</code>). Pass-through wrappers <code>parenthesized_expression</code> and <code>cast_expression</code> are peeled so <code>((Foo) map.get(k)).bar</code> is recognised. <strong>Java has NO optional-chaining operator</strong> (<code>?.</code> doesn't exist) - the only safe guards are <code>if (result != null)</code> or <code>Optional.ofNullable(...)</code>. The <code>spring-boot</code> preset adds <code>queryForObject</code> (treated conservatively because RowMapper implementations and nullable column values can yield null - the zero-rows case actually raises <code>EmptyResultDataAccessException</code> rather than returning null, but the result-mapping paths above warrant the nullable-method treatment). Disabled by default.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe901-spring_field_injection">SAFE901</a></td>
+<td><code>spring_field_injection</code></td>
+<td><strong>Java + Spring Boot only.</strong> Fires on <code>@Autowired</code> on a field. Spring's reference docs recommend constructor injection (immutable, testable, fail-fast on missing deps). Both bare <code>@Autowired</code> and fully-qualified <code>@org.springframework.beans.factory.annotation.Autowired</code> are recognised. Enabled by <code>framework = "spring-boot"</code>.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe902-spring_missing_transactional">SAFE902</a></td>
+<td><code>spring_missing_transactional</code></td>
+<td><strong>Java + Spring Boot only.</strong> Fires when a <code>@Service</code> or <code>@Component</code> method does 2+ Spring Data repository writes (<code>save</code> / <code>saveAll</code> / <code>saveAndFlush</code> / <code>delete</code> / <code>deleteAll</code> / <code>deleteAllInBatch</code> / <code>deleteAllById</code> / <code>deleteAllByIdInBatch</code> / <code>deleteById</code> / <code>update</code>) without <code>@Transactional</code> (on the method or the class). <strong>Receiver-name guard:</strong> detection is constrained to call receivers whose lowercased name contains <code>repo</code> / <code>dao</code> / <code>jdbctemplate</code> (so <code>userRepo.save()</code> / <code>productDao.update()</code> / <code>jdbcTemplate.update()</code> match, but <code>file.delete()</code> / <code>cache.delete()</code> / <code>restTemplate.delete()</code> are correctly skipped); rename or restructure if your project uses <code>userStore</code> / <code>userManager</code> / etc. Single-write methods are exempt. Enabled by <code>framework = "spring-boot"</code>.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe903-spring_unvalidated_input">SAFE903</a></td>
+<td><code>spring_unvalidated_input</code></td>
+<td><strong>Java + Spring Boot only.</strong> Fires when a <code>@RestController</code> or <code>@Controller</code> method parameter binds <code>@RequestBody</code> or <code>@ModelAttribute</code> without <code>@Valid</code> or <code>@Validated</code>. <code>@PathVariable</code> / <code>@RequestParam</code> are deliberately NOT covered (typically bind to primitives). Complements SAFE801 structurally. Enabled by <code>framework = "spring-boot"</code>.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe904-spring_async_checked_exception">SAFE904</a></td>
+<td><code>spring_async_checked_exception</code></td>
+<td><strong>Java + Spring Boot only.</strong> Fires on <code>@Async</code> methods that declare a <code>throws</code> clause. Spring runs <code>@Async</code> on a separate thread and silently swallows exceptions; the caller never sees them. Fix: catch inside the body or return <code>CompletableFuture.failedFuture(...)</code>. Enabled by <code>framework = "spring-boot"</code>.</td>
 </tr>
 </tbody>
 </table>
-<p>The 2 rules <strong>not registered for TypeScript</strong> (same as for JS):</p>
+<p>The 4 rules <strong>not registered for Java</strong>:</p>
 <ul>
-<li><a href="../../configuration/rules/#safe201-bare_except">SAFE201 <code>bare_except</code></a>, TS <code>catch</code> always binds the caught error.</li>
-<li><a href="../../configuration/rules/#safe301-global_state">SAFE301 <code>global_state</code></a>, TS has no <code>global</code> keyword.</li>
+<li><a href="../../configuration/rules/#safe201-bare_except">SAFE201 <code>bare_except</code></a>, Python-only construct. Java's <code>catch (Throwable t)</code> is the closest analogue but is already covered by SAFE202 (empty body) and SAFE203 (missing logging).</li>
+<li><a href="../../configuration/rules/#safe301-global_state">SAFE301 <code>global_state</code></a>, Python-only (<code>global</code> keyword). Java has no statement-level "this references module state" annotation.</li>
+<li><a href="../../configuration/rules/#safe302-global_mutation">SAFE302 <code>global_mutation</code></a>, Python's <code>global</code> keyword and JS's <code>globalThis.x = ...</code> patterns have no clean Java analogue. The natural Java equivalent (writes to non-final static fields from outside the declaring class's own static initialiser) needs class-scope analysis the rule doesn't yet do. Deferred to a future release.</li>
+<li><a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305 <code>wide_scope_declaration</code></a>, JavaScript / TypeScript only (<code>var</code> hoisting). Java's <code>var</code> (Java 10+) is local-only and block-scoped, no hoisting hazard.</li>
 </ul>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
-<p>SafeLint config is read from <code>[tool.safelint]</code> in <code>pyproject.toml</code> or from a standalone <code>safelint.toml</code>. TypeScript projects that don't already have a <code>pyproject.toml</code> typically prefer the standalone form.</p>
-<h3 id="typescript-inherits-javascript-config">TypeScript inherits JavaScript config<a class="headerlink" href="#typescript-inherits-javascript-config" title="Permanent link">#</a></h3>
-<p>The runtime is the same (TS compiles to JS), so the threat surface, I/O primitives, global namespaces, etc. are identical. By default, every <code>_javascript</code>-suffixed config key applies to BOTH <code>.js</code> AND <code>.ts</code> files. Setting <code>_typescript</code>-suffixed keys is opt-in, you do it only when you genuinely want different behaviour for <code>.ts</code> files. See <a href="../../configuration/toml/#typescript-and-the-_javascript-config-keys">TypeScript and the <code>_javascript</code> config keys</a> for the full precedence rules.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># safelint.toml (typical TS-only project: no TS-specific config needed)</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="n">mode</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;ci&quot;</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">fail_on</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
+<p>SafeLint config is read from <code>[tool.safelint]</code> in <code>pyproject.toml</code> or from a standalone <code>safelint.toml</code> at the project root. Java projects that don't already have a <code>pyproject.toml</code> typically prefer the standalone form (without the <code>[tool.safelint]</code> prefix).</p>
+<h3 id="framework-presets">Framework presets<a class="headerlink" href="#framework-presets" title="Permanent link">#</a></h3>
+<p>Java source is Java source - the parser, AST, and rule logic are framework-agnostic. But the <em>defaults</em> baked into the rules (taint sinks, nullable methods, etc.) shift depending on which framework the project uses. <code>[tool.safelint.java] framework = "&lt;name&gt;"</code> selects the preset:</p>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>When to pick it</th>
+<th>What changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vanilla</code> (default)</td>
+<td>Plain Java applications, Jakarta EE, Android, Spring-free libraries</td>
+<td>Stdlib-only defaults (the lists in the rules table above). The four <code>SAFE9xx</code> Spring-specific rules are disabled.</td>
+</tr>
+<tr>
+<td><code>spring-boot</code></td>
+<td>Spring Boot 2.x / 3.x applications - Spring MVC, Spring Data JPA, Spring JDBC, Spring WebFlux</td>
+<td>Adds unambiguous <code>JdbcTemplate</code> / <code>RestTemplate</code> methods to SAFE801 sinks (<code>query*</code> / <code>batchUpdate</code> / <code>*ForObject</code> / <code>*ForEntity</code> / <code>postForLocation</code> / <code>patchForObject</code>). Bare <code>put</code> / <code>delete</code> / <code>update</code> / <code>exchange</code> are excluded because they collide with HashMap / File / project-local helpers - add manually via <code>sinks_java</code> if you need them. Adds <code>queryForObject</code> to SAFE803 nullable methods. <strong>Enables the four <code>SAFE901-904</code> Spring rules.</strong></td>
+</tr>
+</tbody>
+</table>
+<p>Configure via TOML:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># safelint.toml (standalone) - no [tool.safelint] wrapper</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">[java]</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;spring-boot&quot;</span>
 <a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">[javascript]</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">runtime</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;node&quot;</span><span class="w">             </span><span class="c1"># node / browser / deno / cloudflare-workers / bun</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="k">[rules.tainted_sink]</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">        </span><span class="c1"># dataflow rules are opt-in; flip on for Spring apps</span>
 <a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a>
-<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">[rules.tainted_sink]</span>
-<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a><span class="c1"># Both .js and .ts files use this list. No _typescript override needed.</span>
-<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myCustomDangerousFunction&quot;</span><span class="p">]</span>
+<a id="__codelineno-1-8" name="__codelineno-1-8" href="#__codelineno-1-8"></a><span class="k">[rules.test_existence]</span>
+<a id="__codelineno-1-9" name="__codelineno-1-9" href="#__codelineno-1-9"></a><span class="n">test_dirs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;src/test/java&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># Maven / Gradle convention</span>
+<a id="__codelineno-1-10" name="__codelineno-1-10" href="#__codelineno-1-10"></a>
+<a id="__codelineno-1-11" name="__codelineno-1-11" href="#__codelineno-1-11"></a><span class="c1"># Or, in pyproject.toml:</span>
+<a id="__codelineno-1-12" name="__codelineno-1-12" href="#__codelineno-1-12"></a><span class="k">[tool.safelint.java]</span>
+<a id="__codelineno-1-13" name="__codelineno-1-13" href="#__codelineno-1-13"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;spring-boot&quot;</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Rare: stricter TS sinks (legacy JS keeps the JS list)</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">[rules.tainted_sink]</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">sinks_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">]</span><span class="w">                                </span><span class="c1"># legacy JS</span>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">sinks_typescript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Object.assign&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;innerHTML&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># stricter for TS</span>
+<p>Explicit per-rule TOML config still wins over the preset; setting <code>[tool.safelint.rules.tainted_sink] sinks_java = [...]</code> overrides whatever the preset planted. The default framework is <code>vanilla</code> so existing v2.1.0+ users with no Java config see no surprise behaviour.</p>
+<h3 id="per-rule-toml-overrides">Per-rule TOML overrides<a class="headerlink" href="#per-rule-toml-overrides" title="Permanent link">#</a></h3>
+<p>Standard pattern - override any per-language config list with the <code>_java</code> suffix:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="k">[tool.safelint.rules.side_effects_hidden]</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="n">io_functions_java</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;println&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;print&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;writeFile&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># narrower than the default</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">sinks_java</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;exec&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;executeQuery&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myInternalSink&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a><span class="n">sanitizers_java</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;escape&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myProjectSanitizer&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-8" name="__codelineno-2-8" href="#__codelineno-2-8"></a><span class="n">sources_java</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;readLine&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;getParameter&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;getHeader&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a>
+<a id="__codelineno-2-10" name="__codelineno-2-10" href="#__codelineno-2-10"></a><span class="k">[tool.safelint.rules.return_value_ignored]</span>
+<a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a><span class="n">flagged_calls_java</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;delete&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;renameTo&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;trim&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myFunctionThatMustHaveReturnUsed&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-13" name="__codelineno-2-13" href="#__codelineno-2-13"></a>
+<a id="__codelineno-2-14" name="__codelineno-2-14" href="#__codelineno-2-14"></a><span class="k">[tool.safelint.rules.null_dereference]</span>
+<a id="__codelineno-2-15" name="__codelineno-2-15" href="#__codelineno-2-15"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-2-16" name="__codelineno-2-16" href="#__codelineno-2-16"></a><span class="n">nullable_methods_java</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;get&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;find&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;queryForObject&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;myCustomNullable&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-17" name="__codelineno-2-17" href="#__codelineno-2-17"></a>
+<a id="__codelineno-2-18" name="__codelineno-2-18" href="#__codelineno-2-18"></a><span class="k">[tool.safelint.rules.resource_lifecycle]</span>
+<a id="__codelineno-2-19" name="__codelineno-2-19" href="#__codelineno-2-19"></a><span class="n">tracked_functions_java</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;FileInputStream&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Socket&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;MyCustomResource&quot;</span><span class="p">]</span>
 </code></pre></div>
-<h3 id="runtime-presets-apply-to-typescript-too">Runtime presets apply to TypeScript too<a class="headerlink" href="#runtime-presets-apply-to-typescript-too" title="Permanent link">#</a></h3>
-<p><code>[tool.safelint.javascript] runtime = "..."</code> selects which API surface the rule defaults assume, and TS inherits the chosen preset because the runtime is what determines <code>fs</code> vs <code>Deno.*</code> vs Cloudflare KV vs Bun-specific APIs. There is no separate <code>[tool.safelint.typescript]</code> table; TS and JS share the same runtime story. See <a href="../../configuration/toml/#javascript-runtime-presets">JavaScript runtime presets</a> for the per-preset details.</p>
-<h2 id="installing-the-typescript-extra">Installing the TypeScript extra<a class="headerlink" href="#installing-the-typescript-extra" title="Permanent link">#</a></h2>
-<p>TypeScript grammar support ships as an optional extra so Python-only projects don't pay for it. The <code>[typescript]</code> extra also bundles <code>tree-sitter-javascript</code> because almost every TS project has a few <code>.js</code> files (vite/webpack configs, jest setup, etc.), one install command covers both:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[typescript]&#39;</span><span class="w">    </span><span class="c1"># adds .ts, .tsx, .as (and .js too)</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="c1"># or kitchen-sink:</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span>
+<p>All accept a list of strings; bare-string typos (<code>sinks_java = "eval"</code> instead of <code>["eval"]</code>) raise a clear <code>TypeError</code> instead of silently coercing into a set of characters.</p>
+<h2 id="installing-the-java-extra">Installing the Java extra<a class="headerlink" href="#installing-the-java-extra" title="Permanent link">#</a></h2>
+<p>Java grammar support ships as an optional extra so non-Java projects don't pay for it:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s1">&#39;safelint[java]==2.1.0rc1&#39;</span><span class="w">        </span><span class="c1"># adds .java only (--pre + RC pin needed until v2.1.0 GA)</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s1">&#39;safelint[python,java]==2.1.0rc1&#39;</span><span class="w"> </span><span class="c1"># polyglot Python + Java monorepo</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s1">&#39;safelint[all]==2.1.0rc1&#39;</span><span class="w">         </span><span class="c1"># kitchen-sink, every supported grammar</span>
 </code></pre></div>
-<p>Without the extra, <code>safelint check</code> skips <code>.ts</code> / <code>.tsx</code> / <code>.as</code> files with a one-line install hint at lint time. If at least one other supported file (e.g. a Python file in a mixed repo) does get linted, the run continues normally. <strong>If every candidate file gets skipped</strong>, the typical case in a TS-only project, the <a href="../../configuration/cli/#exit-code-2--silent-failure-triggers">silent-failure guard</a> fires and SafeLint exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.</p>
+<p>Without the extra, <code>safelint check</code> skips <code>.java</code> files with a one-line install hint at lint time. If at least one other supported file (e.g. a Python file in a mixed repo) does get linted, the run continues normally. <strong>If every candidate file gets skipped</strong>, the typical case in a Java-only project, the <a href="../../configuration/cli/#exit-code-2--silent-failure-triggers">silent-failure guard</a> fires and SafeLint exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.</p>
 <h2 id="pre-commit-integration">Pre-commit integration<a class="headerlink" href="#pre-commit-integration" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># .pre-commit-config.yaml</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">repos</span><span class="p">:</span>
 <a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.1.0rc1</span><span class="w">    </span><span class="c1"># pin to a release (use a recent tag; v2.1.0rc1 also unlocks the Java extra if you later add .java files)</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.1.0rc1</span><span class="w">    </span><span class="c1"># pin to a release (RC tag; switch to v2.1.0 once GA is published)</span>
 <a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
 <a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="c1"># TS users add the matching extra so pre-commit&#39;s isolated environment</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="c1"># installs ``tree-sitter-typescript`` (and the bundled JS grammar).</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[typescript]&#39;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="c1"># Java users add the matching extra so pre-commit&#39;s isolated</span>
+<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="c1"># environment installs ``tree-sitter-java``.</span>
+<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[java]==2.1.0rc1&#39;</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># RC pin needed until v2.1.0 GA</span>
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="c1"># The published hook&#39;s ``types_or`` already includes python,</span>
-<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">        </span><span class="c1"># javascript, ts, and tsx. Optional: scope to a directory.</span>
+<a id="__codelineno-4-11" name="__codelineno-4-11" href="#__codelineno-4-11"></a><span class="w">        </span><span class="c1"># javascript, ts, tsx, and java. Optional: scope to a directory.</span>
 <a id="__codelineno-4-12" name="__codelineno-4-12" href="#__codelineno-4-12"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span>
 </code></pre></div>
-<p><strong>AssemblyScript (<code>.as</code>) users, additional override required.</strong> Pre-commit's <code>identify</code> library has no <code>as</code> filetype tag, so the default <code>types_or: [python, javascript, ts, tsx]</code> won't match <code>.as</code> files. Override <code>types_or</code> with a permissive tag that <code>.as</code> files <em>actually</em> carry (<code>text</code> or <code>file</code>) and use <code>files</code> to scope the match. <code>types_or: []</code> does <strong>not</strong> work, pre-commit treats an empty tag list as "no tag matches" rather than "filter disabled", so the hook never fires.</p>
+<p>For a Maven / Gradle project that organises sources under <code>src/main/java</code> and tests under <code>src/test/java</code>, prefer:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[typescript]&#39;</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">        </span><span class="nt">types_or</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">text</span><span class="p p-Indicator">]</span><span class="w">                              </span><span class="c1"># permissive tag .as files carry; files scopes the match</span>
-<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/.*\.(ts|tsx|as)$</span><span class="w">                  </span><span class="c1"># explicit extension allow-list</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[java]==2.1.0rc1&#39;</span><span class="p p-Indicator">]</span><span class="w">  </span><span class="c1"># RC pin needed until v2.1.0 GA</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/(main|test)/java/</span>
 </code></pre></div>
-<h2 id="typescript-specific-config-keys">TypeScript-specific config keys<a class="headerlink" href="#typescript-specific-config-keys" title="Permanent link">#</a></h2>
-<p>All JS config keys also work as <code>_typescript</code>-suffixed variants when you want TS-specific overrides:</p>
+<p>See <a href="../../pre-commit/">Pre-commit integration</a> for the full hook reference.</p>
+<h2 id="java-specific-config-keys">Java-specific config keys<a class="headerlink" href="#java-specific-config-keys" title="Permanent link">#</a></h2>
+<p>All cross-language rules accept a <code>_java</code>-suffixed variant of their per-language config:</p>
 <ul>
-<li><code>[tool.safelint.rules.side_effects_hidden]</code>, <code>io_functions_typescript</code></li>
-<li><code>[tool.safelint.rules.side_effects]</code>, <code>io_functions_typescript</code></li>
-<li><code>[tool.safelint.rules.global_mutation]</code>, <code>global_namespaces_typescript</code></li>
-<li><code>[tool.safelint.rules.resource_lifecycle]</code>, <code>tracked_functions_typescript</code></li>
-<li><code>[tool.safelint.rules.missing_assertions]</code>, <code>assertion_calls_typescript</code></li>
-<li><code>[tool.safelint.rules.tainted_sink]</code>, <code>sinks_typescript</code>, <code>sanitizers_typescript</code>, <code>sources_typescript</code></li>
-<li><code>[tool.safelint.rules.return_value_ignored]</code>, <code>flagged_calls_typescript</code></li>
-<li><code>[tool.safelint.rules.null_dereference]</code>, <code>nullable_methods_typescript</code></li>
+<li><code>[tool.safelint.rules.side_effects_hidden]</code>, <code>io_functions_java</code></li>
+<li><code>[tool.safelint.rules.side_effects]</code>, <code>io_functions_java</code></li>
+<li><code>[tool.safelint.rules.resource_lifecycle]</code>, <code>tracked_functions_java</code></li>
+<li><code>[tool.safelint.rules.missing_assertions]</code>, <code>assertion_calls_java</code></li>
+<li><code>[tool.safelint.rules.tainted_sink]</code>, <code>sinks_java</code>, <code>sanitizers_java</code>, <code>sources_java</code></li>
+<li><code>[tool.safelint.rules.return_value_ignored]</code>, <code>flagged_calls_java</code></li>
+<li><code>[tool.safelint.rules.null_dereference]</code>, <code>nullable_methods_java</code></li>
 </ul>
-<p>All accept a list of strings; bare-string typos (<code>sinks_typescript = "eval"</code> instead of <code>["eval"]</code>) raise a clear <code>TypeError</code> instead of silently coercing into a set of characters.</p>
+<p>The Spring-specific <code>SAFE9xx</code> rules use the standard <code>enabled</code> / <code>severity</code> knobs only; no per-rule list config today (the Spring annotation names they look for are fixed).</p>
+<h2 id="integration-with-existing-java-tooling">Integration with existing Java tooling<a class="headerlink" href="#integration-with-existing-java-tooling" title="Permanent link">#</a></h2>
+<p>SafeLint runs alongside the standard Java tool chain; it doesn't replace any of them:</p>
+<ul>
+<li><strong>SpotBugs / PMD / Checkstyle</strong> keep covering style and general defect detection. SafeLint covers a different, narrower set (Holzmann safety rules + Spring framework-specific patterns).</li>
+<li><strong>ErrorProne</strong> focuses on compile-time correctness; SafeLint is a separate review-time pass.</li>
+<li><strong>CI</strong>: invoke <code>safelint check src/main/java src/test/java --mode ci</code> in your build. Exit code 0 / 1 / 2 maps to "passed" / "violations found" / "setup error".</li>
+<li><strong>IDE</strong>: any JSON-output-consuming editor plugin (the safelint JSON schema is stable in v2.0.0+) can surface violations inline.</li>
+</ul>
 <h2 id="contributing">Contributing<a class="headerlink" href="#contributing" title="Permanent link">#</a></h2>
-<p>Want to refine a rule's TypeScript behaviour, add a TS-only handler, or extend AssemblyScript coverage? See <a href="../../contributing/adding-a-language/">Adding a language</a> for the architecture overview, or open an issue / PR against the <a href="https://github.com/shelkesays/safelint">main repo</a>.</p>
+<p>Want to refine a rule's Java behaviour, add a Spring-aware handler, or extend coverage to other JVM languages (Kotlin / Groovy / Scala)? See <a href="../../contributing/adding-a-language/">Adding a language</a> for the architecture overview, or open an issue / PR against the <a href="https://github.com/shelkesays/safelint">main repo</a>.</p>
 
 
 
@@ -2358,7 +2444,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../javascript/" class="md-footer__link md-footer__link--prev" aria-label="Previous: JavaScript">
+          <a href="../typescript/" class="md-footer__link md-footer__link--prev" aria-label="Previous: TypeScript">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2368,20 +2454,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                JavaScript
+                TypeScript
               </div>
             </div>
           </a>
         
         
           
-          <a href="../java/" class="md-footer__link md-footer__link--next" aria-label="Next: Java">
+          <a href="../../configuration/" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Java
+                Overview
               </div>
             </div>
             <div class="md-footer__button md-icon">

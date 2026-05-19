@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python and JavaScript">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -480,6 +480,8 @@
       
         
       
+        
+      
     
     
     
@@ -596,6 +598,34 @@
     
   
     TypeScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../languages/java/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Java
   
 
     
@@ -1291,6 +1321,67 @@
     <span class="md-ellipsis">
       
         SAFE803: null_dereference
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#java-spring-boot-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Java + Spring Boot rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Java + Spring Boot rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#safe901-spring_field_injection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE901: spring_field_injection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe902-spring_missing_transactional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE902: spring_missing_transactional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe903-spring_unvalidated_input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE903: spring_unvalidated_input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe904-spring_async_checked_exception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE904: spring_async_checked_exception
       
     </span>
   </a>
@@ -2757,6 +2848,67 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#java-spring-boot-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Java + Spring Boot rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Java + Spring Boot rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#safe901-spring_field_injection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE901: spring_field_injection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe902-spring_missing_transactional" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE902: spring_missing_transactional
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe903-spring_unvalidated_input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE903: spring_unvalidated_input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe904-spring_async_checked_exception" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE904: spring_async_checked_exception
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -2799,13 +2951,13 @@
 <li><strong>Python</strong> (<code>.py</code>, <code>.pyw</code>).</li>
 <li><strong>JavaScript</strong> (<code>.js</code>, <code>.mjs</code>, <code>.cjs</code>), source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime <em>defaults</em> (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the <a href="../toml/#javascript-runtime-presets"><code>[tool.safelint.javascript] runtime = "..."</code></a> preset, the source-language rules themselves don't change.</li>
 <li><strong>TypeScript</strong> (<code>.ts</code>, <code>.tsx</code>), and <strong>AssemblyScript</strong> (<code>.as</code>, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, <code>as</code> casts, non-null assertions, <code>declare global</code> ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See <a href="../../languages/typescript/">TypeScript</a> for the full language reference.</li>
+<li><strong>Java</strong> (<code>.java</code>), new in v2.1.0rc1 (release candidate; install with <code>pip install --pre 'safelint[java]==2.1.0rc1'</code>). 16 of the cross-language rules port cleanly plus 4 Spring Boot framework-specific structural rules (<code>SAFE901-904</code>) target Spring annotation patterns. Per-framework <em>defaults</em> (sinks, nullable methods, structural rule enablement) are switchable via the <a href="../../languages/java/#framework-presets"><code>[tool.safelint.java] framework = "..."</code></a> preset (<code>vanilla</code> / <code>spring-boot</code>). See <a href="../../languages/java/">Java</a> for the full language reference.</li>
 </ul>
 <h3 id="planned">Planned<a class="headerlink" href="#planned" title="Permanent link">#</a></h3>
 <p>Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see <a href="../../contributing/adding-a-language/">Adding a language</a>) makes each new language incremental, community contributions for any of these are welcome.</p>
 <ol>
 <li><strong>Go</strong> (<code>.go</code>).</li>
 <li><strong>Rust</strong> (<code>.rs</code>).</li>
-<li><strong>Java</strong> (<code>.java</code>).</li>
 <li><strong>C</strong> (<code>.c</code>, <code>.h</code>), Holzmann's original target language.</li>
 <li><strong>C++</strong> (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.</li>
 <li><strong>PHP</strong> (<code>.php</code>).</li>
@@ -2821,9 +2973,14 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>Cross-language</strong> (Python, JavaScript, TypeScript)</td>
-<td>17</td>
-<td>SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE302, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803</td>
+<td><strong>Cross-language</strong> (Python, JavaScript, TypeScript, Java)</td>
+<td>16</td>
+<td>SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803</td>
+</tr>
+<tr>
+<td><strong>Python / JS / TS</strong> (not Java)</td>
+<td>1</td>
+<td>SAFE302 (<code>global_mutation</code>, where Java's natural analogue (non-final static field writes from outside the declaring class's static initialiser) needs class-scope analysis the rule doesn't yet do; deferred to a future release)</td>
 </tr>
 <tr>
 <td><strong>Python-only</strong></td>
@@ -2833,7 +2990,12 @@
 <tr>
 <td><strong>JavaScript-family-only</strong> (JS and TS)</td>
 <td>1</td>
-<td>SAFE305 (<code>wide_scope_declaration</code>, Python has no <code>var</code> / <code>let</code> / <code>const</code> distinction; <code>var</code> is still legal in TS and the same scope-hoisting hazard applies, so the rule fires on both <code>.js</code> and <code>.ts</code>)</td>
+<td>SAFE305 (<code>wide_scope_declaration</code>, Python and Java have no <code>var</code> / <code>let</code> / <code>const</code> distinction; <code>var</code> is still legal in TS and the same scope-hoisting hazard applies, so the rule fires on both <code>.js</code> and <code>.ts</code>)</td>
+</tr>
+<tr>
+<td><strong>Java + Spring Boot only</strong></td>
+<td>4</td>
+<td>SAFE901 (<code>spring_field_injection</code>), SAFE902 (<code>spring_missing_transactional</code>), SAFE903 (<code>spring_unvalidated_input</code>), SAFE904 (<code>spring_async_checked_exception</code>); all default-disabled under vanilla, default-enabled by the <code>spring-boot</code> framework preset</td>
 </tr>
 </tbody>
 </table>
@@ -2970,6 +3132,30 @@
 <td><a href="#safe803-null_dereference"><code>SAFE803</code></a></td>
 <td><code>null_dereference</code></td>
 <td>error</td>
+<td>no</td>
+</tr>
+<tr>
+<td><a href="#safe901-spring_field_injection"><code>SAFE901</code></a></td>
+<td><code>spring_field_injection</code></td>
+<td>warning</td>
+<td>no</td>
+</tr>
+<tr>
+<td><a href="#safe902-spring_missing_transactional"><code>SAFE902</code></a></td>
+<td><code>spring_missing_transactional</code></td>
+<td>error</td>
+<td>no</td>
+</tr>
+<tr>
+<td><a href="#safe903-spring_unvalidated_input"><code>SAFE903</code></a></td>
+<td><code>spring_unvalidated_input</code></td>
+<td>error</td>
+<td>no</td>
+</tr>
+<tr>
+<td><a href="#safe904-spring_async_checked_exception"><code>SAFE904</code></a></td>
+<td><code>spring_async_checked_exception</code></td>
+<td>warning</td>
 <td>no</td>
 </tr>
 </tbody>
@@ -4026,6 +4212,177 @@
 <a id="__codelineno-64-7" name="__codelineno-64-7" href="#__codelineno-64-7"></a><span class="k">if</span><span class="w"> </span><span class="p">(</span><span class="nx">el</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">null</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-64-8" name="__codelineno-64-8" href="#__codelineno-64-8"></a><span class="w">  </span><span class="nx">process</span><span class="p">(</span><span class="nx">el</span><span class="p">.</span><span class="nx">textContent</span><span class="p">);</span>
 <a id="__codelineno-64-9" name="__codelineno-64-9" href="#__codelineno-64-9"></a><span class="p">}</span>
+</code></pre></div>
+<h2 id="java-spring-boot-rules">Java + Spring Boot rules<a class="headerlink" href="#java-spring-boot-rules" title="Permanent link">#</a></h2>
+<p><code>SAFE9xx</code> rules are Java-only structural checks for common Spring Boot misuses. All four are disabled by default and enabled together by the <code>spring-boot</code> framework preset (<code>[tool.safelint.java] framework = "spring-boot"</code>). They do not fire on Python / JavaScript / TypeScript files even if explicitly enabled; rule dispatch is gated on file language.</p>
+<h3 id="safe901-spring_field_injection">SAFE901: <code>spring_field_injection</code><a class="headerlink" href="#safe901-spring_field_injection" title="Permanent link">#</a></h3>
+<p><strong>What it flags:</strong> A class field annotated with <code>@Autowired</code> (or the fully-qualified <code>@org.springframework.beans.factory.annotation.Autowired</code>). Java only.</p>
+<p>Spring's reference documentation recommends constructor injection over field injection: constructor-injected dependencies are immutable (<code>final</code>), testable without reflection, fail fast on missing beans at construction time, and surface obvious circular dependencies as compile errors. Field-injected dependencies hide all of those properties.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code> (vanilla) / <code>true</code> (spring-boot preset)</td>
+<td>Toggle the rule</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>"warning"</code></td>
+<td><code>"error"</code> or <code>"warning"</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bad:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-65-1" name="__codelineno-65-1" href="#__codelineno-65-1"></a><span class="nd">@Service</span>
+<a id="__codelineno-65-2" name="__codelineno-65-2" href="#__codelineno-65-2"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">OrderService</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-65-3" name="__codelineno-65-3" href="#__codelineno-65-3"></a><span class="w">    </span><span class="nd">@Autowired</span>
+<a id="__codelineno-65-4" name="__codelineno-65-4" href="#__codelineno-65-4"></a><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="n">InventoryClient</span><span class="w"> </span><span class="n">inventory</span><span class="p">;</span><span class="w">   </span><span class="c1">// SAFE901</span>
+<a id="__codelineno-65-5" name="__codelineno-65-5" href="#__codelineno-65-5"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Good:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-66-1" name="__codelineno-66-1" href="#__codelineno-66-1"></a><span class="nd">@Service</span>
+<a id="__codelineno-66-2" name="__codelineno-66-2" href="#__codelineno-66-2"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">OrderService</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-66-3" name="__codelineno-66-3" href="#__codelineno-66-3"></a><span class="w">    </span><span class="kd">private</span><span class="w"> </span><span class="kd">final</span><span class="w"> </span><span class="n">InventoryClient</span><span class="w"> </span><span class="n">inventory</span><span class="p">;</span>
+<a id="__codelineno-66-4" name="__codelineno-66-4" href="#__codelineno-66-4"></a>
+<a id="__codelineno-66-5" name="__codelineno-66-5" href="#__codelineno-66-5"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="nf">OrderService</span><span class="p">(</span><span class="n">InventoryClient</span><span class="w"> </span><span class="n">inventory</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-66-6" name="__codelineno-66-6" href="#__codelineno-66-6"></a><span class="w">        </span><span class="k">this</span><span class="p">.</span><span class="na">inventory</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">inventory</span><span class="p">;</span>
+<a id="__codelineno-66-7" name="__codelineno-66-7" href="#__codelineno-66-7"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-66-8" name="__codelineno-66-8" href="#__codelineno-66-8"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="safe902-spring_missing_transactional">SAFE902: <code>spring_missing_transactional</code><a class="headerlink" href="#safe902-spring_missing_transactional" title="Permanent link">#</a></h3>
+<p><strong>What it flags:</strong> A <code>@Service</code> or <code>@Component</code> method that performs two or more Spring Data repository writes (<code>save</code> / <code>saveAll</code> / <code>saveAndFlush</code> / <code>delete</code> / <code>deleteAll</code> / <code>deleteAllInBatch</code> / <code>deleteAllById</code> / <code>deleteAllByIdInBatch</code> / <code>deleteById</code> / <code>update</code>) without <code>@Transactional</code> on the method or the enclosing class. Java only.</p>
+<p>Multi-write methods without <code>@Transactional</code> run each write in its own short-lived transaction; a failure between writes leaves the database in a partially-updated state. Single-write methods are exempt because the implicit per-statement transaction is sufficient.</p>
+<p><strong>Receiver-name heuristic:</strong> detection is constrained to method invocations whose receiver name (lowercased) contains <code>repo</code> / <code>dao</code> / <code>jdbctemplate</code>, e.g. <code>userRepo.save(...)</code>, <code>productDao.update(...)</code>, <code>jdbcTemplate.update(...)</code>. Without this guard, <code>call_name()</code> strips the receiver and unrelated calls like <code>file.delete()</code> / <code>cache.delete()</code> / <code>restTemplate.delete(...)</code> would be counted. Rename a service-managed field if your convention is <code>userStore</code> / <code>userManager</code> / etc., or add the matching pattern via <code>[tool.safelint.rules.spring_missing_transactional]</code> configuration in a future release (currently the pattern set is fixed at the source level).</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code> (vanilla) / <code>true</code> (spring-boot preset)</td>
+<td>Toggle the rule</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>"error"</code></td>
+<td><code>"error"</code> or <code>"warning"</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bad:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-67-1" name="__codelineno-67-1" href="#__codelineno-67-1"></a><span class="nd">@Service</span>
+<a id="__codelineno-67-2" name="__codelineno-67-2" href="#__codelineno-67-2"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">OrderService</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-67-3" name="__codelineno-67-3" href="#__codelineno-67-3"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">placeOrder</span><span class="p">(</span><span class="n">Order</span><span class="w"> </span><span class="n">order</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-67-4" name="__codelineno-67-4" href="#__codelineno-67-4"></a><span class="w">        </span><span class="n">orderRepo</span><span class="p">.</span><span class="na">save</span><span class="p">(</span><span class="n">order</span><span class="p">);</span>
+<a id="__codelineno-67-5" name="__codelineno-67-5" href="#__codelineno-67-5"></a><span class="w">        </span><span class="n">inventoryRepo</span><span class="p">.</span><span class="na">update</span><span class="p">(</span><span class="n">order</span><span class="p">.</span><span class="na">itemId</span><span class="p">(),</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span><span class="p">);</span><span class="w">   </span><span class="c1">// SAFE902: 2 writes, no @Transactional</span>
+<a id="__codelineno-67-6" name="__codelineno-67-6" href="#__codelineno-67-6"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-67-7" name="__codelineno-67-7" href="#__codelineno-67-7"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Good:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-68-1" name="__codelineno-68-1" href="#__codelineno-68-1"></a><span class="nd">@Service</span>
+<a id="__codelineno-68-2" name="__codelineno-68-2" href="#__codelineno-68-2"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">OrderService</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-68-3" name="__codelineno-68-3" href="#__codelineno-68-3"></a><span class="w">    </span><span class="nd">@Transactional</span>
+<a id="__codelineno-68-4" name="__codelineno-68-4" href="#__codelineno-68-4"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">placeOrder</span><span class="p">(</span><span class="n">Order</span><span class="w"> </span><span class="n">order</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-68-5" name="__codelineno-68-5" href="#__codelineno-68-5"></a><span class="w">        </span><span class="n">orderRepo</span><span class="p">.</span><span class="na">save</span><span class="p">(</span><span class="n">order</span><span class="p">);</span>
+<a id="__codelineno-68-6" name="__codelineno-68-6" href="#__codelineno-68-6"></a><span class="w">        </span><span class="n">inventoryRepo</span><span class="p">.</span><span class="na">update</span><span class="p">(</span><span class="n">order</span><span class="p">.</span><span class="na">itemId</span><span class="p">(),</span><span class="w"> </span><span class="o">-</span><span class="mi">1</span><span class="p">);</span>
+<a id="__codelineno-68-7" name="__codelineno-68-7" href="#__codelineno-68-7"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-68-8" name="__codelineno-68-8" href="#__codelineno-68-8"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="safe903-spring_unvalidated_input">SAFE903: <code>spring_unvalidated_input</code><a class="headerlink" href="#safe903-spring_unvalidated_input" title="Permanent link">#</a></h3>
+<p><strong>What it flags:</strong> A <code>@RestController</code> or <code>@Controller</code> method parameter annotated with <code>@RequestBody</code> or <code>@ModelAttribute</code> that is NOT also annotated with <code>@Valid</code> or <code>@Validated</code>. Java only.</p>
+<p>Without <code>@Valid</code> / <code>@Validated</code>, Bean Validation constraints declared on the DTO (<code>@NotNull</code>, <code>@Size</code>, <code>@Email</code>, etc.) are silently ignored. Malformed or hostile input reaches the controller body. <code>@PathVariable</code> and <code>@RequestParam</code> are deliberately NOT covered because they typically bind to primitives or simple strings where bean validation is rarely declared.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code> (vanilla) / <code>true</code> (spring-boot preset)</td>
+<td>Toggle the rule</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>"error"</code></td>
+<td><code>"error"</code> or <code>"warning"</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bad:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-69-1" name="__codelineno-69-1" href="#__codelineno-69-1"></a><span class="nd">@RestController</span>
+<a id="__codelineno-69-2" name="__codelineno-69-2" href="#__codelineno-69-2"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">UserController</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-69-3" name="__codelineno-69-3" href="#__codelineno-69-3"></a><span class="w">    </span><span class="nd">@PostMapping</span><span class="p">(</span><span class="s">&quot;/users&quot;</span><span class="p">)</span>
+<a id="__codelineno-69-4" name="__codelineno-69-4" href="#__codelineno-69-4"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">User</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="nd">@RequestBody</span><span class="w"> </span><span class="n">UserDto</span><span class="w"> </span><span class="n">dto</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// SAFE903: no @Valid</span>
+<a id="__codelineno-69-5" name="__codelineno-69-5" href="#__codelineno-69-5"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Good:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-70-1" name="__codelineno-70-1" href="#__codelineno-70-1"></a><span class="nd">@RestController</span>
+<a id="__codelineno-70-2" name="__codelineno-70-2" href="#__codelineno-70-2"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">UserController</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-70-3" name="__codelineno-70-3" href="#__codelineno-70-3"></a><span class="w">    </span><span class="nd">@PostMapping</span><span class="p">(</span><span class="s">&quot;/users&quot;</span><span class="p">)</span>
+<a id="__codelineno-70-4" name="__codelineno-70-4" href="#__codelineno-70-4"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">User</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="nd">@Valid</span><span class="w"> </span><span class="nd">@RequestBody</span><span class="w"> </span><span class="n">UserDto</span><span class="w"> </span><span class="n">dto</span><span class="p">)</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span>
+<a id="__codelineno-70-5" name="__codelineno-70-5" href="#__codelineno-70-5"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="safe904-spring_async_checked_exception">SAFE904: <code>spring_async_checked_exception</code><a class="headerlink" href="#safe904-spring_async_checked_exception" title="Permanent link">#</a></h3>
+<p><strong>What it flags:</strong> A method annotated <code>@Async</code> that declares a <code>throws</code> clause. Java only.</p>
+<p>The rule's name and historical framing emphasised checked exceptions, but the implementation flags <strong>any</strong> <code>throws</code> clause (checked or unchecked) because distinguishing the two requires class-resolution / type-inference we don't do. The conservative behaviour is justified: Spring's executor swallows whatever the method throws regardless of checked-vs-unchecked, so the <code>throws</code> clause is always misleading - it implies the caller can observe the exception when in fact they cannot. Fix by either catching inside the method body or returning a <code>CompletableFuture</code> whose failure state carries the exception (<code>CompletableFuture.failedFuture(ex)</code>).</p>
+<p>If you have a deliberate <code>throws RuntimeException</code> on an <code>@Async</code> method (rare; the JLS doesn't require it), suppress with <code>// nosafe: SAFE904</code> on the method declaration.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code> (vanilla) / <code>true</code> (spring-boot preset)</td>
+<td>Toggle the rule</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>"warning"</code></td>
+<td><code>"error"</code> or <code>"warning"</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bad:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-71-1" name="__codelineno-71-1" href="#__codelineno-71-1"></a><span class="nd">@Service</span>
+<a id="__codelineno-71-2" name="__codelineno-71-2" href="#__codelineno-71-2"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">IngestService</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-71-3" name="__codelineno-71-3" href="#__codelineno-71-3"></a><span class="w">    </span><span class="nd">@Async</span>
+<a id="__codelineno-71-4" name="__codelineno-71-4" href="#__codelineno-71-4"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="kt">void</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">File</span><span class="w"> </span><span class="n">f</span><span class="p">)</span><span class="w"> </span><span class="kd">throws</span><span class="w"> </span><span class="n">IOException</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="p">...</span><span class="w"> </span><span class="p">}</span><span class="w">   </span><span class="c1">// SAFE904</span>
+<a id="__codelineno-71-5" name="__codelineno-71-5" href="#__codelineno-71-5"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Good:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-72-1" name="__codelineno-72-1" href="#__codelineno-72-1"></a><span class="nd">@Service</span>
+<a id="__codelineno-72-2" name="__codelineno-72-2" href="#__codelineno-72-2"></a><span class="kd">public</span><span class="w"> </span><span class="kd">class</span> <span class="nc">IngestService</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-72-3" name="__codelineno-72-3" href="#__codelineno-72-3"></a><span class="w">    </span><span class="nd">@Async</span>
+<a id="__codelineno-72-4" name="__codelineno-72-4" href="#__codelineno-72-4"></a><span class="w">    </span><span class="kd">public</span><span class="w"> </span><span class="n">CompletableFuture</span><span class="o">&lt;</span><span class="n">Void</span><span class="o">&gt;</span><span class="w"> </span><span class="nf">process</span><span class="p">(</span><span class="n">File</span><span class="w"> </span><span class="n">f</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-72-5" name="__codelineno-72-5" href="#__codelineno-72-5"></a><span class="w">        </span><span class="k">try</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-72-6" name="__codelineno-72-6" href="#__codelineno-72-6"></a><span class="w">            </span><span class="c1">// ... I/O work</span>
+<a id="__codelineno-72-7" name="__codelineno-72-7" href="#__codelineno-72-7"></a><span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">CompletableFuture</span><span class="p">.</span><span class="na">completedFuture</span><span class="p">(</span><span class="kc">null</span><span class="p">);</span>
+<a id="__codelineno-72-8" name="__codelineno-72-8" href="#__codelineno-72-8"></a><span class="w">        </span><span class="p">}</span><span class="w"> </span><span class="k">catch</span><span class="w"> </span><span class="p">(</span><span class="n">IOException</span><span class="w"> </span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-72-9" name="__codelineno-72-9" href="#__codelineno-72-9"></a><span class="w">            </span><span class="k">return</span><span class="w"> </span><span class="n">CompletableFuture</span><span class="p">.</span><span class="na">failedFuture</span><span class="p">(</span><span class="n">e</span><span class="p">);</span>
+<a id="__codelineno-72-10" name="__codelineno-72-10" href="#__codelineno-72-10"></a><span class="w">        </span><span class="p">}</span>
+<a id="__codelineno-72-11" name="__codelineno-72-11" href="#__codelineno-72-11"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-72-12" name="__codelineno-72-12" href="#__codelineno-72-12"></a><span class="p">}</span>
 </code></pre></div>
 
 

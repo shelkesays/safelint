@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python and JavaScript">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -480,6 +480,8 @@
       
         
       
+        
+      
     
     
     
@@ -596,6 +598,34 @@
     
   
     TypeScript
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../languages/java/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Java
   
 
     
@@ -2282,30 +2312,31 @@
 <p>Add this block to your <code>.pre-commit-config.yaml</code>. Pick the <code>additional_dependencies</code> line that matches the language(s) your repo contains:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a><span class="nt">repos</span><span class="p">:</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.0.0</span><span class="w">  </span><span class="c1"># replace with the latest release tag</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.1.0rc1</span><span class="w">  </span><span class="c1"># replace with the latest release tag (Java support requires v2.1.0rc1 or later)</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a><span class="w">        </span><span class="c1"># Required in v2.0.0+. Pick whichever extras match your project&#39;s languages:</span>
 <a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[python]&#39;</span><span class="p p-Indicator">]</span><span class="w">               </span><span class="c1"># Python-only repo</span>
 <a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[javascript]&#39;]         # JS-only repo</span>
 <a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[typescript]&#39;]         # TypeScript repo (bundles JS too)</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[python,javascript]&#39;]  # mixed monorepo</span>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[all]&#39;]                # every supported language</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a><span class="w">        </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">--fail-on=error</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># default; use --fail-on=warning for stricter CI</span>
-<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span><span class="w">              </span><span class="c1"># optional, scope to a directory</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[java]==2.1.0rc1&#39;]     # Java repo, RC pin until v2.1.0 GA (Spring Boot via [tool.safelint.java] framework = &quot;spring-boot&quot;)</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[python,javascript]&#39;]  # mixed monorepo</span>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a><span class="w">        </span><span class="c1"># additional_dependencies: [&#39;safelint[all]==2.1.0rc1&#39;]      # every supported language, RC pin until v2.1.0 GA so [all] actually includes Java</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a><span class="w">        </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">--fail-on=error</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># default; use --fail-on=warning for stricter CI</span>
+<a id="__codelineno-0-15" name="__codelineno-0-15" href="#__codelineno-0-15"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span><span class="w">              </span><span class="c1"># optional, scope to a directory</span>
 </code></pre></div>
 <p>Then install the hooks:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>pre-commit<span class="w"> </span>install
 </code></pre></div>
 <p>SafeLint now runs on every <code>git commit</code> and blocks the commit if it finds blocking violations.</p>
 <h2 id="what-the-additional_dependencies-line-does">What the <code>additional_dependencies</code> line does<a class="headerlink" href="#what-the-additional_dependencies-line-does" title="Permanent link">#</a></h2>
-<p>v2.0.0+ ships every language grammar as an opt-in PEP 621 extra (<code>[python]</code>, <code>[javascript]</code>, <code>[typescript]</code>, <code>[all]</code>). Plain <code>pip install safelint</code> installs only the engine, no grammars. The same applies to the hook: pre-commit creates an isolated virtualenv per hook revision and installs only what you list in <code>additional_dependencies</code>.</p>
-<p><code>safelint[python]</code> pulls <code>tree-sitter-python</code>. <code>safelint[javascript]</code> pulls <code>tree-sitter-javascript</code>. <code>safelint[typescript]</code> pulls both <code>tree-sitter-javascript</code> and <code>tree-sitter-typescript</code> (TypeScript projects almost always have <code>.js</code> files too: vite / webpack / jest configs, generated declaration shims). <code>safelint[all]</code> is the kitchen-sink that pulls every supported grammar in one go.</p>
+<p>v2.0.0+ ships every language grammar as an opt-in PEP 621 extra (<code>[python]</code>, <code>[javascript]</code>, <code>[typescript]</code>, <code>[java]</code>, <code>[all]</code>). Plain <code>pip install safelint</code> installs only the engine, no grammars. The same applies to the hook: pre-commit creates an isolated virtualenv per hook revision and installs only what you list in <code>additional_dependencies</code>.</p>
+<p><code>safelint[python]</code> pulls <code>tree-sitter-python</code>. <code>safelint[javascript]</code> pulls <code>tree-sitter-javascript</code>. <code>safelint[typescript]</code> pulls both <code>tree-sitter-javascript</code> and <code>tree-sitter-typescript</code> (TypeScript projects almost always have <code>.js</code> files too: vite / webpack / jest configs, generated declaration shims). <code>safelint[java]</code> pulls <code>tree-sitter-java</code> and unlocks the optional Spring Boot framework preset configured via <code>[tool.safelint.java] framework = "spring-boot"</code>. <code>safelint[all]</code> is the kitchen-sink that pulls every supported grammar (<code>tree-sitter-python</code>, <code>tree-sitter-javascript</code>, <code>tree-sitter-typescript</code>, <code>tree-sitter-java</code>) in one go.</p>
 <p>You can compose extras: <code>['safelint[python,javascript]']</code> for a Python+JS monorepo is exactly the same as listing both individually, just one fewer string. New languages will get their own extras and be folded into <code>[all]</code> as they land.</p>
 <h2 id="one-hook-every-language">One hook, every language<a class="headerlink" href="#one-hook-every-language" title="Permanent link">#</a></h2>
-<p>The same <code>id: safelint</code> handles Python, JavaScript, and TypeScript. There is no <code>safelint-python</code> / <code>safelint-javascript</code> / <code>safelint-typescript</code> split. The published hook spec sets:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">types_or</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">javascript</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">ts</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tsx</span><span class="p p-Indicator">]</span>
+<p>The same <code>id: safelint</code> handles Python, JavaScript, TypeScript, and Java. There is no <code>safelint-python</code> / <code>safelint-javascript</code> / <code>safelint-typescript</code> / <code>safelint-java</code> split. The published hook spec sets:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="nt">types_or</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">python</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">javascript</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">ts</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">tsx</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">java</span><span class="p p-Indicator">]</span>
 </code></pre></div>
 <p>so pre-commit's <a href="https://github.com/pre-commit/identify"><code>identify</code></a> library routes the right files to the hook automatically. SafeLint's engine then dispatches each file to its language-specific rule implementations based on the extension, the file-type tag pre-commit attached is just the routing key.</p>
 <p>Every CLI flag (<code>--fail-on</code>, <code>--mode</code>, <code>--ignore</code>, <code>--format</code>, <code>--statistics</code>) and every TOML option behaves identically across languages. The only per-project knob is which <code>additional_dependencies</code> extra you list.</p>
@@ -2391,7 +2422,7 @@
 <p>The suppression breakdown surfaces in the hook's per-run summary the same way it does interactively. See <a href="../configuration/suppression/">Suppression mechanisms</a> for the full model.</p>
 <h2 id="troubleshooting">Troubleshooting<a class="headerlink" href="#troubleshooting" title="Permanent link">#</a></h2>
 <h3 id="installenvironmenterror-pre-commit-failed">"InstallEnvironmentError: pre-commit failed"<a class="headerlink" href="#installenvironmenterror-pre-commit-failed" title="Permanent link">#</a></h3>
-<p>Usually means pre-commit couldn't install one of the <code>additional_dependencies</code> entries at all: for example, the requirement string is malformed, the package name / version is wrong, or dependency resolution / download failed. Verify the requirement syntax is valid and that any SafeLint extras use supported names such as <code>[python]</code>, <code>[javascript]</code>, <code>[typescript]</code>, <code>[python,javascript]</code>, or <code>[all]</code>. A typoed extra name (e.g. <code>safelint[pythno]</code>) does <em>not</em> fail the install, pip emits a <code>WARNING: safelint X.Y.Z does not provide the extra 'pythno'</code> and continues, so the hook env still builds and the typo only shows up at runtime as the missing-grammar / silent-failure case below.</p>
+<p>Usually means pre-commit couldn't install one of the <code>additional_dependencies</code> entries at all: for example, the requirement string is malformed, the package name / version is wrong, or dependency resolution / download failed. Verify the requirement syntax is valid and that any SafeLint extras use supported names such as <code>[python]</code>, <code>[javascript]</code>, <code>[typescript]</code>, <code>[java]</code>, <code>[python,javascript]</code>, or <code>[all]</code>. A typoed extra name (e.g. <code>safelint[pythno]</code>) does <em>not</em> fail the install, pip emits a <code>WARNING: safelint X.Y.Z does not provide the extra 'pythno'</code> and continues, so the hook env still builds and the typo only shows up at runtime as the missing-grammar / silent-failure case below.</p>
 <h3 id="hook-runs-but-lints-nothing">Hook runs but lints nothing<a class="headerlink" href="#hook-runs-but-lints-nothing" title="Permanent link">#</a></h3>
 <p>Either pre-commit isn't passing files (check <code>types_or</code> matches your file extensions, or use <code>--all-files</code> to test) or the silent-failure guard is firing because the needed grammar wasn't installed (for example, you forgot the extra or typoed an extra name, both of which leave SafeLint installed but without the matching tree-sitter grammar). See <a href="#what-happens-if-you-forget-the-extra">"What happens if you forget the extra"</a> above for the error message and the fix.</p>
 <h3 id="hook-is-slow-on-the-first-run">Hook is slow on the first run<a class="headerlink" href="#hook-is-slow-on-the-first-run" title="Permanent link">#</a></h3>
