@@ -27,7 +27,7 @@ For pre-commit integration, set `additional_dependencies` in
 
 ```yaml
 - repo: https://github.com/shelkesays/safelint
-  rev: v2.0.0  # pin to a release (use the GA tag once v2.0.0 ships)
+  rev: v2.1.0rc1  # pin to a release (use a recent tag; v2.1.0rc1 also unlocks the Java extra if you later add .java files)
   hooks:
     - id: safelint
       additional_dependencies: ['safelint[typescript]']
@@ -60,7 +60,7 @@ lints some files keeps the warning as context.)
 
 ## Rule count
 
-18 rules fire on TypeScript: the 17 cross-language rules plus SAFE305
+18 rules fire on TypeScript: the 16 cross-language rules (Python / JS / TS / Java) plus SAFE302 (`global_mutation`, Python / JS / TS only) plus SAFE305
 `wide_scope_declaration` (JS-family-only, flags `var`, which is
 still legal but discouraged in TypeScript). The 2 Python-only rules
 (SAFE201, SAFE301) are skipped automatically.

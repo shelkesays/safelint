@@ -25,10 +25,11 @@ Originally designed for mission-critical systems, these principles apply to any 
 | **Python** | `.py`, `.pyw` |  |
 | **JavaScript** | `.js`, `.mjs`, `.cjs` | Runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine. Per-runtime *defaults* are selectable via [`[tool.safelint.javascript] runtime = "..."`](https://shelkesays.github.io/safelint/configuration/toml/#javascript-runtime-presets). |
 | **TypeScript** (incl. **TSX** + **AssemblyScript**) | `.ts`, `.tsx`, `.as` | Reuses the JS rule implementations end-to-end with TS-specific handling for generics, `as` casts, non-null assertions, `declare global` blocks, etc. Shares JS runtime presets since TS compiles to JS. |
+| **Java** (with **Spring Boot** framework preset) | `.java` | 16 cross-language rules port cleanly; 4 Spring-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* are selectable via [`[tool.safelint.java] framework = "..."`](https://shelkesays.github.io/safelint/languages/java/#framework-presets). New in v2.1.0rc1 (release candidate; install with `pip install --pre 'safelint[java]==2.1.0rc1'`). |
 
-**Rule coverage:** 17 rules apply to all three languages, 2 are Python-only (`bare_except`, `global_state`), and 1 is JavaScript-family-only (`wide_scope_declaration` for `var`).
+**Rule coverage:** 16 cross-language rules apply across all four languages; 2 are Python-only (`bare_except`, `global_state`); 1 applies to Python / JS / TS but not Java (`global_mutation`: Java has no clean analogue, deferred); 1 is JavaScript-family-only (`wide_scope_declaration` for `var`); and 4 are Java + Spring Boot only (`spring_field_injection`, `spring_missing_transactional`, `spring_unvalidated_input`, `spring_async_checked_exception`).
 
-**Planned future languages** (working-priority order, no timelines committed): Go, Rust, Java, C, C++, PHP. SafeLint's registry-driven design makes each addition incremental; see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
+**Planned future languages** (working-priority order, no timelines committed): Go, Rust, C, C++, PHP. SafeLint's registry-driven design makes each addition incremental; see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
 
 SafeLint integrates with pre-commit and CI pipelines to prevent unsafe code from entering your codebase.
 
@@ -52,7 +53,7 @@ SafeLint catches these early, automatically, regardless of who wrote the code.
 
 ## Power of Ten - adapted for modern languages
 
-In 1987, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly four decades later, the same failure patterns appear in every fast-moving codebase. SafeLint is those ten rules, adapted for modern languages (Python, JavaScript, and TypeScript today; further languages in future releases) and automated.
+In 1987, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly four decades later, the same failure patterns appear in every fast-moving codebase. SafeLint is those ten rules, adapted for modern languages (Python, JavaScript, TypeScript, and Java with the Spring Boot framework preset today; further languages in future releases) and automated.
 
 | # | Holzmann's Rule | SafeLint Rule | Code |
 |---|---|---|---|
@@ -81,7 +82,7 @@ SafeLint ships **every** per-language grammar as an opt-in extra. The base insta
 pip install 'safelint[python]'         # adds .py, .pyw
 pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs
 pip install 'safelint[typescript]'     # adds .ts, .tsx, .as (and bundles JS too)
-pip install 'safelint[all]'            # every supported language
+pip install --pre 'safelint[all]==2.1.0rc1'         # every supported language (RC pin needed until v2.1.0 GA so [all] actually includes Java)
 
 # Multiple extras compose, for monorepos:
 pip install 'safelint[python,javascript]'
@@ -170,15 +171,16 @@ Add this to your `.pre-commit-config.yaml`, pick the `additional_dependencies` l
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.0.0  # replace with the latest release tag (use the GA tag once v2.0.0 ships)
+    rev: v2.1.0rc1  # replace with the latest release tag (v2.1.0rc1 is required for Java support)
     hooks:
       - id: safelint
         # Required in v2.0.0+, pick the line for the language(s) your repo lints:
         additional_dependencies: ['safelint[python]']               # Python-only repo
         # additional_dependencies: ['safelint[javascript]']         # JS-only repo (Node / browser / Deno / Cloudflare Workers / Bun)
         # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles tree-sitter-javascript too)
+        # additional_dependencies: ['safelint[java]==2.1.0rc1']     # Java repo, RC pin until v2.1.0 GA (Spring Boot via [tool.safelint.java] framework = "spring-boot")
         # additional_dependencies: ['safelint[python,javascript]']  # mixed monorepo
-        # additional_dependencies: ['safelint[all]']                # kitchen-sink
+        # additional_dependencies: ['safelint[all]==2.1.0rc1']      # kitchen-sink, RC pin until v2.1.0 GA so [all] actually includes Java
 
         args: [--fail-on=error]   # or --fail-on=warning for stricter CI
         files: ^src/              # optional, scope to a directory
@@ -186,7 +188,7 @@ repos:
 
 ### One hook, every language
 
-The same `id: safelint` handles Python, JavaScript, and TypeScript, there's no `safelint-python` / `safelint-js` / `safelint-ts` split. The published hook spec sets `types_or: [python, javascript, ts, tsx]` so pre-commit automatically routes the right files to safelint; the engine then dispatches each file to its language-specific rule implementations based on extension. **AssemblyScript `.as` files are not matched by that default `types_or` list**, pre-commit's `identify` library has no `as` filetype tag, so AS users must override `types_or` with a permissive tag `.as` files *actually* carry (e.g. `types_or: [text]`) and use `files: \.(ts|tsx|as)$` to scope the match. (`types_or: []` doesn't work, pre-commit treats an empty list as "no tag matches", not "filter disabled".) **Every flag (`--fail-on`, `--mode`, `--ignore`, `--format`, `--statistics`) and every config option behaves identically across languages.** The only per-project lever is the `additional_dependencies` extra, that's what tells pre-commit which tree-sitter grammar(s) to install into the hook's isolated environment.
+The same `id: safelint` handles Python, JavaScript, TypeScript, and Java; there's no `safelint-python` / `safelint-js` / `safelint-ts` / `safelint-java` split. The published hook spec sets `types_or: [python, javascript, ts, tsx, java]` so pre-commit automatically routes the right files to safelint; the engine then dispatches each file to its language-specific rule implementations based on extension. **AssemblyScript `.as` files are not matched by that default `types_or` list**, pre-commit's `identify` library has no `as` filetype tag, so AS users must override `types_or` with a permissive tag `.as` files *actually* carry (e.g. `types_or: [text]`) and use `files: \.(ts|tsx|as)$` to scope the match. (`types_or: []` doesn't work, pre-commit treats an empty list as "no tag matches", not "filter disabled".) **Every flag (`--fail-on`, `--mode`, `--ignore`, `--format`, `--statistics`) and every config option behaves identically across languages.** The only per-project lever is the `additional_dependencies` extra, that's what tells pre-commit which tree-sitter grammar(s) to install into the hook's isolated environment.
 
 ### What happens if you forget the extra
 
@@ -212,7 +214,7 @@ SafeLint will now run on every `git commit` and block the commit if it finds err
 
 ## What it checks
 
-SafeLint ships **20 rules** across the Holzmann safety categories. **14 are on by default**; **6 are opt-in** (the dataflow trio is opt-in for performance reasons; the test-discipline and assertion rules are opt-in because they only make sense in projects that follow paired-test conventions).
+SafeLint ships **24 rules** across the Holzmann safety categories. **14 are on by default**; **10 are opt-in** (the dataflow trio is opt-in for performance reasons; the test-discipline and assertion rules are opt-in because they only make sense in projects that follow paired-test conventions; the four Java + Spring Boot rules are opt-in under vanilla and flipped on automatically by the `spring-boot` framework preset).
 
 ### Default-on rules (14)
 
@@ -233,7 +235,7 @@ SafeLint ships **20 rules** across the Holzmann safety categories. **14 are on b
 | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) | `resource_lifecycle` | error | Files or connections opened outside a `with` block (Python) or without paired cleanup (JS / TS) |
 | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) | `unbounded_loops` | warning | `while True` loops with no `break` |
 
-### Opt-in rules (6): enable via `[tool.safelint.rules.<name>] enabled = true`
+### Opt-in rules (10): enable via `[tool.safelint.rules.<name>] enabled = true`
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|
@@ -243,6 +245,10 @@ SafeLint ships **20 rules** across the Holzmann safety categories. **14 are on b
 | [SAFE801](https://shelkesays.github.io/safelint/configuration/rules/#safe801-tainted_sink) | `tainted_sink` | error | User input flowing into `eval`, `exec`, `subprocess`, etc. without sanitization *(dataflow)* |
 | [SAFE802](https://shelkesays.github.io/safelint/configuration/rules/#safe802-return_value_ignored) | `return_value_ignored` | warning | Discarding the return value of calls like `subprocess.run` or `file.write` *(dataflow)* |
 | [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference) | `null_dereference` | error | Chaining methods directly on calls that can return `None`, e.g. `d.get("key").strip()` *(dataflow)* |
+| [SAFE901](https://shelkesays.github.io/safelint/configuration/rules/#safe901-spring_field_injection) | `spring_field_injection` | warning | `@Autowired` on a field; prefer constructor injection *(Java + Spring Boot only; auto-enabled by the `spring-boot` framework preset)* |
+| [SAFE902](https://shelkesays.github.io/safelint/configuration/rules/#safe902-spring_missing_transactional) | `spring_missing_transactional` | error | `@Service` / `@Component` method doing 2+ repository writes without `@Transactional` *(Java + Spring Boot only; auto-enabled by the `spring-boot` framework preset)* |
+| [SAFE903](https://shelkesays.github.io/safelint/configuration/rules/#safe903-spring_unvalidated_input) | `spring_unvalidated_input` | error | `@RequestBody` / `@ModelAttribute` parameter without `@Valid` / `@Validated` *(Java + Spring Boot only; auto-enabled by the `spring-boot` framework preset)* |
+| [SAFE904](https://shelkesays.github.io/safelint/configuration/rules/#safe904-spring_async_checked_exception) | `spring_async_checked_exception` | warning | `@Async` method with a `throws` clause (Spring's executor swallows it) *(Java + Spring Boot only; auto-enabled by the `spring-boot` framework preset)* |
 
 Plus **`SAFE004 unused_suppression`** (engine meta-check, on by default), flags stale `# nosafe` directives that no longer suppress anything. Disable globally via `ignore = ["SAFE004"]` if undesired.
 

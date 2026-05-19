@@ -13,6 +13,12 @@ from safelint.rules.max_arguments import MaxArgumentsRule
 from safelint.rules.nesting_depth import NestingDepthRule
 from safelint.rules.resource_lifecycle import ResourceLifecycleRule
 from safelint.rules.side_effects import SideEffectsHiddenRule, SideEffectsRule
+from safelint.rules.spring import (
+    SpringAsyncCheckedExceptionRule,
+    SpringFieldInjectionRule,
+    SpringMissingTransactionalRule,
+    SpringUnvalidatedInputRule,
+)
 from safelint.rules.state_purity import GlobalMutationRule, GlobalStateRule, WideScopeDeclarationRule
 from safelint.rules.test_coverage import TestCouplingRule, TestExistenceRule
 
@@ -43,6 +49,14 @@ ALL_RULES: list[type[BaseRule]] = [
     TaintedSinkRule,
     ReturnValueIgnoredRule,
     NullDereferenceRule,
+    # Spring Boot framework-aware rules (SAFE9xx band) - Java-only,
+    # disabled by default under the vanilla Java preset; enabled by
+    # the [tool.safelint.java] framework = "spring-boot" preset.
+    # See safelint.rules.spring for the per-rule rationale.
+    SpringFieldInjectionRule,
+    SpringMissingTransactionalRule,
+    SpringUnvalidatedInputRule,
+    SpringAsyncCheckedExceptionRule,
 ]
 
 RULE_BY_NAME: dict[str, type[BaseRule]] = {cls.name: cls for cls in ALL_RULES}
@@ -66,6 +80,10 @@ __all__ = [
     "ReturnValueIgnoredRule",
     "SideEffectsHiddenRule",
     "SideEffectsRule",
+    "SpringAsyncCheckedExceptionRule",
+    "SpringFieldInjectionRule",
+    "SpringMissingTransactionalRule",
+    "SpringUnvalidatedInputRule",
     "TaintedSinkRule",
     "TestCouplingRule",
     "TestExistenceRule",

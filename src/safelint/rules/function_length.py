@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from safelint.languages import get_language_for_file
 from safelint.languages._node_utils import end_lineno, lineno, node_text, resolve_lang_name, walk
+from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.rules.base import BaseRule
@@ -24,6 +25,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
+    "java": _JAVA_FUNCTION_TYPES,
 }
 
 # ``count_mode = "statements"`` is language-aware: each language has a
@@ -115,7 +117,7 @@ class FunctionLengthRule(BaseRule):
 
     name = "function_length"
     code = "SAFE101"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function or async function exceeding the configured size."""

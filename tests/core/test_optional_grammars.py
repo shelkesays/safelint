@@ -37,6 +37,9 @@ from safelint.languages import (
     unavailable_extensions,
 )
 from safelint.languages import (
+    java as _java_mod,
+)
+from safelint.languages import (
     javascript as _javascript_mod,
 )
 from safelint.languages import (
@@ -113,6 +116,25 @@ def test_typescript_install_hint_names_the_right_extra() -> None:
     assert _typescript_mod.GRAMMAR_INSTALL_HINT == "pip install 'safelint[typescript]'"
 
 
+def test_java_parser_factory_raises_when_grammar_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``_create_java_parser`` errors clearly when the grammar isn't installed."""
+    monkeypatch.setattr(_java_mod, "_JAVA_TS_LANGUAGE", None)
+    with pytest.raises(ImportError, match=r"tree-sitter-java is not installed.*safelint\[java\]"):
+        _java_mod._create_java_parser()
+
+
+def test_java_install_hint_names_the_right_extra() -> None:
+    """The Java hint must keep the ``--pre`` + ``==2.1.0rc1`` pin until v2.1.0 GA.
+
+    Pip otherwise resolves the bare ``safelint[java]`` request against
+    the latest stable v2.0.0 which lacks the [java] extra, so the
+    hint would tell users to install a package that still lacks the
+    grammar. When v2.1.0 GA ships, drop both ``--pre`` and the pin
+    from ``GRAMMAR_INSTALL_HINT`` and from this assertion together.
+    """
+    assert _java_mod.GRAMMAR_INSTALL_HINT == "pip install --pre 'safelint[java]==2.1.0rc1'"
+
+
 def test_registry_skips_javascript_when_grammar_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     """When ``_GRAMMAR_AVAILABLE`` is False, ``.js`` is in ``unavailable_extensions``, not ``supported_extensions``.
 
@@ -133,6 +155,21 @@ def test_registry_skips_javascript_when_grammar_unavailable(monkeypatch: pytest.
     finally:
         # Restore the registry so subsequent tests see the dev install state.
         monkeypatch.setattr(_javascript_mod, "_GRAMMAR_AVAILABLE", True)
+        importlib.reload(languages)
+
+
+def test_registry_skips_java_when_grammar_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When ``_GRAMMAR_AVAILABLE`` is False for Java, ``.java`` is unavailable; other languages stay available."""
+    monkeypatch.setattr(_java_mod, "_GRAMMAR_AVAILABLE", False)
+    reloaded = importlib.reload(languages)
+    try:
+        assert ".java" not in reloaded.supported_extensions()
+        assert reloaded.unavailable_extensions()[".java"] == _java_mod.GRAMMAR_INSTALL_HINT
+        # Other languages stay available since their grammars are independent.
+        assert ".py" in reloaded.supported_extensions()
+        assert ".js" in reloaded.supported_extensions()
+    finally:
+        monkeypatch.setattr(_java_mod, "_GRAMMAR_AVAILABLE", True)
         importlib.reload(languages)
 
 
@@ -183,22 +220,35 @@ def test_install_hint_for_returns_hint_when_grammar_unavailable(monkeypatch: pyt
 
 
 def test_every_language_has_its_own_extra() -> None:
-    """v2.0.0's fully-symmetric model: every supported language ships as an opt-in extra.
+    """v2.0.0+'s fully-symmetric model: every supported language ships as an opt-in extra.
 
     None of the per-language grammars are in the base install. Each
     has a matching extra (``[python]``, ``[javascript]``,
-    ``[typescript]``) so users opt in to only the languages their
-    project actually contains. ``[all]`` is a convenience alias for
-    everything.
+    ``[typescript]``, ``[java]``) so users opt in to only the
+    languages their project actually contains. ``[all]`` is a
+    convenience alias for everything.
 
     Verified by reading ``project.optional-dependencies`` straight
-    from the wheel's metadata via :mod:`importlib.metadata`.
+    from the wheel's metadata via :mod:`importlib.metadata`. Add
+    the new extra to ``expected`` when registering a new language
+    (the contract is enforced both directions: any expected entry
+    missing fails the test, and any extra in the wheel that isn't
+    in ``expected`` fails the strict-set assertion below).
     """
     md = metadata("safelint")
     provides_extras = set(md.get_all("Provides-Extra") or [])
-    expected = {"python", "javascript", "typescript", "all"}
-    missing = expected - provides_extras
-    assert not missing, f"v2.0.0 contract: every supported language must have its own opt-in extra. Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"
+    # Drop tooling extras (``dev``, ``docs``, anything else non-language)
+    # before comparing - those aren't part of the per-language contract.
+    # Keep the exclusion list explicit so adding a new tooling extra
+    # forces a deliberate update here.
+    language_extras = provides_extras - {"dev", "docs"}
+    expected = {"python", "javascript", "typescript", "java", "all"}
+    missing = expected - language_extras
+    unexpected = language_extras - expected
+    assert not missing, f"v2.x contract: every supported language must have its own opt-in extra. Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"
+    assert not unexpected, (
+        f"Wheel metadata advertises an extra not in the expected set. Either add it to ``expected`` (if it's a new language) or remove it from pyproject.toml. Unexpected: {sorted(unexpected)}"
+    )
 
 
 def test_dev_install_has_every_grammar() -> None:

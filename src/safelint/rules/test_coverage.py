@@ -21,6 +21,20 @@ from safelint.rules.base import BaseRule
 _JS_EXTENSIONS: tuple[str, ...] = tuple(sorted(JAVASCRIPT.file_extensions))
 _TS_EXTENSIONS: tuple[str, ...] = tuple(sorted(TYPESCRIPT.file_extensions | TSX.file_extensions))
 
+# Java's three conventional test-filename suffixes. Maven and Gradle
+# both expect a test class to live alongside the production class
+# with one of these forms:
+#
+# * ``<ClassName>Test.java``  - JUnit unit tests (default for new code)
+# * ``<ClassName>Tests.java`` - Spring's preferred form
+#   (``@SpringBootTest`` examples in spring.io docs use this)
+# * ``<ClassName>IT.java``    - Maven Surefire / Failsafe integration tests
+#
+# Plus the ``Test<ClassName>.java`` *prefix* form, which is older but
+# still legal in JUnit. The candidate list yields all four so projects
+# can mix conventions without false-positive misses.
+_JAVA_TEST_SUFFIXES: tuple[str, ...] = ("Test", "Tests", "IT")
+
 
 if TYPE_CHECKING:
     import tree_sitter
@@ -42,6 +56,14 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
     ``foo.ts`` source pairs with ``foo.test.ts`` (or ``.tsx`` / ``.as``),
     NOT ``foo.test.js`` - language-family consistency between source
     and test is a convention every JS / TS test runner expects.
+
+    Java: ``<ClassName>Test.java`` / ``<ClassName>Tests.java`` /
+    ``<ClassName>IT.java`` (Maven Surefire / Failsafe + Spring Boot
+    conventions), plus the legacy ``Test<ClassName>.java`` prefix form.
+    Users following a different convention can override
+    ``test_dirs`` and rely on test-discovery from a custom location
+    (e.g. Kotlin / Groovy sources at ``src/test/groovy``); the
+    candidate-list generation only owns the filename convention.
     """
     if lang_name == "javascript":
         stem = src_path.stem
@@ -51,6 +73,11 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
         stem = src_path.stem
         infixes = (".test", ".spec")
         return [f"{stem}{infix}{ext}" for infix in infixes for ext in _TS_EXTENSIONS]
+    if lang_name == "java":
+        stem = src_path.stem
+        suffix_forms = [f"{stem}{suf}.java" for suf in _JAVA_TEST_SUFFIXES]
+        prefix_form = [f"Test{stem}.java"]
+        return [*suffix_forms, *prefix_form]
     # Python (and any future language without an explicit override).
     return [f"test_{src_path.stem}.py"]
 
@@ -61,12 +88,15 @@ def _test_filename_for_message(src_path: Path, lang_name: str) -> str:
     The "expected" filename in messages is one example, not the full
     list (which would be unwieldy). For Python, the unique pattern;
     for JavaScript, the Jest-style ``foo.test.js`` form (the most
-    common modern convention).
+    common modern convention); for Java, the JUnit 5 default
+    ``<ClassName>Test.java``.
     """
     if lang_name in ("javascript", "typescript"):
         # Default to the Jest-style ``.test.<source-extension>`` form so the
         # suggestion matches the source file's own extension.
         return f"{src_path.stem}.test{src_path.suffix}"
+    if lang_name == "java":
+        return f"{src_path.stem}Test.java"
     return f"test_{src_path.stem}.py"
 
 
@@ -136,6 +166,20 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
     name = Path(filepath).name
     if lang_name in ("javascript", "typescript"):
         return ".test." in name or ".spec." in name
+    if lang_name == "java":
+        # ``Foo.java`` stems ending in ``Test`` / ``Tests`` / ``IT``.
+        # The legacy ``Test``-prefix form (``TestFoo.java``) is NOT
+        # checked here: production classes like ``TestDataFactory.java``
+        # and ``TestConfig.java`` under ``src/main/java`` use the same
+        # prefix in real Spring Boot codebases and would be wrongly
+        # classified as tests, silently skipping them from SAFE701 /
+        # SAFE702 enforcement. Legitimate JUnit 3 ``Test``-prefix
+        # tests are still picked up via the ``test_dirs`` path-
+        # component check above when they live in the configured
+        # test directory (typically ``src/test/java``); the rule
+        # prefers the false negative on misplaced tests over the
+        # false positive on Test*-named production utilities.
+        return any(Path(filepath).stem.endswith(suf) for suf in _JAVA_TEST_SUFFIXES)
     return name.startswith("test_")
 
 
@@ -156,7 +200,7 @@ class TestExistenceRule(BaseRule):
 
     name = "test_existence"
     code = "SAFE701"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:  # noqa: ARG002
         """Return a violation when no matching test file can be found.
@@ -197,7 +241,7 @@ class TestCouplingRule(BaseRule):
 
     name = "test_coupling"
     code = "SAFE702"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:  # noqa: ARG002
         """Return a violation when the paired test file was not part of this commit."""

@@ -19,6 +19,7 @@ If either check returns non-zero (or the shell reports "command not found" / "is
   | `.py` / `.pyw` | `uv add 'safelint[python]'` or `pip install 'safelint[python]'` |
   | `.js` / `.mjs` / `.cjs` | `uv add 'safelint[javascript]'` or `pip install 'safelint[javascript]'` |
   | `.ts` / `.tsx` / `.as` | `uv add 'safelint[typescript]'` or `pip install 'safelint[typescript]'` (bundles JS) |
+  | `.java` | `uv add 'safelint[java]==2.1.0rc1'` or `pip install --pre 'safelint[java]==2.1.0rc1'` (RC pin needed until v2.1.0 GA; Spring Boot via `[tool.safelint.java] framework = "spring-boot"`, see `languages/java.md`) |
   | Multiple languages | Compose, e.g. `pip install 'safelint[python,javascript]'` |
   | Unsure / kitchen-sink | `pip install 'safelint[all]'` |
 
@@ -37,6 +38,7 @@ Look at the project files in cwd to figure out which languages safelint can lint
 | Python | `.py`, `.pyw` | `languages/python.md` |
 | JavaScript (Node) | `.js`, `.mjs`, `.cjs` | `languages/javascript.md` |
 | TypeScript (also AssemblyScript) | `.ts`, `.tsx`, `.as` | `languages/typescript.md` |
+| Java (vanilla and Spring Boot) | `.java` | `languages/java.md` |
 
 (More languages will land over time. To check the live list, run `python -c "from safelint.languages import supported_extensions; print(sorted(supported_extensions()))"`.)
 
@@ -162,6 +164,10 @@ The rule set is shared across all supported languages. Universal rationale crib 
 | SAFE801 | tainted_sink | Untrusted input flowing into `eval` / `exec` / shell sinks is a classic injection vector, the rule traces taint from sources to sinks intra-procedurally. |
 | SAFE802 | return_value_ignored | Discarding the return value of error-signalling functions like `subprocess.run` silently swallows failures. |
 | SAFE803 | null_dereference | Using a value as if non-None after a None check (or where it could be None) is a common crash source. |
+| SAFE901 | spring_field_injection | *Java + Spring Boot only.* `@Autowired` on a field; Spring's own docs recommend constructor injection (immutable, testable, fail-fast on missing deps). Enabled by `[tool.safelint.java] framework = "spring-boot"`. |
+| SAFE902 | spring_missing_transactional | *Java + Spring Boot only.* Service-layer method does multiple repository writes (`save` / `delete` / etc.) without `@Transactional`; partial writes leak on failure. |
+| SAFE903 | spring_unvalidated_input | *Java + Spring Boot only.* Controller method parameter uses `@RequestBody` / `@ModelAttribute` without `@Valid` / `@Validated`; bean validation must run on deserialised request bodies. Complements SAFE801 structurally. |
+| SAFE904 | spring_async_checked_exception | *Java + Spring Boot only.* `@Async` method declares a `throws` clause; Spring runs `@Async` on a separate thread and swallows exceptions, the caller never sees them. Catch inside the body or return `CompletableFuture.failedFuture(...)`. |
 
 For language-specific phrasing read the relevant `languages/<lang>.md` addendum; locate it via `safelint skill path`.
 

@@ -18,6 +18,7 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 - **Python** (`.py`, `.pyw`).
 - **JavaScript** (`.js`, `.mjs`, `.cjs`), source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime *defaults* (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the [`[tool.safelint.javascript] runtime = "..."`](toml.md#javascript-runtime-presets) preset, the source-language rules themselves don't change.
 - **TypeScript** (`.ts`, `.tsx`), and **AssemblyScript** (`.as`, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, `as` casts, non-null assertions, `declare global` ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See [TypeScript](../languages/typescript.md) for the full language reference.
+- **Java** (`.java`), new in v2.1.0rc1 (release candidate; install with `pip install --pre 'safelint[java]==2.1.0rc1'`). 16 of the cross-language rules port cleanly plus 4 Spring Boot framework-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* (sinks, nullable methods, structural rule enablement) are switchable via the [`[tool.safelint.java] framework = "..."`](../languages/java.md#framework-presets) preset (`vanilla` / `spring-boot`). See [Java](../languages/java.md) for the full language reference.
 
 ### Planned
 
@@ -25,18 +26,19 @@ Listed in the project's current working priority; no timelines committed. SafeLi
 
 1. **Go** (`.go`).
 2. **Rust** (`.rs`).
-3. **Java** (`.java`).
-4. **C** (`.c`, `.h`), Holzmann's original target language.
-5. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
-6. **PHP** (`.php`).
+3. **C** (`.c`, `.h`), Holzmann's original target language.
+4. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
+5. **PHP** (`.php`).
 
 ### Rule scope (current languages)
 
 | Scope | Count | Codes |
 |---|---|---|
-| **Cross-language** (Python, JavaScript, TypeScript) | 17 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE302, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 |
+| **Cross-language** (Python, JavaScript, TypeScript, Java) | 16 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 |
+| **Python / JS / TS** (not Java) | 1 | SAFE302 (`global_mutation`, where Java's natural analogue (non-final static field writes from outside the declaring class's static initialiser) needs class-scope analysis the rule doesn't yet do; deferred to a future release) |
 | **Python-only** | 2 | SAFE201 (`bare_except`, JS / TS catches always bind the error; no `KeyboardInterrupt` hijack hazard), SAFE301 (`global_state`, JS / TS have no `global` keyword; SAFE302 covers their "writes to module-level state" cases) |
-| **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`, Python has no `var` / `let` / `const` distinction; ``var`` is still legal in TS and the same scope-hoisting hazard applies, so the rule fires on both `.js` and `.ts`) |
+| **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`, Python and Java have no `var` / `let` / `const` distinction; `var` is still legal in TS and the same scope-hoisting hazard applies, so the rule fires on both `.js` and `.ts`) |
+| **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`); all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset |
 
 The engine's per-language dispatch automatically skips rules whose `language` tuple doesn't include the active file's language. There's no manual configuration to do, drop a `.py` file in a JS / TS project (or vice versa) and the right rules fire on each.
 
@@ -947,5 +949,152 @@ const first = users.find(u => u.id === id)?.name;
 const el = document.getElementById("title");
 if (el != null) {
   process(el.textContent);
+}
+```
+
+## Java + Spring Boot rules
+
+`SAFE9xx` rules are Java-only structural checks for common Spring Boot misuses. All four are disabled by default and enabled together by the `spring-boot` framework preset (`[tool.safelint.java] framework = "spring-boot"`). They do not fire on Python / JavaScript / TypeScript files even if explicitly enabled; rule dispatch is gated on file language.
+
+### SAFE901: `spring_field_injection`
+
+**What it flags:** A class field annotated with `@Autowired` (or the fully-qualified `@org.springframework.beans.factory.annotation.Autowired`). Java only.
+
+Spring's reference documentation recommends constructor injection over field injection: constructor-injected dependencies are immutable (`final`), testable without reflection, fail fast on missing beans at construction time, and surface obvious circular dependencies as compile errors. Field-injected dependencies hide all of those properties.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (spring-boot preset) | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```java
+@Service
+public class OrderService {
+    @Autowired
+    private InventoryClient inventory;   // SAFE901
+}
+```
+
+**Good:**
+
+```java
+@Service
+public class OrderService {
+    private final InventoryClient inventory;
+
+    public OrderService(InventoryClient inventory) {
+        this.inventory = inventory;
+    }
+}
+```
+
+### SAFE902: `spring_missing_transactional`
+
+**What it flags:** A `@Service` or `@Component` method that performs two or more Spring Data repository writes (`save` / `saveAll` / `saveAndFlush` / `delete` / `deleteAll` / `deleteAllInBatch` / `deleteAllById` / `deleteAllByIdInBatch` / `deleteById` / `update`) without `@Transactional` on the method or the enclosing class. Java only.
+
+Multi-write methods without `@Transactional` run each write in its own short-lived transaction; a failure between writes leaves the database in a partially-updated state. Single-write methods are exempt because the implicit per-statement transaction is sufficient.
+
+**Receiver-name heuristic:** detection is constrained to method invocations whose receiver name (lowercased) contains `repo` / `dao` / `jdbctemplate`, e.g. `userRepo.save(...)`, `productDao.update(...)`, `jdbcTemplate.update(...)`. Without this guard, `call_name()` strips the receiver and unrelated calls like `file.delete()` / `cache.delete()` / `restTemplate.delete(...)` would be counted. Rename a service-managed field if your convention is `userStore` / `userManager` / etc., or add the matching pattern via `[tool.safelint.rules.spring_missing_transactional]` configuration in a future release (currently the pattern set is fixed at the source level).
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (spring-boot preset) | Toggle the rule |
+| `severity` | `"error"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```java
+@Service
+public class OrderService {
+    public void placeOrder(Order order) {
+        orderRepo.save(order);
+        inventoryRepo.update(order.itemId(), -1);   // SAFE902: 2 writes, no @Transactional
+    }
+}
+```
+
+**Good:**
+
+```java
+@Service
+public class OrderService {
+    @Transactional
+    public void placeOrder(Order order) {
+        orderRepo.save(order);
+        inventoryRepo.update(order.itemId(), -1);
+    }
+}
+```
+
+### SAFE903: `spring_unvalidated_input`
+
+**What it flags:** A `@RestController` or `@Controller` method parameter annotated with `@RequestBody` or `@ModelAttribute` that is NOT also annotated with `@Valid` or `@Validated`. Java only.
+
+Without `@Valid` / `@Validated`, Bean Validation constraints declared on the DTO (`@NotNull`, `@Size`, `@Email`, etc.) are silently ignored. Malformed or hostile input reaches the controller body. `@PathVariable` and `@RequestParam` are deliberately NOT covered because they typically bind to primitives or simple strings where bean validation is rarely declared.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (spring-boot preset) | Toggle the rule |
+| `severity` | `"error"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```java
+@RestController
+public class UserController {
+    @PostMapping("/users")
+    public User create(@RequestBody UserDto dto) { ... }   // SAFE903: no @Valid
+}
+```
+
+**Good:**
+
+```java
+@RestController
+public class UserController {
+    @PostMapping("/users")
+    public User create(@Valid @RequestBody UserDto dto) { ... }
+}
+```
+
+### SAFE904: `spring_async_checked_exception`
+
+**What it flags:** A method annotated `@Async` that declares a `throws` clause. Java only.
+
+The rule's name and historical framing emphasised checked exceptions, but the implementation flags **any** `throws` clause (checked or unchecked) because distinguishing the two requires class-resolution / type-inference we don't do. The conservative behaviour is justified: Spring's executor swallows whatever the method throws regardless of checked-vs-unchecked, so the `throws` clause is always misleading - it implies the caller can observe the exception when in fact they cannot. Fix by either catching inside the method body or returning a `CompletableFuture` whose failure state carries the exception (`CompletableFuture.failedFuture(ex)`).
+
+If you have a deliberate `throws RuntimeException` on an `@Async` method (rare; the JLS doesn't require it), suppress with `// nosafe: SAFE904` on the method declaration.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (spring-boot preset) | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```java
+@Service
+public class IngestService {
+    @Async
+    public void process(File f) throws IOException { ... }   // SAFE904
+}
+```
+
+**Good:**
+
+```java
+@Service
+public class IngestService {
+    @Async
+    public CompletableFuture<Void> process(File f) {
+        try {
+            // ... I/O work
+            return CompletableFuture.completedFuture(null);
+        } catch (IOException e) {
+            return CompletableFuture.failedFuture(e);
+        }
+    }
 }
 ```

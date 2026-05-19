@@ -11,15 +11,16 @@ Add this block to your `.pre-commit-config.yaml`. Pick the `additional_dependenc
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.0.0  # replace with the latest release tag
+    rev: v2.1.0rc1  # replace with the latest release tag (Java support requires v2.1.0rc1 or later)
     hooks:
       - id: safelint
         # Required in v2.0.0+. Pick whichever extras match your project's languages:
         additional_dependencies: ['safelint[python]']               # Python-only repo
         # additional_dependencies: ['safelint[javascript]']         # JS-only repo
         # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles JS too)
+        # additional_dependencies: ['safelint[java]==2.1.0rc1']     # Java repo, RC pin until v2.1.0 GA (Spring Boot via [tool.safelint.java] framework = "spring-boot")
         # additional_dependencies: ['safelint[python,javascript]']  # mixed monorepo
-        # additional_dependencies: ['safelint[all]']                # every supported language
+        # additional_dependencies: ['safelint[all]==2.1.0rc1']      # every supported language, RC pin until v2.1.0 GA so [all] actually includes Java
 
         args: [--fail-on=error]   # default; use --fail-on=warning for stricter CI
         files: ^src/              # optional, scope to a directory
@@ -35,18 +36,18 @@ SafeLint now runs on every `git commit` and blocks the commit if it finds blocki
 
 ## What the `additional_dependencies` line does
 
-v2.0.0+ ships every language grammar as an opt-in PEP 621 extra (`[python]`, `[javascript]`, `[typescript]`, `[all]`). Plain `pip install safelint` installs only the engine, no grammars. The same applies to the hook: pre-commit creates an isolated virtualenv per hook revision and installs only what you list in `additional_dependencies`.
+v2.0.0+ ships every language grammar as an opt-in PEP 621 extra (`[python]`, `[javascript]`, `[typescript]`, `[java]`, `[all]`). Plain `pip install safelint` installs only the engine, no grammars. The same applies to the hook: pre-commit creates an isolated virtualenv per hook revision and installs only what you list in `additional_dependencies`.
 
-`safelint[python]` pulls `tree-sitter-python`. `safelint[javascript]` pulls `tree-sitter-javascript`. `safelint[typescript]` pulls both `tree-sitter-javascript` and `tree-sitter-typescript` (TypeScript projects almost always have `.js` files too: vite / webpack / jest configs, generated declaration shims). `safelint[all]` is the kitchen-sink that pulls every supported grammar in one go.
+`safelint[python]` pulls `tree-sitter-python`. `safelint[javascript]` pulls `tree-sitter-javascript`. `safelint[typescript]` pulls both `tree-sitter-javascript` and `tree-sitter-typescript` (TypeScript projects almost always have `.js` files too: vite / webpack / jest configs, generated declaration shims). `safelint[java]` pulls `tree-sitter-java` and unlocks the optional Spring Boot framework preset configured via `[tool.safelint.java] framework = "spring-boot"`. `safelint[all]` is the kitchen-sink that pulls every supported grammar (`tree-sitter-python`, `tree-sitter-javascript`, `tree-sitter-typescript`, `tree-sitter-java`) in one go.
 
 You can compose extras: `['safelint[python,javascript]']` for a Python+JS monorepo is exactly the same as listing both individually, just one fewer string. New languages will get their own extras and be folded into `[all]` as they land.
 
 ## One hook, every language
 
-The same `id: safelint` handles Python, JavaScript, and TypeScript. There is no `safelint-python` / `safelint-javascript` / `safelint-typescript` split. The published hook spec sets:
+The same `id: safelint` handles Python, JavaScript, TypeScript, and Java. There is no `safelint-python` / `safelint-javascript` / `safelint-typescript` / `safelint-java` split. The published hook spec sets:
 
 ```yaml
-types_or: [python, javascript, ts, tsx]
+types_or: [python, javascript, ts, tsx, java]
 ```
 
 so pre-commit's [`identify`](https://github.com/pre-commit/identify) library routes the right files to the hook automatically. SafeLint's engine then dispatches each file to its language-specific rule implementations based on the extension, the file-type tag pre-commit attached is just the routing key.
@@ -144,7 +145,7 @@ The suppression breakdown surfaces in the hook's per-run summary the same way it
 
 ### "InstallEnvironmentError: pre-commit failed"
 
-Usually means pre-commit couldn't install one of the `additional_dependencies` entries at all: for example, the requirement string is malformed, the package name / version is wrong, or dependency resolution / download failed. Verify the requirement syntax is valid and that any SafeLint extras use supported names such as `[python]`, `[javascript]`, `[typescript]`, `[python,javascript]`, or `[all]`. A typoed extra name (e.g. `safelint[pythno]`) does *not* fail the install, pip emits a `WARNING: safelint X.Y.Z does not provide the extra 'pythno'` and continues, so the hook env still builds and the typo only shows up at runtime as the missing-grammar / silent-failure case below.
+Usually means pre-commit couldn't install one of the `additional_dependencies` entries at all: for example, the requirement string is malformed, the package name / version is wrong, or dependency resolution / download failed. Verify the requirement syntax is valid and that any SafeLint extras use supported names such as `[python]`, `[javascript]`, `[typescript]`, `[java]`, `[python,javascript]`, or `[all]`. A typoed extra name (e.g. `safelint[pythno]`) does *not* fail the install, pip emits a `WARNING: safelint X.Y.Z does not provide the extra 'pythno'` and continues, so the hook env still builds and the typo only shows up at runtime as the missing-grammar / silent-failure case below.
 
 ### Hook runs but lints nothing
 

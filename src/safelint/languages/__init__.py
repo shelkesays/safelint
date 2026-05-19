@@ -17,10 +17,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from safelint.languages import java as _java_mod
 from safelint.languages import javascript as _javascript_mod
 from safelint.languages import python as _python_mod
 from safelint.languages import typescript as _typescript_mod
 from safelint.languages._types import LanguageDefinition
+from safelint.languages.java import JAVA
 from safelint.languages.javascript import JAVASCRIPT
 from safelint.languages.python import PYTHON
 from safelint.languages.typescript import TSX, TYPESCRIPT
@@ -76,6 +78,18 @@ else:
         for _ext in _lang.file_extensions:
             _UNAVAILABLE_EXTENSIONS[_ext] = _typescript_mod.GRAMMAR_INSTALL_HINT
             _UNAVAILABLE_EXTRA_NAMES[_ext] = _typescript_mod.EXTRA_NAME
+
+# Java - only register if ``tree-sitter-java`` is installed (i.e. the
+# ``[java]`` or ``[all]`` extra was selected). Spring Boot support is
+# *not* a separate registration; it's a framework preset on top of the
+# Java language definition, configured via ``[tool.safelint.java] framework``.
+if _java_mod._GRAMMAR_AVAILABLE:
+    for _ext in JAVA.file_extensions:
+        _REGISTRY[_ext] = JAVA
+else:
+    for _ext in JAVA.file_extensions:
+        _UNAVAILABLE_EXTENSIONS[_ext] = _java_mod.GRAMMAR_INSTALL_HINT
+        _UNAVAILABLE_EXTRA_NAMES[_ext] = _java_mod.EXTRA_NAME
 
 
 def get_language_for_file(filepath: str) -> LanguageDefinition | None:
@@ -139,6 +153,7 @@ def extra_name_for(extension: str) -> str | None:
 
 
 __all__ = [
+    "JAVA",
     "JAVASCRIPT",
     "PYTHON",
     "TSX",

@@ -2491,3 +2491,30 @@ def test_test_coupling_handles_relative_changed_files_against_absolute_test_dirs
     # under the absolute ``test_dirs`` entry - coupling satisfied,
     # SAFE702 must NOT fire.
     assert not any(v.rule == "test_coupling" for v in violations)
+
+
+def test_safe701_does_not_treat_test_prefixed_java_production_as_test(tmp_path: Path) -> None:
+    """``src/main/java/TestDataFactory.java`` is NOT a test file.
+
+    Pre-fix, the SAFE701 helper treated any Java stem starting with
+    ``Test`` as a test file regardless of path. Production classes
+    like ``TestDataFactory.java`` / ``TestConfig.java`` under
+    ``src/main/java/`` then got silently skipped from coverage
+    enforcement. Test passes an absolute ``test_dirs`` entry so the
+    path-component matcher works against tmp_path-rooted paths.
+    """
+    from safelint.rules.test_coverage import _is_test_file  # noqa: PLC0415
+
+    main_path = tmp_path / "src" / "main" / "java" / "TestDataFactory.java"
+    main_path.parent.mkdir(parents=True)
+    main_path.write_text("class TestDataFactory {}\n")
+    # Not in test_dirs → must NOT be treated as a test file.
+    test_dirs = [str(tmp_path / "src" / "test" / "java")]
+    assert _is_test_file(str(main_path), test_dirs, "java") is False
+
+    # When the same name lives under src/test/java, the path-component
+    # check matches and it IS treated as a test.
+    test_path = tmp_path / "src" / "test" / "java" / "TestDataFactory.java"
+    test_path.parent.mkdir(parents=True)
+    test_path.write_text("class TestDataFactory {}\n")
+    assert _is_test_file(str(test_path), test_dirs, "java") is True

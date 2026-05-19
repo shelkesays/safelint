@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
+from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
@@ -21,10 +22,13 @@ from safelint.rules.base import BaseRule, Suggestion, TextEdit
 # Per-language: which Tree-sitter node types are "the catch handler clause".
 # Python: ``except_clause`` (a child of ``try_statement``).
 # JavaScript: ``catch_clause`` (also a child of ``try_statement``).
+# Java: ``catch_clause`` (same node name; same shape as JS apart from the
+# typed-binding requirement that the language enforces upstream).
 _CATCH_CLAUSE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({EXCEPT_CLAUSE}),
     "javascript": frozenset({"catch_clause"}),
     "typescript": frozenset({"catch_clause"}),
+    "java": frozenset({"catch_clause"}),
 }
 
 # Per-language: function-defining node types (used to skip nested
@@ -35,15 +39,18 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
+    "java": _JAVA_FUNCTION_TYPES,
 }
 
-# Per-language: re-raise statement types. ``except: raise`` (Python) and
-# ``catch (e) { throw; }`` (JavaScript) both pass the error up the
-# stack, which the logging-on-error rule treats as legitimate handling.
+# Per-language: re-raise statement types. ``except: raise`` (Python),
+# ``catch (e) { throw e; }`` (JavaScript), and ``catch (E e) { throw e; }``
+# (Java) all pass the error up the stack, which the logging-on-error
+# rule treats as legitimate handling.
 _RERAISE_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({RAISE_STATEMENT}),
     "javascript": frozenset({"throw_statement"}),
     "typescript": frozenset({"throw_statement"}),
+    "java": frozenset({"throw_statement"}),
 }
 
 # Statement-only no-op nodes: their presence means "developer wrote something
@@ -51,11 +58,21 @@ _RERAISE_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # Python: ``pass`` / ``continue`` (continue inside an except is rare but
 # valid mid-loop). JavaScript: ``empty_statement`` (the bare ``;``);
 # ``continue`` is a continue_statement that's only valid in loops, so it's
-# unlikely to appear inside catch.
+# unlikely to appear inside catch. Java: tree-sitter-java emits ``line_comment``
+# and ``block_comment`` as *named* children of a block (unlike JS where
+# comments are extras), so a Java catch body containing only a ``// todo``
+# would have a single named child of comment type. Counting comments as
+# no-op statements lets ``catch (Throwable t) { /* todo */ }`` match the
+# empty-handler intent the way ``catch (Throwable t) {}`` already does.
 _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({"pass_statement", "continue_statement"}),
     "javascript": frozenset({"empty_statement"}),
     "typescript": frozenset({"empty_statement"}),
+    # Java accepts bare semicolons (``catch (Exception e) { ; }``) as
+    # empty statements, same as JS. ``line_comment`` / ``block_comment``
+    # cover comment-only bodies (tree-sitter-java emits comments as
+    # named block children, unlike JS where they're extras).
+    "java": frozenset({"empty_statement", "line_comment", "block_comment"}),
 }
 
 # Per-language: literal expression node types that count as "comment-like"
@@ -64,6 +81,8 @@ _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # Python ``string`` is handled separately via :func:`_is_string_literal_expression`
 # to distinguish plain strings from f-strings; JS template strings carry
 # similar interpolation risk so are also delegated to the helper.
+# Java ``string_literal`` is delegated too (Java 21+ string templates carry
+# the same interpolation hazard as JS template strings).
 _JS_LITERAL_EXPR_TYPES = frozenset(
     {
         "number",
@@ -71,6 +90,20 @@ _JS_LITERAL_EXPR_TYPES = frozenset(
         "false",
         "null",
         "undefined",
+    }
+)
+_JAVA_LITERAL_EXPR_TYPES = frozenset(
+    {
+        "decimal_integer_literal",
+        "hex_integer_literal",
+        "octal_integer_literal",
+        "binary_integer_literal",
+        "decimal_floating_point_literal",
+        "hex_floating_point_literal",
+        "true",
+        "false",
+        "null_literal",
+        "character_literal",
     }
 )
 _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
@@ -87,11 +120,12 @@ _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     ),
     "javascript": _JS_LITERAL_EXPR_TYPES,
     "typescript": _JS_LITERAL_EXPR_TYPES,
+    "java": _JAVA_LITERAL_EXPR_TYPES,
 }
 
 
 def _is_noop_body(body_node: tree_sitter.Node | None, lang_name: str) -> bool:
-    """Return True if *body_node* contains only no-op statements.
+    r"""Return True if *body_node* contains only no-op statements.
 
     Catches (varying by language):
 
@@ -104,18 +138,28 @@ def _is_noop_body(body_node: tree_sitter.Node | None, lang_name: str) -> bool:
     * Empty body / no statements at all                  (defensive - shouldn't
       happen with valid Tree-sitter output but kept for safety)
 
-    Bodies with multiple statements never match - even if every statement is
-    a literal, two literals signal *some* intentional structure (rare edge
-    case, but preferable to false positives).
+    Multi-statement Java bodies are accepted when **every** statement
+    is a no-op (the all-comments-are-no-op case). tree-sitter-java emits
+    each comment as a named child of the block, so
+    ``catch (Exception e) { // a\n // b\n }`` has two named children
+    (both ``line_comment``). Without the all-no-op variant, that body
+    falls through with False.
 
-    Comments inside the body don't affect the result because Tree-sitter
-    treats comments as separate nodes outside the block.
+    Multi-statement Python / JS / TS bodies are NOT accepted even when
+    every statement is a no-op: two no-op statements there signal some
+    intentional structure (``except: "log msg"; pass`` etc.), and the
+    rule prefers a false negative to flagging legitimate-looking code.
+    Python / JS / TS comments live OUTSIDE the block node in Tree-sitter,
+    so the "multiple comments" scenario doesn't arise for them.
     """
     if body_node is None or not body_node.named_children:
         return True
-    if len(body_node.named_children) != 1:
+    children = body_node.named_children
+    if lang_name == "java":
+        return all(_stmt_is_noop(child, lang_name) for child in children)
+    if len(children) != 1:
         return False
-    return _stmt_is_noop(body_node.named_children[0], lang_name)
+    return _stmt_is_noop(children[0], lang_name)
 
 
 def _stmt_is_noop(stmt: tree_sitter.Node, lang_name: str) -> bool:
@@ -133,38 +177,94 @@ def _stmt_is_noop(stmt: tree_sitter.Node, lang_name: str) -> bool:
     return _is_string_literal_expression(inner, lang_name)
 
 
+def _python_string_is_literal(node: tree_sitter.Node) -> bool:
+    """Return True for a Python ``string`` node with no interpolation."""
+    return node.type == "string" and all(child.type != "interpolation" for child in node.named_children) and bool(node_text(node))
+
+
+def _js_string_is_literal(node: tree_sitter.Node) -> bool:
+    """Return True for a JS / TS ``string`` or ``template_string`` with no interpolation."""
+    if node.type not in ("string", "template_string"):
+        return False
+    return all(child.type != "template_substitution" for child in node.named_children) and bool(node_text(node))
+
+
+def _java_string_is_literal(node: tree_sitter.Node) -> bool:
+    """Return True for a Java ``string_literal`` with no nested template markers.
+
+    Java 21 preview / final string templates introduce interpolation as
+    nested ``string_fragment`` / template marker shapes. Plain literals
+    have only string-content children (anonymous tokens, not named),
+    so a ``string_literal`` with no named children is a plain literal.
+    """
+    return node.type == "string_literal" and not node.named_children and bool(node_text(node))
+
+
+_STRING_LITERAL_PREDICATES: dict[str, Callable[[tree_sitter.Node], bool]] = {
+    "python": _python_string_is_literal,
+    "javascript": _js_string_is_literal,
+    "typescript": _js_string_is_literal,
+    "java": _java_string_is_literal,
+}
+
+
 def _is_string_literal_expression(node: tree_sitter.Node, lang_name: str) -> bool:
     """Return True for plain string / template-string literals serving as no-op markers.
 
-    Python ``string`` and JavaScript ``string`` are interpolation-capable;
-    we conservatively treat strings containing interpolation as
-    non-empty (an interpolated value is a real expression with potential
-    side effects). Plain literal strings used as a "TODO" comment are
-    treated as no-ops. JavaScript template strings (backtick-quoted) follow
-    the same rule.
+    Python / JavaScript / Java strings can all contain interpolation
+    forms (Python f-strings, JS template literals, Java 21+ string
+    templates); the per-language helpers above conservatively treat
+    those as non-empty. Plain literal strings used as a "TODO" comment
+    are treated as no-ops. Languages not in the dispatch table return
+    False (unrecognised language).
     """
-    if lang_name == "python":
-        if node.type != "string":
-            return False
-        # Pure string literals (no f-string interpolation) have only string-content
-        # children. f-strings include ``interpolation`` nodes - those carry side
-        # effects so we don't treat them as no-ops.
-        return all(child.type != "interpolation" for child in node.named_children) and bool(node_text(node))
-    if lang_name in ("javascript", "typescript"):
-        if node.type not in ("string", "template_string"):
-            return False
-        # ``template_string`` may contain ``template_substitution`` children
-        # (the ``${expr}`` interpolation form) - treat those as non-empty.
-        return all(child.type != "template_substitution" for child in node.named_children) and bool(node_text(node))
-    return False
+    predicate = _STRING_LITERAL_PREDICATES.get(lang_name)
+    return predicate(node) if predicate is not None else False
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterator
+    from collections.abc import Callable, Iterator
 
     import tree_sitter
 
     from safelint.rules.base import Violation
+
+
+def _java_catch_formal_parameter(catch_node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the ``catch_formal_parameter`` child of a Java ``catch_clause``, or None."""
+    return next((c for c in catch_node.named_children if c.type == "catch_formal_parameter"), None)
+
+
+def _caught_binding_name(catch_node: tree_sitter.Node, lang_name: str) -> str | None:
+    """Return the variable name bound by the catch clause, or None if there isn't one.
+
+    * JavaScript / TypeScript: ``catch (e)`` exposes the binding directly
+      via the ``parameter`` field on ``catch_clause``. ``catch {}``
+      (optional-binding form, ES2019+) has no parameter and returns None.
+    * Java: ``catch (Type e)`` exposes the binding via the ``name`` field
+      of a ``catch_formal_parameter`` named child of ``catch_clause``.
+      Multi-catch ``catch (A | B e)`` follows the same shape - only the
+      variable name is needed for the re-raise comparison.
+
+    Returns the raw identifier text (e.g. ``"e"``) ready for the caller
+    to compare against the body's ``throw e;`` argument. ``call_name``
+    style normalisation is not appropriate here - exact byte equality
+    is the contract.
+    """
+    if lang_name in ("javascript", "typescript"):
+        param_node = catch_node.child_by_field_name("parameter")
+        if param_node is None or param_node.type != "identifier":
+            return None
+        return node_text(param_node)
+    if lang_name != "java":
+        return None
+    formal = _java_catch_formal_parameter(catch_node)
+    if formal is None:
+        return None
+    name_node = formal.child_by_field_name("name")
+    if name_node is None or name_node.type != "identifier":
+        return None
+    return node_text(name_node)
 
 
 def _iter_catch_clauses(tree: tree_sitter.Tree, lang_name: str) -> Iterator[tree_sitter.Node]:
@@ -274,15 +374,15 @@ class EmptyExceptRule(BaseRule):
 
     name = "empty_except"
     code = "SAFE202"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every catch handler whose body is effectively empty."""
         lang_name = resolve_lang_name(filepath)
         # Match the violation message to the source language's terminology -
-        # JavaScript developers don't write ``except`` blocks. Same
-        # Python/JS message-selection pattern as ``LoggingOnErrorRule``.
-        message = "Empty catch block - add error handling or a logging call" if lang_name in ("javascript", "typescript") else "Empty except block - add error handling or a logging call"
+        # JavaScript / Java developers don't write ``except`` blocks. Same
+        # message-selection pattern as ``LoggingOnErrorRule``.
+        message = "Empty catch block - add error handling or a logging call" if lang_name in ("javascript", "typescript", "java") else "Empty except block - add error handling or a logging call"
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if _is_noop_body(_catch_body(clause), lang_name)]
 
 
@@ -296,16 +396,18 @@ class LoggingOnErrorRule(BaseRule):
 
     name = "logging_on_error"
     code = "SAFE203"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     # Union of method names treated as "logging" across registered
     # languages. Python stdlib ``logging`` exposes ``debug`` / ``info`` /
     # ``warning`` / ``error`` / ``exception`` / ``critical``; JavaScript's
     # ``console`` exposes ``log`` / ``error`` / ``warn`` / ``info`` /
-    # ``debug`` / ``trace``. ``call_name`` already strips the receiver
+    # ``debug`` / ``trace``; Java's SLF4J / log4j / java.util.logging
+    # adds ``severe`` / ``fine`` / ``finer`` / ``finest`` for the JUL
+    # severity levels (the other JUL levels overlap with names already
+    # listed). ``call_name`` already strips the receiver
     # (``logger.error()`` and ``console.error()`` both resolve to
-    # ``"error"``) so a single set covers both languages without
-    # ambiguity.
+    # ``"error"``) so a single set covers every language without ambiguity.
     _LOG_METHODS = frozenset(
         {
             # Python stdlib logging.
@@ -319,6 +421,12 @@ class LoggingOnErrorRule(BaseRule):
             "log",
             "warn",
             "trace",
+            # Java java.util.logging severity-level methods (SLF4J / log4j
+            # share names with the JS / Python set above).
+            "severe",
+            "fine",
+            "finer",
+            "finest",
         }
     )
 
@@ -338,6 +446,15 @@ class LoggingOnErrorRule(BaseRule):
         of the caught value at all, so any throw there requires
         logging. ``throw new Error(...)`` / ``throw {code: 1}`` etc.
         construct fresh values and are always non-re-raises.
+
+        Java: ``throw <caught-binding>;`` where ``<caught-binding>`` is
+        the variable name from the ``catch (Type e)`` clause's
+        ``catch_formal_parameter``. Same semantics as JS, except the
+        parameter lives inside a ``catch_formal_parameter`` child (with
+        a ``name`` field) rather than directly under the catch clause.
+        Multi-catch ``catch (A | B e)`` follows the same shape, the
+        binding is one identifier regardless of how many types are
+        listed.
         """
         body_node = _catch_body(except_node)
         # Defensive - ``_catch_body`` only returns None for malformed AST
@@ -352,17 +469,17 @@ class LoggingOnErrorRule(BaseRule):
         if lang_name == "python":
             # Bare ``raise`` has no children.
             return not children
-        # JavaScript: ``throw <identifier>;`` only counts as a re-raise
+        # JS / TS / Java: ``throw <identifier>;`` only counts as a re-raise
         # when ``<identifier>`` is the exact name bound by the
         # ``catch`` clause. Without a caught binding (``catch {}``)
         # there is no name to re-raise, so any throw there is a fresh
         # error and the rule still requires logging.
         if len(children) != 1 or children[0].type != "identifier":
             return False
-        param_node = except_node.child_by_field_name("parameter")
-        if param_node is None or param_node.type != "identifier":
+        param_text = _caught_binding_name(except_node, lang_name)
+        if param_text is None:
             return False
-        return node_text(children[0]) == node_text(param_node)
+        return node_text(children[0]) == param_text
 
     def _has_log_call(self, except_node: tree_sitter.Node, function_types: frozenset[str]) -> bool:
         """Return True when the handler body contains at least one logging call.
@@ -392,10 +509,15 @@ class LoggingOnErrorRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         # Same language-specific terminology as ``EmptyExceptRule.check_file``
-        # - JavaScript developers write ``catch``, not ``except``.
+        # - JavaScript / TypeScript / Java developers write ``catch``,
+        # not ``except``. Keeping the Python wording for non-Python
+        # languages reads as a stale Python-only message and confuses
+        # Java users in particular (Java's catch-clause is far enough
+        # from Python's except-clause that the wording mismatch is
+        # immediately visible).
         message = (
             "Catch block missing logging call - errors must be logged before being swallowed"
-            if lang_name in ("javascript", "typescript")
+            if lang_name in ("javascript", "typescript", "java")
             else "Except block missing logging call - errors must be logged before being swallowed"
         )
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if self._is_unlogged(clause, lang_name, function_types)]

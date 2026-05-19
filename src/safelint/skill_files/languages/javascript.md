@@ -22,7 +22,7 @@ For pre-commit integration, the published hook accepts JavaScript via the `javas
 
 ```yaml
 - repo: https://github.com/shelkesays/safelint
-  rev: v2.0.0  # pin to a release (use the GA tag once v2.0.0 ships)
+  rev: v2.1.0rc1  # pin to a release (use a recent tag; v2.1.0rc1 also unlocks the Java extra if you later add .java files)
   hooks:
     - id: safelint
       additional_dependencies: ['safelint[javascript]']
@@ -67,7 +67,7 @@ result = eval(userInput);  // nosafe: SAFE801
 
 ## Rules ported to JavaScript
 
-18 of safelint's 20 user-facing rules now lint JavaScript, the 17 cross-language rules plus SAFE305 (`wide_scope_declaration`, JavaScript-only). The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here remain Python-only by design, see *Rules that stay Python-only* below.
+18 of safelint's 24 user-facing rules lint JavaScript: the 16 cross-language rules (Python / JS / TS / Java) plus SAFE302 (`global_mutation`, Python / JS / TS only, not ported to Java yet) plus SAFE305 (`wide_scope_declaration`, JavaScript-family only). The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here remain Python-only (SAFE201, SAFE301) or Java + Spring Boot only (SAFE901-904), see *Rules that stay Python-only* below.
 
 | Code | Rule | JavaScript-specific notes |
 |---|---|---|

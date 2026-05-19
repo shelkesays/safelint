@@ -145,6 +145,11 @@ DEFAULTS: dict[str, Any] = {
             "tainted_sink",
             "return_value_ignored",
             "null_dereference",
+            # Spring Boot framework-aware rules (SAFE9xx, Java-only)
+            "spring_field_injection",
+            "spring_missing_transactional",
+            "spring_unvalidated_input",
+            "spring_async_checked_exception",
         ],
     },
     "rules": {
@@ -180,11 +185,11 @@ DEFAULTS: dict[str, Any] = {
         "side_effects_hidden": {
             "enabled": True,
             "severity": "error",
-            # Per-language I/O primitive lists. Adding both keys here
-            # rather than a single shared list avoids Python false
-            # positives on calls like ``logger.error()`` (where
-            # ``call_name`` returns ``"error"``) - the JS list is only
-            # consulted on ``.js`` / ``.mjs`` / ``.cjs`` files.
+            # Per-language I/O primitive lists. Adding separate keys per
+            # language rather than a single shared list avoids Python
+            # false positives on calls like ``logger.error()`` (where
+            # ``call_name`` returns ``"error"``) - each language's list
+            # is only consulted on its own file extensions.
             "io_functions": ["open", "print", "input", "subprocess"],
             "io_functions_javascript": [
                 "log",  # console.log
@@ -198,6 +203,50 @@ DEFAULTS: dict[str, Any] = {
                 "readFileSync",
                 "writeFileSync",
                 "open",  # fs.open
+            ],
+            "io_functions_java": [
+                # PrintStream / PrintWriter methods - ``System.out.println(...)``
+                # resolves to ``"println"`` after ``call_name`` strips the receiver.
+                # ``format`` is deliberately NOT listed: ``call_name`` returns the
+                # bare method name, so an entry would also match the pure
+                # ``String.format(...)`` / ``MessageFormat.format(...)`` / SLF4J's
+                # ``String.format``-wrapped logging calls and produce false
+                # positives. ``printf`` is unambiguous (PrintStream / PrintWriter
+                # only) so it stays in.
+                "println",
+                "print",
+                "printf",
+                # Java stdin / Scanner methods.
+                "readLine",
+                "nextLine",
+                "nextInt",
+                "next",
+                # File I/O via ``new`` - ``call_name`` on ``object_creation_expression``
+                # returns the simple class name.
+                "FileInputStream",
+                "FileOutputStream",
+                "FileReader",
+                "FileWriter",
+                "BufferedReader",
+                "BufferedWriter",
+                "Scanner",
+                "PrintWriter",
+                # java.nio.file.Files static methods.
+                "readAllBytes",
+                "readAllLines",
+                "readString",
+                "writeString",
+                "write",
+                # Network I/O. ``HttpClient`` is NOT listed: it doesn't expose
+                # a public constructor (the JDK uses static factory methods),
+                # so ``call_name`` never returns ``"HttpClient"`` for the
+                # standard ``HttpClient.newHttpClient()`` / ``newBuilder()``
+                # acquirers. The actual I/O happens through ``send`` /
+                # ``sendAsync`` on the resulting client.
+                "Socket",
+                "newHttpClient",  # HttpClient.newHttpClient() factory
+                "send",  # HttpClient.send(request, ...)
+                "sendAsync",  # HttpClient.sendAsync(request, ...)
             ],
             "pure_prefixes": [
                 "calculate",
@@ -235,6 +284,22 @@ DEFAULTS: dict[str, Any] = {
                 "writeFile",
                 "readFileSync",
                 "writeFileSync",
+            ],
+            "io_functions_java": [
+                "println",
+                "print",
+                "printf",
+                "readLine",
+                "nextLine",
+                "FileInputStream",
+                "FileOutputStream",
+                "FileReader",
+                "FileWriter",
+                "Scanner",
+                "readAllBytes",
+                "readAllLines",
+                "writeString",
+                "write",
             ],
             "io_name_keywords": [
                 "print",
@@ -321,6 +386,38 @@ DEFAULTS: dict[str, Any] = {
                 "expect",  # Jest, Chai (when used via expect()), Vitest's vi.expect
                 "should",  # Should.js
             ],
+            # Java assertion-method names. Java has the built-in ``assert``
+            # keyword (handled directly by the rule, no config needed for
+            # that path), AND in test code uses JUnit / AssertJ / Hamcrest
+            # method-call assertions. The list below covers JUnit 5
+            # (``Assertions.*``), JUnit 4 (``Assert.*``), AssertJ
+            # (``assertThat``), Hamcrest (``assertThat`` again), and the
+            # ``fail(...)`` short form. ``call_name`` strips the receiver
+            # (``Assertions.assertEquals`` resolves to ``"assertEquals"``).
+            "assertion_calls_java": [
+                # JUnit 5 Assertions
+                "assertEquals",
+                "assertNotEquals",
+                "assertTrue",
+                "assertFalse",
+                "assertNull",
+                "assertNotNull",
+                "assertSame",
+                "assertNotSame",
+                "assertArrayEquals",
+                "assertIterableEquals",
+                "assertLinesMatch",
+                "assertThrows",
+                "assertDoesNotThrow",
+                "assertAll",
+                "assertTimeout",
+                "assertTimeoutPreemptively",
+                "assertInstanceOf",
+                # AssertJ / Hamcrest entry point
+                "assertThat",
+                # Common short forms
+                "fail",
+            ],
         },
         "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
         "test_coupling": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
@@ -378,6 +475,91 @@ DEFAULTS: dict[str, Any] = {
                 "stdin",  # process.stdin
                 "input",  # generic input wrappers
             ],
+            # Java stdlib sink / sanitizer / source lists. Spring Boot adds
+            # ``executeQuery`` etc. via the ``framework = "spring-boot"`` preset.
+            "sinks_java": [
+                # Runtime / process execution.
+                "exec",  # Runtime.getRuntime().exec(...)
+                "getRuntime",  # caller usually chains ``.exec(...)`` next
+                "ProcessBuilder",  # ``new ProcessBuilder(tainted)``
+                "loadLibrary",  # System.loadLibrary, Runtime.loadLibrary
+                "load",  # System.load
+                # Reflection - arbitrary class / method invocation by name
+                # is a code-execution sink when ``name`` is user-controlled.
+                "forName",  # Class.forName(tainted)
+                "invoke",  # Method.invoke(receiver, tainted)
+                "newInstance",  # Class.newInstance, Constructor.newInstance
+                # Script engines (JSR 223) - executes arbitrary script source.
+                "eval",  # ScriptEngine.eval
+                # JDBC raw SQL execution. ``executeQuery`` / ``execute`` /
+                # ``executeUpdate`` are sinks when the SQL string is built
+                # from user input. ``PreparedStatement`` users would
+                # parametrise these calls; raw ``Statement`` users
+                # concatenate, which is the hazard.
+                "executeQuery",
+                "execute",
+                "executeUpdate",
+                "executeLargeUpdate",
+                # URL fetch with attacker-controlled host - SSRF surface.
+                "openConnection",  # URL.openConnection
+                "openStream",  # URL.openStream
+            ],
+            "sanitizers_java": [
+                # IMPORTANT: SAFE801 has a SINGLE shared ``sanitizers_java``
+                # set that clears taint for every sink type (SQL,
+                # reflection, shell, SSRF). Context-specific encoders
+                # are deliberately NOT in the defaults:
+                #
+                # * HTML / XML encoders (OWASP ``forHtml`` / ``forXml`` /
+                #   ``forJavaScript`` / ``forCssString``, Apache Commons
+                #   ``escapeHtml*`` / ``escapeXml``, Spring ``htmlEscape``)
+                #   - safe only for HTML output, NOT for SQL / shell /
+                #   reflection. Including them would suppress real SAFE801
+                #   findings like ``jdbc.query(... + forHtml(input))``.
+                #
+                # * URL encoders (``encode`` / ``encodeURIComponent``) -
+                #   safe only for URL contexts. URL-encoding input before
+                #   concatenating into SQL or shell would suppress those
+                #   warnings even though URL encoding doesn't quote SQL
+                #   metacharacters or shell metacharacters.
+                #
+                # Defaults below are limited to names that imply
+                # *validation* (not encoding) or project-level
+                # *wrappers* whose semantics are typically generic.
+                # Even ``sanitize`` / ``quote`` are ambiguous in
+                # principle (OWASP ``HtmlPolicyBuilder.sanitize`` is
+                # HTML-only, SQL ``quote`` is SQL-only) - they're kept
+                # in defaults because they're more commonly used as
+                # project-level generic wrappers than as exact library
+                # call sites. Projects with strict requirements should
+                # configure ``[tool.safelint.rules.tainted_sink]
+                # sanitizers_java`` explicitly, and a category-aware
+                # sanitiser framework is on the v3.x roadmap.
+                "sanitize",  # OWASP HtmlPolicyBuilder + generic wrappers
+                "validate",  # generic input validators (idiomatic name)
+                "quote",  # SQL / shell quoting helpers + generic wrappers
+                "escape",  # generic; project-level wrappers + Apache Commons
+            ],
+            "sources_java": [
+                # System / env sources.
+                "getenv",  # System.getenv(name)
+                "getProperty",  # System.getProperty - configurable, often user
+                # Console / Scanner / BufferedReader stdin.
+                "readLine",
+                "nextLine",
+                "next",
+                "nextInt",
+                # Servlet API - HttpServletRequest user-input methods.
+                "getParameter",
+                "getParameterValues",
+                "getHeader",
+                "getHeaders",
+                "getQueryString",
+                "getCookies",
+                "getPathInfo",
+                "getRequestURI",
+                "getRemoteUser",
+            ],
         },
         "return_value_ignored": {
             "enabled": False,
@@ -427,6 +609,50 @@ DEFAULTS: dict[str, Any] = {
                 "spawn",
                 "spawnSync",
             ],
+            # Java methods whose return value carries success / failure
+            # information. ``File.delete()`` / ``.mkdir()`` / ``.renameTo()``
+            # return ``boolean`` (false on failure); ignoring them silently
+            # swallows the failure. ``String`` / ``BigDecimal`` / etc. are
+            # immutable - calling a mutator without using the result is a
+            # common no-op bug.
+            "flagged_calls_java": [
+                # java.io.File: boolean-returning mutators
+                "delete",
+                "mkdir",
+                "mkdirs",
+                "renameTo",
+                "setLastModified",
+                "setReadOnly",
+                "setWritable",
+                "setReadable",
+                "setExecutable",
+                "createNewFile",
+                # String immutables - ignoring the result is always a bug
+                "trim",
+                "strip",
+                "toUpperCase",
+                "toLowerCase",
+                "replace",
+                "replaceAll",
+                "replaceFirst",
+                "substring",
+                "concat",
+                "intern",
+                # BigDecimal / BigInteger immutables
+                "add",
+                "subtract",
+                "multiply",
+                "divide",
+                "remainder",
+                "negate",
+                "abs",
+                # Futures: ignoring ``cancel()`` discards the success
+                # boolean. ``get()`` is deliberately NOT listed because
+                # ``get`` collides with ``Map.get``, ``Optional.get``,
+                # and many getter-style methods where discarding the
+                # return value is the normal pattern.
+                "cancel",
+            ],
         },
         "null_dereference": {
             "enabled": False,
@@ -449,7 +675,43 @@ DEFAULTS: dict[str, Any] = {
                 "match",
                 "closest",
             ],
+            # Java's null-returning stdlib methods. Conservative defaults
+            # covering the most common SAFE803 hazards in vanilla Java;
+            # the Spring Boot preset adds ``find`` (EntityManager.find),
+            # ``findById`` (when not using the Optional-returning
+            # CrudRepository), and the Spring-cache pattern.
+            "nullable_methods_java": [
+                "get",  # Map.get(missing-key) returns null; Properties.get likewise
+                "getOrDefault",  # returns default only when *value* is null, hazardous chain target
+                "remove",  # Map.remove returns the previous value, null if absent
+                "put",  # Map.put returns the previous value, null if no previous
+                "putIfAbsent",  # null when binding succeeded (counterintuitive)
+                # Servlet API - HttpServletRequest reads.
+                "getParameter",
+                "getHeader",
+                "getCookie",
+                "getAttribute",
+                "getSession",  # may return null when ``create=false``
+                # java.util.Properties / System
+                "getProperty",
+                # Reflection - many methods return null when not found.
+                "getAnnotation",
+                "getDeclaredAnnotation",
+                "getEnclosingClass",
+                "getEnclosingMethod",
+                # Stream.findFirst / findAny return Optional, not null - so
+                # NOT listed here. peek / orElse / orElseGet similarly fine.
+            ],
         },
+        # Spring Boot framework-aware rules (SAFE9xx band). Java-only.
+        # Default-disabled under the vanilla preset so non-Spring users
+        # see no behaviour change; the ``[tool.safelint.java] framework
+        # = "spring-boot"`` preset flips ``enabled`` to True for the
+        # whole set via ``_JAVA_FRAMEWORK_PRESETS["spring-boot"]``.
+        "spring_field_injection": {"enabled": False, "severity": "warning"},
+        "spring_missing_transactional": {"enabled": False, "severity": "error"},
+        "spring_unvalidated_input": {"enabled": False, "severity": "error"},
+        "spring_async_checked_exception": {"enabled": False, "severity": "warning"},
     },
 }
 
@@ -827,6 +1089,265 @@ def _apply_javascript_runtime_preset(defaults: dict[str, Any], runtime: str) -> 
             target[key] = copy.deepcopy(value)
 
 
+# ---------------------------------------------------------------------------
+# Java framework presets
+# ---------------------------------------------------------------------------
+#
+# Same architectural shape as ``_JS_RUNTIME_PRESETS`` above but selected via
+# ``[tool.safelint.java] framework = "..."`` in TOML. The current presets:
+#
+#   * ``vanilla`` (default) - pure-Java stdlib defaults; the lists baked
+#     into ``DEFAULTS["rules"]`` already encode this preset, so the entry
+#     is empty.
+#   * ``spring-boot`` - augments the vanilla defaults with Spring-aware
+#     sinks (``JdbcTemplate``'s ``query`` / ``queryForObject`` / ``queryForList``
+#     / ``queryForMap`` / ``queryForRowSet`` / ``batchUpdate``,
+#     ``RestTemplate``'s ``getForObject`` / ``getForEntity`` / ``postForObject``
+#     / ``postForEntity`` / ``postForLocation`` / ``patchForObject`` for SSRF;
+#     bare ``put`` / ``delete`` / ``update`` / ``exchange`` are deliberately
+#     NOT in the preset because they collide with HashMap / File / project
+#     helpers under SAFE801's single-set design - users who specifically
+#     want them can opt in via TOML) and nullable methods
+#     (``queryForObject``: zero-rows raises ``EmptyResultDataAccessException``
+#     rather than returning null, but RowMapper implementations and
+#     nullable column values can still produce a null result, so the
+#     conservative treatment applies).
+#
+# Source-language analysis is identical across frameworks - same parser,
+# same AST walks, same per-rule logic. Only the *defaults* shift, so a
+# user explicitly setting ``sinks_java = [...]`` in their TOML still
+# wins over the preset.
+#
+# Adding a framework: add an entry below with the same nested shape as
+# ``DEFAULTS["rules"]`` (only the keys you want to override). Adding a
+# new language whose framework varies similarly follows the same pattern
+# with a ``[tool.safelint.<lang>] framework`` selector.
+
+_JAVA_VALID_FRAMEWORKS: frozenset[str] = frozenset({"vanilla", "spring-boot"})
+
+_JAVA_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
+    # ``vanilla`` is the baseline - equal to DEFAULTS, so the preset is
+    # empty. Listed so unknown-framework validation can compare against
+    # the full set of accepted names.
+    "vanilla": {},
+    # ``spring-boot`` - the Spring Web / Spring Data / Spring JDBC
+    # ecosystem. The vanilla Java sinks / sources already cover the
+    # Servlet API (which Spring MVC uses underneath); the preset adds
+    # the framework-level abstractions that sit on top:
+    #
+    #   * ``JdbcTemplate`` - the raw-SQL escape hatch. ``query`` /
+    #     ``queryForObject`` / ``queryForList`` / ``update`` /
+    #     ``batchUpdate`` all take a SQL string the application code
+    #     typically concatenates. Treated as sinks for SAFE801.
+    #   * ``RestTemplate`` / ``WebClient`` - outbound HTTP. SSRF
+    #     surface when the URL is built from user input. ``exchange``
+    #     / ``getForObject`` / ``getForEntity`` / ``postForObject`` /
+    #     ``postForEntity`` / ``put`` / ``delete`` cover the canonical
+    #     methods.
+    #   * ``queryForObject`` raises ``EmptyResultDataAccessException``
+    #     when zero rows match; nullable results come from RowMapper
+    #     implementations and nullable column values, which is why
+    #     the method is included in ``nullable_methods_java``. The
+    #     Optional-returning alternatives ``JdbcClient.findOne`` /
+    #     ``JdbcClient.findFirst`` were added in Spring 6.1 for
+    #     unambiguous null-or-present access in newer code.
+    #
+    # The preset deliberately does NOT touch:
+    #
+    #   * SAFE304 ``side_effects`` - exempting ``@Bean`` factory methods
+    #     from the I/O warning would require annotation-aware rule
+    #     logic the preset can't express through default overrides.
+    #     Users with noisy SAFE304 hits on factory methods can
+    #     suppress via ``// nosafe: SAFE304`` (Java's comment prefix)
+    #     until a future ``skip_functions_annotated_with`` knob lands.
+    #   * SAFE401 ``resource_lifecycle`` - Spring-managed resources
+    #     (``JdbcTemplate``-borrowed connections) are typically not
+    #     held in user code at all, so the vanilla tracked-function
+    #     list doesn't fire on them. Raw ``DriverManager.getConnection``
+    #     still fires (correctly) regardless of Spring presence.
+    #   * SAFE203 ``logging_on_error`` - SLF4J / Log4j method names
+    #     (``error`` / ``warn`` / ``info`` / ``debug`` / ``trace``)
+    #     are already in the universal logger-method set.
+    "spring-boot": {
+        "rules": {
+            "tainted_sink": {
+                # Spring sinks layered on top of vanilla Java's stdlib
+                # set. The vanilla list (``exec``, ``executeQuery``, ...)
+                # also fires because the preset REPLACES rather than
+                # extends; we include both vanilla and Spring-specific
+                # entries here so the preset is self-contained. Users
+                # who configure ``[tool.safelint.rules.tainted_sink]
+                # sinks_java = [...]`` in TOML still win - their
+                # explicit list overrides the preset.
+                "sinks_java": [
+                    # Vanilla Java sinks (mirrored from DEFAULTS so the
+                    # preset is a complete replacement, not a partial
+                    # one. Keep these in sync with the vanilla list
+                    # above; a drift-detection test in tests/core/
+                    # test_java_framework_presets.py guards against
+                    # divergence.)
+                    "exec",
+                    "getRuntime",
+                    "ProcessBuilder",
+                    "loadLibrary",
+                    "load",
+                    "forName",
+                    "invoke",
+                    "newInstance",
+                    "eval",
+                    "executeQuery",
+                    "execute",
+                    "executeUpdate",
+                    "executeLargeUpdate",
+                    "openConnection",
+                    "openStream",
+                    # Spring JdbcTemplate raw-SQL methods. Includes ``query``
+                    # which - despite being a common verb - is rarely a
+                    # collision (no standard Java type has a public ``query``
+                    # method in the way HashMap has ``put`` or File has
+                    # ``delete``). ``batchUpdate`` is Spring-only naming.
+                    # Bare ``update`` is deliberately NOT in defaults
+                    # because it collides with ``Hibernate.Session.update``,
+                    # Swing's ``update``, and project-local helpers; users
+                    # who want ``jdbcTemplate.update`` flagged can add
+                    # ``update`` to ``[tool.safelint.rules.tainted_sink]
+                    # sinks_java`` explicitly.
+                    "query",
+                    "queryForObject",
+                    "queryForList",
+                    "queryForMap",
+                    "queryForRowSet",
+                    "batchUpdate",
+                    # Spring NamedParameterJdbcTemplate - same names,
+                    # same risk. Already covered by the above.
+                    # Spring RestTemplate / WebClient - outbound HTTP,
+                    # SSRF surface when URL contains user input. The
+                    # ``...For{Object,Entity,Location}`` names are
+                    # unambiguous (no other API uses them). Bare
+                    # ``put`` / ``delete`` / ``exchange`` are
+                    # deliberately NOT in defaults because they collide
+                    # heavily with HashMap.put, File.delete,
+                    # CurrencyExchange.exchange, and many project-local
+                    # helpers. Users who specifically need
+                    # ``restTemplate.put`` / ``.delete`` / ``.exchange``
+                    # SSRF detection can add them via TOML; the SAFE801
+                    # rule has a single-set design without receiver-
+                    # aware matching, so flagging them globally would
+                    # create more noise than signal on typical Java
+                    # code.
+                    "getForObject",
+                    "getForEntity",
+                    "postForObject",
+                    "postForEntity",
+                    "postForLocation",
+                    "patchForObject",
+                ],
+            },
+            "null_dereference": {
+                "nullable_methods_java": [
+                    # Vanilla Java nullable methods (mirrored for the
+                    # same self-contained reason).
+                    "get",
+                    "getOrDefault",
+                    "remove",
+                    "put",
+                    "putIfAbsent",
+                    "getParameter",
+                    "getHeader",
+                    "getCookie",
+                    "getAttribute",
+                    "getSession",
+                    "getProperty",
+                    "getAnnotation",
+                    "getDeclaredAnnotation",
+                    "getEnclosingClass",
+                    "getEnclosingMethod",
+                    # Spring JdbcTemplate.queryForObject(...) raises
+                    # ``EmptyResultDataAccessException`` on zero rows;
+                    # null can still surface via RowMapper output or
+                    # nullable column values, hence the conservative
+                    # entry here. The newer ``JdbcClient.findOne``
+                    # returns Optional and is deliberately NOT listed.
+                    "queryForObject",
+                    # Spring ApplicationContext.getBean(name) throws
+                    # when missing; NOT null-returning. NOT listed.
+                ],
+            },
+            # Spring-specific structural rules (SAFE901-904) - opt-in
+            # under the vanilla preset, opt-out under spring-boot.
+            # Flipping ``enabled`` to True here is the only knob
+            # users need to get Spring-aware structural checks
+            # (the dataflow rules SAFE801 / SAFE803 are already opt-in
+            # for performance reasons and remain so under spring-boot).
+            "spring_field_injection": {"enabled": True},
+            "spring_missing_transactional": {"enabled": True},
+            "spring_unvalidated_input": {"enabled": True},
+            "spring_async_checked_exception": {"enabled": True},
+        },
+    },
+}
+
+
+def _apply_java_framework_preset(defaults: dict[str, Any], framework: str) -> None:
+    """Modify *defaults* in place to apply the Java framework preset.
+
+    No-op when the framework is ``"vanilla"`` (defaults already encode
+    that framework) or when the framework is unknown - unknown-framework
+    warnings are emitted by :func:`_resolve_java_framework` before this
+    helper runs.
+
+    The preset's nested shape mirrors ``DEFAULTS``: each key is a path
+    into ``DEFAULTS["rules"][...]``, with values that *replace* the
+    vanilla default for that rule. The user's TOML is then deep-merged
+    on top, so explicit user overrides still win.
+    """
+    preset = _JAVA_FRAMEWORK_PRESETS.get(framework)
+    if not preset:
+        return
+    import copy  # noqa: PLC0415
+
+    for rule_name, rule_overrides in preset.get("rules", {}).items():
+        target = defaults["rules"].setdefault(rule_name, {})
+        for key, value in rule_overrides.items():
+            target[key] = copy.deepcopy(value)
+
+
+def _resolve_java_framework(cfg: dict[str, Any]) -> str:
+    """Extract the Java framework selector from *cfg* (user TOML), defaulting to ``"vanilla"``.
+
+    Validates the value: unknown frameworks surface as a stderr warning
+    via :mod:`safelint.core._diagnostics` and fall back to ``"vanilla"``.
+    Type errors (non-string ``framework``) surface the same way. Mirrors
+    :func:`_resolve_javascript_runtime` exactly - same diagnostic
+    posture, same fallback shape.
+    """
+    java_section = cfg.get("java", {})
+    if not isinstance(java_section, dict):
+        from safelint.core import _diagnostics  # noqa: PLC0415
+
+        _diagnostics.print_warning(
+            f"[tool.safelint.java] must be a table, got {type(java_section).__name__} - falling back to framework='vanilla'",
+        )
+        return "vanilla"
+    framework = java_section.get("framework", "vanilla")
+    if not isinstance(framework, str):
+        from safelint.core import _diagnostics  # noqa: PLC0415
+
+        _diagnostics.print_warning(
+            f"[tool.safelint.java].framework must be a string, got {type(framework).__name__} - falling back to 'vanilla'",
+        )
+        return "vanilla"
+    if framework not in _JAVA_VALID_FRAMEWORKS:
+        from safelint.core import _diagnostics  # noqa: PLC0415
+
+        valid = ", ".join(sorted(_JAVA_VALID_FRAMEWORKS))
+        _diagnostics.print_warning(
+            f"[tool.safelint.java].framework={framework!r} is not recognised (valid: {valid}) - falling back to 'vanilla'",
+        )
+        return "vanilla"
+    return framework
+
+
 def _resolve_javascript_runtime(cfg: dict[str, Any]) -> str:
     """Extract the JS runtime selector from *cfg* (user TOML), defaulting to ``"node"``.
 
@@ -1161,5 +1682,6 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
             # preset via the deep_merge that follows.
             defaults_with_preset = copy.deepcopy(DEFAULTS)
             _apply_javascript_runtime_preset(defaults_with_preset, _resolve_javascript_runtime(cfg))
+            _apply_java_framework_preset(defaults_with_preset, _resolve_java_framework(cfg))
             return _apply_extend_keys(deep_merge(defaults_with_preset, cfg))
     return copy.deepcopy(DEFAULTS)

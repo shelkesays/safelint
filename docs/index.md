@@ -1,6 +1,6 @@
 # SafeLint
 
-> Holzmann "Power of Ten" safety lint rules for modern **Python, JavaScript, and TypeScript**, adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint) doesn't reach.
+> Holzmann "Power of Ten" safety lint rules for modern **Python, JavaScript, TypeScript, and Java** (with **Spring Boot** framework preset), adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint, SpotBugs, Checkstyle) doesn't reach.
 
 SafeLint complements your existing linters. Where ruff handles style and pylint catches general defects, SafeLint enforces a focused set of *safety* rules: the kind you'd want in code that has to be reviewable, testable, and predictably-terminating. It's a CLI, a [pre-commit hook](pre-commit.md), a JSON / SARIF emitter for editor and CI consumers, and an [AI-client skill](ai-clients/index.md) that twelve agents (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) speak.
 
@@ -11,10 +11,11 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 | **Python** | `.py`, `.pyw` | Default language; the rule set was originally designed for Python and ports unchanged. No per-runtime configuration. |
 | **JavaScript** | `.js`, `.mjs`, `.cjs` | Runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine. Per-runtime *defaults* are switchable via [`[tool.safelint.javascript] runtime = "..."`](configuration/toml.md#javascript-runtime-presets). |
 | **TypeScript** (including **AssemblyScript**) | `.ts`, `.tsx`, `.as` | Reuses the JS rule implementations end-to-end with TS-specific handling for type-only constructs (generics, `as` casts, non-null assertions, `declare global` blocks, etc.). Shares JS runtime presets since TS compiles to JS. |
+| **Java** (with **Spring Boot** framework preset) | `.java` | 16 cross-language rules port cleanly; 4 Spring-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* are switchable via [`[tool.safelint.java] framework = "..."`](languages/java.md#framework-presets). |
 
-**Rule coverage:** 17 rules apply to all three languages; 2 are Python-only (`bare_except`, `global_state`; the keywords don't exist in JS/TS) and 1 is JavaScript-family-only (`wide_scope_declaration`; `var`'s function-scoping hazard doesn't exist in Python, but applies to both `.js` and `.ts`).
+**Rule coverage:** 16 cross-language rules apply across Python / JavaScript / TypeScript / Java; 2 are Python-only (`bare_except`, `global_state`), 1 applies to Python / JS / TS but not Java (`global_mutation`; the Python `global` keyword and JS `globalThis.x = ...` patterns have no clean Java analogue; deferred to a future release), 1 is JavaScript-family-only (`wide_scope_declaration`; `var`'s function-scoping hazard doesn't exist in Python or Java), and 4 are Java + Spring Boot only (`spring_field_injection`, `spring_missing_transactional`, `spring_unvalidated_input`, `spring_async_checked_exception`).
 
-**Planned future languages** (in working-priority order, no timelines committed): Go, Rust, Java, C, C++, PHP. See the [language-coverage roadmap](configuration/rules.md#planned).
+**Planned future languages** (in working-priority order, no timelines committed): Go, Rust, C, C++, PHP. See the [language-coverage roadmap](configuration/rules.md#planned).
 
 ## Quick start
 
@@ -22,8 +23,9 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 pip install 'safelint[python]'         # adds .py, .pyw
 pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs
 pip install 'safelint[typescript]'     # adds .ts, .tsx, .as (also bundles JS)
-pip install 'safelint[all]'            # every supported language
-pip install 'safelint[python,javascript]'   # multiple extras compose
+pip install --pre 'safelint[java]==2.1.0rc1'        # adds .java (Spring Boot framework preset available; RC pin needed until v2.1.0 GA)
+pip install --pre 'safelint[all]==2.1.0rc1'         # every supported language (RC pin needed until v2.1.0 GA so [all] includes Java)
+pip install --pre 'safelint[python,java]==2.1.0rc1' # multiple extras compose (Java row needs the same RC pin)
 # uv add 'safelint[typescript]' works the same way.
 
 safelint check src/                    # lint a directory

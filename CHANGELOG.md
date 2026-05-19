@@ -7,6 +7,77 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed (Java)
+
+- **``SAFE401 resource_lifecycle``** for Java's manual ``try { ... } finally { ... }`` form is now strict: the finally clause must contain a direct ``<acquired-var>.close()`` invocation for the rule to consider the resource guarded. The previous heuristic (mirroring JS) accepted *any* try with a finally clause, so ``try { in = new FileInputStream(p); } finally { audit(); }`` silently passed even though nothing closed ``in``. Bare-expression acquirers (``try { new FileInputStream(p); } finally { ... }``) now always fire, since there's no variable handle that could ever be closed. **Helper-pattern trade-off:** ``IOUtils.closeQuietly(in)``, ``Try.run(() -> in.close())``, and similar close-via-helper patterns are NOT recognised under the new strict matcher and will fire SAFE401; switch to try-with-resources or suppress with ``// nosafe: SAFE401`` on the acquirer line. The strict path applies to Java only; JavaScript retains its documented heuristic.
+
+## [2.1.0rc1] - 2026-05-16
+
+**Java is now a supported language, with a dedicated Spring Boot framework preset.** First MINOR release after v2.0.0; ships as a release candidate so the new language can be exercised against real Spring Boot codebases before promoting to GA. Source-language analysis works on every Java file; per-project tuning happens via the new ``[tool.safelint.java] framework = "spring-boot"`` selector that adds Spring-aware taint sinks, nullable methods, and four new structural rules (``SAFE901-904``) covering common Spring Boot misuses. Python / JavaScript / TypeScript users see zero behaviour change.
+
+Install as a RC pre-release:
+
+```bash
+pip install --pre 'safelint[java]==2.1.0rc1'
+# or, for a polyglot repo:
+pip install --pre 'safelint[python,java]==2.1.0rc1'
+# or the kitchen-sink:
+pip install --pre 'safelint[all]==2.1.0rc1'
+```
+
+Pre-commit users update ``rev: v2.0.0`` to ``rev: v2.1.0rc1`` and add ``'safelint[java]==2.1.0rc1'`` to ``additional_dependencies`` (the RC pin is required until v2.1.0 GA so pre-commit's pip resolver does not fall back to v2.0.0 which lacks the ``[java]`` extra).
+
+### Added
+
+- **Java as a fully-registered language**, ``.java`` files are now parsed, walked, and dispatched through the engine the same way as Python / JavaScript / TypeScript. New ``src/safelint/languages/java.py`` exports the per-grammar node-type constants (``METHOD_DECLARATION`` / ``CONSTRUCTOR_DECLARATION`` / ``LAMBDA_EXPRESSION`` / ``CATCH_CLAUSE`` / ``TRY_WITH_RESOURCES_STATEMENT`` / ``METHOD_INVOCATION`` / ``OBJECT_CREATION_EXPRESSION`` / etc.) plus the ``JAVA`` ``LanguageDefinition``. Registered in ``src/safelint/languages/__init__.py`` with the standard available / unavailable gating - missing the ``[java]`` extra surfaces the install hint on first run, same posture as JS / TS.
+- **16 cross-language rules ported to Java**: ``SAFE101 function_length``, ``SAFE102 nesting_depth``, ``SAFE103 max_arguments``, ``SAFE104 complexity``, ``SAFE202 empty_except``, ``SAFE203 logging_on_error``, ``SAFE303 side_effects_hidden``, ``SAFE304 side_effects``, ``SAFE401 resource_lifecycle``, ``SAFE501 unbounded_loops``, ``SAFE601 missing_assertions``, ``SAFE701 test_existence``, ``SAFE702 test_coupling``, ``SAFE801 tainted_sink``, ``SAFE802 return_value_ignored``, ``SAFE803 null_dereference``. Each rule's ``language`` tuple was widened to include ``"java"`` and the per-language node-type tables grew a Java entry. Java-specific defaults shipped for the configurable rules: ``io_functions_java`` (``println`` / ``print`` / ``FileInputStream`` / ``Files.readAllBytes`` / ...), ``tracked_functions_java`` (file streams via ``new`` + ``Files`` factory methods + JDBC ``getConnection``), ``assertion_calls_java`` (JUnit 5 ``Assertions.*`` + AssertJ ``assertThat``), ``sinks_java`` / ``sources_java`` (Servlet API for sources; ``Runtime.exec`` / ``executeQuery`` / reflection / SSRF entry points for sinks) and ``sanitizers_java`` (limited to generic validators / wrappers: ``sanitize`` / ``validate`` / ``quote`` / ``escape``. Context-specific encoders are deliberately NOT in the defaults: URL encoders ``encode`` / ``encodeURIComponent`` are URL-only, Apache Commons HTML/XML escapers and Spring ``htmlEscape`` are HTML-only, and the OWASP Java Encoder API is per-context; including any of those as universal sanitizers would suppress SAFE801 on cross-context flows like ``jdbc.query("... " + encode(input))``. Users who route output through one of those encoders can opt them in via TOML), ``flagged_calls_java`` (``File`` mutators + immutable-type methods), ``nullable_methods_java`` (``Map.get`` / ``getParameter`` / ``getHeader`` / reflection getters).
+- **Java framework presets** via ``[tool.safelint.java] framework = "<name>"``, mirroring the JS runtime-presets architecture from v1.13.0. Two presets ship today:
+  - ``vanilla`` (default) - plain Java stdlib defaults; the four ``SAFE9xx`` Spring rules stay disabled. Existing v2.0.0 users picking up v2.1.0rc1 see no behaviour change unless they explicitly opt in.
+  - ``spring-boot`` - extends ``sinks_java`` with unambiguous JdbcTemplate / RestTemplate methods: ``query`` / ``queryForObject`` / ``queryForList`` / ``queryForMap`` / ``queryForRowSet`` / ``batchUpdate``, and ``getForObject`` / ``getForEntity`` / ``postForObject`` / ``postForEntity`` / ``postForLocation`` / ``patchForObject``. Bare ``put`` / ``delete`` / ``update`` / ``exchange`` are deliberately excluded because they collide with HashMap / File / project-local helpers under SAFE801's single-set design (no receiver-aware matching); users who specifically want ``restTemplate.put`` / ``.delete`` / ``.exchange`` SSRF detection or ``jdbcTemplate.update`` SQLi detection can opt in via TOML. Extends ``nullable_methods_java`` with ``queryForObject`` (RowMapper implementations and nullable column values can yield null; the zero-rows case raises ``EmptyResultDataAccessException`` instead). Enables the four ``SAFE9xx`` Spring-specific structural rules below. Source-language analysis is identical across presets - same parser, same AST walks - only the rule *defaults* shift.
+- **Four new Spring Boot framework-aware rules** (``SAFE9xx`` band, Java-only, default-disabled under vanilla, enabled by the ``spring-boot`` preset):
+  - **``SAFE901 spring_field_injection``** (warning): ``@Autowired`` on a field declaration. Spring's reference docs recommend constructor injection (immutable, testable, fail-fast on missing deps). Both bare ``@Autowired`` and fully-qualified ``@org.springframework.beans.factory.annotation.Autowired`` are recognised.
+  - **``SAFE902 spring_missing_transactional``** (error): service-layer method (``@Service`` / ``@Component`` class) doing 2+ Spring Data writes (``save`` / ``saveAll`` / ``saveAndFlush`` / ``delete`` / ``deleteAll`` / ``deleteAllInBatch`` / ``deleteAllById`` / ``deleteAllByIdInBatch`` / ``deleteById`` / ``update``) without ``@Transactional`` on the method or the class. Receiver-name guard constrains matching to receivers whose lowercased name contains ``repo`` / ``dao`` / ``jdbctemplate`` so unrelated calls like ``file.delete()`` / ``restTemplate.delete()`` don't count. Single-write methods are exempt.
+  - **``SAFE903 spring_unvalidated_input``** (error): ``@RestController`` / ``@Controller`` method parameter binds ``@RequestBody`` or ``@ModelAttribute`` without ``@Valid`` / ``@Validated``. ``@PathVariable`` and ``@RequestParam`` are deliberately NOT covered (typically bind to primitives). Complements ``SAFE801`` structurally - ``SAFE801`` catches via dataflow, ``SAFE903`` catches at the input boundary.
+  - **``SAFE904 spring_async_checked_exception``** (warning): ``@Async`` method declares a ``throws`` clause. Spring runs ``@Async`` on a separate thread and silently swallows exceptions; the caller never sees them, regardless of throws-clause declarations. Fix: catch inside the body and either swallow with logging or return ``CompletableFuture.failedFuture(...)``.
+- **``[java]`` PEP 621 extra** in ``pyproject.toml``, pulls ``tree-sitter-java>=0.23.0``. Folded into ``[all]`` alongside ``[python]`` / ``[javascript]`` / ``[typescript]``. ``pip install --pre 'safelint[java]==2.1.0rc1'`` is the typical Java-only invocation during the RC (drop ``--pre`` and the pin once v2.1.0 GA ships); polyglot Python + Java monorepos compose extras via ``'safelint[python,java]==2.1.0rc1'``.
+- **Bundled skill addendum** at ``src/safelint/skill_files/languages/java.md`` (~250 lines) shipped in the wheel so every AI client (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) consults Java-specific guidance on demand via ``safelint skill path``. Covers install nuance, framework presets, per-rule notes for all 20 applicable rules, deliberately-skipped rules with rationale, idiomatic Java + Spring fix patterns, and integration-with-existing-tooling guidance.
+- **mkdocs site page** at ``docs/languages/java.md`` mirroring the skill addendum for the user-facing site. Wired into the Languages nav between TypeScript and Configuration; the landing page (``docs/index.md``) gains a Java row in the supported-languages table.
+- **Pre-commit ``types_or`` extended** to ``[python, javascript, ts, tsx, java]`` in ``.pre-commit-hooks.yaml`` so the published hook automatically routes ``.java`` files to the engine without users needing to override the filter. The dedicated Pre-commit docs page (``docs/pre-commit.md``) and the root README gain the ``['safelint[java]']`` ``additional_dependencies`` variant.
+
+### Changed
+
+- **Internal helper refactors** to keep the engine surface clean as the per-language tables grew:
+  - ``safelint.languages._node_utils.call_name`` switched to a per-call-node-type dispatch table (``_CALL_NAME_DISPATCH``) so adding Java's ``method_invocation`` and ``object_creation_expression`` didn't push the function-return-count past SAFE104's limit. The public API is unchanged.
+  - ``CALL_TYPES`` in ``_node_utils`` now includes Java's two call shapes so cross-language rules walking ``node.type in CALL_TYPES`` automatically catch Java method invocations and ``new Foo()`` constructor calls without per-rule edits.
+- **Per-rule drift-detection allow-list** in ``tests/core/test_engine.py`` restructured. A new ``_RULES_JAVA_ONLY`` bucket joins ``_RULES_WIDENED_FOR_JS_FAMILY`` / ``_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA`` / ``_RULES_JS_FAMILY_ONLY``. The four ``SAFE9xx`` rules live in the Java-only bucket; the previously-cross-language rules ported in this release graduated into the ``_AND_JAVA`` bucket as each port landed. Contributors adding a new per-language rule are pointed at the four buckets in the assertion error message.
+- **Coverage threshold held at 97** in ``pyproject.toml`` (unchanged from v2.0.0). The Java port temporarily dipped coverage to 95.84% during scaffolding; the defensive AST-guard branches that valid tree-sitter-java grammar doesn't reach were either pragma-annotated (``# pragma: no cover`` with a one-line rationale) or covered by targeted tests in ``tests/analysis/test_dataflow_java.py`` (cast-unwrap / scoped-type / lambda-capture paths). End-to-end coverage of the cross-language Java rule branches is exercised through the integration suite (``tests/integration/test_spring_boot_e2e.py``) plus per-rule Java unit tests (``tests/rules/test_resource_lifecycle_java.py``, ``tests/rules/test_max_arguments_java.py``, ``tests/rules/test_spring_rules.py``). Final coverage: 97.01%.
+
+### Known limitations
+
+- **``SAFE302 global_mutation`` is deliberately NOT registered for Java.** Python's ``global`` keyword and JS's ``globalThis.x = ...`` patterns have no clean Java analogue. The natural Java equivalent (writes to non-final static fields from outside the declaring class's own static initialiser) needs class-scope analysis the rule doesn't yet do. Deferred to a future release pending user feedback.
+- **``SAFE304 side_effects`` does NOT exempt ``@Bean`` factory methods** under the ``spring-boot`` preset. Spring ``@Bean`` factory methods that legitimately create side-effectful resources (DB connections, HTTP clients) trigger the warning today. Suppress with ``// nosafe: SAFE304`` on each factory method until a future ``skip_functions_annotated_with`` config knob lands. The preset's docstring spells this out explicitly so the limitation is auditable.
+- **Java 21+ string templates are treated conservatively as untainted** by the dataflow tracker. tree-sitter-java does not yet expose the template-substitution shape uniformly, so a ``STR."Hello \{name}"`` form won't propagate taint through the template. A future grammar upgrade can lift this without re-architecting the rule.
+
+### Upgrading from v2.0.0
+
+For Python / JavaScript / TypeScript users, no action needed - v2.1.0rc1 is fully backward-compatible. The new ``[java]`` extra is opt-in, the Java rules are Java-only (no false positives on existing files), and the framework preset is gated on an explicit ``[tool.safelint.java] framework = "..."`` selector that defaults to ``vanilla``.
+
+For Java adopters, the minimal config is:
+
+```toml
+# safelint.toml (standalone) - no [tool.safelint] wrapper
+[java]
+framework = "spring-boot"   # if you're using Spring Boot; omit for vanilla Java
+
+[rules.tainted_sink]
+enabled = true              # dataflow rules are opt-in; flip on for security checks
+
+[rules.test_existence]
+test_dirs = ["src/test/java"]   # Maven / Gradle convention
+```
+
+See [`docs/languages/java.md`](https://shelkesays.github.io/safelint/languages/java/) for the full per-rule reference and idiomatic fix patterns.
+
 ## [2.0.0] - 2026-05-15
 
 **v2.0.0 GA.** The release candidate cycle (rc1 / rc2 / rc3) is closed. RC validation surfaced no blocking issues, so the engine and rule behaviour of v2.0.0 is identical to v2.0.0rc3: every rule check, every Tree-sitter walk, every config-resolution path, every CLI flag, every JSON / SARIF emission produces byte-identical output for byte-identical input. The GA bump also folds in one deliberate **skill-install refactor** so the bundled-skill layout and the Claude install shape land symmetric with every peer client before 2.0.0 freezes that surface for the rest of the 2.x line, the change is internal to the install machinery (CLI surface unchanged; existing v1.x Claude installs continue to report fresh on `safelint skill status` because the destination `SKILL.md` path and its bytes both match). The release-time changes are:
@@ -550,7 +621,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.0.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.1.0rc1...HEAD
+[2.1.0rc1]: https://github.com/shelkesays/safelint/compare/v2.0.0...v2.1.0rc1
 [2.0.0]: https://github.com/shelkesays/safelint/compare/v2.0.0rc3...v2.0.0
 [2.0.0rc3]: https://github.com/shelkesays/safelint/compare/v2.0.0rc2...v2.0.0rc3
 [2.0.0rc2]: https://github.com/shelkesays/safelint/compare/v2.0.0rc1...v2.0.0rc2

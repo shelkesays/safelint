@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator
 
     import tree_sitter
 
@@ -109,9 +109,15 @@ def node_text(node: tree_sitter.Node) -> str:
 #: Tree-sitter node types that represent a function-call expression
 #: across every registered language. Use ``node.type in CALL_TYPES``
 #: instead of importing per-language constants when a rule needs to
-#: walk calls without caring about source language. (Python emits
-#: ``call``; JavaScript emits ``call_expression``.)
-CALL_TYPES: frozenset[str] = frozenset({"call", "call_expression"})
+#: walk calls without caring about source language.
+#:
+#: * Python: ``call``
+#: * JavaScript / TypeScript: ``call_expression`` (regular calls) and
+#:   ``new_expression`` (``new Foo(...)`` constructor invocations -
+#:   ``call_name`` resolves them via the ``constructor`` field)
+#: * Java: ``method_invocation`` (regular calls) and
+#:   ``object_creation_expression`` (``new Foo(...)``)
+CALL_TYPES: frozenset[str] = frozenset({"call", "call_expression", "new_expression", "method_invocation", "object_creation_expression"})
 
 
 def resolve_lang_name(filepath: str) -> str:
@@ -132,30 +138,59 @@ def resolve_lang_name(filepath: str) -> str:
     return lang.name if lang is not None else "python"
 
 
-def call_name(call_node: tree_sitter.Node) -> str | None:
-    """Return the bare callable name from a call node, or None if unresolvable.
+def _java_method_invocation_name(call_node: tree_sitter.Node) -> str | None:
+    """Return the bare method name from a Java ``method_invocation`` node."""
+    name_node = call_node.child_by_field_name("name")
+    return node_text(name_node) if name_node and name_node.type == "identifier" else None
 
-    Handles five forms across the languages safelint registers:
 
-    * Python ``foo(...)``           - function field is ``identifier`` → ``"foo"``
-    * Python ``obj.method(...)``    - function field is ``attribute``  → ``"method"``
-    * JavaScript ``foo(...)``       - function field is ``identifier`` → ``"foo"``
-    * JavaScript ``obj.method(...)`` - function field is ``member_expression`` → ``"method"``
-    * JavaScript ``new Foo(...)``   - *constructor* field on ``new_expression``
-      (instead of ``function``) → ``"Foo"`` for the identifier form,
-      ``"WriteStream"`` for ``new fs.WriteStream(...)``.
+def _last_type_identifier(type_node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the last ``type_identifier`` named child of *type_node*, or None."""
+    last_id = None
+    for child in type_node.named_children:
+        if child.type == "type_identifier":
+            last_id = child
+    return last_id
 
-    Returns ``None`` for callees the rule layer can't resolve to a
-    bareword (subscripted calls like ``x[0]()``, immediately-invoked
-    function expressions, etc.) - rules that filter on call name then
-    naturally skip those.
 
-    Callers must pass the call node itself (not the function sub-node).
+def _java_object_creation_name(call_node: tree_sitter.Node) -> str | None:
+    """Return the simple class name from a Java ``object_creation_expression``.
+
+    Handles three Java type shapes that can appear in the ``type`` field:
+
+    * ``type_identifier`` - bare ``new Foo(...)``. Returns ``"Foo"``.
+    * ``scoped_type_identifier`` - qualified ``new java.io.WriteStream(...)``.
+      Returns the trailing identifier (``"WriteStream"``).
+    * ``generic_type`` - parameterised ``new MyResource<Foo>(...)``. Unwraps
+      to the inner ``type_identifier`` / ``scoped_type_identifier``.
+      Otherwise SAFE401 tracked acquirers, SAFE801 constructor sinks,
+      and SAFE303 / SAFE304 I/O constructors would silently miss every
+      generic instantiation.
     """
+    type_node = call_node.child_by_field_name("type")
+    if type_node is None:  # pragma: no cover - defensive: object_creation_expression always has a type field
+        return None
+    return _java_type_name(type_node)
+
+
+def _java_type_name(type_node: tree_sitter.Node) -> str | None:
+    """Resolve a Java ``type_identifier`` / ``scoped_type_identifier`` / ``generic_type`` to its simple name."""
+    if type_node.type == "generic_type":
+        if not type_node.named_children:  # pragma: no cover - defensive: generic_type always wraps a type
+            return None
+        return _java_type_name(type_node.named_children[0])
+    if type_node.type == "type_identifier":
+        return node_text(type_node)
+    if type_node.type != "scoped_type_identifier":  # pragma: no cover - array creation etc. falls through
+        return None
+    last_id = _last_type_identifier(type_node)
+    return node_text(last_id) if last_id is not None else None  # pragma: no cover - defensive: scoped_type_identifier always has trailing identifier
+
+
+def _python_js_call_name(call_node: tree_sitter.Node) -> str | None:
+    """Return the bareword for a Python ``call`` or JS ``call_expression`` / ``new_expression``."""
     # ``call`` (Python) and ``call_expression`` (JS) expose the callee
     # via the ``function`` field; JS ``new_expression`` uses ``constructor``.
-    # Probing both lets a single helper cover all five shapes without the
-    # rule layer having to branch on node type.
     func_node = call_node.child_by_field_name("function") or call_node.child_by_field_name("constructor")
     if func_node is None:
         return None
@@ -171,3 +206,47 @@ def call_name(call_node: tree_sitter.Node) -> str | None:
         prop_node = func_node.child_by_field_name("property")
         return node_text(prop_node) if prop_node else None
     return None
+
+
+# Per-call-node-type dispatch: each entry returns the bareword name (or
+# ``None``). Kept as a table so adding a new language's call shape is a
+# one-line append, and ``call_name`` stays small (no growing chain of
+# ``if`` branches that would trip the function-return-count guard).
+_CALL_NAME_DISPATCH: dict[str, Callable[[tree_sitter.Node], str | None]] = {
+    "method_invocation": _java_method_invocation_name,
+    "object_creation_expression": _java_object_creation_name,
+}
+
+
+def call_name(call_node: tree_sitter.Node) -> str | None:
+    """Return the bare callable name from a call node, or None if unresolvable.
+
+    Handles call shapes across every registered language:
+
+    * Python ``foo(...)``           - function field is ``identifier`` → ``"foo"``
+    * Python ``obj.method(...)``    - function field is ``attribute``  → ``"method"``
+    * JavaScript ``foo(...)``       - function field is ``identifier`` → ``"foo"``
+    * JavaScript ``obj.method(...)`` - function field is ``member_expression`` → ``"method"``
+    * JavaScript ``new Foo(...)``   - *constructor* field on ``new_expression``
+      (instead of ``function``) → ``"Foo"`` for the identifier form,
+      ``"WriteStream"`` for ``new fs.WriteStream(...)``.
+    * Java ``foo(...)`` / ``obj.foo(...)`` - ``method_invocation`` node with
+      a ``name`` field carrying the method identifier → ``"foo"``. The
+      receiver lives on the ``object`` field, irrelevant for the bareword
+      name extraction.
+    * Java ``new Foo(...)`` - ``object_creation_expression`` node whose
+      ``type`` field carries a ``type_identifier`` or
+      ``scoped_type_identifier`` → ``"Foo"`` for the simple case,
+      ``"WriteStream"`` for ``new java.io.WriteStream(...)``.
+
+    Returns ``None`` for callees the rule layer can't resolve to a
+    bareword (subscripted calls like ``x[0]()``, immediately-invoked
+    function expressions, etc.) - rules that filter on call name then
+    naturally skip those.
+
+    Callers must pass the call node itself (not the function sub-node).
+    """
+    handler = _CALL_NAME_DISPATCH.get(call_node.type)
+    if handler is not None:
+        return handler(call_node)
+    return _python_js_call_name(call_node)

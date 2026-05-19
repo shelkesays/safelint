@@ -376,29 +376,41 @@ def test_base_rule_default_language_is_python_only() -> None:
 
 _RULES_WIDENED_FOR_JS_FAMILY: frozenset[str] = frozenset(
     {
-        # Cross-language rules: ``language`` should be exactly
-        # ``("python", "javascript", "typescript")``. The JS family
-        # (JS / TS / TSX / AS) shares rule logic; rules deliberately
-        # widen all three at once. Silent drift past this allow-list
-        # (a half-ported rule, or a rule unintentionally narrowing
-        # back to Python-only) is what the assertion catches.
+        # Cross-language rules ported to the JS family but NOT YET ported to
+        # Java. ``language`` should be exactly ``("python", "javascript",
+        # "typescript")``. As the v2.1.0 Java port lands rule-by-rule, each
+        # entry here graduates to ``_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA``.
+        # The split exists so the drift-detection assertion catches partial
+        # ports - a rule's language tuple must always match exactly one of
+        # the documented buckets.
+        "GlobalMutationRule",
+    }
+)
+
+_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA: frozenset[str] = frozenset(
+    {
+        # Cross-language rules ported to JS / TS / Java. ``language`` should
+        # be exactly ``("python", "javascript", "typescript", "java")``.
+        # Entries graduate from ``_RULES_WIDENED_FOR_JS_FAMILY`` as the
+        # rule's Java port lands; once every cross-language rule is in this
+        # set, ``_RULES_WIDENED_FOR_JS_FAMILY`` will be empty and can be
+        # removed.
         "FunctionLengthRule",
         "NestingDepthRule",
         "MaxArgumentsRule",
         "ComplexityRule",
         "EmptyExceptRule",
         "LoggingOnErrorRule",
+        "UnboundedLoopRule",
         "SideEffectsHiddenRule",
         "SideEffectsRule",
-        "UnboundedLoopRule",
+        "ResourceLifecycleRule",
         "MissingAssertionsRule",
         "TestExistenceRule",
         "TestCouplingRule",
         "TaintedSinkRule",
         "ReturnValueIgnoredRule",
         "NullDereferenceRule",
-        "GlobalMutationRule",
-        "ResourceLifecycleRule",
     }
 )
 
@@ -408,6 +420,20 @@ _RULES_JS_FAMILY_ONLY: frozenset[str] = frozenset(
         # the hazard has no useful Python translation. ``var`` is
         # legal in TS too, so SAFE305 fires on both.
         "WideScopeDeclarationRule",  # SAFE305: ``var`` keyword (no Python equivalent)
+    }
+)
+
+_RULES_JAVA_ONLY: frozenset[str] = frozenset(
+    {
+        # Java-only framework-aware rules (SAFE9xx band,
+        # ``language=("java",)``). The hazards are Spring Boot
+        # annotation patterns that have no analogue in Python / JS /
+        # TS. Default-disabled under the vanilla Java preset; flipped
+        # on by ``[tool.safelint.java] framework = "spring-boot"``.
+        "SpringFieldInjectionRule",  # SAFE901
+        "SpringMissingTransactionalRule",  # SAFE902
+        "SpringUnvalidatedInputRule",  # SAFE903
+        "SpringAsyncCheckedExceptionRule",  # SAFE904
     }
 )
 
@@ -426,18 +452,31 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
       from the allow-list along with the deliberate scope reduction.
     """
     cross_lang_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript")}
+    cross_lang_with_java_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript", "java")}
     js_family_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("javascript", "typescript")}
+    java_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("java",)}
     assert cross_lang_actual == _RULES_WIDENED_FOR_JS_FAMILY, (
         f"Cross-language allow-list out of sync. Actually ('python', 'javascript', 'typescript'): {sorted(cross_lang_actual)}; documented: {sorted(_RULES_WIDENED_FOR_JS_FAMILY)}"
+    )
+    assert cross_lang_with_java_actual == _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA, (
+        "Cross-language-with-Java allow-list out of sync. "
+        f"Actually ('python', 'javascript', 'typescript', 'java'): {sorted(cross_lang_with_java_actual)}; "
+        f"documented: {sorted(_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA)}"
     )
     assert js_family_only_actual == _RULES_JS_FAMILY_ONLY, (
         f"JS-family-only allow-list out of sync. Actually ('javascript', 'typescript'): {sorted(js_family_only_actual)}; documented: {sorted(_RULES_JS_FAMILY_ONLY)}"
     )
+    assert java_only_actual == _RULES_JAVA_ONLY, f"Java-only allow-list out of sync. Actually ('java',): {sorted(java_only_actual)}; documented: {sorted(_RULES_JAVA_ONLY)}"
 
     for cls in ALL_RULES:
-        if cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY:
+        if cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA:
+            assert cls.language == ("python", "javascript", "typescript", "java"), f"{cls.__name__} should be ('python', 'javascript', 'typescript', 'java'); got {cls.language}"
+        elif cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY:
             assert cls.language == ("python", "javascript", "typescript"), f"{cls.__name__} should be ('python', 'javascript', 'typescript'); got {cls.language}"
         elif cls.__name__ in _RULES_JS_FAMILY_ONLY:
             assert cls.language == ("javascript", "typescript"), f"{cls.__name__} should be ('javascript', 'typescript'); got {cls.language}"
+        elif cls.__name__ in _RULES_JAVA_ONLY:
+            assert cls.language == ("java",), f"{cls.__name__} should be ('java',); got {cls.language}"
         else:
-            assert cls.language == ("python",), f"{cls.__name__} has unexpected language={cls.language}; add it to _RULES_WIDENED_FOR_JS_FAMILY or _RULES_JS_FAMILY_ONLY if intentional"
+            buckets = "_RULES_WIDENED_FOR_JS_FAMILY, _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA, _RULES_JS_FAMILY_ONLY, or _RULES_JAVA_ONLY"
+            assert cls.language == ("python",), f"{cls.__name__} has unexpected language={cls.language}; add it to {buckets} if intentional"
