@@ -1786,14 +1786,47 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#210-2026-05-21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1.0 - 2026-05-21
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1.0 - 2026-05-21">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed-java" class="md-nav__link">
+  <a href="#rule-corrections-vs-210rc1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fixed (Java)
+        Rule corrections (vs 2.1.0rc1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#doc-skill-alignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Doc / skill alignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration
       
     </span>
   </a>
@@ -2589,7 +2622,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#migration" class="md-nav__link">
+  <a href="#migration_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Migration
@@ -2917,14 +2950,47 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#210-2026-05-21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1.0 - 2026-05-21
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.1.0 - 2026-05-21">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#fixed-java" class="md-nav__link">
+  <a href="#rule-corrections-vs-210rc1" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Fixed (Java)
+        Rule corrections (vs 2.1.0rc1)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#doc-skill-alignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Doc / skill alignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#migration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Migration
       
     </span>
   </a>
@@ -3720,7 +3786,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#migration" class="md-nav__link">
+  <a href="#migration_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Migration
@@ -3970,21 +4036,50 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.1.0rc1...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
-<h3 id="fixed-java">Fixed (Java)<a class="headerlink" href="#fixed-java" title="Permanent link">#</a></h3>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.1.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="210-2026-05-21"><a href="https://github.com/shelkesays/safelint/compare/v2.1.0rc1...v2.1.0">2.1.0</a> - 2026-05-21<a class="headerlink" href="#210-2026-05-21" title="Permanent link">#</a></h2>
+<p><strong>v2.1.0 GA.</strong> The release candidate cycle is closed. The cumulative scope vs <code>v2.1.0rc1</code> is a long list of rule-correctness fixes and doc / skill consistency fixes that landed during the RC review cycle; engine and rule behaviour on the headline Java + Spring Boot surface is now finalised for the 2.1.x line. Functionally <code>v2.1.0</code> ships the rc1 feature set (Java as a registered language, the <code>spring-boot</code> framework preset, the four new <code>SAFE901-904</code> rules, 16 cross-language rules ported to Java) plus the corrections below.</p>
+<p><strong>Install:</strong> RC pins and <code>--pre</code> flags are no longer required. <code>pip install 'safelint[java]'</code> resolves to <code>2.1.0</code> straight from PyPI.</p>
+<h3 id="rule-corrections-vs-210rc1">Rule corrections (vs <code>2.1.0rc1</code>)<a class="headerlink" href="#rule-corrections-vs-210rc1" title="Permanent link">#</a></h3>
 <ul>
-<li><strong><code>SAFE401 resource_lifecycle</code></strong> for Java's manual <code>try { ... } finally { ... }</code> form is now strict: the finally clause must contain a direct <code>&lt;acquired-var&gt;.close()</code> invocation for the rule to consider the resource guarded. The previous heuristic (mirroring JS) accepted <em>any</em> try with a finally clause, so <code>try { in = new FileInputStream(p); } finally { audit(); }</code> silently passed even though nothing closed <code>in</code>. Bare-expression acquirers (<code>try { new FileInputStream(p); } finally { ... }</code>) now always fire, since there's no variable handle that could ever be closed. <strong>Helper-pattern trade-off:</strong> <code>IOUtils.closeQuietly(in)</code>, <code>Try.run(() -&gt; in.close())</code>, and similar close-via-helper patterns are NOT recognised under the new strict matcher and will fire SAFE401; switch to try-with-resources or suppress with <code>// nosafe: SAFE401</code> on the acquirer line. The strict path applies to Java only; JavaScript retains its documented heuristic.</li>
+<li><strong>SAFE401 <code>resource_lifecycle</code></strong> for Java's manual <code>try { ... } finally { ... }</code> is now strict: the finally clause must contain a direct <code>&lt;acquired-var&gt;.close()</code> invocation. The previous heuristic accepted any try with a finally; <code>try { in = new FileInputStream(p); } finally { audit(); }</code> silently passed. Bare-expression acquirers (<code>try { new FileInputStream(p); } finally { ... }</code>) now always fire. Wrapped acquirers (<code>br = new BufferedReader(new FileReader(path))</code>) correctly inherit the outer variable name for cleanup tracking. <strong>Helper-pattern trade-off:</strong> <code>IOUtils.closeQuietly(in)</code>, <code>Try.run(() -&gt; in.close())</code> style closes are NOT recognised under the strict matcher and will fire; switch to try-with-resources or suppress with <code>// nosafe: SAFE401</code>. The strict path applies to Java only; JavaScript retains its documented heuristic.</li>
+<li><strong>SAFE801 <code>tainted_sink</code></strong> lambda capture analysis: a Java lambda's tracker is now seeded with own-params plus the enclosing method's final tainted set (locals included), so <code>String dirty = input; run(() -&gt; exec(dirty));</code> correctly fires. Compound assignments (<code>sql += " suffix"</code>) preserve the LHS's existing taint. Chained assignments (<code>a = b = source()</code>) propagate the innermost-RHS taint through every LHS. Enhanced-for loops (<code>for (String arg : args) { exec(arg); }</code>) taint the loop variable from the iterable. Receiver-as-input now matches generic-type constructors via <code>generic_type</code> unwrap (<code>new MyResource&lt;Foo&gt;(input)</code>).</li>
+<li><strong>SAFE801 sanitizers_java defaults narrowed.</strong> Context-specific output encoders (OWASP <code>forHtml</code> / <code>forJavaScript</code> / <code>forCssString</code>, Apache Commons <code>escapeHtml*</code> / <code>escapeXml</code> / <code>escapeJava</code> / <code>escapeJson</code>, Spring <code>htmlEscape</code>) and URL encoders (<code>encode</code> / <code>encodeURIComponent</code>) are no longer in defaults. They were creating cross-context false negatives (<code>Encode.forHtml(name)</code> before <code>jdbc.query(...)</code> silently cleared the SQL-sink warning). Defaults are now <code>sanitize</code> / <code>validate</code> / <code>quote</code> / <code>escape</code> only; opt back in via TOML if your project routes everything through a specific encoder.</li>
+<li><strong>SAFE801 spring-boot preset sinks: collision-prone bare verbs removed.</strong> <code>put</code> / <code>delete</code> / <code>update</code> / <code>exchange</code> are no longer in the preset's <code>sinks_java</code>; they collided with <code>HashMap.put</code> / <code>File.delete</code> / <code>CurrencyExchange.exchange</code> / project-local helpers under SAFE801's single-set design. Unambiguous Spring names (<code>query</code> / <code>queryForObject</code> / <code>queryForList</code> / <code>queryForMap</code> / <code>queryForRowSet</code> / <code>batchUpdate</code> / <code>getForObject</code> / <code>getForEntity</code> / <code>postForObject</code> / <code>postForEntity</code> / <code>postForLocation</code> / <code>patchForObject</code>) stay. Add the bare verbs explicitly via <code>[tool.safelint.rules.tainted_sink] sinks_java</code> if your project needs <code>restTemplate.put(...)</code> / <code>jdbcTemplate.update(...)</code> coverage.</li>
+<li><strong>SAFE902 <code>spring_missing_transactional</code> receiver-name guard.</strong> The rule now only counts repository-write method calls whose receiver name (lowercased) contains <code>repo</code> / <code>dao</code> / <code>jdbctemplate</code>. Without this, <code>call_name()</code> stripped the receiver and unrelated calls like <code>file.delete()</code> / <code>cache.delete()</code> / <code>restTemplate.delete(...)</code> were counted as Spring Data writes. Bare <code>template</code> was tested but matched non-DB Spring templates (<code>restTemplate</code>, <code>kafkaTemplate</code>, <code>redisTemplate</code>); <code>jdbctemplate</code> is the correct narrower pattern. Recognises <code>this.userRepo.save(...)</code> field-access receivers too.</li>
+<li><strong>SAFE904 <code>spring_async_checked_exception</code> class-level <code>@Async</code>.</strong> The rule now also fires when the enclosing class carries <code>@Async</code> (not only the method). Spring applies class-level <code>@Async</code> to every method in the class; the throws clause is just as misleading either way. Docs and rule docstring updated to reflect that the rule flags ANY <code>throws</code> clause (checked or unchecked) for simplicity; distinguishing checked vs unchecked needs type-inference safelint doesn't do.</li>
+<li><strong>SAFE103 <code>max_arguments</code> untyped Java lambda params.</strong> <code>(a, b, c, d, e, f, g, h) -&gt; ...</code> and <code>a -&gt; ...</code> shapes parse as <code>inferred_parameters</code> / bare <code>identifier</code> in tree-sitter-java; the rule's counter dispatched only on <code>formal_parameter</code> / <code>spread_parameter</code> and silently counted untyped lambdas as zero-arg. Added the lambda-specific dispatch so over-argument untyped lambdas in stream pipelines correctly fire.</li>
+<li><strong>SAFE202 <code>empty_except</code> Java catch-body shapes.</strong> Empty Java catch bodies with multiple comment children (<code>{ // a\n // b\n }</code>) now correctly classify as empty. tree-sitter-java emits each comment as a named block child. Empty-statement (<code>;</code>) inside Java catches is also recognised as a no-op. Python / JS / TS retain their single-statement check.</li>
+<li><strong>SAFE701 / SAFE702 <code>Test</code>-prefix Java false-positives removed.</strong> Production classes like <code>TestDataFactory.java</code> / <code>TestConfig.java</code> under <code>src/main/java</code> were being classified as tests (silently skipping coverage enforcement). The <code>Test</code>-prefix shortcut is gone; legitimate JUnit 3 tests under the configured <code>test_dirs</code> are still picked up via the path-component check.</li>
+<li><strong><code>_node_utils._java_object_creation_name</code> now handles <code>generic_type</code>.</strong> <code>new MyResource&lt;Foo&gt;(...)</code> parameterised constructors were silently invisible to SAFE401 tracked-acquirer / SAFE801 constructor-sink / SAFE303-304 I/O-constructor matchers. The unwrap recurses through <code>generic_type</code> to the inner <code>type_identifier</code> / <code>scoped_type_identifier</code>.</li>
+<li><strong>SAFE303 / 304 default <code>io_functions_java</code> cleanups.</strong> <code>HttpClient</code> is replaced by the actual matched factory + send method names (<code>newHttpClient</code> / <code>send</code> / <code>sendAsync</code>); the class itself has no public constructor so <code>call_name()</code> never returned <code>"HttpClient"</code>. <code>format</code> removed from SAFE303's set (collided with <code>String.format</code> / <code>MessageFormat.format</code>). <code>FileChannel</code> removed from SAFE401's <code>tracked_functions_java</code> for the same receiver-stripping reason.</li>
+</ul>
+<h3 id="doc-skill-alignment">Doc / skill alignment<a class="headerlink" href="#doc-skill-alignment" title="Permanent link">#</a></h3>
+<ul>
+<li>All Java suppression examples switched from <code># nosafe</code> to <code>// nosafe</code>; Java's comment prefix is <code>//</code>.</li>
+<li>SAFE801 docs now describe what's actually in <code>sanitizers_java</code> defaults (no HTML / URL encoders) and explain why.</li>
+<li>README rule-count totals corrected: 24 rules total (was 20), 14 default-on, 10 opt-in (the four <code>SAFE9xx</code> are opt-in under vanilla, default-enabled by the <code>spring-boot</code> preset).</li>
+<li>Per-language docs corrected: "16 cross-language rules" (was "17"); SAFE302 is Python / JS / TS only, not cross-all-four.</li>
+<li>SAFE902 / SAFE903 severity rows in the rule reference corrected from <code>"warning"</code> to <code>"error"</code> (matches the implementation).</li>
+<li>README and the docs landing page now list Java in the "Currently supported languages" table; PyPI keywords + description include <code>java</code> / <code>spring-boot</code>.</li>
+<li><code>docs/configuration/rules.md</code> got a full <code>SAFE901</code> / <code>SAFE902</code> / <code>SAFE903</code> / <code>SAFE904</code> rule-detail section (was missing).</li>
+<li>Project-wide writing-style sweep: em-dashes removed from all docs / skills / README / CHANGELOG re-introduced during the RC cycle.</li>
+</ul>
+<h3 id="migration">Migration<a class="headerlink" href="#migration" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>From <code>v2.0.0</code>:</strong> see the <em>Migration</em> table in the <a href="https://github.com/shelkesays/safelint/compare/v2.0.0...v2.1.0rc1">2.1.0rc1</a> entry below; the only required change is bumping the install command to opt into the new <code>[java]</code> extra if you lint Java sources, and bumping <code>rev: v2.0.0</code> to <code>rev: v2.1.0</code> in pre-commit configs.</li>
+<li><strong>From <code>v2.1.0rc1</code>:</strong> drop any <code>==2.1.0rc1</code> pin or <code>--pre</code> flag; <code>pip install -U 'safelint[&lt;lang&gt;]'</code> is sufficient. Pre-commit users bump <code>rev: v2.1.0rc1</code> to <code>rev: v2.1.0</code>.</li>
 </ul>
 <h2 id="210rc1-2026-05-16"><a href="https://github.com/shelkesays/safelint/compare/v2.0.0...v2.1.0rc1">2.1.0rc1</a> - 2026-05-16<a class="headerlink" href="#210rc1-2026-05-16" title="Permanent link">#</a></h2>
 <p><strong>Java is now a supported language, with a dedicated Spring Boot framework preset.</strong> First MINOR release after v2.0.0; ships as a release candidate so the new language can be exercised against real Spring Boot codebases before promoting to GA. Source-language analysis works on every Java file; per-project tuning happens via the new <code>[tool.safelint.java] framework = "spring-boot"</code> selector that adds Spring-aware taint sinks, nullable methods, and four new structural rules (<code>SAFE901-904</code>) covering common Spring Boot misuses. Python / JavaScript / TypeScript users see zero behaviour change.</p>
 <p>Install as a RC pre-release:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s1">&#39;safelint[java]==2.1.0rc1&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[java]&#39;</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a><span class="c1"># or, for a polyglot repo:</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s1">&#39;safelint[python,java]==2.1.0rc1&#39;</span>
+<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python,java]&#39;</span>
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a><span class="c1"># or the kitchen-sink:</span>
-<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pip<span class="w"> </span>install<span class="w"> </span>--pre<span class="w"> </span><span class="s1">&#39;safelint[all]==2.1.0rc1&#39;</span>
+<a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span>
 </code></pre></div>
-<p>Pre-commit users update <code>rev: v2.0.0</code> to <code>rev: v2.1.0rc1</code> and add <code>'safelint[java]==2.1.0rc1'</code> to <code>additional_dependencies</code> (the RC pin is required until v2.1.0 GA so pre-commit's pip resolver does not fall back to v2.0.0 which lacks the <code>[java]</code> extra).</p>
+<p>Pre-commit users update <code>rev: v2.0.0</code> to <code>rev: v2.1.0</code> and add <code>'safelint[java]==2.1.0rc1'</code> to <code>additional_dependencies</code> (the RC pin is required until v2.1.0 GA so pre-commit's pip resolver does not fall back to v2.0.0 which lacks the <code>[java]</code> extra).</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>Java as a fully-registered language</strong>, <code>.java</code> files are now parsed, walked, and dispatched through the engine the same way as Python / JavaScript / TypeScript. New <code>src/safelint/languages/java.py</code> exports the per-grammar node-type constants (<code>METHOD_DECLARATION</code> / <code>CONSTRUCTOR_DECLARATION</code> / <code>LAMBDA_EXPRESSION</code> / <code>CATCH_CLAUSE</code> / <code>TRY_WITH_RESOURCES_STATEMENT</code> / <code>METHOD_INVOCATION</code> / <code>OBJECT_CREATION_EXPRESSION</code> / etc.) plus the <code>JAVA</code> <code>LanguageDefinition</code>. Registered in <code>src/safelint/languages/__init__.py</code> with the standard available / unavailable gating - missing the <code>[java]</code> extra surfaces the install hint on first run, same posture as JS / TS.</li>
@@ -3997,7 +4092,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><strong><code>SAFE902 spring_missing_transactional</code></strong> (error): service-layer method (<code>@Service</code> / <code>@Component</code> class) doing 2+ Spring Data writes (<code>save</code> / <code>saveAll</code> / <code>saveAndFlush</code> / <code>delete</code> / <code>deleteAll</code> / <code>deleteAllInBatch</code> / <code>deleteAllById</code> / <code>deleteAllByIdInBatch</code> / <code>deleteById</code> / <code>update</code>) without <code>@Transactional</code> on the method or the class. Receiver-name guard constrains matching to receivers whose lowercased name contains <code>repo</code> / <code>dao</code> / <code>jdbctemplate</code> so unrelated calls like <code>file.delete()</code> / <code>restTemplate.delete()</code> don't count. Single-write methods are exempt.</li>
 <li><strong><code>SAFE903 spring_unvalidated_input</code></strong> (error): <code>@RestController</code> / <code>@Controller</code> method parameter binds <code>@RequestBody</code> or <code>@ModelAttribute</code> without <code>@Valid</code> / <code>@Validated</code>. <code>@PathVariable</code> and <code>@RequestParam</code> are deliberately NOT covered (typically bind to primitives). Complements <code>SAFE801</code> structurally - <code>SAFE801</code> catches via dataflow, <code>SAFE903</code> catches at the input boundary.</li>
 <li><strong><code>SAFE904 spring_async_checked_exception</code></strong> (warning): <code>@Async</code> method declares a <code>throws</code> clause. Spring runs <code>@Async</code> on a separate thread and silently swallows exceptions; the caller never sees them, regardless of throws-clause declarations. Fix: catch inside the body and either swallow with logging or return <code>CompletableFuture.failedFuture(...)</code>.</li>
-<li><strong><code>[java]</code> PEP 621 extra</strong> in <code>pyproject.toml</code>, pulls <code>tree-sitter-java&gt;=0.23.0</code>. Folded into <code>[all]</code> alongside <code>[python]</code> / <code>[javascript]</code> / <code>[typescript]</code>. <code>pip install --pre 'safelint[java]==2.1.0rc1'</code> is the typical Java-only invocation during the RC (drop <code>--pre</code> and the pin once v2.1.0 GA ships); polyglot Python + Java monorepos compose extras via <code>'safelint[python,java]==2.1.0rc1'</code>.</li>
+<li><strong><code>[java]</code> PEP 621 extra</strong> in <code>pyproject.toml</code>, pulls <code>tree-sitter-java&gt;=0.23.0</code>. Folded into <code>[all]</code> alongside <code>[python]</code> / <code>[javascript]</code> / <code>[typescript]</code>. <code>pip install 'safelint[java]'</code> is the typical Java-only invocation during the RC (drop <code>--pre</code> and the pin once v2.1.0 GA ships); polyglot Python + Java monorepos compose extras via <code>'safelint[python,java]==2.1.0rc1'</code>.</li>
 <li><strong>Bundled skill addendum</strong> at <code>src/safelint/skill_files/languages/java.md</code> (~250 lines) shipped in the wheel so every AI client (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) consults Java-specific guidance on demand via <code>safelint skill path</code>. Covers install nuance, framework presets, per-rule notes for all 20 applicable rules, deliberately-skipped rules with rationale, idiomatic Java + Spring fix patterns, and integration-with-existing-tooling guidance.</li>
 <li><strong>mkdocs site page</strong> at <code>docs/languages/java.md</code> mirroring the skill addendum for the user-facing site. Wired into the Languages nav between TypeScript and Configuration; the landing page (<code>docs/index.md</code>) gains a Java row in the supported-languages table.</li>
 <li><strong>Pre-commit <code>types_or</code> extended</strong> to <code>[python, javascript, ts, tsx, java]</code> in <code>.pre-commit-hooks.yaml</code> so the published hook automatically routes <code>.java</code> files to the engine without users needing to override the filter. The dedicated Pre-commit docs page (<code>docs/pre-commit.md</code>) and the root README gain the <code>['safelint[java]']</code> <code>additional_dependencies</code> variant.</li>
@@ -4485,7 +4580,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>CLI now fails loudly on unknown flags. <code>--formta=json</code> and similar typos used to be silently ignored (because hook/stdin parsing called <code>parse_known_args</code>); they now surface as <code>error: unrecognized arguments: --formta=json</code>.</li>
 <li>In <code>--format json</code>/<code>--format sarif</code>, status messages from the git-modified-files probe go to stderr instead of stdout, so machine-readable output stays a single parseable document. The "no modified Python files" early-return now also emits an empty JSON/SARIF doc on stdout in those modes.</li>
 </ul>
-<h3 id="migration">Migration<a class="headerlink" href="#migration" title="Permanent link">#</a></h3>
+<h3 id="migration_1">Migration<a class="headerlink" href="#migration_1" title="Permanent link">#</a></h3>
 <p>If you installed the v1.5.0 skill by symlinking <code>skills/safelint/</code> from a git checkout, that path no longer exists in v1.6.0. To migrate:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>rm<span class="w"> </span>~/.claude/skills/safelint<span class="w">           </span><span class="c1"># remove the stale symlink</span>
 <a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>pip<span class="w"> </span>install<span class="w"> </span>--upgrade<span class="w"> </span>safelint
