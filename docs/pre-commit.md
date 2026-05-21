@@ -11,16 +11,16 @@ Add this block to your `.pre-commit-config.yaml`. Pick the `additional_dependenc
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.1.0rc1  # replace with the latest release tag (Java support requires v2.1.0rc1 or later)
+    rev: v2.1.0  # replace with the latest release tag (Java support requires v2.1.0 or later)
     hooks:
       - id: safelint
         # Required in v2.0.0+. Pick whichever extras match your project's languages:
         additional_dependencies: ['safelint[python]']               # Python-only repo
         # additional_dependencies: ['safelint[javascript]']         # JS-only repo
         # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles JS too)
-        # additional_dependencies: ['safelint[java]==2.1.0rc1']     # Java repo, RC pin until v2.1.0 GA (Spring Boot via [tool.safelint.java] framework = "spring-boot")
+        # additional_dependencies: ['safelint[java]']     # Java repo, RC pin until v2.1.0 GA (Spring Boot via [tool.safelint.java] framework = "spring-boot")
         # additional_dependencies: ['safelint[python,javascript]']  # mixed monorepo
-        # additional_dependencies: ['safelint[all]==2.1.0rc1']      # every supported language, RC pin until v2.1.0 GA so [all] actually includes Java
+        # additional_dependencies: ['safelint[all]']      # every supported language, RC pin until v2.1.0 GA so [all] actually includes Java
 
         args: [--fail-on=error]   # default; use --fail-on=warning for stricter CI
         files: ^src/              # optional, scope to a directory

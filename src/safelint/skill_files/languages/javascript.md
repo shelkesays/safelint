@@ -22,7 +22,7 @@ For pre-commit integration, the published hook accepts JavaScript via the `javas
 
 ```yaml
 - repo: https://github.com/shelkesays/safelint
-  rev: v2.1.0rc1  # pin to a release (use a recent tag; v2.1.0rc1 also unlocks the Java extra if you later add .java files)
+  rev: v2.1.0  # pin to a release (use a recent tag; v2.1.0+ also unlocks the Java extra if you later add .java files)
   hooks:
     - id: safelint
       additional_dependencies: ['safelint[javascript]']

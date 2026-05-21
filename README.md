@@ -25,7 +25,7 @@ Originally designed for mission-critical systems, these principles apply to any 
 | **Python** | `.py`, `.pyw` |  |
 | **JavaScript** | `.js`, `.mjs`, `.cjs` | Runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine. Per-runtime *defaults* are selectable via [`[tool.safelint.javascript] runtime = "..."`](https://shelkesays.github.io/safelint/configuration/toml/#javascript-runtime-presets). |
 | **TypeScript** (incl. **TSX** + **AssemblyScript**) | `.ts`, `.tsx`, `.as` | Reuses the JS rule implementations end-to-end with TS-specific handling for generics, `as` casts, non-null assertions, `declare global` blocks, etc. Shares JS runtime presets since TS compiles to JS. |
-| **Java** (with **Spring Boot** framework preset) | `.java` | 16 cross-language rules port cleanly; 4 Spring-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* are selectable via [`[tool.safelint.java] framework = "..."`](https://shelkesays.github.io/safelint/languages/java/#framework-presets). New in v2.1.0rc1 (release candidate; install with `pip install --pre 'safelint[java]==2.1.0rc1'`). |
+| **Java** (with **Spring Boot** framework preset) | `.java` | 16 cross-language rules port cleanly; 4 Spring-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* are selectable via [`[tool.safelint.java] framework = "..."`](https://shelkesays.github.io/safelint/languages/java/#framework-presets). New in v2.1.0. |
 
 **Rule coverage:** 16 cross-language rules apply across all four languages; 2 are Python-only (`bare_except`, `global_state`); 1 applies to Python / JS / TS but not Java (`global_mutation`: Java has no clean analogue, deferred); 1 is JavaScript-family-only (`wide_scope_declaration` for `var`); and 4 are Java + Spring Boot only (`spring_field_injection`, `spring_missing_transactional`, `spring_unvalidated_input`, `spring_async_checked_exception`).
 
@@ -82,7 +82,7 @@ SafeLint ships **every** per-language grammar as an opt-in extra. The base insta
 pip install 'safelint[python]'         # adds .py, .pyw
 pip install 'safelint[javascript]'     # adds .js, .mjs, .cjs
 pip install 'safelint[typescript]'     # adds .ts, .tsx, .as (and bundles JS too)
-pip install --pre 'safelint[all]==2.1.0rc1'         # every supported language (RC pin needed until v2.1.0 GA so [all] actually includes Java)
+pip install 'safelint[all]'         # every supported language (RC pin needed until v2.1.0 GA so [all] actually includes Java)
 
 # Multiple extras compose, for monorepos:
 pip install 'safelint[python,javascript]'
@@ -171,16 +171,16 @@ Add this to your `.pre-commit-config.yaml`, pick the `additional_dependencies` l
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.1.0rc1  # replace with the latest release tag (v2.1.0rc1 is required for Java support)
+    rev: v2.1.0  # replace with the latest release tag (Java support requires v2.1.0 or later)
     hooks:
       - id: safelint
         # Required in v2.0.0+, pick the line for the language(s) your repo lints:
         additional_dependencies: ['safelint[python]']               # Python-only repo
         # additional_dependencies: ['safelint[javascript]']         # JS-only repo (Node / browser / Deno / Cloudflare Workers / Bun)
         # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles tree-sitter-javascript too)
-        # additional_dependencies: ['safelint[java]==2.1.0rc1']     # Java repo, RC pin until v2.1.0 GA (Spring Boot via [tool.safelint.java] framework = "spring-boot")
+        # additional_dependencies: ['safelint[java]']     # Java repo, RC pin until v2.1.0 GA (Spring Boot via [tool.safelint.java] framework = "spring-boot")
         # additional_dependencies: ['safelint[python,javascript]']  # mixed monorepo
-        # additional_dependencies: ['safelint[all]==2.1.0rc1']      # kitchen-sink, RC pin until v2.1.0 GA so [all] actually includes Java
+        # additional_dependencies: ['safelint[all]']      # kitchen-sink, RC pin until v2.1.0 GA so [all] actually includes Java
 
         args: [--fail-on=error]   # or --fail-on=warning for stricter CI
         files: ^src/              # optional, scope to a directory

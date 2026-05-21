@@ -1,6 +1,6 @@
 # Java
 
-SafeLint analyses Java source for the Holzmann "Power of Ten" safety rules, function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like Checkstyle and PMD don't catch. Java support landed in **v2.1.0rc1** (release candidate; install with `pip install --pre 'safelint[java]==2.1.0rc1'`, see [Quick start](#quick-start) below) alongside a dedicated **Spring Boot framework preset** that adds Spring-aware sinks, nullable methods, and four `SAFE9xx` framework-specific structural rules. Java does NOT replace SpotBugs / Checkstyle / PMD / ErrorProne, it runs alongside them and covers a different, narrower set focused on Holzmann safety + Spring-specific patterns.
+SafeLint analyses Java source for the Holzmann "Power of Ten" safety rules, function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bug that style linters like Checkstyle and PMD don't catch. Java support landed in **v2.1.0** alongside a dedicated **Spring Boot framework preset** that adds Spring-aware sinks, nullable methods, and four `SAFE9xx` framework-specific structural rules. Java does NOT replace SpotBugs / Checkstyle / PMD / ErrorProne, it runs alongside them and covers a different, narrower set focused on Holzmann safety + Spring-specific patterns.
 
 ## File extensions
 
@@ -11,18 +11,13 @@ Kotlin (`.kt`), Groovy (`.groovy`), and Scala (`.scala`) are NOT yet registered;
 ## Quick start
 
 ```bash
-pip install --pre 'safelint[java]==2.1.0rc1'    # --pre + RC pin are required until v2.1.0 GA; [java] adds the Java grammar
+pip install 'safelint[java]'    # --pre + RC pin are required until v2.1.0 GA; [java] adds the Java grammar
 safelint check src/                    # lint a directory (git-modified files by default)
 safelint check --all-files .           # lint everything
 safelint check --format json src/      # machine-readable for editors / CI
 ```
 
-While the RC is the current release, pip needs to know it should pick a pre-release version; by default it resolves to the latest stable (v2.0.0), which does not have a `[java]` extra. Either of two forms tells pip the right thing:
-
-* **Pin only**: `pip install 'safelint[java]==2.1.0rc1'`. The exact pre-release version pin is itself an explicit pre-release request, so `--pre` isn't required.
-* **`--pre` only**: `pip install --pre 'safelint[java]'`. The flag lets pip choose any pre-release that satisfies the requirement, currently 2.1.0rc1.
-
-The Quick start above combines both (`pip install --pre 'safelint[java]==2.1.0rc1'`) for maximum explicitness; the combined form is redundant but harmless. Drop both once v2.1.0 GA is published. If your Java project doesn't already have a Python tool chain, `pipx install 'safelint[java]==2.1.0rc1'` isolates the install (pipx doesn't accept pip's `--pre` directly, but the explicit `==2.1.0rc1` pin lets pipx resolve to the pre-release without needing the flag; for arbitrary pre-release resolution use `pipx install --pip-args='--pre' 'safelint[java]'`). Maven / Gradle plugins are NOT required; safelint is a standalone CLI that reads source files directly.
+If your Java project doesn't already have a Python tool chain, `pipx install 'safelint[java]'` isolates the install. Maven / Gradle plugins are NOT required; safelint is a standalone CLI that reads source files directly.
 
 v2.1.0+ ships every language grammar as an opt-in extra, plain `pip install safelint` installs only the engine and would skip every `.java` file with an install hint on first run.
 
@@ -126,9 +121,9 @@ All accept a list of strings; bare-string typos (`sinks_java = "eval"` instead o
 Java grammar support ships as an optional extra so non-Java projects don't pay for it:
 
 ```bash
-pip install --pre 'safelint[java]==2.1.0rc1'        # adds .java only (--pre + RC pin needed until v2.1.0 GA)
-pip install --pre 'safelint[python,java]==2.1.0rc1' # polyglot Python + Java monorepo
-pip install --pre 'safelint[all]==2.1.0rc1'         # kitchen-sink, every supported grammar
+pip install 'safelint[java]'        # adds .java only (--pre + RC pin needed until v2.1.0 GA)
+pip install 'safelint[python,java]' # polyglot Python + Java monorepo
+pip install 'safelint[all]'         # kitchen-sink, every supported grammar
 ```
 
 Without the extra, `safelint check` skips `.java` files with a one-line install hint at lint time. If at least one other supported file (e.g. a Python file in a mixed repo) does get linted, the run continues normally. **If every candidate file gets skipped**, the typical case in a Java-only project, the [silent-failure guard](../configuration/cli.md#exit-code-2--silent-failure-triggers) fires and SafeLint exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.
@@ -139,12 +134,12 @@ Without the extra, `safelint check` skips `.java` files with a one-line install 
 # .pre-commit-config.yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.1.0rc1    # pin to a release (RC tag; switch to v2.1.0 once GA is published)
+    rev: v2.1.0    # pin to a release (RC tag; switch to v2.1.0 once GA is published)
     hooks:
       - id: safelint
         # Java users add the matching extra so pre-commit's isolated
         # environment installs ``tree-sitter-java``.
-        additional_dependencies: ['safelint[java]==2.1.0rc1']  # RC pin needed until v2.1.0 GA
+        additional_dependencies: ['safelint[java]']  # RC pin needed until v2.1.0 GA
         # The published hook's ``types_or`` already includes python,
         # javascript, ts, tsx, and java. Optional: scope to a directory.
         files: ^src/
@@ -154,7 +149,7 @@ For a Maven / Gradle project that organises sources under `src/main/java` and te
 
 ```yaml
       - id: safelint
-        additional_dependencies: ['safelint[java]==2.1.0rc1']  # RC pin needed until v2.1.0 GA
+        additional_dependencies: ['safelint[java]']  # RC pin needed until v2.1.0 GA
         files: ^src/(main|test)/java/
 ```
 

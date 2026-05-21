@@ -124,15 +124,8 @@ def test_java_parser_factory_raises_when_grammar_missing(monkeypatch: pytest.Mon
 
 
 def test_java_install_hint_names_the_right_extra() -> None:
-    """The Java hint must keep the ``--pre`` + ``==2.1.0rc1`` pin until v2.1.0 GA.
-
-    Pip otherwise resolves the bare ``safelint[java]`` request against
-    the latest stable v2.0.0 which lacks the [java] extra, so the
-    hint would tell users to install a package that still lacks the
-    grammar. When v2.1.0 GA ships, drop both ``--pre`` and the pin
-    from ``GRAMMAR_INSTALL_HINT`` and from this assertion together.
-    """
-    assert _java_mod.GRAMMAR_INSTALL_HINT == "pip install --pre 'safelint[java]==2.1.0rc1'"
+    """The hint string matches what users actually need to type."""
+    assert _java_mod.GRAMMAR_INSTALL_HINT == "pip install 'safelint[java]'"
 
 
 def test_registry_skips_javascript_when_grammar_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:

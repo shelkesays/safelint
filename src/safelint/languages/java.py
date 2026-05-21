@@ -54,7 +54,7 @@ EXTRA_NAME = "java"
 
 #: Install hint surfaced by the CLI when a user has ``.java`` files in
 #: their project but ``tree-sitter-java`` isn't installed.
-GRAMMAR_INSTALL_HINT = f"pip install --pre 'safelint[{EXTRA_NAME}]==2.1.0rc1'"
+GRAMMAR_INSTALL_HINT = f"pip install 'safelint[{EXTRA_NAME}]'"
 
 
 def _create_java_parser() -> tree_sitter.Parser:

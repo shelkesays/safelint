@@ -227,3 +227,5 @@ CLAUDE.md
 
 # Safelint per-project lint-result cache
 .safelint_cache/
+
+.claude/

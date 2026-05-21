@@ -7,29 +7,27 @@ Language-specific notes for the Java target. Mirrors `src/safelint/languages/jav
 safelint is a Python package, not a Maven / Gradle artefact. v2.1.0+ ships the Java grammar in the `[java]` extra:
 
 ```bash
-pip install --pre 'safelint[java]==2.1.0rc1'
+pip install 'safelint[java]'
 # or, in a project that already uses uv:
-uv add --dev 'safelint[java]==2.1.0rc1'
+uv add --dev 'safelint[java]'
 # or, kitchen-sink:
-pip install --pre 'safelint[all]==2.1.0rc1'
+pip install 'safelint[all]'
 ```
-
-Both ``--pre`` and the explicit ``==2.1.0rc1`` pin are required while the RC is the current release: pip otherwise resolves to the latest stable (v2.0.0) which does not have a `[java]` extra. With pip, omitting the extra emits a warning ("safelint 2.0.0 does not provide the extra 'java'") and still installs the base package, leaving Java users without `tree-sitter-java`; safelint then surfaces a missing-grammar warning at lint time rather than an install-time error. Drop both flags once v2.1.0 GA is tagged.
 
 After install, `safelint` is on `PATH`. Run it from the Java project's root the same way as for a Python project, it auto-detects the language by file extension. Maven / Gradle plugins are NOT required; safelint is a standalone CLI that reads source files directly.
 
-If you run plain `pip install safelint` (no extra) or end up with v2.0.0 because the RC pin was omitted, the first run emits `safelint: warning: skipping .java files, install with: pip install --pre 'safelint[java]==2.1.0rc1'`. **Exit code is 2 only when EVERY candidate file is skipped** (typical Java-only project); in a mixed Python + Java repo, safelint emits the `.java` skip warning and continues linting the supported files normally. Re-install with the extra and retry.
+If you run plain `pip install safelint` (no extra) or end up with v2.0.0 because the RC pin was omitted, the first run emits `safelint: warning: skipping .java files, install with: pip install 'safelint[java]'`. **Exit code is 2 only when EVERY candidate file is skipped** (typical Java-only project); in a mixed Python + Java repo, safelint emits the `.java` skip warning and continues linting the supported files normally. Re-install with the extra and retry.
 
 For pre-commit integration, the published hook routes `.java` files via the `java` filetype tag in `types_or` (pre-commit's `identify` library recognises it):
 
 ```yaml
 - repo: https://github.com/shelkesays/safelint
-  rev: v2.1.0rc1  # pin to a release (RC tag; switch to v2.1.0 once GA is published)
+  rev: v2.1.0  # pin to a release (RC tag; switch to v2.1.0 once GA is published)
   hooks:
     - id: safelint
-      additional_dependencies: ['safelint[java]==2.1.0rc1']  # RC pin needed until v2.1.0 GA
+      additional_dependencies: ['safelint[java]']  # RC pin needed until v2.1.0 GA
       # For a polyglot repo with Python + Java:
-      # additional_dependencies: ['safelint[python,java]==2.1.0rc1']
+      # additional_dependencies: ['safelint[python,java]']
 ```
 
 ## File extensions
@@ -88,7 +86,7 @@ When the user asks "why is this flagged?", the universal rationale in the per-cl
 
 ## Deliberately skipped rules
 
-These rules are NOT registered for Java in v2.1.0rc1 because the Python / JS-family semantics don't translate cleanly:
+These rules are NOT registered for Java in v2.1.0 because the Python / JS-family semantics don't translate cleanly:
 
 | Code | Rule | Why skipped for Java |
 |---|---|---|

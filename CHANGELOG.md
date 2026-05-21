@@ -7,9 +7,41 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Fixed (Java)
+## [2.1.0] - 2026-05-21
 
-- **``SAFE401 resource_lifecycle``** for Java's manual ``try { ... } finally { ... }`` form is now strict: the finally clause must contain a direct ``<acquired-var>.close()`` invocation for the rule to consider the resource guarded. The previous heuristic (mirroring JS) accepted *any* try with a finally clause, so ``try { in = new FileInputStream(p); } finally { audit(); }`` silently passed even though nothing closed ``in``. Bare-expression acquirers (``try { new FileInputStream(p); } finally { ... }``) now always fire, since there's no variable handle that could ever be closed. **Helper-pattern trade-off:** ``IOUtils.closeQuietly(in)``, ``Try.run(() -> in.close())``, and similar close-via-helper patterns are NOT recognised under the new strict matcher and will fire SAFE401; switch to try-with-resources or suppress with ``// nosafe: SAFE401`` on the acquirer line. The strict path applies to Java only; JavaScript retains its documented heuristic.
+**v2.1.0 GA.** The release candidate cycle is closed. The cumulative scope vs `v2.1.0rc1` is a long list of rule-correctness fixes and doc / skill consistency fixes that landed during the RC review cycle; engine and rule behaviour on the headline Java + Spring Boot surface is now finalised for the 2.1.x line. Functionally `v2.1.0` ships the rc1 feature set (Java as a registered language, the `spring-boot` framework preset, the four new `SAFE901-904` rules, 16 cross-language rules ported to Java) plus the corrections below.
+
+**Install:** RC pins and `--pre` flags are no longer required. `pip install 'safelint[java]'` resolves to `2.1.0` straight from PyPI.
+
+### Rule corrections (vs `2.1.0rc1`)
+
+- **SAFE401 `resource_lifecycle`** for Java's manual `try { ... } finally { ... }` is now strict: the finally clause must contain a direct `<acquired-var>.close()` invocation. The previous heuristic accepted any try with a finally; `try { in = new FileInputStream(p); } finally { audit(); }` silently passed. Bare-expression acquirers (`try { new FileInputStream(p); } finally { ... }`) now always fire. Wrapped acquirers (`br = new BufferedReader(new FileReader(path))`) correctly inherit the outer variable name for cleanup tracking. **Helper-pattern trade-off:** `IOUtils.closeQuietly(in)`, `Try.run(() -> in.close())` style closes are NOT recognised under the strict matcher and will fire; switch to try-with-resources or suppress with `// nosafe: SAFE401`. The strict path applies to Java only; JavaScript retains its documented heuristic.
+- **SAFE801 `tainted_sink`** lambda capture analysis: a Java lambda's tracker is now seeded with own-params plus the enclosing method's final tainted set (locals included), so `String dirty = input; run(() -> exec(dirty));` correctly fires. Compound assignments (`sql += " suffix"`) preserve the LHS's existing taint. Chained assignments (`a = b = source()`) propagate the innermost-RHS taint through every LHS. Enhanced-for loops (`for (String arg : args) { exec(arg); }`) taint the loop variable from the iterable. Receiver-as-input now matches generic-type constructors via `generic_type` unwrap (`new MyResource<Foo>(input)`).
+- **SAFE801 sanitizers_java defaults narrowed.** Context-specific output encoders (OWASP `forHtml` / `forJavaScript` / `forCssString`, Apache Commons `escapeHtml*` / `escapeXml` / `escapeJava` / `escapeJson`, Spring `htmlEscape`) and URL encoders (`encode` / `encodeURIComponent`) are no longer in defaults. They were creating cross-context false negatives (`Encode.forHtml(name)` before `jdbc.query(...)` silently cleared the SQL-sink warning). Defaults are now `sanitize` / `validate` / `quote` / `escape` only; opt back in via TOML if your project routes everything through a specific encoder.
+- **SAFE801 spring-boot preset sinks: collision-prone bare verbs removed.** `put` / `delete` / `update` / `exchange` are no longer in the preset's `sinks_java`; they collided with `HashMap.put` / `File.delete` / `CurrencyExchange.exchange` / project-local helpers under SAFE801's single-set design. Unambiguous Spring names (`query` / `queryForObject` / `queryForList` / `queryForMap` / `queryForRowSet` / `batchUpdate` / `getForObject` / `getForEntity` / `postForObject` / `postForEntity` / `postForLocation` / `patchForObject`) stay. Add the bare verbs explicitly via `[tool.safelint.rules.tainted_sink] sinks_java` if your project needs `restTemplate.put(...)` / `jdbcTemplate.update(...)` coverage.
+- **SAFE902 `spring_missing_transactional` receiver-name guard.** The rule now only counts repository-write method calls whose receiver name (lowercased) contains `repo` / `dao` / `jdbctemplate`. Without this, `call_name()` stripped the receiver and unrelated calls like `file.delete()` / `cache.delete()` / `restTemplate.delete(...)` were counted as Spring Data writes. Bare `template` was tested but matched non-DB Spring templates (`restTemplate`, `kafkaTemplate`, `redisTemplate`); `jdbctemplate` is the correct narrower pattern. Recognises `this.userRepo.save(...)` field-access receivers too.
+- **SAFE904 `spring_async_checked_exception` class-level `@Async`.** The rule now also fires when the enclosing class carries `@Async` (not only the method). Spring applies class-level `@Async` to every method in the class; the throws clause is just as misleading either way. Docs and rule docstring updated to reflect that the rule flags ANY `throws` clause (checked or unchecked) for simplicity; distinguishing checked vs unchecked needs type-inference safelint doesn't do.
+- **SAFE103 `max_arguments` untyped Java lambda params.** `(a, b, c, d, e, f, g, h) -> ...` and `a -> ...` shapes parse as `inferred_parameters` / bare `identifier` in tree-sitter-java; the rule's counter dispatched only on `formal_parameter` / `spread_parameter` and silently counted untyped lambdas as zero-arg. Added the lambda-specific dispatch so over-argument untyped lambdas in stream pipelines correctly fire.
+- **SAFE202 `empty_except` Java catch-body shapes.** Empty Java catch bodies with multiple comment children (`{ // a\n // b\n }`) now correctly classify as empty. tree-sitter-java emits each comment as a named block child. Empty-statement (`;`) inside Java catches is also recognised as a no-op. Python / JS / TS retain their single-statement check.
+- **SAFE701 / SAFE702 `Test`-prefix Java false-positives removed.** Production classes like `TestDataFactory.java` / `TestConfig.java` under `src/main/java` were being classified as tests (silently skipping coverage enforcement). The `Test`-prefix shortcut is gone; legitimate JUnit 3 tests under the configured `test_dirs` are still picked up via the path-component check.
+- **`_node_utils._java_object_creation_name` now handles `generic_type`.** `new MyResource<Foo>(...)` parameterised constructors were silently invisible to SAFE401 tracked-acquirer / SAFE801 constructor-sink / SAFE303-304 I/O-constructor matchers. The unwrap recurses through `generic_type` to the inner `type_identifier` / `scoped_type_identifier`.
+- **SAFE303 / 304 default `io_functions_java` cleanups.** `HttpClient` is replaced by the actual matched factory + send method names (`newHttpClient` / `send` / `sendAsync`); the class itself has no public constructor so `call_name()` never returned `"HttpClient"`. `format` removed from SAFE303's set (collided with `String.format` / `MessageFormat.format`). `FileChannel` removed from SAFE401's `tracked_functions_java` for the same receiver-stripping reason.
+
+### Doc / skill alignment
+
+- All Java suppression examples switched from `# nosafe` to `// nosafe`; Java's comment prefix is `//`.
+- SAFE801 docs now describe what's actually in `sanitizers_java` defaults (no HTML / URL encoders) and explain why.
+- README rule-count totals corrected: 24 rules total (was 20), 14 default-on, 10 opt-in (the four `SAFE9xx` are opt-in under vanilla, default-enabled by the `spring-boot` preset).
+- Per-language docs corrected: "16 cross-language rules" (was "17"); SAFE302 is Python / JS / TS only, not cross-all-four.
+- SAFE902 / SAFE903 severity rows in the rule reference corrected from `"warning"` to `"error"` (matches the implementation).
+- README and the docs landing page now list Java in the "Currently supported languages" table; PyPI keywords + description include `java` / `spring-boot`.
+- `docs/configuration/rules.md` got a full `SAFE901` / `SAFE902` / `SAFE903` / `SAFE904` rule-detail section (was missing).
+- Project-wide writing-style sweep: em-dashes removed from all docs / skills / README / CHANGELOG re-introduced during the RC cycle.
+
+### Migration
+
+- **From `v2.0.0`:** see the *Migration* table in the [2.1.0rc1] entry below; the only required change is bumping the install command to opt into the new `[java]` extra if you lint Java sources, and bumping `rev: v2.0.0` to `rev: v2.1.0` in pre-commit configs.
+- **From `v2.1.0rc1`:** drop any `==2.1.0rc1` pin or `--pre` flag; `pip install -U 'safelint[<lang>]'` is sufficient. Pre-commit users bump `rev: v2.1.0rc1` to `rev: v2.1.0`.
 
 ## [2.1.0rc1] - 2026-05-16
 
@@ -18,14 +50,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Install as a RC pre-release:
 
 ```bash
-pip install --pre 'safelint[java]==2.1.0rc1'
+pip install 'safelint[java]'
 # or, for a polyglot repo:
-pip install --pre 'safelint[python,java]==2.1.0rc1'
+pip install 'safelint[python,java]'
 # or the kitchen-sink:
-pip install --pre 'safelint[all]==2.1.0rc1'
+pip install 'safelint[all]'
 ```
 
-Pre-commit users update ``rev: v2.0.0`` to ``rev: v2.1.0rc1`` and add ``'safelint[java]==2.1.0rc1'`` to ``additional_dependencies`` (the RC pin is required until v2.1.0 GA so pre-commit's pip resolver does not fall back to v2.0.0 which lacks the ``[java]`` extra).
+Pre-commit users update ``rev: v2.0.0`` to ``rev: v2.1.0`` and add ``'safelint[java]==2.1.0rc1'`` to ``additional_dependencies`` (the RC pin is required until v2.1.0 GA so pre-commit's pip resolver does not fall back to v2.0.0 which lacks the ``[java]`` extra).
 
 ### Added
 
@@ -39,7 +71,7 @@ Pre-commit users update ``rev: v2.0.0`` to ``rev: v2.1.0rc1`` and add ``'safelin
   - **``SAFE902 spring_missing_transactional``** (error): service-layer method (``@Service`` / ``@Component`` class) doing 2+ Spring Data writes (``save`` / ``saveAll`` / ``saveAndFlush`` / ``delete`` / ``deleteAll`` / ``deleteAllInBatch`` / ``deleteAllById`` / ``deleteAllByIdInBatch`` / ``deleteById`` / ``update``) without ``@Transactional`` on the method or the class. Receiver-name guard constrains matching to receivers whose lowercased name contains ``repo`` / ``dao`` / ``jdbctemplate`` so unrelated calls like ``file.delete()`` / ``restTemplate.delete()`` don't count. Single-write methods are exempt.
   - **``SAFE903 spring_unvalidated_input``** (error): ``@RestController`` / ``@Controller`` method parameter binds ``@RequestBody`` or ``@ModelAttribute`` without ``@Valid`` / ``@Validated``. ``@PathVariable`` and ``@RequestParam`` are deliberately NOT covered (typically bind to primitives). Complements ``SAFE801`` structurally - ``SAFE801`` catches via dataflow, ``SAFE903`` catches at the input boundary.
   - **``SAFE904 spring_async_checked_exception``** (warning): ``@Async`` method declares a ``throws`` clause. Spring runs ``@Async`` on a separate thread and silently swallows exceptions; the caller never sees them, regardless of throws-clause declarations. Fix: catch inside the body and either swallow with logging or return ``CompletableFuture.failedFuture(...)``.
-- **``[java]`` PEP 621 extra** in ``pyproject.toml``, pulls ``tree-sitter-java>=0.23.0``. Folded into ``[all]`` alongside ``[python]`` / ``[javascript]`` / ``[typescript]``. ``pip install --pre 'safelint[java]==2.1.0rc1'`` is the typical Java-only invocation during the RC (drop ``--pre`` and the pin once v2.1.0 GA ships); polyglot Python + Java monorepos compose extras via ``'safelint[python,java]==2.1.0rc1'``.
+- **``[java]`` PEP 621 extra** in ``pyproject.toml``, pulls ``tree-sitter-java>=0.23.0``. Folded into ``[all]`` alongside ``[python]`` / ``[javascript]`` / ``[typescript]``. ``pip install 'safelint[java]'`` is the typical Java-only invocation during the RC (drop ``--pre`` and the pin once v2.1.0 GA ships); polyglot Python + Java monorepos compose extras via ``'safelint[python,java]==2.1.0rc1'``.
 - **Bundled skill addendum** at ``src/safelint/skill_files/languages/java.md`` (~250 lines) shipped in the wheel so every AI client (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) consults Java-specific guidance on demand via ``safelint skill path``. Covers install nuance, framework presets, per-rule notes for all 20 applicable rules, deliberately-skipped rules with rationale, idiomatic Java + Spring fix patterns, and integration-with-existing-tooling guidance.
 - **mkdocs site page** at ``docs/languages/java.md`` mirroring the skill addendum for the user-facing site. Wired into the Languages nav between TypeScript and Configuration; the landing page (``docs/index.md``) gains a Java row in the supported-languages table.
 - **Pre-commit ``types_or`` extended** to ``[python, javascript, ts, tsx, java]`` in ``.pre-commit-hooks.yaml`` so the published hook automatically routes ``.java`` files to the engine without users needing to override the filter. The dedicated Pre-commit docs page (``docs/pre-commit.md``) and the root README gain the ``['safelint[java]']`` ``additional_dependencies`` variant.
@@ -621,7 +653,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.1.0rc1...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.1.0...HEAD
+[2.1.0]: https://github.com/shelkesays/safelint/compare/v2.1.0rc1...v2.1.0
 [2.1.0rc1]: https://github.com/shelkesays/safelint/compare/v2.0.0...v2.1.0rc1
 [2.0.0]: https://github.com/shelkesays/safelint/compare/v2.0.0rc3...v2.0.0
 [2.0.0rc3]: https://github.com/shelkesays/safelint/compare/v2.0.0rc2...v2.0.0rc3
