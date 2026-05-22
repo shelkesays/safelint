@@ -20,11 +20,13 @@ from pathlib import Path
 from safelint.languages import java as _java_mod
 from safelint.languages import javascript as _javascript_mod
 from safelint.languages import python as _python_mod
+from safelint.languages import rust as _rust_mod
 from safelint.languages import typescript as _typescript_mod
 from safelint.languages._types import LanguageDefinition
 from safelint.languages.java import JAVA
 from safelint.languages.javascript import JAVASCRIPT
 from safelint.languages.python import PYTHON
+from safelint.languages.rust import RUST
 from safelint.languages.typescript import TSX, TYPESCRIPT
 
 
@@ -90,6 +92,20 @@ else:
     for _ext in JAVA.file_extensions:
         _UNAVAILABLE_EXTENSIONS[_ext] = _java_mod.GRAMMAR_INSTALL_HINT
         _UNAVAILABLE_EXTRA_NAMES[_ext] = _java_mod.EXTRA_NAME
+
+# Rust - only register if ``tree-sitter-rust`` is installed (i.e. the
+# ``[rust]`` or ``[all]`` extra was selected). Memory safety is enforced
+# by rustc, so safelint's rule set on Rust is narrower than other
+# languages (function shape, error-handling discipline, loop safety,
+# dataflow); SAFE401 ``resource_lifecycle`` is intentionally NOT registered
+# for Rust because RAII / Drop already guarantees cleanup.
+if _rust_mod._GRAMMAR_AVAILABLE:
+    for _ext in RUST.file_extensions:
+        _REGISTRY[_ext] = RUST
+else:
+    for _ext in RUST.file_extensions:
+        _UNAVAILABLE_EXTENSIONS[_ext] = _rust_mod.GRAMMAR_INSTALL_HINT
+        _UNAVAILABLE_EXTRA_NAMES[_ext] = _rust_mod.EXTRA_NAME
 
 
 def get_language_for_file(filepath: str) -> LanguageDefinition | None:

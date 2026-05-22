@@ -46,6 +46,9 @@ from safelint.languages import (
     python as _python_mod,
 )
 from safelint.languages import (
+    rust as _rust_mod,
+)
+from safelint.languages import (
     typescript as _typescript_mod,
 )
 
@@ -166,6 +169,34 @@ def test_registry_skips_java_when_grammar_unavailable(monkeypatch: pytest.Monkey
         importlib.reload(languages)
 
 
+def test_rust_parser_factory_raises_when_grammar_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``_create_rust_parser`` errors clearly when the grammar isn't installed."""
+    monkeypatch.setattr(_rust_mod, "_RUST_TS_LANGUAGE", None)
+    with pytest.raises(ImportError, match=r"tree-sitter-rust is not installed.*safelint\[rust\]"):
+        _rust_mod._create_rust_parser()
+
+
+def test_rust_install_hint_names_the_right_extra() -> None:
+    """The hint string matches what users actually need to type."""
+    assert _rust_mod.GRAMMAR_INSTALL_HINT == "pip install 'safelint[rust]'"
+
+
+def test_registry_skips_rust_when_grammar_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When ``_GRAMMAR_AVAILABLE`` is False for Rust, ``.rs`` is unavailable; other languages stay available."""
+    monkeypatch.setattr(_rust_mod, "_GRAMMAR_AVAILABLE", False)
+    reloaded = importlib.reload(languages)
+    try:
+        assert ".rs" not in reloaded.supported_extensions()
+        assert reloaded.unavailable_extensions()[".rs"] == _rust_mod.GRAMMAR_INSTALL_HINT
+        # Other languages stay available since their grammars are independent.
+        assert ".py" in reloaded.supported_extensions()
+        assert ".js" in reloaded.supported_extensions()
+        assert ".java" in reloaded.supported_extensions()
+    finally:
+        monkeypatch.setattr(_rust_mod, "_GRAMMAR_AVAILABLE", True)
+        importlib.reload(languages)
+
+
 def test_registry_skips_typescript_when_grammar_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     """When TS grammar isn't installed, ``.ts`` / ``.tsx`` / ``.as`` are unavailable, JS stays available."""
     monkeypatch.setattr(_typescript_mod, "_GRAMMAR_AVAILABLE", False)
@@ -235,7 +266,7 @@ def test_every_language_has_its_own_extra() -> None:
     # Keep the exclusion list explicit so adding a new tooling extra
     # forces a deliberate update here.
     language_extras = provides_extras - {"dev", "docs"}
-    expected = {"python", "javascript", "typescript", "java", "all"}
+    expected = {"python", "javascript", "typescript", "java", "rust", "all"}
     missing = expected - language_extras
     unexpected = language_extras - expected
     assert not missing, f"v2.x contract: every supported language must have its own opt-in extra. Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"
