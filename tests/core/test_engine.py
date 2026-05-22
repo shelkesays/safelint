@@ -389,13 +389,12 @@ _RULES_WIDENED_FOR_JS_FAMILY: frozenset[str] = frozenset(
 
 _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA: frozenset[str] = frozenset(
     {
-        # Cross-language rules ported to JS / TS / Java. ``language`` should
-        # be exactly ``("python", "javascript", "typescript", "java")``.
-        # Entries graduate from ``_RULES_WIDENED_FOR_JS_FAMILY`` as the
-        # rule's Java port lands; once every cross-language rule is in this
-        # set, ``_RULES_WIDENED_FOR_JS_FAMILY`` will be empty and can be
-        # removed.
-        "FunctionLengthRule",
+        # Cross-language rules ported to JS / TS / Java but NOT YET ported
+        # to Rust. ``language`` should be exactly ``("python", "javascript",
+        # "typescript", "java")``. As the v2.2.0 Rust port lands rule-by-
+        # rule, each entry here graduates to
+        # ``_RULES_PORTED_TO_ALL_FIVE_LANGUAGES``. Once every cross-language
+        # rule is in that set, this bucket will be empty and can be removed.
         "NestingDepthRule",
         "MaxArgumentsRule",
         "ComplexityRule",
@@ -411,6 +410,17 @@ _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA: frozenset[str] = frozenset(
         "TaintedSinkRule",
         "ReturnValueIgnoredRule",
         "NullDereferenceRule",
+    }
+)
+
+_RULES_PORTED_TO_ALL_FIVE_LANGUAGES: frozenset[str] = frozenset(
+    {
+        # Cross-language rules ported to all five languages.
+        # ``language`` should be exactly ``("python", "javascript",
+        # "typescript", "java", "rust")``. Entries graduate here from
+        # ``_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA`` as each rule's Rust port
+        # lands during v2.2.0rc1.
+        "FunctionLengthRule",
     }
 )
 
@@ -453,6 +463,7 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
     """
     cross_lang_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript")}
     cross_lang_with_java_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript", "java")}
+    cross_lang_all_five_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript", "java", "rust")}
     js_family_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("javascript", "typescript")}
     java_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("java",)}
     assert cross_lang_actual == _RULES_WIDENED_FOR_JS_FAMILY, (
@@ -463,13 +474,20 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
         f"Actually ('python', 'javascript', 'typescript', 'java'): {sorted(cross_lang_with_java_actual)}; "
         f"documented: {sorted(_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA)}"
     )
+    assert cross_lang_all_five_actual == _RULES_PORTED_TO_ALL_FIVE_LANGUAGES, (
+        "All-five-languages allow-list out of sync. "
+        f"Actually ('python', 'javascript', 'typescript', 'java', 'rust'): {sorted(cross_lang_all_five_actual)}; "
+        f"documented: {sorted(_RULES_PORTED_TO_ALL_FIVE_LANGUAGES)}"
+    )
     assert js_family_only_actual == _RULES_JS_FAMILY_ONLY, (
         f"JS-family-only allow-list out of sync. Actually ('javascript', 'typescript'): {sorted(js_family_only_actual)}; documented: {sorted(_RULES_JS_FAMILY_ONLY)}"
     )
     assert java_only_actual == _RULES_JAVA_ONLY, f"Java-only allow-list out of sync. Actually ('java',): {sorted(java_only_actual)}; documented: {sorted(_RULES_JAVA_ONLY)}"
 
     for cls in ALL_RULES:
-        if cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA:
+        if cls.__name__ in _RULES_PORTED_TO_ALL_FIVE_LANGUAGES:
+            assert cls.language == ("python", "javascript", "typescript", "java", "rust"), f"{cls.__name__} should be ('python', 'javascript', 'typescript', 'java', 'rust'); got {cls.language}"
+        elif cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA:
             assert cls.language == ("python", "javascript", "typescript", "java"), f"{cls.__name__} should be ('python', 'javascript', 'typescript', 'java'); got {cls.language}"
         elif cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY:
             assert cls.language == ("python", "javascript", "typescript"), f"{cls.__name__} should be ('python', 'javascript', 'typescript'); got {cls.language}"
@@ -478,5 +496,5 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
         elif cls.__name__ in _RULES_JAVA_ONLY:
             assert cls.language == ("java",), f"{cls.__name__} should be ('java',); got {cls.language}"
         else:
-            buckets = "_RULES_WIDENED_FOR_JS_FAMILY, _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA, _RULES_JS_FAMILY_ONLY, or _RULES_JAVA_ONLY"
+            buckets = "_RULES_WIDENED_FOR_JS_FAMILY, _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA, _RULES_PORTED_TO_ALL_FIVE_LANGUAGES, _RULES_JS_FAMILY_ONLY, or _RULES_JAVA_ONLY"
             assert cls.language == ("python",), f"{cls.__name__} has unexpected language={cls.language}; add it to {buckets} if intentional"
