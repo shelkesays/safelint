@@ -395,7 +395,6 @@ _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA: frozenset[str] = frozenset(
         # rule, each entry here graduates to
         # ``_RULES_PORTED_TO_ALL_FIVE_LANGUAGES``. Once every cross-language
         # rule is in that set, this bucket will be empty and can be removed.
-        "ComplexityRule",
         "EmptyExceptRule",
         "LoggingOnErrorRule",
         "UnboundedLoopRule",
@@ -418,6 +417,7 @@ _RULES_PORTED_TO_ALL_FIVE_LANGUAGES: frozenset[str] = frozenset(
         # "typescript", "java", "rust")``. Entries graduate here from
         # ``_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA`` as each rule's Rust port
         # lands during v2.2.0rc1.
+        "ComplexityRule",
         "FunctionLengthRule",
         "MaxArgumentsRule",
         "NestingDepthRule",
