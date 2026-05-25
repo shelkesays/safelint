@@ -8,6 +8,7 @@ from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
+from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.rules.base import BaseRule
 
 
@@ -22,6 +23,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
+    "rust": _RUST_FUNCTION_TYPES,
 }
 
 _PY_SPLAT_PARAM_TYPES = frozenset({"list_splat_pattern", "dictionary_splat_pattern"})
@@ -82,11 +84,29 @@ _JAVA_COUNTED_PARAM_TYPES = frozenset(
     }
 )
 
+# Rust ``function_item`` has a ``parameters`` container whose children
+# are ``parameter`` (typed: ``name: Type``) or ``self_parameter`` (``self``
+# / ``&self`` / ``&mut self``). The self forms are deliberately excluded -
+# they're the explicit method-receiver, analogous to Python's ``self`` /
+# ``cls`` and Java's ``receiver_parameter``, and shouldn't count as a
+# user-facing argument. Closures (``closure_expression``) expose a
+# ``closure_parameters`` container whose children are bare ``identifier``
+# nodes for untyped closures (``|x, y| ...``) or ``parameter`` nodes for
+# typed closures (``|x: i32, y: i32| ...``); ``identifier`` is in the
+# counted set so untyped closure arity is captured.
+_RUST_COUNTED_PARAM_TYPES = frozenset(
+    {
+        "parameter",
+        "identifier",
+    }
+)
+
 _COUNTED_PARAM_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": _PY_COUNTED_PARAM_TYPES,
     "javascript": _JS_COUNTED_PARAM_TYPES,
     "typescript": _TS_COUNTED_PARAM_TYPES,
     "java": _JAVA_COUNTED_PARAM_TYPES,
+    "rust": _RUST_COUNTED_PARAM_TYPES,
 }
 
 
@@ -165,7 +185,7 @@ class MaxArgumentsRule(BaseRule):
 
     name = "max_arguments"
     code = "SAFE103"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "rust")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function with more arguments than max_args."""
