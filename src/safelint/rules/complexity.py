@@ -19,6 +19,7 @@ from safelint.languages.python import (
     IF_STATEMENT,
     WHILE_STATEMENT,
 )
+from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.rules.base import BaseRule
 
 
@@ -33,6 +34,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
+    "rust": _RUST_FUNCTION_TYPES,
 }
 
 # Node types that add 1 to cyclomatic complexity. Both languages: every
@@ -75,6 +77,26 @@ _JAVA_BRANCHING_TYPES = frozenset(
         "ternary_expression",
     }
 )
+# Rust: ``if`` / ``for`` / ``while`` / ``loop`` are control-flow
+# constructs in their own right. ``if let`` and ``while let`` parse as
+# the standard ``if_expression`` / ``while_expression`` with a
+# ``let_condition`` child (tree-sitter-rust 0.24.x), so they are
+# covered without a separate node type. ``match_arm`` plays the same
+# role as Java's switch_block_statement_group / switch_rule - one
+# branch per arm. ``try_expression`` is the ``?`` operator
+# (``foo()?``); it is conditional early-return, so it counts as one
+# branch (analogous to ``catch_clause`` in Java). Rust has no
+# ternary; ``if`` is itself an expression and is already counted.
+_RUST_BRANCHING_TYPES = frozenset(
+    {
+        "if_expression",
+        "for_expression",
+        "while_expression",
+        "loop_expression",
+        "match_arm",
+        "try_expression",
+    }
+)
 _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset(
         {
@@ -91,6 +113,7 @@ _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": _JS_BRANCHING_TYPES,
     "typescript": _JS_BRANCHING_TYPES,
     "java": _JAVA_BRANCHING_TYPES,
+    "rust": _RUST_BRANCHING_TYPES,
 }
 
 # JavaScript: ``binary_expression`` covers many operators (``+``, ``>``,
@@ -102,13 +125,29 @@ _JS_BRANCHING_BINARY_OPS = frozenset({"&&", "||", "??"})
 # for the null-coalescing role; both call expressions, not operators).
 _JAVA_BRANCHING_BINARY_OPS = frozenset({"&&", "||"})
 
+# Rust: ``&&`` / ``||`` short-circuit just like JS / Java. Rust has no
+# ``??`` operator (the ``?`` operator is ``try_expression``, not a
+# binary operator, and is already counted via the branching-types set).
+_RUST_BRANCHING_BINARY_OPS = frozenset({"&&", "||"})
+
+# Per-language allow-list for ``binary_expression`` operators that add
+# one to cyclomatic complexity. Languages absent from this map (e.g.
+# Python, where ``boolean_operator`` is its own node type) fall through
+# to the empty set.
+_BRANCHING_BINARY_OPS_BY_LANG: dict[str, frozenset[str]] = {
+    "javascript": _JS_BRANCHING_BINARY_OPS,
+    "typescript": _JS_BRANCHING_BINARY_OPS,
+    "java": _JAVA_BRANCHING_BINARY_OPS,
+    "rust": _RUST_BRANCHING_BINARY_OPS,
+}
+
 
 class ComplexityRule(BaseRule):
     """Reject functions whose cyclomatic complexity exceeds max_complexity."""
 
     name = "complexity"
     code = "SAFE104"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "rust")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions whose cyclomatic complexity exceeds the configured maximum."""
@@ -157,21 +196,20 @@ def _is_branch_node(node: tree_sitter.Node, lang_name: str, branching_types: fro
     """Return True if *node* contributes 1 to the enclosing function's cyclomatic complexity.
 
     Most languages can answer this with a simple node-type set membership.
-    JavaScript / TypeScript / Java need a side check because ``&&`` / ``||``
-    (and ``??`` for JS / TS) parse as ``binary_expression`` (a node type
-    that also covers ``+``, ``>``, ``-``, etc., which are *not* branches) -
-    we filter on the operator string.
+    JavaScript / TypeScript / Java / Rust need a side check because
+    ``&&`` / ``||`` (and ``??`` for JS / TS) parse as
+    ``binary_expression`` (a node type that also covers ``+``, ``>``,
+    ``-``, etc., which are *not* branches) - we filter on the operator
+    string via ``_BRANCHING_BINARY_OPS_BY_LANG``.
     """
     if node.type in branching_types:
         return True
     if node.type != "binary_expression":
         return False
+    branching_ops = _BRANCHING_BINARY_OPS_BY_LANG.get(lang_name)
+    if branching_ops is None:
+        return False
     op = node.child_by_field_name("operator")
     if op is None or op.text is None:
         return False
-    op_text = op.text.decode("utf-8")
-    if lang_name in ("javascript", "typescript"):
-        return op_text in _JS_BRANCHING_BINARY_OPS
-    if lang_name == "java":
-        return op_text in _JAVA_BRANCHING_BINARY_OPS
-    return False
+    return op.text.decode("utf-8") in branching_ops
