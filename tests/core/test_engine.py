@@ -397,7 +397,6 @@ _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA: frozenset[str] = frozenset(
         # rule is in that set, this bucket will be empty and can be removed.
         "EmptyExceptRule",
         "LoggingOnErrorRule",
-        "UnboundedLoopRule",
         "SideEffectsHiddenRule",
         "SideEffectsRule",
         "ResourceLifecycleRule",
@@ -421,6 +420,7 @@ _RULES_PORTED_TO_ALL_FIVE_LANGUAGES: frozenset[str] = frozenset(
         "FunctionLengthRule",
         "MaxArgumentsRule",
         "NestingDepthRule",
+        "UnboundedLoopRule",
     }
 )
 
