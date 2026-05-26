@@ -418,6 +418,34 @@ DEFAULTS: dict[str, Any] = {
                 # Common short forms
                 "fail",
             ],
+            # Rust assertion-macro names. Rust expresses assertions
+            # exclusively through macros (no ``assert`` keyword like
+            # Python / Java). ``call_name`` doesn't help here - the
+            # rule walks ``macro_invocation`` nodes and matches the
+            # bareword macro name (with ``std::`` / ``core::`` qualifiers
+            # stripped). Defaults cover the standard library's three
+            # always-on assertion macros, the three debug-only variants,
+            # and proptest's ``prop_assert*`` triplet which is widely
+            # used in property-based test code. ``panic!`` / ``todo!`` /
+            # ``unreachable!`` / ``unimplemented!`` are intentionally
+            # NOT in the defaults: they're failure-exit markers, not
+            # invariant assertions in the Power of Ten sense - projects
+            # that want them counted can add them via
+            # ``assertion_calls_rust``.
+            "assertion_calls_rust": [
+                # Standard library (always on)
+                "assert",
+                "assert_eq",
+                "assert_ne",
+                # Standard library (debug builds only)
+                "debug_assert",
+                "debug_assert_eq",
+                "debug_assert_ne",
+                # proptest crate - property-based test assertions
+                "prop_assert",
+                "prop_assert_eq",
+                "prop_assert_ne",
+            ],
         },
         "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
         "test_coupling": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},

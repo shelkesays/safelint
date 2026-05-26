@@ -400,7 +400,6 @@ _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA: frozenset[str] = frozenset(
         "SideEffectsHiddenRule",
         "SideEffectsRule",
         "ResourceLifecycleRule",
-        "MissingAssertionsRule",
         "TestExistenceRule",
         "TestCouplingRule",
         "TaintedSinkRule",
@@ -419,6 +418,7 @@ _RULES_PORTED_TO_ALL_FIVE_LANGUAGES: frozenset[str] = frozenset(
         "ComplexityRule",
         "FunctionLengthRule",
         "MaxArgumentsRule",
+        "MissingAssertionsRule",
         "NestingDepthRule",
         "UnboundedLoopRule",
     }
