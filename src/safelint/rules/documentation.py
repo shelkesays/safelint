@@ -9,6 +9,7 @@ from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, res
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASSERT_STATEMENT, ASYNC_FUNCTION_DEF, FUNCTION_DEF
+from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.rules.base import BaseRule
 
 
@@ -23,6 +24,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
+    "rust": _RUST_FUNCTION_TYPES,
 }
 
 
@@ -59,6 +61,55 @@ def _java_has_assertion(func_node: tree_sitter.Node, function_types: frozenset[s
         if c.type == "assert_statement":
             return True
         if c.type in CALL_TYPES and call_name(c) in assertion_calls:
+            return True
+    return False
+
+
+def _rust_macro_name(macro_node: tree_sitter.Node) -> str | None:
+    """Return the bareword macro name from a Rust ``macro_invocation`` ``macro`` field.
+
+    The ``macro`` field is one of:
+
+    * ``identifier`` - bare ``assert!`` / ``debug_assert_eq!``. Return as-is.
+    * ``scoped_identifier`` - qualified ``std::assert!`` / ``core::panic!``.
+      Return the trailing identifier (``"assert"`` / ``"panic"``) so that
+      ``assertion_calls_rust`` can use bareword names without needing the
+      caller to list every plausible qualifier.
+
+    Returns ``None`` for shapes the rule can't resolve (an empty
+    scoped_identifier with no trailing name etc.); the caller's filter
+    naturally skips those.
+    """
+    if macro_node.type == "identifier":
+        return node_text(macro_node)
+    if macro_node.type == "scoped_identifier":
+        name = macro_node.child_by_field_name("name")
+        return node_text(name) if name is not None else None
+    return None
+
+
+def _rust_has_assertion(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str]) -> bool:
+    """Return True when the Rust function body contains an assertion macro.
+
+    Rust expresses assertions exclusively through macros (``assert!``,
+    ``assert_eq!``, ``assert_ne!``, ``debug_assert!``, etc.), NOT
+    function calls. tree-sitter-rust parses these as
+    ``macro_invocation`` with a ``macro`` field carrying the bareword
+    or qualified macro name.
+
+    Skips nested function / closure bodies so the outer function
+    isn't credited for asserts that live in a closure body.
+    """
+    for c in walk(func_node, skip_types=tuple(function_types)):
+        if c is func_node:
+            continue
+        if c.type != "macro_invocation":
+            continue
+        macro = c.child_by_field_name("macro")
+        if macro is None:
+            continue
+        name = _rust_macro_name(macro)
+        if name is not None and name in assertion_calls:
             return True
     return False
 
@@ -104,7 +155,7 @@ class MissingAssertionsRule(BaseRule):
 
     name = "missing_assertions"
     code = "SAFE601"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "rust")
 
     def _has_assertion(self, func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str]) -> bool:
         """Dispatch to the language-appropriate assertion-presence check.
@@ -126,6 +177,14 @@ class MissingAssertionsRule(BaseRule):
             raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", "java", default=[])
             assertion_calls = frozenset(_validated_string_list(raw, error_key))
             return _java_has_assertion(func_node, function_types, assertion_calls)
+        if lang_name == "rust":
+            # Rust assertions are macros (``assert!``, ``assert_eq!``,
+            # ``debug_assert!`` etc.), NOT function calls. The rule walks
+            # ``macro_invocation`` nodes and matches the bareword macro
+            # name (stripped of any ``std::`` / ``core::`` qualifier).
+            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", "rust", default=[])
+            assertion_calls = frozenset(_validated_string_list(raw, error_key))
+            return _rust_has_assertion(func_node, function_types, assertion_calls)
         # JS-family (JS / TS): TypeScript inherits the JS list by default
         # via the TS→JS fallback in ``get_per_language_config``.
         raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", lang_name, default=[])
