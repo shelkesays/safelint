@@ -187,25 +187,48 @@ def _java_type_name(type_node: tree_sitter.Node) -> str | None:
     return node_text(last_id) if last_id is not None else None  # pragma: no cover - defensive: scoped_type_identifier always has trailing identifier
 
 
+# Maps each callee node type to the field name where the trailing
+# bareword lives. ``identifier`` is the trivial case (returned directly
+# via ``node_text``); for the others, the value is the field name
+# whose target ``node_text`` resolves to. Per-language meaning:
+#
+# * Python ``attribute`` (``obj.method``) - the bareword is on
+#   ``attribute``.
+# * JavaScript ``member_expression`` (``obj.method`` /
+#   ``new fs.WriteStream``) - bareword on ``property``.
+# * Rust ``field_expression`` (``obj.method()``) - bareword on
+#   ``field``.
+# * Rust ``scoped_identifier`` (``std::fs::read``) - trailing identifier
+#   on ``name``. Returning just the bareword keeps sink-list configs
+#   short - users don't have to enumerate every plausible qualifier.
+_CALLEE_BAREWORD_FIELD: dict[str, str] = {
+    "attribute": "attribute",
+    "member_expression": "property",
+    "field_expression": "field",
+    "scoped_identifier": "name",
+}
+
+
 def _python_js_call_name(call_node: tree_sitter.Node) -> str | None:
-    """Return the bareword for a Python ``call`` or JS ``call_expression`` / ``new_expression``."""
-    # ``call`` (Python) and ``call_expression`` (JS) expose the callee
+    """Return the bareword for a Python ``call``, JS ``call_expression`` / ``new_expression``, or Rust ``call_expression``.
+
+    Single multi-language helper because all four languages share the
+    ``function`` / ``constructor`` field convention; only the callee
+    sub-node shape varies per language and is handled by the
+    :data:`_CALLEE_BAREWORD_FIELD` table.
+    """
+    # ``call`` (Python), ``call_expression`` (JS / Rust) expose the callee
     # via the ``function`` field; JS ``new_expression`` uses ``constructor``.
     func_node = call_node.child_by_field_name("function") or call_node.child_by_field_name("constructor")
     if func_node is None:
         return None
     if func_node.type == "identifier":
         return node_text(func_node)
-    if func_node.type == "attribute":
-        # Python: ``obj.method``. Property is the ``attribute`` field.
-        attr_node = func_node.child_by_field_name("attribute")
-        return node_text(attr_node) if attr_node else None
-    if func_node.type == "member_expression":
-        # JavaScript: ``obj.method`` (or ``new fs.WriteStream`` - same shape).
-        # Property is the ``property`` field.
-        prop_node = func_node.child_by_field_name("property")
-        return node_text(prop_node) if prop_node else None
-    return None
+    field = _CALLEE_BAREWORD_FIELD.get(func_node.type)
+    if field is None:
+        return None
+    target = func_node.child_by_field_name(field)
+    return node_text(target) if target else None
 
 
 # Per-call-node-type dispatch: each entry returns the bareword name (or

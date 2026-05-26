@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, ClassVar
 from safelint.analysis.dataflow import TaintTracker
 from safelint.analysis.dataflow_java import JavaTaintTracker
 from safelint.analysis.dataflow_javascript import JsTaintTracker
+from safelint.analysis.dataflow_rust import RustTaintTracker
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
@@ -19,6 +20,7 @@ from safelint.languages.python import (
     FUNCTION_DEF,
     SUBSCRIPT,
 )
+from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.rules.base import BaseRule
 
 
@@ -35,6 +37,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
+    "rust": _RUST_FUNCTION_TYPES,
 }
 
 
@@ -88,6 +91,27 @@ _JAVA_PASSTHROUGH_WRAPPER_TYPES = frozenset(
         "cast_expression",
     }
 )
+
+
+_RUST_PASSTHROUGH_WRAPPER_TYPES = frozenset(
+    {
+        "parenthesized_expression",
+        "reference_expression",  # ``&x`` / ``&mut x``
+        "try_expression",  # ``foo()?`` propagates Ok inside the Result
+    }
+)
+
+
+def _peel_rust_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Descend through Rust pass-through wrappers, returning the inner expression.
+
+    Mirrors :func:`_peel_js_passthrough` and :func:`_peel_java_passthrough`
+    for Rust's reference / parenthesis / try-operator shapes. The loop
+    is bounded by tree depth.
+    """
+    while node is not None and node.type in _RUST_PASSTHROUGH_WRAPPER_TYPES and node.named_children:  # nosafe: SAFE501
+        node = node.named_children[0]
+    return node
 
 
 def _peel_java_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
@@ -277,6 +301,74 @@ def _java_spread_param_name(child: tree_sitter.Node) -> str | None:
     return node_text(name_node)
 
 
+def _rust_param_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return all parameter names for *func_node* (Rust function or closure).
+
+    Rust functions expose ``parameters`` (the ``(...)`` container);
+    closures expose ``closure_parameters`` (the ``|...|`` container).
+    Each container holds:
+
+    * ``parameter`` nodes - typed params with a ``pattern`` field
+      carrying the binding. Tuple / struct destructuring on the
+      pattern is expanded so every bound name enters the tainted set.
+    * ``identifier`` nodes - bare names in untyped closure params
+      (``|x, y| ...``); contribute the name directly.
+    * ``self_parameter`` - the ``self`` / ``&self`` / ``&mut self``
+      receiver; ALWAYS skipped because ``self`` is the bound name and
+      shouldn't be treated as an untrusted input.
+    """
+    params_node = func_node.child_by_field_name("parameters")
+    if params_node is None:  # pragma: no cover - defensive: valid Rust functions/closures always have a parameters list
+        return set()
+    names: set[str] = set()
+    for child in params_node.named_children:
+        names.update(_rust_single_param_names(child))
+    return names
+
+
+def _rust_single_param_names(child: tree_sitter.Node) -> set[str]:
+    """Return the bound names contributed by a single Rust param-list entry."""
+    if child.type == "self_parameter":
+        return set()
+    if child.type == "identifier":
+        return {node_text(child)}
+    if child.type == "parameter":
+        pattern = child.child_by_field_name("pattern")
+        return _rust_collect_pattern_names(pattern) if pattern is not None else set()
+    return set()
+
+
+_RUST_RECURSIVE_PATTERN_TYPES = frozenset({"mut_pattern", "ref_pattern", "tuple_pattern", "tuple_struct_pattern", "struct_pattern", "captured_pattern"})
+
+
+def _rust_collect_pattern_names(node: tree_sitter.Node) -> set[str]:
+    """Walk a Rust parameter pattern and collect every bound identifier name.
+
+    Mirrors :class:`~safelint.analysis.dataflow_rust.RustTaintTracker._iter_pattern_identifiers`
+    but returns a flat set rather than yielding nodes - cheaper for
+    parameter seeding where positional info isn't needed.
+    """
+    if node.type in ("identifier", "shorthand_field_identifier"):
+        return {node_text(node)}
+    if node.type in _RUST_RECURSIVE_PATTERN_TYPES:
+        names: set[str] = set()
+        for child in node.named_children:
+            names.update(_rust_collect_pattern_names(child))
+        return names
+    if node.type == "field_pattern":
+        return _rust_field_pattern_names(node)
+    return set()
+
+
+def _rust_field_pattern_names(node: tree_sitter.Node) -> set[str]:
+    """Return the bound name(s) inside a single ``field_pattern`` node."""
+    inner = node.child_by_field_name("pattern")
+    if inner is not None:
+        return _rust_collect_pattern_names(inner)
+    shorthand = next((c for c in node.named_children if c.type == "shorthand_field_identifier"), None)
+    return {node_text(shorthand)} if shorthand is not None else set()
+
+
 def _java_lambda_enclosing_tainted(lambda_node: tree_sitter.Node, cache: dict[int, set[str]]) -> set[str]:
     """Return the enclosing function's final tainted set for *lambda_node*.
 
@@ -368,7 +460,7 @@ class TaintedSinkRule(BaseRule):
 
     name = "tainted_sink"
     code = "SAFE801"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "rust")
 
     _DEFAULT_SINKS: ClassVar[list[str]] = [
         "eval",
@@ -514,6 +606,34 @@ class TaintedSinkRule(BaseRule):
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 
+    def _rust_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run Rust taint analysis on every function / closure in *tree*.
+
+        Rust's threat surface differs meaningfully from the other
+        languages: there is no ``eval`` / ``Function(code)``; the
+        dynamic-execution sinks reduce to ``Command`` (shell), database
+        crate calls (sqlx / diesel / rusqlite / postgres), and FFI
+        (``libloading`` / extern fn invocation). Defaults focus on the
+        stdlib shape; downstream projects extend via
+        ``sinks_rust`` / ``sanitizers_rust`` / ``sources_rust``.
+        """
+        sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", "rust", default=[])
+        sinks = frozenset(_validated_string_list(sinks_raw, sinks_key))
+        sanitizers_raw, sanitizers_key = resolve_lang_config_lookup(self.config, "sanitizers", "rust", default=[])
+        sanitizers = frozenset(_validated_string_list(sanitizers_raw, sanitizers_key))
+        sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", "rust", default=[])
+        sources = frozenset(_validated_string_list(sources_raw, sources_key))
+        assume = self._resolve_assume_taint_preserving()
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type not in _RUST_FUNCTION_TYPES:
+                continue
+            params = _rust_param_names(node)
+            tracker = RustTaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker.visit(node)
+            violations.extend(self._format_hits(filepath, tracker.sink_hits))
+        return violations
+
     def _format_hits(self, filepath: str, hits: list[tuple[tree_sitter.Node, str, str]]) -> list[Violation]:
         """Convert tracker hits to Violations - same message format for both languages."""
         return [
@@ -532,6 +652,8 @@ class TaintedSinkRule(BaseRule):
             return self._javascript_check(filepath, tree, lang_name)
         if lang_name == "java":
             return self._java_check(filepath, tree)
+        if lang_name == "rust":
+            return self._rust_check(filepath, tree)
         return self._python_check(filepath, tree)
 
 
@@ -547,7 +669,7 @@ class ReturnValueIgnoredRule(BaseRule):
 
     name = "return_value_ignored"
     code = "SAFE802"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "rust")
 
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
@@ -617,6 +739,8 @@ def _null_dereference_message(method: str, lang_name: str) -> str:
         return f'Result of "{method}()" is immediately dereferenced without a null check - guard with optional chaining ("result?.field") or "if (result != null)"'
     if lang_name == "java":
         return f'Result of "{method}()" is immediately dereferenced without a null check - guard with "if (result != null)" or wrap in Optional.ofNullable(...)'
+    if lang_name == "rust":
+        return f'Result of "{method}()" is immediately unwrapped without an Option/Result check - guard with "if let Some(x) = ..." / "match" or propagate with "?"'
     return f'Result of "{method}()" is immediately dereferenced without a None check - guard with "if result is not None"'
 
 
@@ -625,7 +749,17 @@ class NullDereferenceRule(BaseRule):
 
     name = "null_dereference"
     code = "SAFE803"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "rust")
+
+    _RUST_UNWRAP_METHODS: ClassVar[frozenset[str]] = frozenset(
+        {
+            "unwrap",
+            "unwrap_unchecked",
+            "expect",
+            "unwrap_err",
+            "expect_err",
+        }
+    )
 
     _DEFAULT_NULLABLE_PYTHON: ClassVar[frozenset[str]] = frozenset(
         {
@@ -696,6 +830,44 @@ class NullDereferenceRule(BaseRule):
         name = call_name(obj)
         return name if name and name in nullable else None
 
+    def _rust_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
+        """Return the method name if *node* is an unsafe Rust unwrap, else None.
+
+        Rust has no ``null`` - the nullable / fallible analogues are
+        ``Option<T>`` and ``Result<T, E>``. The hazardous pattern is
+        ``some_call().unwrap()`` (or ``.expect("...")``) where the
+        inner call returns one of these types: ``unwrap`` panics on
+        ``None`` / ``Err``, exactly the SAFE803 hazard adapted for
+        Rust's type system.
+
+        Detection shape:
+
+        1. *node* is a ``call_expression``.
+        2. Its ``function`` is a ``field_expression`` whose ``field``
+           is one of :attr:`_RUST_UNWRAP_METHODS`.
+        3. The ``value`` of that ``field_expression`` (the receiver
+           that's being unwrapped) is itself a ``call_expression``
+           whose resolved ``call_name`` is in *nullable*.
+
+        Pass-through wrappers between the unwrap-target and the
+        inner call are peeled via :func:`_peel_rust_passthrough` so
+        ``(map.get(&k)).unwrap()`` and ``(&map.get(&k)).unwrap()``
+        both fire.
+        """
+        if node.type != "call_expression":
+            return None
+        func = node.child_by_field_name("function")
+        if func is None or func.type != "field_expression":
+            return None
+        field = func.child_by_field_name("field")
+        if field is None or node_text(field) not in self._RUST_UNWRAP_METHODS:
+            return None
+        receiver = _peel_rust_passthrough(func.child_by_field_name("value"))
+        if receiver is None or receiver.type != "call_expression":
+            return None
+        name = call_name(receiver)
+        return name if name and name in nullable else None
+
     def _javascript_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
         """Return the method name if *node* is an unsafe JavaScript dereference, else None.
 
@@ -750,6 +922,10 @@ class NullDereferenceRule(BaseRule):
             raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", "java", default=[])
             nullable = frozenset(_validated_string_list(raw, error_key))
             deref_hit = self._java_deref_hit
+        elif lang_name == "rust":
+            raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", "rust", default=[])
+            nullable = frozenset(_validated_string_list(raw, error_key))
+            deref_hit = self._rust_deref_hit
         else:
             # JS-family (JS / TS): TypeScript inherits the JS list by default.
             raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", lang_name, default=[])

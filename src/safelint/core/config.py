@@ -588,6 +588,63 @@ DEFAULTS: dict[str, Any] = {
                 "getRequestURI",
                 "getRemoteUser",
             ],
+            # Rust stdlib sink / sanitizer / source lists. Rust has no
+            # ``eval`` / dynamic-code-execution analogue; the security
+            # surface is shell execution (``Command`` / ``arg`` /
+            # ``args``), raw-SQL database APIs (sqlx / diesel /
+            # rusqlite / postgres), and FFI loading. ``call_name``
+            # strips the qualifier (``std::process::Command::new``
+            # resolves to ``"new"``; ``cmd.arg(x)`` to ``"arg"``).
+            "sinks_rust": [
+                # Process execution.
+                "Command",  # ``Command::new(tainted)`` - the program path
+                "new",  # ``Command::new(tainted)`` - the bareword path resolves to "new"
+                "arg",  # ``cmd.arg(tainted)`` - tainted command argument
+                "args",  # ``cmd.args(tainted)`` - tainted args iterator
+                # Database raw-SQL (sqlx / diesel / rusqlite / postgres).
+                # All four crates expose a ``query`` / ``execute`` entry
+                # point that takes a SQL string; bind parameters via
+                # placeholders are safe, but interpolation isn't.
+                "query",
+                "query_as",
+                "query_scalar",
+                "execute",
+                "execute_batch",
+                # FFI / dynamic-library loading.
+                "Library",  # ``libloading::Library::new(path)`` with tainted path
+                # File-path sinks (path traversal). ``Path::new`` and
+                # the ``read`` / ``write`` family take paths; tainted
+                # paths can escape an allow-listed directory via ``..``.
+                "open",  # ``File::open(tainted_path)``
+            ],
+            "sanitizers_rust": [
+                # Narrow defaults - the same trade-off as Java's
+                # sanitizers_java. Context-specific HTML / URL / shell
+                # encoders are deliberately NOT included because they
+                # only clear taint for their own output context;
+                # including them would suppress real SAFE801 findings
+                # when used for the wrong context.
+                "validate",
+                "sanitize",
+                "escape",
+                "quote",
+                # Rust crate convention: ``percent_encode`` for URLs,
+                # ``html_escape::encode_text`` for HTML. These ARE
+                # context-specific; users should configure them per
+                # rule rather than the global default.
+            ],
+            "sources_rust": [
+                # Environment / process / args sources.
+                "var",  # ``std::env::var(name)`` - returns user-controlled env value
+                "args",  # ``std::env::args()`` - command-line argument iterator
+                # Stdin sources.
+                "read_line",  # ``stdin().read_line(&mut buf)``
+                "read_to_string",  # ``File::read_to_string(...)`` / ``stdin().read_to_string(...)``
+                "lock",  # ``stdin().lock()`` - returned reader is a source
+                # Network sources (basic - frameworks add more).
+                "recv",  # ``UdpSocket::recv``, ``Receiver::recv``
+                "recv_from",
+            ],
         },
         "return_value_ignored": {
             "enabled": False,
@@ -681,6 +738,48 @@ DEFAULTS: dict[str, Any] = {
                 # return value is the normal pattern.
                 "cancel",
             ],
+            # Rust stdlib methods that return ``Result<_, _>`` or
+            # ``Option<_>`` carrying success / failure information.
+            # Bare-statement ``file.write(buf);`` discards the Result
+            # silently - Rust's ``#[must_use]`` only warns at the
+            # compiler level for new code, not for legacy code or
+            # types defined outside the crate. ``call_name`` strips
+            # the receiver, so ``file.write_all(buf)`` resolves to
+            # ``"write_all"`` and matches the bareword list.
+            "flagged_calls_rust": [
+                # io::Write
+                "write",
+                "write_all",
+                "write_fmt",
+                "flush",
+                # io::Read - rare to discard but possible
+                "read",
+                "read_exact",
+                "read_to_end",
+                "read_to_string",
+                # std::fs filesystem mutators
+                "remove_file",
+                "remove_dir",
+                "remove_dir_all",
+                "rename",
+                "copy",
+                "create_dir",
+                "create_dir_all",
+                "set_permissions",
+                "set_len",
+                # Networking - socket I/O
+                "send",
+                "send_to",
+                # std::process::Command runners
+                "spawn",
+                "output",
+                "status",
+                # std::process::Child
+                "wait",
+                "wait_with_output",
+                "try_wait",
+                "kill",
+            ],
         },
         "null_dereference": {
             "enabled": False,
@@ -729,6 +828,54 @@ DEFAULTS: dict[str, Any] = {
                 "getEnclosingMethod",
                 # Stream.findFirst / findAny return Optional, not null - so
                 # NOT listed here. peek / orElse / orElseGet similarly fine.
+            ],
+            # Rust methods returning ``Option<T>`` or ``Result<T, E>``.
+            # The Rust SAFE803 fires on ``<call>.unwrap()`` /
+            # ``<call>.expect(...)`` when ``<call>``'s name is in this
+            # list - unwrapping the resulting Option / Result panics on
+            # ``None`` / ``Err``, the closest analogue to a null-
+            # dereference in a language without ``null``.
+            "nullable_methods_rust": [
+                # std collections - missing-key lookups
+                "get",  # HashMap::get / Vec::get / BTreeMap::get / slice::get
+                "get_mut",
+                "get_key_value",
+                # Vec / slice positional access
+                "first",
+                "last",
+                "first_mut",
+                "last_mut",
+                "pop",  # Vec::pop
+                # Iterator advancing - exhausted iterator returns None
+                "next",
+                "next_back",
+                "nth",
+                "peek",  # Peekable::peek
+                # String / &str search
+                "find",
+                "rfind",
+                "chars",  # chains commonly into ``.next()``
+                # Parse / convert
+                "parse",  # &str::parse - returns Result
+                "to_socket_addrs",
+                # Env / process
+                "var",  # std::env::var - returns Result
+                "var_os",
+                # Filesystem
+                "read",
+                "read_to_string",
+                "read_to_end",
+                "read_dir",
+                "metadata",
+                "canonicalize",
+                # IO
+                "read_line",
+                "lines",
+                # Common Option-returning conversion methods
+                "checked_add",
+                "checked_sub",
+                "checked_mul",
+                "checked_div",
             ],
         },
         # Spring Boot framework-aware rules (SAFE9xx band). Java-only.
