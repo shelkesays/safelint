@@ -6,7 +6,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from safelint.languages import JAVASCRIPT, TSX, TYPESCRIPT
-from safelint.languages._node_utils import resolve_lang_name
+from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.rules.base import BaseRule
 
 
@@ -34,6 +34,12 @@ _TS_EXTENSIONS: tuple[str, ...] = tuple(sorted(TYPESCRIPT.file_extensions | TSX.
 # still legal in JUnit. The candidate list yields all four so projects
 # can mix conventions without false-positive misses.
 _JAVA_TEST_SUFFIXES: tuple[str, ...] = ("Test", "Tests", "IT")
+
+# Rust test-filename suffixes. Cargo's integration-test convention is
+# ``tests/<stem>.rs`` (exact stem, no suffix); some projects also use a
+# ``<stem>_test.rs`` suffix as a colocated convention. Both are listed
+# as candidates so projects following either pattern get a match.
+_RUST_TEST_SUFFIXES: tuple[str, ...] = ("", "_test")
 
 
 if TYPE_CHECKING:
@@ -78,6 +84,9 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
         suffix_forms = [f"{stem}{suf}.java" for suf in _JAVA_TEST_SUFFIXES]
         prefix_form = [f"Test{stem}.java"]
         return [*suffix_forms, *prefix_form]
+    if lang_name == "rust":
+        stem = src_path.stem
+        return [f"{stem}{suf}.rs" for suf in _RUST_TEST_SUFFIXES]
     # Python (and any future language without an explicit override).
     return [f"test_{src_path.stem}.py"]
 
@@ -97,6 +106,12 @@ def _test_filename_for_message(src_path: Path, lang_name: str) -> str:
         return f"{src_path.stem}.test{src_path.suffix}"
     if lang_name == "java":
         return f"{src_path.stem}Test.java"
+    if lang_name == "rust":
+        # Cargo's integration-test convention - bare ``<stem>.rs`` under
+        # ``tests/``. Inline ``#[cfg(test)] mod tests { }`` users won't
+        # see this message since the rule's tree-walk bypass clears
+        # the violation before the message is built.
+        return f"{src_path.stem}.rs"
     return f"test_{src_path.stem}.py"
 
 
@@ -124,16 +139,42 @@ def _path_components_contain(haystack: tuple[str, ...], needle: tuple[str, ...])
     return any(haystack[i : i + n] == needle for i in range(len(haystack) - n + 1))
 
 
+def _filename_matches_test_pattern(filepath: str, lang_name: str) -> bool:
+    """Return True if *filepath*'s bare filename matches a test-file naming convention.
+
+    Per-language conventions:
+
+    * JS / TS: ``.test.`` or ``.spec.`` infix (Jest / Mocha / Karma).
+    * Java: stem ending in ``Test`` / ``Tests`` / ``IT``. The legacy
+      ``Test<Name>.java`` prefix form is deliberately NOT recognised
+      here because production utilities (``TestDataFactory``,
+      ``TestConfig``) under ``src/main/java`` use the same prefix and
+      would be wrongly classified as tests; legitimate JUnit 3
+      ``Test``-prefix tests get picked up via the path-component check
+      in :func:`_is_test_file` when they live in the configured test
+      directory.
+    * Rust: stem ending in ``_test`` (colocated convention). Bare
+      ``<stem>.rs`` under ``tests/`` is handled by path-component
+      matching at the call site, not here.
+    * Python (fallback): filename starting with ``test_``.
+    """
+    name = Path(filepath).name
+    if lang_name in ("javascript", "typescript"):
+        return ".test." in name or ".spec." in name
+    if lang_name == "java":
+        return any(Path(filepath).stem.endswith(suf) for suf in _JAVA_TEST_SUFFIXES)
+    if lang_name == "rust":
+        return Path(filepath).stem.endswith("_test")
+    return name.startswith("test_")
+
+
 def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
     """Return True if *filepath* is itself a test file (so SAFE701/702 should not run on it).
 
     Without this guard the test-coverage rules would treat a test file
     as a source file and look for *its* paired test (e.g. ``tests/foo.test.js``
     would search for ``foo.test.test.js``, ``tests/test_bar.py`` would
-    search for ``test_test_bar.py``). With ``files: ^src/`` dropped
-    from the published pre-commit hook in v1.13.0, the rules now reach
-    test files in any project that doesn't restore the filter locally,
-    making this false-positive guard necessary.
+    search for ``test_test_bar.py``).
 
     Two checks, OR'd together:
 
@@ -141,46 +182,94 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
        configured ``test_dirs`` entry - covers test files even if
        their filenames don't follow the pattern convention
        (``conftest.py``, ``__init__.py``, fixtures, helpers).
-       Handles multi-component entries (``"tests/unit"``,
-       ``"packages/foo/tests"``) and absolute paths
-       (``"/abs/path/tests"``) by matching each ``test_dirs`` entry's
-       full ``Path.parts`` tuple as a contiguous subsequence of the
-       filepath's parts.
-    2. **Filename-pattern match.** The bare filename matches the
-       language's test-file convention - covers tests written
-       inline alongside source (some projects do
-       ``src/foo/foo.test.js``).
+       Handles multi-component entries (``"tests/unit"``) and
+       absolute paths by matching each ``test_dirs`` entry's full
+       ``Path.parts`` tuple as a contiguous subsequence.
+    2. **Filename-pattern match.** Delegated to
+       :func:`_filename_matches_test_pattern`.
     """
     # Normalise both sides to absolute paths before the parts comparison.
     # Without this, a relative ``filepath`` (``tests/conftest.js``) wouldn't
     # match against an absolute ``test_dirs`` entry (``/abs/project/tests``)
-    # and helper files under the test root would be misclassified as
-    # source - triggering false-positive SAFE701/702 violations. Using
-    # ``.absolute()`` (not ``.resolve()``) avoids following symlinks, which
-    # is what we want for path-component comparison.
+    # and helper files under the test root would be misclassified as source.
+    # ``.absolute()`` (not ``.resolve()``) avoids following symlinks.
     path_parts = Path(filepath).absolute().parts
     for td in test_dirs:
         td_parts = Path(td).absolute().parts
         if _path_components_contain(path_parts, td_parts):
             return True
-    name = Path(filepath).name
-    if lang_name in ("javascript", "typescript"):
-        return ".test." in name or ".spec." in name
-    if lang_name == "java":
-        # ``Foo.java`` stems ending in ``Test`` / ``Tests`` / ``IT``.
-        # The legacy ``Test``-prefix form (``TestFoo.java``) is NOT
-        # checked here: production classes like ``TestDataFactory.java``
-        # and ``TestConfig.java`` under ``src/main/java`` use the same
-        # prefix in real Spring Boot codebases and would be wrongly
-        # classified as tests, silently skipping them from SAFE701 /
-        # SAFE702 enforcement. Legitimate JUnit 3 ``Test``-prefix
-        # tests are still picked up via the ``test_dirs`` path-
-        # component check above when they live in the configured
-        # test directory (typically ``src/test/java``); the rule
-        # prefers the false negative on misplaced tests over the
-        # false positive on Test*-named production utilities.
-        return any(Path(filepath).stem.endswith(suf) for suf in _JAVA_TEST_SUFFIXES)
-    return name.startswith("test_")
+    return _filename_matches_test_pattern(filepath, lang_name)
+
+
+def _token_tree_mentions_test(token_tree: tree_sitter.Node) -> bool:
+    """Return True if *token_tree* directly contains an ``identifier`` ``test``."""
+    return any(inner.type == "identifier" and node_text(inner) == "test" for inner in token_tree.named_children)
+
+
+def _cfg_token_tree_mentions_test(children: list[tree_sitter.Node]) -> bool:
+    """Return True if any ``token_tree`` in *children* contains an ``identifier`` ``test``.
+
+    Helper for :func:`_rust_has_test_marker`'s ``#[cfg(test)]`` branch.
+    Split out so the marker walker stays under the cyclomatic /
+    nesting limits SafeLint enforces on its own code.
+    """
+    return any(child.type == "token_tree" and _token_tree_mentions_test(child) for child in children)
+
+
+def _attribute_is_rust_test_marker(node: tree_sitter.Node) -> bool:
+    """Return True if *node* is a ``#[test]`` or ``#[cfg(test)]`` attribute."""
+    children = node.named_children
+    if not children:  # pragma: no cover - tree-sitter-rust always emits a name child on an attribute
+        return False
+    first = children[0]
+    if first.type != "identifier":  # pragma: no cover - defensive: macro-path attributes use scoped_identifier
+        return False
+    first_name = node_text(first)
+    if first_name == "test":
+        return True
+    if first_name != "cfg":
+        return False
+    return _cfg_token_tree_mentions_test(children[1:])
+
+
+def _rust_has_test_marker(tree: tree_sitter.Tree) -> bool:
+    """Return True if *tree* contains ``#[test]`` or ``#[cfg(test)]``.
+
+    Both attributes mean the file *is* a test (inline tests in a
+    ``#[cfg(test)] mod tests { }`` block) or *defines* tests
+    (``#[test] fn it_works()``), satisfying SAFE701 / SAFE702
+    without a separate paired file. Rust's idiomatic unit-test
+    placement is in-file, so the rule must recognise it - otherwise
+    every Rust source with inline tests would still fire SAFE701
+    asking for an external ``tests/<stem>.rs`` that doesn't exist.
+
+    tree-sitter-rust parses both forms as ``attribute`` nodes whose
+    first named child is an ``identifier``; the per-node decision
+    lives in :func:`_attribute_is_rust_test_marker`.
+    """
+    return any(node.type == "attribute" and _attribute_is_rust_test_marker(node) for node in walk(tree.root_node))
+
+
+def _paired_test_in_changed_under_test_dirs(src: Path, changed: set[str], test_dirs: list[str], lang_name: str) -> bool:
+    """Return True if any candidate paired-test filename for *src* is in *changed* and under *test_dirs*.
+
+    Restricts the candidate match to changed paths whose components
+    include a configured ``test_dirs`` entry as a contiguous
+    subsequence. A same-basename file changed outside the test root
+    (e.g. ``legacy/test_foo.py`` or ``packages/foo/bar/foo.test.js``
+    when ``test_dirs=["tests"]``) would otherwise satisfy the
+    basename match and silently skip SAFE702 even though the paired
+    test under ``tests/`` wasn't touched.
+
+    Both sides are normalised via ``.absolute()`` before the parts
+    comparison so a relative ``changed_files`` entry and an absolute
+    ``test_dirs`` entry still match - mirrors :func:`_is_test_file`.
+    """
+    candidates = _candidate_test_filenames(src, lang_name)
+    td_parts_list = [Path(td).absolute().parts for td in test_dirs]
+    changed_under_test_dirs = {f for f in changed if any(_path_components_contain(Path(f).absolute().parts, td_parts) for td_parts in td_parts_list)}
+    changed_basenames = {Path(f).name for f in changed_under_test_dirs}
+    return any(candidate in changed_basenames for candidate in candidates)
 
 
 def _test_dir_contains(test_dir: Path, candidates: list[str]) -> bool:
@@ -200,18 +289,23 @@ class TestExistenceRule(BaseRule):
 
     name = "test_existence"
     code = "SAFE701"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "rust")
 
-    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:  # noqa: ARG002
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when no matching test file can be found.
 
         Filename pattern is language-aware - see :func:`_candidate_test_filenames`.
         Skips test files themselves (see :func:`_is_test_file`) so we
-        don't ask a test to have its own test.
+        don't ask a test to have its own test. For Rust, additionally
+        skips files that carry inline tests (``#[test]`` /
+        ``#[cfg(test)]``) - that's the idiomatic Rust placement and
+        the rule must not demand an external test file alongside it.
         """
         lang_name = resolve_lang_name(filepath)
         test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
         if _is_test_file(filepath, test_dirs, lang_name):
+            return []
+        if lang_name == "rust" and _rust_has_test_marker(tree):
             return []
         src = Path(filepath)
         if _find_test_file(src, test_dirs, lang_name):
@@ -241,9 +335,9 @@ class TestCouplingRule(BaseRule):
 
     name = "test_coupling"
     code = "SAFE702"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "rust")
 
-    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:  # noqa: ARG002
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when the paired test file was not part of this commit."""
         # No coupling context means we are not in a diff-aware run (e.g. --all-files).
         # Firing on every file would be noise, so skip entirely.
@@ -258,6 +352,12 @@ class TestCouplingRule(BaseRule):
         # test to also change.
         if _is_test_file(filepath, test_dirs, lang_name):
             return []
+        # Rust files with inline tests are themselves the test file -
+        # if the source changed, the inline tests in the same file
+        # were necessarily reachable for editing in the same commit,
+        # so the coupling guarantee is satisfied by definition.
+        if lang_name == "rust" and _rust_has_test_marker(tree):
+            return []
         changed: set[str] = set(self.config["_changed_files"])
         src = Path(filepath)
 
@@ -265,28 +365,7 @@ class TestCouplingRule(BaseRule):
         if not _find_test_file(src, test_dirs, lang_name):
             return []
 
-        # Was *any* of the candidate test filenames part of this commit
-        # *and located under one of the configured test_dirs*? The
-        # test_dirs gate is essential: a same-basename file changed
-        # outside the test root (e.g. ``legacy/test_foo.py`` or
-        # ``packages/foo/bar/foo.test.js`` when ``test_dirs=["tests"]``)
-        # would otherwise satisfy the basename match and silently
-        # skip SAFE702 even though the paired test under ``tests/``
-        # wasn't touched. Restricting the candidate match to changed
-        # paths whose components include a ``test_dirs`` entry as a
-        # contiguous subsequence - the same logic ``_is_test_file``
-        # uses - fixes the false-negative.
-        #
-        # Both sides are normalised via ``.absolute()`` before the
-        # parts comparison so a relative ``changed_files`` entry
-        # (CLI passes relative paths when possible) and an absolute
-        # ``test_dirs`` entry (user-configured) still match. Mirrors
-        # the normalisation in ``_is_test_file``.
-        candidates = _candidate_test_filenames(src, lang_name)
-        td_parts_list = [Path(td).absolute().parts for td in test_dirs]
-        changed_under_test_dirs = {f for f in changed if any(_path_components_contain(Path(f).absolute().parts, td_parts) for td_parts in td_parts_list)}
-        changed_basenames = {Path(f).name for f in changed_under_test_dirs}
-        if any(candidate in changed_basenames for candidate in candidates):
+        if _paired_test_in_changed_under_test_dirs(src, changed, test_dirs, lang_name):
             return []
 
         expected = _test_filename_for_message(src, lang_name)
