@@ -114,6 +114,35 @@ def test_java_labeled_break_exits_outer_while(tmp_path: Path) -> None:
     assert _safe501_count(result) == 0, "labelled break should exit the outer while (true) and clear SAFE501"
 
 
+def test_java_labeled_break_to_different_label_still_fires(tmp_path: Path) -> None:
+    """``outer: while (true) { inner: for (...) { break inner; } }`` still fires.
+
+    The ``break inner;`` exits the inner labelled ``for`` (whose label
+    sits strictly inside ``outer``), so the outer ``while (true)`` has
+    no exiting break and SAFE501 fires. Exercises the Java branch of
+    ``_node_label_name`` that reads the bare ``identifier`` token off
+    a ``labeled_statement`` (Java's label-token type, unlike JS's
+    ``statement_identifier``).
+    """
+    sample = tmp_path / "LabelInner.java"
+    sample.write_text(
+        "class LabelInner {\n"
+        "    void f(java.util.List<String> items) {\n"
+        "        outer: while (true) {\n"
+        "            inner: for (String item : items) {\n"
+        "                if (item.isEmpty()) {\n"
+        "                    break inner;\n"
+        "                }\n"
+        "            }\n"
+        "        }\n"
+        "    }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert _safe501_count(result) >= 1, "labelled break targeting an inner label should not clear the outer while (true)"
+
+
 def test_java_unlabeled_break_in_nested_for_does_not_exit_outer_while(tmp_path: Path) -> None:
     """``while (true) { for (...) { break; } }`` (no label) still fires.
 
