@@ -977,6 +977,8 @@ DEFAULTS: dict[str, Any] = {
             ],
         },
         "lock_poisoning_ignored": {"enabled": False, "severity": "warning"},
+        "silent_result_discard": {"enabled": False, "severity": "warning"},
+        "unlogged_error_branch": {"enabled": False, "severity": "warning"},
         "dangerous_mem_ops": {
             "enabled": False,
             "severity": "error",

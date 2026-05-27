@@ -16,7 +16,9 @@ from safelint.rules.rust_rules import (
     DangerousMemOpsRule,
     LockPoisoningIgnoredRule,
     PanicMacrosOutsideTestsRule,
+    SilentResultDiscardRule,
     UndocumentedUnsafeRule,
+    UnloggedErrorBranchRule,
 )
 from safelint.rules.side_effects import SideEffectsHiddenRule, SideEffectsRule
 from safelint.rules.spring import (
@@ -69,6 +71,8 @@ ALL_RULES: list[type[BaseRule]] = [
     # [tool.safelint.rules.<name>] enabled = true.
     PanicMacrosOutsideTestsRule,
     LockPoisoningIgnoredRule,
+    SilentResultDiscardRule,
+    UnloggedErrorBranchRule,
     DangerousMemOpsRule,
     UndocumentedUnsafeRule,
 ]
@@ -97,6 +101,7 @@ __all__ = [
     "ReturnValueIgnoredRule",
     "SideEffectsHiddenRule",
     "SideEffectsRule",
+    "SilentResultDiscardRule",
     "SpringAsyncCheckedExceptionRule",
     "SpringFieldInjectionRule",
     "SpringMissingTransactionalRule",
@@ -106,6 +111,7 @@ __all__ = [
     "TestExistenceRule",
     "UnboundedLoopRule",
     "UndocumentedUnsafeRule",
+    "UnloggedErrorBranchRule",
     "Violation",
     "WideScopeDeclarationRule",
 ]

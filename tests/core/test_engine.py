@@ -457,9 +457,11 @@ _RULES_RUST_ONLY: frozenset[str] = frozenset(
         # Rust-only language-idiom rules (``language=("rust",)``).
         # Slotted into existing category bands per the SafeLint
         # numbering policy (see CLAUDE.md): the band still encodes
-        # category, not language. All four disabled by default.
+        # category, not language. All disabled by default.
         "PanicMacrosOutsideTestsRule",  # SAFE204 - error handling
         "LockPoisoningIgnoredRule",  # SAFE205 - error handling
+        "SilentResultDiscardRule",  # SAFE206 - error handling (Rust analogue of SAFE202)
+        "UnloggedErrorBranchRule",  # SAFE207 - error handling (Rust analogue of SAFE203)
         "DangerousMemOpsRule",  # SAFE306 - side effects
         "UndocumentedUnsafeRule",  # SAFE602 - documentation
     }
