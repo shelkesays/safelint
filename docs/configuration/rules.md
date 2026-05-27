@@ -19,26 +19,27 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 - **JavaScript** (`.js`, `.mjs`, `.cjs`), source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime *defaults* (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the [`[tool.safelint.javascript] runtime = "..."`](toml.md#javascript-runtime-presets) preset, the source-language rules themselves don't change.
 - **TypeScript** (`.ts`, `.tsx`), and **AssemblyScript** (`.as`, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, `as` casts, non-null assertions, `declare global` ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See [TypeScript](../languages/typescript.md) for the full language reference.
 - **Java** (`.java`), new in v2.1.0. 16 of the cross-language rules port cleanly plus 4 Spring Boot framework-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* (sinks, nullable methods, structural rule enablement) are switchable via the [`[tool.safelint.java] framework = "..."`](../languages/java.md#framework-presets) preset (`vanilla` / `spring-boot`). See [Java](../languages/java.md) for the full language reference.
+- **Rust** (`.rs`), new in v2.2.0. 17 of the cross-language rules port cleanly plus 10 Rust-only rules cover Rust-idiom-specific patterns (panic-in-non-test, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer parameters, broad `.unwrap()` outside tests, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). 6 cross-language rules deliberately skipped because their semantics don't translate cleanly (Rust has no try/catch / `global` keyword, and RAII / Drop covers resource cleanup). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. See [Rust](../languages/rust.md) for the full language reference.
 
 ### Planned
 
 Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see [Adding a language](../contributing/adding-a-language.md)) makes each new language incremental, community contributions for any of these are welcome.
 
 1. **Go** (`.go`).
-2. **Rust** (`.rs`).
-3. **C** (`.c`, `.h`), Holzmann's original target language.
-4. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
-5. **PHP** (`.php`).
+2. **C** (`.c`, `.h`), Holzmann's original target language.
+3. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
+4. **PHP** (`.php`).
 
 ### Rule scope (current languages)
 
 | Scope | Count | Codes |
 |---|---|---|
-| **Cross-language** (Python, JavaScript, TypeScript, Java) | 16 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE202, SAFE203, SAFE303, SAFE304, SAFE401, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 |
-| **Python / JS / TS** (not Java) | 1 | SAFE302 (`global_mutation`, where Java's natural analogue (non-final static field writes from outside the declaring class's static initialiser) needs class-scope analysis the rule doesn't yet do; deferred to a future release) |
-| **Python-only** | 2 | SAFE201 (`bare_except`, JS / TS catches always bind the error; no `KeyboardInterrupt` hijack hazard), SAFE301 (`global_state`, JS / TS have no `global` keyword; SAFE302 covers their "writes to module-level state" cases) |
-| **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`, Python and Java have no `var` / `let` / `const` distinction; `var` is still legal in TS and the same scope-hoisting hazard applies, so the rule fires on both `.js` and `.ts`) |
-| **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`); all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset |
+| **Cross-language** (Python, JavaScript, TypeScript, Java, Rust) | 17 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE303, SAFE304, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 (apply to all five). Plus SAFE202, SAFE203, SAFE401 which apply to Python / JS / TS / Java but not Rust (analogues covered by Rust-specific replacements). |
+| **Python / JS / TS** (not Java, not Rust) | 1 | SAFE302 (`global_mutation`); Java has no clean analogue (deferred); Rust's `static mut` is unsafe-gated and covered by SAFE602 instead. |
+| **Python-only** | 2 | SAFE201 (`bare_except`), SAFE301 (`global_state`); JS / TS / Java / Rust have no `global` keyword and JS / TS / Java catches always bind the error. |
+| **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`); Python / Java / Rust have no `var` / `let` / `const` distinction. |
+| **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`); all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset. |
+| **Rust-only** | 10 | SAFE110 (`needless_mut`), SAFE112 (`unchecked_arithmetic_on_input`), SAFE204 (`panic_macros_outside_tests`), SAFE205 (`lock_poisoning_ignored`), SAFE206 (`silent_result_discard`, the Rust analogue of SAFE202), SAFE207 (`unlogged_error_branch`, the Rust analogue of SAFE203), SAFE208 (`result_unwrap_outside_tests`), SAFE306 (`dangerous_mem_ops`), SAFE308 (`truncating_as_cast`), SAFE602 (`undocumented_unsafe`); all default-disabled. |
 
 The engine's per-language dispatch automatically skips rules whose `language` tuple doesn't include the active file's language. There's no manual configuration to do, drop a `.py` file in a JS / TS project (or vice versa) and the right rules fire on each.
 
@@ -1096,5 +1097,287 @@ public class IngestService {
             return CompletableFuture.failedFuture(e);
         }
     }
+}
+```
+
+## Rust-only rules
+
+The following 10 rules apply only to Rust source. They cover patterns the cross-language rules don't translate to cleanly (Rust has no try/catch, no `global` keyword, RAII handles resource cleanup), or that are uniquely valuable in Rust idiom (`unsafe` documentation, panic placement, lock poisoning, etc.). All ship disabled by default; opt in via `[tool.safelint.rules.<name>] enabled = true`. See [Rust](../languages/rust.md) for the full language reference including idiomatic fix patterns.
+
+### SAFE110: `needless_mut`
+
+**What it flags:** `let mut x = ...` where `x` is never reassigned, never has `&mut x` taken, and is never used as a method receiver / field-access target / index target. Rust only.
+
+Rust's default-immutable design encourages declaring `mut` only when truly needed. Needless `mut` widens the surface for accidental mutation and obscures which variables are actually meant to change. The rule is conservative - skips when usage is ambiguous (method call, field expression, index expression) to keep false-positive rate low. Mirrors `clippy::needless_mut` for projects without a clippy run. Holzmann rule 6 (smallest scope).
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```rust
+let mut x = compute();
+println!("{}", x);   // never reassigned - SAFE110
+```
+
+**Good:**
+
+```rust
+let x = compute();
+println!("{}", x);
+```
+
+### SAFE112: `unchecked_arithmetic_on_input`
+
+**What it flags:** `+` / `-` / `*` (NOT `/` or `%`) where at least one operand is an `identifier` matching an integer-typed function parameter. Rust only.
+
+Rust's bare `+` / `-` / `*` panic on overflow in debug builds and wrap silently in release builds - the worst of both worlds for production reliability. `checked_*` / `wrapping_*` / `saturating_*` make the choice explicit. `/` and `%` are excluded - division by zero is a separate panic-on-debug hazard not addressed by the `checked_*` family the same way. Static-only detection (parameter type annotations); locally-derived integers aren't tracked - `cargo clippy` covers the type-inference version. Holzmann rule 7 (check return values).
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```rust
+pub fn total(price: u32, quantity: u32) -> u32 {
+    price * quantity        // silent overflow in release - SAFE112
+}
+```
+
+**Good:**
+
+```rust
+pub fn total(price: u32, quantity: u32) -> Result<u32, &'static str> {
+    price.checked_mul(quantity).ok_or("overflow")
+}
+```
+
+### SAFE204: `panic_macros_outside_tests`
+
+**What it flags:** `panic!` / `todo!` / `unimplemented!` macro invocations in non-test code. Rust only.
+
+Production code should return `Result<_, _>` instead of crashing. Panics in test code (`#[test]` / `#[cfg(test)] mod`) are expected - they're the test framework's failure signal - so test context is exempt. `unreachable!()` is deliberately excluded from defaults - it's idiomatic for impossible-branch markers in `match` arms.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+| `panic_macros_rust` | `["panic", "todo", "unimplemented"]` | Macro names that count as "panicking". Add `"unreachable"` if you want it flagged. |
+
+**Bad:**
+
+```rust
+pub fn parse_config(path: &str) -> Config {
+    let raw = std::fs::read_to_string(path).unwrap();
+    if raw.is_empty() {
+        panic!("config is empty");   // SAFE204
+    }
+    serde_yaml::from_str(&raw).unwrap()
+}
+```
+
+**Good:**
+
+```rust
+pub fn parse_config(path: &str) -> Result<Config, ConfigError> {
+    let raw = std::fs::read_to_string(path)?;
+    if raw.is_empty() {
+        return Err(ConfigError::Empty);
+    }
+    serde_yaml::from_str(&raw).map_err(ConfigError::Parse)
+}
+```
+
+### SAFE205: `lock_poisoning_ignored`
+
+**What it flags:** `mutex.lock().unwrap()` / `rwlock.read().unwrap()` / `.write().unwrap()` / `try_lock().unwrap()` / `try_read().unwrap()` / `try_write().unwrap()` and the `.expect("...")` variants. Rust only.
+
+When a thread panics while holding a `Mutex` / `RwLock` guard, the lock becomes *poisoned*: subsequent acquisitions return `Err(PoisonError)`. `.unwrap()` cascades the panic to every other lock holder, often masking the original failure. Safer alternatives: `match` on `PoisonResult`, `.into_inner()` to recover explicitly, or `parking_lot::Mutex` which has no poison state.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```rust
+let guard = mutex.lock().unwrap();   // panics on poison - SAFE205
+```
+
+**Good:**
+
+```rust
+let guard = mutex.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+```
+
+### SAFE206: `silent_result_discard`
+
+**What it flags:** Empty `Err` arms in `match` (`Err(_) => {}`) and empty `if let Err(_) = ... { }` bodies. Rust only.
+
+The Rust spiritual analogue of `SAFE202 empty_except` - "I caught the error and did literally nothing." Both wildcard (`Err(_)`) and binding (`Err(e)`) forms count; the silent thing is the no-op body. `let _ = result;` and `result.ok();` do NOT fire - those are explicit auditable discards, not silent swallows. `if let Ok(v) = result { ... }` without `else` doesn't fire either (common idiom where the Err case is handled elsewhere).
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```rust
+match maybe_save(record) {
+    Ok(_) => {},
+    Err(_) => {}   // silent swallow - SAFE206
+}
+```
+
+**Good:**
+
+```rust
+match maybe_save(record) {
+    Ok(_) => {},
+    Err(e) => log::error!("save failed: {:?}", e),
+}
+```
+
+### SAFE207: `unlogged_error_branch`
+
+**What it flags:** `Err` arms / `if let Err(...)` bodies with non-empty bodies that contain no log call and don't propagate / panic. Rust only.
+
+The Rust spiritual analogue of `SAFE203 logging_on_error` - handling an error without logging it loses the failure context. Recognised log calls: `error!` / `warn!` / `info!` / `debug!` / `trace!` / `log!` / `event!` (log + tracing crates), `eprintln!` / `eprint!` / `println!` / `print!` / `dbg!`. Exempts bodies that contain a `return_expression`, a panic-like macro (`panic!` / `todo!` / `unreachable!` / `unimplemented!`), or a tail-position `Err(...)` re-raise.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```rust
+if let Err(e) = save(record) {
+    cleanup();   // handled but unlogged - SAFE207
+}
+```
+
+**Good:**
+
+```rust
+if let Err(e) = save(record) {
+    log::error!("save failed: {:?}", e);
+    cleanup();
+}
+```
+
+### SAFE208: `result_unwrap_outside_tests`
+
+**What it flags:** Any `.unwrap()` / `.expect()` / `.unwrap_unchecked()` outside test code (`#[test]` / `#[cfg(test)] mod` exempt). Rust only.
+
+The broad Holzmann-rule-7 form: catches bare-variable unwraps (`let r = foo(); r.unwrap();`) and unwrap chains the narrower SAFE205 (lock-specific) / SAFE803 (nullable-method-specific) rules don't cover. With all three enabled, `mutex.lock().unwrap()` fires multiple codes - documented intentional overlap; users pick strictness level by enabling subsets. `unwrap_or` / `unwrap_or_default` / `unwrap_or_else` are NOT flagged - they're explicit-default-on-Err, not silent failures.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```rust
+pub fn read_config() -> Config {
+    let raw = std::fs::read_to_string("config.toml").unwrap();   // SAFE208
+    toml::from_str(&raw).unwrap()                                  // SAFE208
+}
+```
+
+**Good:**
+
+```rust
+pub fn read_config() -> Result<Config, ConfigError> {
+    let raw = std::fs::read_to_string("config.toml")?;
+    toml::from_str(&raw).map_err(ConfigError::Parse)
+}
+```
+
+### SAFE306: `dangerous_mem_ops`
+
+**What it flags:** Calls to `std::mem::transmute` / `transmute_copy` / `forget` / `zeroed` / `uninitialized`. Rust only.
+
+All four are footguns: `transmute` reinterprets bits as a different type (use `From` / `TryFrom` / `bytemuck` instead); `forget` skips Drop (use `ManuallyDrop`); `zeroed` constructs an all-zero value of any type (use `MaybeUninit::zeroed` + explicit unsafe read so the hazard is visible at the use site); `uninitialized` was deprecated in 1.39+ in favour of `MaybeUninit::uninit()`.
+
+**Path-qualified detection:** the function must be a `scoped_identifier` whose path contains `"mem"` (so `mem::transmute` after `use std::mem` and `std::mem::transmute` both fire, but a user-defined `my_helpers::transmute` does NOT). Bare `transmute(x)` (no `mem::` prefix) is NOT flagged.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"error"` | `"error"` or `"warning"` |
+| `dangerous_mem_ops_rust` | `["transmute", "transmute_copy", "forget", "zeroed", "uninitialized"]` | Names to flag (trailing bareword of the scoped path) |
+
+**Bad:**
+
+```rust
+let x: i8 = unsafe { std::mem::transmute::<u8, i8>(255) };   // SAFE306
+```
+
+**Good:**
+
+```rust
+let x: i8 = i8::try_from(255).unwrap_or(0);
+```
+
+### SAFE308: `truncating_as_cast`
+
+**What it flags:** `as u8` / `as i8` / `as u16` / `as i16` / `as u32` / `as i32` / `as u64` / `as i64` / `as f32` casts. Rust only.
+
+Rust's `as` operator silently truncates when the source value doesn't fit in the destination: `1_000_000u32 as u8` returns `64` (low byte), no panic, no error. `TryFrom` / `try_into()` returns `Result<T, TryFromIntError>`, making the failure mode explicit and checked. `isize` / `usize` / `i128` / `u128` / `f64` are NOT flagged as targets (widest types; casts TO them from smaller types don't truncate). Holzmann rule 1 + 7.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+| `truncating_cast_targets_rust` | `["i8", "u8", "i16", "u16", "i32", "u32", "i64", "u64", "f32"]` | Target type names to flag |
+
+**Bad:**
+
+```rust
+let small: u8 = big_value as u8;   // silent truncation - SAFE308
+```
+
+**Good:**
+
+```rust
+let small: u8 = u8::try_from(big_value).map_err(|_| MyError::OutOfRange)?;
+```
+
+### SAFE602: `undocumented_unsafe`
+
+**What it flags:** `unsafe { ... }` blocks lacking a `// SAFETY:` comment (case-insensitive) on a preceding line. Rust only.
+
+The `// SAFETY:` comment convention (also enforced by `clippy::undocumented_unsafe_blocks`) documents why a particular use of `unsafe` is sound - which invariants the surrounding code upholds, why the safety contract of each unsafe operation is met. Without it, future readers (including the original author six months later) can't audit whether the unsafe is still justified.
+
+Both `// SAFETY:` (line comment) and `/* SAFETY: */` (block comment) forms count. Multiple intervening line comments are allowed (the SAFETY line doesn't need to be the immediately-previous sibling, but no non-comment statement may sit between them). `unsafe fn` declarations are NOT covered - they require `/// # Safety` doc comments, a separate convention.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```rust
+unsafe {
+    std::ptr::write(dst, value);   // SAFE602
+}
+```
+
+**Good:**
+
+```rust
+// SAFETY: dst was allocated and aligned by the caller (see `Buffer::reserve`);
+// value is a Copy type so this can't leak Drop.
+unsafe {
+    std::ptr::write(dst, value);
 }
 ```
