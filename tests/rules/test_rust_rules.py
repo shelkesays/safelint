@@ -488,6 +488,250 @@ def test_rust_log_call_inside_nested_closure_does_not_satisfy(tmp_path: Path) ->
 
 
 # ---------------------------------------------------------------------------
+# SAFE208 - result_unwrap_outside_tests
+# ---------------------------------------------------------------------------
+
+
+def test_rust_bare_unwrap_outside_tests_fires_safe208(tmp_path: Path) -> None:
+    """``r.unwrap()`` outside tests fires SAFE208."""
+    sample = tmp_path / "unwrap208.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) -> i32 {\n    r.unwrap()\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("result_unwrap_outside_tests").check_file(str(sample))
+    fired = _violations(result, "SAFE208")
+    assert len(fired) == 1
+    assert "unwrap" in fired[0].message
+
+
+def test_rust_expect_outside_tests_fires_safe208(tmp_path: Path) -> None:
+    """``.expect(...)`` also fires."""
+    sample = tmp_path / "expect208.rs"
+    sample.write_text(
+        'fn run(r: Result<i32, String>) -> i32 {\n    r.expect("must not fail")\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("result_unwrap_outside_tests").check_file(str(sample))
+    assert len(_violations(result, "SAFE208")) == 1
+
+
+def test_rust_unwrap_in_test_function_does_not_fire_safe208(tmp_path: Path) -> None:
+    """``#[test] fn foo() { r.unwrap() }`` doesn't fire - tests get panic behaviour."""
+    sample = tmp_path / "test_unwrap208.rs"
+    sample.write_text(
+        "#[test]\nfn test_it() {\n    let r: Result<i32, ()> = Ok(1);\n    let _v = r.unwrap();\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("result_unwrap_outside_tests").check_file(str(sample))
+    assert _violations(result, "SAFE208") == []
+
+
+def test_rust_unwrap_in_cfg_test_mod_does_not_fire_safe208(tmp_path: Path) -> None:
+    """``#[cfg(test)] mod tests`` exempts ``.unwrap()`` inside."""
+    sample = tmp_path / "cfg_test_unwrap.rs"
+    sample.write_text(
+        "#[cfg(test)]\nmod tests {\n    fn helper(r: Result<i32, ()>) -> i32 {\n        r.unwrap()\n    }\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("result_unwrap_outside_tests").check_file(str(sample))
+    assert _violations(result, "SAFE208") == []
+
+
+def test_rust_unwrap_or_does_not_fire_safe208(tmp_path: Path) -> None:
+    """``.unwrap_or(default)`` is explicit-default-on-Err and doesn't fire."""
+    sample = tmp_path / "unwrap_or.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) -> i32 {\n    r.unwrap_or(0)\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("result_unwrap_outside_tests").check_file(str(sample))
+    assert _violations(result, "SAFE208") == []
+
+
+# ---------------------------------------------------------------------------
+# SAFE110 - needless_mut
+# ---------------------------------------------------------------------------
+
+
+def test_rust_let_mut_never_reassigned_fires_safe110(tmp_path: Path) -> None:
+    """``let mut x = 5; println!("{}", x);`` fires - x never reassigned."""
+    sample = tmp_path / "needless.rs"
+    sample.write_text(
+        'fn run() {\n    let mut x = 5;\n    println!("{}", x);\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("needless_mut").check_file(str(sample))
+    fired = _violations(result, "SAFE110")
+    assert len(fired) == 1
+    assert "mut x" in fired[0].message
+
+
+def test_rust_let_mut_reassigned_does_not_fire(tmp_path: Path) -> None:
+    """``let mut x = 5; x = 10;`` doesn't fire - x IS reassigned."""
+    sample = tmp_path / "reassigned.rs"
+    sample.write_text(
+        "fn run() {\n    let mut x = 5;\n    x = 10;\n    let _y = x;\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("needless_mut").check_file(str(sample))
+    assert _violations(result, "SAFE110") == []
+
+
+def test_rust_let_mut_compound_assignment_does_not_fire(tmp_path: Path) -> None:
+    """``let mut x = 5; x += 1;`` doesn't fire - compound assignment counts."""
+    sample = tmp_path / "compound.rs"
+    sample.write_text(
+        "fn run() {\n    let mut x = 5;\n    x += 1;\n    let _y = x;\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("needless_mut").check_file(str(sample))
+    assert _violations(result, "SAFE110") == []
+
+
+def test_rust_let_mut_method_call_does_not_fire(tmp_path: Path) -> None:
+    """``let mut v = Vec::new(); v.push(1);`` doesn't fire - method may take &mut self."""
+    sample = tmp_path / "method110.rs"
+    sample.write_text(
+        "fn run() {\n    let mut v = Vec::new();\n    v.push(1);\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("needless_mut").check_file(str(sample))
+    assert _violations(result, "SAFE110") == []
+
+
+def test_rust_let_mut_mut_reference_does_not_fire(tmp_path: Path) -> None:
+    """``let mut x = 5; consume(&mut x);`` doesn't fire - &mut x needs mut."""
+    sample = tmp_path / "mut_ref.rs"
+    sample.write_text(
+        "fn run() {\n    let mut x = 5;\n    consume(&mut x);\n}\nfn consume(_x: &mut i32) {}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("needless_mut").check_file(str(sample))
+    assert _violations(result, "SAFE110") == []
+
+
+def test_rust_let_without_mut_does_not_fire_safe110(tmp_path: Path) -> None:
+    """``let x = 5;`` (no mut) doesn't fire - the rule only flags mut bindings."""
+    sample = tmp_path / "immut.rs"
+    sample.write_text(
+        'fn run() {\n    let x = 5;\n    println!("{}", x);\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("needless_mut").check_file(str(sample))
+    assert _violations(result, "SAFE110") == []
+
+
+# ---------------------------------------------------------------------------
+# SAFE112 - unchecked_arithmetic_on_input
+# ---------------------------------------------------------------------------
+
+
+def test_rust_arithmetic_on_int_param_fires_safe112(tmp_path: Path) -> None:
+    """``fn run(a: u32, b: u32) -> u32 { a + b }`` fires SAFE112."""
+    sample = tmp_path / "arith.rs"
+    sample.write_text(
+        "fn run(a: u32, b: u32) -> u32 {\n    a + b\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unchecked_arithmetic_on_input").check_file(str(sample))
+    fired = _violations(result, "SAFE112")
+    assert len(fired) >= 1
+    assert "+" in fired[0].message
+    assert "checked_add" in fired[0].message
+
+
+def test_rust_subtraction_on_int_param_fires(tmp_path: Path) -> None:
+    """``fn run(a: i64, b: i64) -> i64 { a - b }`` fires."""
+    sample = tmp_path / "sub.rs"
+    sample.write_text(
+        "fn run(a: i64, b: i64) -> i64 {\n    a - b\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unchecked_arithmetic_on_input").check_file(str(sample))
+    assert len(_violations(result, "SAFE112")) >= 1
+
+
+def test_rust_division_on_int_param_does_not_fire(tmp_path: Path) -> None:
+    """``/`` is deliberately excluded - division-by-zero is a separate hazard."""
+    sample = tmp_path / "div.rs"
+    sample.write_text(
+        "fn run(a: u32, b: u32) -> u32 {\n    a / b\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unchecked_arithmetic_on_input").check_file(str(sample))
+    assert _violations(result, "SAFE112") == []
+
+
+def test_rust_arithmetic_on_string_param_does_not_fire(tmp_path: Path) -> None:
+    """``fn run(s: String) -> usize { s.len() + 1 }`` doesn't fire on s (not integer)."""
+    sample = tmp_path / "non_int.rs"
+    sample.write_text(
+        "fn run(s: String) -> usize {\n    s.len() + 1\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unchecked_arithmetic_on_input").check_file(str(sample))
+    # ``s.len() + 1`` - neither operand is the int param ``s`` (left is method call).
+    # So no fire even though there's a ``+``.
+    assert _violations(result, "SAFE112") == []
+
+
+def test_rust_arithmetic_on_local_does_not_fire_safe112(tmp_path: Path) -> None:
+    """Arithmetic on locals (not params) doesn't fire."""
+    sample = tmp_path / "local.rs"
+    sample.write_text(
+        "fn run() -> u32 {\n    let a: u32 = 5;\n    let b: u32 = 10;\n    a + b\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unchecked_arithmetic_on_input").check_file(str(sample))
+    assert _violations(result, "SAFE112") == []
+
+
+def test_rust_float_param_arithmetic_does_not_fire(tmp_path: Path) -> None:
+    """Float parameters aren't flagged - SAFE112 only targets integer overflow.
+
+    ``f32`` / ``f64`` are primitive_type but not in the integer set;
+    ``_integer_param_names`` skips them. Float arithmetic has its
+    own hazards (NaN, infinity, precision) but they're a different
+    category than silent integer overflow.
+    """
+    sample = tmp_path / "float.rs"
+    sample.write_text(
+        "fn run(a: f64, b: f64) -> f64 {\n    a + b\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unchecked_arithmetic_on_input").check_file(str(sample))
+    assert _violations(result, "SAFE112") == []
+
+
+def test_rust_tuple_destructure_param_not_checked(tmp_path: Path) -> None:
+    """Tuple-destructured params aren't analysed - their pattern isn't a plain identifier.
+
+    ``fn f((a, b): (u32, u32))`` parses with pattern = tuple_pattern,
+    not identifier, so SAFE112's name lookup skips it. Documented
+    heuristic limitation rather than a bug.
+    """
+    sample = tmp_path / "tuple_param.rs"
+    sample.write_text(
+        "fn run((a, b): (u32, u32)) -> u32 {\n    a + b\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unchecked_arithmetic_on_input").check_file(str(sample))
+    assert _violations(result, "SAFE112") == []
+
+
+def test_rust_param_with_literal_arithmetic_fires(tmp_path: Path) -> None:
+    """``fn run(a: u32) -> u32 { a + 1 }`` fires - param-and-literal still flagged."""
+    sample = tmp_path / "param_lit.rs"
+    sample.write_text(
+        "fn run(a: u32) -> u32 {\n    a + 1\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unchecked_arithmetic_on_input").check_file(str(sample))
+    assert len(_violations(result, "SAFE112")) == 1
+
+
+# ---------------------------------------------------------------------------
 # SAFE306 - dangerous_mem_ops
 # ---------------------------------------------------------------------------
 
@@ -580,6 +824,92 @@ def test_rust_core_mem_transmute_also_fires(tmp_path: Path) -> None:
     )
     result = _enabled_engine("dangerous_mem_ops").check_file(str(sample))
     assert len(_violations(result, "SAFE306")) == 1
+
+
+# ---------------------------------------------------------------------------
+# SAFE308 - truncating_as_cast
+# ---------------------------------------------------------------------------
+
+
+def test_rust_as_u8_cast_fires_safe308(tmp_path: Path) -> None:
+    """``big as u8`` fires SAFE308 - silent truncation hazard."""
+    sample = tmp_path / "trunc.rs"
+    sample.write_text(
+        "fn run(big: u64) -> u8 {\n    big as u8\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("truncating_as_cast").check_file(str(sample))
+    fired = _violations(result, "SAFE308")
+    assert len(fired) == 1
+    assert "as u8" in fired[0].message
+    assert "try_from" in fired[0].message
+
+
+def test_rust_as_i32_cast_fires_safe308(tmp_path: Path) -> None:
+    """``f as i32`` fires - float-to-int is truncating."""
+    sample = tmp_path / "f_to_i.rs"
+    sample.write_text(
+        "fn run(f: f64) -> i32 {\n    f as i32\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("truncating_as_cast").check_file(str(sample))
+    assert len(_violations(result, "SAFE308")) == 1
+
+
+def test_rust_as_usize_does_not_fire_safe308(tmp_path: Path) -> None:
+    """``as usize`` doesn't fire - usize isn't in the truncating-target set (widest type on 64-bit)."""
+    sample = tmp_path / "usize.rs"
+    sample.write_text(
+        "fn run(x: u32) -> usize {\n    x as usize\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("truncating_as_cast").check_file(str(sample))
+    assert _violations(result, "SAFE308") == []
+
+
+def test_rust_as_i128_does_not_fire_safe308(tmp_path: Path) -> None:
+    """``as i128`` doesn't fire - widest signed type, casts to it don't truncate."""
+    sample = tmp_path / "i128.rs"
+    sample.write_text(
+        "fn run(x: i64) -> i128 {\n    x as i128\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("truncating_as_cast").check_file(str(sample))
+    assert _violations(result, "SAFE308") == []
+
+
+def test_rust_cast_to_reference_type_does_not_fire(tmp_path: Path) -> None:
+    """``ptr as &T`` (reference cast) doesn't fire - target isn't a primitive_type."""
+    sample = tmp_path / "ref_cast.rs"
+    sample.write_text(
+        "fn run(p: *const u8) -> *const i8 {\n    p as *const i8\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("truncating_as_cast").check_file(str(sample))
+    # ``*const i8`` is a pointer_type, not primitive_type, so no fire.
+    assert _violations(result, "SAFE308") == []
+
+
+def test_rust_truncating_cast_targets_configurable(tmp_path: Path) -> None:
+    """Custom ``truncating_cast_targets_rust`` overrides the default set."""
+    sample = tmp_path / "configurable.rs"
+    sample.write_text(
+        "fn run(x: u64) -> u8 {\n    x as u8\n}\nfn run2(x: u32) -> i32 {\n    x as i32\n}\n",
+        encoding="utf-8",
+    )
+    overrides = {
+        "rules": {
+            "truncating_as_cast": {
+                # Only flag casts to i32; tolerate u8.
+                "truncating_cast_targets_rust": ["i32"],
+            },
+        },
+    }
+    result = _enabled_engine("truncating_as_cast", overrides).check_file(str(sample))
+    fired = _violations(result, "SAFE308")
+    # Only the ``as i32`` cast fires; ``as u8`` is now excluded.
+    assert len(fired) == 1
+    assert "as i32" in fired[0].message
 
 
 # ---------------------------------------------------------------------------

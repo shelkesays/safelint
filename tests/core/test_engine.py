@@ -458,11 +458,15 @@ _RULES_RUST_ONLY: frozenset[str] = frozenset(
         # Slotted into existing category bands per the SafeLint
         # numbering policy (see CLAUDE.md): the band still encodes
         # category, not language. All disabled by default.
+        "NeedlessMutRule",  # SAFE110 - function shape (Holzmann rule 6)
+        "UncheckedArithmeticOnInputRule",  # SAFE112 - function shape (Holzmann rule 7)
         "PanicMacrosOutsideTestsRule",  # SAFE204 - error handling
         "LockPoisoningIgnoredRule",  # SAFE205 - error handling
         "SilentResultDiscardRule",  # SAFE206 - error handling (Rust analogue of SAFE202)
         "UnloggedErrorBranchRule",  # SAFE207 - error handling (Rust analogue of SAFE203)
+        "ResultUnwrapOutsideTestsRule",  # SAFE208 - error handling (Holzmann rule 7)
         "DangerousMemOpsRule",  # SAFE306 - side effects
+        "TruncatingAsCastRule",  # SAFE308 - side effects (Holzmann rule 1 + 7)
         "UndocumentedUnsafeRule",  # SAFE602 - documentation
     }
 )
