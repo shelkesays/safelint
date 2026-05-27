@@ -327,7 +327,7 @@ let x: i8 = unsafe { std::mem::transmute::<u8, i8>(255) };  // SAFE306
 
 // After
 let x = i8::from_ne_bytes([255]);   // for byte reinterpretation
-let x = u8::try_into::<i8>(255).unwrap_or(0);  // for value conversion with checked failure
+let x = i8::try_from(255u8).unwrap_or(0);  // for value conversion with checked failure
 ```
 
 For `mem::forget`, use `ManuallyDrop` instead - it's typed, has IDE / clippy support, and makes intent explicit. For `mem::zeroed` / `mem::uninitialized`, use `MaybeUninit` which forces an explicit `unsafe { .assume_init() }` at the use site (the hazard becomes visible).

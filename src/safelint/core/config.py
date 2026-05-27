@@ -346,10 +346,16 @@ DEFAULTS: dict[str, Any] = {
                 "write",
             ],
             "io_functions_rust": [
-                # See full rationale in ``side_effects_hidden`` config above.
-                # Same default set; both rules share the I/O primitive
-                # vocabulary (one filters by pure-named prefix, the
-                # other by absence of an I/O keyword in the name).
+                # SAFE304's list is a deliberately narrower subset of
+                # SAFE303's ``io_functions_rust`` (mirrors the Java
+                # SAFE303/SAFE304 handling). SAFE303-only entries
+                # (``metadata`` / ``canonicalize`` / ``read_exact`` /
+                # ``write_fmt`` / ``bind`` / ``accept`` / ``recv_from``)
+                # are intentionally NOT in SAFE304's list because
+                # flagging every non-pure-named caller of those would
+                # be too noisy; SAFE303 only catches them when the
+                # function name signals purity, which is a stronger
+                # signal of incorrect placement.
                 "println",
                 "print",
                 "eprintln",
