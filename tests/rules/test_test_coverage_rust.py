@@ -92,6 +92,27 @@ def test_rust_inline_test_module_satisfies_safe701(tmp_path: Path) -> None:
     assert not any(v.code == "SAFE701" for v in result.violations)
 
 
+def test_rust_rstest_fn_satisfies_safe701(tmp_path: Path) -> None:
+    """``#[rstest]`` (bare) and ``#[rstest::rstest]`` (scoped) clear SAFE701.
+
+    rstest is the most popular parametric-test framework for Rust;
+    its attribute doesn't end in ``test`` so trailing-name matching
+    alone wouldn't catch it. Both forms are recognised via
+    ``_RUST_TEST_ATTRIBUTE_NAMES``.
+    """
+    src = tmp_path / "src" / "rstest_handler.rs"
+    src.parent.mkdir(parents=True)
+    src.write_text(
+        "pub fn add(a: i32, b: i32) -> i32 { a + b }\n\n#[rstest]\nfn it_adds() {\n    assert_eq!(add(2, 2), 4);\n}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests").mkdir()
+
+    with _cd(tmp_path):
+        result = _enabled_engine().check_file(str(src))
+    assert not any(v.code == "SAFE701" for v in result.violations)
+
+
 def test_rust_tokio_test_fn_satisfies_safe701(tmp_path: Path) -> None:
     """``#[tokio::test]`` (scoped path attribute) clears SAFE701.
 
