@@ -175,7 +175,7 @@ Add this to your `.pre-commit-config.yaml`, pick the `additional_dependencies` l
 ```yaml
 repos:
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.2.0  # replace with the latest release tag (Java requires v2.1.0+, Rust requires v2.2.0+)
+    rev: v2.2.0rc1  # replace with the latest release tag (Java requires v2.1.0+, Rust requires v2.2.0+; the v2.2.0 GA tag will exist once the RC cycle closes)
     hooks:
       - id: safelint
         # Required in v2.0.0+, pick the line for the language(s) your repo lints:
