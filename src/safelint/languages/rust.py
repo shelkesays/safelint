@@ -93,12 +93,16 @@ FUNCTION_SIGNATURE_ITEM = "function_signature_item"
 CLOSURE_EXPRESSION = "closure_expression"
 BLOCK = "block"  # generic block; not function-like on its own
 
-#: Aggregate of every Rust node type that defines a function. Use in rules
-#: instead of listing the individual constants. ``function_signature_item``
-#: is included even though it has no body so rules that count or label
-#: functions handle trait-method signatures consistently; rules that walk
-#: bodies (length, complexity, etc.) can additionally check whether a
-#: ``body`` child is present.
+#: Aggregate of every Rust node type that defines a function with a body.
+#: Use in rules instead of listing the individual constants.
+#: ``function_signature_item`` is deliberately NOT included: it has no
+#: body, so body-walking rules (SAFE101 function_length, SAFE104
+#: complexity, SAFE601 missing_assertions) would either produce
+#: trivial / false-positive results on trait-method signatures or
+#: would need per-rule body-presence guards. Keeping signatures out
+#: of the set avoids both problems. Rules that *do* want to enumerate
+#: signatures (e.g. a future "long-arg-list trait method" rule) can
+#: reference :data:`FUNCTION_SIGNATURE_ITEM` directly.
 FUNCTION_TYPES = frozenset(
     {
         FUNCTION_ITEM,

@@ -241,7 +241,7 @@ SafeLint ships **34 rules** across the Holzmann safety categories. **14 are on b
 | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) | `resource_lifecycle` | error | Files or connections opened outside a `with` block (Python) or without paired cleanup (JS / TS) |
 | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) | `unbounded_loops` | warning | `while True` loops with no `break` |
 
-### Opt-in rules (10): enable via `[tool.safelint.rules.<name>] enabled = true`
+### Opt-in rules (20): enable via `[tool.safelint.rules.<name>] enabled = true`
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|

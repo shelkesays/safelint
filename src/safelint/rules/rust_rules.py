@@ -539,13 +539,14 @@ class DangerousMemOpsRule(BaseRule):
         * ``mem::transmute(...)`` - ``function`` is ``scoped_identifier``
           whose path contains ``"mem"``. Returns the trailing bareword.
         * ``std::mem::transmute(...)`` - ditto; path contains ``"mem"``.
-        * ``transmute(...)`` (bare call) - ``function`` is ``identifier``
-          matching a dangerous name. We do NOT fire on bare calls
-          because they're indistinguishable from a user-defined helper
-          of the same name; users who want bare-call detection can
-          add ``transmute`` to the configured set explicitly via
-          ``dangerous_mem_ops_rust`` and accept the false-positive
-          rate.
+        * ``transmute(...)`` (bare call without ``mem::`` prefix) is
+          NOT flagged - it's indistinguishable from a user-defined
+          helper of the same name without type inference. Projects
+          that need bare-call detection should rename the import
+          path (``use std::mem;`` then ``mem::transmute(...)``) so
+          the rule's ``"mem"``-in-path check catches it; the
+          ``dangerous_mem_ops_rust`` config only customises the set
+          of *names* matched, not the detection shape.
 
         The ``generic_function`` wrapper (used for turbofish calls like
         ``mem::transmute::<u8, i8>(0)``) is peeled before the path check.

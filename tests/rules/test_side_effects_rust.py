@@ -173,5 +173,8 @@ def test_rust_io_in_nested_closure_does_not_attribute_to_outer(tmp_path: Path) -
     # The closure has println-like I/O in a non-IO-named function,
     # so SAFE304 fires on the closure itself - exactly one violation.
     fired = _violations(result, "SAFE304")
+    # Must emit at least one violation (otherwise the all-check below
+    # passes vacuously and the test loses its regression value).
+    assert len(fired) >= 1, "SAFE304 must fire on the closure body"
     # Outer ``process`` should NOT be in the fired list - the I/O isn't in its body.
     assert all("process" not in v.message or "anonymous" in v.message for v in fired)
