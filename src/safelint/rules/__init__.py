@@ -12,6 +12,12 @@ from safelint.rules.loop_safety import UnboundedLoopRule
 from safelint.rules.max_arguments import MaxArgumentsRule
 from safelint.rules.nesting_depth import NestingDepthRule
 from safelint.rules.resource_lifecycle import ResourceLifecycleRule
+from safelint.rules.rust_rules import (
+    DangerousMemOpsRule,
+    LockPoisoningIgnoredRule,
+    PanicMacrosOutsideTestsRule,
+    UndocumentedUnsafeRule,
+)
 from safelint.rules.side_effects import SideEffectsHiddenRule, SideEffectsRule
 from safelint.rules.spring import (
     SpringAsyncCheckedExceptionRule,
@@ -57,6 +63,14 @@ ALL_RULES: list[type[BaseRule]] = [
     SpringMissingTransactionalRule,
     SpringUnvalidatedInputRule,
     SpringAsyncCheckedExceptionRule,
+    # Rust-idiom rules (slotted into category bands per the SafeLint
+    # numbering policy: 2xx error-handling, 3xx side-effects, 6xx
+    # documentation). All disabled by default; opt in via
+    # [tool.safelint.rules.<name>] enabled = true.
+    PanicMacrosOutsideTestsRule,
+    LockPoisoningIgnoredRule,
+    DangerousMemOpsRule,
+    UndocumentedUnsafeRule,
 ]
 
 RULE_BY_NAME: dict[str, type[BaseRule]] = {cls.name: cls for cls in ALL_RULES}
@@ -67,15 +81,18 @@ __all__ = [
     "BareExceptRule",
     "BaseRule",
     "ComplexityRule",
+    "DangerousMemOpsRule",
     "EmptyExceptRule",
     "FunctionLengthRule",
     "GlobalMutationRule",
     "GlobalStateRule",
+    "LockPoisoningIgnoredRule",
     "LoggingOnErrorRule",
     "MaxArgumentsRule",
     "MissingAssertionsRule",
     "NestingDepthRule",
     "NullDereferenceRule",
+    "PanicMacrosOutsideTestsRule",
     "ResourceLifecycleRule",
     "ReturnValueIgnoredRule",
     "SideEffectsHiddenRule",
@@ -88,6 +105,7 @@ __all__ = [
     "TestCouplingRule",
     "TestExistenceRule",
     "UnboundedLoopRule",
+    "UndocumentedUnsafeRule",
     "Violation",
     "WideScopeDeclarationRule",
 ]
