@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "safelint"
 version = "2.2.0rc1"
-description = "Engineering safety lint rules and pre-commit integration for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset) codebases"
+description = "Engineering safety lint rules and pre-commit integration for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), and Rust codebases"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
-keywords = ["lint", "pre-commit", "static-analysis", "safety", "python", "javascript", "typescript", "java", "spring-boot"]
+keywords = ["lint", "pre-commit", "static-analysis", "safety", "python", "javascript", "typescript", "java", "spring-boot", "rust"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -79,13 +79,19 @@ typescript = [
 java = [
     "tree-sitter-java>=0.23.0",
 ]
-# Rust support. Memory safety is enforced by rustc + borrow checker, so
-# safelint's rule scope on Rust is narrower than for other languages:
-# function shape (length / nesting / complexity / args), error-handling
-# discipline (empty match arms, ignored Result returns), and dataflow
-# patterns (unsanitised input into ``std::process::Command`` / ``sqlx::query``
-# / equivalents). Rust-specific structural rules (unwrap-without-context,
-# lock-poisoning, undocumented unsafe) are on the v2.2.x roadmap.
+# Rust support (new in v2.2.0). Memory safety is enforced by rustc +
+# borrow checker, so safelint's rule scope on Rust is focused on the
+# patterns rustc doesn't catch: function shape (length / nesting /
+# complexity / args), error-handling discipline (empty Err arms,
+# ignored Result returns, unlogged error branches), and dataflow
+# patterns (unsanitised input into ``std::process::Command`` /
+# ``sqlx::query`` / equivalents). v2.2.0 also adds ten Rust-only
+# rules covering panic placement (SAFE204), lock poisoning (SAFE205),
+# silent / unlogged Err handling (SAFE206 / SAFE207), broad
+# ``.unwrap()`` outside tests (SAFE208), dangerous ``std::mem`` ops
+# (SAFE306), truncating ``as`` casts (SAFE308), undocumented
+# ``unsafe`` blocks (SAFE602), needless ``mut`` (SAFE110), and
+# unchecked arithmetic on integer params (SAFE112).
 rust = [
     "tree-sitter-rust>=0.23.0",
 ]
