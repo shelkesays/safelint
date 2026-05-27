@@ -887,6 +887,42 @@ DEFAULTS: dict[str, Any] = {
         "spring_missing_transactional": {"enabled": False, "severity": "error"},
         "spring_unvalidated_input": {"enabled": False, "severity": "error"},
         "spring_async_checked_exception": {"enabled": False, "severity": "warning"},
+        # Rust-idiom rules. Slotted into category bands per the
+        # SafeLint rule-numbering policy (see CLAUDE.md); all four
+        # are language-specific (no cross-language counterpart) and
+        # disabled by default so non-Rust projects see no behaviour
+        # change. Opt in via [tool.safelint.rules.<name>] enabled = true.
+        "panic_macros_outside_tests": {
+            "enabled": False,
+            "severity": "warning",
+            # Macro names that count as "panicking". Defaults to the
+            # three obvious offenders; ``unreachable!`` is deliberately
+            # excluded (idiomatic for impossible-branch markers).
+            # Override to add custom panic macros from a project's
+            # own crate (``my_assert!`` etc.) or to add ``unreachable``.
+            "panic_macros_rust": [
+                "panic",
+                "todo",
+                "unimplemented",
+            ],
+        },
+        "lock_poisoning_ignored": {"enabled": False, "severity": "warning"},
+        "dangerous_mem_ops": {
+            "enabled": False,
+            "severity": "error",
+            # std::mem footguns. All four have safer Rust idioms:
+            # ``transmute`` -> ``From`` / ``TryFrom`` / ``bytemuck``;
+            # ``forget`` -> ``ManuallyDrop``;
+            # ``zeroed`` / ``uninitialized`` -> ``MaybeUninit``.
+            "dangerous_mem_ops_rust": [
+                "transmute",
+                "transmute_copy",
+                "forget",
+                "zeroed",
+                "uninitialized",
+            ],
+        },
+        "undocumented_unsafe": {"enabled": False, "severity": "warning"},
     },
 }
 

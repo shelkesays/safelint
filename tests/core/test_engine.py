@@ -447,6 +447,19 @@ _RULES_JAVA_ONLY: frozenset[str] = frozenset(
     }
 )
 
+_RULES_RUST_ONLY: frozenset[str] = frozenset(
+    {
+        # Rust-only language-idiom rules (``language=("rust",)``).
+        # Slotted into existing category bands per the SafeLint
+        # numbering policy (see CLAUDE.md): the band still encodes
+        # category, not language. All four disabled by default.
+        "PanicMacrosOutsideTestsRule",  # SAFE204 - error handling
+        "LockPoisoningIgnoredRule",  # SAFE205 - error handling
+        "DangerousMemOpsRule",  # SAFE306 - side effects
+        "UndocumentedUnsafeRule",  # SAFE602 - documentation
+    }
+)
+
 
 def test_widened_rules_match_the_documented_allow_list() -> None:
     """The set of rules with non-default ``language`` matches the documented allow-list.
@@ -466,6 +479,7 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
     cross_lang_all_five_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript", "java", "rust")}
     js_family_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("javascript", "typescript")}
     java_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("java",)}
+    rust_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("rust",)}
     assert cross_lang_actual == _RULES_WIDENED_FOR_JS_FAMILY, (
         f"Cross-language allow-list out of sync. Actually ('python', 'javascript', 'typescript'): {sorted(cross_lang_actual)}; documented: {sorted(_RULES_WIDENED_FOR_JS_FAMILY)}"
     )
@@ -483,6 +497,7 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
         f"JS-family-only allow-list out of sync. Actually ('javascript', 'typescript'): {sorted(js_family_only_actual)}; documented: {sorted(_RULES_JS_FAMILY_ONLY)}"
     )
     assert java_only_actual == _RULES_JAVA_ONLY, f"Java-only allow-list out of sync. Actually ('java',): {sorted(java_only_actual)}; documented: {sorted(_RULES_JAVA_ONLY)}"
+    assert rust_only_actual == _RULES_RUST_ONLY, f"Rust-only allow-list out of sync. Actually ('rust',): {sorted(rust_only_actual)}; documented: {sorted(_RULES_RUST_ONLY)}"
 
     for cls in ALL_RULES:
         if cls.__name__ in _RULES_PORTED_TO_ALL_FIVE_LANGUAGES:
@@ -495,6 +510,8 @@ def test_widened_rules_match_the_documented_allow_list() -> None:
             assert cls.language == ("javascript", "typescript"), f"{cls.__name__} should be ('javascript', 'typescript'); got {cls.language}"
         elif cls.__name__ in _RULES_JAVA_ONLY:
             assert cls.language == ("java",), f"{cls.__name__} should be ('java',); got {cls.language}"
+        elif cls.__name__ in _RULES_RUST_ONLY:
+            assert cls.language == ("rust",), f"{cls.__name__} should be ('rust',); got {cls.language}"
         else:
-            buckets = "_RULES_WIDENED_FOR_JS_FAMILY, _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA, _RULES_PORTED_TO_ALL_FIVE_LANGUAGES, _RULES_JS_FAMILY_ONLY, or _RULES_JAVA_ONLY"
+            buckets = "_RULES_WIDENED_FOR_JS_FAMILY, _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA, _RULES_PORTED_TO_ALL_FIVE_LANGUAGES, _RULES_JS_FAMILY_ONLY, _RULES_JAVA_ONLY, or _RULES_RUST_ONLY"
             assert cls.language == ("python",), f"{cls.__name__} has unexpected language={cls.language}; add it to {buckets} if intentional"
