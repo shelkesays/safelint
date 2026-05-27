@@ -151,6 +151,18 @@ _PANIC_LIKE_MACROS: frozenset[str] = frozenset(
     }
 )
 
+#: Test-attribute names that mark a function as a test, used by the
+#: scoped-and-bare detection in :func:`_attribute_marks_test` and its
+#: twin in :mod:`safelint.rules.test_coverage`. ``"test"`` covers the
+#: stdlib ``#[test]`` plus every framework that suffixes ``::test``
+#: (tokio / actix_web / async_std / smol_potat / smol / futures /
+#: test_log). ``"rstest"`` covers the parametric-test framework that
+#: uses ``#[rstest]`` (bare) and occasionally ``#[rstest::rstest]``
+#: (scoped) - those don't end in ``test`` so trailing-name matching
+#: alone wouldn't recognise them. Add new names here if a future
+#: test framework lands with a different attribute pattern.
+_RUST_TEST_ATTRIBUTE_NAMES: frozenset[str] = frozenset({"test", "rstest"})
+
 #: Unwrap-family method names. SAFE208 fires when any of these is
 #: called outside test code. Wider set than SAFE205's
 #: :data:`_UNWRAP_METHOD_NAMES` because the broad rule also covers
@@ -266,17 +278,20 @@ def _attribute_first_child_marks_test(children: list[tree_sitter.Node]) -> bool:
     """Dispatch test-marker check on an attribute's first named child.
 
     Helper extracted from :func:`_attribute_marks_test` to keep the
-    parent function's return count under PLR0911.
+    parent function's return count under PLR0911. Matches against
+    :data:`_RUST_TEST_ATTRIBUTE_NAMES` for both bare attributes
+    (``#[test]`` / ``#[rstest]``) and scoped paths' trailing identifier
+    (``#[tokio::test]`` / ``#[rstest::rstest]``).
     """
     first = children[0]
     if first.type == "scoped_identifier":
-        # ``#[tokio::test]`` and friends - check the trailing identifier.
+        # ``#[tokio::test]`` / ``#[rstest::rstest]`` - check the trailing identifier.
         trailing = first.child_by_field_name("name")
-        return trailing is not None and node_text(trailing) == "test"
+        return trailing is not None and node_text(trailing) in _RUST_TEST_ATTRIBUTE_NAMES
     if first.type != "identifier":  # pragma: no cover - defensive: token-tree-first attribute shapes are rare
         return False
     first_name = node_text(first)
-    if first_name == "test":
+    if first_name in _RUST_TEST_ATTRIBUTE_NAMES:
         return True
     if first_name != "cfg":
         return False
