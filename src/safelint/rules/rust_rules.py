@@ -1,32 +1,55 @@
-"""Rust-idiom rules: SAFE204 / SAFE205 / SAFE206 / SAFE207 / SAFE306 / SAFE602.
+"""Rust-idiom rules: function-shape, error-handling, side-effect, documentation.
 
 Rules in this file are Rust-language-specific (no cross-language
 counterpart). Codes are slotted into the existing category bands by
-closest theme, per the SafeLint rule-numbering policy in CLAUDE.md:
-
-* **SAFE204** ``panic_macros_outside_tests`` (error handling) - flags
-  ``panic!`` / ``todo!`` / ``unimplemented!`` macros in non-test code
-  (production paths should return ``Result`` instead of crashing).
-* **SAFE205** ``lock_poisoning_ignored`` (error handling) - flags
-  ``mutex.lock().unwrap()`` and ``rwlock.read().unwrap()`` /
-  ``rwlock.write().unwrap()`` - patterns that silently swallow lock
-  poisoning instead of handling the ``PoisonError``.
-* **SAFE206** ``silent_result_discard`` (error handling) - the Rust
-  spiritual analogue of SAFE202 (empty_except). Flags empty ``Err``
-  arms in ``match`` and empty ``if let Err(_) = ... { }`` bodies.
-* **SAFE207** ``unlogged_error_branch`` (error handling) - the Rust
-  spiritual analogue of SAFE203 (logging_on_error). Flags ``Err``
-  arms / branches with non-empty bodies that contain no log call
-  and don't propagate the error.
-* **SAFE306** ``dangerous_mem_ops`` (side effects) - flags calls to
-  ``std::mem::transmute``, ``std::mem::forget``, ``std::mem::zeroed``,
-  and ``std::mem::uninitialized``. All four have safer Rust idioms.
-* **SAFE602** ``undocumented_unsafe`` (documentation) - flags
-  ``unsafe { ... }`` blocks that lack a ``// SAFETY:`` comment on a
-  preceding line documenting the safety invariants.
-
-All disabled by default; opt in via
+closest theme, per the SafeLint rule-numbering policy in CLAUDE.md.
+Each rule is disabled by default; opt in via
 ``[tool.safelint.rules.<name>] enabled = true``.
+
+**Function shape (1xx)** - Holzmann rule 6 (smallest scope) and
+rule 1/7 (well-defined operations):
+
+* **SAFE110** ``needless_mut`` - flags ``let mut x = ...`` where ``x``
+  is never reassigned, never has ``&mut`` taken, and is never used
+  as a method receiver / field-access target. Conservative: skips
+  when usage is ambiguous so false-positive rate stays low.
+* **SAFE112** ``unchecked_arithmetic_on_input`` - flags ``+`` / ``-`` /
+  ``*`` on integer-typed function parameters. Silent overflow is
+  release-mode-only in Rust; ``checked_*`` / ``wrapping_*`` /
+  ``saturating_*`` makes the choice explicit.
+
+**Error handling (2xx)** - Holzmann rule 7 (check return values):
+
+* **SAFE204** ``panic_macros_outside_tests`` - flags ``panic!`` /
+  ``todo!`` / ``unimplemented!`` macros in non-test code.
+* **SAFE205** ``lock_poisoning_ignored`` - flags ``mutex.lock().unwrap()``
+  and ``rwlock.read().unwrap()`` / ``.write().unwrap()``.
+* **SAFE206** ``silent_result_discard`` - the Rust spiritual analogue
+  of SAFE202 (empty_except). Flags empty ``Err`` arms in ``match``
+  and empty ``if let Err(_) = ... { }`` bodies.
+* **SAFE207** ``unlogged_error_branch`` - the Rust spiritual analogue
+  of SAFE203 (logging_on_error). Flags ``Err`` arms / branches with
+  non-empty bodies that contain no log call and don't propagate.
+* **SAFE208** ``result_unwrap_outside_tests`` - flags any
+  ``.unwrap()`` / ``.expect()`` / ``.unwrap_unchecked()`` outside
+  test code. Broader than SAFE205 (lock-specific) and SAFE803
+  (nullable-method-specific); catches bare ``let r = foo(); r.unwrap();``
+  cases the narrow rules miss.
+
+**Side effects / state (3xx)** - Holzmann rule 1/7 (well-defined
+operations + checked conversions):
+
+* **SAFE306** ``dangerous_mem_ops`` - flags calls to
+  ``std::mem::transmute`` / ``forget`` / ``zeroed`` /
+  ``uninitialized``.
+* **SAFE308** ``truncating_as_cast`` - flags ``as u8`` / ``as u16``
+  / ``as u32`` / ``as i32`` casts. Silently truncates in Rust;
+  ``TryFrom`` / ``try_into()`` makes the failure mode explicit.
+
+**Documentation (6xx)**:
+
+* **SAFE602** ``undocumented_unsafe`` - flags ``unsafe { ... }``
+  blocks lacking a ``// SAFETY:`` comment.
 """
 
 from __future__ import annotations
@@ -127,6 +150,67 @@ _PANIC_LIKE_MACROS: frozenset[str] = frozenset(
         "unreachable",
     }
 )
+
+#: Unwrap-family method names. SAFE208 fires when any of these is
+#: called outside test code. Wider set than SAFE205's
+#: :data:`_UNWRAP_METHOD_NAMES` because the broad rule also covers
+#: ``.unwrap_unchecked()`` (an unsafe fast-path); SAFE205 sticks to
+#: the safe-API set because the lock-poisoning hazard is about the
+#: panic-on-Err mode of ``.unwrap()``, not the UB-on-Err mode of
+#: ``.unwrap_unchecked()``.
+_GENERAL_UNWRAP_METHODS: frozenset[str] = frozenset(
+    {
+        "unwrap",
+        "expect",
+        "unwrap_unchecked",
+    }
+)
+
+#: Fixed-width integer / float primitive type names that SAFE308 flags
+#: as truncating-cast targets. The complete list of Rust primitive
+#: numeric types except ``i128`` / ``u128`` / ``f64`` (cast TO those
+#: types from any smaller type is non-truncating) and except ``isize``
+#: / ``usize`` (platform-dependent width, but casts TO them from
+#: smaller types are non-truncating on 64-bit platforms - leaving
+#: them out keeps the rule's default narrow).
+_TRUNCATING_CAST_TARGETS: frozenset[str] = frozenset(
+    {
+        "i8",
+        "u8",
+        "i16",
+        "u16",
+        "i32",
+        "u32",
+        "i64",  # cast from u64 / i128 / u128 still truncates
+        "u64",  # cast from i64 (sign) / i128 / u128 truncates
+        "f32",  # cast from f64 loses precision
+    }
+)
+
+#: Rust primitive integer type names. SAFE112 only fires when a
+#: function parameter's declared type is one of these.
+_RUST_INTEGER_PRIMITIVE_TYPES: frozenset[str] = frozenset(
+    {
+        "i8",
+        "i16",
+        "i32",
+        "i64",
+        "i128",
+        "isize",
+        "u8",
+        "u16",
+        "u32",
+        "u64",
+        "u128",
+        "usize",
+    }
+)
+
+#: Binary operators that SAFE112 flags when applied to integer-typed
+#: function parameters. ``/`` and ``%`` are NOT included because
+#: division by zero is its own (well-defined) panic, not the silent
+#: overflow that SAFE112 cares about.
+_RUST_ARITHMETIC_OPERATORS: frozenset[str] = frozenset({"+", "-", "*"})
 
 
 # ---------------------------------------------------------------------------
@@ -867,3 +951,423 @@ class UnloggedErrorBranchRule(BaseRule):
         if _body_has_log_call(body):
             return False
         return not _body_propagates_or_panics(body)
+
+
+# ---------------------------------------------------------------------------
+# SAFE208 - result_unwrap_outside_tests
+# ---------------------------------------------------------------------------
+
+
+class ResultUnwrapOutsideTestsRule(BaseRule):
+    """Flag ``.unwrap()`` / ``.expect()`` / ``.unwrap_unchecked()`` outside test code.
+
+    The broad Holzmann-rule-7 ("check return values") form for Rust.
+    Narrower siblings:
+
+    * SAFE205 (``lock_poisoning_ignored``) - lock-specific
+      ``.unwrap()`` patterns.
+    * SAFE803 (``null_dereference``) - ``.unwrap()`` on inner calls
+      whose name is in the ``nullable_methods_rust`` set.
+
+    SAFE208 catches the cases those miss: bare-variable unwraps
+    (``let r = foo(); r.unwrap();``), unwrap chains where the inner
+    call isn't in the nullable list, etc. Test code (``#[test]`` /
+    ``#[cfg(test)]``) is exempt - panics there are the test
+    framework's failure signal, not a bug.
+
+    Enable alongside or instead of SAFE205/SAFE803 depending on
+    desired strictness. With all three enabled, ``mutex.lock().unwrap()``
+    fires multiple codes - documented overlap, intentional.
+    """
+
+    name = "result_unwrap_outside_tests"
+    code = "SAFE208"
+    language = ("rust",)
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag unwrap-family method calls outside test code."""
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type != "call_expression":
+                continue
+            method = self._unwrap_method_name(node)
+            if method is None:
+                continue
+            if _is_in_test_context(node):
+                continue
+            violations.append(
+                self._make_violation_for_node(
+                    filepath,
+                    node,
+                    f'".{method}()" outside test code - handle the Result / Option explicitly via match, "if let", or the "?" operator',
+                )
+            )
+        return violations
+
+    @staticmethod
+    def _unwrap_method_name(call_node: tree_sitter.Node) -> str | None:
+        """Return the method name if *call_node* is ``<x>.<unwrap-method>()``, else None."""
+        func = call_node.child_by_field_name("function")
+        if func is None or func.type != "field_expression":
+            return None
+        field = func.child_by_field_name("field")
+        if field is None:  # pragma: no cover - defensive: every field_expression has a field child
+            return None
+        method = node_text(field)
+        return method if method in _GENERAL_UNWRAP_METHODS else None
+
+
+# ---------------------------------------------------------------------------
+# SAFE308 - truncating_as_cast
+# ---------------------------------------------------------------------------
+
+
+class TruncatingAsCastRule(BaseRule):
+    """Flag ``as`` casts to fixed-width numeric types (silent truncation hazard).
+
+    Rust's ``as`` cast truncates without warning when the source value
+    doesn't fit in the destination: ``1_000_000u32 as u8`` returns
+    ``64`` (low byte), no panic, no error. The safe alternative is
+    ``u8::try_from(x)`` which returns ``Result<u8, TryFromIntError>``
+    - the failure mode becomes explicit and checked.
+
+    The rule flags ``as`` casts whose target type is in
+    :data:`_TRUNCATING_CAST_TARGETS` - the fixed-width integer
+    types and ``f32`` (where the precision-loss hazard is similar).
+    It deliberately fires even on apparently-safe casts (``0u8 as u8``,
+    ``small as i32``) because without type inference the rule can't
+    tell which casts truly fit; consistent "use TryFrom" beats
+    selective tolerance.
+
+    ``isize`` / ``usize`` / ``i128`` / ``u128`` / ``f64`` are NOT
+    flagged as targets - they're the widest types, casts TO them
+    from smaller types don't truncate. (Casts FROM them to smaller
+    targets still fire because the smaller target type is in the
+    set.)
+    """
+
+    name = "truncating_as_cast"
+    code = "SAFE308"
+    language = ("rust",)
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag ``as`` casts to fixed-width numeric types."""
+        targets = frozenset(self.config.get("truncating_cast_targets_rust", sorted(_TRUNCATING_CAST_TARGETS)))
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type != "type_cast_expression":
+                continue
+            target_name = self._cast_target_primitive(node)
+            if target_name is None or target_name not in targets:
+                continue
+            violations.append(
+                self._make_violation_for_node(
+                    filepath,
+                    node,
+                    f'"as {target_name}" silently truncates - use {target_name}::try_from(x) for a checked conversion or u-cast intentionally with a "// truncates: ..." comment',
+                )
+            )
+        return violations
+
+    @staticmethod
+    def _cast_target_primitive(cast_node: tree_sitter.Node) -> str | None:
+        """Return the trailing ``primitive_type`` name in *cast_node*, or None.
+
+        ``type_cast_expression`` named children are the source
+        expression followed by the target type. The target type is
+        ``primitive_type`` for the cases SAFE308 cares about; other
+        target shapes (reference_type, generic_type, etc.) are not
+        flagged - those casts are typically zero-cost reinterpretation,
+        not value truncation.
+        """
+        named = cast_node.named_children
+        if len(named) < 2:  # pragma: no cover - defensive: type_cast_expression has source + type
+            return None
+        target = named[-1]
+        return node_text(target) if target.type == "primitive_type" else None
+
+
+# ---------------------------------------------------------------------------
+# SAFE110 - needless_mut
+# ---------------------------------------------------------------------------
+
+
+def _let_mut_binding_name(let_decl: tree_sitter.Node) -> str | None:
+    """Return the bound name if *let_decl* is ``let mut <name> = ...``, else None.
+
+    Handles only the simple ``let mut <ident>`` shape - tuple /
+    struct destructure forms (``let mut (a, b) = ...``) aren't
+    legal Rust (``mut`` goes per-binding inside the pattern:
+    ``let (mut a, mut b) = ...``), so the rule sticks to the
+    common single-binding form to minimise complexity.
+    """
+    if not any(c.type == "mutable_specifier" for c in let_decl.named_children):
+        return None
+    for child in let_decl.named_children:
+        if child.type == "identifier":
+            return node_text(child)
+    return None  # pragma: no cover - defensive: ``let mut`` without an identifier binding is non-trivial destructure (caller skips it)
+
+
+def _function_body(func_node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the ``block`` body of *func_node*, or None if it has no body.
+
+    Rust ``function_item`` exposes the body on the ``body`` field;
+    closures use the body field too but their body is an arbitrary
+    expression (often a block).
+    """
+    return func_node.child_by_field_name("body")
+
+
+def _name_needs_mut_usage(name: str, body: tree_sitter.Node) -> bool:
+    """Return True if any usage of *name* in *body* requires the binding to be ``mut``.
+
+    Three kinds of usage definitively need mut:
+
+    * Assignment target: ``name = ...`` or ``name += ...`` etc.
+    * Mutable reference: ``&mut name``.
+    * Method call receiver: ``name.method(...)`` - the method may
+      take ``&mut self``, and without type info we can't tell.
+      Conservative: assume yes (= rule skips firing).
+    * Field-access target: ``name.field`` (read or write -
+      conservative: same reasoning).
+
+    Index expressions are also ambiguous; treated the same way.
+    """
+    return any(_node_is_mut_use_of(name, n) for n in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP))
+
+
+def _node_is_mut_use_of(name: str, node: tree_sitter.Node) -> bool:
+    """Return True if *node* is a usage of *name* that requires the binding to be ``mut``."""
+    if node.type == "assignment_expression":
+        return _assignment_left_is(name, node)
+    if node.type == "compound_assignment_expr":
+        return _assignment_left_is(name, node)
+    if node.type == "reference_expression":
+        return _is_mut_reference_of(name, node)
+    if node.type == "field_expression":
+        return _field_expression_value_is(name, node)
+    if node.type == "index_expression":
+        return _first_named_child_is(name, node)  # pragma: no cover - rare: index_expression as a mut-needing usage isn't reached by the current tests
+    return False
+
+
+def _assignment_left_is(name: str, node: tree_sitter.Node) -> bool:
+    """Return True if *node*'s ``left`` field is identifier *name*."""
+    left = node.child_by_field_name("left")
+    return left is not None and left.type == "identifier" and node_text(left) == name
+
+
+def _is_mut_reference_of(name: str, node: tree_sitter.Node) -> bool:
+    """Return True if *node* is ``&mut <name>``."""
+    if not any(c.type == "mutable_specifier" for c in node.named_children):
+        return False  # pragma: no cover - bare ``&x`` references aren't mut-needing usages
+    inner = next((c for c in node.named_children if c.type == "identifier"), None)
+    return inner is not None and node_text(inner) == name
+
+
+def _field_expression_value_is(name: str, node: tree_sitter.Node) -> bool:
+    """Return True if *node*'s ``value`` (receiver) is identifier *name*."""
+    value = node.child_by_field_name("value")
+    return value is not None and value.type == "identifier" and node_text(value) == name
+
+
+def _first_named_child_is(name: str, node: tree_sitter.Node) -> bool:
+    """Return True if *node*'s first named child is identifier *name*."""
+    children = node.named_children
+    return bool(children) and children[0].type == "identifier" and node_text(children[0]) == name  # pragma: no cover - helper for the rarely-hit index_expression branch
+
+
+class NeedlessMutRule(BaseRule):
+    """Flag ``let mut x = ...`` where ``x`` is never reassigned or mutably referenced.
+
+    Holzmann rule 6 (smallest scope / least privilege). Rust's
+    default-immutable design encourages declaring ``mut`` only when
+    truly needed; needless ``mut`` widens the surface for accidental
+    mutation and obscures which variables are actually meant to
+    change.
+
+    The rule is conservative to keep false-positive rate low: it
+    fires ONLY when none of the following usages appear in the
+    enclosing function body:
+
+    * ``name = ...`` (assignment) or ``name += ...`` (compound).
+    * ``&mut name`` (taking a mutable reference).
+    * ``name.method(...)`` (method call - receiver may need ``&mut self``).
+    * ``name.field`` (field access - read or write, unknown without types).
+    * ``name[i]`` (index expression - same reasoning).
+
+    Skips nested function / closure bodies during the usage walk so
+    a use inside an inner scope that isn't analysed for ``mut``
+    requirements doesn't taint the outer binding's classification.
+
+    Note: bindings inside ``loop`` / ``for`` / ``while`` bodies that
+    use ``mut`` for a fold-style accumulator are correctly handled -
+    the accumulator IS reassigned (``acc = combine(acc, x)``), so
+    the rule sees the assignment and stays quiet.
+    """
+
+    name = "needless_mut"
+    code = "SAFE110"
+    language = ("rust",)
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag every needless ``let mut`` binding in the file."""
+        violations: list[Violation] = []
+        for func_node in walk(tree.root_node):
+            if func_node.type not in _RUST_FUNCTION_TYPES_FOR_SKIP:
+                continue
+            body = _function_body(func_node)
+            if body is None:
+                continue  # pragma: no cover - trait-method-signature functions have no body
+            violations.extend(self._violations_in_body(filepath, body))
+        return violations
+
+    def _violations_in_body(self, filepath: str, body: tree_sitter.Node) -> list[Violation]:
+        """Return needless-mut violations for every ``let mut`` in *body*."""
+        out: list[Violation] = []
+        for let_decl in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP):
+            if let_decl.type != "let_declaration":
+                continue
+            name = _let_mut_binding_name(let_decl)
+            if name is None or _name_needs_mut_usage(name, body):
+                continue
+            out.append(
+                self._make_violation_for_node(
+                    filepath,
+                    let_decl,
+                    f'"let mut {name}" is never reassigned or mutably referenced - drop the "mut"',
+                )
+            )
+        return out
+
+
+# ---------------------------------------------------------------------------
+# SAFE112 - unchecked_arithmetic_on_input
+# ---------------------------------------------------------------------------
+
+
+def _integer_param_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return parameter names whose declared type is a Rust integer primitive.
+
+    Walks the ``parameters`` field's children, finds ``parameter``
+    nodes whose ``type`` field is a ``primitive_type`` with a Rust
+    integer-type name, and collects the pattern's bound name.
+    Skips ``self_parameter``, untyped closure ``identifier``
+    children, and non-primitive types (``String``, generic types,
+    references, etc.).
+    """
+    params_node = func_node.child_by_field_name("parameters")
+    if params_node is None:  # pragma: no cover - defensive: every function_item has parameters
+        return set()
+    names: set[str] = set()
+    for child in params_node.named_children:
+        if child.type != "parameter":
+            continue  # pragma: no cover - self_parameter / variadic skipped
+        type_node = child.child_by_field_name("type")
+        if type_node is None or type_node.type != "primitive_type":
+            continue
+        if node_text(type_node) not in _RUST_INTEGER_PRIMITIVE_TYPES:
+            continue
+        pattern = child.child_by_field_name("pattern")
+        if pattern is None or pattern.type != "identifier":
+            continue
+        names.add(node_text(pattern))
+    return names
+
+
+class UncheckedArithmeticOnInputRule(BaseRule):
+    """Flag bare arithmetic on integer-typed function parameters.
+
+    Rust's ``+`` / ``-`` / ``*`` panic on overflow in debug builds
+    and wrap silently in release builds - the worst of both worlds
+    for production reliability. ``checked_add`` / ``wrapping_add`` /
+    ``saturating_add`` make the choice explicit at the call site:
+    you either get ``Option<T>`` to check the failure mode, declare
+    you want wrapping, or declare you want saturation.
+
+    The rule fires when:
+
+    * The enclosing function has at least one parameter of integer
+      primitive type (``i8`` ... ``u128``, ``isize``, ``usize``).
+    * A ``binary_expression`` inside the function body has operator
+      in :data:`_RUST_ARITHMETIC_OPERATORS` (``+`` / ``-`` / ``*``).
+    * At least one operand is an ``identifier`` whose text matches
+      one of the integer parameter names.
+
+    ``/`` and ``%`` are deliberately excluded - division by zero
+    is a separate, loudly-panic-on-debug hazard not addressed by
+    the ``checked_*`` family the same way; SAFE112 stays focused
+    on silent-overflow.
+
+    Heuristic limitation: the rule has no type information beyond
+    parameter annotations, so it misses arithmetic on locally-bound
+    integer variables that derive from parameters
+    (``let x = p + 1; let y = x + 1;`` only fires on the first).
+    Users wanting tighter coverage can use ``clippy`` for the
+    full-type-info version; SAFE112 is the static-only baseline.
+    """
+
+    name = "unchecked_arithmetic_on_input"
+    code = "SAFE112"
+    language = ("rust",)
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag unchecked arithmetic on integer-typed parameters."""
+        violations: list[Violation] = []
+        for func_node in walk(tree.root_node):
+            if func_node.type != "function_item":
+                continue
+            int_params = _integer_param_names(func_node)
+            if not int_params:
+                continue
+            body = _function_body(func_node)
+            if body is None:
+                continue  # pragma: no cover - trait-method-signature functions have no body
+            violations.extend(self._violations_in_body(filepath, body, int_params))
+        return violations
+
+    def _violations_in_body(self, filepath: str, body: tree_sitter.Node, int_params: set[str]) -> list[Violation]:
+        """Return violations for every unchecked arithmetic op on *int_params* in *body*."""
+        out: list[Violation] = []
+        for node in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP):
+            if node.type != "binary_expression":
+                continue
+            op = self._operator_text(node)
+            if op not in _RUST_ARITHMETIC_OPERATORS:
+                continue  # comparisons / divisions / boolean ops aren't flagged
+            param_name = self._operand_matching_param(node, int_params)
+            if param_name is None:
+                continue  # arithmetic between locals (neither operand is a flagged param)
+            suffix = _op_method_suffix(op)
+            out.append(
+                self._make_violation_for_node(
+                    filepath,
+                    node,
+                    f'"{op}" on integer parameter "{param_name}" can overflow silently in release - use checked_{suffix} / wrapping_{suffix} / saturating_{suffix}',
+                )
+            )
+        return out
+
+    @staticmethod
+    def _operator_text(binary: tree_sitter.Node) -> str | None:
+        """Return the operator text of a ``binary_expression``."""
+        op = binary.child_by_field_name("operator")
+        return node_text(op) if op is not None else None
+
+    @staticmethod
+    def _operand_matching_param(binary: tree_sitter.Node, int_params: set[str]) -> str | None:
+        """Return the first operand whose text is in *int_params*, or None."""
+        for field in ("left", "right"):
+            operand = binary.child_by_field_name(field)
+            if operand is None or operand.type != "identifier":
+                continue  # operand is a literal / method call / nested binary - not a param identifier
+            text = node_text(operand)
+            if text in int_params:
+                return text
+        return None
+
+
+def _op_method_suffix(op: str | None) -> str:
+    """Map an arithmetic operator to its checked_*/wrapping_*/saturating_* method suffix."""
+    return {"+": "add", "-": "sub", "*": "mul"}.get(op or "", "op")

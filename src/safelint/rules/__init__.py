@@ -15,8 +15,12 @@ from safelint.rules.resource_lifecycle import ResourceLifecycleRule
 from safelint.rules.rust_rules import (
     DangerousMemOpsRule,
     LockPoisoningIgnoredRule,
+    NeedlessMutRule,
     PanicMacrosOutsideTestsRule,
+    ResultUnwrapOutsideTestsRule,
     SilentResultDiscardRule,
+    TruncatingAsCastRule,
+    UncheckedArithmeticOnInputRule,
     UndocumentedUnsafeRule,
     UnloggedErrorBranchRule,
 )
@@ -66,14 +70,18 @@ ALL_RULES: list[type[BaseRule]] = [
     SpringUnvalidatedInputRule,
     SpringAsyncCheckedExceptionRule,
     # Rust-idiom rules (slotted into category bands per the SafeLint
-    # numbering policy: 2xx error-handling, 3xx side-effects, 6xx
-    # documentation). All disabled by default; opt in via
-    # [tool.safelint.rules.<name>] enabled = true.
+    # numbering policy: 1xx function-shape, 2xx error-handling, 3xx
+    # side-effects, 6xx documentation). All disabled by default; opt
+    # in via [tool.safelint.rules.<name>] enabled = true.
+    NeedlessMutRule,
+    UncheckedArithmeticOnInputRule,
     PanicMacrosOutsideTestsRule,
     LockPoisoningIgnoredRule,
     SilentResultDiscardRule,
     UnloggedErrorBranchRule,
+    ResultUnwrapOutsideTestsRule,
     DangerousMemOpsRule,
+    TruncatingAsCastRule,
     UndocumentedUnsafeRule,
 ]
 
@@ -94,10 +102,12 @@ __all__ = [
     "LoggingOnErrorRule",
     "MaxArgumentsRule",
     "MissingAssertionsRule",
+    "NeedlessMutRule",
     "NestingDepthRule",
     "NullDereferenceRule",
     "PanicMacrosOutsideTestsRule",
     "ResourceLifecycleRule",
+    "ResultUnwrapOutsideTestsRule",
     "ReturnValueIgnoredRule",
     "SideEffectsHiddenRule",
     "SideEffectsRule",
@@ -109,7 +119,9 @@ __all__ = [
     "TaintedSinkRule",
     "TestCouplingRule",
     "TestExistenceRule",
+    "TruncatingAsCastRule",
     "UnboundedLoopRule",
+    "UncheckedArithmeticOnInputRule",
     "UndocumentedUnsafeRule",
     "UnloggedErrorBranchRule",
     "Violation",

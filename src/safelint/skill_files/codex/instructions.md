@@ -148,6 +148,8 @@ The rule set is shared across all supported languages. Universal rationale crib 
 | SAFE102 | nesting_depth | Deep nesting hides control flow and grows exponentially with conditions. |
 | SAFE103 | max_arguments | Many parameters indicate the function does too much or has hidden coupling. |
 | SAFE104 | complexity | Cyclomatic complexity bounds the number of independent paths. |
+| SAFE110 | needless_mut | *Rust-only.* `let mut x = ...` where `x` is never reassigned, never has `&mut` taken, and is never used as a method receiver / field-access target. Holzmann rule 6 (smallest scope). |
+| SAFE112 | unchecked_arithmetic_on_input | *Rust-only.* `+` / `-` / `*` on integer-typed function parameters can overflow silently in release. Use `checked_*` / `wrapping_*` / `saturating_*` to make the choice explicit. Holzmann rule 7. |
 | SAFE201 | bare_except | Catch-all error handlers swallow signals you actually want to propagate. |
 | SAFE202 | empty_except | Silent failure is the worst failure mode. |
 | SAFE203 | logging_on_error | An `except` block with no log call loses the failure context, so debugging starts from a blank trace. |
@@ -155,12 +157,14 @@ The rule set is shared across all supported languages. Universal rationale crib 
 | SAFE205 | lock_poisoning_ignored | *Rust-only.* `mutex.lock().unwrap()` / `rwlock.read().unwrap()` / `.write().unwrap()` silently swallow lock poisoning. Match on `PoisonError` or call `.into_inner()` to recover explicitly. |
 | SAFE206 | silent_result_discard | *Rust-only.* Empty `Err` arms (`Err(_) => {}`) and empty `if let Err(_) = ... {}` bodies silently swallow errors. Spiritual analogue of SAFE202 (empty_except) for Rust's `Result`/`Option` idioms. `let _ = result;` is the explicit auditable discard and is NOT flagged. |
 | SAFE207 | unlogged_error_branch | *Rust-only.* `Err` arms / `if let Err(...)` bodies that handle the error but neither log it nor propagate it. Exempts bodies containing `return`, `panic!` / `todo!` / `unreachable!` / `unimplemented!`, or a tail `Err(...)` re-raise. Spiritual analogue of SAFE203 (logging_on_error). |
+| SAFE208 | result_unwrap_outside_tests | *Rust-only.* `.unwrap()` / `.expect()` / `.unwrap_unchecked()` outside test code. Broader than SAFE205 (lock-specific) and SAFE803 (nullable-method-specific). Holzmann rule 7 (check return values). |
 | SAFE301 | global_state | Global state makes functions impure and breaks local reasoning. |
 | SAFE302 | global_mutation | Reassigning shared state mid-function is a Power-of-Ten violation outright. |
 | SAFE303 | side_effects_hidden | Pure-named functions doing I/O surprise callers. |
 | SAFE304 | side_effects | I/O at unexpected sites makes testing harder; rename or inject. |
 | SAFE305 | wide_scope_declaration | JS-family (JavaScript and TypeScript): `var` is function-scoped (hoisted across blocks); `let` / `const` are block-scoped. The rule fires on every `var` declaration; the fix is mechanical (replace with `let` if reassigned, `const` otherwise). TypeScript inherits the same scoping behaviour. No Python equivalent. |
 | SAFE306 | dangerous_mem_ops | *Rust-only.* Calls to `std::mem::transmute` / `forget` / `zeroed` / `uninitialized` are footguns. Use `From` / `TryFrom` / `bytemuck` for casts, `ManuallyDrop` for explicit drop control, `MaybeUninit` for uninitialised memory. |
+| SAFE308 | truncating_as_cast | *Rust-only.* `as u8` / `as u16` / `as u32` / `as i32` / `as f32` casts silently truncate. Use `u8::try_from(x)` / `u16::try_from(x)` etc. for a checked conversion. Holzmann rule 1 + 7. |
 | SAFE401 | resource_lifecycle | Files, locks, sockets, and similar resources should be acquired inside a `with` block so cleanup is guaranteed even on exception paths. |
 | SAFE501 | unbounded_loops | Every loop should have a bounded iteration count for predictable termination. |
 | SAFE601 | missing_assertions | Functions without internal assertions skip a key opportunity to catch invariant violations close to where they happen. |

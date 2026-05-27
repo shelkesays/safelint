@@ -979,6 +979,28 @@ DEFAULTS: dict[str, Any] = {
         "lock_poisoning_ignored": {"enabled": False, "severity": "warning"},
         "silent_result_discard": {"enabled": False, "severity": "warning"},
         "unlogged_error_branch": {"enabled": False, "severity": "warning"},
+        "result_unwrap_outside_tests": {"enabled": False, "severity": "warning"},
+        "needless_mut": {"enabled": False, "severity": "warning"},
+        "unchecked_arithmetic_on_input": {"enabled": False, "severity": "warning"},
+        "truncating_as_cast": {
+            "enabled": False,
+            "severity": "warning",
+            # Per-target overridable. Default covers the fixed-width
+            # integer types and f32. ``isize`` / ``usize`` / ``i128`` /
+            # ``u128`` / ``f64`` are the widest types - casts TO them
+            # don't truncate, so they're not in the default set.
+            "truncating_cast_targets_rust": [
+                "i8",
+                "u8",
+                "i16",
+                "u16",
+                "i32",
+                "u32",
+                "i64",
+                "u64",
+                "f32",
+            ],
+        },
         "dangerous_mem_ops": {
             "enabled": False,
             "severity": "error",
