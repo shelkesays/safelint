@@ -248,6 +248,50 @@ DEFAULTS: dict[str, Any] = {
                 "send",  # HttpClient.send(request, ...)
                 "sendAsync",  # HttpClient.sendAsync(request, ...)
             ],
+            # Rust I/O primitives. Most common stdlib I/O is via MACROS
+            # (``println!`` / ``print!`` / ``eprintln!`` / ``eprint!`` /
+            # ``write!`` / ``writeln!``), which the rule walks as
+            # ``macro_invocation`` nodes alongside regular calls.
+            # ``format!`` and ``vec!`` are deliberately NOT here -
+            # they don't perform I/O (return ``String`` / ``Vec<T>``).
+            "io_functions_rust": [
+                # Stdout / stderr macros
+                "println",
+                "print",
+                "eprintln",
+                "eprint",
+                # ``write!`` / ``writeln!`` macros - write to any
+                # ``Write`` impl (stdout, file, network).
+                "write",
+                "writeln",
+                "dbg",  # ``dbg!(x)`` prints to stderr
+                # std::fs read/write entry points - both bare and scoped
+                # forms resolve via ``call_name``'s scoped_identifier
+                # branch to the trailing bareword.
+                "read_to_string",
+                "read_to_end",
+                "read_dir",
+                "metadata",
+                "canonicalize",
+                # std::io::Read / std::io::Write trait methods
+                "read",
+                "read_exact",
+                "read_line",
+                "write_all",
+                "write_fmt",
+                "flush",
+                # std::process - subprocess execution
+                "spawn",
+                "output",
+                "status",
+                # Network - TCP / UDP / HTTP
+                "connect",  # TcpStream::connect
+                "bind",  # UdpSocket::bind, TcpListener::bind
+                "accept",  # TcpListener::accept
+                "recv",
+                "recv_from",
+                "send_to",
+            ],
             "pure_prefixes": [
                 "calculate",
                 "compute",
@@ -300,6 +344,32 @@ DEFAULTS: dict[str, Any] = {
                 "readAllLines",
                 "writeString",
                 "write",
+            ],
+            "io_functions_rust": [
+                # See full rationale in ``side_effects_hidden`` config above.
+                # Same default set; both rules share the I/O primitive
+                # vocabulary (one filters by pure-named prefix, the
+                # other by absence of an I/O keyword in the name).
+                "println",
+                "print",
+                "eprintln",
+                "eprint",
+                "write",
+                "writeln",
+                "dbg",
+                "read_to_string",
+                "read_to_end",
+                "read_dir",
+                "read",
+                "read_line",
+                "write_all",
+                "flush",
+                "spawn",
+                "output",
+                "status",
+                "connect",
+                "recv",
+                "send_to",
             ],
             "io_name_keywords": [
                 "print",
