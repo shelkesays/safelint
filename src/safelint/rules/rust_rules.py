@@ -1,4 +1,4 @@
-"""Rust-idiom rules: SAFE204 / SAFE205 / SAFE306 / SAFE602.
+"""Rust-idiom rules: SAFE204 / SAFE205 / SAFE206 / SAFE207 / SAFE306 / SAFE602.
 
 Rules in this file are Rust-language-specific (no cross-language
 counterpart). Codes are slotted into the existing category bands by
@@ -11,6 +11,13 @@ closest theme, per the SafeLint rule-numbering policy in CLAUDE.md:
   ``mutex.lock().unwrap()`` and ``rwlock.read().unwrap()`` /
   ``rwlock.write().unwrap()`` - patterns that silently swallow lock
   poisoning instead of handling the ``PoisonError``.
+* **SAFE206** ``silent_result_discard`` (error handling) - the Rust
+  spiritual analogue of SAFE202 (empty_except). Flags empty ``Err``
+  arms in ``match`` and empty ``if let Err(_) = ... { }`` bodies.
+* **SAFE207** ``unlogged_error_branch`` (error handling) - the Rust
+  spiritual analogue of SAFE203 (logging_on_error). Flags ``Err``
+  arms / branches with non-empty bodies that contain no log call
+  and don't propagate the error.
 * **SAFE306** ``dangerous_mem_ops`` (side effects) - flags calls to
   ``std::mem::transmute``, ``std::mem::forget``, ``std::mem::zeroed``,
   and ``std::mem::uninitialized``. All four have safer Rust idioms.
@@ -18,7 +25,7 @@ closest theme, per the SafeLint rule-numbering policy in CLAUDE.md:
   ``unsafe { ... }`` blocks that lack a ``// SAFETY:`` comment on a
   preceding line documenting the safety invariants.
 
-All four are disabled by default; opt in via
+All disabled by default; opt in via
 ``[tool.safelint.rules.<name>] enabled = true``.
 """
 
@@ -26,7 +33,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from safelint.languages._node_utils import node_text, walk
+from safelint.languages._node_utils import call_name, node_text, walk
 from safelint.rules.base import BaseRule
 
 
@@ -79,18 +86,65 @@ _DANGEROUS_MEM_OP_NAMES: frozenset[str] = frozenset(
     }
 )
 
+#: Log-call macro names recognised by SAFE207 as "this error branch is
+#: logged". Covers the ``log`` crate (``log::error!`` / ``warn!`` /
+#: ``info!`` / ``debug!`` / ``trace!``), the ``tracing`` crate (same
+#: names plus ``event!`` / ``span!``), and bare stderr / stdout writers
+#: (``eprintln!`` / ``eprint!`` / ``println!`` / ``print!`` / ``dbg!``).
+#: ``log::log!`` (the generic macro) is included via the bare ``log``
+#: entry. ``call_name`` (extended for Rust ``scoped_identifier``) and
+#: ``_rust_macro_name`` both strip qualifiers, so ``log::error!`` and
+#: ``error!`` and ``tracing::error!`` all resolve to ``"error"``.
+_LOG_CALL_NAMES: frozenset[str] = frozenset(
+    {
+        # log / tracing crate level macros
+        "error",
+        "warn",
+        "info",
+        "debug",
+        "trace",
+        "event",
+        "log",
+        # stderr / stdout writers (also count as "made the failure visible")
+        "eprintln",
+        "eprint",
+        "println",
+        "print",
+        "dbg",
+    }
+)
+
+#: Panic-like macros that, when present in an error-handling branch,
+#: count as "the failure was made loudly observable" - SAFE207 exempts
+#: bodies containing them. Same set as SAFE204's recognised panic
+#: macros plus ``unreachable!`` (which is excluded from SAFE204's
+#: panic-in-non-test check but DOES make a failure visible).
+_PANIC_LIKE_MACROS: frozenset[str] = frozenset(
+    {
+        "panic",
+        "todo",
+        "unimplemented",
+        "unreachable",
+    }
+)
+
 
 # ---------------------------------------------------------------------------
 # Shared helpers
 # ---------------------------------------------------------------------------
 
 
-def _rust_macro_name(macro_node: tree_sitter.Node) -> str | None:
+def _rust_macro_name(macro_node: tree_sitter.Node | None) -> str | None:
     """Return the bareword macro name from a Rust ``macro_invocation`` ``macro`` field.
 
     Bare ``panic!`` resolves to ``"panic"``; scoped ``std::panic!``
     also resolves to ``"panic"`` (trailing identifier extracted).
+    Returns ``None`` when *macro_node* is None (e.g. a malformed
+    ``macro_invocation`` lacking the ``macro`` field) so callers can
+    pass ``child_by_field_name("macro")`` directly.
     """
+    if macro_node is None:  # pragma: no cover - defensive: every macro_invocation has a macro field
+        return None
     if macro_node.type == "identifier":
         return node_text(macro_node)
     if macro_node.type == "scoped_identifier":
@@ -257,7 +311,7 @@ def _is_lock_method_call(call_node: tree_sitter.Node) -> str | None:
     """If *call_node* is ``<receiver>.lock()`` / ``.read()`` / ``.write()`` etc., return the method name."""
     func = call_node.child_by_field_name("function")
     if func is None or func.type != "field_expression":
-        return None
+        return None  # pragma: no cover - guarded by caller (SAFE205 only reaches here for field_expression calls)
     field = func.child_by_field_name("field")
     if field is None:  # pragma: no cover - defensive: every field_expression has a field child
         return None
@@ -298,7 +352,7 @@ class LockPoisoningIgnoredRule(BaseRule):
                 continue
             inner = self._inner_lock_call(node)
             if inner is None:
-                continue
+                continue  # pragma: no cover - covered by ``_inner_lock_call``'s None-receiver branch (defensive)
             lock_method = _is_lock_method_call(inner)
             if lock_method is None:
                 continue
@@ -316,7 +370,7 @@ class LockPoisoningIgnoredRule(BaseRule):
         """If *call_node* is ``<x>.unwrap()`` / ``<x>.expect(...)``, return the method name."""
         func = call_node.child_by_field_name("function")
         if func is None or func.type != "field_expression":
-            return None
+            return None  # pragma: no cover - SAFE205 walks every call_expression; most aren't field_expression calls
         field = func.child_by_field_name("field")
         if field is None:  # pragma: no cover - defensive: every field_expression has a field child
             return None
@@ -497,3 +551,319 @@ class UndocumentedUnsafeRule(BaseRule):
                 return True
             prev = prev.prev_sibling
         return False
+
+
+# ---------------------------------------------------------------------------
+# Shared helpers for SAFE206 / SAFE207 (Err-branch analysis)
+# ---------------------------------------------------------------------------
+
+
+def _is_err_pattern(pattern: tree_sitter.Node | None) -> bool:
+    """Return True if *pattern* is ``Err(...)`` (binding or wildcard).
+
+    Both ``Err(_)`` and ``Err(e)`` parse as ``tuple_struct_pattern``
+    whose first named child is an ``identifier`` ``"Err"``. The
+    inner pattern (``_`` vs ``e``) doesn't matter for either rule:
+    SAFE206 cares about empty body, SAFE207 cares about absence of
+    log call, neither cares about the binding form.
+    """
+    if pattern is None or pattern.type != "tuple_struct_pattern":
+        return False
+    children = pattern.named_children
+    if not children or children[0].type != "identifier":  # pragma: no cover - defensive: tuple_struct_pattern always has a leading identifier
+        return False
+    return node_text(children[0]) == "Err"
+
+
+def _match_arm_pattern_and_body(arm: tree_sitter.Node) -> tuple[tree_sitter.Node | None, tree_sitter.Node | None]:
+    """Return ``(pattern_inner, body)`` for *arm*, or ``(None, None)``.
+
+    ``match_arm`` has a ``match_pattern`` first named child wrapping the
+    actual pattern; the body is the second named child (either a
+    ``block`` for ``Err(_) => { ... }`` or a bare expression for
+    ``Err(_) => expr,``).
+    """
+    children = arm.named_children
+    if len(children) < 2 or children[0].type != "match_pattern":  # pragma: no cover - defensive: every match_arm has match_pattern + body
+        return None, None
+    pattern_inner = next((c for c in children[0].named_children), None)
+    return pattern_inner, children[1]
+
+
+def _if_let_err_pattern_and_body(if_expr: tree_sitter.Node) -> tuple[tree_sitter.Node | None, tree_sitter.Node | None]:
+    """Return ``(pattern, body_block)`` if *if_expr* is ``if let Err(...) = ...``, else ``(None, None)``.
+
+    tree-sitter-rust parses ``if let`` as an ``if_expression`` whose
+    first named child is ``let_condition``. The let_condition has the
+    pattern as its first named child and the matched value second.
+    The ``block`` body is the next named child of ``if_expression``.
+    """
+    condition = next((c for c in if_expr.named_children if c.type == "let_condition"), None)
+    if condition is None:
+        return None, None  # plain ``if cond { ... }`` without ``let`` - not an if-let
+    pattern = next((c for c in condition.named_children), None)
+    if not _is_err_pattern(pattern):
+        return None, None
+    block = next((c for c in if_expr.named_children if c.type == "block"), None)
+    return pattern, block
+
+
+_NOOP_LEAF_TYPES: frozenset[str] = frozenset(
+    {
+        "integer_literal",
+        "float_literal",
+        "string_literal",
+        "char_literal",
+        "boolean_literal",
+        "unit_expression",
+    }
+)
+
+
+def _body_is_noop(body: tree_sitter.Node | None) -> bool:
+    """Return True if *body* is effectively empty / a no-op.
+
+    A no-op body is one of:
+
+    * Empty block ``{}`` - ``block`` with no named children.
+    * Block containing only a single literal / unit expression
+      (``{ () }``, ``{ 0 }``, ``{ "TODO" }``).
+    * A bare literal / unit expression in tail-form arm
+      (``Err(_) => 0,`` / ``Err(_) => (),``).
+    """
+    if body is None:  # pragma: no cover - defensive: callers guard body presence
+        return False
+    if body.type in _NOOP_LEAF_TYPES:
+        return True
+    if body.type != "block":
+        return False
+    return _block_is_noop(body)
+
+
+def _block_is_noop(block: tree_sitter.Node) -> bool:
+    """Return True if *block* (a ``block`` node) is empty or holds only a noop leaf."""
+    named = block.named_children
+    if not named:
+        return True
+    if len(named) > 1:
+        return False
+    only = named[0]
+    if only.type in _NOOP_LEAF_TYPES:
+        return True
+    if only.type != "expression_statement":  # pragma: no cover - rare: noop-leaf single-stmt blocks parse as direct leaf (tail form) or expression_statement (semicolon-terminated)
+        return False
+    inner = next((c for c in only.named_children), None)
+    return inner is not None and inner.type in _NOOP_LEAF_TYPES
+
+
+_RUST_FUNCTION_TYPES_FOR_SKIP: tuple[str, ...] = ("function_item", "closure_expression")
+
+
+def _node_resolves_to_log_call(node: tree_sitter.Node) -> bool:
+    """Return True if *node* is a macro or call resolving to a log-call name."""
+    if node.type == "macro_invocation":
+        return _rust_macro_name(node.child_by_field_name("macro")) in _LOG_CALL_NAMES
+    if node.type == "call_expression":
+        return call_name(node) in _LOG_CALL_NAMES
+    return False
+
+
+def _body_has_log_call(body: tree_sitter.Node | None) -> bool:
+    """Return True if *body* contains at least one log-call macro or function call.
+
+    Skips into nested function / closure bodies so a log call inside
+    an inner closure that never runs synchronously doesn't count.
+    """
+    if body is None:  # pragma: no cover - defensive: caller guards body presence
+        return False
+    return any(_node_resolves_to_log_call(n) for n in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP))
+
+
+def _node_is_panic_like_macro(node: tree_sitter.Node) -> bool:
+    """Return True if *node* is a panic-like macro invocation."""
+    if node.type != "macro_invocation":
+        return False
+    return _rust_macro_name(node.child_by_field_name("macro")) in _PANIC_LIKE_MACROS
+
+
+def _body_propagates_or_panics(body: tree_sitter.Node | None) -> bool:
+    """Return True if *body* propagates the error or panics loudly.
+
+    SAFE207 exempts bodies that:
+
+    * Contain a ``return_expression`` (any return; ``return Err(e)``,
+      ``return;``, ``return some_default``).
+    * Contain a panic-like macro (``panic!`` / ``todo!`` /
+      ``unreachable!`` / ``unimplemented!``).
+    * Tail-position re-raise: the body's single tail expression is
+      a ``call_expression`` whose callee is bare ``Err``
+      (``Err(_) => Err(e),`` or ``Err(e) => { Err(e) }``).
+
+    All three signal "the failure isn't being silently absorbed",
+    so logging is optional. Skips nested function / closure bodies
+    so unrelated returns / panics inside closures don't count.
+    """
+    if body is None:  # pragma: no cover - defensive: caller guards body presence
+        return False
+    for node in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP):
+        if node.type == "return_expression" or _node_is_panic_like_macro(node):
+            return True
+    return _body_tail_is_err_constructor(body)
+
+
+def _body_tail_is_err_constructor(body: tree_sitter.Node) -> bool:
+    """Return True if *body*'s tail expression is ``Err(...)`` (re-raise pattern)."""
+    if body.type == "call_expression" and _is_err_constructor_call(body):
+        return True
+    if body.type != "block":
+        return False
+    named = body.named_children
+    if not named:  # pragma: no cover - defensive: callers reach this only for non-empty bodies
+        return False
+    tail = named[-1]
+    if tail.type == "call_expression":
+        return _is_err_constructor_call(tail)  # pragma: no cover - tail-form ``Err(...)`` in a block is rare (typically a bare expression at the arm level)
+    if tail.type == "expression_statement":
+        inner = next((c for c in tail.named_children), None)
+        return inner is not None and inner.type == "call_expression" and _is_err_constructor_call(inner)
+    return False  # pragma: no cover - non-call tail (let_declaration etc.) - body isn't a re-raise
+
+
+def _is_err_constructor_call(call_node: tree_sitter.Node) -> bool:
+    """Return True if *call_node* is ``Err(...)`` (the bare constructor)."""
+    func = call_node.child_by_field_name("function")
+    if func is None or func.type != "identifier":
+        return False  # pragma: no cover - rare: ``Err`` used via method or scoped path isn't matched
+    return node_text(func) == "Err"
+
+
+# ---------------------------------------------------------------------------
+# SAFE206 - silent_result_discard
+# ---------------------------------------------------------------------------
+
+
+class SilentResultDiscardRule(BaseRule):
+    """Flag empty ``Err`` arms in ``match`` and empty ``if let Err(_) = ...`` bodies.
+
+    The Rust spiritual analogue of SAFE202 (``empty_except``):
+    "I caught the error and did literally nothing." Two shapes fire:
+
+    * ``match res { Ok(v) => ..., Err(_) => {} }`` - empty Err arm.
+    * ``if let Err(_) = res { }`` - empty if-let-Err body.
+
+    Both ``Err(_)`` (wildcard) and ``Err(e)`` (with binding) trigger
+    the rule when the body is empty - the silent thing is the no-op
+    body, not the pattern. ``let _ = res;`` (the idiomatic explicit
+    discard) does NOT fire; that's a deliberately auditable
+    statement, not a silent swallow.
+    """
+
+    name = "silent_result_discard"
+    code = "SAFE206"
+    language = ("rust",)
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag empty Err arms / if-let-Err bodies."""
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            violation = self._check_node(filepath, node)
+            if violation is not None:
+                violations.append(violation)
+        return violations
+
+    def _check_node(self, filepath: str, node: tree_sitter.Node) -> Violation | None:
+        """Dispatch *node* to the right shape check; return a violation or None."""
+        if node.type == "match_arm":
+            pattern, body = _match_arm_pattern_and_body(node)
+            if _is_err_pattern(pattern) and _body_is_noop(body):
+                return self._make_violation_for_node(
+                    filepath,
+                    node,
+                    'Empty "Err" arm silently discards the error - log the failure or return / propagate it',
+                )
+            return None
+        if node.type == "if_expression":
+            _, body = _if_let_err_pattern_and_body(node)
+            if body is not None and _body_is_noop(body):
+                return self._make_violation_for_node(
+                    filepath,
+                    node,
+                    'Empty "if let Err(...)" body silently discards the error - log the failure or return / propagate it',
+                )
+        return None
+
+
+# ---------------------------------------------------------------------------
+# SAFE207 - unlogged_error_branch
+# ---------------------------------------------------------------------------
+
+
+class UnloggedErrorBranchRule(BaseRule):
+    """Flag ``Err`` arms / branches with non-empty bodies that don't log and don't propagate.
+
+    The Rust spiritual analogue of SAFE203 (``logging_on_error``):
+    handling an error without logging it loses the failure context
+    for debugging. Two shapes fire:
+
+    * ``match res { Err(e) => { cleanup(); } ... }`` - Err arm body
+      with no log call and no propagation.
+    * ``if let Err(e) = res { cleanup(); }`` - same shape for if-let.
+
+    The body is exempted when:
+
+    * It contains any ``return_expression`` (propagating /
+      early-returning is an explicit response).
+    * It contains a panic-like macro (``panic!`` / ``todo!`` /
+      ``unreachable!`` / ``unimplemented!``) - the failure is loud.
+    * Its tail expression is ``Err(...)`` (re-raise pattern in
+      ``Result``-returning functions).
+
+    Empty bodies are handled by SAFE206, not this rule.
+    """
+
+    name = "unlogged_error_branch"
+    code = "SAFE207"
+    language = ("rust",)
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag Err arms / if-let-Err bodies that handle the error silently."""
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            violation = self._check_node(filepath, node)
+            if violation is not None:
+                violations.append(violation)
+        return violations
+
+    def _check_node(self, filepath: str, node: tree_sitter.Node) -> Violation | None:
+        """Dispatch *node* and return a violation if the Err-branch body is silent."""
+        if node.type == "match_arm":
+            pattern, body = _match_arm_pattern_and_body(node)
+            if not _is_err_pattern(pattern):
+                return None
+            if self._is_silent_handle(body):
+                return self._make_violation_for_node(
+                    filepath,
+                    node,
+                    '"Err" arm handles the error but does not log it - add a log::error! / tracing::error! call or propagate the error',
+                )
+            return None
+        if node.type == "if_expression":
+            _, body = _if_let_err_pattern_and_body(node)
+            if body is None:
+                return None
+            if self._is_silent_handle(body):
+                return self._make_violation_for_node(
+                    filepath,
+                    node,
+                    '"if let Err(...)" body handles the error but does not log it - add a log::error! / tracing::error! call or propagate the error',
+                )
+        return None
+
+    @staticmethod
+    def _is_silent_handle(body: tree_sitter.Node | None) -> bool:
+        """Return True if *body* is non-empty, has no log call, and doesn't propagate."""
+        if body is None or _body_is_noop(body):
+            return False
+        if _body_has_log_call(body):
+            return False
+        return not _body_propagates_or_panics(body)

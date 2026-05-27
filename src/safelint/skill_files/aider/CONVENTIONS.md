@@ -161,6 +161,8 @@ The rule set is shared across all supported languages. Universal rationale crib 
 | SAFE203 | logging_on_error | An `except` block with no log call loses the failure context, so debugging starts from a blank trace. |
 | SAFE204 | panic_macros_outside_tests | *Rust-only.* `panic!()` / `todo!()` / `unimplemented!()` in non-test code crash on error; production paths should return `Result<_, _>` instead. Test code (`#[test]` / `#[cfg(test)]`) is excluded. |
 | SAFE205 | lock_poisoning_ignored | *Rust-only.* `mutex.lock().unwrap()` / `rwlock.read().unwrap()` / `.write().unwrap()` silently swallow lock poisoning. Match on `PoisonError` or call `.into_inner()` to recover explicitly. |
+| SAFE206 | silent_result_discard | *Rust-only.* Empty `Err` arms (`Err(_) => {}`) and empty `if let Err(_) = ... {}` bodies silently swallow errors. Spiritual analogue of SAFE202 (empty_except) for Rust's `Result`/`Option` idioms. `let _ = result;` is the explicit auditable discard and is NOT flagged. |
+| SAFE207 | unlogged_error_branch | *Rust-only.* `Err` arms / `if let Err(...)` bodies that handle the error but neither log it nor propagate it. Exempts bodies containing `return`, `panic!` / `todo!` / `unreachable!` / `unimplemented!`, or a tail `Err(...)` re-raise. Spiritual analogue of SAFE203 (logging_on_error). |
 | SAFE301 | global_state | Global state makes functions impure and breaks local reasoning. |
 | SAFE302 | global_mutation | Reassigning shared state mid-function is a Power-of-Ten violation outright. |
 | SAFE303 | side_effects_hidden | Pure-named functions doing I/O surprise callers. |

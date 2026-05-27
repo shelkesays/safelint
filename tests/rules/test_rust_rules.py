@@ -235,6 +235,259 @@ def test_rust_unrelated_unwrap_does_not_fire(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# SAFE206 - silent_result_discard
+# ---------------------------------------------------------------------------
+
+
+def test_rust_empty_err_arm_fires_safe206(tmp_path: Path) -> None:
+    """``Err(_) => { 0 }`` (single-literal body) fires SAFE206."""
+    sample = tmp_path / "empty_err.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) -> i32 {\n    match r {\n        Ok(v) => v,\n        Err(_) => 0,\n    }\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("silent_result_discard").check_file(str(sample))
+    safe206 = _violations(result, "SAFE206")
+    assert len(safe206) == 1
+    assert "Err" in safe206[0].message
+
+
+def test_rust_empty_err_arm_with_binding_fires(tmp_path: Path) -> None:
+    """``Err(e) => {}`` also fires - the noop body is the silent part."""
+    sample = tmp_path / "empty_err_bind.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) {\n    match r {\n        Ok(_) => {},\n        Err(e) => {}\n    }\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("silent_result_discard").check_file(str(sample))
+    # The Ok(_) arm has Ok pattern, not Err - it doesn't fire.
+    # Only Err(e) => {} fires.
+    safe206 = _violations(result, "SAFE206")
+    assert len(safe206) == 1
+
+
+def test_rust_handled_err_arm_does_not_fire_safe206(tmp_path: Path) -> None:
+    """``Err(e) => cleanup()`` doesn't fire (body is non-empty)."""
+    sample = tmp_path / "handled.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) {\n    match r {\n        Ok(_) => {},\n        Err(e) => { cleanup(); }\n    }\n}\nfn cleanup() {}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("silent_result_discard").check_file(str(sample))
+    assert _violations(result, "SAFE206") == []
+
+
+def test_rust_empty_if_let_err_body_fires_safe206(tmp_path: Path) -> None:
+    """``if let Err(_) = r {}`` fires SAFE206."""
+    sample = tmp_path / "if_let_empty.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) {\n    if let Err(_) = r {}\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("silent_result_discard").check_file(str(sample))
+    assert len(_violations(result, "SAFE206")) == 1
+
+
+def test_rust_if_let_ok_with_no_else_does_not_fire(tmp_path: Path) -> None:
+    """``if let Ok(v) = r { ... }`` doesn't fire - SAFE206 only flags Err patterns.
+
+    Guards the rule from over-firing on the common ``if let Ok(...)
+    = ... { handle }`` idiom where the Err case is intentionally
+    skipped (often handled elsewhere or not relevant).
+    """
+    sample = tmp_path / "if_let_ok.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) {\n    if let Ok(v) = r { process(v); }\n}\nfn process(_v: i32) {}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("silent_result_discard").check_file(str(sample))
+    assert _violations(result, "SAFE206") == []
+
+
+def test_rust_non_err_patterns_and_plain_if_do_not_fire(tmp_path: Path) -> None:
+    """Match arms with non-Err patterns and plain ``if cond`` aren't flagged.
+
+    Guards SAFE206 / SAFE207 against firing on:
+    * Literal-pattern arms (``0 => ...``)
+    * Wildcard arms (``_ => ...``)
+    * Plain ``if cond { ... }`` (no ``let``)
+    * Match arms whose pattern is bare ``Ok(_)`` rather than ``Err(_)``
+
+    Exercises the early-return branches in ``_is_err_pattern`` (non
+    tuple_struct_pattern) and ``_if_let_err_pattern_and_body`` (no
+    let_condition).
+    """
+    sample = tmp_path / "non_err.rs"
+    sample.write_text(
+        "fn run(x: i32, r: Result<i32, String>) {\n"
+        "    match x {\n"
+        "        0 => {},\n"
+        "        _ => {},\n"
+        "    }\n"
+        "    if x > 0 {\n"
+        "        process();\n"
+        "    }\n"
+        "    match r {\n"
+        "        Ok(_) => {},\n"
+        "        Err(e) => { cleanup(e); }\n"
+        "    }\n"
+        "}\n"
+        "fn process() {}\n"
+        "fn cleanup(_e: String) {}\n",
+        encoding="utf-8",
+    )
+    # Both rules are checked - the only firing case is SAFE207 on
+    # the Err(e) arm with cleanup() (no log, no return, no panic).
+    safe206_result = _enabled_engine("silent_result_discard").check_file(str(sample))
+    safe207_result = _enabled_engine("unlogged_error_branch").check_file(str(sample))
+    assert _violations(safe206_result, "SAFE206") == []
+    assert len(_violations(safe207_result, "SAFE207")) == 1
+
+
+def test_rust_block_with_single_literal_noop_fires(tmp_path: Path) -> None:
+    """``Err(_) => { 0 }`` (block containing a single literal) counts as noop and fires SAFE206.
+
+    Exercises ``_block_is_noop`` paths that the tail-form
+    literal test doesn't reach.
+    """
+    sample = tmp_path / "block_literal.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) -> i32 {\n    match r {\n        Ok(v) => v,\n        Err(_) => { 0 }\n    }\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("silent_result_discard").check_file(str(sample))
+    assert len(_violations(result, "SAFE206")) == 1
+
+
+def test_rust_let_underscore_assign_does_not_fire(tmp_path: Path) -> None:
+    """``let _ = r;`` doesn't fire - explicit auditable discard, not silent.
+
+    The idiomatic Rust way to explicitly disclaim caring about a
+    Result is ``let _ = ...``. SAFE206 deliberately doesn't fire on
+    this because it's MORE auditable than the empty Err arm
+    pattern - the ``_`` is visible at the use site.
+    """
+    sample = tmp_path / "let_discard.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) {\n    let _ = r;\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("silent_result_discard").check_file(str(sample))
+    assert _violations(result, "SAFE206") == []
+
+
+# ---------------------------------------------------------------------------
+# SAFE207 - unlogged_error_branch
+# ---------------------------------------------------------------------------
+
+
+def test_rust_err_arm_without_log_fires_safe207(tmp_path: Path) -> None:
+    """``Err(e) => { cleanup(); }`` (no log call) fires SAFE207."""
+    sample = tmp_path / "unlogged.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) {\n    match r {\n        Ok(_) => {},\n        Err(e) => { cleanup(); }\n    }\n}\nfn cleanup() {}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unlogged_error_branch").check_file(str(sample))
+    safe207 = _violations(result, "SAFE207")
+    assert len(safe207) == 1
+    assert "log" in safe207[0].message.lower() or "log::error" in safe207[0].message
+
+
+def test_rust_err_arm_with_log_does_not_fire(tmp_path: Path) -> None:
+    """``Err(e) => { log::error!(...) }`` doesn't fire."""
+    sample = tmp_path / "logged.rs"
+    sample.write_text(
+        'fn run(r: Result<i32, String>) {\n    match r {\n        Ok(_) => {},\n        Err(e) => { log::error!("{}", e); }\n    }\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unlogged_error_branch").check_file(str(sample))
+    assert _violations(result, "SAFE207") == []
+
+
+def test_rust_err_arm_with_eprintln_does_not_fire(tmp_path: Path) -> None:
+    """``Err(e) => { eprintln!(...) }`` doesn't fire - eprintln is in log set."""
+    sample = tmp_path / "eprintln.rs"
+    sample.write_text(
+        'fn run(r: Result<i32, String>) {\n    match r {\n        Ok(_) => {},\n        Err(e) => { eprintln!("oops: {}", e); }\n    }\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unlogged_error_branch").check_file(str(sample))
+    assert _violations(result, "SAFE207") == []
+
+
+def test_rust_err_arm_with_return_does_not_fire(tmp_path: Path) -> None:
+    """``Err(e) => { return; }`` doesn't fire - early return is an explicit response."""
+    sample = tmp_path / "return.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) {\n    match r {\n        Ok(_) => {},\n        Err(_e) => { return; }\n    }\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unlogged_error_branch").check_file(str(sample))
+    assert _violations(result, "SAFE207") == []
+
+
+def test_rust_err_arm_with_panic_does_not_fire(tmp_path: Path) -> None:
+    """``Err(e) => panic!(...)`` doesn't fire - panic makes the failure loud."""
+    sample = tmp_path / "panic.rs"
+    sample.write_text(
+        'fn run(r: Result<i32, String>) {\n    match r {\n        Ok(_) => {},\n        Err(e) => panic!("fatal: {}", e),\n    }\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unlogged_error_branch").check_file(str(sample))
+    assert _violations(result, "SAFE207") == []
+
+
+def test_rust_err_arm_with_err_tail_does_not_fire(tmp_path: Path) -> None:
+    """``Err(e) => Err(e)`` (re-raise pattern) doesn't fire - error is propagated."""
+    sample = tmp_path / "rethrow.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) -> Result<i32, String> {\n    match r {\n        Ok(v) => Ok(v + 1),\n        Err(e) => Err(e),\n    }\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unlogged_error_branch").check_file(str(sample))
+    assert _violations(result, "SAFE207") == []
+
+
+def test_rust_if_let_err_without_log_fires_safe207(tmp_path: Path) -> None:
+    """``if let Err(e) = r { cleanup(); }`` fires SAFE207."""
+    sample = tmp_path / "if_let_unlogged.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) {\n    if let Err(_e) = r {\n        cleanup();\n    }\n}\nfn cleanup() {}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unlogged_error_branch").check_file(str(sample))
+    assert len(_violations(result, "SAFE207")) == 1
+
+
+def test_rust_empty_err_body_does_not_fire_safe207(tmp_path: Path) -> None:
+    """Empty Err bodies are SAFE206 territory; SAFE207 stays quiet on them."""
+    sample = tmp_path / "empty_err_body.rs"
+    sample.write_text(
+        "fn run(r: Result<i32, String>) {\n    match r {\n        Ok(_) => {},\n        Err(_) => {}\n    }\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unlogged_error_branch").check_file(str(sample))
+    assert _violations(result, "SAFE207") == []
+
+
+def test_rust_log_call_inside_nested_closure_does_not_satisfy(tmp_path: Path) -> None:
+    """A log call inside a closure inside the Err branch doesn't satisfy SAFE207.
+
+    The closure may never run synchronously (or at all). The
+    ``_body_has_log_call`` helper skips nested function / closure
+    bodies for this reason.
+    """
+    sample = tmp_path / "nested_closure.rs"
+    sample.write_text(
+        'fn run(r: Result<i32, String>) {\n    match r {\n        Ok(_) => {},\n        Err(e) => { let _f = || log::error!("{}", e); cleanup(); }\n    }\n}\nfn cleanup() {}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("unlogged_error_branch").check_file(str(sample))
+    assert len(_violations(result, "SAFE207")) == 1
+
+
+# ---------------------------------------------------------------------------
 # SAFE306 - dangerous_mem_ops
 # ---------------------------------------------------------------------------
 
