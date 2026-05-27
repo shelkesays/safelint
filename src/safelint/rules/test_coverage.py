@@ -217,12 +217,24 @@ def _cfg_token_tree_mentions_test(children: list[tree_sitter.Node]) -> bool:
 
 
 def _attribute_is_rust_test_marker(node: tree_sitter.Node) -> bool:
-    """Return True if *node* is a ``#[test]`` or ``#[cfg(test)]`` attribute."""
+    """Return True if *node* is a ``#[test]`` or ``#[cfg(test)]`` attribute.
+
+    Also recognises scoped test-attribute paths whose trailing
+    identifier is ``"test"`` - the convention every major async-test
+    framework follows: ``#[tokio::test]``, ``#[actix_web::test]``,
+    ``#[async_std::test]``, ``#[smol_potat::test]``, etc. Without
+    this, files using those frameworks falsely fire SAFE701 /
+    SAFE702 / SAFE204 / SAFE208 even though they ARE test files.
+    """
     children = node.named_children
     if not children:  # pragma: no cover - tree-sitter-rust always emits a name child on an attribute
         return False
     first = children[0]
-    if first.type != "identifier":  # pragma: no cover - defensive: macro-path attributes use scoped_identifier
+    if first.type == "scoped_identifier":
+        # ``#[tokio::test]`` and friends - check the trailing identifier.
+        trailing = first.child_by_field_name("name")
+        return trailing is not None and node_text(trailing) == "test"
+    if first.type != "identifier":  # pragma: no cover - defensive: rare attribute shapes (token_tree etc.)
         return False
     first_name = node_text(first)
     if first_name == "test":

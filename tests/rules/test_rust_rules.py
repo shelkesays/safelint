@@ -71,6 +71,24 @@ def test_rust_panic_in_test_function_does_not_fire(tmp_path: Path) -> None:
     assert _violations(result, "SAFE204") == []
 
 
+def test_rust_panic_in_tokio_test_function_does_not_fire(tmp_path: Path) -> None:
+    """``#[tokio::test]`` (scoped path attribute) is recognised as test context.
+
+    Same shape applies to ``#[actix_web::test]``, ``#[async_std::test]``,
+    ``#[smol_potat::test]``, and any other async-test framework that
+    suffixes its attribute macro with ``test``. The detection extracts
+    the trailing identifier of the ``scoped_identifier`` and matches
+    against ``"test"``.
+    """
+    sample = tmp_path / "tokio_test.rs"
+    sample.write_text(
+        '#[tokio::test]\nasync fn test_it() {\n    panic!("in a tokio test");\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("panic_macros_outside_tests").check_file(str(sample))
+    assert _violations(result, "SAFE204") == []
+
+
 def test_rust_panic_inside_cfg_test_mod_does_not_fire(tmp_path: Path) -> None:
     """``panic!()`` inside a ``#[cfg(test)] mod`` does NOT fire."""
     sample = tmp_path / "cfg_test.rs"
