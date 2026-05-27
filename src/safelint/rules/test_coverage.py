@@ -41,6 +41,15 @@ _JAVA_TEST_SUFFIXES: tuple[str, ...] = ("Test", "Tests", "IT")
 # as candidates so projects following either pattern get a match.
 _RUST_TEST_SUFFIXES: tuple[str, ...] = ("", "_test")
 
+#: Test-attribute names that mark a function as a test. Mirrors
+#: :data:`safelint.rules.rust_rules._RUST_TEST_ATTRIBUTE_NAMES` -
+#: keep the two in sync. ``"test"`` covers ``#[test]`` plus every
+#: framework that suffixes ``::test`` (tokio / actix_web /
+#: async_std / smol_potat / etc.); ``"rstest"`` covers the
+#: parametric-test framework's bare ``#[rstest]`` and scoped
+#: ``#[rstest::rstest]`` forms.
+_RUST_TEST_ATTRIBUTE_NAMES: frozenset[str] = frozenset({"test", "rstest"})
+
 
 if TYPE_CHECKING:
     import tree_sitter
@@ -231,13 +240,13 @@ def _attribute_is_rust_test_marker(node: tree_sitter.Node) -> bool:
         return False
     first = children[0]
     if first.type == "scoped_identifier":
-        # ``#[tokio::test]`` and friends - check the trailing identifier.
+        # ``#[tokio::test]`` / ``#[rstest::rstest]`` - check the trailing identifier.
         trailing = first.child_by_field_name("name")
-        return trailing is not None and node_text(trailing) == "test"
+        return trailing is not None and node_text(trailing) in _RUST_TEST_ATTRIBUTE_NAMES
     if first.type != "identifier":  # pragma: no cover - defensive: rare attribute shapes (token_tree etc.)
         return False
     first_name = node_text(first)
-    if first_name == "test":
+    if first_name in _RUST_TEST_ATTRIBUTE_NAMES:
         return True
     if first_name != "cfg":
         return False

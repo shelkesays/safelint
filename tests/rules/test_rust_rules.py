@@ -71,6 +71,23 @@ def test_rust_panic_in_test_function_does_not_fire(tmp_path: Path) -> None:
     assert _violations(result, "SAFE204") == []
 
 
+def test_rust_panic_in_rstest_function_does_not_fire(tmp_path: Path) -> None:
+    """``#[rstest]`` (bare) and ``#[rstest::rstest]`` (scoped) clear SAFE204.
+
+    rstest is the most popular parametric-test framework for Rust;
+    its attribute doesn't end in ``test`` so trailing-name matching
+    alone wouldn't catch it. Both forms are recognised via
+    ``_RUST_TEST_ATTRIBUTE_NAMES``.
+    """
+    sample = tmp_path / "rstest_test.rs"
+    sample.write_text(
+        '#[rstest]\nfn it_works() {\n    panic!("in an rstest");\n}\n#[rstest::rstest]\nfn it_scoped() {\n    panic!("in scoped rstest");\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("panic_macros_outside_tests").check_file(str(sample))
+    assert _violations(result, "SAFE204") == []
+
+
 def test_rust_panic_in_tokio_test_function_does_not_fire(tmp_path: Path) -> None:
     """``#[tokio::test]`` (scoped path attribute) is recognised as test context.
 
