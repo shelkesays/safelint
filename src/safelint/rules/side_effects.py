@@ -9,6 +9,7 @@ from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, res
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
+from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.rules.base import BaseRule
 
 
@@ -23,6 +24,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
+    "rust": _RUST_FUNCTION_TYPES,
 }
 
 
@@ -48,14 +50,68 @@ def _io_funcs_for_lang(rule_config: dict, lang_name: str, fallback: list[str]) -
 
 
 def _first_io_call(func_node: tree_sitter.Node, io_funcs: frozenset[str], function_types: frozenset[str]) -> tree_sitter.Node | None:
-    """Return the first I/O call inside *func_node* (skipping nested defs), or None."""
-    for child in walk(func_node, skip_types=tuple(function_types)):
-        if child.type not in CALL_TYPES:
-            continue
-        name = call_name(child)
-        if name and name in io_funcs:
-            return child
+    """Return the first I/O call (or Rust I/O macro) inside *func_node*, or None.
+
+    Rust's most common I/O entry points are macros (``println!``,
+    ``eprintln!``, ``write!``, ``writeln!``) rather than function
+    calls. The walk additionally inspects ``macro_invocation`` nodes
+    and resolves the macro name via ``_rust_macro_name_text``. The
+    same configured ``io_funcs`` set is consulted for both - a user
+    listing ``"println"`` covers ``println!(...)``.
+
+    Skips nested function / closure definitions so inner functions
+    are analysed separately.
+    """
+    return next(
+        (child for child in walk(func_node, skip_types=tuple(function_types)) if _io_call_name(child) in io_funcs),
+        None,
+    )
+
+
+def _io_call_name(node: tree_sitter.Node) -> str | None:
+    """Return the bareword name if *node* is a call or Rust macro; ``None`` otherwise.
+
+    Helper for :func:`_first_io_call` so the loop body stays under
+    SafeLint's nesting cap.
+    """
+    if node.type in CALL_TYPES:
+        return call_name(node)
+    if node.type == "macro_invocation":
+        return _rust_macro_name_text(node)
     return None
+
+
+def _resolved_io_call_name(io_call: tree_sitter.Node) -> str:
+    """Return the display name for an I/O call or macro, falling back to ``"<unknown>"``.
+
+    Wraps ``call_name`` (call_expression / method_invocation / object_creation /
+    new_expression / Python call) and ``_rust_macro_name_text``
+    (macro_invocation) so the message formatter doesn't need to dispatch
+    on node type. Rust macros render with the trailing ``!`` so
+    ``println!`` is clearly distinguished from a hypothetical ``println``
+    function in messages.
+    """
+    if io_call.type == "macro_invocation":
+        name = _rust_macro_name_text(io_call)
+        return f"{name}!" if name else "<unknown>"
+    return call_name(io_call) or "<unknown>"
+
+
+def _rust_macro_name_text(macro_invocation: tree_sitter.Node) -> str | None:
+    """Resolve a Rust ``macro_invocation``'s bareword name, or None.
+
+    Bare ``println!`` resolves to ``"println"``; scoped ``std::println!``
+    also resolves to ``"println"`` (trailing identifier extracted).
+    """
+    macro_field = macro_invocation.child_by_field_name("macro")
+    if macro_field is None:
+        return None
+    if macro_field.type == "identifier":
+        return node_text(macro_field)
+    if macro_field.type == "scoped_identifier":
+        name_node = macro_field.child_by_field_name("name")
+        return node_text(name_node) if name_node is not None else None
+    return None  # pragma: no cover - defensive: macro field is always identifier or scoped_identifier
 
 
 def _func_display_name(func_node: tree_sitter.Node) -> str:
@@ -90,7 +146,7 @@ class SideEffectsHiddenRule(BaseRule):
 
     name = "side_effects_hidden"
     code = "SAFE303"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "rust")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
@@ -111,7 +167,7 @@ class SideEffectsHiddenRule(BaseRule):
                 continue
             io_call = _first_io_call(node, io_funcs, function_types)
             if io_call:
-                io_name = call_name(io_call) or "<unknown>"
+                io_name = _resolved_io_call_name(io_call)
                 violations.append(
                     self._make_violation_for_node(
                         filepath,
@@ -127,7 +183,7 @@ class SideEffectsRule(BaseRule):
 
     name = "side_effects"
     code = "SAFE304"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "rust")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""
@@ -149,7 +205,7 @@ class SideEffectsRule(BaseRule):
                 continue
             io_call = _first_io_call(node, io_funcs, function_types)
             if io_call:
-                io_name = call_name(io_call) or "<unknown>"
+                io_name = _resolved_io_call_name(io_call)
                 violations.append(
                     self._make_violation_for_node(
                         filepath,

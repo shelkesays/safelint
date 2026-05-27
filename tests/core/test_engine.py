@@ -389,16 +389,19 @@ _RULES_WIDENED_FOR_JS_FAMILY: frozenset[str] = frozenset(
 
 _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA: frozenset[str] = frozenset(
     {
-        # Cross-language rules ported to JS / TS / Java but NOT YET ported
-        # to Rust. ``language`` should be exactly ``("python", "javascript",
-        # "typescript", "java")``. As the v2.2.0 Rust port lands rule-by-
-        # rule, each entry here graduates to
-        # ``_RULES_PORTED_TO_ALL_FIVE_LANGUAGES``. Once every cross-language
-        # rule is in that set, this bucket will be empty and can be removed.
+        # Cross-language rules ported to JS / TS / Java but deliberately
+        # not ported to Rust (separate "skipped on purpose" decision per
+        # rule). ``language`` should be exactly ``("python", "javascript",
+        # "typescript", "java")``.
+        #
+        # * EmptyExceptRule / LoggingOnErrorRule - SAFE202 / SAFE203: no
+        #   try/catch in Rust. The Rust analogue (silent ``let _ = result;``
+        #   or ``if let Ok(_) = r {}`` patterns) needs a separate
+        #   rule design, not a port. Deferred.
+        # * ResourceLifecycleRule - SAFE401: Rust's RAII (Drop trait)
+        #   makes cleanup language-enforced. The rule has nothing to add.
         "EmptyExceptRule",
         "LoggingOnErrorRule",
-        "SideEffectsHiddenRule",
-        "SideEffectsRule",
         "ResourceLifecycleRule",
     }
 )
@@ -417,6 +420,8 @@ _RULES_PORTED_TO_ALL_FIVE_LANGUAGES: frozenset[str] = frozenset(
         "NestingDepthRule",
         "NullDereferenceRule",
         "ReturnValueIgnoredRule",
+        "SideEffectsHiddenRule",
+        "SideEffectsRule",
         "TaintedSinkRule",
         "TestCouplingRule",
         "TestExistenceRule",
