@@ -7,7 +7,8 @@
     Every supported language ships as an opt-in extra in v2.0.0+ - pick the
     matching one via ``additional_dependencies`` in your
     ``.pre-commit-config.yaml``: ``['safelint[python]']``,
-    ``['safelint[javascript]']``, ``['safelint[typescript]']``, or
+    ``['safelint[javascript]']``, ``['safelint[typescript]']``,
+    ``['safelint[java]']``, ``['safelint[rust]']``, or
     ``['safelint[all]']``. Without an extra, the hook installs only the
     engine and exits with a clear install hint on first run.
   entry: safelint
@@ -31,7 +32,7 @@
   #       additional_dependencies: ['safelint[typescript]']
   #       types_or: [text]         # permissive tag that .as files actually carry
   #       files: \.(ts|tsx|as)$    # restrict to TS-family extensions
-  types_or: [python, javascript, ts, tsx, java]
+  types_or: [python, javascript, ts, tsx, java, rust]
   args: [--fail-on=error]
   # Force a single invocation. Without this, pre-commit runs the hook
   # in parallel batches across files, producing one "Found N errors ...
