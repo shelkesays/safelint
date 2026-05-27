@@ -92,6 +92,28 @@ def test_rust_inline_test_module_satisfies_safe701(tmp_path: Path) -> None:
     assert not any(v.code == "SAFE701" for v in result.violations)
 
 
+def test_rust_tokio_test_fn_satisfies_safe701(tmp_path: Path) -> None:
+    """``#[tokio::test]`` (scoped path attribute) clears SAFE701.
+
+    Files whose test markers are scoped framework macros - tokio,
+    actix_web, async_std, smol_potat, etc. - should not be told to
+    add an external paired test file. The detection looks at the
+    trailing identifier of the scoped path and recognises any
+    ``::test``-suffixed attribute as a test marker.
+    """
+    src = tmp_path / "src" / "tokio_handler.rs"
+    src.parent.mkdir(parents=True)
+    src.write_text(
+        "pub async fn handle() -> i32 { 1 }\n\n#[tokio::test]\nasync fn it_handles() {\n    assert_eq!(handle().await, 1);\n}\n",
+        encoding="utf-8",
+    )
+    (tmp_path / "tests").mkdir()
+
+    with _cd(tmp_path):
+        result = _enabled_engine().check_file(str(src))
+    assert not any(v.code == "SAFE701" for v in result.violations)
+
+
 def test_rust_free_test_fn_satisfies_safe701(tmp_path: Path) -> None:
     """A free-standing ``#[test] fn`` (no enclosing mod) also clears SAFE701."""
     src = tmp_path / "src" / "bar.rs"

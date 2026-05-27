@@ -245,6 +245,13 @@ def _attribute_marks_test(attr_item: tree_sitter.Node) -> bool:
     need to know about the wrapper. Returns False for any other
     attribute shape (``#[derive(...)]``, ``#[cfg(unix)]``, ``#[inline]``,
     etc.).
+
+    Also recognises scoped test-attribute paths whose trailing
+    identifier is ``"test"`` - the convention every major async-test
+    framework follows: ``#[tokio::test]``, ``#[actix_web::test]``,
+    ``#[async_std::test]``, ``#[smol_potat::test]``, etc. Without
+    this, ``panic!`` / ``.unwrap()`` inside those framework's test
+    functions would falsely fire SAFE204 / SAFE208.
     """
     attribute = next((c for c in attr_item.named_children if c.type == "attribute"), None)
     if attribute is None:  # pragma: no cover - defensive: every attribute_item wraps an attribute
@@ -252,8 +259,21 @@ def _attribute_marks_test(attr_item: tree_sitter.Node) -> bool:
     children = attribute.named_children
     if not children:  # pragma: no cover - defensive: every attribute has at least a name child
         return False
+    return _attribute_first_child_marks_test(children)
+
+
+def _attribute_first_child_marks_test(children: list[tree_sitter.Node]) -> bool:
+    """Dispatch test-marker check on an attribute's first named child.
+
+    Helper extracted from :func:`_attribute_marks_test` to keep the
+    parent function's return count under PLR0911.
+    """
     first = children[0]
-    if first.type != "identifier":  # pragma: no cover - defensive: path-attribute shape (#[a::b]) is rare and not a test marker
+    if first.type == "scoped_identifier":
+        # ``#[tokio::test]`` and friends - check the trailing identifier.
+        trailing = first.child_by_field_name("name")
+        return trailing is not None and node_text(trailing) == "test"
+    if first.type != "identifier":  # pragma: no cover - defensive: token-tree-first attribute shapes are rare
         return False
     first_name = node_text(first)
     if first_name == "test":
