@@ -91,8 +91,19 @@ _COPIES: tuple[tuple[str, str, dict[str, str]], ...] = (
             "ADDING_A_LANGUAGE.md": "../contributing/adding-a-language.md",
             "CONTRIBUTING.md": "../contributing/index.md",
             "CODE_OF_CONDUCT.md": "code-of-conduct.md",
+            "SECURITY.md": "security.md",
             "README.md": "../index.md",
             "docs/json-schema.md": "../json-schema.md",
+        },
+    ),
+    (
+        "SECURITY.md",
+        "docs/project/security.md",
+        {
+            "CHANGELOG.md": "changelog.md",
+            "CODE_OF_CONDUCT.md": "code-of-conduct.md",
+            "SUPPORT.md": "support.md",
+            "README.md": "../index.md",
         },
     ),
 )
