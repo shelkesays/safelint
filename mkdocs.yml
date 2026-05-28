@@ -145,6 +145,7 @@ nav:
   - Project:
       - Changelog: project/changelog.md
       - Code of conduct: project/code-of-conduct.md
+      - Security policy: project/security.md
       - Support: project/support.md
 
 extra:
@@ -162,6 +163,7 @@ extra:
 #   CONTRIBUTING.md       → docs/contributing/index.md
 #   CHANGELOG.md          → docs/project/changelog.md
 #   CODE_OF_CONDUCT.md    → docs/project/code-of-conduct.md
+#   SECURITY.md           → docs/project/security.md
 #   SUPPORT.md            → docs/project/support.md
 # Plus the rules-at-a-glance snippet at build/snippets/_rules_at_a_glance.md
 # (sourced from ``safelint.rules.ALL_RULES``). All targets are NOT committed

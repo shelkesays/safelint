@@ -160,6 +160,7 @@ venv.bak/
 # are ephemeral build artefacts and must never be committed.
 /docs/project/changelog.md
 /docs/project/code-of-conduct.md
+/docs/project/security.md
 /docs/project/support.md
 /docs/contributing/index.md
 # Rules-at-a-glance table generated from ALL_RULES + DEFAULTS by

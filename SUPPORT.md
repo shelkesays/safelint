@@ -10,7 +10,7 @@ SafeLint is a community-maintained open-source project. There's no paid support 
 | **Request a new feature** (a new rule, a new AI client, a new language) | Open an issue describing the use case. For new AI clients, include the marker convention you've seen in the wild (cwd / home paths); that's what we need to add a new `ClientSpec`. |
 | **Ask "how do I do X with safelint"** | Check [`README.md`](README.md), [`CONFIGURATION.md`](CONFIGURATION.md), and [`AI_CLIENTS.md`](AI_CLIENTS.md) first; most usage questions are covered there. If still stuck, open a question issue |
 | **Contribute a fix or new feature** | See [`CONTRIBUTING.md`](CONTRIBUTING.md); three contribution paths (rule / AI client / language) are documented with checklists |
-| **Report a security vulnerability** | Email the maintainer directly at **srahul07@gmail.com**. Please don't open a public issue for security problems; give us time to ship a fix first |
+| **Report a security vulnerability** | See [`SECURITY.md`](SECURITY.md) for the full policy. Use GitHub's [private vulnerability reporting](https://github.com/shelkesays/safelint/security/advisories/new) or email **srahul07@gmail.com**. Please don't open a public issue for security problems; give us time to ship a fix first |
 | **Report Code of Conduct violations** | Email **srahul07@gmail.com**. See [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) for the full process |
 
 ## What to include in a bug report
