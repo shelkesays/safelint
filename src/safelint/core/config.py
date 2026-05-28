@@ -671,12 +671,34 @@ DEFAULTS: dict[str, Any] = {
             # rusqlite / postgres), and FFI loading. ``call_name``
             # strips the qualifier (``std::process::Command::new``
             # resolves to ``"new"``; ``cmd.arg(x)`` to ``"arg"``).
+            #
+            # NOTE: ``"new"`` is deliberately NOT in the default set
+            # despite ``Command::new(tainted)`` being a real shell-
+            # injection hazard. Because ``call_name()`` collapses every
+            # ``Type::new(...)`` constructor (``String::new``,
+            # ``Vec::new``, ``HashMap::new``, ``Box::new``, etc.) to the
+            # bareword ``"new"``, including it in defaults would fire
+            # SAFE801 on every constructor call that takes a tainted
+            # argument - a massive false-positive rate that drowns the
+            # real signal. Detection of ``Command::new(tainted)``
+            # routes through ``.arg(tainted)`` / ``.args(tainted)``
+            # instead, which is the idiomatic call shape (the program
+            # name in ``Command::new`` is almost always a literal).
+            # Users who specifically need ``Command::new(tainted)``
+            # flagged can opt ``"new"`` into ``sinks_rust`` and accept
+            # the false-positive cost; a future version may add
+            # qualified-path matching to distinguish ``Command::new``
+            # from other ``Type::new`` calls. Same applies to
+            # ``"Command"`` and ``"Library"`` as type-name entries:
+            # ``call_name()`` resolves ``Command::new(...)`` to
+            # ``"new"``, never ``"Command"``, so listing the type names
+            # has no effect.
             "sinks_rust": [
-                # Process execution.
-                "Command",  # ``Command::new(tainted)`` - the program path
-                "new",  # ``Command::new(tainted)`` - the bareword path resolves to "new"
-                "arg",  # ``cmd.arg(tainted)`` - tainted command argument
-                "args",  # ``cmd.args(tainted)`` - tainted args iterator
+                # Process execution. ``cmd.arg(tainted)`` /
+                # ``cmd.args(tainted)`` is the practical detection
+                # shape; see note above on why ``"new"`` is excluded.
+                "arg",
+                "args",
                 # Database raw-SQL (sqlx / diesel / rusqlite / postgres).
                 # All four crates expose a ``query`` / ``execute`` entry
                 # point that takes a SQL string; bind parameters via
@@ -686,8 +708,6 @@ DEFAULTS: dict[str, Any] = {
                 "query_scalar",
                 "execute",
                 "execute_batch",
-                # FFI / dynamic-library loading.
-                "Library",  # ``libloading::Library::new(path)`` with tainted path
                 # File-path sinks (path traversal). ``Path::new`` and
                 # the ``read`` / ``write`` family take paths; tainted
                 # paths can escape an allow-listed directory via ``..``.

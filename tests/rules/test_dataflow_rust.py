@@ -7,7 +7,7 @@ Rust-specific cases worth calling out:
   ``const`` / ``let`` like JavaScript; the Rust tracker propagates
   taint through it the same way.
 * Method calls (``cmd.arg(tainted)``) and qualified path calls
-  (``Command::new(tainted)``) both resolve via ``call_name``'s
+  (``Command::new("echo").arg(tainted)``) both resolve via ``call_name``'s
   ``field_expression`` and ``scoped_identifier`` branches.
 * The default sink list focuses on stdlib: ``Command``, ``arg``,
   ``args``, the ``query`` family for raw-SQL crates, ``open`` for
@@ -44,25 +44,34 @@ def _enabled_engine(rule: str, overrides: dict | None = None) -> SafetyEngine:
 # ---------------------------------------------------------------------------
 
 
-def test_rust_direct_param_to_command_new_fires(tmp_path: Path) -> None:
-    """``Command::new(tainted)`` fires SAFE801."""
+def test_rust_direct_param_to_command_arg_fires(tmp_path: Path) -> None:
+    """``Command::new("echo").arg(tainted)`` fires SAFE801.
+
+    Direct ``Command::new(tainted)`` detection is deliberately NOT in
+    the default ``sinks_rust`` set because ``call_name()`` reduces all
+    ``Type::new(...)`` to the bareword ``"new"`` (would also fire on
+    ``String::new`` / ``Vec::new`` / etc.). The practical detection
+    path is ``.arg(tainted)`` - which is also the idiomatic call shape
+    since the program name in ``Command::new`` is almost always a
+    literal.
+    """
     sample = tmp_path / "cmd.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run(user_input: String) {\n    Command::new(user_input);\n}\n",
+        'use std::process::Command;\nfn run(user_input: String) {\n    Command::new("echo").arg(user_input);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
     safe801 = [v for v in result.violations if v.code == "SAFE801"]
     assert len(safe801) >= 1
     assert "user_input" in safe801[0].message
-    assert "new" in safe801[0].message
+    assert "arg" in safe801[0].message
 
 
 def test_rust_taint_through_let_binding_fires(tmp_path: Path) -> None:
-    """``let y = tainted; Command::new(y);`` propagates taint."""
+    """``let y = tainted; Command::new("echo").arg(y);`` propagates taint."""
     sample = tmp_path / "let.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run(user_input: String) {\n    let y = user_input;\n    Command::new(y);\n}\n",
+        'use std::process::Command;\nfn run(user_input: String) {\n    let y = user_input;\n    Command::new("echo").arg(y);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -73,7 +82,7 @@ def test_rust_taint_through_assignment_fires(tmp_path: Path) -> None:
     """``y = tainted`` (assignment_expression) propagates taint."""
     sample = tmp_path / "assign.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run(user_input: String) {\n    let mut y = String::new();\n    y = user_input;\n    Command::new(y);\n}\n",
+        'use std::process::Command;\nfn run(user_input: String) {\n    let mut y = String::new();\n    y = user_input;\n    Command::new("echo").arg(y);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -97,7 +106,7 @@ def test_rust_sanitised_value_does_not_fire(tmp_path: Path) -> None:
     """``validate(tainted)`` clears taint and downstream sink doesn't fire."""
     sample = tmp_path / "san.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run(user_input: String) {\n    let y = validate(user_input);\n    Command::new(y);\n}\nfn validate(s: String) -> String { s }\n",
+        'use std::process::Command;\nfn run(user_input: String) {\n    let y = validate(user_input);\n    Command::new("echo").arg(y);\n}\nfn validate(s: String) -> String { s }\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -131,7 +140,7 @@ def test_rust_source_call_to_sink_fires(tmp_path: Path) -> None:
     """
     sample = tmp_path / "source.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run() {\n    let user_input = recv();\n    Command::new(user_input);\n}\nfn recv() -> String { String::new() }\n",
+        'use std::process::Command;\nfn run() {\n    let user_input = recv();\n    Command::new("echo").arg(user_input);\n}\nfn recv() -> String { String::new() }\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -142,7 +151,7 @@ def test_rust_tuple_destructure_param_taints(tmp_path: Path) -> None:
     """``fn f((a, b): (String, String)) - both ``a`` and ``b`` are tainted entry points."""
     sample = tmp_path / "tuple_param.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run((user_input, _other): (String, i32)) {\n    Command::new(user_input);\n}\n",
+        'use std::process::Command;\nfn run((user_input, _other): (String, i32)) {\n    Command::new("echo").arg(user_input);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -153,7 +162,7 @@ def test_rust_taint_through_reference_propagates(tmp_path: Path) -> None:
     """``&tainted`` keeps the value tainted - reference is a pass-through."""
     sample = tmp_path / "ref.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run(user_input: String) {\n    let y = &user_input;\n    Command::new(y);\n}\n",
+        'use std::process::Command;\nfn run(user_input: String) {\n    let y = &user_input;\n    Command::new("echo").arg(y);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -164,7 +173,7 @@ def test_rust_taint_through_try_expression_propagates(tmp_path: Path) -> None:
     """``tainted?`` carries taint (the ``?`` operator returns the Ok value)."""
     sample = tmp_path / "try.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run(user_input: Result<String, std::io::Error>) -> Result<(), std::io::Error> {\n    let y = user_input?;\n    Command::new(y);\n    Ok(())\n}\n",
+        'use std::process::Command;\nfn run(user_input: Result<String, std::io::Error>) -> Result<(), std::io::Error> {\n    let y = user_input?;\n    Command::new("echo").arg(y);\n    Ok(())\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -226,7 +235,7 @@ def test_rust_compound_assignment_propagates_taint(tmp_path: Path) -> None:
     """``buf += tainted`` propagates taint to ``buf`` via compound_assignment_expr."""
     sample = tmp_path / "compound.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run(user_input: String) {\n    let mut buf = String::new();\n    buf += &user_input;\n    Command::new(buf);\n}\n",
+        'use std::process::Command;\nfn run(user_input: String) {\n    let mut buf = String::new();\n    buf += &user_input;\n    Command::new("echo").arg(buf);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -237,7 +246,7 @@ def test_rust_struct_destructure_param_taints(tmp_path: Path) -> None:
     """``fn f(Point { x, y }: Point)`` - struct-destructured params taint both fields."""
     sample = tmp_path / "struct_param.rs"
     sample.write_text(
-        "use std::process::Command;\nstruct Cfg { cmd: String, other: i32 }\nfn run(Cfg { cmd, other: _ }: Cfg) {\n    Command::new(cmd);\n}\n",
+        'use std::process::Command;\nstruct Cfg { cmd: String, other: i32 }\nfn run(Cfg { cmd, other: _ }: Cfg) {\n    Command::new("echo").arg(cmd);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -248,7 +257,7 @@ def test_rust_let_without_init_clears_shadowed_taint(tmp_path: Path) -> None:
     """``let x;`` re-binds untainted; downstream sink with that ``x`` doesn't fire."""
     sample = tmp_path / "let_no_init.rs"
     sample.write_text(
-        'use std::process::Command;\nfn run(user_input: String) {\n    let user_input: String;\n    user_input = "echo".to_string();\n    Command::new(user_input);\n}\n',
+        'use std::process::Command;\nfn run(user_input: String) {\n    let user_input: String;\n    user_input = "echo".to_string();\n    Command::new("echo").arg(user_input);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -256,10 +265,10 @@ def test_rust_let_without_init_clears_shadowed_taint(tmp_path: Path) -> None:
 
 
 def test_rust_field_expression_preserves_taint(tmp_path: Path) -> None:
-    """``tainted.field`` keeps taint; ``Command::new(t.field)`` fires."""
+    """``tainted.field`` keeps taint; ``Command::new("echo").arg(t.field)`` fires."""
     sample = tmp_path / "field.rs"
     sample.write_text(
-        "use std::process::Command;\nstruct Req { path: String }\nfn run(t: Req) {\n    Command::new(t.path);\n}\n",
+        'use std::process::Command;\nstruct Req { path: String }\nfn run(t: Req) {\n    Command::new("echo").arg(t.path);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -270,7 +279,7 @@ def test_rust_array_literal_with_tainted_element_propagates(tmp_path: Path) -> N
     """``[tainted, clean]`` propagates taint to the array."""
     sample = tmp_path / "array.rs"
     sample.write_text(
-        'use std::process::Command;\nfn run(user_input: String) {\n    let args = [user_input, "clean".to_string()];\n    Command::new(&args[0]);\n}\n',
+        'use std::process::Command;\nfn run(user_input: String) {\n    let args = [user_input, "clean".to_string()];\n    Command::new("echo").arg(&args[0]);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -281,7 +290,7 @@ def test_rust_assume_taint_preserving_false_drops_taint(tmp_path: Path) -> None:
     """With ``assume_taint_preserving = false``, unknown calls return clean."""
     sample = tmp_path / "assume.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run(user_input: String) {\n    let y = wrap(user_input);\n    Command::new(y);\n}\nfn wrap(s: String) -> String { s }\n",
+        'use std::process::Command;\nfn run(user_input: String) {\n    let y = wrap(user_input);\n    Command::new("echo").arg(y);\n}\nfn wrap(s: String) -> String { s }\n',
         encoding="utf-8",
     )
     overrides = {
@@ -294,10 +303,10 @@ def test_rust_assume_taint_preserving_false_drops_taint(tmp_path: Path) -> None:
 
 
 def test_rust_sink_with_non_identifier_arg_records_expr(tmp_path: Path) -> None:
-    """Tainted non-identifier expression (``Command::new(tainted + "x")``) records ``<expr>``."""
+    """Tainted non-identifier expression (``Command::new("echo").arg(tainted + "x")``) records ``<expr>``."""
     sample = tmp_path / "expr_arg.rs"
     sample.write_text(
-        'use std::process::Command;\nfn run(user_input: String) {\n    Command::new(user_input + "x");\n}\n',
+        'use std::process::Command;\nfn run(user_input: String) {\n    Command::new("echo").arg(user_input + "x");\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -309,7 +318,7 @@ def test_rust_nested_closure_isolated(tmp_path: Path) -> None:
     """Closure body is analysed separately; the closure's param doesn't taint the enclosing fn."""
     sample = tmp_path / "closure.rs"
     sample.write_text(
-        'use std::process::Command;\nfn run() {\n    let h = |user_input: String| {\n        Command::new(user_input);\n    };\n    h("echo".to_string());\n}\n',
+        'use std::process::Command;\nfn run() {\n    let h = |user_input: String| {\n        Command::new("echo").arg(user_input);\n    };\n    h("echo".to_string());\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -402,7 +411,7 @@ def test_rust_let_tuple_destructure_propagates_taint(tmp_path: Path) -> None:
     """``let (a, b) = produce_tainted();`` taints both ``a`` and ``b``."""
     sample = tmp_path / "let_tuple.rs"
     sample.write_text(
-        "use std::process::Command;\nfn run(user_input: String) {\n    let (a, _b) = (user_input, 0);\n    Command::new(a);\n}\n",
+        'use std::process::Command;\nfn run(user_input: String) {\n    let (a, _b) = (user_input, 0);\n    Command::new("echo").arg(a);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -419,7 +428,7 @@ def test_rust_let_struct_destructure_propagates_taint(tmp_path: Path) -> None:
     """
     sample = tmp_path / "let_struct.rs"
     sample.write_text(
-        "use std::process::Command;\nstruct Cfg { cmd: String, other: i32 }\nfn run(user_input: Cfg) {\n    let Cfg { cmd, other: _ } = user_input;\n    Command::new(cmd);\n}\n",
+        'use std::process::Command;\nstruct Cfg { cmd: String, other: i32 }\nfn run(user_input: Cfg) {\n    let Cfg { cmd, other: _ } = user_input;\n    Command::new("echo").arg(cmd);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -437,7 +446,7 @@ def test_rust_untyped_closure_param_taints(tmp_path: Path) -> None:
     """
     sample = tmp_path / "closure_untyped.rs"
     sample.write_text(
-        'use std::process::Command;\nfn run() {\n    let h = |x| { Command::new(x); };\n    h("echo".to_string());\n}\n',
+        'use std::process::Command;\nfn run() {\n    let h = |x| { Command::new("echo").arg(x); };\n    h("echo".to_string());\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
@@ -454,7 +463,7 @@ def test_rust_self_parameter_not_seeded_as_tainted(tmp_path: Path) -> None:
     """
     sample = tmp_path / "self.rs"
     sample.write_text(
-        "use std::process::Command;\nstruct Runner { cmd: String }\nimpl Runner {\n    fn run(&self) {\n        Command::new(&self.cmd);\n    }\n}\n",
+        'use std::process::Command;\nstruct Runner { cmd: String }\nimpl Runner {\n    fn run(&self) {\n        Command::new("echo").arg(&self.cmd);\n    }\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))

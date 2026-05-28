@@ -57,6 +57,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.rules._rust_test_attribute import attribute_item_is_test_marker
 from safelint.rules.base import BaseRule
 
 
@@ -151,18 +152,6 @@ _PANIC_LIKE_MACROS: frozenset[str] = frozenset(
     }
 )
 
-#: Test-attribute names that mark a function as a test, used by the
-#: scoped-and-bare detection in :func:`_attribute_marks_test` and its
-#: twin in :mod:`safelint.rules.test_coverage`. ``"test"`` covers the
-#: stdlib ``#[test]`` plus every framework that suffixes ``::test``
-#: (tokio / actix_web / async_std / smol_potat / smol / futures /
-#: test_log). ``"rstest"`` covers the parametric-test framework that
-#: uses ``#[rstest]`` (bare) and occasionally ``#[rstest::rstest]``
-#: (scoped) - those don't end in ``test`` so trailing-name matching
-#: alone wouldn't recognise them. Add new names here if a future
-#: test framework lands with a different attribute pattern.
-_RUST_TEST_ATTRIBUTE_NAMES: frozenset[str] = frozenset({"test", "rstest"})
-
 #: Unwrap-family method names. SAFE208 fires when any of these is
 #: called outside test code. Wider set than SAFE205's
 #: :data:`_UNWRAP_METHOD_NAMES` because the broad rule also covers
@@ -249,75 +238,19 @@ def _rust_macro_name(macro_node: tree_sitter.Node | None) -> str | None:
     return None  # pragma: no cover - defensive: macro field is always identifier or scoped_identifier
 
 
-def _attribute_marks_test(attr_item: tree_sitter.Node) -> bool:
-    """Return True if *attr_item* is ``#[test]`` or ``#[cfg(test)]``.
-
-    Mirrors :func:`safelint.rules.test_coverage._attribute_is_rust_test_marker`
-    but takes the outer ``attribute_item`` so the call site doesn't
-    need to know about the wrapper. Returns False for any other
-    attribute shape (``#[derive(...)]``, ``#[cfg(unix)]``, ``#[inline]``,
-    etc.).
-
-    Also recognises scoped test-attribute paths whose trailing
-    identifier is ``"test"`` - the convention every major async-test
-    framework follows: ``#[tokio::test]``, ``#[actix_web::test]``,
-    ``#[async_std::test]``, ``#[smol_potat::test]``, etc. Without
-    this, ``panic!`` / ``.unwrap()`` inside those framework's test
-    functions would falsely fire SAFE204 / SAFE208.
-    """
-    attribute = next((c for c in attr_item.named_children if c.type == "attribute"), None)
-    if attribute is None:  # pragma: no cover - defensive: every attribute_item wraps an attribute
-        return False
-    children = attribute.named_children
-    if not children:  # pragma: no cover - defensive: every attribute has at least a name child
-        return False
-    return _attribute_first_child_marks_test(children)
-
-
-def _attribute_first_child_marks_test(children: list[tree_sitter.Node]) -> bool:
-    """Dispatch test-marker check on an attribute's first named child.
-
-    Helper extracted from :func:`_attribute_marks_test` to keep the
-    parent function's return count under PLR0911. Matches against
-    :data:`_RUST_TEST_ATTRIBUTE_NAMES` for both bare attributes
-    (``#[test]`` / ``#[rstest]``) and scoped paths' trailing identifier
-    (``#[tokio::test]`` / ``#[rstest::rstest]``).
-    """
-    first = children[0]
-    if first.type == "scoped_identifier":
-        # ``#[tokio::test]`` / ``#[rstest::rstest]`` - check the trailing identifier.
-        trailing = first.child_by_field_name("name")
-        return trailing is not None and node_text(trailing) in _RUST_TEST_ATTRIBUTE_NAMES
-    if first.type != "identifier":  # pragma: no cover - defensive: token-tree-first attribute shapes are rare
-        return False
-    first_name = node_text(first)
-    if first_name in _RUST_TEST_ATTRIBUTE_NAMES:
-        return True
-    if first_name != "cfg":
-        return False
-    return _cfg_token_tree_mentions_test(children[1:])
-
-
-def _cfg_token_tree_mentions_test(children: list[tree_sitter.Node]) -> bool:
-    """Return True if any ``token_tree`` in *children* directly contains ``identifier "test"``."""
-    for child in children:
-        if child.type != "token_tree":  # pragma: no cover - ``#[cfg = "value"]`` shape isn't a test marker
-            continue
-        if any(inner.type == "identifier" and node_text(inner) == "test" for inner in child.named_children):
-            return True
-    return False
-
-
 def _node_has_test_marker_attribute(node: tree_sitter.Node) -> bool:
     """Return True if *node* has a ``#[test]`` or ``#[cfg(test)]`` attribute attached.
 
     In tree-sitter-rust, attributes parse as ``attribute_item`` *preceding
     siblings* of the function / mod / impl they decorate. Walks the
-    ``prev_named_sibling`` chain while it yields attribute_items.
+    ``prev_named_sibling`` chain while it yields attribute_items. The
+    per-attribute marker check is delegated to
+    :func:`safelint.rules._rust_test_attribute.attribute_item_is_test_marker`
+    so SAFE204 / SAFE208 / SAFE701 / SAFE702 all share one definition.
     """
     cursor = node.prev_named_sibling
     while cursor is not None and cursor.type == "attribute_item":  # nosafe: SAFE501
-        if _attribute_marks_test(cursor):
+        if attribute_item_is_test_marker(cursor):
             return True
         cursor = cursor.prev_named_sibling
     return False
