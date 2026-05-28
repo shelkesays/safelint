@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 
 from safelint.languages import JAVASCRIPT, TSX, TYPESCRIPT
-from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import resolve_lang_name, walk
+from safelint.rules._rust_test_attribute import attribute_is_test_marker
 from safelint.rules.base import BaseRule
 
 
@@ -40,15 +41,6 @@ _JAVA_TEST_SUFFIXES: tuple[str, ...] = ("Test", "Tests", "IT")
 # ``<stem>_test.rs`` suffix as a colocated convention. Both are listed
 # as candidates so projects following either pattern get a match.
 _RUST_TEST_SUFFIXES: tuple[str, ...] = ("", "_test")
-
-#: Test-attribute names that mark a function as a test. Mirrors
-#: :data:`safelint.rules.rust_rules._RUST_TEST_ATTRIBUTE_NAMES` -
-#: keep the two in sync. ``"test"`` covers ``#[test]`` plus every
-#: framework that suffixes ``::test`` (tokio / actix_web /
-#: async_std / smol_potat / etc.); ``"rstest"`` covers the
-#: parametric-test framework's bare ``#[rstest]`` and scoped
-#: ``#[rstest::rstest]`` forms.
-_RUST_TEST_ATTRIBUTE_NAMES: frozenset[str] = frozenset({"test", "rstest"})
 
 
 if TYPE_CHECKING:
@@ -210,49 +202,6 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
     return _filename_matches_test_pattern(filepath, lang_name)
 
 
-def _token_tree_mentions_test(token_tree: tree_sitter.Node) -> bool:
-    """Return True if *token_tree* directly contains an ``identifier`` ``test``."""
-    return any(inner.type == "identifier" and node_text(inner) == "test" for inner in token_tree.named_children)
-
-
-def _cfg_token_tree_mentions_test(children: list[tree_sitter.Node]) -> bool:
-    """Return True if any ``token_tree`` in *children* contains an ``identifier`` ``test``.
-
-    Helper for :func:`_rust_has_test_marker`'s ``#[cfg(test)]`` branch.
-    Split out so the marker walker stays under the cyclomatic /
-    nesting limits SafeLint enforces on its own code.
-    """
-    return any(child.type == "token_tree" and _token_tree_mentions_test(child) for child in children)
-
-
-def _attribute_is_rust_test_marker(node: tree_sitter.Node) -> bool:
-    """Return True if *node* is a ``#[test]`` or ``#[cfg(test)]`` attribute.
-
-    Also recognises scoped test-attribute paths whose trailing
-    identifier is ``"test"`` - the convention every major async-test
-    framework follows: ``#[tokio::test]``, ``#[actix_web::test]``,
-    ``#[async_std::test]``, ``#[smol_potat::test]``, etc. Without
-    this, files using those frameworks falsely fire SAFE701 /
-    SAFE702 / SAFE204 / SAFE208 even though they ARE test files.
-    """
-    children = node.named_children
-    if not children:  # pragma: no cover - tree-sitter-rust always emits a name child on an attribute
-        return False
-    first = children[0]
-    if first.type == "scoped_identifier":
-        # ``#[tokio::test]`` / ``#[rstest::rstest]`` - check the trailing identifier.
-        trailing = first.child_by_field_name("name")
-        return trailing is not None and node_text(trailing) in _RUST_TEST_ATTRIBUTE_NAMES
-    if first.type != "identifier":  # pragma: no cover - defensive: rare attribute shapes (token_tree etc.)
-        return False
-    first_name = node_text(first)
-    if first_name in _RUST_TEST_ATTRIBUTE_NAMES:
-        return True
-    if first_name != "cfg":
-        return False
-    return _cfg_token_tree_mentions_test(children[1:])
-
-
 def _rust_has_test_marker(tree: tree_sitter.Tree) -> bool:
     """Return True if *tree* contains ``#[test]`` or ``#[cfg(test)]``.
 
@@ -264,11 +213,11 @@ def _rust_has_test_marker(tree: tree_sitter.Tree) -> bool:
     every Rust source with inline tests would still fire SAFE701
     asking for an external ``tests/<stem>.rs`` that doesn't exist.
 
-    tree-sitter-rust parses both forms as ``attribute`` nodes whose
-    first named child is an ``identifier``; the per-node decision
-    lives in :func:`_attribute_is_rust_test_marker`.
+    The per-attribute marker check is delegated to
+    :func:`safelint.rules._rust_test_attribute.attribute_is_test_marker`
+    so SAFE701 / SAFE702 / SAFE204 / SAFE208 share one definition.
     """
-    return any(node.type == "attribute" and _attribute_is_rust_test_marker(node) for node in walk(tree.root_node))
+    return any(node.type == "attribute" and attribute_is_test_marker(node) for node in walk(tree.root_node))
 
 
 def _paired_test_in_changed_under_test_dirs(src: Path, changed: set[str], test_dirs: list[str], lang_name: str) -> bool:
