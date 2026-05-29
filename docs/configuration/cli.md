@@ -13,14 +13,16 @@ SafeLint: Holzmann-inspired safety lint rules and pre-commit integration for Pyt
 Usage: safelint [OPTIONS] <COMMAND>
 
 Commands:
-  check    Scan a file or directory for safety violations
-  skill    Manage the bundled AI-client skill / project rule (Claude, Cursor, Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed)
-  help     Print this message or the help of the given subcommand
-  version  Display SafeLint's version
+  check       Scan a file or directory for safety violations
+  skill       Manage the bundled AI-client skill / project rule (Claude, Cursor, Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp)
+  list-rules  Print the rule catalogue (filter by --language, render as text / json / markdown / sarif)
+  help        Print this message or the help of the given subcommand
+  version     Display SafeLint's version
 
 Options:
   -h, --help     Print help (see a summary with -h)
   -V, --version  Print version
+  --list-rules   Alias for the list-rules subcommand
 
 Global options:
   --fail-on <LEVEL>        Minimum severity that blocks the run: error | warning

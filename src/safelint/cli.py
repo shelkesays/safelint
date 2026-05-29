@@ -1362,7 +1362,7 @@ def _build_skill_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="safelint skill",
         description=(
-            "Manage the bundled safelint skill / project rule for AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed)"
+            "Manage the bundled safelint skill / project rule for AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp)"
         ),
     )
     sub = parser.add_subparsers(dest="skill_action", required=True, metavar="ACTION")
@@ -1511,6 +1511,104 @@ def _first_positional_index(argv: list[str]) -> int | None:
     return None
 
 
+def _known_rule_languages() -> tuple[str, ...]:
+    """Return every language name any registered rule lists in ``language``.
+
+    Used as the choice set for ``list-rules --language``. Computed from
+    :data:`safelint.rules.ALL_RULES` so the option auto-grows when a new
+    language is added; the catalogue stays accurate without an explicit
+    table to keep in sync.
+    """
+    from safelint.rules import ALL_RULES  # noqa: PLC0415
+
+    langs: set[str] = set()
+    for cls in ALL_RULES:
+        langs.update(cls.language)
+    return tuple(sorted(langs))
+
+
+def _build_list_rules_parser() -> argparse.ArgumentParser:
+    """Build the ``list-rules`` subcommand parser.
+
+    Surfaces the rule catalogue for agents, dashboards, and docs
+    regeneration. Default output is the text table (grouped by category
+    band, one line per rule). ``--format json`` / ``markdown`` / ``sarif``
+    switch to the matching structured representation.
+    """
+    parser = argparse.ArgumentParser(
+        prog="safelint list-rules",
+        description="Print the catalogue of every shipped rule, optionally filtered by language.",
+    )
+    parser.add_argument(
+        "--language",
+        choices=_known_rule_languages(),
+        default=None,
+        help="Filter to rules that apply to this language (e.g. ``python``, ``rust``). Omit to list every rule.",
+    )
+    parser.add_argument(
+        "--format",
+        dest="output_format",
+        choices=["text", "json", "markdown", "sarif"],
+        default="text",
+        help="Output format. ``text`` (default) prints an aligned table grouped by category band. ``json`` / ``markdown`` / ``sarif`` emit structured representations of the same catalogue.",
+    )
+    parser.add_argument(
+        "--enabled-only",
+        dest="enabled_only",
+        action="store_true",
+        default=False,
+        help="Filter to rules enabled by default (drops opt-in rules). Useful for 'what fires out of the box?' views.",
+    )
+    return parser
+
+
+def _print_rule_listing(specs: list, fmt: str) -> None:
+    """Render *specs* in *fmt* and emit the result to stdout.
+
+    Centralises every ``print`` / stdout write for the rule catalogue so
+    :func:`_run_list_rules` stays a pure orchestrator and the SAFE304
+    "calls I/O without naming it" heuristic isn't triggered. ``fmt`` is
+    one of the choices argparse already validated.
+    """
+    from safelint._rule_listing import (  # noqa: PLC0415
+        format_json_listing,
+        format_markdown_listing,
+        format_sarif_listing,
+        format_text,
+    )
+
+    if fmt == "text":
+        sys.stdout.write(format_text(specs))
+    elif fmt == "markdown":
+        sys.stdout.write(format_markdown_listing(specs))
+    elif fmt == "json":
+        print(format_json_listing(specs))
+    else:  # "sarif"
+        print(format_sarif_listing(specs))
+
+
+def _run_list_rules(args: argparse.Namespace) -> int:
+    """Execute the ``list-rules`` subcommand.
+
+    Exit code is 0 on success and 2 when the filter combination matches
+    zero rules; the second case is treated as a configuration error so a
+    typo in a CI script (``--language pythn``) doesn't silently produce
+    an empty document.
+    """
+    from safelint._rule_listing import filter_specs, iter_rule_specs  # noqa: PLC0415
+
+    specs = filter_specs(
+        iter_rule_specs(),
+        language=args.language,
+        enabled_only=args.enabled_only,
+    )
+    if not specs:
+        _diagnostics.print_error("no rules matched the requested filter")
+        return 2
+    _print_rule_listing(specs, args.output_format)
+    return 0
+
+
 def _run_skill(args: argparse.Namespace) -> int:
     """Dispatch the ``safelint skill <action>`` subcommands."""
     # Local import keeps importlib.resources off the hot path for
@@ -1554,7 +1652,8 @@ def _run_skill(args: argparse.Namespace) -> int:
 
 _HELP_COMMANDS: tuple[tuple[str, str], ...] = (
     ("check", "Scan a file or directory for safety violations"),
-    ("skill", "Manage the bundled AI-client skill / project rule (Claude, Cursor, Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed)"),
+    ("skill", "Manage the bundled AI-client skill / project rule (Claude, Cursor, Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp)"),
+    ("list-rules", "Print the rule catalogue (filter by --language, render as text / json / markdown / sarif)"),
     ("help", "Print this message or the help of the given subcommand"),
     ("version", "Display SafeLint's version"),
 )
@@ -1580,7 +1679,7 @@ _HELP_SKILL_SUBCOMMANDS: tuple[tuple[str, str], ...] = (
 _HELP_SKILL_FLAGS: tuple[tuple[str, str], ...] = (
     (
         "--client <NAME>",
-        "Target AI client: ``auto`` | ``claude`` | ``cursor`` | ``copilot`` | ``gemini`` | ``windsurf`` | ``codex`` | ``continue`` | ``cline`` | ``aider`` | ``trae`` | ``antigravity`` | ``zed``",
+        "Target AI client: ``auto`` | ``claude`` | ``cursor`` | ``copilot`` | ``gemini`` | ``windsurf`` | ``codex`` | ``continue`` | ``cline`` | ``aider`` | ``trae`` | ``antigravity`` | ``zed`` | ``warp``",  # noqa: E501
     ),
     ("--project", "Restrict to project-scope installs (``<cwd>/.<client>/...``)"),
     ("--symlink", "Use symlink mode instead of copying - ``pip upgrade safelint`` then auto-updates the artefact"),
@@ -1593,6 +1692,7 @@ _HELP_SKILL_FLAGS: tuple[tuple[str, str], ...] = (
 _HELP_OPTIONS: tuple[tuple[str, str], ...] = (
     ("-h, --help", "Print help (see a summary with -h)"),
     ("-V, --version", "Print version"),
+    ("--list-rules", "Alias for the ``list-rules`` subcommand"),
 )
 
 
@@ -1666,6 +1766,8 @@ def _print_subcommand_help(subcommand: str) -> int:
         _build_check_parser().parse_args(["--help"])
     elif subcommand == "skill":
         _build_skill_parser().parse_args(["--help"])
+    elif subcommand == "list-rules":
+        _build_list_rules_parser().parse_args(["--help"])
     elif subcommand in ("help", "version"):
         _print_main_help()
     else:
@@ -1734,6 +1836,21 @@ def _is_top_level_help_request() -> tuple[bool, str | None]:
     return False, None
 
 
+def _strip_list_rules_flag(argv: list[str]) -> list[str] | None:
+    """Detect ``--list-rules`` anywhere in *argv* and return *argv* without it.
+
+    Returns ``None`` when ``--list-rules`` is absent. The flag is the
+    user-facing alias for the ``list-rules`` subcommand; treat any
+    invocation containing it as if the user wrote ``safelint list-rules
+    <other-flags>``. Strips both the bare token and its leading-dash
+    forms; argparse then parses the remaining argv with the subcommand's
+    parser so flag-typo guarantees stay intact.
+    """
+    if "--list-rules" not in argv:
+        return None
+    return [a for a in argv if a != "--list-rules"]
+
+
 def _is_version_request() -> bool:
     """Detect ``safelint -V`` / ``safelint --version`` / ``safelint version``.
 
@@ -1759,16 +1876,36 @@ def _is_version_request() -> bool:
     return False
 
 
+def _dispatch_subcommand(rest: list[str], idx: int) -> int | None:
+    """Route the first-positional token at *idx* to its subcommand handler.
+
+    Returns the subcommand's exit code, or ``None`` if the token at
+    *idx* isn't a recognised subcommand (caller then falls through to
+    hook mode). Each branch drops the token but keeps every surrounding
+    flag so ``safelint --format json check src`` parses as
+    ``--format json src`` against the subcommand parser.
+    """
+    subcommand = rest[idx]
+    argv_for_sub = rest[:idx] + rest[idx + 1 :]
+    if subcommand == "check":
+        return _run_check(_build_check_parser().parse_args(argv_for_sub))
+    if subcommand == "list-rules":
+        return _run_list_rules(_build_list_rules_parser().parse_args(argv_for_sub))
+    if subcommand == "skill":
+        return _run_skill(_build_skill_parser().parse_args(argv_for_sub))
+    return None
+
+
 def main() -> None:
     """Entry point for direct CLI invocation, pre-commit hook, and stdin mode.
 
     Routing logic (in order):
     - ``-h`` / ``--help`` / ``help`` (with optional subcommand) → print help.
     - ``-V`` / ``--version`` / ``version`` → print version and exit.
+    - ``--list-rules`` anywhere → ``list-rules`` subcommand (flag alias).
     - ``--stdin`` anywhere in argv → read source from stdin (editor mode).
-    - First true positional argument is ``check`` → ``check`` subcommand.
-    - First true positional argument is ``skill`` → ``skill`` subcommand
-      (install / path).
+    - First true positional argument is ``check`` / ``list-rules`` /
+      ``skill`` → the matching subcommand.
     - Otherwise → pre-commit hook mode (positional arguments whose extension
       is in :func:`safelint.languages.supported_extensions` are files).
 
@@ -1787,33 +1924,21 @@ def main() -> None:
         _print_version()
         sys.exit(0)
 
+    stripped = _strip_list_rules_flag(sys.argv[1:])
+    if stripped is not None:
+        args = _build_list_rules_parser().parse_args(stripped)
+        sys.exit(_run_list_rules(args))
+
     if "--stdin" in sys.argv[1:]:
         args = _build_stdin_parser().parse_args()
         sys.exit(_run_stdin(args))
 
     rest = sys.argv[1:]
     idx = _first_positional_index(rest)
-    if idx is not None and rest[idx] == "check":
-        # Drop the ``check`` token but keep every flag (and its value)
-        # before and after it so e.g. ``safelint --format json check src``
-        # parses cleanly as ``--format json src``.
-        argv_for_check = rest[:idx] + rest[idx + 1 :]
-        args = _build_check_parser().parse_args(argv_for_check)
-        sys.exit(_run_check(args))
-    if idx is not None and rest[idx] == "skill":
-        # Drop the ``skill`` token but keep every flag (and its value)
-        # before and after it. Pre-skill tokens then fall to the skill
-        # parser, which rejects unknowns - matching the "fail loudly on
-        # unknown flags" posture of every other branch. Without this,
-        # ``safelint --formta=json skill install`` would silently swallow
-        # the typo. The skill parser doesn't accept the global formatter
-        # flags by design (there's no JSON output for ``skill install``);
-        # passing one in front of ``skill`` is therefore an error, not a
-        # global override.
-        argv_for_skill = rest[:idx] + rest[idx + 1 :]
-        args = _build_skill_parser().parse_args(argv_for_skill)
-        sys.exit(_run_skill(args))
-
+    if idx is not None:
+        rc = _dispatch_subcommand(rest, idx)
+        if rc is not None:
+            sys.exit(rc)
     sys.exit(_dispatch_hook_mode())
 
 

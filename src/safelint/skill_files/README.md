@@ -1,10 +1,10 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets twelve AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/`, currently Python, JavaScript, and TypeScript (mirroring safelint's `src/safelint/languages/` package layout).
+A bundled skill / project-rule that lets thirteen AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/`, currently Python, JavaScript, and TypeScript (mirroring safelint's `src/safelint/languages/` package layout).
 
 > **For the comprehensive user guide** (auto-detection logic, per-client setup, troubleshooting, adding a new client) see [`AI_CLIENTS.md`](https://github.com/shelkesays/safelint/blob/main/AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
 
-Twelve clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
+Thirteen clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
 
 - **Claude Code**: installs as a single skill manifest at `~/.claude/skills/safelint/SKILL.md` (or `<cwd>/.claude/skills/safelint/SKILL.md` for project scope). Language-specific addendums are looked up on demand via `safelint skill path`, same as the other clients.
 - **Cursor**: installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
@@ -18,6 +18,7 @@ Twelve clients ship today; all follow the *same* workflow because safelint's CLI
 - **Trae**: installs as a Markdown rule at `<cwd>/.trae/rules/safelint.md` (canonical, auto-loaded) or `~/.trae/rules/safelint.md` (user-global).
 - **Antigravity**: installs as a Markdown rule at `<cwd>/.antigravity/rules/safelint.md` (canonical, auto-loaded) or `~/.antigravity/rules/safelint.md` (user-global).
 - **Zed**: installs as workspace rules at `<cwd>/.rules` (canonical, auto-loaded) or `~/.rules` (user-global).
+- **Warp**: installs as a Markdown instructions file at `<cwd>/WARP.md` (canonical, auto-discovered by Warp's AI) or `~/.warp/WARP.md` (user-global; Warp reads it on every project).
 
 Once installed, ask the agent things like:
 

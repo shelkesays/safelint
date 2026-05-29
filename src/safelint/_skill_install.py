@@ -307,6 +307,30 @@ _AIDER_SPEC = ClientSpec(
 )
 
 
+_WARP_SPEC = ClientSpec(
+    name="warp",
+    display_name="Warp",
+    artefact_label="instructions",
+    # Warp (warp.dev) auto-discovers ``WARP.md`` at the project root.
+    # ``.warp/`` is the user-scope config directory (themes, prefs,
+    # AI settings); its presence signals an active Warp user even
+    # before a project ``WARP.md`` is committed. Listing both as cwd
+    # markers mirrors the GEMINI / Windsurf shape.
+    cwd_markers=("WARP.md", ".warp"),
+    home_markers=(".warp",),
+    # Project-scope canonical: ``<cwd>/WARP.md`` (auto-discovered by
+    # Warp's AI). User-scope: ``~/.warp/WARP.md`` for global
+    # instructions Warp reads on every project. We install to the
+    # project location; the user-scope path is documented in the
+    # bundled WARP.md for users who want it global.
+    install_relpath=("WARP.md",),
+    bundled_relpath=("warp", "WARP.md"),
+    restart_hint="Restart Warp (or reload its AI panel) to pick up the new instructions.",
+    usage_hint='Then ask Warp "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("warp", "WARP.md"),),
+)
+
+
 _CODEX_SPEC = ClientSpec(
     name="codex",
     display_name="codex",
@@ -348,6 +372,7 @@ _CLIENT_SPECS: tuple[ClientSpec, ...] = (
     _TRAE_SPEC,
     _ANTIGRAVITY_SPEC,
     _ZED_SPEC,
+    _WARP_SPEC,
 )
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
