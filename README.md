@@ -12,7 +12,7 @@
 
 </div>
 
-> **📖 Full documentation:** <https://shelkesays.github.io/safelint/>, searchable, navigable, with a per-client install guide for each of the twelve supported AI agents. The README below is the repo home; the docs site is the user reference.
+> **📖 Full documentation:** <https://shelkesays.github.io/safelint/>, searchable, navigable, with a per-client install guide for each of the thirteen supported AI agents. The README below is the repo home; the docs site is the user reference.
 
 SafeLint is a configurable static analysis tool that enforces safety-critical coding practices inspired by Gerard J. Holzmann's "Power of Ten" rules at NASA/JPL.
 
@@ -372,7 +372,7 @@ safelint skill remove        # auto-detects and removes every install
 
 `safelint skill remove` accepts a few filter flags: `--symlink` keeps copy installs and only removes the ones created with `--symlink` (i.e., the skill file is a symlink pointing back at the bundled wheel, handy for skill developers); `--path PATH` removes one specific install location safelint's auto-detect didn't find; `--dry-run` previews everything without touching disk.
 
-For explicit control (`--client <name>` for any of the twelve), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, post-upgrade workflow, and troubleshooting, see the [AI client integrations guide](https://shelkesays.github.io/safelint/ai-clients/). To add support for a new AI client (the registry is open-ended), follow the contributor walkthrough in [Adding a new AI client](https://shelkesays.github.io/safelint/contributing/adding-an-ai-client/).
+For explicit control (`--client <name>` for any of the thirteen), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, post-upgrade workflow, and troubleshooting, see the [AI client integrations guide](https://shelkesays.github.io/safelint/ai-clients/). To add support for a new AI client (the registry is open-ended), follow the contributor walkthrough in [Adding a new AI client](https://shelkesays.github.io/safelint/contributing/adding-an-ai-client/).
 
 ### Other integration points
 

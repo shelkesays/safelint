@@ -7,6 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0rc2] - 2026-05-29
+
+**Two additive features on top of rc1 ahead of the 2.2.0 GA.** Rust support stays exactly as it shipped in rc1 (no behaviour change for the existing language work); this RC adds a CLI rule-catalogue command and brings the AI-client roster to thirteen.
+
+### Added
+
+- **`safelint list-rules` subcommand (and `--list-rules` flag alias)** - prints the full rule catalogue so AI agents, CI dashboards, and docs-generation pipelines can introspect what safelint will check without grepping the per-agent skill files. Filters: `--language=python|javascript|typescript|java|rust` to scope to a single language, `--enabled-only` to drop opt-in rules. Output formats: `--format=text` (default; aligned table grouped by category band), `--format=json` (programmatic catalogue with `version` + per-rule schema), `--format=markdown` (one table per category band, useful for piping into docs), `--format=sarif` (SARIF 2.1.0 catalogue with the rules under `runs[0].tool.driver.rules[]` and an empty `results[]`; consumable by GitHub Code Scanning catalogue UIs). Categories are derived from the leading digit of the rule code so the listing automatically picks up the SafeLint rule-numbering policy (1xx function shape, 2xx error handling, 3xx side effects / state, 4xx resource lifecycle, 5xx loop safety, 6xx documentation, 7xx test coverage, 8xx dataflow, 9xx framework-specific). Default scope shows every shipped rule with a `Default` column marking enabled-by-default vs opt-in; the catalogue stays catalogue-only (severity / enabled defaults from the bundled `DEFAULTS`, not from the user's resolved config). Empty filter combinations exit 2 with a stderr error so a typo in a CI script (`--language=pythn`) can't silently produce an empty document.
+- **Warp as a 13th AI client** - `safelint skill install --client=warp` writes `<cwd>/WARP.md` (canonical, auto-discovered by Warp's AI) or `~/.warp/WARP.md` (user-global). The bundled skill file (`src/safelint/skill_files/warp/WARP.md`) mirrors the existing 12 client skill files: the same 8 steps, the same JSON parsing recipe, the same Power-of-Ten rationale crib sheet, plus Warp-specific touches (the AI is in the terminal, so all check / install commands land directly as terminal tasks). Auto-detection markers are `WARP.md` (the canonical project file) and `.warp` (Warp's user-config directory). Listed in the `--client` choices, the `safelint help skill` output, and the `_HELP_COMMANDS` line.
+
+### Changed
+
+- **`safelint list-rules` referenced in every skill file's language-detection step** - the new "to check the live rule list, run `safelint list-rules --format json` and look at the `languages` field" hint replaces the longer Python-snippet fallback in the bundled WARP.md addendum (other agent skill files still carry the legacy form for backwards compatibility with already-installed copies). The Python snippet stays documented as the fallback.
+- **Documentation roster updated** - `README.md`, `SUPPORT.md`, `AI_CLIENTS.md`, `docs/index.md`, `docs/configuration/cli.md`, `docs/contributing/adding-an-ai-client.md`, and `src/safelint/skill_files/README.md` now read "thirteen supported AI clients" and add Warp to every per-client install/usage table.
+
+### Internal
+
+- `src/safelint/_rule_listing.py` - new module exposing `iter_rule_specs()`, `filter_specs()`, and four format renderers (`format_text` / `format_json_listing` / `format_markdown_listing` / `format_sarif_listing`). Pure-function design, no engine / config / parser dependencies, so the catalogue is cheap to render in any process the agent is running in.
+- `cli.py` - `_build_list_rules_parser` + `_run_list_rules` + `_print_rule_listing` thread the subcommand through the existing argv-routing scanner. `_dispatch_subcommand` refactor moves the per-subcommand-token routing out of `main()` so `main()` stays under the `function_length=60` / `complexity=10` caps safelint enforces on itself.
+- `_skill_install.py` - one `_WARP_SPEC` `ClientSpec` entry plus its position in `_CLIENT_SPECS`; the rest of the install / detection / status / remove machinery picks it up automatically because all of those routes iterate over the registry.
+
 ## [2.2.0rc1] - 2026-05-27
 
 **Rust is now a supported language.** Second new language landing in the v2.x line. `.rs` files are discovered, parsed via Tree-sitter, and run against 17 of the 20 cross-language rules - plus 10 new Rust-only rules covering Rust-idiom-specific patterns. Python / JavaScript / TypeScript / Java users see zero behaviour change beyond an additive grammar option.
