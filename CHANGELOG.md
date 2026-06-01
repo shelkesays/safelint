@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-06-01
+
+**Rust support; rule-catalogue CLI; Warp + OpenCode agents.** Promotion of the rc1 / rc2 / rc3 cycle to GA. Three additive bundles ship together: a fifth supported language, a CLI surface for catalogue introspection, and two more AI clients on the registry. Python / JavaScript / TypeScript / Java users see zero behaviour change beyond an additive grammar option, an additive CLI subcommand, and an additive `--client=warp` choice.
+
+**Install:** `pip install 'safelint[rust]'` to add Rust to an existing setup (PyO3 / maturin polyglot: `pip install 'safelint[python,rust]'`); plain `pip install safelint` still ships the engine + Python.
+
+### Highlights
+
+- **Rust as the 5th registered language** (from rc1). `.rs` files are discovered, parsed via Tree-sitter, and run against 17 of the 20 cross-language rules. 10 additional Rust-only rules cover Rust-idiom-specific patterns (panic placement, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer params, broad `.unwrap()` outside tests, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. See the [Rust language page](https://shelkesays.github.io/safelint/languages/rust/) and the rc1 entry below for the full per-rule rationale.
+- **`safelint list-rules` subcommand** (from rc2). Prints the rule catalogue so AI agents, CI dashboards, and docs pipelines can introspect what safelint will check. Filters: `--language=python|javascript|typescript|java|rust`, `--enabled-only`. Output formats: `--format=text` (default), `--format=json`, `--format=markdown`, `--format=sarif`. The `--list-rules` flag form works as an alias when placed anywhere in argv. Categories derived from the leading digit of each `SAFExxx` code, matching the rule-numbering policy.
+- **Warp as the 13th AI client** (from rc2). `safelint skill install --client=warp` writes `<cwd>/WARP.md` (auto-discovered by Warp's terminal-native AI) or `~/.warp/WARP.md` (user-global). Auto-detection markers: `WARP.md` and `.warp/`.
+- **OpenCode auto-detection** (from rc3). `safelint skill install --client=auto` notices OpenCode (`sst/opencode`) projects via `.opencode/` in codex's `cwd_markers`. OpenCode reads `AGENTS.md` for project context, the same file codex's secondary install already populates with a delimited safelint section. No new client spec needed.
+
+### Cumulative scope vs 2.1.0
+
+Every change shipped via the three release candidates is in this GA. Pin to `safelint==2.2.0` for a deterministic install; the rc1 / rc2 / rc3 entries below document the iteration history for anyone who needs to trace when a specific feature landed.
+
+The detailed change lists, default configurations, deliberately-skipped rules, and per-rule rationale live in the rc1 / rc2 / rc3 sections immediately below. They are kept verbatim as historical record rather than reflowed here.
+
 ## [2.2.0rc3] - 2026-06-01
 
 **OpenCode auto-detection.** One-line addition to the codex spec's `cwd_markers` extends `safelint skill install --client=auto` to notice OpenCode (sst/opencode) projects. OpenCode reads `AGENTS.md` at the repo root for project context, the same file codex's secondary install populates with a delimited safelint section. An OpenCode-only project (`.opencode/` directory present, no `.codex/`) now auto-detects and gets the safelint section in `AGENTS.md` transparently.
