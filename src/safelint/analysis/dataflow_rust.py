@@ -271,6 +271,13 @@ class RustTaintTracker:
         Mirrors the Python / JS tracker's :meth:`_call_tainted` exactly -
         sanitizers clear, sources inject, unknowns either preserve or
         drop based on ``assume_taint_preserving``.
+
+        For Rust, ``assume_taint_preserving=True`` must also flow taint
+        through the *method receiver* on calls like ``tainted.trim()``
+        / ``path.clone()`` / ``s.to_string()``: those return a value
+        derived from the receiver but take zero positional arguments,
+        so a positional-only inspection would silently mark them clean
+        and miss real sinks (``cmd.arg(tainted.trim())``).
         """
         name = call_name(node)
         if name in self.sanitizers:
@@ -279,7 +286,17 @@ class RustTaintTracker:
             return True
         if not self.assume_taint_preserving:
             return False
+        candidates: list[tree_sitter.Node] = []
         args_node = node.child_by_field_name("arguments")
-        if not args_node:  # pragma: no cover - defensive: every call_expression has an arguments child
-            return False
-        return any(self._is_tainted(arg) for arg in args_node.named_children)
+        if args_node is not None:
+            candidates.extend(args_node.named_children)
+        # Method-call shape: ``call_expression.function`` is a
+        # ``field_expression`` whose ``value`` is the receiver. Plain
+        # function calls (``foo(x)``) have an ``identifier`` /
+        # ``scoped_identifier`` function and no receiver to read.
+        function = node.child_by_field_name("function")
+        if function is not None and function.type == "field_expression":
+            receiver = function.child_by_field_name("value")
+            if receiver is not None:
+                candidates.append(receiver)
+        return any(self._is_tainted(c) for c in candidates)
