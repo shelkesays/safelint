@@ -275,6 +275,72 @@ def test_rust_field_expression_preserves_taint(tmp_path: Path) -> None:
     assert any(v.code == "SAFE801" for v in result.violations)
 
 
+def test_rust_method_call_on_tainted_receiver_preserves_taint(tmp_path: Path) -> None:
+    """``tainted.trim()`` keeps taint; the receiver flows through the call result.
+
+    Pins the receiver-taint path in ``RustTaintTracker._call_tainted``:
+    method calls with zero positional arguments (``.trim()``, ``.clone()``,
+    ``.to_string()``) historically read as "no taint to check" because the
+    inspection only looked at positional args. The fix inspects the
+    receiver too; this test ensures the SAFE801 sink fires.
+    """
+    sample = tmp_path / "receiver_method.rs"
+    sample.write_text(
+        'use std::process::Command;\nfn run(user_input: String) {\n    Command::new("echo").arg(user_input.trim());\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    assert any(v.code == "SAFE801" for v in result.violations)
+
+
+def test_rust_method_call_chain_on_tainted_receiver_preserves_taint(tmp_path: Path) -> None:
+    """``tainted.trim().to_string()`` keeps taint across a method chain.
+
+    Recursive ``_is_tainted`` on the inner ``call_expression`` keeps the
+    receiver-taint check working at every link in a method chain.
+    """
+    sample = tmp_path / "receiver_chain.rs"
+    sample.write_text(
+        'use std::process::Command;\nfn run(user_input: String) {\n    let cleaned = user_input.trim().to_string();\n    Command::new("echo").arg(cleaned);\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    assert any(v.code == "SAFE801" for v in result.violations)
+
+
+def test_rust_method_call_on_clean_receiver_stays_clean(tmp_path: Path) -> None:
+    """A literal receiver (``"foo".to_string()``) doesn't taint the sink.
+
+    Guards against the receiver-taint fix over-firing: only *tainted*
+    receivers propagate; clean ones (string literals, locally-constructed
+    values) must not trip SAFE801.
+    """
+    sample = tmp_path / "receiver_clean.rs"
+    sample.write_text(
+        'use std::process::Command;\nfn run() {\n    Command::new("echo").arg("hello".to_string().trim());\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    assert not any(v.code == "SAFE801" for v in result.violations)
+
+
+def test_rust_method_call_on_tainted_receiver_assume_false_drops_taint(tmp_path: Path) -> None:
+    """With ``assume_taint_preserving = false``, receiver method calls drop taint.
+
+    The receiver-inspection only fires inside the
+    ``assume_taint_preserving=True`` branch, so disabling that knob must
+    still produce the documented "unknown calls return clean" behaviour.
+    """
+    sample = tmp_path / "receiver_assume_false.rs"
+    sample.write_text(
+        'use std::process::Command;\nfn run(user_input: String) {\n    Command::new("echo").arg(user_input.trim());\n}\n',
+        encoding="utf-8",
+    )
+    overrides = {"rules": {"tainted_sink": {"assume_taint_preserving": False}}}
+    result = _enabled_engine("tainted_sink", overrides).check_file(str(sample))
+    assert not any(v.code == "SAFE801" for v in result.violations)
+
+
 def test_rust_array_literal_with_tainted_element_propagates(tmp_path: Path) -> None:
     """``[tainted, clean]`` propagates taint to the array."""
     sample = tmp_path / "array.rs"
