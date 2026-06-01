@@ -1,4 +1,4 @@
-"""Tests for the four Rust-idiom rules: SAFE204 / SAFE205 / SAFE306 / SAFE602."""
+"""Tests for the Rust-idiom rules: SAFE110, SAFE112, SAFE204-SAFE208, SAFE306, SAFE308, SAFE602."""
 
 from __future__ import annotations
 

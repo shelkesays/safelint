@@ -312,17 +312,23 @@ _WARP_SPEC = ClientSpec(
     display_name="Warp",
     artefact_label="instructions",
     # Warp (warp.dev) auto-discovers ``WARP.md`` at the project root.
-    # ``.warp/`` is the user-scope config directory (themes, prefs,
-    # AI settings); its presence signals an active Warp user even
-    # before a project ``WARP.md`` is committed. Listing both as cwd
-    # markers mirrors the GEMINI / Windsurf shape.
+    # ``.warp/`` is its user-scope config directory (themes, prefs,
+    # AI settings); its presence in cwd signals an active Warp user
+    # even before a project ``WARP.md`` is committed.
     cwd_markers=("WARP.md", ".warp"),
-    home_markers=(".warp",),
+    # Warp's "Global Rules" feature (cross-project AI context) is
+    # managed through the Warp Drive UI (Personal > Rules), NOT a
+    # file at ``~/WARP.md`` or ``~/.warp/WARP.md``. So home-scope
+    # auto-detection is intentionally empty: ``--client=auto`` won't
+    # fall back to home for Warp, and ``safelint skill install
+    # --client=warp`` (no ``--project`` flag with empty cwd markers)
+    # surfaces the "no clients detected" path rather than writing a
+    # file Warp doesn't read.
+    home_markers=(),
     # Project-scope canonical: ``<cwd>/WARP.md`` (auto-discovered by
-    # Warp's AI). User-scope: ``~/.warp/WARP.md`` for global
-    # instructions Warp reads on every project. We install to the
-    # project location; the user-scope path is documented in the
-    # bundled WARP.md for users who want it global.
+    # Warp's AI). Warp does NOT auto-discover any user-scope file -
+    # cross-project rules go through Warp Drive's Personal > Rules
+    # UI, not the filesystem.
     install_relpath=("WARP.md",),
     bundled_relpath=("warp", "WARP.md"),
     restart_hint="Restart Warp (or reload its AI panel) to pick up the new instructions.",

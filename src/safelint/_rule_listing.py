@@ -127,8 +127,14 @@ def iter_rule_specs() -> list[RuleSpec]:
     """Walk :data:`safelint.rules.ALL_RULES` and return one :class:`RuleSpec` per rule.
 
     Severity and default-enabled state come from the bundled
-    :data:`safelint.core.config.DEFAULTS`. Rules that aren't present in
-    DEFAULTS (none today) fall back to their class-level defaults.
+    :data:`safelint.core.config.DEFAULTS`. Every shipped rule has a
+    DEFAULTS entry today; the lookup falls back to a defensive
+    ``severity="error"`` / ``default_enabled=False`` pair if a contributor
+    adds a rule class without wiring it into DEFAULTS, so the catalogue
+    still renders rather than crashing. The fallback values match the
+    safest defaults (most-blocking severity, opt-in enablement) and
+    surface the misconfiguration visibly enough that it's easy to spot
+    in catalogue output.
     """
     defaults = DEFAULTS.get("rules", {})
     specs: list[RuleSpec] = []
