@@ -339,8 +339,18 @@ _CODEX_SPEC = ClientSpec(
     # ``AGENTS.md`` is the cross-agent shared file convention - its
     # presence is also a strong signal for codex usage and triggers
     # the secondary section install (see below).
-    cwd_markers=(".codex", "AGENTS.md"),
-    home_markers=(".codex",),
+    #
+    # ``.opencode/`` is OpenCode's (sst/opencode) user-config directory.
+    # OpenCode reads ``AGENTS.md`` at the repo root for project context,
+    # which is the same file the secondary install below populates -
+    # so an OpenCode-only project gets the safelint section through the
+    # codex spec's machinery. Listing ``.opencode`` here teaches
+    # ``--client=auto`` to notice those projects. (Trade-off: a
+    # ``.codex/instructions.md`` file is also written, even though
+    # OpenCode itself reads only ``AGENTS.md``. Users can ignore /
+    # gitignore the codex file; the actual integration works.)
+    cwd_markers=(".codex", "AGENTS.md", ".opencode"),
+    home_markers=(".codex", ".opencode"),
     install_relpath=(".codex", "instructions.md"),
     bundled_relpath=("codex", "instructions.md"),
     restart_hint="Restart codex (or your codex-aware editor) to pick up the new instructions.",
