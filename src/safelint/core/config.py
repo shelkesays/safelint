@@ -730,16 +730,47 @@ DEFAULTS: dict[str, Any] = {
                 # rule rather than the global default.
             ],
             "sources_rust": [
-                # Environment / process / args sources.
-                "var",  # ``std::env::var(name)`` - returns user-controlled env value
-                "args",  # ``std::env::args()`` - command-line argument iterator
-                # Stdin sources.
-                "read_line",  # ``stdin().read_line(&mut buf)``
-                "read_to_string",  # ``File::read_to_string(...)`` / ``stdin().read_to_string(...)``
-                "lock",  # ``stdin().lock()`` - returned reader is a source
-                # Network sources (basic - frameworks add more).
-                "recv",  # ``UdpSocket::recv``, ``Receiver::recv``
-                "recv_from",
+                # The taint tracker only marks a call's RETURN value as
+                # tainted, so a source default has to be a call whose
+                # return carries user data. Several plausible-looking
+                # names (``read_line``, ``recv``, ``recv_from``, ``lock``)
+                # don't fit because they write into an out-parameter and
+                # return a count, return a guard, or are in-process IPC
+                # not a boundary input - listing them as sources just
+                # creates noisy false positives. They stay documented
+                # below so users can re-add via config if their codebase
+                # genuinely uses them as taint sources.
+                #
+                # Environment source - kept.
+                "var",  # ``std::env::var(name)`` - returns Result<String> of env value
+                # Filesystem source - the ``std::fs::read_to_string(path)``
+                # function form returns the file contents as a String;
+                # that's the dominant intent. The ``BufRead::read_to_string``
+                # method form writes to ``&mut buf`` and returns a count,
+                # which is a minor known false-positive surface but
+                # outweighed by the fs form's correctness value.
+                "read_to_string",
+                # Deliberately NOT in defaults (uncomment in user config
+                # if your codebase reads user input through these and you
+                # accept the noise trade-off):
+                #
+                # * ``args``  - ``std::env::args()`` IS a real source, but
+                #               the bareword ``"args"`` collides with the
+                #               ``Command::args()`` builder method on the
+                #               sinks_rust side, producing crossed-wire
+                #               false positives.
+                # * ``read_line`` / ``read_to_end`` - write to a ``&mut``
+                #               out-parameter; return value is a count,
+                #               not user data.
+                # * ``lock``  - returns a ``MutexGuard``, not user data;
+                #               the taint should flow from the value
+                #               inside the guard, which the tracker
+                #               doesn't model.
+                # * ``recv`` / ``recv_from`` - UdpSocket forms write to
+                #               a ``&mut`` buffer and return a count or
+                #               (count, addr) tuple. The ``Receiver::recv``
+                #               form is in-process IPC, not a boundary
+                #               source.
             ],
         },
         "return_value_ignored": {

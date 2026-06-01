@@ -12,8 +12,12 @@ Rust-specific cases worth calling out:
 * The default sink list focuses on stdlib: ``Command``, ``arg``,
   ``args``, the ``query`` family for raw-SQL crates, ``open`` for
   filesystem paths, ``Library`` for FFI loading.
-* Sources include ``var`` (``env::var``), ``args`` (``env::args``),
-  ``read_line`` (stdin), and basic socket ``recv`` / ``recv_from``.
+* Sources are trimmed to call names whose RETURN value carries
+  user data: ``var`` (``env::var``) and ``read_to_string``
+  (``std::fs::read_to_string``). Out-parameter / count-returning
+  calls (``read_line``, ``recv``, ``recv_from``, ``lock``) and
+  bareword-colliding builders (``args`` vs ``Command::args``)
+  are intentionally NOT in defaults.
 * Macros (``println!`` / ``sqlx::query!``) are NOT modelled - a
   known limitation documented in CONFIGURATION.md.
 """
@@ -125,14 +129,14 @@ def test_rust_clean_param_does_not_fire(tmp_path: Path) -> None:
 
 
 def test_rust_source_call_to_sink_fires(tmp_path: Path) -> None:
-    """A ``recv`` source call's return value flowing into ``Command::new`` fires.
+    """A ``var`` source call's return value flowing into ``Command::new`` fires.
 
     Tests the source-call code path: ``call_name`` resolves the bare
-    call ``recv(...)`` (or scoped ``Receiver::recv(...)``) to ``"recv"``
+    call ``var(...)`` (or scoped ``std::env::var(...)``) to ``"var"``
     which is in the default ``sources_rust`` list; the returned value
     is treated as tainted and the downstream sink call fires.
 
-    Uses a bare ``recv`` call rather than chained ``var(...).unwrap()``
+    Uses a bare ``var`` call rather than chained ``var(...).unwrap()``
     because the taint tracker doesn't propagate taint through method
     chains (same limitation as JS / Python). Real Rust code would
     typically destructure the ``Result``, which is outside the
@@ -140,7 +144,7 @@ def test_rust_source_call_to_sink_fires(tmp_path: Path) -> None:
     """
     sample = tmp_path / "source.rs"
     sample.write_text(
-        'use std::process::Command;\nfn run() {\n    let user_input = recv();\n    Command::new("echo").arg(user_input);\n}\nfn recv() -> String { String::new() }\n',
+        'use std::process::Command;\nfn run() {\n    let user_input = var();\n    Command::new("echo").arg(user_input);\n}\nfn var() -> String { String::new() }\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
