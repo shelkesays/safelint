@@ -11,7 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Rust support; rule-catalogue CLI; Warp + OpenCode agents.** Promotion of the rc1 / rc2 / rc3 cycle to GA. Three additive bundles ship together: a fifth supported language, a CLI surface for catalogue introspection, and two more AI clients on the registry. Python / JavaScript / TypeScript / Java users see zero behaviour change beyond an additive grammar option, an additive CLI subcommand, and an additive `--client=warp` choice.
 
-**Install:** `pip install 'safelint[rust]'` to add Rust to an existing setup (PyO3 / maturin polyglot: `pip install 'safelint[python,rust]'`); plain `pip install safelint` still ships the engine + Python.
+**Install:** `pip install 'safelint[rust]'` to add Rust to an existing setup (PyO3 / maturin polyglot: `pip install 'safelint[python,rust]'`); plain `pip install safelint` ships the engine only (no language grammars), so projects must use the `[<lang>]` extra matching their source files.
 
 ### Highlights
 
@@ -745,7 +745,11 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.1.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.2.0...HEAD
+[2.2.0]: https://github.com/shelkesays/safelint/compare/v2.2.0rc3...v2.2.0
+[2.2.0rc3]: https://github.com/shelkesays/safelint/compare/v2.2.0rc2...v2.2.0rc3
+[2.2.0rc2]: https://github.com/shelkesays/safelint/compare/v2.2.0rc1...v2.2.0rc2
+[2.2.0rc1]: https://github.com/shelkesays/safelint/compare/v2.1.0...v2.2.0rc1
 [2.1.0]: https://github.com/shelkesays/safelint/compare/v2.1.0rc1...v2.1.0
 [2.1.0rc1]: https://github.com/shelkesays/safelint/compare/v2.0.0...v2.1.0rc1
 [2.0.0]: https://github.com/shelkesays/safelint/compare/v2.0.0rc3...v2.0.0

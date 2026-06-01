@@ -36,7 +36,7 @@ safelint lints `.rs` files. The skill doesn't need to filter by extension - `saf
 
 ## Rule count
 
-27 rules apply to Rust: **17 cross-language rules** (SAFE101-104, SAFE303-304, SAFE501, SAFE601, SAFE701-702, SAFE801-803) plus **10 Rust-specific rules** (SAFE110, SAFE112, SAFE204-208, SAFE306, SAFE308, SAFE602). The 6 cross-language rules deliberately skipped for Rust (SAFE201, SAFE202, SAFE203, SAFE301, SAFE302, SAFE401) are listed in the "Deliberately skipped" section below.
+23 rules apply to Rust: **13 cross-language rules** (SAFE101-104, SAFE303-304, SAFE501, SAFE601, SAFE701-702, SAFE801-803) plus **10 Rust-specific rules** (SAFE110, SAFE112, SAFE204-208, SAFE306, SAFE308, SAFE602). The 6 rules deliberately skipped for Rust (SAFE201, SAFE202, SAFE203, SAFE301, SAFE302, SAFE401) are listed in the "Deliberately skipped" section below.
 
 ## Macros vs function calls
 
