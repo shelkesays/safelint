@@ -20,6 +20,7 @@ from safelint.languages.python import (
     FUNCTION_DEF,
     SUBSCRIPT,
 )
+from safelint.languages.rust import CLOSURE_EXPRESSION as _RUST_CLOSURE
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.rules.base import BaseRule
 
@@ -393,6 +394,33 @@ def _java_lambda_enclosing_tainted(lambda_node: tree_sitter.Node, cache: dict[in
     return set()  # pragma: no cover - defensive: a lambda in valid Java always has an enclosing function
 
 
+def _rust_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[int, set[str]]) -> set[str]:
+    """Return the enclosing function / closure's final tainted set for *closure_node*.
+
+    Rust closures capture by reference / value from the enclosing scope,
+    so a closure body referencing a tainted local like ``cmd.arg(input)``
+    must see ``input`` as tainted even when ``input`` is bound on the
+    outer function's parameters or `let` bindings, not on the closure's
+    own parameter list. Mirrors the Java lambda approach: walk parents
+    to the nearest ``function_item`` or outer ``closure_expression`` and
+    return that scope's cached tainted set.
+
+    Same over-approximation as the Java variant: the enclosing's full
+    tainted set is returned without regard to textual position, so a
+    local that becomes tainted only after the closure is constructed
+    still appears in its seed. Trade-off favours not missing real
+    sinks; the alternative is unsound. Empty set when no function
+    ancestor is found (a closure outside any function isn't valid Rust;
+    defensive).
+    """
+    cur = closure_node.parent
+    while cur is not None:
+        if cur.type in _RUST_FUNCTION_TYPES:
+            return cache.get(cur.id, set())
+        cur = cur.parent
+    return set()  # pragma: no cover - defensive: a closure in valid Rust always has an enclosing function
+
+
 def _java_param_names(func_node: tree_sitter.Node) -> set[str]:
     """Return all parameter names for *func_node* (Java).
 
@@ -616,6 +644,13 @@ class TaintedSinkRule(BaseRule):
         (``libloading`` / extern fn invocation). Defaults focus on the
         stdlib shape; downstream projects extend via
         ``sinks_rust`` / ``sanitizers_rust`` / ``sources_rust``.
+
+        Two passes - mirrors the Java lambda handling. Pass 1 analyses
+        ``function_item`` nodes and caches each function's final tainted
+        set. Pass 2 analyses ``closure_expression`` nodes seeded with
+        the enclosing scope's tainted names so a captured tainted local
+        (``iter.for_each(|_| cmd.arg(input))``) reaches the sink check
+        instead of being treated as an unrelated free variable.
         """
         sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", "rust", default=[])
         sinks = frozenset(_validated_string_list(sinks_raw, sinks_key))
@@ -625,12 +660,27 @@ class TaintedSinkRule(BaseRule):
         sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
         violations: list[Violation] = []
+        # Pass 1: ``function_item`` nodes. Cache the final tainted set
+        # keyed by ``node.id`` (tree-sitter-stable across wrapper accesses;
+        # ``id(wrapper)`` is not).
+        tainted_cache: dict[int, set[str]] = {}
         for node in walk(tree.root_node):
-            if node.type not in _RUST_FUNCTION_TYPES:
+            if node.type != _RUST_CLOSURE and node.type in _RUST_FUNCTION_TYPES:
+                tracker = RustTaintTracker(_rust_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
+                tracker.visit(node)
+                tainted_cache[node.id] = set(tracker.tainted)
+                violations.extend(self._format_hits(filepath, tracker.sink_hits))
+        # Pass 2: ``closure_expression`` nodes, seeded with the
+        # enclosing scope's final tainted set so captures are visible.
+        # Preorder walk processes outer closures before inner ones, so
+        # nested closures inherit transitively via the cache.
+        for node in walk(tree.root_node):
+            if node.type != _RUST_CLOSURE:
                 continue
-            params = _rust_param_names(node)
-            tracker = RustTaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            seed = _rust_param_names(node) | _rust_closure_enclosing_tainted(node, tainted_cache)
+            tracker = RustTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume)
             tracker.visit(node)
+            tainted_cache[node.id] = set(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 

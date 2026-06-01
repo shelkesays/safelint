@@ -397,6 +397,74 @@ def test_rust_nested_closure_isolated(tmp_path: Path) -> None:
     assert len(safe801) >= 1
 
 
+def test_rust_closure_captures_enclosing_tainted_local(tmp_path: Path) -> None:
+    """A closure body referencing an enclosing-scope tainted local fires SAFE801.
+
+    Pins the closure-seeding contract in ``_rust_check``: the closure
+    parameter list doesn't carry ``user_input``, but it's captured from
+    the outer ``fn run(user_input: String)``. Pass 1 caches ``run``'s
+    tainted set; pass 2 seeds the closure with that set + its own params.
+    Without the seeding step, the closure's reference to ``user_input``
+    looks like a free variable and SAFE801 never fires.
+    """
+    sample = tmp_path / "closure_capture.rs"
+    sample.write_text(
+        "use std::process::Command;\n"
+        "fn run(user_input: String) {\n"
+        "    let items = vec![1, 2, 3];\n"
+        "    items.iter().for_each(|_| {\n"
+        '        Command::new("echo").arg(user_input.clone());\n'
+        "    });\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    assert any(v.code == "SAFE801" for v in result.violations), "Closure must inherit ``user_input`` taint from the enclosing function's parameter list"
+
+
+def test_rust_nested_closure_inherits_outer_closure_taint(tmp_path: Path) -> None:
+    """Inner closures inherit taint transitively through outer closures.
+
+    Pass 2 caches each closure's final tainted set when it's analysed,
+    so an inner closure reached later in the same walk picks up the
+    outer closure's tainted set via ``_rust_closure_enclosing_tainted``.
+    Verifies the cache-propagation contract.
+    """
+    sample = tmp_path / "closure_nested_capture.rs"
+    sample.write_text(
+        "use std::process::Command;\n"
+        "fn run(user_input: String) {\n"
+        "    let outer = |_x: i32| {\n"
+        "        let inner = |_y: i32| {\n"
+        '            Command::new("echo").arg(user_input.clone());\n'
+        "        };\n"
+        "        inner(1);\n"
+        "    };\n"
+        "    outer(0);\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    assert any(v.code == "SAFE801" for v in result.violations)
+
+
+def test_rust_closure_in_clean_function_stays_clean(tmp_path: Path) -> None:
+    """A closure inside a function with no tainted params doesn't fire on a literal sink arg.
+
+    Guards against the closure-seeding fix over-firing: when the
+    enclosing scope has nothing tainted, the closure's seed must be
+    its own params only - a closure passing a string literal to
+    ``Command::new("...").arg(...)`` should stay clean.
+    """
+    sample = tmp_path / "closure_clean.rs"
+    sample.write_text(
+        'use std::process::Command;\nfn run() {\n    let items = vec![1, 2, 3];\n    items.iter().for_each(|_| {\n        Command::new("echo").arg("constant");\n    });\n}\n',
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    assert not any(v.code == "SAFE801" for v in result.violations)
+
+
 # ---------------------------------------------------------------------------
 # SAFE803 - null_dereference (Rust: ``.unwrap()`` / ``.expect()``)
 # ---------------------------------------------------------------------------
