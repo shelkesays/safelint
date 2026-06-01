@@ -7,6 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0rc3] - 2026-06-01
+
+**OpenCode auto-detection.** One-line addition to the codex spec's `cwd_markers` extends `safelint skill install --client=auto` to notice OpenCode (sst/opencode) projects. OpenCode reads `AGENTS.md` at the repo root for project context, the same file codex's secondary install populates with a delimited safelint section. An OpenCode-only project (`.opencode/` directory present, no `.codex/`) now auto-detects and gets the safelint section in `AGENTS.md` transparently.
+
+### Added
+
+- **`.opencode` in codex `cwd_markers` and `home_markers`** - OpenCode users get the safelint AGENTS.md section through the existing codex spec machinery; no new client entry needed because both agents read the same shared file. The primary install still lands at `.codex/instructions.md` (a small Markdown file OpenCode itself ignores; users can gitignore it). New test (`test_install_auto_detects_codex_via_opencode_dir`) pins the contract.
+
+### Evaluated and skipped
+
+- **OpenClaw** (https://openclaw.ai) - chat-bridge agent (WhatsApp / Slack / Telegram / iMessage / Discord / Signal) with global-only configuration (`~/.openclaw/openclaw.json` for channel allowlists and mention rules). No project-level instructions / rules file convention, no per-workspace context. Installing a Markdown skill file would create a file nothing reads, so OpenClaw doesn't currently fit the safelint skill abstraction. Revisit when (if) the project adds a per-project rules-file feature.
+
 ## [2.2.0rc2] - 2026-05-29
 
 **Two additive features on top of rc1 ahead of the 2.2.0 GA.** Rust support stays exactly as it shipped in rc1 (no behaviour change for the existing language work); this RC adds a CLI rule-catalogue command and brings the AI-client roster to thirteen.

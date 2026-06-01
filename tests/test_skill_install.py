@@ -852,6 +852,27 @@ def test_install_auto_detects_codex_via_agents_md(monkeypatch: pytest.MonkeyPatc
     assert "codex" in out
 
 
+def test_install_auto_detects_codex_via_opencode_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """An OpenCode-only project (``.opencode/`` directory) triggers the codex spec on auto-detect.
+
+    OpenCode (sst/opencode) reads ``AGENTS.md`` for project context - the
+    same file codex's secondary install populates. Listing ``.opencode``
+    in the codex spec's ``cwd_markers`` teaches ``--client=auto`` to
+    notice these projects so OpenCode users get the safelint section
+    without needing to know about codex. The primary install lands at
+    ``.codex/instructions.md`` (a small Markdown file users can ignore
+    or gitignore); the actual OpenCode integration is the
+    ``AGENTS.md`` section, written when AGENTS.md exists.
+    """
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".opencode").mkdir()
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".codex" / "instructions.md").is_file()
+    out = capsys.readouterr().out
+    assert "codex" in out
+
+
 def test_run_path_with_client_codex_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
     """``safelint skill path --client codex`` prints the bundled instructions file path."""
     rc = _skill_install.run_path(argparse.Namespace(client="codex"))

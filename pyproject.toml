@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "safelint"
-version = "2.2.0rc2"
+version = "2.2.0rc3"
 description = "Engineering safety lint rules and pre-commit integration for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), and Rust codebases"
 readme = "README.md"
 requires-python = ">=3.11"
