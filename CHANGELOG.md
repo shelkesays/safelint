@@ -13,9 +13,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 **Install:** `pip install 'safelint[rust]'` to add Rust to an existing setup (PyO3 / maturin polyglot: `pip install 'safelint[python,rust]'`); plain `pip install safelint` ships the engine only (no language grammars), so projects must use the `[<lang>]` extra matching their source files.
 
+### Release model
+
+The `pyproject.toml` version bump that lands on `main` for this release reads as `2.1.0` (the previous GA) to `2.2.0`. That's the diff a reviewer sees against `main`. The full trajectory was tracked on the `release/rust` integration branch instead, so `main` is insulated from the in-flight RC churn:
+
+| Step | Branch | Tag | PyPI |
+|---|---|---|---|
+| `2.1.0` (previous GA) | `main` | `v2.1.0` | live |
+| `2.1.0` to `2.2.0rc1` | `release/rust` | `v2.2.0rc1` | live (pre-release) |
+| to `2.2.0rc2` | `release/rust` | `v2.2.0rc2` | live (pre-release) |
+| to `2.2.0rc3` | `release/rust` | `v2.2.0rc3` | live (pre-release) |
+| to `2.2.0` (this GA) | merges to `main` | `v2.2.0` | published on tag push |
+
+The rc1 / rc2 / rc3 commits never landed on `main` directly; their content arrives wholesale through this GA merge. The detailed rc1 / rc2 / rc3 changelog entries below catalogue when each feature first shipped so anyone tracing a regression can find the originating RC.
+
 ### Highlights
 
-- **Rust as the 5th registered language** (from rc1). `.rs` files are discovered, parsed via Tree-sitter, and run against 17 of the 20 cross-language rules. 10 additional Rust-only rules cover Rust-idiom-specific patterns (panic placement, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer params, broad `.unwrap()` outside tests, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. See the [Rust language page](https://shelkesays.github.io/safelint/languages/rust/) and the rc1 entry below for the full per-rule rationale.
+- **Rust as the 5th registered language** (from rc1). `.rs` files are discovered, parsed via Tree-sitter, and run against 13 of the cross-language rules (the all-five-languages set). 10 additional Rust-only rules cover Rust-idiom-specific patterns (panic placement, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer params, broad `.unwrap()` outside tests, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. See the [Rust language page](https://shelkesays.github.io/safelint/languages/rust/) and the rc1 entry below for the full per-rule rationale.
 - **`safelint list-rules` subcommand** (from rc2). Prints the rule catalogue so AI agents, CI dashboards, and docs pipelines can introspect what safelint will check. Filters: `--language=python|javascript|typescript|java|rust`, `--enabled-only`. Output formats: `--format=text` (default), `--format=json`, `--format=markdown`, `--format=sarif`. The `--list-rules` flag form works as an alias when placed anywhere in argv. Categories derived from the leading digit of each `SAFExxx` code, matching the rule-numbering policy.
 - **Warp as the 13th AI client** (from rc2). `safelint skill install --client=warp` writes `<cwd>/WARP.md` (auto-discovered by Warp's terminal-native AI) or `~/.warp/WARP.md` (user-global). Auto-detection markers: `WARP.md` and `.warp/`.
 - **OpenCode auto-detection** (from rc3). `safelint skill install --client=auto` notices OpenCode (`sst/opencode`) projects via `.opencode/` in codex's `cwd_markers`. OpenCode reads `AGENTS.md` for project context, the same file codex's secondary install already populates with a delimited safelint section. No new client spec needed.
