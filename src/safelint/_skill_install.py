@@ -318,12 +318,14 @@ _WARP_SPEC = ClientSpec(
     cwd_markers=("WARP.md", ".warp"),
     # Warp's "Global Rules" feature (cross-project AI context) is
     # managed through the Warp Drive UI (Personal > Rules), NOT a
-    # file at ``~/WARP.md`` or ``~/.warp/WARP.md``. So home-scope
-    # auto-detection is intentionally empty: ``--client=auto`` won't
-    # fall back to home for Warp, and ``safelint skill install
-    # --client=warp`` (no ``--project`` flag with empty cwd markers)
-    # surfaces the "no clients detected" path rather than writing a
-    # file Warp doesn't read.
+    # file at ``~/WARP.md`` or ``~/.warp/WARP.md``. ``home_markers``
+    # is therefore intentionally empty: this signals "project-scope
+    # only" to the install planner. ``_resolve_install_plan`` reads
+    # the empty tuple and refuses ``safelint skill install
+    # --client=warp`` without ``--project``, surfacing a clear error
+    # rather than writing a useless ``~/WARP.md``. Auto-detection
+    # also won't fall back to home for Warp (no home markers to
+    # match).
     home_markers=(),
     # Project-scope canonical: ``<cwd>/WARP.md`` (auto-discovered by
     # Warp's AI). Warp does NOT auto-discover any user-scope file -
@@ -520,12 +522,23 @@ def _resolve_install_plan(args: argparse.Namespace) -> tuple[str, list[tuple[Cli
     no notice is appropriate, e.g. for explicit ``--client``). On
     auto-detect failure, prints a helpful error to stderr and returns
     None - the caller maps that to exit code 1.
+
+    Project-scope-only clients (those with empty ``home_markers``)
+    cannot be installed user-scope - the client doesn't read from a
+    home-directory file at all. Currently only Warp falls in this
+    category: Warp's "Global Rules" feature is managed through the
+    Warp Drive UI, not a filesystem file. Refuse the install rather
+    than write a useless ``~/WARP.md`` that the agent ignores.
     """
     client = getattr(args, "client", "auto")
     project_flag = bool(getattr(args, "project", False))
 
     if client != "auto":
-        return "", [(_spec_by_name(client), project_flag)]
+        spec = _spec_by_name(client)
+        if not project_flag and not spec.home_markers:
+            _print_user_scope_unsupported_error(spec)
+            return None
+        return "", [(spec, project_flag)]
 
     cwd_specs = _detected_clients(Path.cwd(), "cwd_markers")
     if cwd_specs:
@@ -575,6 +588,21 @@ def _print_install_success(spec: ClientSpec, *, target: Path, kind: str, scope: 
 def _print_target_exists_error(target: Path) -> None:
     """Print the "target already exists" error to stderr."""
     print(f"safelint: error: {target} already exists. Use --force to replace it.", file=sys.stderr)
+
+
+def _print_user_scope_unsupported_error(spec: ClientSpec) -> None:
+    """Print the "this client is project-scope only" error to stderr.
+
+    Fires when an explicit ``--client=<name>`` references a spec with
+    empty ``home_markers`` and the user didn't pass ``--project``. Lists
+    the project-scope install path so the user can re-run with the right
+    flag without consulting docs.
+    """
+    install_rel = "/".join(spec.install_relpath)
+    print(
+        f"safelint: error: {spec.display_name} does not support user-scope install (it doesn't read from a home-directory file). Re-run with --project to install at <cwd>/{install_rel}.",
+        file=sys.stderr,
+    )
 
 
 def _print_no_clients_error(*, scope_description: str) -> None:

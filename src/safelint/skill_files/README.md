@@ -18,7 +18,7 @@ Thirteen clients ship today; all follow the *same* workflow because safelint's C
 - **Trae**: installs as a Markdown rule at `<cwd>/.trae/rules/safelint.md` (canonical, auto-loaded) or `~/.trae/rules/safelint.md` (user-global).
 - **Antigravity**: installs as a Markdown rule at `<cwd>/.antigravity/rules/safelint.md` (canonical, auto-loaded) or `~/.antigravity/rules/safelint.md` (user-global).
 - **Zed**: installs as workspace rules at `<cwd>/.rules` (canonical, auto-loaded) or `~/.rules` (user-global).
-- **Warp**: installs as a Markdown instructions file at `<cwd>/WARP.md` (canonical, auto-discovered by Warp's AI) or `~/.warp/WARP.md` (user-global; Warp reads it on every project).
+- **Warp**: project-scope only. Installs as a Markdown instructions file at `<cwd>/WARP.md` (auto-discovered by Warp's AI). Warp does **not** read any user-scope filesystem file; cross-project rules are managed through the Warp Drive UI (Personal > Rules) instead, so `safelint skill install --client warp` requires `--project`.
 
 Once installed, ask the agent things like:
 
