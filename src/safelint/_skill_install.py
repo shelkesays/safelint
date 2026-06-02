@@ -350,13 +350,23 @@ _CODEX_SPEC = ClientSpec(
     # OpenCode reads ``AGENTS.md`` at the repo root for project context,
     # which is the same file the secondary install below populates -
     # so an OpenCode-only project gets the safelint section through the
-    # codex spec's machinery. Listing ``.opencode`` here teaches
-    # ``--client=auto`` to notice those projects. (Trade-off: a
-    # ``.codex/instructions.md`` file is also written, even though
+    # codex spec's machinery. Listing ``.opencode`` in ``cwd_markers``
+    # teaches ``--client=auto`` to notice those projects. (Trade-off:
+    # a ``.codex/instructions.md`` file is also written, even though
     # OpenCode itself reads only ``AGENTS.md``. Users can ignore /
     # gitignore the codex file; the actual integration works.)
+    #
+    # ``.opencode`` is DELIBERATELY NOT in ``home_markers``. The home
+    # marker check fires when ``--client=auto`` finds no cwd markers
+    # and falls back to scanning ``~``. A user with ``~/.opencode/``
+    # (OpenCode installed globally) but a project that doesn't use
+    # codex / OpenCode would then trigger a surprise codex install at
+    # ``~/.codex/instructions.md`` - a file the user never asked for
+    # and OpenCode itself doesn't read. Keeping ``.opencode`` cwd-only
+    # makes detection follow the project, not the user's global
+    # install posture.
     cwd_markers=(".codex", "AGENTS.md", ".opencode"),
-    home_markers=(".codex", ".opencode"),
+    home_markers=(".codex",),
     install_relpath=(".codex", "instructions.md"),
     bundled_relpath=("codex", "instructions.md"),
     restart_hint="Restart codex (or your codex-aware editor) to pick up the new instructions.",
