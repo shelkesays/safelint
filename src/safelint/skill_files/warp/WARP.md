@@ -74,7 +74,7 @@ Notes:
 
 ## Step 5: Parse the JSON
 
-The schema is documented in [`docs/json-schema.md`](https://github.com/shelkesays/safelint/blob/main/docs/json-schema.md) inside the safelint repo. It's stable since v1.5.0. The shape:
+The schema is documented in [`docs/json-schema.md`](https://github.com/shelkesays/safelint/blob/main/docs/json-schema.md) inside the safelint repo. Its *shape* has been stable since v1.5.0; the rule set has expanded as new languages landed (Java in v2.1.0, Rust in v2.2.0), but the field structure of each violation / summary entry is unchanged. The shape:
 
 ```json
 {
@@ -89,10 +89,10 @@ The schema is documented in [`docs/json-schema.md`](https://github.com/shelkesay
     "suppressed": {"total": N, "by_code": {"SAFE501": 3, "...": "..."}}
   },
   "violations": [
-    {"code": "SAFE101", "rule": "function_length", "severity": "error",
+    {"code": "SAFE201", "rule": "bare_except", "severity": "error",
      "filepath": "src/foo.py", "lineno": 42,
-     "end_lineno": 42, "column_start": 5, "column_end": 17,
-     "message": "Function ...",
+     "end_lineno": 42, "column_start": 5, "column_end": 12,
+     "message": "Bare ``except:`` clause - specify the exception type to handle",
      "suggestions": [
        {"description": "Replace `except:` with `except Exception:`",
         "edits": [
