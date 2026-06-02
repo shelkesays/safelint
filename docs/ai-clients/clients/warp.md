@@ -1,6 +1,6 @@
 # Warp
 
-[Warp](https://warp.dev) is a terminal-native AI coding agent. Its project rules / context file is `WARP.md` (or the cross-agent `AGENTS.md`) at the repo root, auto-discovered by Warp's AI when the workspace is the project directory.
+[Warp](https://warp.dev) is a terminal-native AI coding agent. Its project rules / context file is `WARP.md` at the repo root, auto-discovered by Warp's AI when the workspace is the project directory. (Warp also supports reading `AGENTS.md` as a project-rules file, but safelint's Warp install writes `WARP.md` and does not register `AGENTS.md` as a Warp marker, that file is handled by the codex spec to avoid double-detection.)
 
 **Markers:** `WARP.md` or `.warp/` in the project root for project-scope detection. `.warp/` is Warp's user-config directory (themes, prefs, AI settings) and its presence in cwd signals an active Warp user even before a project `WARP.md` is committed.
 
