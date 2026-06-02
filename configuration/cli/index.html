@@ -15,10 +15,10 @@
         <link rel="canonical" href="https://shelkesays.github.io/safelint/configuration/cli/">
       
       
-        <link rel="prev" href="../">
+        <link rel="prev" href="../../languages/rust/">
       
       
-        <link rel="next" href="../suppression/">
+        <link rel="next" href="../">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>CLI flags and commands - SafeLint</title>
+        <title>CLI commands and flags - SafeLint</title>
       
     
     
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              CLI flags and commands
+              CLI commands and flags
             
           </span>
         </div>
@@ -273,9 +273,28 @@
     
   
   
+    <li class="md-tabs__item md-tabs__item--active">
+      <a href="./" class="md-tabs__link">
+        
+  
+  
+    
+  
+  CLI commands and flags
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
     
     
-      <li class="md-tabs__item md-tabs__item--active">
+      <li class="md-tabs__item">
         <a href="../" class="md-tabs__link">
           
   
@@ -684,86 +703,6 @@
   
   
   
-    
-    
-      
-        
-          
-        
-      
-        
-      
-        
-      
-        
-      
-        
-      
-    
-    
-    
-      
-        
-        
-      
-      
-        
-      
-    
-    
-    <li class="md-nav__item md-nav__item--active md-nav__item--section md-nav__item--nested">
-      
-        
-        
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" checked>
-        
-          
-          <div class="md-nav__link md-nav__container">
-            <a href="../" class="md-nav__link ">
-              
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    Configuration
-  
-
-    
-  </span>
-  
-  
-
-            </a>
-            
-              
-              <label class="md-nav__link " for="__nav_3" id="__nav_3_label" tabindex="">
-                <span class="md-nav__icon md-icon"></span>
-              </label>
-            
-          </div>
-        
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="true">
-          <label class="md-nav__title" for="__nav_3">
-            <span class="md-nav__icon md-icon"></span>
-            
-  
-    Configuration
-  
-
-          </label>
-          <ul class="md-nav__list" data-md-scrollfix>
-            
-              
-            
-              
-                
-  
-  
-    
-  
-  
-  
     <li class="md-nav__item md-nav__item--active">
       
       <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
@@ -779,7 +718,7 @@
   <span class="md-ellipsis">
     
   
-    CLI flags and commands
+    CLI commands and flags
   
 
     
@@ -797,7 +736,7 @@
   <span class="md-ellipsis">
     
   
-    CLI flags and commands
+    CLI commands and flags
   
 
     
@@ -823,10 +762,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#top-level-commands-and-flags" class="md-nav__link">
+  <a href="#top-level-surface" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Top-level commands and flags
+        Top-level surface
       
     </span>
   </a>
@@ -834,10 +773,109 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#safelint-check-flags" class="md-nav__link">
+  <a href="#safelint-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        safelint check flags
+        safelint check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-list-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint list-rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-skill-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint skill install
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-skill-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint skill status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-skill-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint skill update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-skill-remove" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint skill remove
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-skill-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint skill path
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-stdin-editor-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint --stdin (editor mode)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-version-and-safelint-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint version and safelint help
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hook-mode-safelint-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook mode (safelint &lt;files&gt;)
       
     </span>
   </a>
@@ -872,39 +910,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#safelint-hook-mode-flags-pre-commit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        safelint hook mode flags (pre-commit)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#skill-freshness-commands-190" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Skill freshness commands (1.9.0)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#skill-update-remove-commands-1100" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Skill update + remove commands (1.10.0)
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -912,6 +917,78 @@
     </li>
   
 
+    
+      
+      
+  
+  
+  
+  
+    
+    
+      
+        
+          
+        
+      
+        
+      
+        
+      
+        
+      
+    
+    
+    
+      
+      
+        
+      
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <div class="md-nav__link md-nav__container">
+            <a href="../" class="md-nav__link ">
+              
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+            </a>
+            
+              
+              <label class="md-nav__link " for="__nav_4" id="__nav_4_label" tabindex="0">
+                <span class="md-nav__icon md-icon"></span>
+              </label>
+            
+          </div>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Configuration
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
               
             
               
@@ -1068,7 +1145,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1090,14 +1167,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_5" id="__nav_5_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_6" id="__nav_6_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1254,6 +1331,8 @@
       
         
       
+        
+      
     
     
     
@@ -1267,10 +1346,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5_6" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6_6" >
         
           
-          <label class="md-nav__link" for="__nav_5_6" id="__nav_5_6_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_6_6" id="__nav_6_6_label" tabindex="0">
             
   
   
@@ -1288,8 +1367,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_5_6_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_5_6">
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_6_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6_6">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1306,14 +1385,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ai-clients/clients/claude-code/" class="md-nav__link">
+      <a href="../../ai-clients/clients/github-copilot/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Claude Code
+    GitHub Copilot
   
 
     
@@ -1362,14 +1441,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ai-clients/clients/github-copilot/" class="md-nav__link">
+      <a href="../../ai-clients/clients/claude-code/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    GitHub Copilot
+    Claude Code
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/codex/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    codex
   
 
     
@@ -1446,34 +1553,6 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ai-clients/clients/codex/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    codex
-  
-
-    
-  </span>
-  
-  
-
-      </a>
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
       <a href="../../ai-clients/clients/continue-dev/" class="md-nav__link">
         
   
@@ -1530,14 +1609,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ai-clients/clients/aider/" class="md-nav__link">
+      <a href="../../ai-clients/clients/zed/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    aider
+    Zed
   
 
     
@@ -1558,14 +1637,42 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ai-clients/clients/trae/" class="md-nav__link">
+      <a href="../../ai-clients/clients/warp/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Trae
+    Warp
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ai-clients/clients/aider/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    aider
   
 
     
@@ -1614,14 +1721,14 @@
   
   
     <li class="md-nav__item">
-      <a href="../../ai-clients/clients/zed/" class="md-nav__link">
+      <a href="../../ai-clients/clients/trae/" class="md-nav__link">
         
   
   
   <span class="md-ellipsis">
     
   
-    Zed
+    Trae
   
 
     
@@ -1707,7 +1814,7 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
         
           
           <div class="md-nav__link md-nav__container">
@@ -1729,14 +1836,14 @@
             </a>
             
               
-              <label class="md-nav__link " for="__nav_7" id="__nav_7_label" tabindex="0">
+              <label class="md-nav__link " for="__nav_8" id="__nav_8_label" tabindex="0">
                 <span class="md-nav__icon md-icon"></span>
               </label>
             
           </div>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_7">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -1841,10 +1948,10 @@
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
         
           
-          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
             
   
   
@@ -1862,8 +1969,8 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
-          <label class="md-nav__title" for="__nav_8">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
             <span class="md-nav__icon md-icon"></span>
             
   
@@ -2019,10 +2126,10 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
-  <a href="#top-level-commands-and-flags" class="md-nav__link">
+  <a href="#top-level-surface" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Top-level commands and flags
+        Top-level surface
       
     </span>
   </a>
@@ -2030,10 +2137,109 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#safelint-check-flags" class="md-nav__link">
+  <a href="#safelint-check" class="md-nav__link">
     <span class="md-ellipsis">
       
-        safelint check flags
+        safelint check
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-list-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint list-rules
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-skill-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint skill install
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-skill-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint skill status
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-skill-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint skill update
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-skill-remove" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint skill remove
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-skill-path" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint skill path
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-stdin-editor-mode" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint --stdin (editor mode)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#safelint-version-and-safelint-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        safelint version and safelint help
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#hook-mode-safelint-files" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Hook mode (safelint &lt;files&gt;)
       
     </span>
   </a>
@@ -2068,39 +2274,6 @@
   
 </li>
       
-        <li class="md-nav__item">
-  <a href="#safelint-hook-mode-flags-pre-commit" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        safelint hook mode flags (pre-commit)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#skill-freshness-commands-190" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Skill freshness commands (1.9.0)
-      
-    </span>
-  </a>
-  
-</li>
-      
-        <li class="md-nav__item">
-  <a href="#skill-update-remove-commands-1100" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Skill update + remove commands (1.10.0)
-      
-    </span>
-  </a>
-  
-</li>
-      
     </ul>
   
 </nav>
@@ -2127,9 +2300,9 @@
 
 
 <h1 id="cli-flags-and-commands">CLI flags and commands<a class="headerlink" href="#cli-flags-and-commands" title="Permanent link">#</a></h1>
-<p>These are passed on the command line and are not part of the config file. For TOML keys see <a href="../toml/">Configuration file</a>; for ways to silence a single rule see <a href="../suppression/">Suppression mechanisms</a>.</p>
-<h2 id="top-level-commands-and-flags">Top-level commands and flags<a class="headerlink" href="#top-level-commands-and-flags" title="Permanent link">#</a></h2>
-<p>SafeLint's top-level surface mirrors ruff's: every command can be invoked positionally (<code>safelint check ...</code>), and every flag has both a short and a long form where conventional. Help and version are intercepted before any command parsing so they always work, even when no subcommand is given.</p>
+<p>Reference for every command and flag safelint exposes. For TOML keys see <a href="../toml/">Configuration file</a>; for ways to silence a single rule see <a href="../suppression/">Suppression mechanisms</a>.</p>
+<h2 id="top-level-surface">Top-level surface<a class="headerlink" href="#top-level-surface" title="Permanent link">#</a></h2>
+<p>SafeLint's CLI mirrors ruff's: every command can be invoked positionally (<code>safelint check ...</code>), help and version are intercepted before any command parsing so they always work even with no subcommand, and ANSI colour auto-disables when stdout is not a TTY.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>$ safelint --help
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>SafeLint: Holzmann-inspired safety lint rules and pre-commit integration for Python, JavaScript, and TypeScript.
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>
@@ -2178,10 +2351,19 @@
 <td>Version</td>
 <td><code>safelint version</code>, <code>safelint --version</code>, <code>safelint -V</code></td>
 </tr>
+<tr>
+<td>Rule catalogue</td>
+<td><code>safelint list-rules</code>, <code>safelint --list-rules</code></td>
+</tr>
 </tbody>
 </table>
-<p>ANSI colour is auto-disabled when stdout is not a TTY (piping to a file produces clean text), matching the rest of safelint's output conventions.</p>
-<h2 id="safelint-check-flags"><code>safelint check</code> flags<a class="headerlink" href="#safelint-check-flags" title="Permanent link">#</a></h2>
+<h2 id="safelint-check"><code>safelint check</code><a class="headerlink" href="#safelint-check" title="Permanent link">#</a></h2>
+<p>The primary linting command. Scans a file or directory and emits violations.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                  </span><span class="c1"># lint git-modified files under src/</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>--all-files<span class="w">      </span><span class="c1"># lint every supported source file under src/</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/app.py<span class="w">            </span><span class="c1"># lint a single file</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span>--format<span class="o">=</span>json<span class="w">       </span><span class="c1"># machine-readable output for editors / CI</span>
+</code></pre></div>
 <table>
 <thead>
 <tr>
@@ -2194,7 +2376,7 @@
 <tr>
 <td><code>--all-files</code></td>
 <td>off</td>
-<td>Scan every supported source file under the target (today: <code>.py</code>, <code>.pyw</code>, <code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.ts</code>, <code>.tsx</code>, <code>.as</code>). Default (without this flag) is to check only git-modified files.</td>
+<td>Scan every supported source file under the target (<code>.py</code>, <code>.pyw</code>, <code>.js</code>, <code>.mjs</code>, <code>.cjs</code>, <code>.ts</code>, <code>.tsx</code>, <code>.as</code>, <code>.java</code>, <code>.rs</code>). Default (without this flag) is to check only git-modified files.</td>
 </tr>
 <tr>
 <td><code>--fail-on</code></td>
@@ -2234,26 +2416,306 @@
 <tr>
 <td><code>--check-skill-freshness</code></td>
 <td>off</td>
-<td><em>Added in 1.9.0.</em> Before linting, verify each installed AI-client skill (Claude Code at <code>~/.claude/skills/safelint/SKILL.md</code>, Cursor at <code>~/.cursor/rules/safelint.mdc</code>, project-scoped equivalents) matches the bundled version in the active wheel. Stale installs surface as <code>safelint: warning: …</code> lines on stderr. Informational only, doesn't fail the lint. Use <code>safelint skill status</code> (also added in 1.9.0; exits 1 if stale) for the dedicated CI-friendly check.</td>
+<td><em>Added in 1.9.0.</em> Before linting, verify each installed AI-client skill matches the bundled version. Stale installs surface as <code>safelint: warning:</code> lines on stderr. Informational only, doesn't fail the lint. See <a href="#safelint-skill-status"><code>safelint skill status</code></a> for the dedicated CI-friendly check.</td>
 </tr>
 <tr>
 <td><code>--stdin</code></td>
 <td>off</td>
-<td>Read source from stdin instead of from disk. Designed for editor extensions linting un-saved buffers. Pair with <code>--stdin-filename</code>.</td>
+<td>Read source from stdin instead of from disk. See <a href="#safelint-stdin-editor-mode"><code>safelint --stdin</code></a> for the editor-mode workflow.</td>
 </tr>
 <tr>
 <td><code>--stdin-filename</code></td>
 <td>(none)</td>
-<td>Pseudo-filename for <code>--stdin</code> input, drives language detection by extension and is shown as the violation file path. Required when <code>--stdin</code> is set.</td>
+<td>Pseudo-filename for <code>--stdin</code> input; drives language detection and shows up as the violation file path. Required when <code>--stdin</code> is set.</td>
 </tr>
 </tbody>
 </table>
-<p><strong>When to use <code>--all-files</code>:</strong></p>
+<p><strong>When to use <code>--all-files</code>:</strong> CI pipelines (clean checkout, no modified files in git terms), one-off full audits. <code>pre-commit run --all-files</code> already passes all files directly, the hook mode handles this automatically.</p>
+<h2 id="safelint-list-rules"><code>safelint list-rules</code><a class="headerlink" href="#safelint-list-rules" title="Permanent link">#</a></h2>
+<p><em>Added in 2.2.0.</em> Prints the rule catalogue so AI agents, CI dashboards, and docs-generation pipelines can introspect what safelint will check without grepping skill files. The <code>--list-rules</code> form (as a top-level flag) is an alias for the subcommand; the two are interchangeable. Categories are derived from the leading digit of each <code>SAFExxx</code> code (1xx function shape, 2xx error handling, 3xx side effects / state, 4xx resource lifecycle, 5xx loop safety, 6xx documentation, 7xx test coverage, 8xx dataflow, 9xx framework-specific).</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>safelint<span class="w"> </span>list-rules<span class="w">                                       </span><span class="c1"># text table, all rules</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>safelint<span class="w"> </span>list-rules<span class="w"> </span>--language<span class="o">=</span>rust<span class="w">                        </span><span class="c1"># rust + cross-language subset</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>safelint<span class="w"> </span>list-rules<span class="w"> </span>--enabled-only<span class="w"> </span>--language<span class="o">=</span>python<span class="w">       </span><span class="c1"># python&#39;s active default surface</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a>safelint<span class="w"> </span>list-rules<span class="w"> </span>--format<span class="o">=</span>json<span class="w"> </span><span class="p">|</span><span class="w"> </span>jq<span class="w"> </span><span class="s1">&#39;.rules | length&#39;</span><span class="w">   </span><span class="c1"># programmatic count</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>safelint<span class="w"> </span>list-rules<span class="w"> </span>--format<span class="o">=</span>markdown<span class="w"> </span>&gt;<span class="w"> </span>docs/rules.md<span class="w">      </span><span class="c1"># docs regeneration</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a>safelint<span class="w"> </span>list-rules<span class="w"> </span>--format<span class="o">=</span>sarif<span class="w">                         </span><span class="c1"># GitHub Code Scanning catalogue feed</span>
+<a id="__codelineno-2-7" name="__codelineno-2-7" href="#__codelineno-2-7"></a>safelint<span class="w"> </span>--list-rules<span class="w"> </span>--language<span class="o">=</span>java<span class="w">                      </span><span class="c1"># flag-alias form (same effect)</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--language &lt;LANG&gt;</code></td>
+<td>(no filter)</td>
+<td>Restrict to one language: <code>python</code>, <code>javascript</code>, <code>typescript</code>, <code>java</code>, <code>rust</code>. Filters by the rule's <code>language</code> tuple, so cross-language rules show under any of their languages.</td>
+</tr>
+<tr>
+<td><code>--format &lt;FMT&gt;</code></td>
+<td><code>text</code></td>
+<td><code>text</code> (aligned table grouped by category band), <code>json</code> (versioned document with <code>code</code>, <code>name</code>, <code>severity</code>, <code>default_enabled</code>, <code>languages</code>, <code>category</code>, <code>description</code>), <code>markdown</code> (one table per category band), or <code>sarif</code> (SARIF 2.1.0 catalogue document with rules under <code>runs[0].tool.driver.rules[]</code>).</td>
+</tr>
+<tr>
+<td><code>--enabled-only</code></td>
+<td>off</td>
+<td>Drop rules that are off by default. Useful for "what fires out of the box?" views.</td>
+</tr>
+</tbody>
+</table>
+<p>Exit codes: <code>0</code> on success, <code>2</code> when the filter combination matches zero rules (so a typo in a CI script like <code>--language=pythn</code> doesn't silently produce an empty document).</p>
+<h2 id="safelint-skill-install"><code>safelint skill install</code><a class="headerlink" href="#safelint-skill-install" title="Permanent link">#</a></h2>
+<p>Install the bundled AI-client skill into the detected client(s) at the chosen scope. Auto-detect scans for marker files in cwd (project scope) or home (user scope) and installs into every matching client.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w">                              </span><span class="c1"># auto-detect, project-first then home</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--project<span class="w">                    </span><span class="c1"># auto-detect, project scope only</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>cursor<span class="w">              </span><span class="c1"># explicit client, user scope</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>claude<span class="w"> </span>--project<span class="w">    </span><span class="c1"># explicit client + scope</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--symlink<span class="w">                    </span><span class="c1"># symlink to bundled file (auto-updates on pip upgrade)</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--force<span class="w">                      </span><span class="c1"># replace existing install</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--client &lt;NAME&gt;</code></td>
+<td><code>auto</code></td>
+<td>One of <code>auto</code>, <code>claude</code>, <code>cursor</code>, <code>copilot</code>, <code>gemini</code>, <code>windsurf</code>, <code>codex</code>, <code>continue</code>, <code>cline</code>, <code>aider</code>, <code>trae</code>, <code>antigravity</code>, <code>zed</code>, <code>warp</code>. With <code>auto</code>, safelint detects which client(s) you use from marker files and installs into all of them.</td>
+</tr>
+<tr>
+<td><code>--project</code></td>
+<td>off</td>
+<td>Force project-scope install (<code>&lt;cwd&gt;/.&lt;client&gt;/...</code>). With <code>--client auto</code>, also restricts detection to cwd.</td>
+</tr>
+<tr>
+<td><code>--symlink</code></td>
+<td>off</td>
+<td>Symlink to the bundled file instead of copying. <code>pip upgrade safelint</code> then auto-updates the skill. Requires symlink support (POSIX, or Windows developer mode).</td>
+</tr>
+<tr>
+<td><code>--force</code></td>
+<td>off</td>
+<td>Replace any existing skill / rule at the target location.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Project-scope-only clients:</strong> specs with no user-scope file (currently just <strong>Warp</strong>) refuse <code>--client warp</code> without <code>--project</code> and exit 1 with a clear error. See the <a href="../../ai-clients/clients/warp/">Warp page</a> for the contract.</p>
+<p><strong>OpenCode (<code>.opencode/</code>) projects:</strong> auto-detected via the codex spec; AGENTS.md is auto-created when absent so OpenCode receives the safelint section. See <a href="../../ai-clients/clients/codex/#opencode-auto-detection">codex's OpenCode subsection</a> for the full lifecycle.</p>
+<h2 id="safelint-skill-status"><code>safelint skill status</code><a class="headerlink" href="#safelint-skill-status" title="Permanent link">#</a></h2>
+<p><em>Added in 1.9.0.</em> Compares every detected installed skill against the bundled version. Pipe-friendly: exits 1 if anything differs, 0 when everything is fresh. The canonical CI / upgrade-script idiom is <code>safelint skill status || safelint skill update</code>.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>status<span class="w">                              </span><span class="c1"># check every detected install</span>
+</code></pre></div>
+<p><code>safelint skill status</code> walks every registered AI client and both scopes (user / project) and prints one line per detected install showing whether it's <em>fresh</em> (matches the bundled version) or <em>differs from bundled</em>.</p>
+<p>A few details:</p>
 <ul>
-<li>CI pipelines (clean checkout, no modified files in git terms)</li>
-<li>Running a one-off full audit</li>
-<li><code>pre-commit run --all-files</code> already passes all files directly; the hook mode handles this automatically.</li>
+<li><strong>Symlink installs</strong> (created with <code>safelint skill install --symlink</code>) always show as fresh, the installed file is a symlink pointing back at the bundled location inside the wheel. After <code>pip upgrade safelint</code>, the upgrade is visible immediately; no <code>skill update</code> needed.</li>
+<li><strong>Copy installs</strong> are content-compared against the bundled file. Match byte-for-byte → fresh; otherwise → differs.</li>
+<li><strong>Edge case, a symlink hand-replaced with an identical copy</strong> reports as fresh (the freshness check compares content, not install mode). User-visible behaviour is fine <em>today</em> because content matches, but the next <code>pip upgrade safelint</code> won't propagate to that location. Re-establish the link with <code>safelint skill update --symlink --force</code>.</li>
+<li><strong>Locally-customised installs</strong> show as <em>differs from bundled</em>; the diagnostic message explicitly mentions that case so customisers can ignore it.</li>
 </ul>
+<p>Folded into a normal lint run: <code>safelint check --check-skill-freshness --all-files .</code> emits the same drift check as one <code>safelint: warning:</code> line per stale install but doesn't change the lint exit code. Off by default so day-to-day <code>safelint check</code> invocations stay fast (no extra FS scan).</p>
+<h2 id="safelint-skill-update"><code>safelint skill update</code><a class="headerlink" href="#safelint-skill-update" title="Permanent link">#</a></h2>
+<p><em>Added in 1.10.0.</em> Refresh installed skills whose content has drifted from the bundled wheel. Idempotent: no-op when fresh, so safe to run from cron / CI / pre-commit hooks.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>update<span class="w">                          </span><span class="c1"># idempotent refresh, no-op when fresh</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>update<span class="w"> </span>--force<span class="w">                  </span><span class="c1"># re-install every detected install</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>safelint<span class="w"> </span>skill<span class="w"> </span>update<span class="w"> </span>--symlink<span class="w"> </span>--force<span class="w">        </span><span class="c1"># convert a copy install to symlink mode</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--client &lt;NAME&gt;</code></td>
+<td><code>auto</code></td>
+<td>With <code>auto</code>, scans the actual install paths (not marker files) for "what's already installed?". This is the key difference from <code>install --client auto</code>, see below.</td>
+</tr>
+<tr>
+<td><code>--project</code></td>
+<td>off</td>
+<td>Restrict to project-scope installs.</td>
+</tr>
+<tr>
+<td><code>--symlink</code></td>
+<td>off</td>
+<td>Re-create the install in symlink mode (only meaningful when switching a copy install to symlink, which requires <code>--force</code> since <code>update</code> is a no-op when content is already fresh).</td>
+</tr>
+<tr>
+<td><code>--force</code></td>
+<td>off</td>
+<td>Refresh every matching install regardless of drift status. Useful for reverting customisations to the bundled content.</td>
+</tr>
+</tbody>
+</table>
+<p><strong><code>update --client auto</code> vs <code>install --client auto</code>:</strong> the two interpretations of "auto" differ deliberately. <code>install --client auto</code> asks <em>"which AI client(s) does this user use?"</em> and answers via marker-file detection. <code>update --client auto</code> asks <em>"what's already installed?"</em> and answers by scanning install paths. The distinction matters when the user has marker files but no install yet (only <code>install</code> will fire) or has an install but the marker file has been deleted (only <code>update</code> / <code>remove</code> will fire).</p>
+<p><strong>Shape preservation:</strong> by default, <code>update</code> preserves the existing install's shape. A copy install stays copy after refresh; a symlink install stays symlink. To <em>switch</em> a copy install to symlink mode, pass <code>--symlink</code> explicitly. If the copy install is already fresh, <code>update</code> is a no-op, so the conversion in that case requires <code>update --force --symlink</code>. Switching the other way (symlink → copy) isn't supported via <code>update</code>; do <code>remove</code> followed by <code>install</code> (without <code>--symlink</code>) instead, so the intent is unambiguous.</p>
+<h2 id="safelint-skill-remove"><code>safelint skill remove</code><a class="headerlink" href="#safelint-skill-remove" title="Permanent link">#</a></h2>
+<p><em>Added in 1.10.0.</em> Delete detected installed skills. Flag-driven filters compose orthogonally.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w">                          </span><span class="c1"># delete every detected install</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w"> </span>--client<span class="w"> </span>cursor<span class="w">          </span><span class="c1"># only Cursor installs (both shapes, both scopes)</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w"> </span>--project<span class="w">                </span><span class="c1"># only project-scope installs (user-scope survives)</span>
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w"> </span>--symlink<span class="w">                </span><span class="c1"># only symlink-shape installs (copies survive)</span>
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w"> </span>--path<span class="w"> </span>/unusual/place<span class="w">    </span><span class="c1"># one specific location, bypasses every other flag</span>
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w"> </span>--dry-run<span class="w">                </span><span class="c1"># preview without deleting</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--client &lt;NAME&gt;</code></td>
+<td><code>auto</code></td>
+<td>Filter by client name (auto-detects from install paths, same as <code>update</code>).</td>
+</tr>
+<tr>
+<td><code>--project</code></td>
+<td>off</td>
+<td>Restrict to project-scope installs.</td>
+</tr>
+<tr>
+<td><code>--symlink</code></td>
+<td>off</td>
+<td>Filter to symlink-shape installs only, copy installs survive. Composable with <code>--client</code> / <code>--project</code>.</td>
+</tr>
+<tr>
+<td><code>--path &lt;PATH&gt;</code></td>
+<td>(none)</td>
+<td>Remove one specific install location, overrides every other flag including auto-detect.</td>
+</tr>
+<tr>
+<td><code>--dry-run</code></td>
+<td>off</td>
+<td>Preview what would be removed without deleting anything.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Filter semantics:</strong> flags compose orthogonally; absence of a flag means "no filter", <em>not</em> "only the opposite":</p>
+<table>
+<thead>
+<tr>
+<th>Invocation</th>
+<th>What gets removed</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>remove</code> (no flags)</td>
+<td>Every detected install, copy + symlink, every client, both scopes</td>
+</tr>
+<tr>
+<td><code>remove --symlink</code></td>
+<td>Only symlink-shape installs (copies survive)</td>
+</tr>
+<tr>
+<td><code>remove --client cursor</code></td>
+<td>All detected Cursor installs (both shapes, both scopes)</td>
+</tr>
+<tr>
+<td><code>remove --project</code></td>
+<td>All detected project-scope installs (user-scope survives)</td>
+</tr>
+<tr>
+<td><code>remove --path PATH</code></td>
+<td>Exactly one location, regardless of every other flag</td>
+</tr>
+</tbody>
+</table>
+<p>In particular, <code>safelint skill remove</code> without <code>--symlink</code> removes <strong>both</strong> copy and symlink installs; it's not a "remove copies only" command. <code>--symlink</code> is a <em>filter</em> you can opt into when you want to be selective, not a creation-mode toggle like in <code>install</code>.</p>
+<p><strong>Safety:</strong> <code>remove</code> only deletes the install location. Bundled files inside <code>site-packages/</code> are never touched (<code>shutil.rmtree</code> doesn't follow symlinks for deletion, and <code>unlink</code> removes the symlink itself, not its bundled target). The worst case for a misfired <code>remove</code> is "re-run <code>install</code> to get the skill back". See <a href="../../ai-clients/lifecycle/#removing-an-installed-skill">Updating, removing, freshness checks</a> for the full filesystem-level breakdown.</p>
+<h2 id="safelint-skill-path"><code>safelint skill path</code><a class="headerlink" href="#safelint-skill-path" title="Permanent link">#</a></h2>
+<p>Print the on-disk location of bundled skill / rule files. Useful for debugging or for editor integrations that need to read the bundled content directly.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w">                       </span><span class="c1"># prints the bundle ROOT directory (parent of every per-client subdir)</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w"> </span>--client<span class="w"> </span>claude<span class="w">       </span><span class="c1"># prints the bundled Claude SKILL.md path</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w"> </span>--client<span class="w"> </span>warp<span class="w">         </span><span class="c1"># prints the bundled WARP.md path</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--client &lt;NAME&gt;</code></td>
+<td>(none)</td>
+<td>Print that client's bundled artefact file. Without it, prints the bundle root directory containing every per-client subdir and the shared <code>languages/&lt;lang&gt;.md</code> addendums.</td>
+</tr>
+</tbody>
+</table>
+<p>Doesn't write or modify anything; pure introspection.</p>
+<h2 id="safelint-stdin-editor-mode"><code>safelint --stdin</code> (editor mode)<a class="headerlink" href="#safelint-stdin-editor-mode" title="Permanent link">#</a></h2>
+<p>Read source from stdin and lint it as if it were the file named by <code>--stdin-filename</code>. Designed for editor extensions linting un-saved buffers without round-tripping through a temp file.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="nb">echo</span><span class="w"> </span><span class="s2">&quot;x = 1&quot;</span><span class="w"> </span><span class="p">|</span><span class="w"> </span>safelint<span class="w"> </span>--stdin<span class="w"> </span>--stdin-filename<span class="o">=</span>buffer.py
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a>cat<span class="w"> </span>foo.ts<span class="w"> </span><span class="p">|</span><span class="w"> </span>safelint<span class="w"> </span>--stdin<span class="w"> </span>--stdin-filename<span class="o">=</span>foo.ts<span class="w"> </span>--format<span class="o">=</span>json
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Flag</th>
+<th>Default</th>
+<th>What it does</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>--stdin</code></td>
+<td>off</td>
+<td>Read source from stdin instead of disk. The pseudo-filename from <code>--stdin-filename</code> drives language detection by extension and shows up as the violation file path.</td>
+</tr>
+<tr>
+<td><code>--stdin-filename &lt;PATH&gt;</code></td>
+<td><code>&lt;stdin&gt;.py</code></td>
+<td>Pseudo-filename for the stdin buffer. Required in practice (the default falls back to a Python extension); set it to the real file path so language detection and <code>exclude_paths</code> matching behave the same as a disk-backed lint.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Cache behaviour:</strong> stdin mode unconditionally bypasses the on-disk cache. Every keystroke in an editor produces a slightly different buffer (cache miss every time anyway), and writing to <code>.safelint_cache/</code> per keystroke would just churn the project tree. <code>--no-cache</code> is therefore irrelevant here.</p>
+<p><code>--fail-on</code> / <code>--mode</code> / <code>--ignore</code> / <code>--format</code> all work in stdin mode and follow the same semantics as <code>safelint check</code>.</p>
+<h2 id="safelint-version-and-safelint-help"><code>safelint version</code> and <code>safelint help</code><a class="headerlink" href="#safelint-version-and-safelint-help" title="Permanent link">#</a></h2>
+<p>Informational commands; trivial but listed for completeness.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a>safelint<span class="w"> </span>version<span class="w">          </span><span class="c1"># prints &quot;safelint X.Y.Z&quot; and exits 0</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a>safelint<span class="w"> </span>--version
+<a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a>safelint<span class="w"> </span>-V
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a>safelint<span class="w"> </span><span class="nb">help</span><span class="w">             </span><span class="c1"># top-level help (the ruff-style usage block above)</span>
+<a id="__codelineno-9-6" name="__codelineno-9-6" href="#__codelineno-9-6"></a>safelint<span class="w"> </span><span class="nb">help</span><span class="w"> </span>check<span class="w">       </span><span class="c1"># equivalent to `safelint check --help`</span>
+<a id="__codelineno-9-7" name="__codelineno-9-7" href="#__codelineno-9-7"></a>safelint<span class="w"> </span><span class="nb">help</span><span class="w"> </span>list-rules<span class="w">  </span><span class="c1"># equivalent to `safelint list-rules --help`</span>
+<a id="__codelineno-9-8" name="__codelineno-9-8" href="#__codelineno-9-8"></a>safelint<span class="w"> </span><span class="nb">help</span><span class="w"> </span>skill<span class="w">       </span><span class="c1"># equivalent to `safelint skill --help`</span>
+<a id="__codelineno-9-9" name="__codelineno-9-9" href="#__codelineno-9-9"></a>safelint<span class="w"> </span>--help
+<a id="__codelineno-9-10" name="__codelineno-9-10" href="#__codelineno-9-10"></a>safelint<span class="w"> </span>-h
+</code></pre></div>
+<p>Both are intercepted before any subcommand routing, so they always work even when no subcommand is given and even when global flags (e.g. <code>--format json</code>) are interleaved.</p>
+<h2 id="hook-mode-safelint-files">Hook mode (<code>safelint &lt;files&gt;</code>)<a class="headerlink" href="#hook-mode-safelint-files" title="Permanent link">#</a></h2>
+<p>Pre-commit invokes safelint with the staged file paths as positional arguments. No subcommand involved; safelint detects the hook-mode shape (positional args that don't start with a known subcommand) and treats them as files to lint. <code>--fail-on</code>, <code>--mode</code>, and <code>--ignore</code> are all supported.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># .pre-commit-config.yaml</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="w">  </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">--fail-on=error</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># or --fail-on=warning for strict CI</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="c1"># Ignore specific rules in the hook:</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
+<a id="__codelineno-10-7" name="__codelineno-10-7" href="#__codelineno-10-7"></a><span class="w">  </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">--fail-on=error</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--ignore=SAFE203</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--ignore=side_effects</span><span class="p p-Indicator">]</span>
+</code></pre></div>
+<p>Pre-commit hooks pass every staged file regardless of extension; safelint filters internally to the supported source extensions before linting. Files with unsupported extensions are silently skipped (the silent-failure guard at exit code 2 catches the case where <em>every</em> passed file was unsupported, see below).</p>
 <h2 id="exit-codes">Exit codes<a class="headerlink" href="#exit-codes" title="Permanent link">#</a></h2>
 <p>SafeLint's exit code tells CI / pre-commit how the run finished:</p>
 <table>
@@ -2308,86 +2770,6 @@
 </table>
 <p>Each error embeds the install hint for the missing extras so the failure is self-explanatory even when no prior warnings were printed (e.g. the no-targets short-circuit, or any machine-output run). The hint phrasing flips between <code>install with: pip install 'safelint[&lt;lang&gt;]'</code> (direct CLI) and <code>add 'safelint[&lt;lang&gt;]' to additional_dependencies in your .pre-commit-config.yaml</code> (pre-commit, detected via <code>PRE_COMMIT=1</code>).</p>
 <p><strong>Per-extension stderr warnings</strong> (one line per missing grammar, listing the affected extensions) are emitted <strong>only in pretty (human) CLI output and in the pre-commit hook flow</strong>. Machine-readable modes, <code>--format json</code> and <code>--format sarif</code>, deliberately suppress those warnings so stderr stays parseable for CI / editor pipelines; the embedded install hint inside the <code>safelint: error:</code> line above is the only signal you get there.</p>
-<h2 id="safelint-hook-mode-flags-pre-commit"><code>safelint</code> hook mode flags (pre-commit)<a class="headerlink" href="#safelint-hook-mode-flags-pre-commit" title="Permanent link">#</a></h2>
-<p>Pre-commit passes the staged files as positional arguments automatically. <code>--fail-on</code>, <code>--mode</code>, and <code>--ignore</code> are all supported here.</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># .pre-commit-config.yaml</span>
-<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
-<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="w">  </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">--fail-on=error</span><span class="p p-Indicator">]</span><span class="w">   </span><span class="c1"># or --fail-on=warning for strict CI</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>
-<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="c1"># Ignore specific rules in the hook:</span>
-<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
-<a id="__codelineno-1-7" name="__codelineno-1-7" href="#__codelineno-1-7"></a><span class="w">  </span><span class="nt">args</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="nv">--fail-on=error</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--ignore=SAFE203</span><span class="p p-Indicator">,</span><span class="w"> </span><span class="nv">--ignore=side_effects</span><span class="p p-Indicator">]</span>
-</code></pre></div>
-<h2 id="skill-freshness-commands-190">Skill freshness commands (1.9.0)<a class="headerlink" href="#skill-freshness-commands-190" title="Permanent link">#</a></h2>
-<p>After <code>pip install --upgrade safelint</code>, the bundled skill files in the wheel update but copy-mode installs at <code>~/.claude/skills/safelint/SKILL.md</code> and <code>~/.cursor/rules/safelint.mdc</code> stay frozen at whatever version was last installed. Two commands answer "is my installed skill up to date?":</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># Dedicated subcommand: pipe-friendly, exits 1 if any install differs from bundled</span>
-<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>status
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a>
-<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="c1"># Or fold the same check into a normal lint run (opt-in stderr warning, doesn&#39;t fail the run)</span>
-<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a>safelint<span class="w"> </span>check<span class="w"> </span>--check-skill-freshness<span class="w"> </span>--all-files<span class="w"> </span>.
-</code></pre></div>
-<p><code>safelint skill status</code> walks every registered AI client × both scopes (user / project) and prints one line per detected install showing whether it's <em>fresh</em> (matches the bundled version) or <em>differs from bundled</em>. Exit code is 0 when everything matches, 1 when anything differs.</p>
-<p>A few details worth knowing:</p>
-<ul>
-<li><strong>Symlink installs</strong> (those created with <code>safelint skill install --symlink</code>) always show as fresh, because the installed file is a symlink pointing back at the bundled location inside the wheel. After <code>pip upgrade safelint</code>, the upgrade is visible immediately; no <code>skill update</code> needed.</li>
-<li><strong>Copy installs</strong> are content-compared against the bundled file. If they match byte-for-byte, fresh; otherwise, differs.</li>
-<li><strong>Edge case, a symlink install hand-replaced with an identical copy</strong> is reported as fresh (the freshness check compares content, not install mode). The user-visible behaviour is fine <em>today</em> because the content matches, but the next <code>pip upgrade safelint</code> won't propagate to that location anymore. If you want to re-establish the live link, run <code>safelint skill update --symlink --force</code>.</li>
-</ul>
-<p>The canonical CI / upgrade-script idiom is:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>status<span class="w"> </span><span class="o">||</span><span class="w"> </span>safelint<span class="w"> </span>skill<span class="w"> </span>update
-</code></pre></div>
-<p><code>safelint check --check-skill-freshness</code> is the same drift check folded into a normal lint run, emits one <code>safelint: warning:</code> line per stale install but doesn't change the lint exit code. Off by default so day-to-day <code>safelint check</code> invocations stay fast (no extra FS scan).</p>
-<p>A locally-customised install will surface as <em>differs from bundled</em>; the diagnostic message explicitly mentions that case so customisers can ignore it. See <a href="../../ai-clients/lifecycle/">Updating, removing, freshness checks</a> for the full workflow.</p>
-<h2 id="skill-update-remove-commands-1100">Skill update + remove commands (1.10.0)<a class="headerlink" href="#skill-update-remove-commands-1100" title="Permanent link">#</a></h2>
-<p>Two follow-on commands to round out the install lifecycle:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>update<span class="w">                          </span><span class="c1"># idempotent refresh, no-op when fresh</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>update<span class="w"> </span>--force<span class="w">                  </span><span class="c1"># re-install every detected install</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w">                          </span><span class="c1"># delete every detected install</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w"> </span>--symlink<span class="w">                </span><span class="c1"># delete only symlink-shape installs (keep copies)</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w"> </span>--path<span class="w"> </span>/unusual/place<span class="w">    </span><span class="c1"># delete one specific location</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a>safelint<span class="w"> </span>skill<span class="w"> </span>remove<span class="w"> </span>--dry-run<span class="w">                </span><span class="c1"># preview without deleting</span>
-</code></pre></div>
-<p>Both commands inherit <code>--client</code> and <code>--project</code> from <code>install</code>, but the meaning of <code>--client auto</code> is <em>different</em> from install's:</p>
-<ul>
-<li><strong><code>install --client auto</code></strong> asks: <em>"which AI client(s) does this user use?"</em>, and answers that by scanning the cwd for marker files (<code>CLAUDE.md</code>, <code>.cursor/</code>, etc.).</li>
-<li><strong><code>update --client auto</code></strong> and <strong><code>remove --client auto</code></strong> ask: <em>"what's already installed?"</em>, and answer that by scanning the actual install paths (<code>~/.claude/skills/safelint/SKILL.md</code>, etc.).</li>
-</ul>
-<p>This distinction matters when the user has marker files but no install yet (only <code>install</code> will fire) or has an install but the marker file has been deleted (only <code>update</code>/<code>remove</code> will fire).</p>
-<p><strong><code>update</code> flag semantics, <code>--force</code>:</strong> without <code>--force</code>, <code>update</code> only re-installs the locations that have actually drifted from the bundle. Running it when everything is fresh is a no-op: it just prints "already fresh" lines and exits 0. That's what makes it safe to run from cron, CI, or pre-commit hooks, calling <code>update</code> repeatedly does nothing extra. With <code>--force</code>, it re-installs every detected location regardless of drift; useful for reverting a customised install back to the bundled content.</p>
-<p><strong><code>update</code> flag semantics, <code>--symlink</code> and shape preservation:</strong> by default, <code>update</code> preserves the existing install's shape. A copy install stays copy after refresh; a symlink install stays symlink. To <em>switch</em> a copy install to symlink mode, pass <code>--symlink</code> explicitly. There's one wrinkle: if the copy install is already fresh, <code>update</code> is normally a no-op, so converting copy → symlink in that case requires <code>update --force --symlink</code> to force the re-install. Switching the other way (symlink → copy) isn't supported via <code>update</code>; do <code>remove</code> followed by <code>install</code> (without <code>--symlink</code>) instead, so the intent is unambiguous.</p>
-<p><strong><code>remove</code> flag semantics:</strong> flags compose orthogonally, the absence of a flag means "no filter", <em>not</em> "only the opposite":</p>
-<table>
-<thead>
-<tr>
-<th>Invocation</th>
-<th>What gets removed</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><code>remove</code> (no flags)</td>
-<td>Every detected install, copy + symlink, every client, both scopes</td>
-</tr>
-<tr>
-<td><code>remove --symlink</code></td>
-<td>Only symlink-shape installs (copies survive)</td>
-</tr>
-<tr>
-<td><code>remove --client cursor</code></td>
-<td>All detected Cursor installs (both shapes, both scopes)</td>
-</tr>
-<tr>
-<td><code>remove --project</code></td>
-<td>All detected project-scope installs (user-scope survives)</td>
-</tr>
-<tr>
-<td><code>remove --path PATH</code></td>
-<td>Exactly one location, regardless of every other flag</td>
-</tr>
-</tbody>
-</table>
-<p>In particular, <code>safelint skill remove</code> without <code>--symlink</code> removes <strong>both</strong> copy and symlink installs; it's not a "remove copies only" command. <code>--symlink</code> is a <em>filter</em> you can opt into when you want to be selective, not a creation-mode toggle like in <code>install</code>.</p>
-<p><code>remove</code> only deletes the install location. Bundled files inside <code>site-packages/</code> are never touched (<code>shutil.rmtree</code> doesn't follow symlinks for deletion, and <code>unlink</code> removes the symlink itself, not its bundled target). The worst case for a misfired <code>remove</code> is "re-run <code>install</code> to get the skill back". See <a href="../../ai-clients/lifecycle/#removing-an-installed-skill">Updating, removing, freshness checks</a> for the full filesystem-level breakdown.</p>
 
 
 
@@ -2425,7 +2807,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../" class="md-footer__link md-footer__link--prev" aria-label="Previous: Overview">
+          <a href="../../languages/rust/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Rust">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2435,20 +2817,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Overview
+                Rust
               </div>
             </div>
           </a>
         
         
           
-          <a href="../suppression/" class="md-footer__link md-footer__link--next" aria-label="Next: Suppression mechanisms">
+          <a href="../" class="md-footer__link md-footer__link--next" aria-label="Next: Overview">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                Suppression mechanisms
+                Overview
               </div>
             </div>
             <div class="md-footer__button md-icon">
