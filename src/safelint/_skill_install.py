@@ -95,8 +95,11 @@ class ClientSpec:
     # *Always* a section-based edit, never full-file overwrite - that's
     # the contract that makes it safe to share AGENTS.md with other
     # agents. If the secondary file does not exist, the secondary install
-    # is a no-op (we never auto-create AGENTS.md just to put a section
-    # in it; that's the user's call).
+    # is normally a no-op (we don't spawn AGENTS.md just to put a section
+    # in it; that's the user's call). Narrow exception: when
+    # ``.opencode/`` is present at the install scope, the file is
+    # auto-created because OpenCode's only safelint integration point
+    # is the secondary file - see ``_maybe_seed_secondary_for_opencode``.
     secondary_install_relpath: tuple[str, ...] | None = None
     secondary_install_section_markers: tuple[str, str] | None = None
 
@@ -378,8 +381,11 @@ _CODEX_SPEC = ClientSpec(
     # root, also write a delimited section there. AGENTS.md is the
     # cross-agent shared file (codex, Cursor fallback, others) - using
     # HTML-comment markers means user-authored content for *other*
-    # agents stays untouched. We never auto-create AGENTS.md; the
-    # secondary install is opt-in via "the user already has the file".
+    # agents stays untouched. The secondary install is normally opt-in
+    # via "the user already has the file"; the one exception is
+    # OpenCode-shaped projects (``.opencode/`` present) where AGENTS.md
+    # is auto-created because that file IS OpenCode's only safelint
+    # integration point.
     secondary_install_relpath=("AGENTS.md",),
     secondary_install_section_markers=("<!-- safelint:begin -->", "<!-- safelint:end -->"),
 )
@@ -605,22 +611,32 @@ def _print_user_scope_unsupported_error(spec: ClientSpec) -> None:
     )
 
 
-def _print_opencode_secondary_gap_warning(spec: ClientSpec, *, project: bool) -> None:
-    """Warn when an OpenCode-shaped project is missing the secondary install file.
+def _maybe_seed_secondary_for_opencode(spec: ClientSpec, *, project: bool) -> None:
+    """Touch the secondary file when ``.opencode/`` is present but the file isn't.
 
     OpenCode (``sst/opencode``) reads ``AGENTS.md`` for project context;
-    it doesn't read ``.codex/instructions.md``. When the codex spec
-    installs at project scope into a directory that has ``.opencode/``
-    but no ``AGENTS.md``, the user gets ``.codex/instructions.md``
-    (which OpenCode ignores) and the secondary AGENTS.md section never
-    fires (the spec deliberately doesn't auto-create the cross-agent
-    shared file). The result is a silent integration gap.
+    it doesn't read ``.codex/instructions.md``. Without this seed step,
+    a ``.opencode/``-only project (no ``AGENTS.md`` yet) installs the
+    codex primary but never the secondary section, so OpenCode never
+    sees the safelint content despite the auto-detect "succeeding".
+    Creating the file as empty here lets the existing section-write
+    path in ``_install_secondary`` fire normally, planting the safelint
+    section as the only content. Subsequent installs (e.g. ``--force``)
+    follow the normal "preserve other agents' content" path because
+    the file now exists with content.
 
-    This helper detects that specific case (cwd has ``.opencode/``,
-    spec opts in to ``secondary_install_relpath``, secondary file is
-    absent) and prints a stderr warning with the corrective command.
-    No-op for user-scope installs (OpenCode is project-scoped) and for
-    specs without a secondary-install opt-in (no gap to flag).
+    Tight guards keep the auto-create narrow:
+
+    * Project-scope only - OpenCode is project-scoped, and we don't
+      want to spawn ``~/AGENTS.md`` for arbitrary users.
+    * Spec must opt in to ``secondary_install_relpath`` - generic;
+      any future cross-agent spec that adds a secondary inherits the
+      same OpenCode-seeding without a per-client change.
+    * ``.opencode/`` must exist in cwd - the only signal that the
+      user actually wants OpenCode integration. Without it, the
+      "never auto-create the shared file" invariant still holds.
+    * Secondary file must NOT exist - if it exists, the normal
+      section-write path preserves existing content. No-op here.
     """
     if not project:
         return
@@ -629,15 +645,10 @@ def _print_opencode_secondary_gap_warning(spec: ClientSpec, *, project: bool) ->
     cwd = Path.cwd()
     if not (cwd / ".opencode").exists():
         return
-    secondary_name = "/".join(spec.secondary_install_relpath)
-    print(
-        f"safelint: warning: detected .opencode/ but no {secondary_name} at project root. "
-        f"OpenCode reads {secondary_name} for project context, so the safelint section "
-        f"never landed where OpenCode can see it. "
-        f"Create {secondary_name} and re-run safelint skill install "
-        f"--client={spec.name} --project --force to add the safelint section.",
-        file=sys.stderr,
-    )
+    secondary = cwd / Path(*spec.secondary_install_relpath)
+    if secondary.exists():
+        return
+    secondary.touch()
 
 
 def _print_no_clients_error(*, scope_description: str) -> None:
@@ -750,9 +761,13 @@ def _install_copy(source: Path, target: Path) -> None:
 # AGENTS.md. The section-marker pattern preserves *user* content in the
 # shared file: install/update edit only the bytes between the markers,
 # remove strips just the section, and status compares only the section
-# body. The shared file is never auto-created (we don't want to spawn
-# AGENTS.md just to drop a section in it - it has to already exist as
-# a signal the user is using a cross-agent workflow).
+# body. The shared file is normally not auto-created (we don't want to
+# spawn AGENTS.md just to drop a section in it - it has to already exist
+# as a signal the user is using a cross-agent workflow). Narrow exception:
+# the ``_maybe_seed_secondary_for_opencode`` step in ``_install_one``
+# touches the file when ``.opencode/`` is present, because OpenCode's
+# only safelint integration point IS the shared file - without seeding,
+# the secondary install would be a no-op for OpenCode-only projects.
 # ---------------------------------------------------------------------------
 
 
@@ -903,7 +918,10 @@ def _secondary_target_writable_or_warn(spec: ClientSpec, *, project: bool) -> Pa
     Returns ``None`` (and the caller should treat as no-op) when:
 
     - The spec has no secondary destination configured.
-    - The destination doesn't exist (we never auto-create the shared file).
+    - The destination doesn't exist. ``_install_one`` may seed the file
+      via ``_maybe_seed_secondary_for_opencode`` before reaching this
+      helper (the ``.opencode/`` exception); when the seed step doesn't
+      apply, this returns ``None`` and the caller treats it as no-op.
     - The destination is a symlink - refused via
       :func:`_print_secondary_symlink_refused` to avoid following it.
     - The destination exists but isn't a regular file (directory, FIFO,
@@ -1037,20 +1055,18 @@ def _install_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) -
 
     scope = "project" if project else "user"
     _print_install_success(spec, target=target, kind=kind, scope=scope)
-    # Secondary install: only fires when the spec opts in AND the
-    # secondary file already exists at the scope root. Section-based
-    # so user content in the shared file (e.g. AGENTS.md) is preserved.
+    # Secondary install: section-based so user content in the shared
+    # file (e.g. AGENTS.md) is preserved when the file already exists.
+    # Normally only fires when the file exists - we don't want to
+    # spawn AGENTS.md at every install. Narrow exception for
+    # OpenCode-shaped projects (``.opencode/`` present at scope root):
+    # OpenCode's only safelint integration point is the secondary
+    # file, so creating it from scratch IS the install for that user.
     secondary = _secondary_target(spec, project=project)
-    if secondary is not None and _install_secondary(spec, project=project):
-        _print_secondary_install_notice(secondary)
-    # OpenCode-shaped projects (``.opencode/`` present at scope root)
-    # rely on AGENTS.md as their only safelint integration point -
-    # OpenCode reads AGENTS.md, not ``.codex/instructions.md``. When the
-    # primary install succeeded but the secondary file is absent,
-    # OpenCode users get no usable integration despite the auto-detect
-    # firing. Emit a one-line nudge so the gap isn't silent.
-    if secondary is not None and not secondary.exists():
-        _print_opencode_secondary_gap_warning(spec, project=project)
+    if secondary is not None:
+        _maybe_seed_secondary_for_opencode(spec, project=project)
+        if _install_secondary(spec, project=project):
+            _print_secondary_install_notice(secondary)
     return 0
 
 
