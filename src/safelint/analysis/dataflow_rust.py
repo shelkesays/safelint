@@ -163,10 +163,10 @@ class RustTaintTracker:
             "mut_pattern",
             "ref_pattern",
             "tuple_pattern",
+            "tuple_expression",  # destructuring assignment: ``(a, b) = ...``
             "tuple_struct_pattern",
             "struct_pattern",
             "captured_pattern",
-            "tuple_expression",
         ):
             for child in pattern.named_children:
                 yield from self._iter_pattern_identifiers(child)
