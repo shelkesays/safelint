@@ -111,9 +111,14 @@ nav:
       - TypeScript: languages/typescript.md
       - Java: languages/java.md
       - Rust: languages/rust.md
+  # CLI commands and flags is a top-level entry (not nested under
+  # Configuration) so users searching for "commands" or "list-rules"
+  # find it without expanding a section. The page lives at
+  # docs/configuration/cli.md so the URL stays stable for any external
+  # links pointing at .../configuration/cli/.
+  - CLI commands and flags: configuration/cli.md
   - Configuration:
       - Overview: configuration/index.md
-      - CLI flags and commands: configuration/cli.md
       - Suppression mechanisms: configuration/suppression.md
       - Configuration file: configuration/toml.md
       - Rules reference: configuration/rules.md
