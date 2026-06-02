@@ -44,6 +44,9 @@ After install, restart the AI client (or reload its window) and ask things like 
 | **[Trae](clients/trae.md)** | Markdown rule (`.trae/rules/<name>.md`) | `~/.trae/rules/safelint.md` (user) or `<cwd>/.trae/rules/safelint.md` (project) | `.trae/` in cwd; `~/.trae/` for user-scope |
 | **[Antigravity](clients/antigravity.md)** | Markdown rule (`.antigravity/rules/<name>.md`) | `~/.antigravity/rules/safelint.md` (user) or `<cwd>/.antigravity/rules/safelint.md` (project) | `.antigravity/` in cwd; `~/.antigravity/` for user-scope |
 | **[Zed](clients/zed.md)** | Workspace rules (`.rules`) | `~/.rules` (user) or `<cwd>/.rules` (project) | `.rules` or `.zed/` in cwd; `~/.rules` or `~/.zed/` for user-scope |
+| **[Warp](clients/warp.md)** | Instructions Markdown (`WARP.md`) | `<cwd>/WARP.md` (**project-scope only**; Warp doesn't read any user-scope file, "Global Rules" go through Warp Drive UI) | `WARP.md` or `.warp/` in cwd |
+
+**OpenCode (`sst/opencode`)** isn't a separate client entry. OpenCode reads `AGENTS.md` for project context, which is the same file the codex spec's secondary install populates with a delimited safelint section. `.opencode/` is therefore listed as a cwd marker on the codex spec, so `--client=auto` notices these projects. When the project has `.opencode/` but no `AGENTS.md` yet, safelint auto-creates `AGENTS.md` (the file is OpenCode's only safelint integration point); when `AGENTS.md` already exists, existing content is preserved and the safelint section is appended via the section-delimited write path. See the [codex page](clients/codex.md) for the full lifecycle.
 
 The registry in `_skill_install.py` is open-ended, adding a new client is a one-`ClientSpec` change. See [Adding a new AI client](../contributing/adding-an-ai-client.md) for the full walkthrough. If you'd like to see another client supported, file a feature request with the marker convention you've seen in the wild.
 
