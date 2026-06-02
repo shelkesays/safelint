@@ -873,39 +873,68 @@ def test_install_auto_detects_codex_via_opencode_dir(monkeypatch: pytest.MonkeyP
     assert "codex" in out
 
 
-def test_install_opencode_without_agents_md_warns(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """``.opencode/`` without ``AGENTS.md`` triggers a clear stderr warning after install.
+def test_install_opencode_without_agents_md_auto_creates_it(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``.opencode/`` without ``AGENTS.md`` auto-creates AGENTS.md with the safelint section.
 
-    Without the warning, an OpenCode user runs ``safelint skill install``,
-    sees a green install message, and walks away unaware that OpenCode
-    never received the safelint context (OpenCode reads ``AGENTS.md``,
-    which the install deliberately doesn't auto-create). The warning
-    names the gap and the corrective command.
+    OpenCode (``sst/opencode``) reads ``AGENTS.md`` for project context;
+    it doesn't read ``.codex/instructions.md``. Without the auto-create
+    step in ``_install_one``, an OpenCode-only repo's install would
+    write only the codex primary, leaving OpenCode with no readable
+    file. The narrow auto-create path (gated on ``.opencode/`` being
+    present) seeds AGENTS.md so the secondary section-write fires and
+    OpenCode gets a working integration after a single install command.
+
+    The file is created fresh and the section markers wrap the safelint
+    content - subsequent ``--force`` re-installs follow the normal
+    "preserve other agents' content" path.
     """
     _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
     (cwd / ".opencode").mkdir()
     rc = _skill_install.run_install(_make_args(client="auto"))
     assert rc == 0
-    err = capsys.readouterr().err
-    assert "AGENTS.md" in err
-    assert "OpenCode reads" in err
-    assert "--force" in err
+    agents = cwd / "AGENTS.md"
+    assert agents.is_file(), "AGENTS.md must be auto-created for .opencode projects"
+    content = agents.read_text(encoding="utf-8")
+    assert "<!-- safelint:begin -->" in content
+    assert "<!-- safelint:end -->" in content
 
 
-def test_install_opencode_with_agents_md_does_not_warn(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """When ``AGENTS.md`` exists alongside ``.opencode/``, the integration is complete and no warning fires.
+def test_install_opencode_with_existing_agents_md_preserves_content(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """When ``AGENTS.md`` exists alongside ``.opencode/``, existing content is preserved.
 
-    The secondary install writes the safelint section into ``AGENTS.md``;
-    OpenCode reads it; the gap-warning path should stay silent.
+    The auto-create step's existence guard short-circuits when the file
+    is already there; the normal section-append path runs and other
+    agents' content stays untouched. Verifies the auto-create doesn't
+    over-fire by clobbering pre-existing AGENTS.md.
     """
     _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
     (cwd / ".opencode").mkdir()
-    (cwd / "AGENTS.md").write_text("# project agents\n", encoding="utf-8")
+    pre_existing = "# project agents\n\nsome user notes for other agents\n"
+    (cwd / "AGENTS.md").write_text(pre_existing, encoding="utf-8")
     rc = _skill_install.run_install(_make_args(client="auto"))
     assert rc == 0
-    err = capsys.readouterr().err
-    # No gap warning should appear when the secondary file exists.
-    assert "OpenCode reads" not in err
+    content = (cwd / "AGENTS.md").read_text(encoding="utf-8")
+    # User content preserved.
+    assert "some user notes for other agents" in content
+    # Safelint section appended.
+    assert "<!-- safelint:begin -->" in content
+
+
+def test_install_codex_without_opencode_does_not_create_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Without ``.opencode/``, the auto-create is silent and AGENTS.md is NOT spawned.
+
+    Pure codex users don't need AGENTS.md - codex reads
+    ``.codex/instructions.md`` directly. The "never auto-create the
+    shared file" invariant still holds for this case; only the narrow
+    ``.opencode/`` exception relaxes it. Guards against the auto-create
+    triggering on every codex install regardless of OpenCode presence.
+    """
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".codex").mkdir()  # codex marker, no .opencode/
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".codex" / "instructions.md").is_file()
+    assert not (cwd / "AGENTS.md").exists(), "AGENTS.md must NOT be auto-created when only .codex/ is present"
 
 
 def test_install_warp_user_scope_is_refused(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
