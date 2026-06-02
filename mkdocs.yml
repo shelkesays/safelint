@@ -137,6 +137,7 @@ nav:
           - Trae: ai-clients/clients/trae.md
           - Antigravity: ai-clients/clients/antigravity.md
           - Zed: ai-clients/clients/zed.md
+          - Warp: ai-clients/clients/warp.md
   - JSON output schema: json-schema.md
   - Contributing:
       - Overview: contributing/index.md

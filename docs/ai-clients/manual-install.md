@@ -74,8 +74,16 @@ safelint skill install --client zed --project
 
 # Zed, user-global
 safelint skill install --client zed
+
+# Warp, project-scoped (the ONLY supported scope; Warp's Global Rules
+# are managed via the Warp Drive UI, not a home-directory file -
+# `safelint skill install --client warp` without --project exits 1
+# with a clear error)
+safelint skill install --client warp --project
 ```
 
-When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd).
+When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd). Specs without a user-scope install (currently just Warp) refuse the install with a clear error when `--project` is omitted.
+
+**OpenCode (`sst/opencode`)** users: use the `codex` client. OpenCode and codex share `AGENTS.md` as their integration point; running `safelint skill install --client codex --project` writes `.codex/instructions.md` and the AGENTS.md section (auto-creating `AGENTS.md` if absent when `.opencode/` is present). `safelint skill install --client auto` also picks up `.opencode/` directories directly. See the [codex page](clients/codex.md#opencode-auto-detection) for the full lifecycle.
 
 For the per-client install path, restart-step, and any client-specific gotchas, see the dedicated guide for each client (linked from the [AI clients overview](index.md)).
