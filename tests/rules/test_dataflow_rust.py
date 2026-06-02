@@ -162,6 +162,30 @@ def test_rust_tuple_destructure_param_taints(tmp_path: Path) -> None:
     assert any(v.code == "SAFE801" for v in result.violations)
 
 
+def test_rust_destructuring_assignment_propagates_taint(tmp_path: Path) -> None:
+    """Rust 1.59+ destructuring assignment ``(a, b) = (tainted, _);`` propagates taint.
+
+    The LHS of an ``assignment_expression`` here is a ``tuple_expression``
+    (not a ``tuple_pattern`` like in ``let (a, b) = ...``), so
+    ``_iter_pattern_identifiers`` must walk the same way through both
+    shapes. Without ``tuple_expression`` in the recurse set, ``a`` would
+    never be marked tainted and the downstream sink would silently pass.
+    """
+    sample = tmp_path / "destructure_assign.rs"
+    sample.write_text(
+        "use std::process::Command;\n"
+        "fn run(user_input: String) {\n"
+        "    let mut a = String::new();\n"
+        "    let mut b = String::new();\n"
+        '    (a, b) = (user_input, String::from("clean"));\n'
+        '    Command::new("echo").arg(a);\n'
+        "}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    assert any(v.code == "SAFE801" for v in result.violations), "Destructuring assignment LHS (tuple_expression) must rebind taint on its identifiers"
+
+
 def test_rust_taint_through_reference_propagates(tmp_path: Path) -> None:
     """``&tainted`` keeps the value tainted - reference is a pass-through."""
     sample = tmp_path / "ref.rs"
