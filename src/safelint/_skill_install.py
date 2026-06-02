@@ -605,6 +605,41 @@ def _print_user_scope_unsupported_error(spec: ClientSpec) -> None:
     )
 
 
+def _print_opencode_secondary_gap_warning(spec: ClientSpec, *, project: bool) -> None:
+    """Warn when an OpenCode-shaped project is missing the secondary install file.
+
+    OpenCode (``sst/opencode``) reads ``AGENTS.md`` for project context;
+    it doesn't read ``.codex/instructions.md``. When the codex spec
+    installs at project scope into a directory that has ``.opencode/``
+    but no ``AGENTS.md``, the user gets ``.codex/instructions.md``
+    (which OpenCode ignores) and the secondary AGENTS.md section never
+    fires (the spec deliberately doesn't auto-create the cross-agent
+    shared file). The result is a silent integration gap.
+
+    This helper detects that specific case (cwd has ``.opencode/``,
+    spec opts in to ``secondary_install_relpath``, secondary file is
+    absent) and prints a stderr warning with the corrective command.
+    No-op for user-scope installs (OpenCode is project-scoped) and for
+    specs without a secondary-install opt-in (no gap to flag).
+    """
+    if not project:
+        return
+    if spec.secondary_install_relpath is None:
+        return
+    cwd = Path.cwd()
+    if not (cwd / ".opencode").exists():
+        return
+    secondary_name = "/".join(spec.secondary_install_relpath)
+    print(
+        f"safelint: warning: detected .opencode/ but no {secondary_name} at project root. "
+        f"OpenCode reads {secondary_name} for project context, so the safelint section "
+        f"never landed where OpenCode can see it. "
+        f"Create {secondary_name} and re-run safelint skill install "
+        f"--client={spec.name} --project --force to add the safelint section.",
+        file=sys.stderr,
+    )
+
+
 def _print_no_clients_error(*, scope_description: str) -> None:
     """Print the auto-detect-failure error to stderr with explicit ``--client`` examples."""
     seen_markers = sorted({m for spec in _CLIENT_SPECS for m in (*spec.cwd_markers, *spec.home_markers)})
@@ -1008,6 +1043,14 @@ def _install_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) -
     secondary = _secondary_target(spec, project=project)
     if secondary is not None and _install_secondary(spec, project=project):
         _print_secondary_install_notice(secondary)
+    # OpenCode-shaped projects (``.opencode/`` present at scope root)
+    # rely on AGENTS.md as their only safelint integration point -
+    # OpenCode reads AGENTS.md, not ``.codex/instructions.md``. When the
+    # primary install succeeded but the secondary file is absent,
+    # OpenCode users get no usable integration despite the auto-detect
+    # firing. Emit a one-line nudge so the gap isn't silent.
+    if secondary is not None and not secondary.exists():
+        _print_opencode_secondary_gap_warning(spec, project=project)
     return 0
 
 
