@@ -873,6 +873,42 @@ def test_install_auto_detects_codex_via_opencode_dir(monkeypatch: pytest.MonkeyP
     assert "codex" in out
 
 
+def test_install_warp_user_scope_is_refused(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill install --client warp`` (without --project) errors out.
+
+    Warp is project-scope only - the "Global Rules" feature is managed
+    through the Warp Drive UI, not a home-directory file. The Warp spec
+    signals this by setting ``home_markers=()``; ``_resolve_install_plan``
+    reads the empty tuple and refuses user-scope install rather than
+    writing a useless ``~/WARP.md`` Warp doesn't read.
+
+    Verifies the error message names the client, names the project-scope
+    install path, and exits non-zero so a CI script catching this
+    misconfiguration fails loudly.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="warp"))
+    assert rc == 1
+    # No file should have been written at user scope.
+    assert not (home / "WARP.md").exists()
+    err = capsys.readouterr().err
+    assert "Warp does not support user-scope install" in err
+    assert "--project" in err
+
+
+def test_install_warp_project_scope_works(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``safelint skill install --client warp --project`` writes ``<cwd>/WARP.md``.
+
+    Pairs with the user-scope-refusal test above: the project-scope
+    contract for Warp must still work, the guard only refuses the
+    home-scope path.
+    """
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="warp", project=True))
+    assert rc == 0
+    assert (cwd / "WARP.md").is_file()
+
+
 def test_run_path_with_client_codex_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
     """``safelint skill path --client codex`` prints the bundled instructions file path."""
     rc = _skill_install.run_path(argparse.Namespace(client="codex"))
