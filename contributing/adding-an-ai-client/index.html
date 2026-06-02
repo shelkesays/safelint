@@ -482,6 +482,8 @@
       
         
       
+        
+      
     
     
     
@@ -626,6 +628,34 @@
     
   
     Java
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../languages/rust/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Rust
   
 
     
@@ -1895,6 +1925,8 @@
       
         
       
+        
+      
     
     
     
@@ -1983,6 +2015,34 @@
     
   
     Code of conduct
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../project/security/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Security policy
   
 
     
@@ -2268,7 +2328,7 @@
 <p>This guide is the cheat sheet for adding support for a new AI coding client (GitHub Copilot, codex, windsurf, antigravity, etc.) to SafeLint's <code>safelint skill install</code> command. The architecture was built for this, the moving parts you need to understand and the steps you need to follow are below.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Twelve clients are registered today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is a one-<code>ClientSpec</code> change plus a bundled artefact and tests. No control-flow changes elsewhere, install / detection / CLI choices / output all read from the registry.</p>
+<p>Thirteen clients are registered today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp). Adding the next is a one-<code>ClientSpec</code> change plus a bundled artefact and tests. No control-flow changes elsewhere, install / detection / CLI choices / output all read from the registry.</p>
 </div>
 <p>For the user-facing surface (auto-detection logic, how each client is invoked after install, troubleshooting), see <a href="../../ai-clients/">AI client integrations</a>. This file is for contributors <em>adding</em> a new entry to the registry.</p>
 <h2 id="the-architecture-in-five-sentences">The architecture, in five sentences<a class="headerlink" href="#the-architecture-in-five-sentences" title="Permanent link">#</a></h2>
