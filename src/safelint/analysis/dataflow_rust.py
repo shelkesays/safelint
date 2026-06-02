@@ -146,6 +146,11 @@ class RustTaintTracker:
           binding as a ``shorthand_field_identifier`` named child.
         * ``captured_pattern`` - ``name @ pattern`` binds both
           ``name`` and any inner identifiers.
+        * ``tuple_expression`` - Rust 1.59+ destructuring assignment
+          ``(a, b) = ...;``. The LHS of ``assignment_expression`` is
+          parsed as ``tuple_expression`` (not ``tuple_pattern``) since
+          it's an l-value expression, not a binding pattern. Recurse
+          the same way to surface the rebound identifiers.
 
         Wildcard ``_`` and type references inside patterns don't bind
         anything and are skipped naturally.
@@ -154,7 +159,15 @@ class RustTaintTracker:
         if ptype in ("identifier", "shorthand_field_identifier"):
             yield pattern
             return
-        if ptype in ("mut_pattern", "ref_pattern", "tuple_pattern", "tuple_struct_pattern", "struct_pattern", "captured_pattern"):
+        if ptype in (
+            "mut_pattern",
+            "ref_pattern",
+            "tuple_pattern",
+            "tuple_struct_pattern",
+            "struct_pattern",
+            "captured_pattern",
+            "tuple_expression",
+        ):
             for child in pattern.named_children:
                 yield from self._iter_pattern_identifiers(child)
             return

@@ -1842,9 +1842,11 @@ def _strip_list_rules_flag(argv: list[str]) -> list[str] | None:
     Returns ``None`` when ``--list-rules`` is absent. The flag is the
     user-facing alias for the ``list-rules`` subcommand; treat any
     invocation containing it as if the user wrote ``safelint list-rules
-    <other-flags>``. Strips both the bare token and its leading-dash
-    forms; argparse then parses the remaining argv with the subcommand's
-    parser so flag-typo guarantees stay intact.
+    <other-flags>``. Removes every occurrence of the literal
+    ``--list-rules`` token (the flag is a boolean toggle, so there's
+    no ``--list-rules=value`` form to consider); argparse then parses
+    the remaining argv with the subcommand's parser so flag-typo
+    guarantees stay intact.
     """
     if "--list-rules" not in argv:
         return None
