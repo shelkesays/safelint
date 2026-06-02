@@ -873,6 +873,41 @@ def test_install_auto_detects_codex_via_opencode_dir(monkeypatch: pytest.MonkeyP
     assert "codex" in out
 
 
+def test_install_opencode_without_agents_md_warns(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``.opencode/`` without ``AGENTS.md`` triggers a clear stderr warning after install.
+
+    Without the warning, an OpenCode user runs ``safelint skill install``,
+    sees a green install message, and walks away unaware that OpenCode
+    never received the safelint context (OpenCode reads ``AGENTS.md``,
+    which the install deliberately doesn't auto-create). The warning
+    names the gap and the corrective command.
+    """
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".opencode").mkdir()
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    err = capsys.readouterr().err
+    assert "AGENTS.md" in err
+    assert "OpenCode reads" in err
+    assert "--force" in err
+
+
+def test_install_opencode_with_agents_md_does_not_warn(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """When ``AGENTS.md`` exists alongside ``.opencode/``, the integration is complete and no warning fires.
+
+    The secondary install writes the safelint section into ``AGENTS.md``;
+    OpenCode reads it; the gap-warning path should stay silent.
+    """
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".opencode").mkdir()
+    (cwd / "AGENTS.md").write_text("# project agents\n", encoding="utf-8")
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    err = capsys.readouterr().err
+    # No gap warning should appear when the secondary file exists.
+    assert "OpenCode reads" not in err
+
+
 def test_install_warp_user_scope_is_refused(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """``safelint skill install --client warp`` (without --project) errors out.
 

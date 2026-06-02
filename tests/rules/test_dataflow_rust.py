@@ -129,22 +129,28 @@ def test_rust_clean_param_does_not_fire(tmp_path: Path) -> None:
 
 
 def test_rust_source_call_to_sink_fires(tmp_path: Path) -> None:
-    """A ``var`` source call's return value flowing into ``Command::new`` fires.
+    """``std::env::var("KEY").unwrap()`` flowing into ``Command::new`` fires.
 
-    Tests the source-call code path: ``call_name`` resolves the bare
-    call ``var(...)`` (or scoped ``std::env::var(...)``) to ``"var"``
-    which is in the default ``sources_rust`` list; the returned value
-    is treated as tainted and the downstream sink call fires.
+    Tests the source-call code path end-to-end with a real-world source
+    shape:
 
-    Uses a bare ``var`` call rather than chained ``var(...).unwrap()``
-    because the taint tracker doesn't propagate taint through method
-    chains (same limitation as JS / Python). Real Rust code would
-    typically destructure the ``Result``, which is outside the
-    tracker's current scope.
+    * ``std::env::var(...)`` is a scoped path; ``call_name`` extracts
+      the trailing bareword ``"var"``, which matches the default
+      ``sources_rust`` entry and marks the call's return as tainted.
+    * The chained ``.unwrap()`` is a method call whose receiver is the
+      tainted ``std::env::var(...)`` call. The receiver-aware taint
+      check in ``_call_tainted`` propagates taint through, so the
+      ``unwrap()`` result is tainted too.
+    * ``Command::new("echo").arg(tainted)`` is the downstream sink.
+
+    Earlier versions of this test used a local ``fn var() -> String``
+    stub because the tracker didn't yet propagate taint through method
+    chains. That limitation was lifted by the receiver-taint fix, so
+    the test now exercises the production source shape directly.
     """
     sample = tmp_path / "source.rs"
     sample.write_text(
-        'use std::process::Command;\nfn run() {\n    let user_input = var();\n    Command::new("echo").arg(user_input);\n}\nfn var() -> String { String::new() }\n',
+        'use std::process::Command;\nfn run() {\n    let user_input = std::env::var("USER_INPUT").unwrap();\n    Command::new("echo").arg(user_input);\n}\n',
         encoding="utf-8",
     )
     result = _enabled_engine("tainted_sink").check_file(str(sample))
