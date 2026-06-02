@@ -124,20 +124,26 @@ nav:
       - Project vs user scope: ai-clients/scope.md
       - Updating, removing, freshness: ai-clients/lifecycle.md
       - Troubleshooting: ai-clients/troubleshooting.md
+      # Ordered by approximate real-world usage in mid-2026; subjective
+      # ranking (no clean public dataset for AI-agent market share), but
+      # the rough buckets are mainstream / mid / lower / niche. Update
+      # when the field shifts; the registry order in ``_skill_install.py``
+      # is unchanged because it drives auto-detection / CLI output and
+      # shouldn't be reshuffled for popularity reasons.
       - Per-client guides:
-          - Claude Code: ai-clients/clients/claude-code.md
-          - Cursor: ai-clients/clients/cursor.md
           - GitHub Copilot: ai-clients/clients/github-copilot.md
+          - Cursor: ai-clients/clients/cursor.md
+          - Claude Code: ai-clients/clients/claude-code.md
+          - codex: ai-clients/clients/codex.md
           - Gemini: ai-clients/clients/gemini.md
           - Windsurf: ai-clients/clients/windsurf.md
-          - codex: ai-clients/clients/codex.md
           - Continue.dev: ai-clients/clients/continue-dev.md
           - Cline: ai-clients/clients/cline.md
-          - aider: ai-clients/clients/aider.md
-          - Trae: ai-clients/clients/trae.md
-          - Antigravity: ai-clients/clients/antigravity.md
           - Zed: ai-clients/clients/zed.md
           - Warp: ai-clients/clients/warp.md
+          - aider: ai-clients/clients/aider.md
+          - Antigravity: ai-clients/clients/antigravity.md
+          - Trae: ai-clients/clients/trae.md
   - JSON output schema: json-schema.md
   - Contributing:
       - Overview: contributing/index.md
