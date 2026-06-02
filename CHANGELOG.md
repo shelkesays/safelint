@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Warp added to the per-client docs.** New `docs/ai-clients/clients/warp.md` page covering the project-scope-only contract; row added to the client table in `docs/ai-clients/index.md`; mkdocs nav entry under Per-client guides. (Warp itself shipped as a client in 2.2.0; this just closes the docs gap.)
+- **OpenCode auto-detection documented in `codex.md`.** New "OpenCode auto-detection" subsection covering the `.opencode/` marker piggyback, the AGENTS.md auto-create vs append cases, and a "Note on OpenClaw" explaining why that agent was evaluated and deliberately not added.
+- **Per-client guides reordered by approximate real-world usage** (mainstream / mid / lower / niche tiers) instead of "the order we added support". `_CLIENT_SPECS` order in `_skill_install.py` is unchanged - the registry order drives auto-detection iteration and CLI output; only the docs ordering follows popularity.
+- **`docs/configuration/cli.md` restructured into a per-command reference** (one section per command and subcommand, brief style: description + flags table + 1-2 examples). New dedicated sections for `safelint skill install`, `safelint skill path`, `safelint --stdin`, `safelint version`, and `safelint help`. Promoted from "Configuration → CLI flags and commands" to a top-level "CLI commands and flags" nav entry; URL `.../configuration/cli/` unchanged.
+- **`docs/json-schema.md` clarifications.** Reframed "stable since v1.5.0" to distinguish shape stability (v1.5.0) from rule-set growth (Java in v2.1.0, Rust in v2.2.0). Added a "Language coverage" note clarifying all five languages produce identical JSON structures.
+
+### Bundled-skill drift after upgrade
+
+`pip install --upgrade safelint` past this release will cause **`safelint skill status` to report DRIFT** on every installed copy. That's because all 13 bundled skill files (the per-client templates under `src/safelint/skill_files/`) were edited to fix two issues:
+
+- The JSON example violation was internally inconsistent (`SAFE101 / function_length` paired with a `bare_except` suggestion). Switched to `SAFE201 / bare_except` so code, rule, and suggestion describe the same defect.
+- The "stable since v1.5.0" schema-stability sentence was reworded to acknowledge rule-set expansion (matching `docs/json-schema.md`).
+
+Action for users running `safelint skill install`: after upgrading, run `safelint skill update` (idempotent; refreshes drifted installs to the new bundled content). Symlink-mode installs (`safelint skill install --symlink`) pick up the new bundle automatically with no action needed. See [`safelint skill status`](https://shelkesays.github.io/safelint/configuration/cli/#safelint-skill-status) and [`safelint skill update`](https://shelkesays.github.io/safelint/configuration/cli/#safelint-skill-update) in the CLI reference.
+
 ## [2.2.0] - 2026-06-01
 
 **Rust support; rule-catalogue CLI; Warp + OpenCode agents.** Promotion of the rc1 / rc2 / rc3 cycle to GA. Three additive bundles ship together: a fifth supported language, a CLI surface for catalogue introspection, and two more AI clients on the registry. Python / JavaScript / TypeScript / Java users see zero behaviour change beyond an additive grammar option, an additive CLI subcommand, and an additive `--client=warp` choice.
