@@ -67,6 +67,30 @@ ANSI colour is auto-disabled when stdout is not a TTY (piping to a file produces
 - Running a one-off full audit
 - `pre-commit run --all-files` already passes all files directly; the hook mode handles this automatically.
 
+## `safelint list-rules` flags (2.2.0)
+
+`safelint list-rules` prints the catalogue of every shipped rule so AI agents, CI dashboards, and docs-generation pipelines can introspect what safelint will check without grepping skill files. The `--list-rules` form (as a top-level flag) is an alias for the subcommand; the two are interchangeable. Categories are derived from the leading digit of each `SAFExxx` code (1xx function shape, 2xx error handling, 3xx side effects / state, 4xx resource lifecycle, 5xx loop safety, 6xx documentation, 7xx test coverage, 8xx dataflow, 9xx framework-specific).
+
+| Flag | Default | What it does |
+|---|---|---|
+| `--language <LANG>` | (no filter; all rules shown) | Restrict the listing to one language. Choices match the canonical registry names: `python`, `javascript`, `typescript`, `java`, `rust`. Filters by the rule's `language` tuple, so cross-language rules show under any of their languages. |
+| `--format <FMT>` | `text` | Output format. `text` prints an aligned table grouped by category band. `json` emits a versioned document with the per-rule schema (`code`, `name`, `severity`, `default_enabled`, `languages`, `category`, `description`). `markdown` emits one table per category band, useful for piping into docs (`safelint list-rules --format=markdown > docs/rules.md`). `sarif` emits a SARIF 2.1.0 catalogue document with the rules under `runs[0].tool.driver.rules[]` and an empty `results[]`; consumable by GitHub Code Scanning catalogue UIs. |
+| `--enabled-only` | off | Drop rules that are off by default. Useful for "what fires out of the box?" views. The default catalogue shows every shipped rule with a `Default` column marking on / off state. |
+
+Examples:
+
+```bash
+safelint list-rules                                       # text table, all rules
+safelint list-rules --language=rust                        # rust + cross-language subset
+safelint list-rules --enabled-only --language=python       # python's active default surface
+safelint list-rules --format=json | jq '.rules | length'   # programmatic count
+safelint list-rules --format=markdown > docs/rules.md      # docs regeneration
+safelint list-rules --format=sarif                         # GitHub Code Scanning catalogue feed
+safelint --list-rules --language=java                      # flag-alias form (same effect)
+```
+
+Exit codes: `0` on success, `2` when the filter combination matches zero rules (so a typo in a CI script like `--language=pythn` doesn't silently produce an empty document).
+
 ## Exit codes
 
 SafeLint's exit code tells CI / pre-commit how the run finished:
