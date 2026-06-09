@@ -4,7 +4,7 @@ This guide is the cheat sheet for adding support for a new AI coding client (Git
 
 !!! note
 
-    Thirteen clients are registered today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp). Adding the next is a one-`ClientSpec` change plus a bundled artefact and tests. No control-flow changes elsewhere, install / detection / CLI choices / output all read from the registry.
+    Fourteen clients are registered today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp, Kiro). Adding the next is a one-`ClientSpec` change plus a bundled artefact and tests. No control-flow changes elsewhere, install / detection / CLI choices / output all read from the registry.
 
 For the user-facing surface (auto-detection logic, how each client is invoked after install, troubleshooting), see [AI client integrations](../ai-clients/index.md). This file is for contributors *adding* a new entry to the registry.
 
@@ -13,7 +13,7 @@ For the user-facing surface (auto-detection logic, how each client is invoked af
 1. `safelint._skill_install.ClientSpec` is a frozen dataclass holding everything the engine needs about an AI client: detection markers, install destination, bundled artefact location, output wording.
 2. Adding a client = appending one `ClientSpec` instance to `_CLIENT_SPECS` and shipping the bundled artefact under `src/safelint/skill_files/`.
 3. The auto-detection scanner walks the registry in order, looking for each spec's `cwd_markers` (then `home_markers` if cwd is empty), the matching specs drive the install.
-4. The install primitives (`_install_copy`, `_install_symlink`, `_install_symlink_directory_filtered`) are client-agnostic, they handle file vs. directory sources from the spec's `bundled_relpath` without caring which client it's for.
+4. The install primitives (`_install_copy`, `_install_symlink`) are client-agnostic, they install the single file at the spec's `bundled_relpath` to the spec's `install_relpath` without caring which client it's for.
 5. CLI `--client` choices on both `install` and `path` subcommands are derived from the registry, so argparse stays in sync automatically the moment a new spec lands.
 
 ## Step-by-step: adding a new client
@@ -55,6 +55,7 @@ _WINDSURF_SPEC = ClientSpec(
     bundled_relpath=("windsurf", "safelint-rules.md"),  # path components under skill_files/
     restart_hint="Reload Windsurf (or restart the editor) to pick up the new rules.",
     usage_hint='Then ask Windsurf "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("windsurf", "safelint-rules.md"),),  # bundled docs the drift tests scan (required field)
 )
 
 
@@ -75,6 +76,31 @@ Field reference:
 | `restart_hint` | Printed after a successful install, tells the user how to make the AI client pick up the new artefact. |
 | `usage_hint` | Printed after `restart_hint`, tells the user what to say to the agent next. |
 | `documentation_relpaths` | Tuple of relpaths under `skill_files/` whose combined text *must* mention every rule code/name in `ALL_RULES` and every extension in `supported_extensions()`. Drift-detection tests parametrised over `_CLIENT_SPECS` enforce this, a new rule or language without corresponding bundled-doc updates fails CI. For a single-file client whose bundled artefact lives at `skill_files/windsurf/safelint-rules.md`, set this to `(("windsurf", "safelint-rules.md"),)`. For Claude Code it points at `(("claude", "SKILL.md"),)`. The outer tuple is a *list* of files; if a client splits its docs across multiple bundled files, list them all and the test treats the union of their text as the searchable surface. |
+
+All fields are required except `secondary_install_relpath` / `secondary_install_section_markers` (both default to `None`, see step 4). In particular `documentation_relpaths` has **no default** - omit it and the dataclass construction raises `TypeError`.
+
+### 3b. (Optional) Project-scope-only clients (no user-scope file)
+
+Some clients read a project-root file but have **no user-scope (home-directory) equivalent**, their cross-project "global rules" live in a cloud / UI rather than on disk. Warp is the worked example: its project file is `<cwd>/WARP.md`, but "Global Rules" are managed through the Warp Drive UI, not `~/WARP.md`.
+
+Signal this by leaving **`home_markers` empty**:
+
+```python
+_WARP_SPEC = ClientSpec(
+    # ... usual fields ...
+    cwd_markers=("WARP.md", ".warp"),
+    home_markers=(),                       # ← no user-scope file: project-scope only
+    install_relpath=("WARP.md",),
+    # ...
+)
+```
+
+You write no extra control flow. `_resolve_install_plan` reads the empty tuple and:
+
+- refuses `safelint skill install --client <name>` without `--project`, printing a clear error (via `_print_user_scope_unsupported_error`) instead of writing a file the client never reads;
+- skips the client during the home-directory auto-detection fallback (no home markers to match), so a bare `safelint skill install` only ever installs it project-scoped.
+
+Mirror Warp's two regression tests when adding such a client: one asserting the user-scope install is refused (exit 1, no file written, error names the client and `--project`), one asserting `--project` still works.
 
 ### 4. (Optional) Cross-agent shared file (the "secondary install")
 
@@ -99,7 +125,7 @@ _YOUR_SPEC = ClientSpec(
 
 When set:
 
-- **`install`** writes the primary destination as usual *and*, if the secondary file already exists at the scope root, edits a delimited section into it. The shared file is **never auto-created**, its existence is the user's signal that they want the cross-agent integration.
+- **`install`** writes the primary destination as usual *and*, if the secondary file already exists at the scope root, edits a delimited section into it. The shared file is normally **not auto-created**, its existence is the user's signal that they want the cross-agent integration. (One narrow exception is wired into `_maybe_seed_secondary_for_opencode`: when `.opencode/` is present at the scope root, `AGENTS.md` *is* created from scratch, because that shared file is OpenCode's only safelint integration point. If your client has an analogous "the shared file is the only integration point" case, that's where to add it.)
 - **`update`** re-renders the section if it has drifted from the bundle.
 - **`status`** escalates the overall verdict to *differs* when the section drifts (even if the primary is fresh).
 - **`remove`** strips just the section. Other content in the shared file is preserved. If the file ends up empty after stripping, it is removed too.
@@ -197,7 +223,7 @@ The existing Cursor tests are a good template, copy them and substitute paths / 
 
 ### 7. Update documentation
 
-Three places to touch:
+Five places to touch:
 
 1. **[AI client integrations](../ai-clients/index.md)**, add a row to the *Supported clients* table.
 2. **Per-client guide**, add a new page at `docs/ai-clients/clients/<client>.md` (mirroring the existing per-client pages: markers, install location, how to invoke after install, manual install) and register it under the `nav.AI client integrations.Per-client guides` entry in `mkdocs.yml`.
@@ -245,7 +271,6 @@ Before opening a pull request:
 
 - [ ] New `ClientSpec` entry added to `_CLIENT_SPECS` in `src/safelint/_skill_install.py`
 - [ ] Bundled artefact lives under `src/safelint/skill_files/<client>/`
-- [ ] Peer-client exclusion (`_PEER_CLIENT_DIRS`) updated if applicable
 - [ ] `pyproject.toml` package-data glob covers any new file extension
 - [ ] Tests added: bundled-file existence, copy/symlink user/project, force replace, CLI routing, auto-detection
 - [ ] Pipeline green: `pytest`, `ruff check`, `ruff format --check`, `ty check`, `safelint check src/` all clean at >=97% coverage

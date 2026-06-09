@@ -53,7 +53,7 @@ safelint skill remove --dry-run           # preview without deleting
 
 `safelint skill remove` mirrors install's auto-detect *for install paths* (not marker files): it scans `~/.claude/skills/safelint/SKILL.md`, `<cwd>/.claude/skills/safelint/SKILL.md`, `~/.cursor/rules/safelint.mdc`, `<cwd>/.cursor/rules/safelint.mdc` and removes whatever exists.
 
-> **Security note on `--path PATH`:** the path you pass must match a registered install shape, i.e. its tail must equal one of the canonical install relpaths (`.cursor/rules/safelint.mdc`, `.codex/instructions.md`, `.continue/rules/safelint.md`, `.clinerules/safelint.md`, `.trae/rules/safelint.md`, `.antigravity/rules/safelint.md`, `.windsurfrules`, `GEMINI.md`, `.rules`, `CONVENTIONS.md`, `.claude/skills/safelint/SKILL.md`, `.github/copilot-instructions.md`). This guard prevents typos and shell-expansion accidents (e.g. `--path ~/.config` instead of `~/.cursor/...`) from triggering `shutil.rmtree` on the wrong directory. If you have a truly unrecognisable install location, remove it manually with `rm` after inspecting its contents.
+> **Security note on `--path PATH`:** the path you pass must match a registered install shape, i.e. its tail must equal one of the canonical install relpaths (`.cursor/rules/safelint.mdc`, `.codex/instructions.md`, `.continue/rules/safelint.md`, `.clinerules/safelint.md`, `.trae/rules/safelint.md`, `.antigravity/rules/safelint.md`, `.windsurfrules`, `GEMINI.md`, `.rules`, `CONVENTIONS.md`, `.claude/skills/safelint/SKILL.md`, `.github/copilot-instructions.md`, `WARP.md`, `.kiro/steering/safelint.md`). The set is derived from the client registry, so newly added clients extend it automatically. This guard prevents typos and shell-expansion accidents (e.g. `--path ~/.config` instead of `~/.cursor/...`) from triggering `shutil.rmtree` on the wrong directory. If you have a truly unrecognisable install location, remove it manually with `rm` after inspecting its contents.
 >
 > **codex secondary install (`AGENTS.md`):** when `AGENTS.md` exists at the install scope root, codex's secondary install writes a delimited section into it (and `remove` strips that section back out). For security, safelint **refuses to follow symlinks** at the secondary destination, if `AGENTS.md` is a symlink, install/update/remove all skip it and print a `safelint: warning: refusing to install/remove safelint section through symlink at ...` line on stderr. Replace the symlink with a real file before re-running if you want safelint to manage that location directly.
 
@@ -75,12 +75,10 @@ In particular, `safelint skill remove` **without `--symlink` removes both shapes
 
 ### Filesystem-level safety
 
-`remove` only deletes from the install location. The bundled files inside `site-packages/` are never touched, regardless of install mode:
+`remove` only deletes from the install location. The bundled files inside `site-packages/` are never touched. Every client installs a single file, so there are exactly two cases:
 
-- **Copy install (single file)**, `target.unlink()` deletes the file.
-- **Copy install (directory tree)**, `shutil.rmtree(target)` walks and deletes the materialised tree.
-- **Symlink install (single file)**, `target.unlink()` deletes the **symlink**, not its bundled target.
-- **Symlink install (per-entry directory layout, Claude `--symlink`)**, `shutil.rmtree(target)` removes the directory; inner symlinks are deleted but their targets in the bundled package stay intact.
+- **Copy install**, `target.unlink()` deletes the file.
+- **Symlink install**, `target.unlink()` deletes the **symlink**, not its bundled target inside the wheel.
 
 So you can run `remove` freely without worrying about damaging the wheel, the worst case is "I have to re-run `install` to get the skill back".
 

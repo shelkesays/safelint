@@ -973,6 +973,115 @@ def test_install_warp_project_scope_works(monkeypatch: pytest.MonkeyPatch, tmp_p
     assert (cwd / "WARP.md").is_file()
 
 
+# ---------------------------------------------------------------------------
+# Kiro client install
+# ---------------------------------------------------------------------------
+
+
+def test_bundled_kiro_steering_file_exists_in_wheel() -> None:
+    """The Kiro steering file ships under ``skill_files/kiro/safelint.md``."""
+    path = _skill_install.bundled_skill_path() / "kiro" / "safelint.md"
+    assert path.is_file()
+    head = path.read_text(encoding="utf-8")[:200]
+    assert head.startswith("# safelint")
+
+
+def test_install_kiro_copy_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--client kiro`` copies the bundled file to ~/.kiro/steering/safelint.md."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="kiro"))
+    assert rc == 0
+    target = home / ".kiro" / "steering" / "safelint.md"
+    assert target.is_file()
+    assert not target.is_symlink()
+    out = capsys.readouterr().out
+    assert "Kiro steering file" in out
+    assert "user scope" in out
+
+
+def test_install_kiro_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client kiro --project`` lands at <cwd>/.kiro/steering/safelint.md."""
+    home, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="kiro", project=True))
+    assert rc == 0
+    assert (cwd / ".kiro" / "steering" / "safelint.md").is_file()
+    assert not (home / ".kiro").exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_kiro_symlink_user_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--client kiro --symlink`` creates a file symlink to the bundled steering file."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    rc = _skill_install.run_install(_make_args(client="kiro", symlink=True))
+    assert rc == 0
+    target = home / ".kiro" / "steering" / "safelint.md"
+    assert target.is_symlink()
+    bundled = _skill_install.bundled_skill_path() / "kiro" / "safelint.md"
+    assert target.resolve() == bundled.resolve()
+
+
+def test_install_kiro_with_force_replaces_existing(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """``--force`` replaces a stale Kiro steering file at the target."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    target = home / ".kiro" / "steering" / "safelint.md"
+    target.parent.mkdir(parents=True)
+    target.write_text("stale steering\n", encoding="utf-8")
+    assert _skill_install.run_install(_make_args(client="kiro", force=True)) == 0
+    assert "stale steering" not in target.read_text(encoding="utf-8")
+
+
+def test_install_kiro_refuses_overwrite_without_force(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A second kiro install without ``--force`` exits 1 with the error on stderr."""
+    _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="kiro")) == 0
+    rc = _skill_install.run_install(_make_args(client="kiro"))
+    assert rc == 1
+    captured = capsys.readouterr()
+    assert "already exists" in captured.err
+
+
+def test_cli_routes_skill_install_with_kiro_client(monkeypatch: pytest.MonkeyPatch, mocker: MockerFixture) -> None:
+    """``safelint skill install --client kiro --project`` forwards both flags to run_install."""
+    monkeypatch.setattr("sys.argv", ["safelint", "skill", "install", "--client", "kiro", "--project"])
+    spy = mocker.patch.object(_skill_install, "run_install", return_value=0)
+    with pytest.raises(SystemExit) as exc:
+        cli.main()
+    assert exc.value.code == 0
+    args = spy.call_args.args[0]
+    assert args.client == "kiro"
+    assert args.project is True
+
+
+def test_install_copy_excludes_peer_kiro_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """The materialised Claude skill folder must NOT contain the peer ``kiro/`` subdirectory."""
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    assert _skill_install.run_install(_make_args(client="claude")) == 0
+    target = home / ".claude" / "skills" / "safelint"
+    assert target.is_dir()
+    assert not (target / "kiro").exists(), "peer kiro/ leaked into Claude skill"
+
+
+def test_install_auto_detects_kiro_in_cwd(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A ``.kiro/`` directory in cwd triggers project-scope Kiro install on auto-detect."""
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".kiro").mkdir()
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    assert (cwd / ".kiro" / "steering" / "safelint.md").is_file()
+    out = capsys.readouterr().out
+    assert "Kiro" in out
+
+
+def test_run_path_with_client_kiro_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint skill path --client kiro`` prints the bundled steering file path."""
+    rc = _skill_install.run_path(argparse.Namespace(client="kiro"))
+    assert rc == 0
+    out = capsys.readouterr().out.strip()
+    p = Path(out)
+    assert p.is_file()
+    assert p.name == "safelint.md"
+
+
 def test_run_path_with_client_codex_prints_md_file(capsys: pytest.CaptureFixture[str]) -> None:
     """``safelint skill path --client codex`` prints the bundled instructions file path."""
     rc = _skill_install.run_path(argparse.Namespace(client="codex"))

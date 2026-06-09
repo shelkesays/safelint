@@ -1,6 +1,6 @@
 # Project vs user scope
 
-Every supported client can be installed at one of two scopes. The choice is independent of which client you're installing.
+Most supported clients can be installed at either of two scopes. The choice is independent of which client you're installing.
 
 | | User scope (default) | Project scope (`--project`) |
 |---|---|---|
@@ -10,6 +10,13 @@ Every supported client can be installed at one of two scopes. The choice is inde
 | **Auto-detect** | Triggered by markers under `~/` | Triggered by markers under `cwd` |
 
 For the exact install path each client uses at each scope, see the per-client guide linked from the [AI clients overview](index.md).
+
+## Project-scope-only clients
+
+A few clients have **no user-scope file** at all, their cross-project "global rules" live in a cloud or UI rather than on disk. Currently this is just **Warp**: its project file is `<cwd>/WARP.md`, but Warp's "Global Rules" are managed through the Warp Drive UI, not `~/WARP.md`. For such a client:
+
+- `safelint skill install --client warp` (without `--project`) exits 1 with a clear error rather than writing a file the client never reads. Pass `--project`.
+- Auto-detection never falls back to the home directory for it (it has no home markers to match), so a bare `safelint skill install` only ever installs it project-scoped.
 
 ## Symlink mode (developer loop)
 

@@ -80,6 +80,12 @@ safelint skill install --client zed
 # `safelint skill install --client warp` without --project exits 1
 # with a clear error)
 safelint skill install --client warp --project
+
+# Kiro, project-scoped (recommended for team-shared repos)
+safelint skill install --client kiro --project
+
+# Kiro, user-global (loaded across all projects)
+safelint skill install --client kiro
 ```
 
 When `--client` is explicit, no detection runs and no detection notice is printed. The install proceeds at the requested scope (default: user; with `--project`: cwd). Specs without a user-scope install (currently just Warp) refuse the install with a clear error when `--project` is omitted.
