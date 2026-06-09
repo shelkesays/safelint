@@ -75,10 +75,11 @@ In particular, `safelint skill remove` **without `--symlink` removes both shapes
 
 ### Filesystem-level safety
 
-`remove` only deletes from the install location. The bundled files inside `site-packages/` are never touched. Every client installs a single file, so there are exactly two cases:
+`remove` only deletes from the install location. The bundled files inside `site-packages/` are never touched. Every client installs a single file, so the common cases are:
 
 - **Copy install**, `target.unlink()` deletes the file.
 - **Symlink install**, `target.unlink()` deletes the **symlink**, not its bundled target inside the wheel.
+- **A directory at the install path** (a legacy install, or a directory you created there by hand), `shutil.rmtree(target)` removes it. Current installs never create a directory at the canonical path, but `remove` handles one defensively if it finds it.
 
 So you can run `remove` freely without worrying about damaging the wheel, the worst case is "I have to re-run `install` to get the skill back".
 

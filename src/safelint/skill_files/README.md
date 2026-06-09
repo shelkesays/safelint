@@ -125,7 +125,7 @@ safelint skill install --client kiro                # ~/.kiro/steering/safelint.
 | Flag | Effect |
 |---|---|
 | `--client` | Target AI client: `auto` (default, detect from cwd, then home), or one of: `claude`, `cursor`, `copilot`, `gemini`, `windsurf`, `codex`, `continue`, `cline`, `aider`, `trae`, `antigravity`, `zed`, `warp`, `kiro`. New clients added to the registry extend this list automatically. |
-| `--project` | Force project scope (`<cwd>/.<client>/...`). With `--client auto`, restricts detection to cwd and refuses to fall back to home. |
+| `--project` | Force project scope: install under the current working directory instead of your home directory. The exact path is per-client, often `<cwd>/.<client>/...`, but several clients install a file at the project root (e.g. `GEMINI.md`, `.windsurfrules`, `.rules`, `WARP.md`, `CONVENTIONS.md`). With `--client auto`, restricts detection to cwd and refuses to fall back to home. |
 | `--symlink` | Symlink to the bundled location instead of copying. `pip upgrade safelint` then immediately changes what the AI client sees. Requires symlink support (POSIX, or Windows developer mode). |
 | `--force` | Replace any existing safelint skill / rule at the target. Use this when re-installing after an upgrade. |
 
