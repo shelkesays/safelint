@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.3.0] - 2026-06-09
+
+**Kiro AI client; documentation accuracy pass.** Kiro (`kiro.dev`, AWS's agentic IDE) joins the registry as the fourteenth supported AI client, additive, one `ClientSpec`. This release also folds in the post-2.2.0 documentation work: the per-client docs gaps for Warp and OpenCode are closed, `docs/configuration/cli.md` is restructured into a per-command reference, and the contributing "Adding an AI client" guide plus the AI client integration pages are corrected against the current single-file install architecture. No behaviour change for existing clients or languages.
+
 ### Added
 
 - **Kiro (`kiro.dev`) added as a supported AI client.** AWS's agentic IDE reads steering files under `.kiro/steering/*.md`; `safelint skill install --client kiro` writes `.kiro/steering/safelint.md` at project scope (`--project`, recommended for team repos) or `~/.kiro/steering/safelint.md` at user scope. Auto-detection picks up a `.kiro/` directory in the cwd (project) or home (user). One `ClientSpec` addition plus the bundled `skill_files/kiro/safelint.md` template; the `_CLIENT_SPECS` registry, drift-detection contract, and CLI choices all extend automatically. Kiro also honours the `AGENTS.md` standard as a fallback, but safelint installs to its first-class steering file rather than coupling on the shared `AGENTS.md` (owned by the codex client).
@@ -18,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Per-client guides reordered by approximate real-world usage** (mainstream / mid / lower / niche tiers) instead of "the order we added support". `_CLIENT_SPECS` order in `_skill_install.py` is unchanged - the registry order drives auto-detection iteration and CLI output; only the docs ordering follows popularity.
 - **`docs/configuration/cli.md` restructured into a per-command reference** (one section per command and subcommand, brief style: description + flags table + 1-2 examples). New dedicated sections for `safelint skill install`, `safelint skill path`, `safelint --stdin`, `safelint version`, and `safelint help`. Promoted from "Configuration → CLI flags and commands" to a top-level "CLI commands and flags" nav entry; URL `.../configuration/cli/` unchanged.
 - **`docs/json-schema.md` clarifications.** Reframed "stable since v1.5.0" to distinguish shape stability (v1.5.0) from rule-set growth (Java in v2.1.0, Rust in v2.2.0). Added a "Language coverage" note clarifying all five languages produce identical JSON structures.
+- **Contributing and integration docs corrected against current code.** The "Adding an AI client" guide dropped a non-existent install primitive and the obsolete `_PEER_CLIENT_DIRS` step, added the required `documentation_relpaths` field to its worked example, documented the project-scope-only client pattern, and refreshed its client / language counts. `docs/ai-clients/lifecycle.md` and `scope.md` now describe the single-file install model (no directory-tree install) and the project-scope-only contract. Contributor pointers no longer instruct editing the moved repo-root redirect stubs (`AI_CLIENTS.md` / `CONFIGURATION.md`).
 
 ### Bundled-skill drift after upgrade
 
