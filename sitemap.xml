@@ -2,154 +2,158 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://shelkesays.github.io/safelint/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/json-schema/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/pre-commit/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/lifecycle/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/manual-install/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/scope/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/troubleshooting/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/aider/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/antigravity/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/claude-code/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/cline/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/codex/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/continue-dev/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/cursor/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/gemini/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/github-copilot/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
+    </url>
+    <url>
+         <loc>https://shelkesays.github.io/safelint/ai-clients/clients/kiro/</loc>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/trae/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/warp/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/windsurf/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/ai-clients/clients/zed/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/configuration/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/configuration/cli/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/configuration/rules/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/configuration/suppression/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/configuration/toml/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/contributing/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/contributing/adding-a-language/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/contributing/adding-an-ai-client/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/languages/java/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/languages/javascript/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/languages/python/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/languages/rust/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/languages/typescript/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/project/changelog/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/project/code-of-conduct/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/project/security/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
     <url>
          <loc>https://shelkesays.github.io/safelint/project/support/</loc>
-         <lastmod>2026-06-02</lastmod>
+         <lastmod>2026-06-09</lastmod>
     </url>
 </urlset>

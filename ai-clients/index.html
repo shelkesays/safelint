@@ -1142,6 +1142,8 @@
       
         
       
+        
+      
     
     
     
@@ -1457,6 +1459,34 @@
     
   
     Warp
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="clients/kiro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiro
   
 
     
@@ -2067,7 +2097,7 @@
 <p>You run the single composed command and you're set up for every language in the repo. Silent when every needed grammar is already installed.</p>
 <p>After install, restart the AI client (or reload its window) and ask things like <em>"run safelint"</em>.</p>
 <h2 id="supported-clients">Supported clients<a class="headerlink" href="#supported-clients" title="Permanent link">#</a></h2>
-<p>Rows are ordered by approximate real-world usage as of mid-2026; the precise rank is subjective (no clean public dataset for AI-agent market share), but the rough buckets are <em>mainstream</em> (GitHub Copilot / Cursor / Claude Code), <em>mid-tier</em> (codex / Gemini / Windsurf), <em>lower</em> (Continue.dev / Cline / Zed / Warp / aider), and <em>niche</em> (Antigravity / Trae). The registry order in <code>_skill_install.py</code> is <strong>unchanged</strong> by this ordering (it drives auto-detection, install-loop, and CLI-output sequencing where popularity isn't the right axis); only this table and the sidebar nav reflect the popularity view.</p>
+<p>Rows are ordered by approximate real-world usage as of mid-2026; the precise rank is subjective (no clean public dataset for AI-agent market share), but the rough buckets are <em>mainstream</em> (GitHub Copilot / Cursor / Claude Code), <em>mid-tier</em> (codex / Gemini / Windsurf), <em>lower</em> (Continue.dev / Cline / Zed / Warp / Kiro / aider), and <em>niche</em> (Antigravity / Trae). The registry order in <code>_skill_install.py</code> is <strong>unchanged</strong> by this ordering (it drives auto-detection, install-loop, and CLI-output sequencing where popularity isn't the right axis); only this table and the sidebar nav reflect the popularity view.</p>
 <table>
 <thead>
 <tr>
@@ -2139,6 +2169,12 @@
 <td><code>WARP.md</code> or <code>.warp/</code> in cwd</td>
 </tr>
 <tr>
+<td><strong><a href="clients/kiro/">Kiro</a></strong></td>
+<td>Steering file (<code>.kiro/steering/&lt;name&gt;.md</code>)</td>
+<td><code>~/.kiro/steering/safelint.md</code> (user) or <code>&lt;cwd&gt;/.kiro/steering/safelint.md</code> (project)</td>
+<td><code>.kiro/</code> in cwd; <code>~/.kiro/</code> for user-scope</td>
+</tr>
+<tr>
 <td><strong><a href="clients/aider/">aider</a></strong></td>
 <td>Markdown conventions (<code>CONVENTIONS.md</code>), <strong>not auto-loaded</strong>; wire via <code>read:</code> in <code>.aider.conf.yml</code></td>
 <td><code>~/CONVENTIONS.md</code> (user) or <code>&lt;cwd&gt;/CONVENTIONS.md</code> (project)</td>
@@ -2175,6 +2211,7 @@
 <a id="__codelineno-2-11" name="__codelineno-2-11" href="#__codelineno-2-11"></a>       │
 <a id="__codelineno-2-12" name="__codelineno-2-12" href="#__codelineno-2-12"></a>       └── no  ──→  error: print explicit --client commands and exit 1
 </code></pre></div>
+<p>Step [2] (the home fallback) skips <strong>project-scope-only</strong> clients such as Warp: they have no user-scope file, so they're never installed at home scope. See <a href="scope/#project-scope-only-clients">Project vs user scope</a>.</p>
 <h3 id="multi-detection">Multi-detection<a class="headerlink" href="#multi-detection" title="Permanent link">#</a></h3>
 <p>If multiple clients are present, <strong>all</strong> of them are installed in the same run. The output prints the detected clients and a per-client success block:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>safelint: detected Claude Code (CLAUDE.md) and Cursor (.cursor) in current directory

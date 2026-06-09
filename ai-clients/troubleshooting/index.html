@@ -1157,6 +1157,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#warp-does-not-support-user-scope-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Warp does not support user-scope install"
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#target-already-exists-use-force-to-replace-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -1217,6 +1228,8 @@
   
     
     
+      
+        
       
         
       
@@ -1559,6 +1572,34 @@
     
   
     Warp
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../clients/kiro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiro
   
 
     
@@ -2051,6 +2092,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#warp-does-not-support-user-scope-install" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        "Warp does not support user-scope install"
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#target-already-exists-use-force-to-replace-it" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2126,6 +2178,10 @@
 <li>The AI client isn't installed on this machine. Install it first, <em>then</em> run <code>safelint skill install</code>.</li>
 <li>You want a specific client regardless of detection. Use <code>--client &lt;name&gt;</code> explicitly; the error message lists the exact commands.</li>
 </ol>
+<h2 id="warp-does-not-support-user-scope-install">"Warp does not support user-scope install"<a class="headerlink" href="#warp-does-not-support-user-scope-install" title="Permanent link">#</a></h2>
+<p>Warp is <strong>project-scope only</strong>, its cross-project "Global Rules" are managed through the Warp Drive UI, not a home-directory file. So <code>safelint skill install --client warp</code> (without <code>--project</code>) exits 1 with this error rather than writing a <code>~/WARP.md</code> that Warp never reads. Re-run with <code>--project</code> to install <code>&lt;cwd&gt;/WARP.md</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>install<span class="w"> </span>--client<span class="w"> </span>warp<span class="w"> </span>--project
+</code></pre></div>
 <h2 id="target-already-exists-use-force-to-replace-it">"target already exists. Use --force to replace it."<a class="headerlink" href="#target-already-exists-use-force-to-replace-it" title="Permanent link">#</a></h2>
 <p>A previous install is in the way. Pass <code>--force</code> to replace it. SafeLint refuses to silently overwrite by default to protect against losing a customised skill folder.</p>
 <h2 id="cursor-doesnt-seem-to-pick-up-the-rule">Cursor doesn't seem to pick up the rule<a class="headerlink" href="#cursor-doesnt-seem-to-pick-up-the-rule" title="Permanent link">#</a></h2>
@@ -2133,9 +2189,9 @@
 <h2 id="claude-code-doesnt-seem-to-pick-up-the-skill">Claude Code doesn't seem to pick up the skill<a class="headerlink" href="#claude-code-doesnt-seem-to-pick-up-the-skill" title="Permanent link">#</a></h2>
 <p>Same idea, Claude Code loads skills on session start. Open a new conversation or restart the app.</p>
 <h2 id="i-want-to-inspect-the-bundled-files-without-installing">"I want to inspect the bundled files without installing"<a class="headerlink" href="#i-want-to-inspect-the-bundled-files-without-installing" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w">                  </span><span class="c1"># bundle root directory</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w"> </span>--client<span class="w"> </span>claude<span class="w">  </span><span class="c1"># &lt;bundle&gt;/claude/SKILL.md (file)</span>
-<a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w"> </span>--client<span class="w"> </span>cursor<span class="w">  </span><span class="c1"># &lt;bundle&gt;/cursor/safelint.mdc (file)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w">                  </span><span class="c1"># bundle root directory</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w"> </span>--client<span class="w"> </span>claude<span class="w">  </span><span class="c1"># &lt;bundle&gt;/claude/SKILL.md (file)</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>safelint<span class="w"> </span>skill<span class="w"> </span>path<span class="w"> </span>--client<span class="w"> </span>cursor<span class="w">  </span><span class="c1"># &lt;bundle&gt;/cursor/safelint.mdc (file)</span>
 </code></pre></div>
 <p>Without <code>--client</code>, prints the bundle root directory - the shared <code>languages/&lt;lang&gt;.md</code> addendums sit at <code>&lt;that path&gt;/languages/&lt;lang&gt;.md</code>. With <code>--client &lt;name&gt;</code>, prints a specific bundled file you can pass to <code>cat</code> to see what the agent is reading (e.g. <code>cat $(safelint skill path --client cursor)</code>).</p>
 

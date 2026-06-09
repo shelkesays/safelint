@@ -1137,6 +1137,8 @@
       
         
       
+        
+      
     
     
     
@@ -1449,6 +1451,34 @@
     
   
     Warp
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ai-clients/clients/kiro/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Kiro
   
 
     
@@ -2073,17 +2103,17 @@
 <tr>
 <td>A new <strong>safety rule</strong> (e.g. another Power-of-Ten check)</td>
 <td>The "Adding a new rule" checklist below</td>
-<td><code>src/safelint/rules/</code>, <code>core/config.py</code>, <code>CONFIGURATION.md</code>, every bundled AI-client doc</td>
+<td><code>src/safelint/rules/</code>, <code>core/config.py</code>, <code>docs/configuration/rules.md</code>, every bundled AI-client doc</td>
 </tr>
 <tr>
 <td>A new <strong>AI-client integration</strong> (e.g. JetBrains AI Assistant, a brand-new IDE)</td>
 <td><a href="adding-an-ai-client/"><code>ADDING_AN_AI_CLIENT.md</code></a>, full walkthrough with a worked example</td>
-<td><code>src/safelint/_skill_install.py</code> (one <code>ClientSpec</code> append), <code>src/safelint/skill_files/&lt;client&gt;/</code>, <code>tests/test_skill_install.py</code>, <code>AI_CLIENTS.md</code>, <code>skill_files/README.md</code>, <code>CHANGELOG.md</code></td>
+<td><code>src/safelint/_skill_install.py</code> (one <code>ClientSpec</code> append), <code>src/safelint/skill_files/&lt;client&gt;/</code>, <code>tests/test_skill_install.py</code>, <code>docs/ai-clients/</code>, <code>skill_files/README.md</code>, <code>CHANGELOG.md</code></td>
 </tr>
 <tr>
 <td>A new <strong>language</strong> safelint can lint (e.g. TypeScript, Go)</td>
 <td><a href="adding-a-language/"><code>ADDING_A_LANGUAGE.md</code></a>, full walkthrough</td>
-<td><code>src/safelint/languages/&lt;lang&gt;.py</code>, the Tree-sitter grammar dependency in <code>pyproject.toml</code>, per-rule audit, <code>tests/</code>, <code>CONFIGURATION.md</code>, every bundled AI-client doc</td>
+<td><code>src/safelint/languages/&lt;lang&gt;.py</code>, the Tree-sitter grammar dependency in <code>pyproject.toml</code>, per-rule audit, <code>tests/</code>, <code>docs/configuration/</code>, every bundled AI-client doc</td>
 </tr>
 </tbody>
 </table>
@@ -2098,25 +2128,24 @@
 <li>Add the rule's class to <code>ALL_RULES</code> in <code>src/safelint/rules/__init__.py</code>. The position in this tuple is the execution order, keep cheap structural rules first, expensive dataflow rules last.</li>
 <li>Add default config to <code>DEFAULTS["rules"]</code> in <code>src/safelint/core/config.py</code>. Set <code>enabled: false</code> if your rule is expensive or false-positive-prone (the dataflow rules do this).</li>
 <li>Write tests covering both the violation case <em>and</em> the clean case. Coverage must stay at ≥97% (the project's enforced threshold).</li>
-<li>Document the rule in <code>CONFIGURATION.md</code> under the matching category, following the format used by existing rules.</li>
+<li>Document the rule in <code>docs/configuration/rules.md</code> under the matching category, following the format used by existing rules.</li>
 <li>Update every bundled AI-client artefact under <code>src/safelint/skill_files/</code> to mention the new rule code + name. The drift-detection tests (<code>test_skill_documents_every_active_rule[&lt;client&gt;]</code>) parametrise over the registry and will fail CI for every client whose docs are missing the new rule.</li>
 </ul>
 <p><strong>Self-imposed constraints:</strong> safelint runs itself in CI, so your new rule's source code must obey the same rules it enforces: <code>function_length ≤ 60</code>, <code>nesting_depth ≤ 2</code>, <code>complexity ≤ 10</code>, etc. If <code>safelint check src/</code> fails on the new rule's own implementation, that's a meta-bug; refactor the rule's code until it passes.</p>
 <hr />
 <h2 id="adding-a-new-ai-client">Adding a new AI client<a class="headerlink" href="#adding-a-new-ai-client" title="Permanent link">#</a></h2>
-<p>Twelve clients ship today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed). Adding the next is one <code>ClientSpec</code> append plus a bundled artefact and ~10 regression tests, no control-flow changes elsewhere. The full walkthrough with a worked example lives in <a href="adding-an-ai-client/"><code>ADDING_AN_AI_CLIENT.md</code></a>. The short version:</p>
+<p>Fourteen clients ship today (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp, Kiro). Adding the next is one <code>ClientSpec</code> append plus a bundled artefact and ~10 regression tests, no control-flow changes elsewhere. The full walkthrough with a worked example lives in <a href="adding-an-ai-client/"><code>ADDING_AN_AI_CLIENT.md</code></a>. The short version:</p>
 <ul>
-<li>Decide on the bundled artefact shape (single file under <code>skill_files/&lt;client&gt;/&lt;filename&gt;</code> is the common case; directory-tree under <code>skill_files/</code> is Claude's pattern).</li>
+<li>Decide on the bundled artefact shape. Every client installs a single file under <code>skill_files/&lt;client&gt;/&lt;filename&gt;</code> (Claude Code is <code>claude/SKILL.md</code>, Cursor is <code>cursor/safelint.mdc</code>, and so on); the shared <code>languages/</code> addendums at the bundle root are looked up on demand via <code>safelint skill path</code>.</li>
 <li>Write the bundled file by adapting an existing one (Cursor's <code>cursor/safelint.mdc</code> is a clean single-file template). Strip MDC frontmatter if your client doesn't use it.</li>
 <li>Append one <code>ClientSpec</code> entry to <code>_CLIENT_SPECS</code> in <code>src/safelint/_skill_install.py</code>, fields: <code>name</code>, <code>display_name</code>, <code>artefact_label</code>, <code>cwd_markers</code>, <code>home_markers</code>, <code>install_relpath</code>, <code>bundled_relpath</code>, <code>restart_hint</code>, <code>usage_hint</code>, <code>documentation_relpaths</code>. If your client also writes to a <em>cross-agent</em> shared file (like codex's <code>AGENTS.md</code>), set <code>secondary_install_relpath</code> and <code>secondary_install_section_markers</code>, the install primitives handle the rest.</li>
-<li>Add the new directory name to <code>_PEER_CLIENT_DIRS</code> so it doesn't leak into Claude's directory-tree install.</li>
 <li>Mirror an existing client's test block (10–12 tests covering install / symlink / force / overwrite / auto-detect / CLI routing / path-print / peer-exclusion).</li>
-<li>Update <code>AI_CLIENTS.md</code>, <code>skill_files/README.md</code>, and <code>CHANGELOG.md</code>.</li>
+<li>Update the docs-site AI-client pages under <code>docs/ai-clients/</code> (index table, new per-client page, manual-install, mkdocs nav), <code>skill_files/README.md</code>, and <code>CHANGELOG.md</code>.</li>
 </ul>
 <p>The security guards (symlink refusal at the secondary destination, <code>skill remove --path PATH</code> install-shape validation, etc.) live in <code>_skill_install.py</code> and apply to your client automatically, no per-client implementation needed.</p>
 <hr />
 <h2 id="adding-a-new-language">Adding a new language<a class="headerlink" href="#adding-a-new-language" title="Permanent link">#</a></h2>
-<p>One language is registered today (Python). Adding a new one (TypeScript, Go, Rust, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in <a href="adding-a-language/"><code>ADDING_A_LANGUAGE.md</code></a>.</p>
+<p>Five languages are registered today (Python, JavaScript, TypeScript, Java, Rust). Adding a new one (Go, C, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in <a href="adding-a-language/"><code>ADDING_A_LANGUAGE.md</code></a>.</p>
 <hr />
 <h2 id="ground-rules">Ground rules<a class="headerlink" href="#ground-rules" title="Permanent link">#</a></h2>
 <ul>
