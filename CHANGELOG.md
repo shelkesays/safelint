@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Kiro (`kiro.dev`) added as a supported AI client.** AWS's agentic IDE reads steering files under `.kiro/steering/*.md`; `safelint skill install --client kiro` writes `.kiro/steering/safelint.md` at project scope (`--project`, recommended for team repos) or `~/.kiro/steering/safelint.md` at user scope. Auto-detection picks up a `.kiro/` directory in the cwd (project) or home (user). One `ClientSpec` addition plus the bundled `skill_files/kiro/safelint.md` template; the `_CLIENT_SPECS` registry, drift-detection contract, and CLI choices all extend automatically. Kiro also honours the `AGENTS.md` standard as a fallback, but safelint installs to its first-class steering file rather than coupling on the shared `AGENTS.md` (owned by the codex client).
+
 ### Documentation
 
 - **Warp added to the per-client docs.** New `docs/ai-clients/clients/warp.md` page covering the project-scope-only contract; row added to the client table in `docs/ai-clients/index.md`; mkdocs nav entry under Per-client guides. (Warp itself shipped as a client in 2.2.0; this just closes the docs gap.)

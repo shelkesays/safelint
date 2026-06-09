@@ -30,7 +30,7 @@ After install, restart the AI client (or reload its window) and ask things like 
 
 ## Supported clients
 
-Rows are ordered by approximate real-world usage as of mid-2026; the precise rank is subjective (no clean public dataset for AI-agent market share), but the rough buckets are *mainstream* (GitHub Copilot / Cursor / Claude Code), *mid-tier* (codex / Gemini / Windsurf), *lower* (Continue.dev / Cline / Zed / Warp / aider), and *niche* (Antigravity / Trae). The registry order in `_skill_install.py` is **unchanged** by this ordering (it drives auto-detection, install-loop, and CLI-output sequencing where popularity isn't the right axis); only this table and the sidebar nav reflect the popularity view.
+Rows are ordered by approximate real-world usage as of mid-2026; the precise rank is subjective (no clean public dataset for AI-agent market share), but the rough buckets are *mainstream* (GitHub Copilot / Cursor / Claude Code), *mid-tier* (codex / Gemini / Windsurf), *lower* (Continue.dev / Cline / Zed / Warp / Kiro / aider), and *niche* (Antigravity / Trae). The registry order in `_skill_install.py` is **unchanged** by this ordering (it drives auto-detection, install-loop, and CLI-output sequencing where popularity isn't the right axis); only this table and the sidebar nav reflect the popularity view.
 
 | Client | Native format | Install destination | Detection markers |
 |---|---|---|---|
@@ -44,6 +44,7 @@ Rows are ordered by approximate real-world usage as of mid-2026; the precise ran
 | **[Cline](clients/cline.md)** | Markdown rule (`.clinerules/<name>.md`) | `~/.clinerules/safelint.md` (user) or `<cwd>/.clinerules/safelint.md` (project) | `.clinerules/` in cwd; `~/.clinerules/` for user-scope |
 | **[Zed](clients/zed.md)** | Workspace rules (`.rules`) | `~/.rules` (user) or `<cwd>/.rules` (project) | `.rules` or `.zed/` in cwd; `~/.rules` or `~/.zed/` for user-scope |
 | **[Warp](clients/warp.md)** | Instructions Markdown (`WARP.md`) | `<cwd>/WARP.md` (**project-scope only**; Warp doesn't read any user-scope file, "Global Rules" go through Warp Drive UI) | `WARP.md` or `.warp/` in cwd |
+| **[Kiro](clients/kiro.md)** | Steering file (`.kiro/steering/<name>.md`) | `~/.kiro/steering/safelint.md` (user) or `<cwd>/.kiro/steering/safelint.md` (project) | `.kiro/` in cwd; `~/.kiro/` for user-scope |
 | **[aider](clients/aider.md)** | Markdown conventions (`CONVENTIONS.md`), **not auto-loaded**; wire via `read:` in `.aider.conf.yml` | `~/CONVENTIONS.md` (user) or `<cwd>/CONVENTIONS.md` (project) | `.aider.conf.yml`, `.aider.conf.yaml`, or `CONVENTIONS.md` in cwd; `~/.aider.conf.{yml,yaml}` for user-scope |
 | **[Antigravity](clients/antigravity.md)** | Markdown rule (`.antigravity/rules/<name>.md`) | `~/.antigravity/rules/safelint.md` (user) or `<cwd>/.antigravity/rules/safelint.md` (project) | `.antigravity/` in cwd; `~/.antigravity/` for user-scope |
 | **[Trae](clients/trae.md)** | Markdown rule (`.trae/rules/<name>.md`) | `~/.trae/rules/safelint.md` (user) or `<cwd>/.trae/rules/safelint.md` (project) | `.trae/` in cwd; `~/.trae/` for user-scope |
@@ -70,6 +71,8 @@ The registry in `_skill_install.py` is open-ended, adding a new client is a one-
        │
        └── no  ──→  error: print explicit --client commands and exit 1
 ```
+
+Step [2] (the home fallback) skips **project-scope-only** clients such as Warp: they have no user-scope file, so they're never installed at home scope. See [Project vs user scope](scope.md#project-scope-only-clients).
 
 ### Multi-detection
 

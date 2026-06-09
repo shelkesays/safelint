@@ -1,10 +1,10 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets thirteen AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/`, currently Python, JavaScript, TypeScript, Java, and Rust (mirroring safelint's `src/safelint/languages/` package layout).
+A bundled skill / project-rule that lets fourteen AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp, Kiro) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/`, currently Python, JavaScript, TypeScript, Java, and Rust (mirroring safelint's `src/safelint/languages/` package layout).
 
-> **For the comprehensive user guide** (auto-detection logic, per-client setup, troubleshooting, adding a new client) see [`AI_CLIENTS.md`](https://github.com/shelkesays/safelint/blob/main/AI_CLIENTS.md). The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives at the repo root.
+> **For the comprehensive user guide** (auto-detection logic, per-client setup, troubleshooting, adding a new client) see the [AI client integrations](https://shelkesays.github.io/safelint/ai-clients/) docs. The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives on the docs site.
 
-Thirteen clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
+Fourteen clients ship today; all follow the *same* workflow because safelint's CLI surface is the same:
 
 - **Claude Code**: installs as a single skill manifest at `~/.claude/skills/safelint/SKILL.md` (or `<cwd>/.claude/skills/safelint/SKILL.md` for project scope). Language-specific addendums are looked up on demand via `safelint skill path`, same as the other clients.
 - **Cursor**: installs as a single MDC project rule at `.cursor/rules/safelint.mdc` (or `~/.cursor/rules/safelint.mdc` for user-global).
@@ -19,6 +19,7 @@ Thirteen clients ship today; all follow the *same* workflow because safelint's C
 - **Antigravity**: installs as a Markdown rule at `<cwd>/.antigravity/rules/safelint.md` (canonical, auto-loaded) or `~/.antigravity/rules/safelint.md` (user-global).
 - **Zed**: installs as workspace rules at `<cwd>/.rules` (canonical, auto-loaded) or `~/.rules` (user-global).
 - **Warp**: project-scope only. Installs as a Markdown instructions file at `<cwd>/WARP.md` (auto-discovered by Warp's AI). Warp does **not** read any user-scope filesystem file; cross-project rules are managed through the Warp Drive UI (Personal > Rules) instead, so `safelint skill install --client warp` requires `--project`.
+- **Kiro**: installs as a steering file at `<cwd>/.kiro/steering/safelint.md` (canonical, auto-loaded for every interaction) or `~/.kiro/steering/safelint.md` (user-global, across all projects). Kiro also honours the `AGENTS.md` standard as a fallback, but safelint installs to its first-class steering file rather than coupling on the shared `AGENTS.md` (owned by the codex client).
 
 Once installed, ask the agent things like:
 
@@ -110,13 +111,20 @@ safelint skill install --client antigravity            # ~/.antigravity/rules/sa
 # Zed
 safelint skill install --client zed --project       # <cwd>/.rules (auto-loaded)
 safelint skill install --client zed                 # ~/.rules (user-global)
+
+# Warp (project-scope only; --project is required - Warp has no user-scope file)
+safelint skill install --client warp --project      # <cwd>/WARP.md (auto-discovered)
+
+# Kiro
+safelint skill install --client kiro --project      # <cwd>/.kiro/steering/safelint.md (auto-loaded)
+safelint skill install --client kiro                # ~/.kiro/steering/safelint.md (user-global)
 ```
 
 ### Options
 
 | Flag | Effect |
 |---|---|
-| `--client` | Target AI client: `auto` (default, detect from cwd, then home), or one of: `claude`, `cursor`, `copilot`, `gemini`, `windsurf`, `codex`, `continue`, `cline`, `aider`, `trae`, `antigravity`, `zed`. New clients added to the registry extend this list automatically. |
+| `--client` | Target AI client: `auto` (default, detect from cwd, then home), or one of: `claude`, `cursor`, `copilot`, `gemini`, `windsurf`, `codex`, `continue`, `cline`, `aider`, `trae`, `antigravity`, `zed`, `warp`, `kiro`. New clients added to the registry extend this list automatically. |
 | `--project` | Force project scope (`<cwd>/.<client>/...`). With `--client auto`, restricts detection to cwd and refuses to fall back to home. |
 | `--symlink` | Symlink to the bundled location instead of copying. `pip upgrade safelint` then immediately changes what the AI client sees. Requires symlink support (POSIX, or Windows developer mode). |
 | `--force` | Replace any existing safelint skill / rule at the target. Use this when re-installing after an upgrade. |
@@ -221,11 +229,16 @@ src/safelint/skill_files/    # ↑ inside the wheel, located by `safelint skill 
 │   └── safelint.md          # Antigravity's rule (installed to .antigravity/rules/safelint.md)
 ├── zed/
 │   └── safelint.md          # Zed's workspace rules (installed to .rules at scope root)
+├── warp/
+│   └── WARP.md              # Warp's instructions (installed to WARP.md at scope root; project-scope only)
+├── kiro/
+│   └── safelint.md          # Kiro's steering file (installed to .kiro/steering/safelint.md)
 └── languages/               # One addendum per supported language
     ├── python.md            # Python-specific install / rationale / idiomatic fixes
     ├── javascript.md        # JavaScript (Node), runtime presets, JS-rule notes
     ├── typescript.md        # TypeScript / TSX / AssemblyScript, TS-specific rule handling
-    └── java.md              # Java + Spring Boot framework preset, Java-rule notes, SAFE901-904
+    ├── java.md              # Java + Spring Boot framework preset, Java-rule notes, SAFE901-904
+    └── rust.md              # Rust-specific rules and Holzmann-inspired additions
 ```
 
 **What ends up where after install:**
@@ -270,7 +283,7 @@ The skill never auto-fixes, every edit goes through a confirmation step.
 
 When safelint adds support for a new language, the skill needs a matching addendum. The workflow:
 
-1. **In safelint itself**, follow [`ADDING_A_LANGUAGE.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_A_LANGUAGE.md). Register the language in `src/safelint/languages/__init__.py`, add the parser factory, expose node-type constants.
+1. **In safelint itself**, follow the [Adding a new language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) guide. Register the language in `src/safelint/languages/__init__.py`, add the parser factory, expose node-type constants.
 2. **In this skill**, create `languages/<lang>.md` modelled on `languages/python.md`. Cover at minimum:
    - Install nuance specific to that ecosystem (if any).
    - File extensions safelint will pick up.
@@ -286,8 +299,8 @@ The skill is just Markdown. Edit `claude/SKILL.md` (or the peer client's own fil
 
 ## See also
 
-- **AI client integrations guide:** [`AI_CLIENTS.md`](https://github.com/shelkesays/safelint/blob/main/AI_CLIENTS.md), the comprehensive user doc (auto-detection, per-client setup, troubleshooting)
-- **Adding a new AI client:** [`ADDING_AN_AI_CLIENT.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_AN_AI_CLIENT.md), contributor walkthrough for shipping a new client integration
-- The main safelint docs: [`README.md`](https://github.com/shelkesays/safelint/blob/main/README.md), [`CONFIGURATION.md`](https://github.com/shelkesays/safelint/blob/main/CONFIGURATION.md)
-- JSON output schema: [`docs/json-schema.md`](https://github.com/shelkesays/safelint/blob/main/docs/json-schema.md)
-- Adding a new language to safelint: [`ADDING_A_LANGUAGE.md`](https://github.com/shelkesays/safelint/blob/main/ADDING_A_LANGUAGE.md)
+- **AI client integrations guide:** [AI client integrations](https://shelkesays.github.io/safelint/ai-clients/), the comprehensive user doc (auto-detection, per-client setup, troubleshooting)
+- **Adding a new AI client:** [Adding a new AI client](https://shelkesays.github.io/safelint/contributing/adding-an-ai-client/), contributor walkthrough for shipping a new client integration
+- The main safelint docs: [README](https://github.com/shelkesays/safelint/blob/main/README.md), [Configuration reference](https://shelkesays.github.io/safelint/configuration/)
+- JSON output schema: [JSON output schema](https://shelkesays.github.io/safelint/json-schema/)
+- Adding a new language to safelint: [Adding a new language](https://shelkesays.github.io/safelint/contributing/adding-a-language/)

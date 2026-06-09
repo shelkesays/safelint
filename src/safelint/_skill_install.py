@@ -342,6 +342,28 @@ _WARP_SPEC = ClientSpec(
 )
 
 
+_KIRO_SPEC = ClientSpec(
+    name="kiro",
+    display_name="Kiro",
+    artefact_label="steering file",
+    # Kiro (AWS's agentic IDE, kiro.dev) auto-discovers steering files
+    # under ``.kiro/steering/*.md`` (project) and ``~/.kiro/steering/*.md``
+    # (user-global), loading each for every interaction by default
+    # (``inclusion: always``). The ``.kiro/`` directory's presence is the
+    # conventional signal of an active Kiro workspace. (Kiro also reads
+    # ``AGENTS.md`` as a fallback standard, but that file is owned by the
+    # codex spec's secondary install - we use Kiro's first-class steering
+    # mechanism here rather than coupling on the shared file.)
+    cwd_markers=(".kiro",),
+    home_markers=(".kiro",),
+    install_relpath=(".kiro", "steering", "safelint.md"),
+    bundled_relpath=("kiro", "safelint.md"),
+    restart_hint="Reload Kiro (or restart the IDE) to pick up the new steering file.",
+    usage_hint='Then ask Kiro "run safelint" or "lint with safelint".',
+    documentation_relpaths=(("kiro", "safelint.md"),),
+)
+
+
 _CODEX_SPEC = ClientSpec(
     name="codex",
     display_name="codex",
@@ -407,6 +429,7 @@ _CLIENT_SPECS: tuple[ClientSpec, ...] = (
     _ANTIGRAVITY_SPEC,
     _ZED_SPEC,
     _WARP_SPEC,
+    _KIRO_SPEC,
 )
 
 _CLIENT_NAMES: tuple[str, ...] = tuple(spec.name for spec in _CLIENT_SPECS)
