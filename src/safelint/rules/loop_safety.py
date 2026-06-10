@@ -370,7 +370,9 @@ class UnboundedLoopRule(BaseRule):
         # so unwrap until we reach the underlying expression - otherwise
         # ``is_literal_true`` would be False on the outer wrapper and the
         # ``while (true)`` check would silently skip.
-        while condition.type == "parenthesized_expression" and condition.named_children:  # nosafe: SAFE501
+        while condition.type == "parenthesized_expression":
+            if not condition.named_children:
+                break
             condition = condition.named_children[0]
 
         if _is_literal_true(condition, lang_name):

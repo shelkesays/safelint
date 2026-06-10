@@ -1,6 +1,6 @@
 # AI client integrations
 
-This page has moved. The full guide (auto-detection logic, per-client setup for all thirteen supported clients, scope semantics, and troubleshooting) now lives on the docs site:
+This page has moved. The full guide (auto-detection logic, per-client setup for all fourteen supported clients, scope semantics, and troubleshooting) now lives on the docs site:
 
 > **<https://shelkesays.github.io/safelint/ai-clients/>**
 

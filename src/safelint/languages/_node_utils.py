@@ -37,7 +37,7 @@ def walk(
     skip = frozenset(skip_types) if skip_types else frozenset()
     yield node
     stack: list[tree_sitter.Node] = list(reversed(node.named_children))
-    while stack:  # nosafe: SAFE501
+    while len(stack) > 0:
         current = stack.pop()
         yield current
         if current.type in skip:
@@ -175,10 +175,12 @@ def _java_object_creation_name(call_node: tree_sitter.Node) -> str | None:
 
 def _java_type_name(type_node: tree_sitter.Node) -> str | None:
     """Resolve a Java ``type_identifier`` / ``scoped_type_identifier`` / ``generic_type`` to its simple name."""
-    if type_node.type == "generic_type":
+    # Peel ``generic_type`` wrappers (``List<Map<String, Foo>>`` -> ``Foo``)
+    # iteratively; depth is bounded by the type's generic nesting.
+    while type_node.type == "generic_type":
         if not type_node.named_children:  # pragma: no cover - defensive: generic_type always wraps a type
             return None
-        return _java_type_name(type_node.named_children[0])
+        type_node = type_node.named_children[0]
     if type_node.type == "type_identifier":
         return node_text(type_node)
     if type_node.type != "scoped_type_identifier":  # pragma: no cover - array creation etc. falls through

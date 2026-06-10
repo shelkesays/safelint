@@ -18,8 +18,8 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 - **Python** (`.py`, `.pyw`).
 - **JavaScript** (`.js`, `.mjs`, `.cjs`), source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime *defaults* (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the [`[tool.safelint.javascript] runtime = "..."`](toml.md#javascript-runtime-presets) preset, the source-language rules themselves don't change.
 - **TypeScript** (`.ts`, `.tsx`), and **AssemblyScript** (`.as`, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, `as` casts, non-null assertions, `declare global` ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See [TypeScript](../languages/typescript.md) for the full language reference.
-- **Java** (`.java`), new in v2.1.0. 16 of the cross-language rules port cleanly plus 4 Spring Boot framework-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* (sinks, nullable methods, structural rule enablement) are switchable via the [`[tool.safelint.java] framework = "..."`](../languages/java.md#framework-presets) preset (`vanilla` / `spring-boot`). See [Java](../languages/java.md) for the full language reference.
-- **Rust** (`.rs`), new in v2.2.0. 13 of the cross-language rules port cleanly (the all-five-languages set) plus 10 Rust-only rules cover Rust-idiom-specific patterns (panic-in-non-test, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer parameters, broad `.unwrap()` outside tests, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). 6 rules deliberately skipped for Rust because their semantics don't translate cleanly (Rust has no try/catch / `global` keyword, and RAII / Drop covers resource cleanup). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. See [Rust](../languages/rust.md) for the full language reference.
+- **Java** (`.java`), new in v2.1.0. 20 of the cross-language rules apply plus 4 Spring Boot framework-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* (sinks, nullable methods, structural rule enablement) are switchable via the [`[tool.safelint.java] framework = "..."`](../languages/java.md#framework-presets) preset (`vanilla` / `spring-boot`). See [Java](../languages/java.md) for the full language reference.
+- **Rust** (`.rs`), new in v2.2.0. 15 of the cross-language rules port cleanly (the all-five-languages set) plus 11 Rust-only rules cover Rust-idiom-specific patterns (panic-in-non-test, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer parameters, broad `.unwrap()` outside tests, interior-mutable `static`s, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). 7 rules deliberately skipped for Rust because their semantics don't translate cleanly (Rust has no try/catch / `global` keyword, RAII / Drop covers resource cleanup, and macros are opaque to the rule-8 dynamic-execution check). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. See [Rust](../languages/rust.md) for the full language reference.
 
 ### Planned
 
@@ -34,12 +34,12 @@ Listed in the project's current working priority; no timelines committed. SafeLi
 
 | Scope | Count | Codes |
 |---|---|---|
-| **Cross-language** (Python, JavaScript, TypeScript, Java, Rust) | 17 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE303, SAFE304, SAFE501, SAFE601, SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 (apply to all five). Plus SAFE202, SAFE203, SAFE401 which apply to Python / JS / TS / Java but not Rust (analogues covered by Rust-specific replacements). |
-| **Python / JS / TS** (not Java, not Rust) | 1 | SAFE302 (`global_mutation`); Java has no clean analogue (deferred); Rust's `static mut` is unsafe-gated and covered by SAFE602 instead. |
+| **Cross-language** (Python, JavaScript, TypeScript, Java, Rust) | 15 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE105 (`no_recursion`), SAFE303, SAFE304, SAFE501, SAFE601, SAFE603 (`blanket_suppression`), SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 (apply to all five). |
+| **Python / JS / TS / Java** (not Rust) | 5 | SAFE202 (`empty_except`), SAFE203 (`logging_on_error`), SAFE302 (`global_mutation`), SAFE309 (`dynamic_code_execution`), SAFE401 (`resource_lifecycle`). Rust's analogues are covered separately: SAFE206 / SAFE207 (try/catch), SAFE307 + SAFE602 (mutable statics), Drop (resource lifecycle), and macros are an opaque token-tree limitation for rule 8. |
 | **Python-only** | 2 | SAFE201 (`bare_except`), SAFE301 (`global_state`); JS / TS / Java / Rust have no `global` keyword and JS / TS / Java catches always bind the error. |
 | **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`); Python / Java / Rust have no `var` / `let` / `const` distinction. |
 | **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`); all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset. |
-| **Rust-only** | 10 | SAFE110 (`needless_mut`), SAFE112 (`unchecked_arithmetic_on_input`), SAFE204 (`panic_macros_outside_tests`), SAFE205 (`lock_poisoning_ignored`), SAFE206 (`silent_result_discard`, the Rust analogue of SAFE202), SAFE207 (`unlogged_error_branch`, the Rust analogue of SAFE203), SAFE208 (`result_unwrap_outside_tests`), SAFE306 (`dangerous_mem_ops`), SAFE308 (`truncating_as_cast`), SAFE602 (`undocumented_unsafe`); all default-disabled. |
+| **Rust-only** | 11 | SAFE110 (`needless_mut`), SAFE112 (`unchecked_arithmetic_on_input`), SAFE204 (`panic_macros_outside_tests`), SAFE205 (`lock_poisoning_ignored`), SAFE206 (`silent_result_discard`, the Rust analogue of SAFE202), SAFE207 (`unlogged_error_branch`, the Rust analogue of SAFE203), SAFE208 (`result_unwrap_outside_tests`), SAFE306 (`dangerous_mem_ops`), SAFE307 (`interior_mutable_static`), SAFE308 (`truncating_as_cast`), SAFE602 (`undocumented_unsafe`); all default-disabled. |
 
 The engine's per-language dispatch automatically skips rules whose `language` tuple doesn't include the active file's language. There's no manual configuration to do, drop a `.py` file in a JS / TS project (or vice versa) and the right rules fire on each.
 
@@ -162,6 +162,27 @@ Cyclomatic complexity counts the number of independent paths through a function.
 enabled = true
 severity = "error"
 max_complexity = 10
+```
+
+### SAFE105: `no_recursion`
+
+**What it flags:** Functions that call themselves directly. Cross-language.
+
+Holzmann's Power of Ten rule 1 ("restrict all code to very simple control flow constructs") bans recursion outright: recursion without a guaranteed bound makes the call stack an unbounded resource, so worst-case depth (and therefore termination and memory behaviour) cannot be proven by inspection. An explicit loop with a worklist makes the bound visible.
+
+The rule fires on **direct self-recursion** - a function whose body contains a call to its own name, either bare (`fact(n - 1)`) or self-qualified (`self.walk(...)` in Python / Rust, `this.walk(...)` in JS / TS / Java). A call on a different receiver (`other.walk(...)`) does not fire. Two cases are intentionally out of scope and documented as blind spots: **indirect / mutual recursion** (`a` calls `b` calls `a`), which needs a call graph, and **anonymous-function recursion** through a binding (`const f = () => f()`), since the function has no name to match.
+
+Enabled by default at `warning` severity (mirrors `unbounded_loops`), so intentional recursion (tree walks, divide-and-conquer) does not block a local run. Annotate deliberate recursion with `# nosafe: SAFE105` (or the language's comment form) and a one-line justification.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `true` | Turn rule on/off |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+```toml
+[tool.safelint.rules.no_recursion]
+enabled = true
+severity = "warning"
 ```
 
 ## Error handling rules
@@ -306,11 +327,13 @@ severity = "warning"
 
 ### SAFE302: `global_mutation`
 
-**What it flags:** writes to module-level state from inside a function. Cross-language, the *intent* is the same in Python, JavaScript, and TypeScript, but the syntactic shape differs.
+**What it flags:** shared module / global mutable state. Cross-language (Python, JavaScript, TypeScript, Java), the *intent* (Holzmann rule 6: declare data at the smallest possible scope) is the same, but the syntactic shape differs per language.
 
 **Python:** by default, functions that declare `global x` and then assign to `x`. With `strict = true`, *any* `global` declaration is flagged regardless of whether a write follows. This is stricter than `SAFE301`. The default behaviour is more nuanced than ruff's `PLW0603` (which fires on any `global`); set `strict = true` if your team's policy is to ban the keyword entirely.
 
 **JavaScript:** function-body writes, `assignment_expression`, `augmented_assignment_expression`, or `update_expression` (`++` / `--`), whose target is a `member_expression` or `subscript_expression` rooted in a configured global namespace. The receiver chain is walked leftward, `process.env.NODE_ENV = '...'`, `process.env['NODE_ENV'] = '...'`, and `process.exitCode++` all resolve to `process` and fire. Bracket-notation writes (`globalThis['x'] = 1`, `window["config"] = {}`) work the same way as dot access. The default namespace list (`global_namespaces_javascript`) is `["globalThis", "window", "global", "self", "process"]`; runtime presets adjust this (browser drops `process`, adds `document`; Deno adds `Deno`, drops `window` and `process`). Module-level (top-of-file) writes do NOT fire, that's setup, not the bug pattern. Reading a global (`return globalThis.env;`) does NOT fire, only writes.
+
+**Java** *(added in 2.4.0):* non-final `static` field declarations. This is **declaration-site** detection, not write-site: a mutable static field IS the smallest-scope violation regardless of where it is written, and a single tree walk over field declarations has near-zero false positives (the same shape PMD's `MutableStaticState` flags). `static final` fields are clean, even when the referent is interiorly mutable (`static final List<String> CACHE = new ArrayList<>()`) - detecting interior mutability would need type resolution safelint does not do, so it is a documented exclusion. Instance fields and local variables never fire. Interface fields are implicitly `public static final` and so are never flagged. This fulfils the Java SAFE302 work previously deferred in the language docs. **Rust** is not covered by SAFE302: `static mut` is unsafe-gated (SAFE602's territory) and safe interior-mutable statics are covered by SAFE307 (`interior_mutable_static`).
 
 | Option | Default | Description |
 |---|---|---|
@@ -501,6 +524,34 @@ function doubleEach(arr) {
     arr[i] = i * 2;
   }
 }
+```
+
+### SAFE309: `dynamic_code_execution`
+
+**What it flags:** runtime code generation and reflection. Python, JavaScript, TypeScript, Java. Disabled by default.
+
+Holzmann's rule 8 restricts the preprocessor because textual code generation defeats static analysis: a tool cannot reason about code that does not exist until runtime. The modern equivalent is `eval` / `exec`-style execution and reflection. SAFE309 is **structural**, it flags the construct wherever it appears, with no dataflow. That is the difference from SAFE801 (`tainted_sink`), which fires only when user input demonstrably reaches one of these sinks. The two are complementary and may both fire on the same line; an untainted `eval(config_string)` still destroys analysability, which is what rule 8 cares about.
+
+Per-language defaults (call names):
+
+- **Python** (`dynamic_exec_calls`): `eval`, `exec`, `compile`, `__import__`. Only **bare** calls and `builtins.`-qualified calls fire, so `model.eval()` (a method call) does not. `getattr` / `setattr` are deliberately excluded (far too common, and they do not generate code).
+- **JavaScript / TypeScript** (`dynamic_exec_calls_javascript`): `eval`, `Function` (both `new Function(...)` and the bare `Function(...)` call), `execScript`. A bare-identifier callee is required, so `obj.eval()` does not fire.
+- **Java** (`dynamic_exec_calls_java`): `forName` (`Class.forName`), `invoke` (`Method.invoke`), `eval` (JSR-223 `ScriptEngine`), `defineClass`, `loadClass`. Matched by method name regardless of receiver, so a user-defined `forName` would also match (acceptable for an off-by-default rule).
+
+**Rust** is excluded: its rule-8 analogue is the macro system, whose bodies parse as opaque token trees (a documented limitation shared with SAFE801), and `panic`-family macros already have SAFE204.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Turn rule on/off |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+| `dynamic_exec_calls` | see above | (Python) call names that count as dynamic execution |
+| `dynamic_exec_calls_javascript` | see above | (JS / TS) call / constructor names |
+| `dynamic_exec_calls_java` | see above | (Java) reflection method names |
+
+```toml
+[tool.safelint.rules.dynamic_code_execution]
+enabled = true
+severity = "warning"
 ```
 
 ## Resource safety rules
@@ -717,6 +768,32 @@ function transfer(amount, src, dst) {
   src.balance -= amount;
   dst.balance += amount;
 }
+```
+
+### SAFE603: `blanket_suppression`
+
+**What it flags:** un-scoped suppressions of *other* analysers. Python, JavaScript, TypeScript, Java, Rust. Disabled by default.
+
+Holzmann's rule 10 ("compile with all warnings enabled and heed every warning") has a modern failure mode: not disabling warnings at the compiler, but silencing an entire analyser from inside the source. SAFE603 flags the *blanket* forms while leaving *scoped* suppressions alone, because a scoped suppression is a deliberate, auditable decision about one rule.
+
+Per language, the blanket forms that fire (and the scoped forms that stay clean):
+
+- **Python** (comments): bare `noqa` (no `: code` list), `type: ignore` with no `[code]` qualifier, `pylint: disable=all`. Scoped (`noqa: E501`, `type: ignore[arg-type]`, `pylint: disable=line-too-long`) is clean.
+- **JavaScript / TypeScript** (comments): `eslint-disable` / `eslint-disable-line` / `eslint-disable-next-line` with no rule list, `@ts-nocheck`, `@ts-ignore`. `@ts-expect-error` is clean (it self-polices: it errors when the suppressed error no longer occurs). A rule-listed `eslint-disable no-console` is clean.
+- **Java** (annotations): `@SuppressWarnings("all")` and `@SuppressWarnings({..., "all"})`. Scoped (`@SuppressWarnings("unchecked")`) is clean.
+- **Rust** (attributes): `#[allow(clippy::all)]`, `#[allow(warnings)]`, and their inner `#![...]` forms. Scoped (`#[allow(dead_code)]`, `#[allow(clippy::too_many_arguments)]`) is clean.
+
+SAFE603 never flags safelint's own `# nosafe` / `# safelint: ignore` directives, those are policed by SAFE004 (unused suppression). Directive-looking text inside a string literal is not flagged either, the detectors scan comment / annotation / attribute nodes, not string contents.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Disabled by default, opt-in |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+```toml
+[tool.safelint.rules.blanket_suppression]
+enabled = true
+severity = "warning"
 ```
 
 ## Test coverage rules
@@ -1325,6 +1402,34 @@ let x: i8 = unsafe { std::mem::transmute::<u8, i8>(255) };   // SAFE306
 
 ```rust
 let x: i8 = i8::try_from(255).unwrap_or(0);
+```
+
+### SAFE307: `interior_mutable_static`
+
+**What it flags:** `static` items whose type provides safe interior mutability, and `lazy_static!` declarations. Rust only. Disabled by default.
+
+Holzmann rule 6 (declare data at the smallest possible scope) bans global mutable state. Rust's `static mut` route requires `unsafe` and is therefore already audit-gated by SAFE602 (`undocumented_unsafe`), but the **idiomatic** route, a plain `static` holding a `Mutex` / `RwLock` / `OnceLock` / `Atomic*` / a `lazy_static!` block, is entirely safe code and invisible to SAFE602. SAFE307 closes that gap.
+
+Two shapes fire: a `static` whose declared type contains an interior-mutability wrapper name as a standalone token (qualified paths like `std::sync::Mutex<T>` match too); and a `lazy_static! { ... }` macro invocation, flagged wholesale because the macro's whole purpose is declaring lazily-initialised statics and its body is an opaque token tree (the same limitation SAFE801 has with `sqlx::query!`). `const` items (immutable by construction) and `static mut` (SAFE602's territory) are not flagged. Word-boundary matching keeps `Lazy` from matching a user type like `LazyLoader`.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+| `interior_mutable_types_rust` | `Mutex`, `RwLock`, `RefCell`, `Cell`, `OnceLock`, `OnceCell`, `Lazy`, `LazyLock`, `LazyCell`, `AtomicBool`, `AtomicI8`..`AtomicI64`, `AtomicIsize`, `AtomicU8`..`AtomicU64`, `AtomicUsize`, `AtomicPtr` | Wrapper type names that mark a static as interior-mutable |
+
+**Bad:**
+
+```rust
+static CACHE: Mutex<Vec<u8>> = Mutex::new(Vec::new());   // SAFE307
+static COUNT: AtomicUsize = AtomicUsize::new(0);          // SAFE307
+```
+
+**Good:**
+
+```rust
+const MAX_RETRIES: u32 = 5;          // immutable constant, not flagged
+// or pass the Mutex<Vec<u8>> explicitly to the consumers that need it
 ```
 
 ### SAFE308: `truncating_as_cast`

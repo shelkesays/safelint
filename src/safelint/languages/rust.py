@@ -153,6 +153,8 @@ LABEL = "label"  # ``'outer:`` block label
 
 # Statements / declarations.
 LET_DECLARATION = "let_declaration"
+STATIC_ITEM = "static_item"  # ``static FOO: T = ...`` (module / impl scope)
+CONST_ITEM = "const_item"  # ``const FOO: T = ...``
 EXPRESSION_STATEMENT = "expression_statement"
 USE_DECLARATION = "use_declaration"
 ATTRIBUTE_ITEM = "attribute_item"  # outer ``#[attr]``

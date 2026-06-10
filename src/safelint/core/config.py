@@ -128,6 +128,7 @@ DEFAULTS: dict[str, Any] = {
             "function_length",
             "nesting_depth",
             "max_arguments",
+            "no_recursion",
             "bare_except",
             "empty_except",
             "global_state",
@@ -137,11 +138,13 @@ DEFAULTS: dict[str, Any] = {
             "complexity",
             "side_effects_hidden",
             "side_effects",
+            "dynamic_code_execution",
             "logging_on_error",
             "resource_lifecycle",
             "test_coupling",
             "test_existence",
             "missing_assertions",
+            "blanket_suppression",
             "tainted_sink",
             "return_value_ignored",
             "null_dereference",
@@ -157,6 +160,10 @@ DEFAULTS: dict[str, Any] = {
         "nesting_depth": {"enabled": True, "max_depth": 2, "severity": "error"},
         "max_arguments": {"enabled": True, "max_args": 7, "severity": "error"},
         "complexity": {"enabled": True, "max_complexity": 10, "severity": "error"},
+        # Holzmann rule 1 bans recursion. Default-enabled at warning severity
+        # (mirrors unbounded_loops): direct self-recursion is flagged so the
+        # stack bound is made explicit, but it does not block a local run.
+        "no_recursion": {"enabled": True, "severity": "warning"},
         "bare_except": {"enabled": True, "severity": "error"},
         "empty_except": {"enabled": True, "severity": "error"},
         "logging_on_error": {"enabled": True, "severity": "warning"},
@@ -182,6 +189,20 @@ DEFAULTS: dict[str, Any] = {
         # scope-control mechanism. No Python equivalent - Python lacks
         # the var/let/const distinction.
         "wide_scope_declaration": {"enabled": True, "severity": "warning"},
+        # Holzmann rule 8 (restrict the preprocessor) adapted to dynamic code
+        # execution / reflection. Structural detection (no dataflow) - the
+        # complement of SAFE801's taint-gated view. Disabled by default
+        # because reflection-heavy frameworks and plugin loaders are noisy.
+        # Per-language call lists use the ``_<lang>`` suffix convention
+        # (Python uses the bare key). Rust is intentionally absent (its rule-8
+        # analogue is macros, whose bodies are opaque token trees).
+        "dynamic_code_execution": {
+            "enabled": False,
+            "severity": "warning",
+            "dynamic_exec_calls": ["eval", "exec", "compile", "__import__"],
+            "dynamic_exec_calls_javascript": ["eval", "Function", "execScript"],
+            "dynamic_exec_calls_java": ["forName", "invoke", "eval", "defineClass", "loadClass"],
+        },
         "side_effects_hidden": {
             "enabled": True,
             "severity": "error",
@@ -525,6 +546,12 @@ DEFAULTS: dict[str, Any] = {
         },
         "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
         "test_coupling": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
+        # Holzmann rule 10 (heed every warning) adapted to blanket suppressions
+        # of OTHER analysers - bare flake8 noqa, rule-less ``eslint-disable``,
+        # ``@SuppressWarnings("all")``, ``#[allow(clippy::all)]``. Scoped
+        # suppressions are clean; safelint's own nosafe directives are never
+        # flagged (SAFE004 polices those). Disabled by default - it's opinionated.
+        "blanket_suppression": {"enabled": False, "severity": "warning"},
         # Dataflow hybrid rules - disabled by default; opt-in via config
         "tainted_sink": {
             "enabled": False,
@@ -1074,6 +1101,37 @@ DEFAULTS: dict[str, Any] = {
             ],
         },
         "undocumented_unsafe": {"enabled": False, "severity": "warning"},
+        # Holzmann rule 6 (smallest scope) for Rust's safe interior-mutable
+        # statics (Mutex / RwLock / OnceLock / Atomic* / lazy_static!), which
+        # SAFE602's unsafe gate never sees. Disabled by default - global
+        # interior-mutable state is sometimes a deliberate design choice.
+        "interior_mutable_static": {
+            "enabled": False,
+            "severity": "warning",
+            "interior_mutable_types_rust": [
+                "Mutex",
+                "RwLock",
+                "RefCell",
+                "Cell",
+                "OnceLock",
+                "OnceCell",
+                "Lazy",
+                "LazyLock",
+                "LazyCell",
+                "AtomicBool",
+                "AtomicI8",
+                "AtomicI16",
+                "AtomicI32",
+                "AtomicI64",
+                "AtomicIsize",
+                "AtomicU8",
+                "AtomicU16",
+                "AtomicU32",
+                "AtomicU64",
+                "AtomicUsize",
+                "AtomicPtr",
+            ],
+        },
     },
 }
 
@@ -1750,14 +1808,39 @@ def _resolve_javascript_runtime(cfg: dict[str, Any]) -> str:
 
 
 def deep_merge(base: dict[str, Any], override: dict[str, Any]) -> dict[str, Any]:
-    """Recursively merge *override* into *base*, returning a new dict."""
-    merged: dict[str, Any] = dict(base)
+    """Merge *override* into *base*, returning a new dict (originals untouched).
+
+    Iterative (explicit worklist) rather than recursive: each work item is a
+    ``(target, override)`` pair where ``target`` is a fresh dict the merge
+    populates. Nested dict-vs-dict keys push a copied child onto the stack so
+    no level of *base* is ever mutated in place. Bounded by config-table
+    nesting depth.
+    """
+    result: dict[str, Any] = dict(base)
+    stack: list[tuple[dict[str, Any], dict[str, Any]]] = [(result, override)]
+    while len(stack) > 0:
+        target, ov = stack.pop()
+        stack.extend(_apply_overrides(target, ov))
+    return result
+
+
+def _apply_overrides(target: dict[str, Any], override: dict[str, Any]) -> list[tuple[dict[str, Any], dict[str, Any]]]:
+    """Apply *override* onto *target* in place; return nested ``(child, override)`` pairs to recurse.
+
+    Scalar / non-dict keys are written straight onto *target* (override wins).
+    A dict-vs-dict key copies the base child so *target*'s nested dicts are
+    never mutated through and queues the copy for a deeper merge.
+    """
+    nested: list[tuple[dict[str, Any], dict[str, Any]]] = []
     for key, value in override.items():
-        if key in merged and isinstance(merged[key], dict) and isinstance(value, dict):
-            merged[key] = deep_merge(merged[key], value)
+        existing = target.get(key)
+        if key in target and isinstance(existing, dict) and isinstance(value, dict):
+            child = dict(existing)
+            target[key] = child
+            nested.append((child, value))
         else:
-            merged[key] = value
-    return merged
+            target[key] = value
+    return nested
 
 
 # ---------------------------------------------------------------------------
@@ -1777,7 +1860,7 @@ def _read_toml_file(candidate: Path) -> dict[str, Any] | None:
         return None
 
 
-def _peek_toml_file(candidate: Path) -> dict[str, Any] | None:
+def _quiet_read_toml_file(candidate: Path) -> dict[str, Any] | None:
     """Parse *candidate* quietly: same as :func:`_read_toml_file` but no diagnostic.
 
     Used by probes (e.g. :func:`_directory_has_config`) that decide
@@ -1789,10 +1872,7 @@ def _peek_toml_file(candidate: Path) -> dict[str, Any] | None:
     the authoritative reporter.
     """
     try:
-        # SAFE304 suppression below: this *is* an I/O probe by design.
-        # Alternative names ("read", "load") would imply an authoritative
-        # read, but this helper is deliberately a quiet peek.
-        with candidate.open("rb") as fp:  # nosafe: SAFE304
+        with candidate.open("rb") as fp:
             return tomllib.load(fp)
     # Fail-silent on purpose: the actual load path will surface the
     # error to the user. SAFE203's heuristic doesn't see the silence
@@ -1846,7 +1926,7 @@ def _directory_has_config(directory: Path) -> bool:
       higher up the tree (e.g. a Python package whose author never
       configured safelint) shouldn't pin the cache there.
 
-    Uses :func:`_peek_toml_file` (silent) rather than
+    Uses :func:`_quiet_read_toml_file` (silent) rather than
     :func:`_read_toml_file` (verbose) so a malformed file's
     diagnostic is emitted exactly once - by the actual load path
     that follows. Otherwise the same broken file would print the
@@ -1854,11 +1934,11 @@ def _directory_has_config(directory: Path) -> bool:
     """
     standalone = directory / STANDALONE_TOML_FILENAME
     if standalone.exists():
-        return _peek_toml_file(standalone) is not None
+        return _quiet_read_toml_file(standalone) is not None
     pyproject = directory / TOML_CONFIG_FILENAME
     if not pyproject.exists():
         return False
-    doc = _peek_toml_file(pyproject)
+    doc = _quiet_read_toml_file(pyproject)
     return doc is not None and doc.get("tool", {}).get(TOML_CONFIG_KEY) is not None
 
 

@@ -82,6 +82,32 @@ _CONTAINER_TYPES = frozenset({"array", "object", "pair", "spread_element"})
 # direction, only the null-safety semantics - handled by SAFE803, not here.
 _MEMBER_TYPES = frozenset({"member_expression", "subscript_expression"})
 
+#: Destructuring-pattern node types that bind through a *specific* field.
+#: ``pair_pattern`` carries the bound alias on ``value`` (``{key: alias}``);
+#: ``assignment_pattern`` carries the binding on ``left`` (``[a = 1]`` -
+#: ``right`` is the default value, not a binding).
+_PATTERN_BINDING_FIELD = {"pair_pattern": "value", "assignment_pattern": "left"}
+
+#: Destructuring-pattern node types whose every named child is a binding.
+_PATTERN_CONTAINER_TYPES = frozenset({"array_pattern", "object_pattern", "rest_pattern"})
+
+
+def _destructure_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
+    """Return the binding sub-nodes of a destructuring pattern *node*.
+
+    Containers (``array_pattern`` / ``object_pattern`` / ``rest_pattern``)
+    yield every named child; field-binding patterns (``pair_pattern`` /
+    ``assignment_pattern``) yield the single binding child. Anything else
+    binds nothing.
+    """
+    if node.type in _PATTERN_CONTAINER_TYPES:
+        return list(node.named_children)
+    field = _PATTERN_BINDING_FIELD.get(node.type)
+    if field is None:
+        return []
+    inner = node.child_by_field_name(field)
+    return [inner] if inner is not None else []
+
 
 class JsTaintTracker:
     """Track tainted variable flow through a JavaScript function body.
@@ -155,30 +181,17 @@ class JsTaintTracker:
         text. Subscript / member targets (``arr[0] = …``, ``obj.x = …``)
         aren't bare names and are skipped.
         """
-        if target.type in ("identifier", "shorthand_property_identifier_pattern"):
-            yield target
-            return
-        # ``array_pattern`` / ``object_pattern`` / ``rest_pattern`` all
-        # bind every named child - same recursion shape, so a single
-        # branch keeps cyclomatic complexity in check.
-        if target.type in ("array_pattern", "object_pattern", "rest_pattern"):
-            for child in target.named_children:
-                yield from self._iter_target_identifiers(child)
-            return
-        # Patterns that bind through a *specific* field name. ``pair_pattern``
-        # carries the bound alias on ``value`` (``{key: alias}``);
-        # ``assignment_pattern`` carries the binding on ``left``
-        # (``[a = 1]`` / ``function f(a = 1) {}`` - the ``right`` is
-        # the default value, not a binding). Without ``assignment_pattern``
-        # taint flowing into a destructuring target with a default would
-        # silently drop on the floor.
-        field_by_type = {"pair_pattern": "value", "assignment_pattern": "left"}
-        field = field_by_type.get(target.type)
-        if field is None:
-            return
-        inner = target.child_by_field_name(field)
-        if inner is not None:
-            yield from self._iter_target_identifiers(inner)
+        # Iterative DFS over the destructuring shape; bounded by its nesting.
+        # Per-node child selection is delegated to ``_destructure_children`` so
+        # this loop stays flat (children pushed reversed to preserve
+        # left-to-right yield order).
+        stack = [target]
+        while len(stack) > 0:
+            current = stack.pop()
+            if current.type in ("identifier", "shorthand_property_identifier_pattern"):
+                yield current
+            else:
+                stack.extend(reversed(_destructure_children(current)))
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x = value`` (assignment_expression)."""
@@ -243,7 +256,23 @@ class JsTaintTracker:
             self.tainted.discard(name)
 
     def _is_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* may carry tainted data."""
+        """Return True if *node* may carry tainted data.
+
+        Iterative worklist with OR semantics (first tainted node wins).
+        Per-node classification is split into :meth:`_node_directly_tainted`
+        and :meth:`_taint_propagating_children`. Depth is bounded by the
+        expression's nesting.
+        """
+        stack = [node]
+        while len(stack) > 0:
+            current = stack.pop()
+            if self._node_directly_tainted(current):
+                return True
+            stack.extend(self._taint_propagating_children(current))
+        return False
+
+    def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
+        """Return True if *node* is a leaf that itself carries taint."""
         node_type = node.type
         if node_type == "identifier":
             return node_text(node) in self.tainted
@@ -251,12 +280,22 @@ class JsTaintTracker:
             return self._call_tainted(node)
         if node_type == "template_string":
             return self._template_tainted(node)
-        if node_type in _MEMBER_TYPES:
-            obj = node.child_by_field_name("object")
-            return self._is_tainted(obj) if obj is not None else False
-        if node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
-            return any(self._is_tainted(child) for child in node.named_children)
         return False
+
+    @staticmethod
+    def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
+        """Return the child nodes through which taint can flow into *node*.
+
+        Member access propagates its ``object`` receiver; spreading
+        expressions and containers propagate every named child. Everything
+        else is a taint dead-end.
+        """
+        if node.type in _MEMBER_TYPES:
+            obj = node.child_by_field_name("object")
+            return [obj] if obj is not None else []
+        if node.type in _SPREADING_TYPES or node.type in _CONTAINER_TYPES:
+            return list(node.named_children)
+        return []
 
     def _call_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if this call produces a tainted value.

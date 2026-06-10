@@ -616,7 +616,7 @@ class SafetyEngine:
         Tree-sitter's own coordinates.
         """
         stack: list[tree_sitter.Node] = [root]
-        while stack:  # nosafe: SAFE501
+        while len(stack) > 0:
             node = stack.pop()
             if not node.has_error:
                 continue

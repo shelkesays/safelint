@@ -19,7 +19,7 @@ v2.0.0 ships every language grammar as an opt-in extra, the `[python]` extra ins
 
 ## Rules that fire on Python
 
-All 19 user-facing rules apply to Python: the 16 cross-language rules (Python / JS / TS / Java) plus SAFE302 `global_mutation` (Python / JS / TS only, not ported to Java yet) plus the 2 Python-only rules (SAFE201 `bare_except`, SAFE301 `global_state`). The 1 JavaScript-family-only rule (SAFE305 `wide_scope_declaration`) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
+Python is in scope for every cross-language rule plus the two Python-only rules (SAFE201 `bare_except`, SAFE301 `global_state`) and SAFE302 `global_mutation`. Newly added in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE309 `dynamic_code_execution`, and SAFE603 `blanket_suppression` (both disabled by default). The 1 JavaScript-family-only rule (SAFE305 `wide_scope_declaration`) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
 
 | Code | Rule | Notes for Python |
 |---|---|---|
@@ -27,6 +27,7 @@ All 19 user-facing rules apply to Python: the 16 cross-language rules (Python / 
 | [SAFE102](../configuration/rules.md#safe102-nesting_depth) | `nesting_depth` | Counts `if` / `for` / `while` / `with` / `try` / `match` blocks. Default max 2. |
 | [SAFE103](../configuration/rules.md#safe103-max_arguments) | `max_arguments` | Counts positional, keyword, `*args`, `**kwargs` separately. Excludes `self` / `cls`. Default cap 7. |
 | [SAFE104](../configuration/rules.md#safe104-complexity) | `complexity` | Cyclomatic complexity, every `if` / `elif` / `for` / `while` / `except` / `case` / ternary / `and` / `or` adds one. Default cap 10. |
+| [SAFE105](../configuration/rules.md#safe105-no_recursion) | `no_recursion` | Flags a function that calls itself directly, bare (`fact(n-1)`) or `self`/`cls`-qualified (`self.walk(...)`). `other.walk(...)` does not fire. Direct self-recursion only. Enabled by default at warning severity. |
 | [SAFE201](../configuration/rules.md#safe201-bare_except) | `bare_except` | **Python-only.** Fires on `except:` with no exception type, catches `KeyboardInterrupt` and `SystemExit`. |
 | [SAFE202](../configuration/rules.md#safe202-empty_except) | `empty_except` | Fires on `except: pass`, `except: ...`, `except: 0`, `except: "TODO"`. |
 | [SAFE203](../configuration/rules.md#safe203-logging_on_error) | `logging_on_error` | Requires a call to `logger.{debug,info,warning,error,exception,critical}` (or bare `raise`) in every except handler. |
@@ -34,9 +35,11 @@ All 19 user-facing rules apply to Python: the 16 cross-language rules (Python / 
 | [SAFE302](../configuration/rules.md#safe302-global_mutation) | `global_mutation` | Function-body writes that follow a `global` declaration. Reading a global doesn't fire. |
 | [SAFE303](../configuration/rules.md#safe303-side_effects_hidden) | `side_effects_hidden` | Functions named with a pure-prefix (`calculate_`, `get_`, `is_`, …) that secretly call `open()` / `print()` / `input()`. |
 | [SAFE304](../configuration/rules.md#safe304-side_effects) | `side_effects` | Any function calling an I/O primitive whose name doesn't signal I/O (no `log_` / `write_` / `read_` / etc. infix). |
+| [SAFE309](../configuration/rules.md#safe309-dynamic_code_execution) | `dynamic_code_execution` | Structural detection of `eval` / `exec` / `compile` / `__import__` (bare or `builtins.`-qualified; `model.eval()` does not fire). Holzmann rule 8; complements SAFE801. Disabled by default. |
 | [SAFE401](../configuration/rules.md#safe401-resource_lifecycle) | `resource_lifecycle` | Tracked acquirer calls (`open`, `connect`, `Lock`, `Pool`, …) must be inside a `with` statement. |
 | [SAFE501](../configuration/rules.md#safe501-unbounded_loops) | `unbounded_loops` | `while True:` with no `break`. Also fires on `while <non-comparison>:`, a heuristic that stays Python-only. |
 | [SAFE601](../configuration/rules.md#safe601-missing_assertions) | `missing_assertions` | Functions with zero `assert` statements. Disabled by default. |
+| [SAFE603](../configuration/rules.md#safe603-blanket_suppression) | `blanket_suppression` | Flags bare `# noqa`, `# type: ignore` without a `[code]`, and `# pylint: disable=all` (Holzmann rule 10). Scoped suppressions and safelint's own `# nosafe` are clean. Disabled by default. |
 | [SAFE701](../configuration/rules.md#safe701-test_existence) | `test_existence` | Every source file should have a matching `test_<stem>.py` under `test_dirs`. Disabled by default. |
 | [SAFE702](../configuration/rules.md#safe702-test_coupling) | `test_coupling` | If you change `src/foo.py`, you must also change `tests/test_foo.py` in the same commit. Disabled by default. |
 | [SAFE801](../configuration/rules.md#safe801-tainted_sink) | `tainted_sink` | Function parameters / `input()` flowing into `eval` / `exec` / `subprocess` / `cursor.execute`. Disabled by default. |
@@ -94,7 +97,7 @@ pip install 'safelint[python,javascript]'   # Python + JS monorepo
 pip install 'safelint[all]'                 # kitchen-sink
 ```
 
-`pip install safelint` (no extras) installs only the engine. safelint will emit `safelint: warning: skipping .py files, install with: pip install 'safelint[python]'` on first run when it finds Python files but the grammar isn't installed. **Heads-up for CI:** in a Python-only project that pattern means *every* candidate file gets skipped, which fires the [silent-failure guard](../configuration/cli.md#exit-code-2--silent-failure-triggers) and exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.
+`pip install safelint` (no extras) installs only the engine. safelint will emit `safelint: warning: skipping .py files, install with: pip install 'safelint[python]'` on first run when it finds Python files but the grammar isn't installed. **Heads-up for CI:** in a Python-only project that pattern means *every* candidate file gets skipped, which fires the [silent-failure guard](../configuration/cli.md#exit-code-2-silent-failure-triggers) and exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.
 
 ## Pre-commit integration
 

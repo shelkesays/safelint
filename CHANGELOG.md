@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.4.0] - 2026-06-10
+
+**Power of Ten gap-closure: five new / widened rules.** This release adds four new rules and widens one existing rule to close the most prominent gaps between SafeLint's rule set and Holzmann's ten rules, plus a new docs page mapping the ten rules onto the checks. Additive across the board (per the project's semver policy, new rules and widened language coverage are MINOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.
+
+### Added
+
+- **SAFE105 `no_recursion` (Holzmann rule 1), all five languages, enabled by default at `warning` severity.** Flags direct self-recursion, a function that calls its own name, either bare (`fact(n - 1)`) or self-qualified (`self.walk(...)` / `this.walk(...)`). A call on a different receiver (`other.walk(...)`) does not fire. Indirect / mutual recursion and anonymous-function recursion are documented out-of-scope blind spots. Annotate deliberate recursion with `# nosafe: SAFE105` (or the language's comment form).
+- **SAFE307 `interior_mutable_static` (Holzmann rule 6), Rust-only, disabled by default.** Flags a `static` whose type provides safe interior mutability (`Mutex` / `RwLock` / `OnceLock` / `Atomic*` / `RefCell` / `Cell` / `Lazy*`) and `lazy_static!` blocks, the safe-code global mutable state that SAFE602's `unsafe` gate never sees. `const` and `static mut` are not flagged. Configurable via `interior_mutable_types_rust`.
+- **SAFE309 `dynamic_code_execution` (Holzmann rule 8), Python / JS / TS / Java, disabled by default.** Structural detection of `eval` / `exec` / `compile` / `__import__` (Python), `eval` / `new Function` (JS/TS), and `Class.forName` / `Method.invoke` / `defineClass` / `loadClass` (Java). Complements the taint-gated SAFE801, both may fire on one line. Rust is excluded (its rule-8 analogue, macros, parses as opaque token trees). Per-language call lists via `dynamic_exec_calls` / `dynamic_exec_calls_javascript` / `dynamic_exec_calls_java`.
+- **SAFE603 `blanket_suppression` (Holzmann rule 10), all five languages, disabled by default.** Flags un-scoped suppressions of *other* analysers: bare flake8 `noqa`, `type: ignore` without a code, rule-less `eslint-disable`, `@ts-nocheck` / `@ts-ignore`, `@SuppressWarnings("all")`, `#[allow(clippy::all)]` / `#[allow(warnings)]`. Scoped suppressions are clean, and SafeLint's own `# nosafe` directives are never flagged (SAFE004 polices those).
+- **New docs page: [The Power of Ten, adapted](https://shelkesays.github.io/safelint/power-of-ten/).** Maps each of Holzmann's ten rules to the SafeLint rules that implement it, per language, and records the rationale for the adapted-away clauses (rule 3 dynamic allocation, rule 8 preprocessor for non-Rust languages).
+
+### Changed
+
+- **SAFE302 `global_mutation` now covers Java** (previously Python / JS / TS only). On Java it flags **non-final `static` field declarations**, Java's shared-mutable-state shape, at the declaration site. `static final` fields are clean (interior mutability of a `final` referent is a documented exclusion needing type resolution); instance fields, locals, and interface fields never fire. This fulfils the Java SAFE302 work previously marked "deferred to a future release" in the language docs. **Heads-up for existing Java users:** because SAFE302 is enabled by default, projects with non-final `static` fields will see new violations after upgrading; suppress per-line with `// nosafe: SAFE302`, per-file, or via `per_file_ignores` if this is not yet a policy you want to enforce. SAFE302 remains unported to Rust (`static mut` is SAFE602's territory; safe interior-mutable statics are the new SAFE307's).
+
+### Documentation
+
+- **Doc accuracy pass for the new rule set.** Refreshed rule and AI-client counts across `README.md`, `docs/index.md`, `docs/configuration/rules.md`, and the per-language pages (38 rules total: 15 on by default, 23 opt-in; 14 supported AI clients), updated every per-language page, the bundled client skill files, and the language crib sheets to list SAFE105 / SAFE307 / SAFE309 / SAFE603 and the widened SAFE302, and fixed a broken `cli.md#exit-code-2-silent-failure-triggers` anchor referenced from three language pages.
+
+### Internal
+
+- **SafeLint now passes its own rule set with no inline suppressions other than the documented `SAFE203` logging exemptions.** The new `SAFE105 no_recursion` rule fires on intra-procedural tree-walkers in the dataflow analysers, `deep_merge`, and a couple of parse-tree helpers; rather than annotate them, those were converted to explicit iterative worklists / loops (mirroring the existing iterative `walk()`), and the remaining `SAFE501` worklist-drain annotations and one `SAFE304` annotation were likewise refactored away. No behaviour change; recursion depth on the affected helpers was always bounded by source-construct nesting.
+
 ## [2.3.0] - 2026-06-09
 
 **Kiro AI client; documentation accuracy pass.** Kiro (`kiro.dev`, AWS's agentic IDE) joins the registry as the fourteenth supported AI client, additive, one `ClientSpec`. This release also folds in the post-2.2.0 documentation work: the per-client docs gaps for Warp and OpenCode are closed, `docs/configuration/cli.md` is restructured into a per-command reference, and the contributing "Adding an AI client" guide plus the AI client integration pages are corrected against the current single-file install architecture. No behaviour change for existing clients or languages.

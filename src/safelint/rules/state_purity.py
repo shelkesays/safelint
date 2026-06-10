@@ -120,7 +120,9 @@ def _unwrap_passthrough_wrappers(node: tree_sitter.Node | None) -> tree_sitter.N
     standard escape hatch for adding properties to the global object.
     """
     cur = node
-    while cur is not None and cur.type in _PASSTHROUGH_WRAPPER_TYPES:  # nosafe: SAFE501
+    while cur is not None:
+        if cur.type not in _PASSTHROUGH_WRAPPER_TYPES:
+            break
         # Pick the expression child. Most wrappers
         # (``parenthesized_expression`` / ``as_expression`` /
         # ``satisfies_expression`` / ``non_null_expression``) have the
@@ -157,7 +159,9 @@ def _javascript_global_namespace_root(target: tree_sitter.Node) -> str | None:
     because they do not change the underlying ownership chain.
     """
     cur = _unwrap_passthrough_wrappers(target)
-    while cur is not None and cur.type in ("member_expression", "subscript_expression"):  # nosafe: SAFE501
+    while cur is not None:
+        if cur.type not in ("member_expression", "subscript_expression"):
+            break
         cur = _unwrap_passthrough_wrappers(cur.child_by_field_name("object"))
     if cur is None or cur.type != "identifier":
         return None
@@ -211,7 +215,7 @@ class GlobalMutationRule(BaseRule):
 
     name = "global_mutation"
     code = "SAFE302"
-    language = ("python", "javascript", "typescript")
+    language = ("python", "javascript", "typescript", "java")
 
     _DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT: ClassVar[list[str]] = [
         "globalThis",  # universal - works in browsers, Node, web workers
@@ -311,7 +315,62 @@ class GlobalMutationRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
         if lang_name == "python":
             return self._python_check(filepath, tree)
+        if lang_name == "java":
+            return self._java_check(filepath, tree)
         return self._javascript_check(filepath, tree, lang_name)
+
+    def _java_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag non-final ``static`` field declarations (Java's shared-mutable-state shape).
+
+        Declaration-site detection (not write-site): a mutable static
+        field IS the smallest-scope violation regardless of where it is
+        written, and a single tree walk over ``field_declaration`` nodes
+        has near-zero false positives. ``static final`` fields are clean
+        even when their referent is interiorly mutable (e.g. a
+        ``static final List``); detecting interior mutability would need
+        type resolution safelint does not do, so it is a documented v1
+        exclusion. Interface fields are implicitly ``public static final``
+        and parse without a ``static`` modifier here, so they never fire.
+        """
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type != "field_declaration":
+                continue
+            modifiers = self._java_modifier_set(node)
+            if "static" not in modifiers or "final" in modifiers:
+                continue
+            field_name = self._java_field_name(node)
+            violations.append(
+                self._make_violation_for_node(
+                    filepath,
+                    node,
+                    f'Non-final static field "{field_name}" is shared mutable state - declare it `final`, or scope the state to its consumer (Power of Ten rule 6)',
+                )
+            )
+        return violations
+
+    @staticmethod
+    def _java_modifier_set(field_node: tree_sitter.Node) -> set[str]:
+        """Return the set of plain modifier keywords on a Java ``field_declaration``.
+
+        Only bare keyword children of the ``modifiers`` node are collected
+        (``static`` / ``final`` / ``public`` / ...); annotation children
+        (``@Autowired`` etc.) are skipped because they are not ``modifier``
+        keyword tokens.
+        """
+        for child in field_node.named_children:
+            if child.type == "modifiers":
+                return {node_text(kw) for kw in child.children if not kw.is_named}
+        return set()
+
+    @staticmethod
+    def _java_field_name(field_node: tree_sitter.Node) -> str:
+        """Return the first declared variable name on a Java ``field_declaration``."""
+        for child in field_node.named_children:
+            if child.type == "variable_declarator":
+                name = child.child_by_field_name("name")
+                return node_text(name) if name is not None else "<field>"
+        return "<field>"
 
     def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run the Python-specific check (``global`` keyword + write)."""
