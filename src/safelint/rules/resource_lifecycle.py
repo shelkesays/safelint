@@ -145,23 +145,39 @@ def _java_acquired_variable_name(call_node: tree_sitter.Node) -> str | None:
     ``cast_expression`` wrappers so ``Resource r = (Resource) acquirer(...)``
     still resolves to ``"r"``.
     """
-    cur = call_node.parent
-    # Parent chain is finite (terminates at the program root), so the
-    # ``cur is not None`` clause bounds the loop; SAFE501 wants a pure
-    # comparison in the header which this conjunction isn't.
-    while cur is not None and cur.type in ("parenthesized_expression", "cast_expression"):  # nosafe: SAFE501
-        cur = cur.parent
-    if cur is None:  # pragma: no cover - defensive: walked off the tree root
+    # Peel outward: a wrapped acquirer (an argument to an enclosing
+    # ``object_creation_expression``) shares the outer wrapper's handle, so we
+    # re-resolve against the outer creation. Looping instead of recursing; the
+    # outward walk is bounded by the finite parent chain (terminates at root),
+    # and the per-step wrapper skip is delegated to ``_skip_wrapper_parents``.
+    node = call_node
+    while node is not None:
+        cur = _skip_wrapper_parents(node.parent)
+        if cur is None:  # pragma: no cover - defensive: walked off the tree root
+            return None
+        direct = _direct_assigned_name(cur)
+        if direct is not None:
+            return direct
+        if cur.type == "argument_list" and cur.parent is not None and cur.parent.type == "object_creation_expression":
+            node = cur.parent
+            continue
         return None
-    direct = _direct_assigned_name(cur)
-    if direct is not None:
-        return direct
-    # Wrapped-acquirer case: this call is an argument to another
-    # ``object_creation_expression``; recurse on the outer creation
-    # which (if itself assigned) yields the variable that owns cleanup.
-    if cur.type == "argument_list" and cur.parent is not None and cur.parent.type == "object_creation_expression":
-        return _java_acquired_variable_name(cur.parent)
-    return None
+    return None  # pragma: no cover - loop exits only via the returns above
+
+
+def _skip_wrapper_parents(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Return the nearest ancestor of *node* (inclusive) that isn't a paren/cast wrapper.
+
+    ``parenthesized_expression`` / ``cast_expression`` are transparent for
+    cleanup purposes (``Resource r = (Resource) acquirer(...)``). Bounded by
+    the finite parent chain.
+    """
+    cur = node
+    while cur is not None:
+        if cur.type not in ("parenthesized_expression", "cast_expression"):
+            return cur
+        cur = cur.parent
+    return None  # node was None, or the wrapper chain ran off the tree root
 
 
 def _direct_assigned_name(node: tree_sitter.Node) -> str | None:

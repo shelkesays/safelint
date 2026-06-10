@@ -197,18 +197,28 @@ class JavaTaintTracker:
         then resolve the chained RHS's taint via
         ``_assignment_chain_tainted`` for the outer ``a``.
         """
-        left = node.child_by_field_name("left")
-        right = node.child_by_field_name("right")
-        if left is None or right is None:  # pragma: no cover - defensive: valid assignments have both sides
-            return
-        if right.type == "assignment_expression":
-            self._visit_assignment(right)
-        if left.type != "identifier":
-            return
-        rhs_tainted = self._assignment_chain_tainted(right)
-        if _is_compound_assignment(node) and self._name_is_tainted(left):
-            rhs_tainted = True
-        self._update_name(left, is_tainted=rhs_tainted)
+        # Collect the chain of nested ``assignment_expression`` nodes
+        # (``a = b = expr`` -> ``[a, b]``) then process innermost-first so each
+        # LHS sees the resolved RHS taint - the iterative form of the original
+        # recurse-on-right. Bounded by the depth of the assignment chain.
+        chain: list[tree_sitter.Node] = []
+        cur: tree_sitter.Node | None = node
+        while cur is not None:
+            if cur.type != "assignment_expression":
+                break
+            chain.append(cur)
+            cur = cur.child_by_field_name("right")
+        for assign in reversed(chain):
+            left = assign.child_by_field_name("left")
+            right = assign.child_by_field_name("right")
+            if left is None or right is None:  # pragma: no cover - defensive: valid assignments have both sides
+                continue
+            if left.type != "identifier":
+                continue
+            rhs_tainted = self._assignment_chain_tainted(right)
+            if _is_compound_assignment(assign) and self._name_is_tainted(left):
+                rhs_tainted = True
+            self._update_name(left, is_tainted=rhs_tainted)
 
     def _assignment_chain_tainted(self, node: tree_sitter.Node) -> bool:
         """Return the innermost-RHS taint state for a (possibly chained) assignment RHS."""
@@ -316,19 +326,45 @@ class JavaTaintTracker:
             self.tainted.discard(name)
 
     def _is_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* may carry tainted data."""
+        """Return True if *node* may carry tainted data.
+
+        Iterative worklist with OR semantics (first tainted node wins).
+        Per-node classification is split into :meth:`_node_directly_tainted`
+        and :meth:`_taint_propagating_children`. Depth is bounded by the
+        expression's nesting.
+        """
+        stack = [node]
+        while len(stack) > 0:
+            current = stack.pop()
+            if self._node_directly_tainted(current):
+                return True
+            stack.extend(self._taint_propagating_children(current))
+        return False
+
+    def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
+        """Return True if *node* is a leaf that itself carries taint."""
         node_type = node.type
         if node_type == "identifier":
             return node_text(node) in self.tainted
         if node_type in _CALL_TYPES:
             return self._call_tainted(node)
-        if node_type in _MEMBER_TYPES:
-            obj_field = "object" if node_type == "field_access" else "array"
-            obj = node.child_by_field_name(obj_field)
-            return self._is_tainted(obj) if obj is not None else False
-        if node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
-            return any(self._is_tainted(child) for child in node.named_children)
         return False
+
+    @staticmethod
+    def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
+        """Return the child nodes through which taint can flow into *node*.
+
+        Member access (``field_access`` / ``array_access``) propagates its
+        receiver; spreading expressions and containers propagate every named
+        child. Everything else is a taint dead-end.
+        """
+        node_type = node.type
+        if node_type in _MEMBER_TYPES:
+            obj = node.child_by_field_name("object" if node_type == "field_access" else "array")
+            return [obj] if obj is not None else []
+        if node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
+            return list(node.named_children)
+        return []
 
     def _call_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if this call produces a tainted value.

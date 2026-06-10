@@ -39,13 +39,16 @@ When the user asks "why is this flagged?", the universal rationale in the per-cl
 | SAFE102 | nesting_depth | Counts `if`/`for`/`while`/`with`/`try` blocks. Default max is 2. Comprehension nesting (`[x for x in y for z in w]`) does not count toward the depth; it's a single AST node. |
 | SAFE103 | max_arguments | Counts positional, keyword, `*args`, `**kwargs`, and keyword-only arguments. `self`/`cls` are *included* in the count. Default cap is 7. |
 | SAFE104 | complexity | Cyclomatic complexity: every `if`/`elif`/`else`/`for`/`while`/`except`/`and`/`or`/ternary adds one. Default cap is 10. |
+| SAFE105 | no_recursion | Flags a function that calls itself directly, bare (`fact(n-1)`) or `self`/`cls`-qualified. `other.walk(...)` does not fire. Direct self-recursion only. Enabled by default at warning severity; annotate intentional recursion with `# nosafe: SAFE105`. |
 | SAFE201 | bare_except | Fires on `except:` (no exception type). The Python-specific concern is that bare `except` swallows `KeyboardInterrupt` and `SystemExit`, breaking Ctrl-C and `sys.exit()`. Always use `except Exception:` at minimum. |
 | SAFE202 | empty_except | Fires on `except <Type>: pass` and `except <Type>: ...`. Exception handlers should at least log; silent suppression is a Power-of-Ten violation. |
 | SAFE301 | global_state | Fires on the `global` keyword inside functions. Python's `global` declaration makes the function depend on module-level state. |
 | SAFE302 | global_mutation | Fires when a function declares `global x` *and* writes to `x`. Reading is fine; writing is the Power-of-Ten concern. |
 | SAFE303 | side_effects_hidden | Fires when a function with a "pure" name prefix (`get_`, `compute_`, `is_`, `has_`, `validate_`, `parse_`, etc.) calls an I/O primitive (`open`, `print`, `subprocess.run`, etc.). |
 | SAFE304 | side_effects | Fires when *any* function calls I/O primitives at unexpected sites, distinct from SAFE303 in that it doesn't require a pure-named caller. Suppress with `# nosafe: SAFE304` for intentional I/O wrappers. |
+| SAFE309 | dynamic_code_execution | Structural detection of `eval` / `exec` / `compile` / `__import__` (bare or `builtins.`-qualified; `model.eval()` does not fire). Holzmann rule 8; complements SAFE801. Disabled by default. |
 | SAFE501 | unbounded_loops | Fires on `while True:` without a `break`. Any loop without a clear termination condition triggers this. |
+| SAFE603 | blanket_suppression | Flags bare `# noqa`, `# type: ignore` without a `[code]`, and `# pylint: disable=all` (Holzmann rule 10). Scoped suppressions and safelint's own `# nosafe` are clean. Disabled by default. |
 
 ## Idiomatic fix patterns
 

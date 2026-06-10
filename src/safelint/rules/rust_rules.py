@@ -54,6 +54,7 @@ operations + checked conversions):
 
 from __future__ import annotations
 
+import re
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.languages._node_utils import call_name, node_text, walk
@@ -213,6 +214,38 @@ _RUST_INTEGER_PRIMITIVE_TYPES: frozenset[str] = frozenset(
 #: overflow that SAFE112 cares about.
 _RUST_ARITHMETIC_OPERATORS: frozenset[str] = frozenset({"+", "-", "*"})
 
+#: Standard-library interior-mutability wrapper types that SAFE307 flags
+#: when they appear in a ``static`` declaration's type. Each lets a
+#: ``static`` (which is shared and immutable-by-binding) hold mutable
+#: state in safe code, which the ``static mut`` route (SAFE602's unsafe
+#: gate) does not catch. ``LazyLock`` / ``Lazy`` are both listed because
+#: word-boundary matching keeps ``Lazy`` from matching ``LazyLock``.
+_INTERIOR_MUTABLE_TYPES: frozenset[str] = frozenset(
+    {
+        "Mutex",
+        "RwLock",
+        "RefCell",
+        "Cell",
+        "OnceLock",
+        "OnceCell",
+        "Lazy",
+        "LazyLock",
+        "LazyCell",
+        "AtomicBool",
+        "AtomicI8",
+        "AtomicI16",
+        "AtomicI32",
+        "AtomicI64",
+        "AtomicIsize",
+        "AtomicU8",
+        "AtomicU16",
+        "AtomicU32",
+        "AtomicU64",
+        "AtomicUsize",
+        "AtomicPtr",
+    }
+)
+
 
 # ---------------------------------------------------------------------------
 # Shared helpers
@@ -249,7 +282,9 @@ def _node_has_test_marker_attribute(node: tree_sitter.Node) -> bool:
     so SAFE204 / SAFE208 / SAFE701 / SAFE702 all share one definition.
     """
     cursor = node.prev_named_sibling
-    while cursor is not None and cursor.type == "attribute_item":  # nosafe: SAFE501
+    while cursor is not None:
+        if cursor.type != "attribute_item":
+            break
         if attribute_item_is_test_marker(cursor):
             return True
         cursor = cursor.prev_named_sibling
@@ -599,7 +634,9 @@ class UndocumentedUnsafeRule(BaseRule):
         if parent is not None and parent.type == "expression_statement":
             anchor = parent
         prev = anchor.prev_sibling
-        while prev is not None and prev.type in ("line_comment", "block_comment"):  # nosafe: SAFE501
+        while prev is not None:
+            if prev.type not in ("line_comment", "block_comment"):
+                break
             if _SAFETY_COMMENT_PREFIX in node_text(prev).lower():
                 return True
             prev = prev.prev_sibling
@@ -1340,3 +1377,91 @@ class UncheckedArithmeticOnInputRule(BaseRule):
 def _op_method_suffix(op: str | None) -> str:
     """Map an arithmetic operator to its checked_*/wrapping_*/saturating_* method suffix."""
     return {"+": "add", "-": "sub", "*": "mul"}.get(op or "", "op")
+
+
+# ---------------------------------------------------------------------------
+# SAFE307 - interior_mutable_static
+# ---------------------------------------------------------------------------
+
+
+def _static_item_is_mutable_specifier(static_node: tree_sitter.Node) -> bool:
+    """Return True if *static_node* is a ``static mut`` declaration.
+
+    ``static mut`` carries a ``mutable_specifier`` named child. Those are
+    already audit-gated by SAFE602 (reads / writes require ``unsafe``), so
+    SAFE307 skips them to avoid double-reporting.
+    """
+    return any(child.type == "mutable_specifier" for child in static_node.named_children)
+
+
+def _type_text_has_interior_mutable(type_text: str, names: frozenset[str]) -> bool:
+    """Return True if *type_text* contains any *names* entry as a standalone token.
+
+    Word-boundary matching (not substring) so ``Lazy`` does not match
+    ``LazyLock`` and a user type like ``MutexGuardWrapper`` does not match
+    ``Mutex``. Qualified paths (``std::sync::Mutex<T>``) still match the
+    trailing type name because ``::`` is a non-word boundary.
+    """
+    return any(re.search(rf"(?<!\w){re.escape(name)}(?!\w)", type_text) for name in names)
+
+
+class InteriorMutableStaticRule(BaseRule):
+    """Flag ``static`` items whose type provides safe interior mutability.
+
+    Holzmann rule 6 (declare data at the smallest possible scope) bans
+    global mutable state. Rust's ``static mut`` route requires ``unsafe``
+    and is therefore already audit-gated by SAFE602, but the idiomatic
+    route - a plain ``static`` holding a ``Mutex`` / ``RwLock`` /
+    ``OnceLock`` / ``Atomic*`` / ``lazy_static!`` - is entirely safe code
+    and invisible to SAFE602. SAFE307 closes that gap.
+
+    Two shapes fire:
+
+    * A ``static_item`` whose declared type contains an interior-mutability
+      wrapper name (configurable via ``interior_mutable_types_rust``).
+    * A ``lazy_static! { ... }`` macro invocation - the macro's whole
+      purpose is declaring lazily-initialised statics, and its body is a
+      token tree safelint cannot decode (the same documented limitation
+      as SAFE801's blindness to ``sqlx::query!``), so the invocation is
+      flagged wholesale.
+
+    ``const`` items (immutable by construction) and ``static mut`` (SAFE602's
+    territory) are deliberately not flagged. Disabled by default.
+    """
+
+    name = "interior_mutable_static"
+    code = "SAFE307"
+    language = ("rust",)
+
+    _DEFAULT_TYPES: ClassVar[frozenset[str]] = _INTERIOR_MUTABLE_TYPES
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag interior-mutable statics and ``lazy_static!`` declarations."""
+        names = frozenset(self.config.get("interior_mutable_types_rust", sorted(self._DEFAULT_TYPES)))
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            violation = self._violation_for(filepath, node, names)
+            if violation is not None:
+                violations.append(violation)
+        return violations
+
+    def _violation_for(self, filepath: str, node: tree_sitter.Node, names: frozenset[str]) -> Violation | None:
+        """Return a SAFE307 violation for *node* if it is an interior-mutable static, else None."""
+        if node.type == "macro_invocation" and _rust_macro_name(node.child_by_field_name("macro")) == "lazy_static":
+            return self._make_violation_for_node(
+                filepath,
+                node,
+                "lazy_static! declares lazily-initialised global mutable state - prefer passing state explicitly or scoping it to the consumer (Power of Ten rule 6)",
+            )
+        if node.type != "static_item" or _static_item_is_mutable_specifier(node):
+            return None
+        type_node = node.child_by_field_name("type")
+        if type_node is None or not _type_text_has_interior_mutable(node_text(type_node), names):
+            return None
+        name_node = node.child_by_field_name("name")
+        static_name = node_text(name_node) if name_node is not None else "<static>"
+        return self._make_violation_for_node(
+            filepath,
+            node,
+            f'Static "{static_name}" uses interior mutability ({node_text(type_node)}) - global mutable state defeats smallest-scope reasoning (Power of Ten rule 6)',
+        )

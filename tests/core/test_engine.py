@@ -383,7 +383,9 @@ _RULES_WIDENED_FOR_JS_FAMILY: frozenset[str] = frozenset(
         # The split exists so the drift-detection assertion catches partial
         # ports - a rule's language tuple must always match exactly one of
         # the documented buckets.
-        "GlobalMutationRule",
+        #
+        # Empty as of v2.4.0: GlobalMutationRule (SAFE302) graduated to the
+        # JS-family-and-Java bucket when its Java declaration-site check landed.
     }
 )
 
@@ -400,9 +402,17 @@ _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA: frozenset[str] = frozenset(
         #   rule design, not a port. Deferred.
         # * ResourceLifecycleRule - SAFE401: Rust's RAII (Drop trait)
         #   makes cleanup language-enforced. The rule has nothing to add.
+        # * GlobalMutationRule - SAFE302: Java fires on non-final static
+        #   field declarations; Rust's ``static mut`` is already covered by
+        #   SAFE602's unsafe gate, and safe interior-mutable statics get
+        #   SAFE307, so SAFE302 itself is not ported to Rust.
+        # * DynamicCodeExecutionRule - SAFE309: Rust's rule-8 analogue is
+        #   macros, whose bodies are opaque token trees; not ported to Rust.
         "EmptyExceptRule",
         "LoggingOnErrorRule",
         "ResourceLifecycleRule",
+        "GlobalMutationRule",
+        "DynamicCodeExecutionRule",
     }
 )
 
@@ -413,11 +423,13 @@ _RULES_PORTED_TO_ALL_FIVE_LANGUAGES: frozenset[str] = frozenset(
         # "typescript", "java", "rust")``. Entries graduate here from
         # ``_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA`` as each rule's Rust port
         # lands during v2.2.0rc1.
+        "BlanketSuppressionRule",
         "ComplexityRule",
         "FunctionLengthRule",
         "MaxArgumentsRule",
         "MissingAssertionsRule",
         "NestingDepthRule",
+        "NoRecursionRule",
         "NullDereferenceRule",
         "ReturnValueIgnoredRule",
         "SideEffectsHiddenRule",
@@ -466,6 +478,7 @@ _RULES_RUST_ONLY: frozenset[str] = frozenset(
         "UnloggedErrorBranchRule",  # SAFE207 - error handling (Rust analogue of SAFE203)
         "ResultUnwrapOutsideTestsRule",  # SAFE208 - error handling (Holzmann rule 7)
         "DangerousMemOpsRule",  # SAFE306 - side effects
+        "InteriorMutableStaticRule",  # SAFE307 - state / scope (Holzmann rule 6)
         "TruncatingAsCastRule",  # SAFE308 - side effects (Holzmann rule 1 + 7)
         "UndocumentedUnsafeRule",  # SAFE602 - documentation
     }

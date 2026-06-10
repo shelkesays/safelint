@@ -149,12 +149,16 @@ class TaintTracker:
         targets (``a[0] = …``, ``obj.x = …``) are not bare names and are
         skipped - TaintTracker only tracks identifiers.
         """
-        if target.type == IDENTIFIER:
-            yield target
-            return
-        if target.type in _PATTERN_TYPES:
-            for child in target.named_children:
-                yield from self._iter_target_identifiers(child)
+        # Iterative DFS over the destructuring shape; children are pushed
+        # reversed so identifiers yield left-to-right. Depth is bounded by the
+        # nesting of the destructuring target.
+        stack = [target]
+        while len(stack) > 0:
+            current = stack.pop()
+            if current.type == IDENTIFIER:
+                yield current
+            elif current.type in _PATTERN_TYPES:
+                stack.extend(reversed(current.named_children))
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x = value``, including destructuring and chains.
@@ -168,7 +172,9 @@ class TaintTracker:
         cursor = node
         # Bounded by the depth of nested ``assignment`` nodes in the parse
         # tree - finite by source structure, not by runtime data.
-        while cursor is not None and cursor.type == ASSIGNMENT:  # nosafe: SAFE501
+        while cursor is not None:
+            if cursor.type != ASSIGNMENT:
+                break
             left = cursor.child_by_field_name("left")
             if left is not None:
                 targets.append(left)
@@ -224,7 +230,24 @@ class TaintTracker:
             self.tainted.discard(name)
 
     def _is_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* may carry tainted data."""
+        """Return True if *node* may carry tainted data.
+
+        Iterative worklist with OR semantics: taint propagates up from any
+        tainted leaf, so the first tainted node short-circuits to ``True``.
+        Per-node classification is split into :meth:`_node_directly_tainted`
+        (leaf check) and :meth:`_taint_propagating_children` (which children to
+        enqueue). Depth is bounded by the expression's nesting.
+        """
+        stack = [node]
+        while len(stack) > 0:
+            current = stack.pop()
+            if self._node_directly_tainted(current):
+                return True
+            stack.extend(self._taint_propagating_children(current))
+        return False
+
+    def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
+        """Return True if *node* is a leaf that itself carries taint."""
         node_type = node.type
         if node_type == IDENTIFIER:
             return node_text(node) in self.tainted
@@ -232,18 +255,22 @@ class TaintTracker:
             return self._call_tainted(node)
         if node_type == STRING:
             return self._fstring_tainted(node)
-        if node_type == "keyword_argument":
-            # foo(name=expr) - only the value carries data flow.
-            value = node.child_by_field_name("value")
-            return self._is_tainted(value) if value is not None else False
-        # Splats (foo(*x, **y)) and spreading expressions (binary op,
-        # boolean op, list/tuple/set literals, f-string concat,
-        # conditional/comparison/unary) all carry taint if any
-        # named child is tainted. Group them so the function stays
-        # below the return-statement limit.
-        if node_type in _SPLAT_TYPES or node_type == CONCATENATED_STRING or node_type in _CONTAINER_TYPES or node_type in _SPREADING_TYPES:
-            return any(self._is_tainted(child) for child in node.named_children)
         return False
+
+    @staticmethod
+    def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
+        """Return the child nodes through which taint can flow into *node*.
+
+        ``keyword_argument`` (``foo(name=expr)``) propagates only its value;
+        splats, f-string concat, containers, and spreading expressions
+        propagate every named child. Everything else is a taint dead-end.
+        """
+        if node.type == "keyword_argument":
+            value = node.child_by_field_name("value")
+            return [value] if value is not None else []
+        if node.type in _SPLAT_TYPES or node.type == CONCATENATED_STRING or node.type in _CONTAINER_TYPES or node.type in _SPREADING_TYPES:
+            return list(node.named_children)
+        return []
 
     def _call_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if this call produces a tainted value.

@@ -571,3 +571,26 @@ def test_nullable_methods_javascript_bare_string_raises_typeerror(tmp_path: Path
     engine = _enabled_engine("null_dereference", {"rules": {"null_dereference": {"nullable_methods_javascript": "find"}}})
     with pytest.raises(TypeError, match=r"nullable_methods_javascript must be a list of strings"):
         engine.check_file(str(sample))
+
+
+# ---------------------------------------------------------------------------
+# Refactored-helper edge cases (iterative destructuring walk)
+# ---------------------------------------------------------------------------
+
+
+def test_js_member_expression_destructure_target_is_ignored(tmp_path: Path) -> None:
+    """A member-expression target inside a destructuring pattern binds no name.
+
+    ``[a, obj.x] = src`` has an array_pattern whose second child is a
+    ``member_expression`` (not a bare binding). The iterative target walk must
+    treat it as a dead-end (no identifier yielded for it) and still bind ``a``.
+    Exercises the ``_destructure_children`` no-binding branch.
+    """
+    sample = tmp_path / "destr.js"
+    sample.write_text(
+        "function f(src) {\n  let a;\n  [a, obj.x] = src;\n  eval(a);\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    # ``a`` is rebound from the tainted ``src`` and flows into eval -> SAFE801.
+    assert any(v.code == "SAFE801" for v in result.violations)

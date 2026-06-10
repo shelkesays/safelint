@@ -17,6 +17,7 @@ if TYPE_CHECKING:
 
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
+from safelint.rules.resource_lifecycle import _skip_wrapper_parents
 
 
 def _engine(overrides: dict | None = None) -> SafetyEngine:
@@ -193,3 +194,8 @@ def test_java_deeply_nested_wrapped_acquirer_clean(tmp_path: Path) -> None:
     )
     result = _engine({"rules": {"resource_lifecycle": {"enabled": True}}}).check_file(str(sample))
     assert _safe401_codes(result.violations) == [], "Three-level nested acquirers should all inherit the outer variable for cleanup"
+
+
+def test_skip_wrapper_parents_returns_none_for_none() -> None:
+    """``_skip_wrapper_parents(None)`` returns None (walked off the tree root)."""
+    assert _skip_wrapper_parents(None) is None

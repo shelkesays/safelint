@@ -60,10 +60,7 @@ lints some files keeps the warning as context.)
 
 ## Rule count
 
-18 rules fire on TypeScript: the 16 cross-language rules (Python / JS / TS / Java) plus SAFE302 (`global_mutation`, Python / JS / TS only) plus SAFE305
-`wide_scope_declaration` (JS-family-only, flags `var`, which is
-still legal but discouraged in TypeScript). The 2 Python-only rules
-(SAFE201, SAFE301) are skipped automatically.
+TypeScript is in scope for the cross-language rules plus SAFE302 (`global_mutation`) and SAFE305 `wide_scope_declaration` (JS-family-only, flags `var`, which is still legal but discouraged in TypeScript). New in 2.4.0: SAFE105 (`no_recursion`, enabled by default), SAFE309 (`dynamic_code_execution`) and SAFE603 (`blanket_suppression`, both disabled by default). The 2 Python-only rules (SAFE201, SAFE301) are skipped automatically.
 
 ## TypeScript-specific rule behaviour
 
@@ -77,6 +74,7 @@ The differences from JavaScript:
 | SAFE701 / SAFE702 | `test_existence` / `test_coupling` | **TS sources pair with TS test files,** not JS test files. `foo.ts` looks for `foo.test.ts` / `foo.spec.ts` / `foo.test.tsx` / `foo.spec.tsx` / `foo.test.as` / `foo.spec.as` under `test_dirs`. |
 | SAFE801 | `tainted_sink` | **TS pass-through wrappers preserve taint.** `eval(userInput as string)`, `eval(userInput satisfies T)`, and `eval(userInput!)` all fire, the `as` / `satisfies` / `!` annotations are compile-time-only and don't affect the runtime value, so taint flows through. |
 | SAFE803 | `null_dereference` | **Non-null assertion (`!`) does NOT bypass the rule.** `users.find(...)!.name` still fires, the `!` is a TS-only annotation, not a runtime guard. The underlying call CAN return undefined; the `!` just silences the TS compiler. Optional chaining (`?.`) remains the only correctly-recognised safe form. |
+| SAFE603 | `blanket_suppression` | **TS-specific suppressions** are flagged in addition to the JS `eslint-disable` forms: `@ts-nocheck` and `@ts-ignore` fire, while `@ts-expect-error` is clean because it self-polices (errors when the suppressed error no longer occurs). Disabled by default. |
 
 Everything else (function length, nesting depth, complexity, error
 handling, side effects, resource lifecycle, unbounded loops, missing

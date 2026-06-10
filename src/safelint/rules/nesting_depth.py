@@ -104,7 +104,7 @@ class NestingDepthRule(BaseRule):
         """
         max_seen = 0
         stack: list[tuple[tree_sitter.Node, int]] = [(root, 0)]
-        while stack:  # nosafe: SAFE501
+        while len(stack) > 0:
             node, depth = stack.pop()
             if node.type in depth_types:
                 depth += 1

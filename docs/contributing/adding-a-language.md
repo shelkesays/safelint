@@ -200,7 +200,7 @@ If the new language's API surface is uniform across runtimes (or the runtime fra
 
 ### 8. Update the bundled AI-client skills
 
-The bundle at `src/safelint/skill_files/` ships one Markdown artefact per registered AI client (12 today, one each under `claude/`, `cursor/`, `copilot/`, `gemini/`, `windsurf/`, `codex/`, `continue/`, `cline/`, `aider/`, `trae/`, `antigravity/`, `zed/`). Every one of them has a **Step 2, Identify the language(s) involved** section with a registry table listing the languages safelint can lint. When you add a new language, all twelve files need a new row in that table.
+The bundle at `src/safelint/skill_files/` ships one Markdown artefact per registered AI client (14 today, one each under `claude/`, `cursor/`, `copilot/`, `gemini/`, `windsurf/`, `codex/`, `continue/`, `cline/`, `aider/`, `trae/`, `antigravity/`, `zed/`, `warp/`, `kiro/`). Every one of them has a **Step 2, Identify the language(s) involved** section with a registry table listing the languages safelint can lint. When you add a new language, all fourteen files need a new row in that table.
 
 You also need to ship a new shared addendum file describing the language. The `languages/` subdirectory at the bundle root mirrors the `safelint/languages/` package one-to-one and is *shared* across every client, there's only one copy of the addendum, and every client references it via `safelint skill path`.
 
@@ -227,7 +227,7 @@ Concretely:
 
 3. **Keep each client's *core* language-neutral**, the Step 2 table is the only language-specific part. Per-language detail belongs in the shared `languages/<lang>.md` addendum, not in any client's entry-point file. Every client tells its agent "for deeper language-specific guidance, read `languages/<lang>.md` from the bundled skill directory", so you only write the deep guidance once.
 
-**The drift-detection test catches you if you miss any.** `test_skill_documents_every_supported_extension` is parametrised over `_CLIENT_SPECS` and fails CI for every client whose bundled doc doesn't mention every extension in `supported_extensions()`. So the moment you add the new extension to `safelint.languages` but forget to update one of the 12 client files, that client's parametrised test fails with a clear error.
+**The drift-detection test catches you if you miss any.** `test_skill_documents_every_supported_extension` is parametrised over `_CLIENT_SPECS` and fails CI for every client whose bundled doc doesn't mention every extension in `supported_extensions()`. So the moment you add the new extension to `safelint.languages` but forget to update one of the 14 client files, that client's parametrised test fails with a clear error.
 
 **Smoke testing:** the bundled docs are just Markdown; no test harness needed beyond the parametrised drift tests. After `safelint skill install --client <name> --force`, ask the relevant agent to "run safelint" on a sample `<lang>` project and confirm it picks up the new file extensions and produces sensible output. Bundling is automatic via `[tool.setuptools.package-data]` in `pyproject.toml` (`skill_files/**/*.md`), so new addendum files ship in the next wheel without further config.
 

@@ -155,11 +155,7 @@ class RustTaintTracker:
         Wildcard ``_`` and type references inside patterns don't bind
         anything and are skipped naturally.
         """
-        ptype = pattern.type
-        if ptype in ("identifier", "shorthand_field_identifier"):
-            yield pattern
-            return
-        if ptype in (
+        nested_types = (
             "mut_pattern",
             "ref_pattern",
             "tuple_pattern",
@@ -167,12 +163,21 @@ class RustTaintTracker:
             "tuple_struct_pattern",
             "struct_pattern",
             "captured_pattern",
-        ):
-            for child in pattern.named_children:
-                yield from self._iter_pattern_identifiers(child)
-            return
-        if ptype == "field_pattern":
-            yield from self._iter_field_pattern_identifiers(pattern)
+        )
+        # Iterative DFS over the pattern shape; children pushed reversed to
+        # preserve left-to-right yield order. ``field_pattern`` delegates to a
+        # helper (which re-enters this method for its inner pattern). Bounded
+        # by the pattern's nesting.
+        stack = [pattern]
+        while len(stack) > 0:
+            current = stack.pop()
+            ptype = current.type
+            if ptype in ("identifier", "shorthand_field_identifier"):
+                yield current
+            elif ptype in nested_types:
+                stack.extend(reversed(current.named_children))
+            elif ptype == "field_pattern":
+                yield from self._iter_field_pattern_identifiers(current)
 
     def _iter_field_pattern_identifiers(self, pattern: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
         """Yield bound identifiers inside a ``field_pattern`` node.
@@ -253,30 +258,49 @@ class RustTaintTracker:
             self.tainted.discard(name)
 
     def _is_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* may carry tainted data."""
+        """Return True if *node* may carry tainted data.
+
+        Iterative worklist with OR semantics (first tainted node wins).
+        Per-node classification is split into :meth:`_node_directly_tainted`
+        and :meth:`_taint_propagating_children`. Depth is bounded by the
+        expression's nesting.
+        """
+        stack = [node]
+        while len(stack) > 0:
+            current = stack.pop()
+            if self._node_directly_tainted(current):
+                return True
+            stack.extend(self._taint_propagating_children(current))
+        return False
+
+    def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
+        """Return True if *node* is a leaf that itself carries taint."""
         node_type = node.type
         if node_type == "identifier":
             return node_text(node) in self.tainted
         if node_type == "call_expression":
             return self._call_tainted(node)
-        if node_type == "field_expression":
-            # ``obj.field`` - taint flows from the receiver. The field
-            # itself is just a name lookup; if the receiver is tainted,
-            # accessing one of its fields preserves taint.
-            obj = node.child_by_field_name("value")
-            return self._is_tainted(obj) if obj is not None else False
-        if node_type == "index_expression":
-            # ``arr[i]`` - same rationale as field access: receiver
-            # taint dominates. ``index_expression`` has no field names
-            # in tree-sitter-rust; the first named child is the value
-            # and the second is the index. Both can carry taint -
-            # ``tainted_arr[clean_idx]`` is tainted, and
-            # ``clean_arr[tainted_idx]`` is also tainted because the
-            # selected element depends on the index.
-            return any(self._is_tainted(child) for child in node.named_children)
-        if node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
-            return any(self._is_tainted(child) for child in node.named_children)
         return False
+
+    @staticmethod
+    def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
+        """Return the child nodes through which taint can flow into *node*.
+
+        ``field_expression`` (``obj.field``) propagates its ``value`` receiver -
+        the field is a name lookup, so receiver taint dominates.
+        ``index_expression`` (``arr[i]``), spreading expressions, and
+        containers propagate every named child: for indexing, both
+        ``tainted_arr[clean_idx]`` and ``clean_arr[tainted_idx]`` are tainted
+        (the selected element depends on the index). Everything else is a
+        taint dead-end.
+        """
+        node_type = node.type
+        if node_type == "field_expression":
+            obj = node.child_by_field_name("value")
+            return [obj] if obj is not None else []
+        if node_type == "index_expression" or node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
+            return list(node.named_children)
+        return []
 
     def _call_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if this call produces a tainted value.

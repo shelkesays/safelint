@@ -3,17 +3,21 @@
 from __future__ import annotations
 
 from safelint.rules.base import BaseRule, Violation
+from safelint.rules.blanket_suppression import BlanketSuppressionRule
 from safelint.rules.complexity import ComplexityRule
 from safelint.rules.dataflow import NullDereferenceRule, ReturnValueIgnoredRule, TaintedSinkRule
 from safelint.rules.documentation import MissingAssertionsRule
+from safelint.rules.dynamic_code_execution import DynamicCodeExecutionRule
 from safelint.rules.error_handling import BareExceptRule, EmptyExceptRule, LoggingOnErrorRule
 from safelint.rules.function_length import FunctionLengthRule
 from safelint.rules.loop_safety import UnboundedLoopRule
 from safelint.rules.max_arguments import MaxArgumentsRule
 from safelint.rules.nesting_depth import NestingDepthRule
+from safelint.rules.no_recursion import NoRecursionRule
 from safelint.rules.resource_lifecycle import ResourceLifecycleRule
 from safelint.rules.rust_rules import (
     DangerousMemOpsRule,
+    InteriorMutableStaticRule,
     LockPoisoningIgnoredRule,
     NeedlessMutRule,
     PanicMacrosOutsideTestsRule,
@@ -41,6 +45,7 @@ ALL_RULES: list[type[BaseRule]] = [
     FunctionLengthRule,
     NestingDepthRule,
     MaxArgumentsRule,
+    NoRecursionRule,
     BareExceptRule,
     EmptyExceptRule,
     GlobalStateRule,
@@ -50,11 +55,13 @@ ALL_RULES: list[type[BaseRule]] = [
     ComplexityRule,
     SideEffectsHiddenRule,
     SideEffectsRule,
+    DynamicCodeExecutionRule,
     LoggingOnErrorRule,
     ResourceLifecycleRule,
     TestCouplingRule,
     TestExistenceRule,
     MissingAssertionsRule,
+    BlanketSuppressionRule,
     # Dataflow hybrid rules - disabled by default; enable via
     # [tool.safelint.rules.<rule>] in pyproject.toml, or [rules.<rule>] in
     # a standalone safelint.toml.
@@ -83,6 +90,7 @@ ALL_RULES: list[type[BaseRule]] = [
     DangerousMemOpsRule,
     TruncatingAsCastRule,
     UndocumentedUnsafeRule,
+    InteriorMutableStaticRule,
 ]
 
 RULE_BY_NAME: dict[str, type[BaseRule]] = {cls.name: cls for cls in ALL_RULES}
@@ -92,18 +100,22 @@ __all__ = [
     "RULE_BY_NAME",
     "BareExceptRule",
     "BaseRule",
+    "BlanketSuppressionRule",
     "ComplexityRule",
     "DangerousMemOpsRule",
+    "DynamicCodeExecutionRule",
     "EmptyExceptRule",
     "FunctionLengthRule",
     "GlobalMutationRule",
     "GlobalStateRule",
+    "InteriorMutableStaticRule",
     "LockPoisoningIgnoredRule",
     "LoggingOnErrorRule",
     "MaxArgumentsRule",
     "MissingAssertionsRule",
     "NeedlessMutRule",
     "NestingDepthRule",
+    "NoRecursionRule",
     "NullDereferenceRule",
     "PanicMacrosOutsideTestsRule",
     "ResourceLifecycleRule",

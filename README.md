@@ -12,7 +12,7 @@
 
 </div>
 
-> **📖 Full documentation:** <https://shelkesays.github.io/safelint/>, searchable, navigable, with a per-client install guide for each of the thirteen supported AI agents. The README below is the repo home; the docs site is the user reference.
+> **📖 Full documentation:** <https://shelkesays.github.io/safelint/>, searchable, navigable, with a per-client install guide for each of the fourteen supported AI agents. The README below is the repo home; the docs site is the user reference.
 
 SafeLint is a configurable static analysis tool that enforces safety-critical coding practices inspired by Gerard J. Holzmann's "Power of Ten" rules at NASA/JPL.
 
@@ -25,10 +25,10 @@ Originally designed for mission-critical systems, these principles apply to any 
 | **Python** | `.py`, `.pyw` |  |
 | **JavaScript** | `.js`, `.mjs`, `.cjs` | Runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine. Per-runtime *defaults* are selectable via [`[tool.safelint.javascript] runtime = "..."`](https://shelkesays.github.io/safelint/configuration/toml/#javascript-runtime-presets). |
 | **TypeScript** (incl. **TSX** + **AssemblyScript**) | `.ts`, `.tsx`, `.as` | Reuses the JS rule implementations end-to-end with TS-specific handling for generics, `as` casts, non-null assertions, `declare global` blocks, etc. Shares JS runtime presets since TS compiles to JS. |
-| **Java** (with **Spring Boot** framework preset) | `.java` | 16 cross-language rules port cleanly; 4 Spring-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* are selectable via [`[tool.safelint.java] framework = "..."`](https://shelkesays.github.io/safelint/languages/java/#framework-presets). New in v2.1.0. |
-| **Rust** | `.rs` | 13 cross-language rules port cleanly (the all-five-languages set); 10 Rust-only rules cover Rust-idiom patterns (panic-in-non-test, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer params, broad `.unwrap()` outside tests, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. New in v2.2.0. |
+| **Java** (with **Spring Boot** framework preset) | `.java` | 20 cross-language rules apply; 4 Spring-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* are selectable via [`[tool.safelint.java] framework = "..."`](https://shelkesays.github.io/safelint/languages/java/#framework-presets). New in v2.1.0. |
+| **Rust** | `.rs` | 15 cross-language rules port cleanly (the all-five-languages set); 11 Rust-only rules cover Rust-idiom patterns (panic-in-non-test, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer params, broad `.unwrap()` outside tests, interior-mutable `static`s, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. New in v2.2.0. |
 
-**Rule coverage:** 13 rules apply across all five languages (the cross-language core); 3 more apply to Python / JavaScript / TypeScript / Java but not Rust (`empty_except`, `logging_on_error`, `resource_lifecycle`); 1 applies to Python / JS / TS but not Java / Rust (`global_mutation`: Java has no clean analogue, deferred; Rust's `static mut` is unsafe-gated and covered by `undocumented_unsafe`); 1 is JavaScript-family-only (`wide_scope_declaration` for `var`); 2 are Python-only (`bare_except`, `global_state`); 4 are Java + Spring Boot only (`spring_*`); and 10 are Rust-only (`needless_mut`, `unchecked_arithmetic_on_input`, `panic_macros_outside_tests`, `lock_poisoning_ignored`, `silent_result_discard`, `unlogged_error_branch`, `result_unwrap_outside_tests`, `dangerous_mem_ops`, `truncating_as_cast`, `undocumented_unsafe`).
+**Rule coverage:** 15 rules apply across all five languages (the cross-language core, including `no_recursion` and `blanket_suppression`); 5 more apply to Python / JavaScript / TypeScript / Java but not Rust (`empty_except`, `logging_on_error`, `global_mutation`, `dynamic_code_execution`, `resource_lifecycle`); 1 is JavaScript-family-only (`wide_scope_declaration` for `var`); 2 are Python-only (`bare_except`, `global_state`); 4 are Java + Spring Boot only (`spring_*`); and 11 are Rust-only (`needless_mut`, `unchecked_arithmetic_on_input`, `panic_macros_outside_tests`, `lock_poisoning_ignored`, `silent_result_discard`, `unlogged_error_branch`, `result_unwrap_outside_tests`, `dangerous_mem_ops`, `interior_mutable_static`, `truncating_as_cast`, `undocumented_unsafe`).
 
 **Planned future languages** (working-priority order, no timelines committed): Go, C, C++, PHP. SafeLint's registry-driven design makes each addition incremental; see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
 
@@ -220,9 +220,9 @@ SafeLint will now run on every `git commit` and block the commit if it finds err
 
 ## What it checks
 
-SafeLint ships **34 rules** across the Holzmann safety categories. **14 are on by default**; **20 are opt-in** (the dataflow trio is opt-in for performance reasons; the test-discipline and assertion rules are opt-in because they only make sense in projects that follow paired-test conventions; the four Java + Spring Boot rules are opt-in under vanilla and flipped on automatically by the `spring-boot` framework preset; the ten Rust-only rules are all opt-in since they encode strict Holzmann-style guidance that's stricter than typical Rust idiom).
+SafeLint ships **38 rules** across the Holzmann safety categories. **15 are on by default**; **23 are opt-in** (the dataflow trio is opt-in for performance reasons; the test-discipline and assertion rules are opt-in because they only make sense in projects that follow paired-test conventions; `dynamic_code_execution` and `blanket_suppression` are opt-in because they are deliberately opinionated; the four Java + Spring Boot rules are opt-in under vanilla and flipped on automatically by the `spring-boot` framework preset; the eleven Rust-only rules are all opt-in since they encode strict Holzmann-style guidance that's stricter than typical Rust idiom).
 
-### Default-on rules (14)
+### Default-on rules (15)
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|
@@ -230,6 +230,7 @@ SafeLint ships **34 rules** across the Holzmann safety categories. **14 are on b
 | [SAFE102](https://shelkesays.github.io/safelint/configuration/rules/#safe102-nesting_depth) | `nesting_depth` | error | Control flow nested more than 2 levels deep |
 | [SAFE103](https://shelkesays.github.io/safelint/configuration/rules/#safe103-max_arguments) | `max_arguments` | error | Functions with more than 7 parameters |
 | [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity) | `complexity` | error | Functions with high cyclomatic complexity |
+| [SAFE105](https://shelkesays.github.io/safelint/configuration/rules/#safe105-no_recursion) | `no_recursion` | warning | Functions that call themselves directly (Holzmann rule 1) |
 | [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except) | `bare_except` | error | `except:` with no exception type *(Python-only)* |
 | [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except) | `empty_except` | error | `except` / `catch` blocks that do nothing |
 | [SAFE203](https://shelkesays.github.io/safelint/configuration/rules/#safe203-logging_on_error) | `logging_on_error` | warning | Except / catch blocks that swallow errors silently |
@@ -241,7 +242,7 @@ SafeLint ships **34 rules** across the Holzmann safety categories. **14 are on b
 | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) | `resource_lifecycle` | error | Files or connections opened outside a `with` block (Python) or without paired cleanup (JS / TS) |
 | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) | `unbounded_loops` | warning | `while True` loops with no `break` |
 
-### Opt-in rules (20): enable via `[tool.safelint.rules.<name>] enabled = true`
+### Opt-in rules (23): enable via `[tool.safelint.rules.<name>] enabled = true`
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|
@@ -251,6 +252,8 @@ SafeLint ships **34 rules** across the Holzmann safety categories. **14 are on b
 | [SAFE801](https://shelkesays.github.io/safelint/configuration/rules/#safe801-tainted_sink) | `tainted_sink` | error | User input flowing into `eval`, `exec`, `subprocess`, etc. without sanitization *(dataflow)* |
 | [SAFE802](https://shelkesays.github.io/safelint/configuration/rules/#safe802-return_value_ignored) | `return_value_ignored` | warning | Discarding the return value of calls like `subprocess.run` or `file.write` *(dataflow)* |
 | [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference) | `null_dereference` | error | Chaining methods directly on calls that can return `None`, e.g. `d.get("key").strip()` *(dataflow)* |
+| [SAFE309](https://shelkesays.github.io/safelint/configuration/rules/#safe309-dynamic_code_execution) | `dynamic_code_execution` | warning | `eval` / `exec` / `new Function` / `Class.forName` reflection (Holzmann rule 8) *(Python / JS / TS / Java)* |
+| [SAFE603](https://shelkesays.github.io/safelint/configuration/rules/#safe603-blanket_suppression) | `blanket_suppression` | warning | Un-scoped suppressions of other analysers: bare `# noqa`, rule-less `eslint-disable`, `@SuppressWarnings("all")`, `#[allow(clippy::all)]` (Holzmann rule 10) |
 | [SAFE901](https://shelkesays.github.io/safelint/configuration/rules/#safe901-spring_field_injection) | `spring_field_injection` | warning | `@Autowired` on a field; prefer constructor injection *(Java + Spring Boot only; auto-enabled by the `spring-boot` framework preset)* |
 | [SAFE902](https://shelkesays.github.io/safelint/configuration/rules/#safe902-spring_missing_transactional) | `spring_missing_transactional` | error | `@Service` / `@Component` method doing 2+ repository writes without `@Transactional` *(Java + Spring Boot only; auto-enabled by the `spring-boot` framework preset)* |
 | [SAFE903](https://shelkesays.github.io/safelint/configuration/rules/#safe903-spring_unvalidated_input) | `spring_unvalidated_input` | error | `@RequestBody` / `@ModelAttribute` parameter without `@Valid` / `@Validated` *(Java + Spring Boot only; auto-enabled by the `spring-boot` framework preset)* |
@@ -263,6 +266,7 @@ SafeLint ships **34 rules** across the Holzmann safety categories. **14 are on b
 | [SAFE207](https://shelkesays.github.io/safelint/configuration/rules/#safe207-unlogged_error_branch) | `unlogged_error_branch` | warning | `Err` branches that handle the error without logging or propagating *(Rust-only; analogue of SAFE203)* |
 | [SAFE208](https://shelkesays.github.io/safelint/configuration/rules/#safe208-result_unwrap_outside_tests) | `result_unwrap_outside_tests` | warning | Broad `.unwrap()` / `.expect()` outside test code *(Rust-only; Holzmann rule 7)* |
 | [SAFE306](https://shelkesays.github.io/safelint/configuration/rules/#safe306-dangerous_mem_ops) | `dangerous_mem_ops` | error | `std::mem::transmute` / `forget` / `zeroed` / `uninitialized` calls *(Rust-only)* |
+| [SAFE307](https://shelkesays.github.io/safelint/configuration/rules/#safe307-interior_mutable_static) | `interior_mutable_static` | warning | `static` holding `Mutex` / `RwLock` / `OnceLock` / `Atomic*` / `lazy_static!` global mutable state (Holzmann rule 6) *(Rust-only)* |
 | [SAFE308](https://shelkesays.github.io/safelint/configuration/rules/#safe308-truncating_as_cast) | `truncating_as_cast` | warning | `as u8` / `as i32` / etc. casts that silently truncate (use `TryFrom`) *(Rust-only; Holzmann rule 1 + 7)* |
 | [SAFE602](https://shelkesays.github.io/safelint/configuration/rules/#safe602-undocumented_unsafe) | `undocumented_unsafe` | warning | `unsafe { ... }` blocks lacking a `// SAFETY:` comment *(Rust-only)* |
 
@@ -334,14 +338,14 @@ Ready-to-copy samples:
 
 ## Editor / agent integrations
 
-### AI-client skills (12 clients supported)
+### AI-client skills (14 clients supported)
 
 ```bash
 pip install safelint
 safelint skill install          # auto-detects which AI client(s) you use
 ```
 
-**Twelve AI clients are supported today**, every one of them runs through the same `safelint skill` command surface, so you only need to learn one workflow:
+**Fourteen AI clients are supported today**, every one of them runs through the same `safelint skill` command surface, so you only need to learn one workflow:
 
 | Client | Marker safelint looks for | Where the skill lands |
 |---|---|---|
@@ -372,7 +376,7 @@ safelint skill remove        # auto-detects and removes every install
 
 `safelint skill remove` accepts a few filter flags: `--symlink` keeps copy installs and only removes the ones created with `--symlink` (i.e., the skill file is a symlink pointing back at the bundled wheel, handy for skill developers); `--path PATH` removes one specific install location safelint's auto-detect didn't find; `--dry-run` previews everything without touching disk.
 
-For explicit control (`--client <name>` for any of the thirteen), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, post-upgrade workflow, and troubleshooting, see the [AI client integrations guide](https://shelkesays.github.io/safelint/ai-clients/). To add support for a new AI client (the registry is open-ended), follow the contributor walkthrough in [Adding a new AI client](https://shelkesays.github.io/safelint/contributing/adding-an-ai-client/).
+For explicit control (`--client <name>` for any of the fourteen), per-client setup, project-vs-user-scope semantics, symlink mode for skill development, post-upgrade workflow, and troubleshooting, see the [AI client integrations guide](https://shelkesays.github.io/safelint/ai-clients/). To add support for a new AI client (the registry is open-ended), follow the contributor walkthrough in [Adding a new AI client](https://shelkesays.github.io/safelint/contributing/adding-an-ai-client/).
 
 ### Other integration points
 

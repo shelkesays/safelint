@@ -21,7 +21,7 @@ If your project doesn't already have a Python toolchain, `pipx install 'safelint
 
 ## Rules that fire on TypeScript
 
-18 user-facing rules apply to TypeScript: the 16 cross-language rules (Python / JS / TS / Java) plus SAFE302 `global_mutation` (Python / JS / TS only, not ported to Java yet) plus 1 JavaScript-family rule (SAFE305 `wide_scope_declaration`, which also fires on TS because `var` is still legal there). The 2 Python-only rules (SAFE201, SAFE301) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
+TypeScript is in scope for every cross-language rule plus SAFE302 `global_mutation` and SAFE305 `wide_scope_declaration` (which also fires on TS because `var` is still legal there). Newly added in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE309 `dynamic_code_execution`, and SAFE603 `blanket_suppression` (both disabled by default). The 2 Python-only rules (SAFE201, SAFE301) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
 
 The behaviour is identical to JavaScript for almost everything, see [JavaScript notes](javascript.md) for the canonical per-rule guidance. The differences below are TypeScript-specific.
 
@@ -31,15 +31,18 @@ The behaviour is identical to JavaScript for almost everything, see [JavaScript 
 | [SAFE102](../configuration/rules.md#safe102-nesting_depth) | `nesting_depth` | Same as JS. TypeScript-only constructs (`interface`, `type` alias declarations) live at module scope and don't appear inside function bodies, so they don't contribute. |
 | [SAFE103](../configuration/rules.md#safe103-max_arguments) | `max_arguments` | **Generic type parameters do NOT count.** `function f<T, U, V>(a, b)` counts as 2 arguments, not 5, TS keeps type parameters in a separate `type_parameters` AST node. Default-value and rest parameters count exactly as in JS. |
 | [SAFE104](../configuration/rules.md#safe104-complexity) | `complexity` | Same as JS. Conditional types (`T extends string ? A : B`) are type-only and don't add cyclomatic complexity. |
+| [SAFE105](../configuration/rules.md#safe105-no_recursion) | `no_recursion` | Same as JS: flags a named function / method calling itself directly (bare or `this`-qualified). Anonymous arrow / function expressions are a documented blind spot. Enabled by default at warning severity. |
 | [SAFE202](../configuration/rules.md#safe202-empty_except) | `empty_except` | Same as JS, fires on empty `catch` blocks. |
 | [SAFE203](../configuration/rules.md#safe203-logging_on_error) | `logging_on_error` | Same as JS, requires `console.*` / `logger.*` or rethrow in `catch`. |
 | [SAFE302](../configuration/rules.md#safe302-global_mutation) | `global_mutation` | TS-specific pass-through unwrappers: `(globalThis as any).counter = 1` is recognised as a global write, the `as` cast and `!` non-null assertion don't break the receiver-chain walk. `declare global { ... }` (ambient declarations) doesn't fire because the block contains type declarations only, no runtime assignments. |
 | [SAFE303](../configuration/rules.md#safe303-side_effects_hidden) | `side_effects_hidden` | Same as JS. Uses the same `io_functions_javascript` list by default (TypeScript inherits the JS config; see [config precedence](../configuration/toml.md#typescript-and-the-_javascript-config-keys)). |
 | [SAFE304](../configuration/rules.md#safe304-side_effects) | `side_effects` | Same as JS. |
 | [SAFE305](../configuration/rules.md#safe305-wide_scope_declaration) | `wide_scope_declaration` | **JavaScript-family only**, but applies to TS too. `var` is legal in TS and still hazardous (function-scoped, hoisted); the rule fires identically on `.ts` / `.tsx` / `.as` files. Migration: replace with `let` (if reassigned) or `const` (if not). |
+| [SAFE309](../configuration/rules.md#safe309-dynamic_code_execution) | `dynamic_code_execution` | Same as JS: `eval` / `new Function(...)` / `Function(...)` / `execScript` (uses the `dynamic_exec_calls_javascript` list via the TS->JS fallback). Holzmann rule 8. Disabled by default. |
 | [SAFE401](../configuration/rules.md#safe401-resource_lifecycle) | `resource_lifecycle` | Same as JS, tracked acquirer calls (`createReadStream`, `Worker`, …) must be inside `try { ... } finally { ... }`. Constructor invocations (`new Worker(...)`) are recognised. |
 | [SAFE501](../configuration/rules.md#safe501-unbounded_loops) | `unbounded_loops` | Same as JS. |
 | [SAFE601](../configuration/rules.md#safe601-missing_assertions) | `missing_assertions` | Same as JS. Uses `assertion_calls_javascript` by default, TS frameworks like Vitest / Jest typically configure the same call names, so no `_typescript` override is needed. Disabled by default. |
+| [SAFE603](../configuration/rules.md#safe603-blanket_suppression) | `blanket_suppression` | Same as JS, plus TS-specific `@ts-nocheck` / `@ts-ignore` are flagged while `@ts-expect-error` (self-policing) is clean. Holzmann rule 10. Disabled by default. |
 | [SAFE701](../configuration/rules.md#safe701-test_existence) | `test_existence` | **Pairs against TS test filenames:** `foo.ts` looks for `foo.test.ts` / `foo.spec.ts` / `foo.test.tsx` / `foo.spec.tsx` / `foo.test.as` / `foo.spec.as` under `test_dirs`. NOT `foo.test.js`, TS source pairs with TS tests (language-family consistency). Disabled by default. |
 | [SAFE702](../configuration/rules.md#safe702-test_coupling) | `test_coupling` | Same filename patterns as SAFE701, if you change `src/foo.ts`, also change `foo.test.ts`. Disabled by default. |
 | [SAFE801](../configuration/rules.md#safe801-tainted_sink) | `tainted_sink` | **TS-only pass-through wrappers preserve taint:** `eval(userInput as string)`, `eval(userInput satisfies T)`, and `eval(userInput!)` all fire, the `as` / `satisfies` / `!` annotations are compile-time-only and don't change the runtime value. Default sinks / sources inherit from `_javascript` config. |
@@ -94,7 +97,7 @@ pip install 'safelint[typescript]'    # adds .ts, .tsx, .as (and .js too)
 pip install 'safelint[all]'
 ```
 
-Without the extra, `safelint check` skips `.ts` / `.tsx` / `.as` files with a one-line install hint at lint time. If at least one other supported file (e.g. a Python file in a mixed repo) does get linted, the run continues normally. **If every candidate file gets skipped**, the typical case in a TS-only project, the [silent-failure guard](../configuration/cli.md#exit-code-2--silent-failure-triggers) fires and SafeLint exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.
+Without the extra, `safelint check` skips `.ts` / `.tsx` / `.as` files with a one-line install hint at lint time. If at least one other supported file (e.g. a Python file in a mixed repo) does get linted, the run continues normally. **If every candidate file gets skipped**, the typical case in a TS-only project, the [silent-failure guard](../configuration/cli.md#exit-code-2-silent-failure-triggers) fires and SafeLint exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.
 
 ## Pre-commit integration
 

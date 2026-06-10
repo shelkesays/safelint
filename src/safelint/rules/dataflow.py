@@ -57,11 +57,12 @@ def _peel_js_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | No
     Handles ``type_assertion`` (TS angle-bracket cast ``<Foo>x``)
     specially because the type comes first and the expression second;
     every other pass-through wrapper has the expression as the first
-    named child. AST depth is bounded by Tree-sitter's own depth cap,
-    so the loop doesn't need an explicit counter - ``# nosafe: SAFE501``
-    on the while.
+    named child. AST depth is bounded by Tree-sitter's own depth cap, so
+    the loop terminates without an explicit counter.
     """
-    while node is not None and node.type in _JS_PASSTHROUGH_WRAPPER_TYPES and node.named_children:  # nosafe: SAFE501
+    while node is not None:
+        if node.type not in _JS_PASSTHROUGH_WRAPPER_TYPES or not node.named_children:
+            break
         node = node.named_children[1] if node.type == "type_assertion" and len(node.named_children) >= 2 else node.named_children[0]
     return node
 
@@ -110,7 +111,9 @@ def _peel_rust_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | 
     for Rust's reference / parenthesis / try-operator shapes. The loop
     is bounded by tree depth.
     """
-    while node is not None and node.type in _RUST_PASSTHROUGH_WRAPPER_TYPES and node.named_children:  # nosafe: SAFE501
+    while node is not None:
+        if node.type not in _RUST_PASSTHROUGH_WRAPPER_TYPES or not node.named_children:
+            break
         node = node.named_children[0]
     return node
 
@@ -121,9 +124,11 @@ def _peel_java_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | 
     ``cast_expression`` exposes the expression on its ``value`` field
     (the type is on the ``type`` field). ``parenthesized_expression``
     is a single-child wrapper. The loop is bounded by Tree-sitter's
-    own depth cap so ``# nosafe: SAFE501`` on the while is sufficient.
+    own depth cap.
     """
-    while node is not None and node.type in _JAVA_PASSTHROUGH_WRAPPER_TYPES:  # nosafe: SAFE501
+    while node is not None:
+        if node.type not in _JAVA_PASSTHROUGH_WRAPPER_TYPES:
+            break
         if node.type == "cast_expression":
             inner = node.child_by_field_name("value")
         elif node.named_children:
@@ -245,8 +250,10 @@ def _javascript_collect_names(node: tree_sitter.Node) -> set[str]:
     # pattern is the first named child; the type annotation (if any)
     # is the second. Recurse into the inner binding pattern. ``or set()``
     # handles the (defensive) case of a wrapper with no named children.
-    if node.type in _TS_PARAM_WRAPPER_TYPES:
-        return _javascript_collect_names(node.named_children[0]) if node.named_children else set()
+    while node.type in _TS_PARAM_WRAPPER_TYPES:
+        if not node.named_children:
+            return set()
+        node = node.named_children[0]
     if node.type in _JS_NAME_LEAF_TYPES:
         return {node_text(node)}
     if node.type in _JS_DESTRUCTURE_CONTAINER_TYPES:
@@ -349,16 +356,19 @@ def _rust_collect_pattern_names(node: tree_sitter.Node) -> set[str]:
     but returns a flat set rather than yielding nodes - cheaper for
     parameter seeding where positional info isn't needed.
     """
-    if node.type in ("identifier", "shorthand_field_identifier"):
-        return {node_text(node)}
-    if node.type in _RUST_RECURSIVE_PATTERN_TYPES:
-        names: set[str] = set()
-        for child in node.named_children:
-            names.update(_rust_collect_pattern_names(child))
-        return names
-    if node.type == "field_pattern":
-        return _rust_field_pattern_names(node)
-    return set()
+    # Iterative DFS over the pattern shape; ``field_pattern`` delegates to a
+    # helper. Bounded by the pattern's nesting.
+    names: set[str] = set()
+    stack = [node]
+    while len(stack) > 0:
+        current = stack.pop()
+        if current.type in ("identifier", "shorthand_field_identifier"):
+            names.add(node_text(current))
+        elif current.type in _RUST_RECURSIVE_PATTERN_TYPES:
+            stack.extend(current.named_children)
+        elif current.type == "field_pattern":
+            names.update(_rust_field_pattern_names(current))
+    return names
 
 
 def _rust_field_pattern_names(node: tree_sitter.Node) -> set[str]:
