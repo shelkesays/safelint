@@ -129,7 +129,7 @@ class BaseRule(ABC):
     #: rules like ``bare_except`` stay narrow).
     #:
     #: This is the engine-side half of the per-language dispatch
-    #: contract documented in ``ADDING_A_LANGUAGE.md``. The other half
+    #: contract documented in ``docs/contributing/adding-a-language.md``. The other half
     #: (per-language rule classes vs. runtime dispatch within a rule's
     #: ``check_file``) is per-rule design and ships *with* each new
     #: language, not as part of the engine plumbing.

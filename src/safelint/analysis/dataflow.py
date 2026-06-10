@@ -99,7 +99,7 @@ class TaintTracker:
         ``True`` is the more *conservative* posture (assume taint is
         preserved through unknown calls); ``False`` is the *less
         conservative* / weaker-detection posture (drop taint at every
-        unknown call). See CONFIGURATION.md for the full trade-off
+        unknown call). See docs/configuration/rules.md for the full trade-off
         discussion.
 
         * ``True`` (default) - conservative / taint-preserving.

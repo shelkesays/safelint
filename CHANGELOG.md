@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Removed the four repo-root redirect stubs** (`AI_CLIENTS.md`, `CONFIGURATION.md`, `ADDING_AN_AI_CLIENT.md`, `ADDING_A_LANGUAGE.md`). These were 7-line "this page has moved" placeholders left behind by the docs-site migration; the live `CONTRIBUTING.md` / `SUPPORT.md` pointers now link straight to the docs site (`shelkesays.github.io/safelint/...`) and code-comment references point at `docs/...` paths. The `mkdocs` build is unaffected (the community-health copies resolve cross-references through `scripts/prepare_docs.py`'s rewrite map, not the stubs).
 - **Doc accuracy pass for the new rule set.** Refreshed rule and AI-client counts across `README.md`, `docs/index.md`, `docs/configuration/rules.md`, and the per-language pages (38 rules total: 15 on by default, 23 opt-in; 14 supported AI clients), updated every per-language page, the bundled client skill files, and the language crib sheets to list SAFE105 / SAFE307 / SAFE309 / SAFE603 and the widened SAFE302, and fixed a broken `cli.md#exit-code-2-silent-failure-triggers` anchor referenced from three language pages.
 
 ### Internal
