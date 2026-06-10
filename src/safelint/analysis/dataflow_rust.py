@@ -24,7 +24,7 @@ Per-Rust quirks worth calling out:
   body parses as a token tree, not an expression list, so we can't
   see argument flow inside it without a per-macro decoder. SAFE801
   macro-based sinks (``sqlx::query!``) are a known limitation
-  documented in CONFIGURATION.md.
+  documented in docs/configuration/rules.md.
 * Reference / dereference (``&x`` / ``*x``) and the ``?`` operator
   parse through ``unary_expression`` / ``reference_expression`` /
   ``try_expression``; taint passes through them unchanged.

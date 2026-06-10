@@ -8,7 +8,7 @@ SafeLint is a community-maintained open-source project. There's no paid support 
 |---|---|
 | **Report a bug** (false positive, missed violation, crash, unexpected output) | [Open an issue](https://github.com/shelkesays/safelint/issues/new). Please include the safelint version (`safelint --version`), the rule code involved (e.g. `SAFE101`), and a minimal code snippet that reproduces it |
 | **Request a new feature** (a new rule, a new AI client, a new language) | Open an issue describing the use case. For new AI clients, include the marker convention you've seen in the wild (cwd / home paths); that's what we need to add a new `ClientSpec`. |
-| **Ask "how do I do X with safelint"** | Check [`README.md`](README.md), [`CONFIGURATION.md`](CONFIGURATION.md), and [`AI_CLIENTS.md`](AI_CLIENTS.md) first; most usage questions are covered there. If still stuck, open a question issue |
+| **Ask "how do I do X with safelint"** | Check [`README.md`](README.md), the [configuration reference](https://shelkesays.github.io/safelint/configuration/), and the [AI client integrations guide](https://shelkesays.github.io/safelint/ai-clients/) first; most usage questions are covered there. If still stuck, open a question issue |
 | **Contribute a fix or new feature** | See [`CONTRIBUTING.md`](CONTRIBUTING.md); three contribution paths (rule / AI client / language) are documented with checklists |
 | **Report a security vulnerability** | See [`SECURITY.md`](SECURITY.md) for the full policy. Use GitHub's [private vulnerability reporting](https://github.com/shelkesays/safelint/security/advisories/new) or email **srahul07@gmail.com**. Please don't open a public issue for security problems; give us time to ship a fix first |
 | **Report Code of Conduct violations** | Email **srahul07@gmail.com**. See [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) for the full process |
@@ -29,8 +29,8 @@ A bug report with all six items typically gets answered same-day; a report missi
 ## Documentation
 
 - [`README.md`](README.md), overview, install, quick start.
-- [`CONFIGURATION.md`](CONFIGURATION.md), every CLI flag, every rule, every config option.
-- [`AI_CLIENTS.md`](AI_CLIENTS.md), the fourteen supported AI clients, per-client setup, troubleshooting.
+- [Configuration reference](https://shelkesays.github.io/safelint/configuration/), every CLI flag, every rule, every config option.
+- [AI client integrations](https://shelkesays.github.io/safelint/ai-clients/), the fourteen supported AI clients, per-client setup, troubleshooting.
 - [`docs/json-schema.md`](docs/json-schema.md), the `--format json` output schema, for editor / plugin authors.
 - [`CONTRIBUTING.md`](CONTRIBUTING.md), how to add new rules, AI clients, or languages.
 

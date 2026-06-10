@@ -19,7 +19,7 @@ Rust-specific cases worth calling out:
   bareword-colliding builders (``args`` vs ``Command::args``)
   are intentionally NOT in defaults.
 * Macros (``println!`` / ``sqlx::query!``) are NOT modelled - a
-  known limitation documented in CONFIGURATION.md.
+  known limitation documented in docs/configuration/rules.md.
 """
 
 from __future__ import annotations
