@@ -77,13 +77,13 @@ roadmap note rather than shipping heuristics now.
 ## 3. Framework presets (record the axis, defer the work)
 
 PHP is the most framework-shaped language in the set. Record a future
-`[tool.safelint.php] framework` preset axis (laravel / symfony / wordpress)
+`[tool.safelint.php] framework` preset axis (config tokens `laravel` / `symfony` / `wordpress`, lowercase like `spring-boot`)
 in the language page, following the Part B standard in
 `docs/contributing/adding-a-language.md`:
 
-- **laravel**: adds `DB::raw`, `whereRaw`, `selectRaw` to `sinks_php`;
+- **Laravel** (`laravel`): adds `DB::raw`, `whereRaw`, `selectRaw` to `sinks_php`;
   `request()` helpers to sources.
-- **wordpress**: `$wpdb->query` sinks, nonce-check structural rules.
+- **WordPress** (`wordpress`): `$wpdb->query` sinks, nonce-check structural rules.
 - Any structural rules these grow take the **9xx band** (905+ free as of
   v2.4.0; verify), exactly like Spring's SAFE901-904.
 
@@ -112,7 +112,7 @@ Shared checklist (plan/README.md), with the PHP-specific content:
 - `docs/power-of-ten.md`: rule 8 note (PHP's `eval`/`include` surface is the
   largest), rule 10 note (the `@` operator as the literal
   suppress-the-analyser construct).
-- `rules.md`: scope-table updates (SAFE301's row leaves "Python-only");
+- `rules.md`: scope-table updates (SAFE301's row **drops** the "Python-only" label and gains PHP, consistent with the section-2 instruction);
   remove PHP from "Planned" - **the Planned section then becomes empty or
   gains its next candidates; ask the maintainer which**.
 - Skill files: `languages/php.md` addendum, 14 Step-2 rows, README counts,

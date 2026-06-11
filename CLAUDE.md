@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project overview
 
-SafeLint is a static analysis tool that enforces Holzmann "Power of Ten" safety rules adapted for Python, JavaScript, and TypeScript (including TSX / AssemblyScript). It uses Tree-sitter (not Python's `ast` module) for parsing; this matters for any rule work because rules walk Tree-sitter trees, not AST nodes. The tool ships as both a CLI (`safelint`) and a pre-commit hook, and lints itself in CI.
+SafeLint is a static analysis tool that enforces Holzmann "Power of Ten" safety rules adapted for Python, JavaScript, TypeScript (including TSX / AssemblyScript), Java (with a Spring Boot framework preset), and Rust. It uses Tree-sitter (not Python's `ast` module) for parsing; this matters for any rule work because rules walk Tree-sitter trees, not AST nodes. The tool ships as both a CLI (`safelint`) and a pre-commit hook, and lints itself in CI.
 
 ## Common commands
 
@@ -19,8 +19,8 @@ uv sync --extra dev
 uv run pytest
 
 # Run a single test file / test
-uv run pytest tests/test_engine.py
-uv run pytest tests/test_engine.py::test_name -v
+uv run pytest tests/core/test_engine.py
+uv run pytest tests/core/test_engine.py::test_name -v
 
 # Lint + format check (CI runs both against src/ and tests/)
 uv run ruff check src/ tests/
@@ -30,7 +30,8 @@ uv run ruff format --check src/ tests/
 uv run ty check src/
 
 # Run safelint on itself: must produce zero blocking violations before merging
-uv run safelint check src/
+# (--all-files matches CI; without it the check defaults to git-modified files only)
+uv run safelint check src/ --all-files
 ```
 
 The CLI has two entry points:
@@ -118,6 +119,6 @@ Invoke the **`add-language-support`** project skill (`.claude/skills/add-languag
 
 ## Pre-commit and CI
 
-`.pre-commit-config.yaml` runs (in order): general file hygiene → ruff (lint + format) → safelint itself → ty (type check via local hook) → pytest with coverage (local hook). All hooks scope to `^src/`.
+`.pre-commit-config.yaml` runs (in order): general file hygiene → ruff (lint + format) → safelint itself → ty (type check via local hook) → pytest with coverage (local hook). Most hooks scope to `^src/`; a few file-hygiene hooks (e.g. `mixed-line-ending`, `fix-byte-order-marker`) deliberately run repo-wide, and `name-tests-test` scopes to `tests/`.
 
-GitHub Actions (`ci.yml`) runs the same lint/format/type checks on a single Python version, then the pytest suite across Python 3.11 / 3.12 / 3.13. Tag pushes (`vX.Y.Z`) trigger `publish.yml`, which uses PyPI Trusted Publishing (OIDC), no token-based publishing.
+GitHub Actions (`ci.yml`) runs the same lint/format/type checks on a single Python version, then the pytest suite across Python 3.11 / 3.12 / 3.13 / 3.14. Tag pushes (`vX.Y.Z`) trigger `publish.yml`, which uses PyPI Trusted Publishing (OIDC), no token-based publishing.

@@ -70,10 +70,13 @@ Update the Status column (and the per-spec status header) as work lands.
   import tree_sitter, tree_sitter_go  # adjust per language
   lang = tree_sitter.Language(tree_sitter_go.language())
   tree = tree_sitter.Parser(lang).parse(b"func main() { go run() }")
-  def walk(n, d=0):
-      print("  " * d + n.type)
-      for c in n.named_children: walk(c, d + 1)
-  walk(tree.root_node)
+  # Iterative on purpose - the same worklist shape production code must use
+  # (safelint's own no_recursion rule polices the codebase).
+  stack = [(tree.root_node, 0)]
+  while len(stack) > 0:
+      node, depth = stack.pop()
+      print("  " * depth + node.type)
+      stack.extend((c, depth + 1) for c in reversed(node.named_children))
   PY
   ```
 
