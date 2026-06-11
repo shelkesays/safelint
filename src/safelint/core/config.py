@@ -1878,9 +1878,11 @@ def _quiet_read_toml_file(candidate: Path) -> dict[str, Any] | None:
     try:
         with candidate.open("rb") as fp:
             return tomllib.load(fp)
-    # Fail-silent on purpose: the actual load path will surface the
-    # error to the user. SAFE203's heuristic doesn't see the silence
-    # as logging, so the suppression marker isn't needed.
+    # Fail-silent on purpose: this is a quiet probe; the real load path
+    # (``_read_toml_file``) is the authoritative reporter and surfaces the
+    # error to the user. This handler neither logs nor re-raises, so SAFE203
+    # does fire here - the suppression is intentional, matching safelint's
+    # deliberate no-logger design (see CLAUDE.md, "Diagnostics channel").
     except (tomllib.TOMLDecodeError, OSError, UnicodeDecodeError):  # nosafe: SAFE203
         return None
 
