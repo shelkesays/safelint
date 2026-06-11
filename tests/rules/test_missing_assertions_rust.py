@@ -24,6 +24,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from safelint.core.engine import LintResult
+    from safelint.rules.base import Violation
+
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
 
@@ -37,7 +40,7 @@ def _enabled_engine(overrides: dict | None = None) -> SafetyEngine:
     return SafetyEngine(config)
 
 
-def _safe601(result) -> list:
+def _safe601(result: LintResult) -> list[Violation]:
     """Return the list of SAFE601 violations on *result*."""
     return [v for v in result.violations if v.code == "SAFE601"]
 
