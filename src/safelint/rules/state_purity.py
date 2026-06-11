@@ -339,15 +339,31 @@ class GlobalMutationRule(BaseRule):
             modifiers = self._java_modifier_set(node)
             if "static" not in modifiers or "final" in modifiers:
                 continue
-            field_name = self._java_field_name(node)
-            violations.append(
+            violations.extend(self._java_field_violations(filepath, node))
+        return violations
+
+    def _java_field_violations(self, filepath: str, field_node: tree_sitter.Node) -> list[Violation]:
+        """Return one violation per declared variable on a non-final static field.
+
+        A single Java ``field_declaration`` can declare several variables
+        (``static int a = 1, b = 2;``); each is its own shared-mutable-state
+        violation, so emit one per ``variable_declarator``, positioned on and
+        named after that declarator.
+        """
+        out: list[Violation] = []
+        for child in field_node.named_children:
+            if child.type != "variable_declarator":
+                continue
+            name = child.child_by_field_name("name")
+            field_name = node_text(name) if name is not None else "<field>"
+            out.append(
                 self._make_violation_for_node(
                     filepath,
-                    node,
+                    child,
                     f'Non-final static field "{field_name}" is shared mutable state - declare it `final`, or scope the state to its consumer (Power of Ten rule 6)',
                 )
             )
-        return violations
+        return out
 
     @staticmethod
     def _java_modifier_set(field_node: tree_sitter.Node) -> set[str]:
@@ -362,15 +378,6 @@ class GlobalMutationRule(BaseRule):
             if child.type == "modifiers":
                 return {node_text(kw) for kw in child.children if not kw.is_named}
         return set()
-
-    @staticmethod
-    def _java_field_name(field_node: tree_sitter.Node) -> str:
-        """Return the first declared variable name on a Java ``field_declaration``."""
-        for child in field_node.named_children:
-            if child.type == "variable_declarator":
-                name = child.child_by_field_name("name")
-                return node_text(name) if name is not None else "<field>"
-        return "<field>"
 
     def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run the Python-specific check (``global`` keyword + write)."""

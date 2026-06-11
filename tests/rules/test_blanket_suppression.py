@@ -162,3 +162,24 @@ def test_disabled_by_default(tmp_path: Path) -> None:
     sample.write_text("x = 1  # noqa\n", encoding="utf-8")
     result = SafetyEngine(DEFAULTS).check_file(str(sample))
     assert [v for v in result.violations if v.code == "SAFE603"] == []
+
+
+def test_ts_nocheck_lookalike_is_clean(tmp_path: Path) -> None:
+    """``@ts-nocheckthis`` is not the ``@ts-nocheck`` directive (token boundary)."""
+    sample = tmp_path / "a.ts"
+    sample.write_text("// @ts-nocheckthis is just a note\nconst x: number = 1;\n", encoding="utf-8")
+    assert _safe603(_engine().check_file(str(sample))) == []
+
+
+def test_rust_allow_with_reason_mentioning_warnings_is_clean(tmp_path: Path) -> None:
+    """A scoped allow whose ``reason`` string mentions ``warnings`` must not fire."""
+    sample = tmp_path / "a.rs"
+    sample.write_text('#[allow(dead_code, reason = "silences spurious warnings")]\nfn a() {}\n', encoding="utf-8")
+    assert _safe603(_engine().check_file(str(sample))) == []
+
+
+def test_rust_allow_warnings_with_reason_still_fires(tmp_path: Path) -> None:
+    """A genuine ``allow(warnings)`` still fires even with a reason note."""
+    sample = tmp_path / "a.rs"
+    sample.write_text('#[allow(warnings, reason = "third-party macro")]\nfn a() {}\n', encoding="utf-8")
+    assert len(_safe603(_engine().check_file(str(sample)))) == 1
