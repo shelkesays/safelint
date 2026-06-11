@@ -87,9 +87,14 @@ def _javascript_blanket(comment_text: str) -> str | None:
     if _JS_TS_IGNORE.match(body):
         return "@ts-ignore"
     match = _JS_ESLINT_DISABLE.match(body)
-    if match is not None and not match.group(2).strip():
-        # ``eslint-disable`` with no trailing rule list - blanket.
-        return match.group(1)
+    if match is not None:
+        # ESLint allows an optional ``-- description`` suffix after the rule
+        # list (``eslint-disable-next-line -- why``). Only the part before
+        # ``--`` is the rule list; an empty rule list means a blanket disable
+        # regardless of any trailing reason.
+        rule_list = match.group(2).split("--", 1)[0].strip()
+        if not rule_list:
+            return match.group(1)
     return None
 
 

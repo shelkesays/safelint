@@ -17,8 +17,12 @@ have no name to match against, so a binding-level recursion such as
 Cross-language: the per-function walk pattern mirrors ``complexity`` and the
 other per-function rules - the outer walk finds every function-defining node
 (including nested ones), and the inner walk is pruned at nested function
-boundaries via ``skip_types`` so a nested helper sharing the outer function's
-name is not misattributed.
+boundaries via ``skip_types`` so calls *inside* a nested function body are not
+attributed to the enclosing function. Name shadowing is handled separately: if
+a function defines a same-named nested function, an unqualified call to that
+name in the enclosing body resolves to the nested binding (not recursion), so
+such bare calls are skipped while ``self``/``this``-qualified self-calls still
+count.
 """
 
 from __future__ import annotations
@@ -139,6 +143,38 @@ def _targets_self(call_node: tree_sitter.Node, func_name: str, lang: str) -> boo
     return _call_targets_self(call_node, func_name, lang)
 
 
+def _call_is_bare(call_node: tree_sitter.Node, lang: str) -> bool:
+    """Return True if *call_node* is an unqualified call (no receiver / ``self`` / ``this``).
+
+    A bare call resolves by name in the current scope, so it is the one a
+    same-named nested function can shadow. ``self.foo()`` / ``this.foo()`` are
+    *not* bare - they always denote the method, never a local binding.
+    """
+    if lang == "java":
+        return call_node.child_by_field_name("object") is None
+    callee = call_node.child_by_field_name("function")
+    return callee is not None and callee.type == "identifier"
+
+
+def _directly_nested_function_names(func: tree_sitter.Node, func_types: frozenset[str]) -> set[str]:
+    """Return the names of functions defined directly inside *func*'s own body.
+
+    The pruned walk yields each directly-nested function-definition node
+    (without descending into it). A nested ``def``/``fn``/method whose name
+    equals the enclosing function's rebinds that name in the enclosing scope,
+    so an unqualified call to it inside the enclosing body resolves to the
+    nested binding, not to recursion.
+    """
+    names: set[str] = set()
+    for node in walk(func, skip_types=tuple(func_types)):
+        if node is func or node.type not in func_types:
+            continue
+        name_node = node.child_by_field_name("name")
+        if name_node is not None:
+            names.add(node_text(name_node))
+    return names
+
+
 class NoRecursionRule(BaseRule):
     """Flag functions that call themselves directly (Power of Ten rule 1)."""
 
@@ -168,17 +204,23 @@ class NoRecursionRule(BaseRule):
     ) -> list[Violation]:
         """Return one violation per direct self-call inside *func*.
 
-        The inner walk is pruned at nested function boundaries so a nested
-        helper sharing this function's name (or a closure that calls this
-        function's name) is not attributed here.
+        The inner walk is pruned at nested function boundaries so calls *inside*
+        a nested function body are not attributed to this function. Name
+        shadowing is also handled: if this function defines a same-named nested
+        function, an unqualified call to that name in the body resolves to the
+        nested binding (not recursion), so bare self-calls are skipped while
+        ``self``/``this``-qualified ones still count.
         """
         name_node = func.child_by_field_name("name")
         if name_node is None:
             return []
         func_name = node_text(name_node)
+        shadowed = func_name in _directly_nested_function_names(func, func_types)
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(func_types)):
             if node.type != call_type:
+                continue
+            if shadowed and _call_is_bare(node, lang):
                 continue
             if _targets_self(node, func_name, lang):
                 base = self._make_violation_for_node(

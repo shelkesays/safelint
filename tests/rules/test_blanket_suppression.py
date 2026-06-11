@@ -190,3 +190,17 @@ def test_rust_allow_with_escaped_quote_reason_is_clean(tmp_path: Path) -> None:
     sample = tmp_path / "a.rs"
     sample.write_text('#[allow(dead_code, reason = "silences \\"warnings\\" from macro")]\nfn a() {}\n', encoding="utf-8")
     assert _safe603(_engine().check_file(str(sample))) == []
+
+
+def test_js_bare_eslint_disable_with_reason_fires(tmp_path: Path) -> None:
+    """`eslint-disable-next-line -- reason` (no rule list) is still a blanket disable."""
+    sample = tmp_path / "a.js"
+    sample.write_text("// eslint-disable-next-line -- legacy, fix later\nconst x = 1;\n", encoding="utf-8")
+    assert len(_safe603(_engine().check_file(str(sample)))) == 1
+
+
+def test_js_scoped_eslint_disable_with_reason_is_clean(tmp_path: Path) -> None:
+    """A rule-listed disable with a `-- reason` suffix stays scoped (clean)."""
+    sample = tmp_path / "a.js"
+    sample.write_text("// eslint-disable-next-line no-console -- legacy\nconsole.log(1);\n", encoding="utf-8")
+    assert _safe603(_engine().check_file(str(sample))) == []
