@@ -246,7 +246,7 @@ SafeLint ships **38 rules** across the Holzmann safety categories. **15 are on b
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|
-| [SAFE601](https://shelkesays.github.io/safelint/configuration/rules/#safe601-missing_assertions) | `missing_assertions` | warning | Functions with fewer than 2 assertions (Holzmann rule #5) |
+| [SAFE601](https://shelkesays.github.io/safelint/configuration/rules/#safe601-missing_assertions) | `missing_assertions` | warning | Functions with fewer than `min_assertions` assertions (default 1; set `min_assertions = 2` for Holzmann rule #5's density) |
 | [SAFE701](https://shelkesays.github.io/safelint/configuration/rules/#safe701-test_existence) | `test_existence` | warning | Source files without a paired test file |
 | [SAFE702](https://shelkesays.github.io/safelint/configuration/rules/#safe702-test_coupling) | `test_coupling` | warning | Source changes in a commit without a matching test change |
 | [SAFE801](https://shelkesays.github.io/safelint/configuration/rules/#safe801-tainted_sink) | `tainted_sink` | error | User input flowing into `eval`, `exec`, `subprocess`, etc. without sanitization *(dataflow)* |

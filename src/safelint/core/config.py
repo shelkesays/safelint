@@ -454,6 +454,10 @@ DEFAULTS: dict[str, Any] = {
         "missing_assertions": {
             "enabled": False,
             "severity": "warning",
+            # Minimum assertions per function. Default 1 keeps noise low;
+            # Holzmann's rule 5 asks for a density of two per function, so
+            # paper-strict projects set ``min_assertions = 2``.
+            "min_assertions": 1,
             # JavaScript assertion-function names. Python uses the
             # built-in ``assert`` keyword (no config needed); JS doesn't
             # have an assert keyword, so the rule walks for *calls* to

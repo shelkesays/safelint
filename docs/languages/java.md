@@ -167,7 +167,7 @@ All cross-language rules accept a `_java`-suffixed variant of their per-language
 - `[tool.safelint.rules.side_effects_hidden]`, `io_functions_java`
 - `[tool.safelint.rules.side_effects]`, `io_functions_java`
 - `[tool.safelint.rules.resource_lifecycle]`, `tracked_functions_java`
-- `[tool.safelint.rules.missing_assertions]`, `assertion_calls_java`
+- `[tool.safelint.rules.missing_assertions]`, `min_assertions` (default 1; set 2 for the paper's density), `assertion_calls_java`
 - `[tool.safelint.rules.tainted_sink]`, `sinks_java`, `sanitizers_java`, `sources_java`
 - `[tool.safelint.rules.return_value_ignored]`, `flagged_calls_java`
 - `[tool.safelint.rules.null_dereference]`, `nullable_methods_java`

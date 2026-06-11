@@ -713,9 +713,11 @@ function poll() {
 
 ### SAFE601: `missing_assertions`
 
-**What it flags:** Functions that contain no assertion calls. Cross-language.
+**What it flags:** Functions with fewer than `min_assertions` assertions. Cross-language.
 
-Based on Holzmann rule 5: every function should have at least two assertions to validate its assumptions. This is a heuristic, disabled by default because many functions legitimately have no assertions (e.g. simple data transformations).
+Based on Holzmann rule 5: the paper asks for an assertion density averaging a minimum of **two** assertions per function. The rule defaults to `min_assertions = 1` (any assertion satisfies it) to keep noise low; paper-strict projects set `min_assertions = 2`. Disabled by default because many functions legitimately have no assertions (e.g. simple data transformations).
+
+Two further clauses of the paper's rule 5 are intentionally out of scope: assertions must be **side-effect free** (safelint does not analyse assertion expressions for effects), and a trivially-true assertion (`assert True`) **counts toward the threshold** even though the paper disallows assertions a static checker can prove never fail. Both need analysis machinery (effect inference, constant propagation) that does not fit a structural rule; review remains the guard there.
 
 Python walks for the AST `assert_statement` (built-in keyword). JavaScript has no built-in `assert` keyword, so the rule walks for *calls* to a configured set of assertion-function names, Node's `assert` module (`assert`, `ok`, `equal`, `strictEqual`, `deepEqual`, `match`, ...), `console.assert`, and test-framework idioms (`expect` for Jest / Chai-via-`expect`, `should` for Should.js, `vi.expect` for Vitest). Configure via `assertion_calls_javascript`.
 
@@ -723,13 +725,23 @@ Python walks for the AST `assert_statement` (built-in keyword). JavaScript has n
 |---|---|---|
 | `enabled` | `false` | Disabled by default, opt-in |
 | `severity` | `"warning"` | `"error"` or `"warning"` |
+| `min_assertions` | `1` | Minimum assertions per function; set `2` for the paper's density. *Added in 2.4.0.* |
 | `assertion_calls_javascript` | (see default JS list above) | (JavaScript only.) Call names that satisfy the assertion check. *Added in 1.13.0.* |
 
 ```toml
+# pyproject.toml
 [tool.safelint.rules.missing_assertions]
 enabled = true
 severity = "warning"
+min_assertions = 2                # Holzmann rule 5 density; default is 1
 assertion_calls_javascript = ["assert", "expect", "should"]
+```
+
+```toml
+# standalone safelint.toml (same keys, no [tool.safelint] prefix)
+[rules.missing_assertions]
+enabled = true
+min_assertions = 2
 ```
 
 **Python, Bad:**
