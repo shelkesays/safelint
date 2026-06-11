@@ -12,6 +12,9 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+    from safelint.core.engine import LintResult
+    from safelint.rules.base import Violation
+
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
 
@@ -21,7 +24,7 @@ def _engine() -> SafetyEngine:
     return SafetyEngine(deep_merge(DEFAULTS, overrides))
 
 
-def _safe603(result) -> list:
+def _safe603(result: LintResult) -> list[Violation]:
     return [v for v in result.violations if v.code == "SAFE603"]
 
 
