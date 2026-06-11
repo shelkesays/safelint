@@ -1,4 +1,4 @@
-"""documentation rule - functions should contain at least one assert (heuristic)."""
+"""documentation rule - functions should contain at least ``min_assertions`` assertions (heuristic)."""
 
 from __future__ import annotations
 
@@ -152,7 +152,7 @@ def _javascript_assertion_count(func_node: tree_sitter.Node, function_types: fro
 
 
 class MissingAssertionsRule(BaseRule):
-    """Warn when a function contains no assert statements (disabled by default).
+    """Warn when a function has fewer than ``min_assertions`` assertions (disabled by default).
 
     Python: walks for the AST ``assert_statement`` (built-in keyword).
 
@@ -227,7 +227,7 @@ class MissingAssertionsRule(BaseRule):
     def _below_minimum_message(func_name: str, count: int, minimum: int) -> str:
         """Render the violation message for a function below the assertion threshold."""
         if count == 0 and minimum == 1:
-            return f'Function "{func_name}" has no assert statements'
+            return f'Function "{func_name}" has no assertions'
         return f'Function "{func_name}" has {count} assertion(s), minimum is {minimum} (Holzmann rule 5 asks for two per function)'
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
