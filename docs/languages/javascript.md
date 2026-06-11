@@ -37,7 +37,7 @@ JavaScript is in scope for every cross-language rule plus SAFE302 `global_mutati
 | [SAFE309](../configuration/rules.md#safe309-dynamic_code_execution) | `dynamic_code_execution` | Structural detection of `eval` / `new Function(...)` / `Function(...)` / `execScript` (bare-identifier callee; `obj.eval()` does not fire). Holzmann rule 8; complements SAFE801. Disabled by default. |
 | [SAFE401](../configuration/rules.md#safe401-resource_lifecycle) | `resource_lifecycle` | Tracked acquirer calls (`createReadStream`, `connect`, `Worker`, …) must be inside a `try { ... } finally { ... }`. Constructor invocations (`new Worker(...)`) are also recognised. The newer `using` syntax (Stage 3 / Node 22+) isn't yet treated as a safe form. |
 | [SAFE501](../configuration/rules.md#safe501-unbounded_loops) | `unbounded_loops` | `while (true)` with no `break`. Nested parens (`while ((true))`) are handled. The non-comparison-condition heuristic stays Python-only, JS idioms like `while (queue.length)` are commonly bounded. |
-| [SAFE601](../configuration/rules.md#safe601-missing_assertions) | `missing_assertions` | Functions with zero assertion calls. JS configures via `assertion_calls_javascript` (default: `assert`, `ok`, `equal`, `expect`, `should`, `console.assert`, …). Disabled by default. |
+| [SAFE601](../configuration/rules.md#safe601-missing_assertions) | `missing_assertions` | Functions with fewer than `min_assertions` assertion calls (default 1; set 2 for Holzmann rule 5's density). JS configures the recognised call names via `assertion_calls_javascript` (default: `assert`, `ok`, `equal`, `expect`, `should`, `console.assert`, …). Disabled by default. |
 | [SAFE603](../configuration/rules.md#safe603-blanket_suppression) | `blanket_suppression` | Flags rule-less `eslint-disable` / `eslint-disable-line` / `eslint-disable-next-line`, plus `@ts-nocheck` / `@ts-ignore` (Holzmann rule 10). Rule-listed disables and `@ts-expect-error` are clean. Disabled by default. |
 | [SAFE701](../configuration/rules.md#safe701-test_existence) | `test_existence` | Every source file should have a matching `<stem>.test.<ext>` (Jest) or `<stem>.spec.<ext>` (Mocha) under `test_dirs`. Disabled by default. |
 | [SAFE702](../configuration/rules.md#safe702-test_coupling) | `test_coupling` | Same pattern as SAFE701: if you change `src/foo.js`, you must also change `foo.test.js` in the same commit. Disabled by default. |
@@ -153,7 +153,7 @@ Each rule that runs on JS has a `_javascript`-suffixed config key parallel to it
 - **`[tool.safelint.rules.side_effects]`**, `io_functions_javascript`
 - **`[tool.safelint.rules.global_mutation]`**, `global_namespaces_javascript` (default depends on preset)
 - **`[tool.safelint.rules.resource_lifecycle]`**, `tracked_functions_javascript`
-- **`[tool.safelint.rules.missing_assertions]`**, `assertion_calls_javascript`
+- **`[tool.safelint.rules.missing_assertions]`**, `min_assertions` (default 1; set 2 for the paper's density), `assertion_calls_javascript`
 - **`[tool.safelint.rules.tainted_sink]`**, `sinks_javascript`, `sanitizers_javascript`, `sources_javascript`
 - **`[tool.safelint.rules.return_value_ignored]`**, `flagged_calls_javascript`
 - **`[tool.safelint.rules.null_dereference]`**, `nullable_methods_javascript`

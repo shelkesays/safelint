@@ -2518,3 +2518,32 @@ def test_safe701_does_not_treat_test_prefixed_java_production_as_test(tmp_path: 
     test_path.parent.mkdir(parents=True)
     test_path.write_text("class TestDataFactory {}\n")
     assert _is_test_file(str(test_path), test_dirs, "java") is True
+
+
+def test_missing_assertions_min_two_fires_on_single_assert(tmp_path) -> None:
+    """With ``min_assertions = 2`` (Holzmann rule 5), one assertion is not enough."""
+    sample = tmp_path / "one.py"
+    sample.write_text("def f(x):\n    assert x > 0\n    return x\n", encoding="utf-8")
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 2}}})
+    result = SafetyEngine(config).check_file(str(sample))
+    hits = [v for v in result.violations if v.code == "SAFE601"]
+    assert len(hits) == 1
+    assert "1 assertion(s), minimum is 2" in hits[0].message
+
+
+def test_missing_assertions_min_two_clean_with_two_asserts(tmp_path) -> None:
+    """Two assertions satisfy ``min_assertions = 2``."""
+    sample = tmp_path / "two.py"
+    sample.write_text("def f(x):\n    assert x > 0\n    assert x < 100\n    return x\n", encoding="utf-8")
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 2}}})
+    result = SafetyEngine(config).check_file(str(sample))
+    assert [v for v in result.violations if v.code == "SAFE601"] == []
+
+
+def test_missing_assertions_min_assertions_typo_raises(tmp_path) -> None:
+    """A non-integer ``min_assertions`` fails loud instead of silently misbehaving."""
+    sample = tmp_path / "t.py"
+    sample.write_text("def f():\n    return 1\n", encoding="utf-8")
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": "2"}}})
+    with pytest.raises(TypeError):
+        SafetyEngine(config).check_file(str(sample))

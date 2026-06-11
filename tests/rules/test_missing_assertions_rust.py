@@ -170,3 +170,22 @@ def test_rust_prop_assert_does_not_fire(tmp_path: Path) -> None:
     )
     result = _enabled_engine().check_file(str(sample))
     assert _safe601(result) == []
+
+
+def test_rust_min_assertions_two_single_assert_fires(tmp_path: Path) -> None:
+    """With ``min_assertions = 2``, a single ``assert!`` is below threshold."""
+    sample = tmp_path / "one.rs"
+    sample.write_text("fn f(x: i32) -> i32 {\n    assert!(x > 0);\n    x\n}\n", encoding="utf-8")
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 2}}})
+    result = SafetyEngine(config).check_file(str(sample))
+    hits = [v for v in result.violations if v.code == "SAFE601"]
+    assert len(hits) == 1
+
+
+def test_rust_min_assertions_two_clean_with_two(tmp_path: Path) -> None:
+    """Two assertion macros satisfy ``min_assertions = 2``."""
+    sample = tmp_path / "two.rs"
+    sample.write_text("fn f(x: i32) -> i32 {\n    assert!(x > 0);\n    assert!(x < 100);\n    x\n}\n", encoding="utf-8")
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 2}}})
+    result = SafetyEngine(config).check_file(str(sample))
+    assert [v for v in result.violations if v.code == "SAFE601"] == []
