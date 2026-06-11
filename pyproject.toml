@@ -119,7 +119,7 @@ dev = [
     # for "every grammar"; adding a new language only edits ``[all]``.
     "safelint[all]",
 ]
-# Documentation site - Material-themed MkDocs build that publishes to https://shelkesays.github.io/safelint/. 
+# Documentation site - Material-themed MkDocs build that publishes to https://shelkesays.github.io/safelint/.
 # Install with `uv sync --extra docs`, then `uv run mkdocs serve` for a live preview at http://127.0.0.1:8000.
 docs = [
     "mkdocs>=1.6.0",
