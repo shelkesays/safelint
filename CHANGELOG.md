@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Documentation
+
+- **Contributing guide: framework / runtime preset standard.** `docs/contributing/adding-a-language.md` gains an "Adding a framework / runtime preset" section (config machinery shape, 9xx-band policy for framework rules, preset tests, and the full docs fan-out including both TOML forms), and its Step 8 client-file list is corrected from 12 to all 14 bundled skill files (warp and kiro were missing).
+
 ## [2.4.0] - 2026-06-10
 
 **Power of Ten gap-closure: five new / widened rules.** This release adds four new rules and widens one existing rule to close the most prominent gaps between SafeLint's rule set and Holzmann's ten rules, plus a new docs page mapping the ten rules onto the checks. Additive across the board (per the project's semver policy, new rules and widened language coverage are MINOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.
