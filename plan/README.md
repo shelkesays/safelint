@@ -36,8 +36,10 @@ Update the Status column (and the per-spec status header) as work lands.
 
 ## Non-negotiables (digest; full detail in CLAUDE.md)
 
-- **SafeLint must pass itself**: `uv run safelint check src/` with zero
-  blocking violations, including the new code obeying `no_recursion`
+- **SafeLint must pass itself**: `uv run safelint check src/ --all-files` with
+  zero blocking violations (the `--all-files` flag matches CI; without it the
+  check only scans git-modified files and can read clean falsely), including
+  the new code obeying `no_recursion`
   (iterative worklists, never recursion), `nesting_depth=2`, `complexity=10`,
   `function_length=60`.
 - **Never rename or repurpose existing rule names / codes.** New rules slot

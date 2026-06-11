@@ -105,7 +105,7 @@ Each rule has a per-rule `severity` (`error` | `warning`). `SafetyEngine.partiti
 6. Update **all 14 bundled client skill files** plus the applicable `skill_files/languages/*.md` crib sheets - `tests/test_skill_install.py::test_skill_documents_every_active_rule` fails for every client whose docs miss the new code or name, so land these in the same commit as the registry change.
 7. Add a `CHANGELOG.md` entry under `[Unreleased]`. New rules are MINOR, never MAJOR. Do not bump the version; releases are the owner's call.
 
-**Critical constraint**: SafeLint must pass itself. `safelint check src/` must report zero blocking violations before any merge. This means new rule code must obey its own rules - `no_recursion` (use iterative worklists), `function_length=60`, `nesting_depth=2`, `complexity=10`, etc. The only sanctioned inline suppressions in safelint's source are the documented `# nosafe: SAFE203` logging exemptions; prefer rewriting over annotating (the project's rule-10 stance).
+**Critical constraint**: SafeLint must pass itself. `safelint check src/ --all-files` must report zero blocking violations before any merge (the `--all-files` flag matches CI; a bare `safelint check src/` only scans git-modified files and can read clean falsely). This means new rule code must obey its own rules - `no_recursion` (use iterative worklists), `function_length=60`, `nesting_depth=2`, `complexity=10`, etc. The only sanctioned inline suppressions in safelint's source are the documented `# nosafe: SAFE203` logging exemptions; prefer rewriting over annotating (the project's rule-10 stance).
 
 ### Adding a new language or framework/runtime preset
 
