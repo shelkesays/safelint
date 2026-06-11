@@ -1962,6 +1962,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#adding-a-framework-runtime-preset-to-an-existing-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a framework / runtime preset to an existing language
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#things-to-leave-alone" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2345,6 +2356,17 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#adding-a-framework-runtime-preset-to-an-existing-language" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adding a framework / runtime preset to an existing language
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#things-to-leave-alone" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2642,7 +2664,7 @@
 <p><strong>Create the shared addendum</strong> at <code>src/safelint/skill_files/languages/&lt;lang&gt;.md</code> modelled on <code>languages/python.md</code>. Cover install nuance (if any, e.g. ecosystem-specific packaging), the file extensions safelint will pick up, language-specific phrasing for the universal rule rationales, and idiomatic fix patterns for the rules most likely to fire on that language.</p>
 </li>
 <li>
-<p><strong>Update every client's Step 2 registry table</strong> with a row pointing at the new addendum. The 12 files to touch:</p>
+<p><strong>Update every client's Step 2 registry table</strong> with a row pointing at the new addendum. The 14 files to touch:</p>
 </li>
 </ol>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a>src/safelint/skill_files/claude/SKILL.md
@@ -2657,12 +2679,22 @@
 <a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a>src/safelint/skill_files/trae/safelint.md
 <a id="__codelineno-5-11" name="__codelineno-5-11" href="#__codelineno-5-11"></a>src/safelint/skill_files/antigravity/safelint.md
 <a id="__codelineno-5-12" name="__codelineno-5-12" href="#__codelineno-5-12"></a>src/safelint/skill_files/zed/safelint.md
+<a id="__codelineno-5-13" name="__codelineno-5-13" href="#__codelineno-5-13"></a>src/safelint/skill_files/warp/WARP.md
+<a id="__codelineno-5-14" name="__codelineno-5-14" href="#__codelineno-5-14"></a>src/safelint/skill_files/kiro/safelint.md
 </code></pre></div>
 <ol>
 <li><strong>Keep each client's <em>core</em> language-neutral</strong>, the Step 2 table is the only language-specific part. Per-language detail belongs in the shared <code>languages/&lt;lang&gt;.md</code> addendum, not in any client's entry-point file. Every client tells its agent "for deeper language-specific guidance, read <code>languages/&lt;lang&gt;.md</code> from the bundled skill directory", so you only write the deep guidance once.</li>
 </ol>
 <p><strong>The drift-detection test catches you if you miss any.</strong> <code>test_skill_documents_every_supported_extension</code> is parametrised over <code>_CLIENT_SPECS</code> and fails CI for every client whose bundled doc doesn't mention every extension in <code>supported_extensions()</code>. So the moment you add the new extension to <code>safelint.languages</code> but forget to update one of the 14 client files, that client's parametrised test fails with a clear error.</p>
 <p><strong>Smoke testing:</strong> the bundled docs are just Markdown; no test harness needed beyond the parametrised drift tests. After <code>safelint skill install --client &lt;name&gt; --force</code>, ask the relevant agent to "run safelint" on a sample <code>&lt;lang&gt;</code> project and confirm it picks up the new file extensions and produces sensible output. Bundling is automatic via <code>[tool.setuptools.package-data]</code> in <code>pyproject.toml</code> (<code>skill_files/**/*.md</code>), so new addendum files ship in the next wheel without further config.</p>
+<h2 id="adding-a-framework-runtime-preset-to-an-existing-language">Adding a framework / runtime preset to an existing language<a class="headerlink" href="#adding-a-framework-runtime-preset-to-an-existing-language" title="Permanent link">#</a></h2>
+<p>Presets change rule <em>defaults</em> for a language without touching parsing or rule logic. Two precedents ship today: <code>[tool.safelint.javascript] runtime</code> (<code>node</code> / <code>browser</code> / <code>deno</code> / <code>cloudflare-workers</code> / <code>bun</code>) and <code>[tool.safelint.java] framework</code> (<code>vanilla</code> / <code>spring-boot</code>). To add one (a new runtime, or a framework preset like Django / Rails / axum):</p>
+<ol>
+<li><strong>Config machinery in <code>core/config.py</code></strong>: a preset dict whose nested shape mirrors <code>DEFAULTS["rules"]</code> and contains <em>only</em> the keys it overrides (the baseline preset, e.g. <code>node</code> / <code>vanilla</code>, is the empty dict); a <code>frozenset</code> of valid preset names; a <code>_resolve_*</code> function that validates <code>cfg["&lt;lang&gt;"]["&lt;axis&gt;"]</code> and, on unknown / non-string / non-table values, surfaces a <code>safelint: warning:</code> via <code>core/_diagnostics</code> and falls back to the default (never raise for a bad preset name); and an <code>_apply_*</code> step that merges the preset into the DEFAULTS copy <strong>before</strong> the user's TOML is overlaid, so explicit user keys always win.</li>
+<li><strong>Framework-specific structural rules</strong> (if the preset warrants them) go in the <strong>9xx band</strong>, which is reserved for framework rules (Spring's SAFE901-904 today). They ship disabled by default and are enabled by the preset. Each follows the full "Adding a new rule" checklist, including the 14 client skill files (the rule drift test enforces this).</li>
+<li><strong>Tests</strong>: preset-resolution tests modelled on <code>tests/core/test_javascript_runtime_presets.py</code> / <code>tests/core/test_java_framework_presets.py</code> (each preset's overrides land; user TOML beats the preset; unknown names warn and fall back), plus an e2e fixture when structural rules ship (precedent: <code>tests/fixtures/spring_boot/</code> + <code>tests/integration/test_spring_boot_e2e.py</code>).</li>
+<li><strong>Documentation fan-out</strong>: the language page gains a preset table (when to pick it, what changes); <a href="../../configuration/toml/">Configuration file</a> gains a preset section showing <strong>both TOML forms</strong> (<code>[tool.safelint.&lt;lang&gt;]</code> in pyproject.toml and bare <code>[&lt;lang&gt;]</code> in standalone safelint.toml); <a href="../../configuration/rules/">Rules reference</a> documents any new 9xx rules; <code>README.md</code> / <code>docs/index.md</code> mention the preset on the language row; the shared <code>skill_files/languages/&lt;lang&gt;.md</code> addendum gains the preset table; and <code>CHANGELOG.md</code> records it under <code>[Unreleased]</code>.</li>
+</ol>
 <h2 id="things-to-leave-alone">Things to leave alone<a class="headerlink" href="#things-to-leave-alone" title="Permanent link">#</a></h2>
 <ul>
 <li>Don't touch <code>_parse_directives</code> itself unless block-comment handling is genuinely needed; the current impl is generic via <code>LanguageDefinition</code>. (The <code>_parse_suppressions</code> / <code>_parse_file_level_ignores</code> wrappers it backs are thin re-exports for unit tests, modify the underlying <code>_parse_directives</code> if you need to change the comment-walk logic.)</li>

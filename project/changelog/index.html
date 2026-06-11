@@ -1940,6 +1940,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Unreleased">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1977,7 +1994,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#documentation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -2027,7 +2044,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation_1" class="md-nav__link">
+  <a href="#documentation_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -2776,7 +2793,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation_2" class="md-nav__link">
+  <a href="#documentation_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -3432,6 +3449,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Unreleased">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -3469,7 +3503,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation" class="md-nav__link">
+  <a href="#documentation_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -3519,7 +3553,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation_1" class="md-nav__link">
+  <a href="#documentation_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -4268,7 +4302,7 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#documentation_2" class="md-nav__link">
+  <a href="#documentation_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Documentation
@@ -4819,6 +4853,11 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.2.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Development guidance is now version-controlled.</strong> <code>CLAUDE.md</code> (the Claude Code project guide), the <code>add-language-support</code> development skill (<code>.claude/skills/add-language-support/</code>), and the language-expansion plans (<code>plan/01-go.md</code> through <code>plan/04-php.md</code> plus <code>plan/README.md</code>) are tracked, reversing the old keep-CLAUDE.md-local convention: the skill and the plans reference CLAUDE.md's checklists, so the three travel together. Machine-local Claude Code state (<code>.claude/settings.local.json</code>, the installed <code>.claude/skills/safelint/</code> copy) stays ignored.</li>
+<li><strong>Contributing guide: framework / runtime preset standard.</strong> <code>docs/contributing/adding-a-language.md</code> gains an "Adding a framework / runtime preset" section (config machinery shape, 9xx-band policy for framework rules, preset tests, and the full docs fan-out including both TOML forms), and its Step 8 client-file list is corrected from 12 to all 14 bundled skill files (warp and kiro were missing).</li>
+</ul>
 <h2 id="240-2026-06-10">[2.4.0] - 2026-06-10<a class="headerlink" href="#240-2026-06-10" title="Permanent link">#</a></h2>
 <p><strong>Power of Ten gap-closure: five new / widened rules.</strong> This release adds four new rules and widens one existing rule to close the most prominent gaps between SafeLint's rule set and Holzmann's ten rules, plus a new docs page mapping the ten rules onto the checks. Additive across the board (per the project's semver policy, new rules and widened language coverage are MINOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
@@ -4834,7 +4873,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <ul>
 <li><strong>SAFE302 <code>global_mutation</code> now covers Java</strong> (previously Python / JS / TS only). On Java it flags <strong>non-final <code>static</code> field declarations</strong>, Java's shared-mutable-state shape, at the declaration site. <code>static final</code> fields are clean (interior mutability of a <code>final</code> referent is a documented exclusion needing type resolution); instance fields, locals, and interface fields never fire. This fulfils the Java SAFE302 work previously marked "deferred to a future release" in the language docs. <strong>Heads-up for existing Java users:</strong> because SAFE302 is enabled by default, projects with non-final <code>static</code> fields will see new violations after upgrading; suppress per-line with <code>// nosafe: SAFE302</code>, per-file, or via <code>per_file_ignores</code> if this is not yet a policy you want to enforce. SAFE302 remains unported to Rust (<code>static mut</code> is SAFE602's territory; safe interior-mutable statics are the new SAFE307's).</li>
 </ul>
-<h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">#</a></h3>
+<h3 id="documentation_1">Documentation<a class="headerlink" href="#documentation_1" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>Removed the four repo-root redirect stubs</strong> (<code>AI_CLIENTS.md</code>, <code>CONFIGURATION.md</code>, <code>ADDING_AN_AI_CLIENT.md</code>, <code>ADDING_A_LANGUAGE.md</code>). These were 7-line "this page has moved" placeholders left behind by the docs-site migration; the live <code>CONTRIBUTING.md</code> / <code>SUPPORT.md</code> pointers now link straight to the docs site (<code>shelkesays.github.io/safelint/...</code>) and code-comment references point at <code>docs/...</code> paths. The <code>mkdocs</code> build is unaffected (the community-health copies resolve cross-references through <code>scripts/prepare_docs.py</code>'s rewrite map, not the stubs).</li>
 <li><strong>Doc accuracy pass for the new rule set.</strong> Refreshed rule and AI-client counts across <code>README.md</code>, <code>docs/index.md</code>, <code>docs/configuration/rules.md</code>, and the per-language pages (38 rules total: 15 on by default, 23 opt-in; 14 supported AI clients), updated every per-language page, the bundled client skill files, and the language crib sheets to list SAFE105 / SAFE307 / SAFE309 / SAFE603 and the widened SAFE302, and fixed a broken <code>cli.md#exit-code-2-silent-failure-triggers</code> anchor referenced from three language pages.</li>
@@ -4849,7 +4888,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <ul>
 <li><strong>Kiro (<code>kiro.dev</code>) added as a supported AI client.</strong> AWS's agentic IDE reads steering files under <code>.kiro/steering/*.md</code>; <code>safelint skill install --client kiro</code> writes <code>.kiro/steering/safelint.md</code> at project scope (<code>--project</code>, recommended for team repos) or <code>~/.kiro/steering/safelint.md</code> at user scope. Auto-detection picks up a <code>.kiro/</code> directory in the cwd (project) or home (user). One <code>ClientSpec</code> addition plus the bundled <code>skill_files/kiro/safelint.md</code> template; the <code>_CLIENT_SPECS</code> registry, drift-detection contract, and CLI choices all extend automatically. Kiro also honours the <code>AGENTS.md</code> standard as a fallback, but safelint installs to its first-class steering file rather than coupling on the shared <code>AGENTS.md</code> (owned by the codex client).</li>
 </ul>
-<h3 id="documentation_1">Documentation<a class="headerlink" href="#documentation_1" title="Permanent link">#</a></h3>
+<h3 id="documentation_2">Documentation<a class="headerlink" href="#documentation_2" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>Warp added to the per-client docs.</strong> New <code>docs/ai-clients/clients/warp.md</code> page covering the project-scope-only contract; row added to the client table in <code>docs/ai-clients/index.md</code>; mkdocs nav entry under Per-client guides. (Warp itself shipped as a client in 2.2.0; this just closes the docs gap.)</li>
 <li><strong>OpenCode auto-detection documented in <code>codex.md</code>.</strong> New "OpenCode auto-detection" subsection covering the <code>.opencode/</code> marker piggyback, the AGENTS.md auto-create vs append cases, and a "Note on OpenClaw" explaining why that agent was evaluated and deliberately not added.</li>
@@ -5362,7 +5401,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><strong><code>per_file_ignores</code></strong> (glob scope), same as before, plus <code>"*"</code> wildcard support.</li>
 <li><strong><code>ignore</code></strong> (project scope), same as before.</li>
 </ul>
-<h3 id="documentation_2">Documentation<a class="headerlink" href="#documentation_2" title="Permanent link">#</a></h3>
+<h3 id="documentation_3">Documentation<a class="headerlink" href="#documentation_3" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>CONFIGURATION.md</strong>, new <em>File-level suppression</em> section with form table, placement rule, typo-guard behaviour, and a four-mechanism comparison table mapping each scope to its right use case.</li>
 <li><strong>CLAUDE.md</strong>, <em>Suppression model</em> section updated from 3 layers to 4 with implementation pointers (<code>_parse_file_level_ignores</code>, <code>_merge_in_file_directives</code>, <code>_is_per_file_ignored</code>'s wildcard short-circuit).</li>
