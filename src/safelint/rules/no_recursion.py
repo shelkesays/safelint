@@ -23,6 +23,7 @@ name is not misattributed.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
@@ -30,13 +31,19 @@ from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
-from safelint.rules.base import BaseRule
+from safelint.rules.base import BaseRule, Suggestion
 
 
 if TYPE_CHECKING:
     import tree_sitter
 
     from safelint.rules.base import Violation
+
+
+#: Advisory, informational-only fix (no TextEdits): the right rewrite is an
+#: explicit loop / worklist, but the shape of that loop depends on the
+#: function, so safelint only names the direction, never an edit.
+_ITERATIVE_SUGGESTION = Suggestion(description="Convert the recursion to an explicit loop with a worklist / accumulator")
 
 
 _PY_FUNCTION_TYPES = frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF})
@@ -174,11 +181,11 @@ class NoRecursionRule(BaseRule):
             if node.type != call_type:
                 continue
             if _targets_self(node, func_name, lang):
-                violations.append(
-                    self._make_violation_for_node(
-                        filepath,
-                        node,
-                        f'Function "{func_name}" calls itself; recursion has no guaranteed stack bound (Power of Ten rule 1) - refactor to an explicit loop or worklist',
-                    )
+                base = self._make_violation_for_node(
+                    filepath,
+                    node,
+                    f'Function "{func_name}" calls itself; recursion has no guaranteed stack bound (Power of Ten rule 1) - refactor to an explicit loop or worklist',
                 )
+                # Violation is frozen; attach the advisory suggestion via replace.
+                violations.append(replace(base, suggestions=(_ITERATIVE_SUGGESTION,)))
         return violations

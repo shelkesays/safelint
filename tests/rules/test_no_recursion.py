@@ -170,3 +170,14 @@ def test_rust_iterative_is_clean(tmp_path: Path) -> None:
     sample = tmp_path / "iter.rs"
     sample.write_text("fn sum(xs: &[u64]) -> u64 {\n    let mut acc = 0;\n    for x in xs { acc += x; }\n    acc\n}\n", encoding="utf-8")
     assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_safe105_carries_informational_suggestion(tmp_path: Path) -> None:
+    """Each SAFE105 violation carries the advisory loop/worklist suggestion (no edits)."""
+    sample = tmp_path / "rec.py"
+    sample.write_text("def fact(n):\n    return n * fact(n - 1)\n", encoding="utf-8")
+    hits = _safe105(_engine().check_file(str(sample)))
+    assert len(hits) == 1
+    assert len(hits[0].suggestions) == 1
+    assert hits[0].suggestions[0].edits == ()
+    assert "loop" in hits[0].suggestions[0].description

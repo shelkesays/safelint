@@ -535,7 +535,7 @@ Holzmann's rule 8 restricts the preprocessor because textual code generation def
 Per-language defaults (call names):
 
 - **Python** (`dynamic_exec_calls`): `eval`, `exec`, `compile`, `__import__`. Only **bare** calls and `builtins.`-qualified calls fire, so `model.eval()` (a method call) does not. `getattr` / `setattr` are deliberately excluded (far too common, and they do not generate code).
-- **JavaScript / TypeScript** (`dynamic_exec_calls_javascript`): `eval`, `Function` (both `new Function(...)` and the bare `Function(...)` call), `execScript`. A bare-identifier callee is required, so `obj.eval()` does not fire.
+- **JavaScript / TypeScript** (`dynamic_exec_calls_javascript`): `eval`, `Function` (both `new Function(...)` and the bare `Function(...)` call), `execScript`. A bare-identifier callee is required, so `obj.eval()` does not fire. `setTimeout` / `setInterval` with a string first argument (the implicit-eval form) are deliberately not in the defaults: flagging every `setTimeout` would be noise, and detecting only the string-argument form is not worth the complexity for a near-extinct idiom; add them via the config list if your codebase still uses the string form.
 - **Java** (`dynamic_exec_calls_java`): `forName` (`Class.forName`), `invoke` (`Method.invoke`), `eval` (JSR-223 `ScriptEngine`), `defineClass`, `loadClass`. Matched by method name regardless of receiver, so a user-defined `forName` would also match (acceptable for an off-by-default rule).
 
 **Rust** is excluded: its rule-8 analogue is the macro system, whose bodies parse as opaque token trees (a documented limitation shared with SAFE801), and `panic`-family macros already have SAFE204.
