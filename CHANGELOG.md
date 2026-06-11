@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Documentation
 
+- **Development guidance is now version-controlled.** `CLAUDE.md` (the Claude Code project guide), the `add-language-support` development skill (`.claude/skills/add-language-support/`), and the language-expansion plans (`plan/01-go.md` through `plan/04-php.md` plus `plan/README.md`) are tracked, reversing the old keep-CLAUDE.md-local convention: the skill and the plans reference CLAUDE.md's checklists, so the three travel together. Machine-local Claude Code state (`.claude/settings.local.json`, the installed `.claude/skills/safelint/` copy) stays ignored.
 - **Contributing guide: framework / runtime preset standard.** `docs/contributing/adding-a-language.md` gains an "Adding a framework / runtime preset" section (config machinery shape, 9xx-band policy for framework rules, preset tests, and the full docs fan-out including both TOML forms), and its Step 8 client-file list is corrected from 12 to all 14 bundled skill files (warp and kiro were missing).
 
 ## [2.4.0] - 2026-06-10
