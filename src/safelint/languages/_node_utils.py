@@ -175,8 +175,10 @@ def _java_object_creation_name(call_node: tree_sitter.Node) -> str | None:
 
 def _java_type_name(type_node: tree_sitter.Node) -> str | None:
     """Resolve a Java ``type_identifier`` / ``scoped_type_identifier`` / ``generic_type`` to its simple name."""
-    # Peel ``generic_type`` wrappers (``List<Map<String, Foo>>`` -> ``Foo``)
-    # iteratively; depth is bounded by the type's generic nesting.
+    # Unwrap a ``generic_type`` to its base type, returning the base's simple
+    # name (``List<Map<String, Foo>>`` -> ``List``; ``MyResource<Foo>`` ->
+    # ``MyResource``). The base is the first named child; the loop guards the
+    # (non-Java) case of a generic whose base is itself generic.
     while type_node.type == "generic_type":
         if not type_node.named_children:  # pragma: no cover - defensive: generic_type always wraps a type
             return None
