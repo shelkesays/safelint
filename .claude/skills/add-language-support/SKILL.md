@@ -167,8 +167,8 @@ never changes parsing or rule logic.
 
 - [ ] Preset-resolution tests modelled on
       `tests/core/test_javascript_runtime_presets.py` /
-      `test_java_framework_presets.py`: each preset's overrides land, user
-      TOML beats the preset, unknown names warn + fall back.
+      `tests/core/test_java_framework_presets.py`: each preset's overrides land,
+      user TOML beats the preset, unknown names warn + fall back.
 - [ ] An e2e fixture if structural rules ship (precedent:
       `tests/fixtures/spring_boot/` + `tests/integration/test_spring_boot_e2e.py`).
 
@@ -192,9 +192,11 @@ never changes parsing or rule logic.
 
 Non-negotiables (full detail in CLAUDE.md):
 
-- safelint must pass itself: `uv run safelint check src/` with zero blocking
-  violations - including the new rules on the new code (no recursion,
-  nesting <= 2, complexity <= 10, function length <= 60).
+- safelint must pass itself: `uv run safelint check src/ --all-files` with zero
+  blocking violations (the `--all-files` flag matches CI; without it the check
+  only scans git-modified files and can read clean falsely) - including the new
+  rules on the new code (no recursion, nesting <= 2, complexity <= 10, function
+  length <= 60).
 - Never rename or repurpose existing rule names / codes.
 - No auto-fix, ever; fixes are advisory `Suggestion`s only.
 - Rule numbering: slot by CATEGORY into 1xx-8xx; 9xx is framework-specific
