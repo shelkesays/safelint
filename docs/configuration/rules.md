@@ -549,9 +549,20 @@ Per-language defaults (call names):
 | `dynamic_exec_calls_java` | see above | (Java) reflection method names |
 
 ```toml
+# pyproject.toml
 [tool.safelint.rules.dynamic_code_execution]
 enabled = true
 severity = "warning"
+# Per-language call lists (each replaces that language's default):
+dynamic_exec_calls = ["eval", "exec", "compile", "__import__"]        # Python (bare key)
+dynamic_exec_calls_javascript = ["eval", "Function", "execScript"]    # JS / TS (TS inherits via fallback)
+dynamic_exec_calls_java = ["forName", "invoke", "defineClass", "loadClass"]   # Java
+```
+
+```toml
+# standalone safelint.toml (same keys, no [tool.safelint] prefix)
+[rules.dynamic_code_execution]
+enabled = true
 ```
 
 ## Resource safety rules
@@ -1429,6 +1440,21 @@ Two shapes fire: a `static` whose declared type contains an interior-mutability 
 | `enabled` | `false` | Toggle the rule |
 | `severity` | `"warning"` | `"error"` or `"warning"` |
 | `interior_mutable_types_rust` | `Mutex`, `RwLock`, `RefCell`, `Cell`, `OnceLock`, `OnceCell`, `Lazy`, `LazyLock`, `LazyCell`, `AtomicBool`, `AtomicI8`..`AtomicI64`, `AtomicIsize`, `AtomicU8`..`AtomicU64`, `AtomicUsize`, `AtomicPtr` | Wrapper type names that mark a static as interior-mutable |
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.interior_mutable_static]
+enabled = true
+severity = "warning"
+# Narrow or extend the wrapper-type set (replaces the default list):
+interior_mutable_types_rust = ["Mutex", "RwLock", "OnceLock", "AtomicUsize"]
+```
+
+```toml
+# standalone safelint.toml (same keys, no [tool.safelint] prefix)
+[rules.interior_mutable_static]
+enabled = true
+```
 
 **Bad:**
 

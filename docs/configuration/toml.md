@@ -356,6 +356,31 @@ sinks_typescript = ["eval", "Function", "Object.assign", "innerHTML"]  # stricte
 
 (Two separate snippets above, each is a complete, self-contained pyproject excerpt. Don't paste them into the same `[tool.safelint.rules.tainted_sink]` block: TOML rejects duplicate table headers, and the rule's config is *one* table no matter how many language-suffixed keys it carries.)
 
+## Java framework presets
+
+Java source is framework-agnostic to parse, but the *defaults* baked into the rules (taint sinks, nullable methods, and which structural rules are active) shift with the framework. The `[tool.safelint.java]` table selects the preset:
+
+```toml
+# pyproject.toml
+[tool.safelint.java]
+framework = "spring-boot"   # or "vanilla" (default)
+```
+
+In a standalone `safelint.toml` (no `[tool.safelint]` wrapper), drop the prefix, the table name is just `[java]`:
+
+```toml
+# safelint.toml (standalone: no [tool.safelint] wrapper)
+[java]
+framework = "spring-boot"
+```
+
+| Framework | When to pick it | What changes |
+|---|---|---|
+| `vanilla` (default) | Plain Java, Jakarta EE, Android, Spring-free libraries | Stdlib-only defaults. The four `SAFE901-904` Spring rules stay disabled. |
+| `spring-boot` | Spring Boot 2.x / 3.x apps (Spring MVC, Spring Data JPA, Spring JDBC, Spring WebFlux) | Adds unambiguous `JdbcTemplate` / `RestTemplate` methods to SAFE801 sinks (`query*` / `batchUpdate` / `*ForObject` / `*ForEntity` / `postForLocation` / `patchForObject`), adds `queryForObject` to SAFE803 nullable methods, and **enables the four `SAFE901-904` Spring structural rules**. |
+
+The preset only changes *defaults*, an explicit `[tool.safelint.rules.tainted_sink] sinks_java = [...]` still wins. Unknown framework names surface a `safelint: warning:` line on stderr and fall back to `vanilla`. See the [Java language page](../languages/java.md#framework-presets) for the full per-rule effect.
+
 ## Adoption path
 
 If you are adding SafeLint to an existing project with many existing violations, start permissive and tighten over time:
@@ -363,5 +388,12 @@ If you are adding SafeLint to an existing project with many existing violations,
 ```text
 Week 1  - mode: local,  fail_on: error    - get used to the tool, fix errors only
 Week 4  - mode: ci,     fail_on: warning  - enforce warnings in CI
-Later   - enable tainted_sink, return_value_ignored, null_dereference as needed
+Later   - enable opt-in rules as needed:
+          - dataflow:   tainted_sink, return_value_ignored, null_dereference
+          - rule 8/10:  dynamic_code_execution, blanket_suppression (all languages)
+          - Rust:       interior_mutable_static and the other Rust-only rules
+          - test discipline: missing_assertions (set min_assertions = 2 for the
+                        Holzmann density), test_existence, test_coupling
 ```
+
+All of these are off by default; see the [Rules reference](rules.md) for each rule's config knobs. `no_recursion` (SAFE105) is the one new rule that is **on by default** (at `warning` severity), so no opt-in step is needed for it.
