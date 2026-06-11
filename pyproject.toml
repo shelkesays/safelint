@@ -85,13 +85,14 @@ java = [
 # complexity / args), error-handling discipline (empty Err arms,
 # ignored Result returns, unlogged error branches), and dataflow
 # patterns (unsanitised input into ``std::process::Command`` /
-# ``sqlx::query`` / equivalents). v2.2.0 also adds ten Rust-only
+# ``sqlx::query`` / equivalents). v2.2.0 added ten Rust-only
 # rules covering panic placement (SAFE204), lock poisoning (SAFE205),
 # silent / unlogged Err handling (SAFE206 / SAFE207), broad
 # ``.unwrap()`` outside tests (SAFE208), dangerous ``std::mem`` ops
 # (SAFE306), truncating ``as`` casts (SAFE308), undocumented
 # ``unsafe`` blocks (SAFE602), needless ``mut`` (SAFE110), and
-# unchecked arithmetic on integer params (SAFE112).
+# unchecked arithmetic on integer params (SAFE112); v2.4.0 adds an
+# eleventh, interior-mutable statics (SAFE307).
 rust = [
     "tree-sitter-rust>=0.23.0",
 ]
@@ -118,9 +119,8 @@ dev = [
     # for "every grammar"; adding a new language only edits ``[all]``.
     "safelint[all]",
 ]
-# Documentation site - Material-themed MkDocs build that publishes to
-# https://shelkesays.github.io/safelint/. Install with `uv sync --extra docs`,
-# then `uv run mkdocs serve` for a live preview at http://127.0.0.1:8000.
+# Documentation site - Material-themed MkDocs build that publishes to https://shelkesays.github.io/safelint/. 
+# Install with `uv sync --extra docs`, then `uv run mkdocs serve` for a live preview at http://127.0.0.1:8000.
 docs = [
     "mkdocs>=1.6.0",
     "mkdocs-material>=9.5.0",
