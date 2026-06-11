@@ -223,10 +223,14 @@ __marimo__/
 
 .vscode/
 
-# Claude Code local guide - kept out of version control by project convention.
-CLAUDE.md
-
 # Safelint per-project lint-result cache
 .safelint_cache/
 
-.claude/
+# CLAUDE.md, .claude/skills/add-language-support/, and plan/ are version-controlled
+# (convention changed 2026-06-11: the dev skill and language plans reference
+# CLAUDE.md's checklists, so the three travel together). Machine-local Claude
+# Code state stays out:
+.claude/settings.local.json
+# Installed copy of the bundled safelint skill - refresh via
+# `safelint skill install --client claude --project --force`, never commit.
+.claude/skills/safelint/
