@@ -36,12 +36,16 @@ rule 1/7 (well-defined operations):
   (nullable-method-specific); catches bare ``let r = foo(); r.unwrap();``
   cases the narrow rules miss.
 
-**Side effects / state (3xx)** - Holzmann rule 1/7 (well-defined
-operations + checked conversions):
+**Side effects / state (3xx)** - Holzmann rule 1/6/7 (well-defined
+operations, smallest scope, checked conversions):
 
 * **SAFE306** ``dangerous_mem_ops`` - flags calls to
   ``std::mem::transmute`` / ``forget`` / ``zeroed`` /
   ``uninitialized``.
+* **SAFE307** ``interior_mutable_static`` - flags ``static`` items whose
+  type provides safe interior mutability (``Mutex`` / ``RwLock`` /
+  ``OnceLock`` / ``Atomic*`` / ``lazy_static!``), the safe-code global
+  mutable state SAFE602's ``unsafe`` gate never sees (Holzmann rule 6).
 * **SAFE308** ``truncating_as_cast`` - flags ``as u8`` / ``as u16``
   / ``as u32`` / ``as i32`` casts. Silently truncates in Rust;
   ``TryFrom`` / ``try_into()`` makes the failure mode explicit.

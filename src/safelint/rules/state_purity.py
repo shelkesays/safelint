@@ -201,16 +201,20 @@ class GlobalStateRule(BaseRule):
 
 
 class GlobalMutationRule(BaseRule):
-    """Reject functions that write to module-level state.
+    """Reject shared module-level / global mutable state.
 
     Python: fires on ``global x; x = ...`` patterns (or, with ``strict =
-    true``, on every ``global`` declaration). JavaScript: fires on
-    function-body assignments that target a configured global namespace
+    true``, on every ``global`` declaration). JavaScript / TypeScript: fires
+    on function-body assignments that target a configured global namespace
     member - ``globalThis.x = ...``, ``window.x = ...``, ``global.x = ...``
     (Node), ``self.x = ...`` (Web Workers), or ``process.env.X = ...``.
-    The rule's intent ("don't mutate module-level state from inside a
-    function") is the same in both languages even though the syntactic
-    shape differs.
+    Java: fires at the declaration site on non-``final`` ``static`` fields
+    (Java's shared-mutable-state shape); ``static final`` fields, instance
+    fields, and locals are clean.
+
+    The rule's intent ("don't keep shared mutable state at module / global
+    scope", Holzmann rule 6) is the same across languages even though the
+    syntactic shape differs.
     """
 
     name = "global_mutation"
