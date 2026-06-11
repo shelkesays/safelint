@@ -183,3 +183,10 @@ def test_rust_allow_warnings_with_reason_still_fires(tmp_path: Path) -> None:
     sample = tmp_path / "a.rs"
     sample.write_text('#[allow(warnings, reason = "third-party macro")]\nfn a() {}\n', encoding="utf-8")
     assert len(_safe603(_engine().check_file(str(sample)))) == 1
+
+
+def test_rust_allow_with_escaped_quote_reason_is_clean(tmp_path: Path) -> None:
+    """An escaped quote inside the reason string must not leak ``warnings`` into matching."""
+    sample = tmp_path / "a.rs"
+    sample.write_text('#[allow(dead_code, reason = "silences \\"warnings\\" from macro")]\nfn a() {}\n', encoding="utf-8")
+    assert _safe603(_engine().check_file(str(sample))) == []

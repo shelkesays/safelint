@@ -46,6 +46,11 @@ _JS_ESLINT_DISABLE = re.compile(r"^(eslint-disable(?:-line|-next-line)?)\b(.*)$"
 _JS_TS_IGNORE = re.compile(r"^@ts-ignore\b")
 _JS_TS_NOCHECK = re.compile(r"^@ts-nocheck\b")
 
+# A double-quoted Rust string literal, escape-aware: ``\"`` does not terminate
+# the literal. Used to blank ``reason = "..."`` contents before scanning a Rust
+# ``allow(...)`` attribute for blanket lint names.
+_RUST_STRING_LITERAL = re.compile(r'"(?:[^"\\]|\\.)*"')
+
 
 def _python_blanket(comment_text: str) -> str | None:
     """Return the blanket-directive label for a Python comment, or None."""
@@ -99,9 +104,11 @@ def _rust_blanket(attr_text: str) -> str | None:
     String-literal contents are neutralised first so a ``reason = "..."``
     note (Rust 1.81+ attribute syntax) that happens to mention ``warnings``
     or ``clippy::all`` - e.g. ``#[allow(dead_code, reason = "silences
-    warnings")]`` - is not mistaken for a blanket allow.
+    warnings")]`` - is not mistaken for a blanket allow. The string pattern is
+    escape-aware: a backslash-escaped quote inside the reason does not end the
+    literal, so an embedded quoted ``warnings`` is still stripped whole.
     """
-    text = re.sub(r'"[^"]*"', '""', attr_text)
+    text = _RUST_STRING_LITERAL.sub('""', attr_text)
     if "allow" not in text:
         return None
     if re.search(r"(?<!\w)clippy::all(?!\w)", text):
