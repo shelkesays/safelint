@@ -208,7 +208,7 @@ Concretely:
 
 1. **Create the shared addendum** at `src/safelint/skill_files/languages/<lang>.md` modelled on `languages/python.md`. Cover install nuance (if any, e.g. ecosystem-specific packaging), the file extensions safelint will pick up, language-specific phrasing for the universal rule rationales, and idiomatic fix patterns for the rules most likely to fire on that language.
 
-2. **Update every client's Step 2 registry table** with a row pointing at the new addendum. The 12 files to touch:
+2. **Update every client's Step 2 registry table** with a row pointing at the new addendum. The 14 files to touch:
 
    ```text
    src/safelint/skill_files/claude/SKILL.md
@@ -223,6 +223,8 @@ Concretely:
    src/safelint/skill_files/trae/safelint.md
    src/safelint/skill_files/antigravity/safelint.md
    src/safelint/skill_files/zed/safelint.md
+   src/safelint/skill_files/warp/WARP.md
+   src/safelint/skill_files/kiro/safelint.md
    ```
 
 3. **Keep each client's *core* language-neutral**, the Step 2 table is the only language-specific part. Per-language detail belongs in the shared `languages/<lang>.md` addendum, not in any client's entry-point file. Every client tells its agent "for deeper language-specific guidance, read `languages/<lang>.md` from the bundled skill directory", so you only write the deep guidance once.
@@ -230,6 +232,15 @@ Concretely:
 **The drift-detection test catches you if you miss any.** `test_skill_documents_every_supported_extension` is parametrised over `_CLIENT_SPECS` and fails CI for every client whose bundled doc doesn't mention every extension in `supported_extensions()`. So the moment you add the new extension to `safelint.languages` but forget to update one of the 14 client files, that client's parametrised test fails with a clear error.
 
 **Smoke testing:** the bundled docs are just Markdown; no test harness needed beyond the parametrised drift tests. After `safelint skill install --client <name> --force`, ask the relevant agent to "run safelint" on a sample `<lang>` project and confirm it picks up the new file extensions and produces sensible output. Bundling is automatic via `[tool.setuptools.package-data]` in `pyproject.toml` (`skill_files/**/*.md`), so new addendum files ship in the next wheel without further config.
+
+## Adding a framework / runtime preset to an existing language
+
+Presets change rule *defaults* for a language without touching parsing or rule logic. Two precedents ship today: `[tool.safelint.javascript] runtime` (`node` / `browser` / `deno` / `cloudflare-workers` / `bun`) and `[tool.safelint.java] framework` (`vanilla` / `spring-boot`). To add one (a new runtime, or a framework preset like Django / Rails / axum):
+
+1. **Config machinery in `core/config.py`**: a preset dict whose nested shape mirrors `DEFAULTS["rules"]` and contains *only* the keys it overrides (the baseline preset, e.g. `node` / `vanilla`, is the empty dict); a `frozenset` of valid preset names; a `_resolve_*` function that validates `cfg["<lang>"]["<axis>"]` and, on unknown / non-string / non-table values, surfaces a `safelint: warning:` via `core/_diagnostics` and falls back to the default (never raise for a bad preset name); and an `_apply_*` step that merges the preset into the DEFAULTS copy **before** the user's TOML is overlaid, so explicit user keys always win.
+2. **Framework-specific structural rules** (if the preset warrants them) go in the **9xx band**, which is reserved for framework rules (Spring's SAFE901-904 today). They ship disabled by default and are enabled by the preset. Each follows the full "Adding a new rule" checklist, including the 14 client skill files (the rule drift test enforces this).
+3. **Tests**: preset-resolution tests modelled on `tests/core/test_javascript_runtime_presets.py` / `test_java_framework_presets.py` (each preset's overrides land; user TOML beats the preset; unknown names warn and fall back), plus an e2e fixture when structural rules ship (precedent: `tests/fixtures/spring_boot/` + `tests/integration/test_spring_boot_e2e.py`).
+4. **Documentation fan-out**: the language page gains a preset table (when to pick it, what changes); [Configuration file](../configuration/toml.md) gains a preset section showing **both TOML forms** (`[tool.safelint.<lang>]` in pyproject.toml and bare `[<lang>]` in standalone safelint.toml); [Rules reference](../configuration/rules.md) documents any new 9xx rules; `README.md` / `docs/index.md` mention the preset on the language row; the shared `skill_files/languages/<lang>.md` addendum gains the preset table; and `CHANGELOG.md` records it under `[Unreleased]`.
 
 ## Things to leave alone
 
