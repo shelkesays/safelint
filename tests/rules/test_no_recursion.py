@@ -181,3 +181,28 @@ def test_safe105_carries_informational_suggestion(tmp_path: Path) -> None:
     assert len(hits[0].suggestions) == 1
     assert hits[0].suggestions[0].edits == ()
     assert "loop" in hits[0].suggestions[0].description
+
+
+def test_python_shadowing_nested_def_called_in_outer_body_is_clean(tmp_path: Path) -> None:
+    """Outer body calling a same-named nested function is shadowing, not recursion."""
+    sample = tmp_path / "shadow.py"
+    sample.write_text(
+        "def process(data):\n    def process(x):\n        return x\n    return process(data)\n",
+        encoding="utf-8",
+    )
+    # The bare ``process(data)`` in the outer body resolves to the nested
+    # ``process`` (Python function-scope shadowing), so the outer function is
+    # NOT self-recursive; the nested one does not call itself either.
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_python_shadowed_self_qualified_call_still_fires(tmp_path: Path) -> None:
+    """A ``self.``-qualified call still denotes the method even when a nested fn shadows the name."""
+    sample = tmp_path / "shadowself.py"
+    sample.write_text(
+        "class C:\n    def walk(self, n):\n        def walk(x):\n            return x\n        return self.walk(n - 1)\n",
+        encoding="utf-8",
+    )
+    # ``self.walk(...)`` is the method (real recursion); the nested ``walk``
+    # only shadows the *bare* name, not the qualified receiver.
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
