@@ -73,3 +73,14 @@ def test_java_public_static_non_final_fires(tmp_path: Path) -> None:
     sample = tmp_path / "Globals.java"
     sample.write_text("class Globals {\n  public static int counter = 0;\n}\n", encoding="utf-8")
     assert len(_safe302(_engine().check_file(str(sample)))) == 1
+
+
+def test_java_multi_declarator_static_fires_per_variable(tmp_path: Path) -> None:
+    """`static int a = 1, b = 2;` is two shared-mutable-state violations, not one."""
+    sample = tmp_path / "Multi.java"
+    sample.write_text("class Multi {\n  static int a = 1, b = 2;\n}\n", encoding="utf-8")
+    hits = _safe302(_engine().check_file(str(sample)))
+    assert len(hits) == 2
+    names = " ".join(h.message for h in hits)
+    assert '"a"' in names
+    assert '"b"' in names

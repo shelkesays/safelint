@@ -39,9 +39,12 @@ _PY_BARE_NOQA = re.compile(r"^noqa$", re.IGNORECASE)
 _PY_BARE_TYPE_IGNORE = re.compile(r"^type:\s*ignore\s*$", re.IGNORECASE)
 _PY_PYLINT_DISABLE_ALL = re.compile(r"^pylint:\s*disable\s*=\s*all$", re.IGNORECASE)
 
-# JS / TS comment directives.
+# JS / TS comment directives. The ``\b`` token boundary on the TS directives
+# keeps ``@ts-nocheck`` / ``@ts-ignore`` from matching longer lookalikes like
+# ``@ts-nocheckthis``.
 _JS_ESLINT_DISABLE = re.compile(r"^(eslint-disable(?:-line|-next-line)?)\b(.*)$")
 _JS_TS_IGNORE = re.compile(r"^@ts-ignore\b")
+_JS_TS_NOCHECK = re.compile(r"^@ts-nocheck\b")
 
 
 def _python_blanket(comment_text: str) -> str | None:
@@ -74,7 +77,7 @@ def _javascript_blanket(comment_text: str) -> str | None:
     (it becomes an error when the suppressed error no longer occurs).
     """
     body = _strip_comment_markers(comment_text)
-    if body.startswith("@ts-nocheck"):
+    if _JS_TS_NOCHECK.match(body):
         return "@ts-nocheck"
     if _JS_TS_IGNORE.match(body):
         return "@ts-ignore"
@@ -92,12 +95,18 @@ def _rust_blanket(attr_text: str) -> str | None:
     allow (``allow(dead_code)`` / ``allow(clippy::too_many_arguments)``) is
     clean. Word-boundary matching keeps ``clippy::all`` from matching
     ``clippy::all_something``.
+
+    String-literal contents are neutralised first so a ``reason = "..."``
+    note (Rust 1.81+ attribute syntax) that happens to mention ``warnings``
+    or ``clippy::all`` - e.g. ``#[allow(dead_code, reason = "silences
+    warnings")]`` - is not mistaken for a blanket allow.
     """
-    if "allow" not in attr_text:
+    text = re.sub(r'"[^"]*"', '""', attr_text)
+    if "allow" not in text:
         return None
-    if re.search(r"(?<!\w)clippy::all(?!\w)", attr_text):
+    if re.search(r"(?<!\w)clippy::all(?!\w)", text):
         return "allow(clippy::all)"
-    if re.search(r"(?<!\w)warnings(?!\w)", attr_text):
+    if re.search(r"(?<!\w)warnings(?!\w)", text):
         return "allow(warnings)"
     return None
 

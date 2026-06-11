@@ -239,7 +239,7 @@ SafeLint ships **38 rules** across the Holzmann safety categories. **15 are on b
 | [SAFE303](https://shelkesays.github.io/safelint/configuration/rules/#safe303-side_effects_hidden) | `side_effects_hidden` | error | Pure-looking functions that secretly do I/O |
 | [SAFE304](https://shelkesays.github.io/safelint/configuration/rules/#safe304-side_effects) | `side_effects` | warning | Functions that call `print`, `open`, etc. without signalling intent |
 | [SAFE305](https://shelkesays.github.io/safelint/configuration/rules/#safe305-wide_scope_declaration) | `wide_scope_declaration` | warning | `var` declarations, prefer `let` / `const` *(JavaScript / TypeScript only)* |
-| [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) | `resource_lifecycle` | error | Files or connections opened outside a `with` block (Python) or without paired cleanup (JS / TS) |
+| [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) | `resource_lifecycle` | error | Files or connections opened outside a `with` block (Python), without paired `try`/`finally` cleanup (JS / TS), or outside try-with-resources / a `finally` close (Java) |
 | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) | `unbounded_loops` | warning | `while True` loops with no `break` |
 
 ### Opt-in rules (23): enable via `[tool.safelint.rules.<name>] enabled = true`

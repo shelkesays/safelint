@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+import pytest
+
 
 if TYPE_CHECKING:
     from pathlib import Path
@@ -89,3 +91,12 @@ def test_custom_type_list_narrows(tmp_path: Path) -> None:
     sample.write_text("static CACHE: Mutex<i32> = Mutex::new(0);\n", encoding="utf-8")
     eng = _engine({"interior_mutable_types_rust": ["AtomicUsize"]})
     assert _safe307(eng.check_file(str(sample))) == []
+
+
+def test_interior_mutable_types_rust_bare_string_raises(tmp_path: Path) -> None:
+    """A bare-string config typo fails loud instead of silently matching characters."""
+    sample = tmp_path / "m.rs"
+    sample.write_text("static CACHE: Mutex<i32> = Mutex::new(0);\n", encoding="utf-8")
+    eng = _engine({"interior_mutable_types_rust": "Mutex"})  # should be a list
+    with pytest.raises(TypeError):
+        eng.check_file(str(sample))

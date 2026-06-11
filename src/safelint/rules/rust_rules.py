@@ -57,6 +57,7 @@ from __future__ import annotations
 import re
 from typing import TYPE_CHECKING, ClassVar
 
+from safelint.core._validators import _validated_string_list
 from safelint.languages._node_utils import call_name, node_text, walk
 from safelint.rules._rust_test_attribute import attribute_item_is_test_marker
 from safelint.rules.base import BaseRule
@@ -1437,7 +1438,8 @@ class InteriorMutableStaticRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag interior-mutable statics and ``lazy_static!`` declarations."""
-        names = frozenset(self.config.get("interior_mutable_types_rust", sorted(self._DEFAULT_TYPES)))
+        raw = self.config.get("interior_mutable_types_rust", sorted(self._DEFAULT_TYPES))
+        names = frozenset(_validated_string_list(raw, "interior_mutable_types_rust"))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             violation = self._violation_for(filepath, node, names)
