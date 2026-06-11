@@ -43,6 +43,13 @@ if TYPE_CHECKING:
 #:   code.
 #: * JavaScript / TypeScript: ``eval`` / ``Function`` (the ``new Function(...)``
 #:   constructor and the bare ``Function(...)`` call) / ``execScript``.
+#:   ``setTimeout`` / ``setInterval`` with a string first argument (the
+#:   implicit-eval form) are deliberately NOT in the defaults: detecting only
+#:   the string-literal-argument form needs per-call argument inspection that
+#:   is not worth the complexity for a near-extinct idiom, and flagging every
+#:   ``setTimeout`` would be noise. Add them via
+#:   ``dynamic_exec_calls_javascript`` if your codebase still uses the
+#:   string form.
 #: * Java: ``forName`` (``Class.forName``), ``invoke`` (``Method.invoke``),
 #:   ``eval`` (JSR-223 ``ScriptEngine``), ``defineClass`` / ``loadClass``
 #:   (custom class loaders).
