@@ -98,6 +98,29 @@ def _javascript_blanket(comment_text: str) -> str | None:
     return None
 
 
+def _go_blanket(comment_text: str) -> str | None:
+    """Return the blanket-directive label for a Go comment, or None.
+
+    golangci-lint's ``//nolint`` silences every linter; the scoped
+    ``//nolint:errcheck`` (or comma list) targets named linters and is
+    clean. staticcheck's bare ``//lint:ignore`` with no check list is
+    likewise blanket; the scoped ``//lint:ignore SA1000 reason`` is clean.
+
+    Both directives are recognised by their tools ONLY with no space after
+    ``//`` (``//nolint``, not ``// nolint``), so the match requires the
+    tight form - a prose comment that merely reads ``// nolint here`` is
+    not a real directive and is left alone.
+    """
+    text = comment_text.strip()
+    if text.startswith("//nolint"):
+        rest = text[len("//nolint") :]
+        scope = rest[1:].strip() if rest.startswith(":") else rest.strip()
+        return "//nolint" if not scope else None
+    if text.startswith("//lint:ignore"):
+        return "//lint:ignore" if not text[len("//lint:ignore") :].strip() else None
+    return None
+
+
 def _rust_blanket(attr_text: str) -> str | None:
     """Return the blanket-allow label for a Rust attribute, or None.
 
@@ -123,12 +146,21 @@ def _rust_blanket(attr_text: str) -> str | None:
     return None
 
 
+# Comment-based blanket detectors keyed by language. Languages absent
+# here (and not handled by the dedicated Java / Rust attribute scans)
+# fall back to the JS-family detector in ``_comment_check``.
+_COMMENT_DETECTORS_BY_LANG = {
+    "python": _python_blanket,
+    "go": _go_blanket,
+}
+
+
 class BlanketSuppressionRule(BaseRule):
     """Flag un-scoped suppressions of other analysers (Power of Ten rule 10)."""
 
     name = "blanket_suppression"
     code = "SAFE603"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "go")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every blanket foreign-analyser suppression in *filepath*."""
@@ -140,8 +172,8 @@ class BlanketSuppressionRule(BaseRule):
         return self._comment_check(filepath, tree, lang)
 
     def _comment_check(self, filepath: str, tree: tree_sitter.Tree, lang: str) -> list[Violation]:
-        """Scan comment nodes for Python / JS-family blanket directives."""
-        detector = _python_blanket if lang == "python" else _javascript_blanket
+        """Scan comment nodes for Python / Go / JS-family blanket directives."""
+        detector = _COMMENT_DETECTORS_BY_LANG.get(lang, _javascript_blanket)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type != "comment":

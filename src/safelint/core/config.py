@@ -202,6 +202,12 @@ DEFAULTS: dict[str, Any] = {
             "dynamic_exec_calls": ["eval", "exec", "compile", "__import__"],
             "dynamic_exec_calls_javascript": ["eval", "Function", "execScript"],
             "dynamic_exec_calls_java": ["forName", "invoke", "eval", "defineClass", "loadClass"],
+            # Go has no ``eval``; the rule-8 surface is reflection
+            # (``reflect`` ``Call`` / ``CallSlice`` / ``MethodByName``) and
+            # plugin loading (``plugin`` ``Open`` / ``Lookup``). Matching is
+            # by bare method name, so ``Open`` also catches ``os.Open`` -
+            # narrow this list if that is noisy (the rule is off by default).
+            "dynamic_exec_calls_go": ["Call", "CallSlice", "MethodByName", "Open", "Lookup"],
         },
         "side_effects_hidden": {
             "enabled": True,
@@ -313,6 +319,27 @@ DEFAULTS: dict[str, Any] = {
                 "recv_from",
                 "send_to",
             ],
+            # Go I/O primitives. ``call_name`` strips the package / receiver,
+            # so each entry is the bare method name (``fmt.Println`` ->
+            # ``Println``). Covers stdout (fmt), file I/O (os), HTTP
+            # (net/http), sockets (net), and SQL execution (database/sql).
+            "io_functions_go": [
+                "Print",
+                "Println",
+                "Printf",
+                "Fprintf",
+                "Open",  # os.Open / sql.Open
+                "Create",  # os.Create
+                "ReadFile",  # os.ReadFile
+                "WriteFile",  # os.WriteFile
+                "Get",  # http.Get
+                "Post",  # http.Post
+                "Do",  # (*http.Client).Do
+                "Dial",  # net.Dial
+                "Listen",  # net.Listen
+                "Exec",  # (*sql.DB).Exec
+                "Query",  # (*sql.DB).Query
+            ],
             "pure_prefixes": [
                 "calculate",
                 "compute",
@@ -397,6 +424,25 @@ DEFAULTS: dict[str, Any] = {
                 "connect",
                 "recv",
                 "send_to",
+            ],
+            # Go: a deliberately narrower subset of SAFE303's
+            # ``io_functions_go`` (mirrors the Java / Rust SAFE303/SAFE304
+            # split). The ambiguous-as-method-name entries (``Get`` /
+            # ``Post`` / ``Do`` / ``Exec`` / ``Query``) are dropped here -
+            # flagging every non-I/O-named function that calls a ``Get`` /
+            # ``Query`` method would be too noisy; SAFE303 still catches
+            # them when the function name signals purity.
+            "io_functions_go": [
+                "Print",
+                "Println",
+                "Printf",
+                "Fprintf",
+                "ReadFile",
+                "WriteFile",
+                "Open",
+                "Create",
+                "Dial",
+                "Listen",
             ],
             "io_name_keywords": [
                 "print",
@@ -803,6 +849,51 @@ DEFAULTS: dict[str, Any] = {
                 #               form is in-process IPC, not a boundary
                 #               source.
             ],
+            # Go stdlib sink / sanitizer / source lists. Go has no
+            # ``eval``; the security surface is shell execution
+            # (``os/exec`` ``Command`` / ``CommandContext``), raw SQL
+            # (``database/sql`` ``Query`` / ``QueryRow`` / ``Exec``), and
+            # plugin loading (``plugin.Open``). ``call_name`` strips the
+            # package / receiver, so each entry is the bare method name.
+            #
+            # COLLISION RULE: matching is name-only, so a token in both
+            # ``sinks_go`` and ``sources_go`` is ambiguous. Sinks win -
+            # ``Query`` is kept here as a sink (``db.Query``) and is NOT
+            # listed in ``sources_go`` even though ``r.URL.Query()`` is a
+            # source, because the SQL-injection hazard dominates. ``Open``
+            # is the ``plugin.Open`` sink; it also matches ``os.Open``
+            # (a documented over-match accepted for an off-by-default rule).
+            "sinks_go": [
+                "Command",  # exec.Command(tainted)
+                "CommandContext",  # exec.CommandContext(ctx, tainted)
+                "Query",  # (*sql.DB).Query(rawSQL)
+                "QueryRow",  # (*sql.DB).QueryRow(rawSQL)
+                "Exec",  # (*sql.DB).Exec(rawSQL)
+                "Open",  # plugin.Open(tainted) (also matches os.Open)
+            ],
+            "sanitizers_go": [
+                # Narrow generic defaults - same trade-off as
+                # ``sanitizers_java`` / ``sanitizers_rust``. Context-specific
+                # encoders (``html.EscapeString`` / ``url.QueryEscape``)
+                # clear taint only for their own output context, so they
+                # are left to per-rule config rather than the global set.
+                "sanitize",
+                "validate",
+                "escape",
+                "quote",
+            ],
+            "sources_go": [
+                # Request / environment accessors whose RETURN value carries
+                # user data. ``os.Args`` is deliberately omitted - it is a
+                # slice expression, not a call, so the call-shaped tracker
+                # cannot taint it; ``Header.Get`` / bare ``Get`` are omitted
+                # because ``Get`` collides with too many unrelated methods.
+                # Users add either via ``sources_go`` config if needed.
+                "Getenv",  # os.Getenv(name)
+                "FormValue",  # (*http.Request).FormValue(key)
+                "PostFormValue",  # (*http.Request).PostFormValue(key)
+                "FormFile",  # (*http.Request).FormFile(key)
+            ],
         },
         "return_value_ignored": {
             "enabled": False,
@@ -937,6 +1028,32 @@ DEFAULTS: dict[str, Any] = {
                 "wait_with_output",
                 "try_wait",
                 "kill",
+            ],
+            # Go methods / functions that return an ``error`` (often as the
+            # last of several return values) carrying success / failure
+            # info. A bare-statement call (``f.Write(b)``) discards that
+            # error silently; the idiomatic explicit discards ``_ = f()``
+            # and ``x, _ := f()`` are assignments, not expression
+            # statements, so they never fire (Go's ``(void)``-cast
+            # analogue). ``call_name`` strips the receiver, so
+            # ``f.Close()`` resolves to ``"Close"``.
+            "flagged_calls_go": [
+                # io.Writer / os.File
+                "Write",
+                "Close",
+                # os filesystem mutators
+                "Remove",
+                "RemoveAll",
+                "Rename",
+                "Mkdir",
+                "MkdirAll",
+                "Chmod",
+                "Chown",
+                "Setenv",
+                "Truncate",
+                # database/sql transaction control
+                "Commit",
+                "Rollback",
             ],
         },
         "null_dereference": {
@@ -1135,6 +1252,28 @@ DEFAULTS: dict[str, Any] = {
                 "AtomicUsize",
                 "AtomicPtr",
             ],
+        },
+        # Go-idiom rules. Slotted into the 2xx error-handling band per the
+        # SafeLint rule-numbering policy; both are language-specific (no
+        # cross-language counterpart) and disabled by default so non-Go
+        # projects see no behaviour change. Opt in via
+        # [tool.safelint.rules.<name>] enabled = true.
+        "empty_error_check": {
+            "enabled": False,
+            "severity": "warning",
+            # Identifier names treated as the error variable in an
+            # ``if <name> != nil {}`` check. Default is Go's conventional
+            # ``err``; add project-specific names (``e`` / ``rerr``) here.
+            "error_names_go": ["err"],
+        },
+        "panic_calls_outside_tests": {
+            "enabled": False,
+            "severity": "warning",
+            # Call names that count as "panicking" in production code.
+            # Defaults to the builtin ``panic``; add ``log.Fatal`` /
+            # ``os.Exit`` resolved barewords (``Fatal`` / ``Fatalf`` /
+            # ``Exit``) if your project treats those as panic-equivalent.
+            "panic_calls_go": ["panic"],
         },
     },
 }

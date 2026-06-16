@@ -12,6 +12,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
@@ -33,36 +34,45 @@ if TYPE_CHECKING:
     from safelint.rules.base import Violation
 
 
-# Per-language: ``while``-statement node type. Python / JS / TS / Java
-# all use ``while_statement``; Rust uses ``while_expression`` (Rust
-# treats most control flow as expressions).
-_WHILE_STATEMENT_BY_LANG: dict[str, str] = {
+# Per-language: ``while``-statement node type, or None for languages with
+# no ``while`` keyword. Python / JS / TS / Java use ``while_statement``;
+# Rust uses ``while_expression``; Go has no ``while`` at all - its only
+# loop keyword is ``for``, and the infinite form (bare ``for {}``) is
+# handled through the unconditional-loop path below, not here.
+_WHILE_STATEMENT_BY_LANG: dict[str, str | None] = {
     "python": WHILE_STATEMENT,
     "javascript": "while_statement",
     "typescript": "while_statement",
     "java": "while_statement",
     "rust": "while_expression",
+    "go": None,
 }
 
 # Per-language: unconditional-``loop`` construct, or None if the
 # language has no equivalent. Rust's ``loop { }`` is the idiomatic
 # infinite loop and is the headline SAFE501 case for Rust source.
+# Go reuses ``for_statement`` here: a bare ``for {}`` (no condition,
+# clause, or range header) is Go's ``while true``. Because the same
+# node type also covers bounded ``for`` loops, ``_check_loop_node``
+# guards on :func:`_is_go_infinite_for` so only the bare form fires.
 _INFINITE_LOOP_STATEMENT_BY_LANG: dict[str, str | None] = {
     "python": None,
     "javascript": None,
     "typescript": None,
     "java": None,
     "rust": "loop_expression",
+    "go": "for_statement",
 }
 
-# Per-language: ``break`` statement node type. Python / JS / TS / Java
-# share ``break_statement``; Rust uses ``break_expression``.
+# Per-language: ``break`` statement node type. Python / JS / TS / Java /
+# Go share ``break_statement``; Rust uses ``break_expression``.
 _BREAK_STATEMENT_BY_LANG: dict[str, str] = {
     "python": BREAK_STATEMENT,
     "javascript": "break_statement",
     "typescript": "break_statement",
     "java": "break_statement",
     "rust": "break_expression",
+    "go": "break_statement",
 }
 
 # Per-language: literal-``true`` condition node type. Python / JS / TS
@@ -82,14 +92,15 @@ _TRUE_LITERAL_BY_LANG: dict[str, str] = {
 # Per-language: the node type used by a labelled-break's argument.
 # JavaScript wraps the label in a dedicated ``statement_identifier`` node;
 # Java uses a plain ``identifier``. Rust uses a ``label`` wrapper
-# (whose inner ``identifier`` carries the name). Python has no
-# labelled break.
+# (whose inner ``identifier`` carries the name). Go uses a ``label_name``
+# node (``break outer``). Python has no labelled break.
 _BREAK_LABEL_TYPE_BY_LANG: dict[str, str | None] = {
     "python": None,
     "javascript": "statement_identifier",
     "typescript": "statement_identifier",
     "java": "identifier",
     "rust": "label",
+    "go": "label_name",
 }
 
 # Per-language: node types that bound a ``break`` statement's scope -
@@ -126,12 +137,24 @@ _RUST_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
     "loop_expression",
     *sorted(_RUST_FUNCTION_TYPES),
 )
+# Go: a nested ``for`` stops a bare ``break`` from referring to the outer
+# loop, and ``break`` inside a ``switch`` / ``select`` exits THAT construct
+# (not the enclosing loop) - so the two switch forms and ``select`` are
+# boundaries too, the same way Java's ``switch_expression`` is.
+_GO_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
+    "for_statement",
+    "expression_switch_statement",
+    "type_switch_statement",
+    "select_statement",
+    *sorted(_GO_FUNCTION_TYPES),
+)
 _BREAK_SCOPE_BOUNDARIES_BY_LANG: dict[str, tuple[str, ...]] = {
     "python": (FOR_STATEMENT, WHILE_STATEMENT, FUNCTION_DEF, ASYNC_FUNCTION_DEF),
     "javascript": _JS_BREAK_SCOPE_BOUNDARIES,
     "typescript": _JS_BREAK_SCOPE_BOUNDARIES,
     "java": _JAVA_BREAK_SCOPE_BOUNDARIES,
     "rust": _RUST_BREAK_SCOPE_BOUNDARIES,
+    "go": _GO_BREAK_SCOPE_BOUNDARIES,
 }
 
 
@@ -167,7 +190,25 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
+    "go": _GO_FUNCTION_TYPES,
 }
+
+
+def _is_go_infinite_for(node: tree_sitter.Node) -> bool:
+    """Return True if *node* is a bare ``for {}`` (Go's ``while true``).
+
+    Go's only loop keyword is ``for``; the bare form with no condition,
+    no three-clause ``for_clause`` header, and no ``range_clause`` is the
+    unconditional infinite loop. Those bounded forms each add a header
+    named child alongside the ``body`` block, so a loop whose only
+    non-comment named child is its body is the infinite form.
+    """
+    # Compare by ``.id`` (stable per underlying node), not ``is``:
+    # tree-sitter hands out a fresh Python wrapper on every access, so
+    # ``child is body`` is always False even for the same node.
+    body = node.child_by_field_name("body")
+    body_id = body.id if body is not None else None
+    return all(child.id == body_id or child.type == "comment" for child in node.named_children)
 
 
 def _rust_label_name(label_node: tree_sitter.Node) -> str | None:
@@ -212,15 +253,38 @@ def _node_label_name(node: tree_sitter.Node, lang_name: str) -> str | None:
       attached to the break itself.
     """
     if lang_name == "rust":
-        if node.type not in _RUST_LABELABLE_NODE_TYPES:
-            return None
-        label = next((c for c in node.named_children if c.type == "label"), None)
-        return None if label is None else _rust_label_name(label)
+        return _rust_node_label_name(node)
     if node.type != "labeled_statement":
         return None
+    return _labeled_statement_name(node, lang_name)
+
+
+def _rust_node_label_name(node: tree_sitter.Node) -> str | None:
+    """Return the label name on a Rust loop node, or None.
+
+    Rust labels are a direct ``label`` named child of a loop expression
+    (no ``labeled_statement`` wrapper); only the loop-expression types in
+    :data:`_RUST_LABELABLE_NODE_TYPES` count.
+    """
+    if node.type not in _RUST_LABELABLE_NODE_TYPES:
+        return None
+    label = next((c for c in node.named_children if c.type == "label"), None)
+    return None if label is None else _rust_label_name(label)
+
+
+def _labeled_statement_name(node: tree_sitter.Node, lang_name: str) -> str | None:
+    """Return the label name on a ``labeled_statement`` (JS / TS / Java / Go).
+
+    Java's label is the first ``identifier`` named child; Go's is a
+    ``label_name`` child (``outer: for { ... }``); JS / TS expose it on the
+    ``label`` field (a ``statement_identifier``).
+    """
     if lang_name == "java":
         ident = next((c for c in node.named_children if c.type == "identifier"), None)
         return node_text(ident) if ident is not None else None
+    if lang_name == "go":
+        label_name = next((c for c in node.named_children if c.type == "label_name"), None)
+        return node_text(label_name) if label_name is not None else None
     label = node.child_by_field_name("label")
     return node_text(label) if label is not None else None
 
@@ -306,7 +370,7 @@ def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
     """
     if _has_direct_break(while_node, lang_name):
         return True
-    if lang_name not in ("javascript", "typescript", "java", "rust"):
+    if lang_name not in ("javascript", "typescript", "java", "rust", "go"):
         return False
     return _has_outward_labelled_break(while_node, lang_name)
 
@@ -345,7 +409,7 @@ class UnboundedLoopRule(BaseRule):
 
     name = "unbounded_loops"
     code = "SAFE501"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "go")
 
     @staticmethod
     def _while_true_construct(lang_name: str) -> str:
@@ -401,14 +465,19 @@ class UnboundedLoopRule(BaseRule):
         return None
 
     def _check_loop_node(self, filepath: str, node: tree_sitter.Node, lang_name: str) -> Violation | None:
-        """Return a violation if Rust's unconditional ``loop { }`` lacks a break."""
+        """Return a violation if an unconditional loop lacks an exiting break.
+
+        Covers Rust's ``loop { }`` and Go's bare ``for {}``. For Go the
+        ``for_statement`` node type also represents bounded loops, so only
+        the headerless infinite form (see :func:`_is_go_infinite_for`) is
+        considered; bounded ``for`` loops return ``None`` immediately.
+        """
+        if lang_name == "go" and not _is_go_infinite_for(node):
+            return None
         if _has_exiting_break(node, lang_name):
             return None
-        return self._make_violation_for_node(
-            filepath,
-            node,
-            "loop has no break - potential infinite loop",
-        )
+        message = "`for {}` loop has no break - potential infinite loop" if lang_name == "go" else "loop has no break - potential infinite loop"
+        return self._make_violation_for_node(filepath, node, message)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag while / loop constructs that may be infinite."""

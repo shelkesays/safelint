@@ -142,12 +142,13 @@ repos:
         entry: uv run --extra dev safelint
         args: [--fail-on=error]
         # `types_or` so adding a language is a one-line append (e.g.
-        # `- ts` for TypeScript). With only Python registered today the
-        # filter is identical to the previous `types: [python]`. SafeLint
-        # itself drops anything not in `supported_extensions()` defensively;
-        # this filter just keeps non-source files (Markdown, Makefiles)
-        # from reaching the hook in the first place.
-        types_or: [python, javascript]
+        # `- ts` for TypeScript). SafeLint itself drops anything not in
+        # `supported_extensions()` defensively; this filter just keeps
+        # non-source files (Markdown, Makefiles) from reaching the hook in
+        # the first place. safelint's own ``src/`` is Python today, so only
+        # the tags it could actually contain are listed here; the published
+        # manifest in ``.pre-commit-hooks.yaml`` carries every language.
+        types_or: [python, javascript, go]
         files: ^src/
         # Mirror the published hook spec in ``.pre-commit-hooks.yaml``: one
         # process per run so the suppression summary aggregates across all

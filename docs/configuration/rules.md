@@ -20,26 +20,29 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 - **TypeScript** (`.ts`, `.tsx`), and **AssemblyScript** (`.as`, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, `as` casts, non-null assertions, `declare global` ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See [TypeScript](../languages/typescript.md) for the full language reference.
 - **Java** (`.java`), new in v2.1.0. 20 rules apply (the 15 cross-language core plus the 5 also registered for Python / JS / TS) plus 4 Spring Boot framework-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* (sinks, nullable methods, structural rule enablement) are switchable via the [`[tool.safelint.java] framework = "..."`](../languages/java.md#framework-presets) preset (`vanilla` / `spring-boot`). See [Java](../languages/java.md) for the full language reference.
 - **Rust** (`.rs`), new in v2.2.0. 15 of the cross-language rules port cleanly (the all-five-languages set) plus 11 Rust-only rules cover Rust-idiom-specific patterns (panic-in-non-test, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer parameters, broad `.unwrap()` outside tests, interior-mutable `static`s, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). 7 rules deliberately skipped for Rust because their semantics don't translate cleanly (Rust has no try/catch / `global` keyword, RAII / Drop covers resource cleanup, and macros are opaque to the rule-8 dynamic-execution check). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. See [Rust](../languages/rust.md) for the full language reference.
+- **Go** (`.go`), new in v2.5.0. 18 cross-language rules apply (the 13 all-six core plus SAFE302 / SAFE309 / SAFE401, which Go shares with the JS family and Java but Rust skips, plus SAFE303 / SAFE304) and 2 Go-only rules cover Go-idiom patterns: SAFE209 (`empty_error_check`, the empty `if err != nil {}` swallow) and SAFE211 (`panic_calls_outside_tests`). 7 rules deliberately skipped for Go because their semantics don't translate cleanly (no try/catch, no `global` keyword, no `var` hoisting, no production assertion idiom, no chained-nullable idiom). Headline Go adaptations: the bare `for {}` infinite loop (SAFE501), the sibling `foo_test.go` convention (SAFE701 / SAFE702), the `_ = f()` explicit-discard exemption (SAFE802), and the `defer x.Close()` resource form (SAFE401). See [Go](../languages/go.md) for the full language reference.
 
 ### Planned
 
 Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see [Adding a language](../contributing/adding-a-language.md)) makes each new language incremental, community contributions for any of these are welcome.
 
-1. **Go** (`.go`).
-2. **C** (`.c`, `.h`), Holzmann's original target language.
-3. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
-4. **PHP** (`.php`).
+1. **C** (`.c`, `.h`), Holzmann's original target language.
+2. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
+3. **PHP** (`.php`).
 
 ### Rule scope (current languages)
 
 | Scope | Count | Codes |
 |---|---|---|
-| **Cross-language** (Python, JavaScript, TypeScript, Java, Rust) | 15 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE105 (`no_recursion`), SAFE303, SAFE304, SAFE501, SAFE601, SAFE603 (`blanket_suppression`), SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 (apply to all five). |
-| **Python / JS / TS / Java** (not Rust) | 5 | SAFE202 (`empty_except`), SAFE203 (`logging_on_error`), SAFE302 (`global_mutation`), SAFE309 (`dynamic_code_execution`), SAFE401 (`resource_lifecycle`). Rust's analogues are covered separately: SAFE206 / SAFE207 (try/catch), SAFE307 + SAFE602 (mutable statics), Drop (resource lifecycle), and macros are an opaque token-tree limitation for rule 8. |
-| **Python-only** | 2 | SAFE201 (`bare_except`), SAFE301 (`global_state`); JS / TS / Java / Rust have no `global` keyword and JS / TS / Java catches always bind the error. |
-| **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`); Python / Java / Rust have no `var` / `let` / `const` distinction. |
+| **Cross-language** (all six: Python, JavaScript, TypeScript, Java, Rust, Go) | 13 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE105 (`no_recursion`), SAFE303, SAFE304, SAFE501, SAFE603 (`blanket_suppression`), SAFE701, SAFE702, SAFE801, SAFE802 (apply to all six). |
+| **Python / JS / TS / Java / Rust** (not Go) | 2 | SAFE601 (`missing_assertions`), SAFE803 (`null_dereference`); Go has no production assertion idiom and no chained-nullable idiom (nil-pointer analysis needs type information). |
+| **Python / JS / TS / Java / Go** (not Rust) | 3 | SAFE302 (`global_mutation`), SAFE309 (`dynamic_code_execution`), SAFE401 (`resource_lifecycle`). Rust's analogues are covered separately: SAFE307 + SAFE602 (mutable statics), Drop (resource lifecycle), and macros are an opaque token-tree limitation for rule 8. Go fires on package-level `var` (SAFE302), reflection / plugin loading (SAFE309), and the `defer x.Close()` form (SAFE401). |
+| **Python / JS / TS / Java** (not Rust, not Go) | 2 | SAFE202 (`empty_except`), SAFE203 (`logging_on_error`). Neither Rust nor Go has try/catch; Rust's analogues are SAFE206 / SAFE207, and Go's empty-`if err != nil` swallow is covered by SAFE209. |
+| **Python-only** | 2 | SAFE201 (`bare_except`), SAFE301 (`global_state`); JS / TS / Java / Rust / Go have no `global` keyword and JS / TS / Java catches always bind the error. |
+| **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`); Python / Java / Rust / Go have no `var` / `let` / `const` distinction. |
 | **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`); all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset. |
 | **Rust-only** | 11 | SAFE110 (`needless_mut`), SAFE112 (`unchecked_arithmetic_on_input`), SAFE204 (`panic_macros_outside_tests`), SAFE205 (`lock_poisoning_ignored`), SAFE206 (`silent_result_discard`, the Rust analogue of SAFE202), SAFE207 (`unlogged_error_branch`, the Rust analogue of SAFE203), SAFE208 (`result_unwrap_outside_tests`), SAFE306 (`dangerous_mem_ops`), SAFE307 (`interior_mutable_static`), SAFE308 (`truncating_as_cast`), SAFE602 (`undocumented_unsafe`); all default-disabled. |
+| **Go-only** | 2 | SAFE209 (`empty_error_check`, the Go analogue of SAFE206), SAFE211 (`panic_calls_outside_tests`, the Go analogue of SAFE204); both default-disabled. |
 
 The engine's per-language dispatch automatically skips rules whose `language` tuple doesn't include the active file's language. There's no manual configuration to do, drop a `.py` file in a JS / TS project (or vice versa) and the right rules fire on each.
 
@@ -333,7 +336,7 @@ severity = "warning"
 
 **JavaScript:** function-body writes, `assignment_expression`, `augmented_assignment_expression`, or `update_expression` (`++` / `--`), whose target is a `member_expression` or `subscript_expression` rooted in a configured global namespace. The receiver chain is walked leftward, `process.env.NODE_ENV = '...'`, `process.env['NODE_ENV'] = '...'`, and `process.exitCode++` all resolve to `process` and fire. Bracket-notation writes (`globalThis['x'] = 1`, `window["config"] = {}`) work the same way as dot access. The default namespace list (`global_namespaces_javascript`) is `["globalThis", "window", "global", "self", "process"]`; runtime presets adjust this (browser drops `process`, adds `document`; Deno adds `Deno`, drops `window` and `process`). Module-level (top-of-file) writes do NOT fire, that's setup, not the bug pattern. Reading a global (`return globalThis.env;`) does NOT fire, only writes.
 
-**Java** *(added in 2.4.0):* non-final `static` field declarations. This is **declaration-site** detection, not write-site: a mutable static field IS the smallest-scope violation regardless of where it is written, and a single tree walk over field declarations has near-zero false positives (the same shape PMD's `MutableStaticState` flags). `static final` fields are clean, even when the referent is interiorly mutable (`static final List<String> CACHE = new ArrayList<>()`) - detecting interior mutability would need type resolution safelint does not do, so it is a documented exclusion. Instance fields and local variables never fire. Interface fields are implicitly `public static final` and so are never flagged. This fulfils the Java SAFE302 work previously deferred in the language docs. **Rust** is not covered by SAFE302: `static mut` is unsafe-gated (SAFE602's territory) and safe interior-mutable statics are covered by SAFE307 (`interior_mutable_static`).
+**Java** *(added in 2.4.0):* non-final `static` field declarations. This is **declaration-site** detection, not write-site: a mutable static field IS the smallest-scope violation regardless of where it is written, and a single tree walk over field declarations has near-zero false positives (the same shape PMD's `MutableStaticState` flags). `static final` fields are clean, even when the referent is interiorly mutable (`static final List<String> CACHE = new ArrayList<>()`) - detecting interior mutability would need type resolution safelint does not do, so it is a documented exclusion. Instance fields and local variables never fire. Interface fields are implicitly `public static final` and so are never flagged. This fulfils the Java SAFE302 work previously deferred in the language docs. **Rust** is not covered by SAFE302: `static mut` is unsafe-gated (SAFE602's territory) and safe interior-mutable statics are covered by SAFE307 (`interior_mutable_static`). **Go** *(added in 2.5.0):* declaration-site detection on every package-level `var`, including sentinel errors (`var ErrNotFound = errors.New(...)`) - the rule does not special-case the initialiser, so treat sentinels as immutable by suppressing with a per-file ignore or `//nosafe` if desired. `const` declarations and block-scoped `var` / `:=` inside functions are clean.
 
 | Option | Default | Description |
 |---|---|---|
@@ -538,7 +541,7 @@ Per-language defaults (call names):
 - **JavaScript / TypeScript** (`dynamic_exec_calls_javascript`): `eval`, `Function` (both `new Function(...)` and the bare `Function(...)` call), `execScript`. A bare-identifier callee is required, so `obj.eval()` does not fire. `setTimeout` / `setInterval` with a string first argument (the implicit-eval form) are deliberately not in the defaults: flagging every `setTimeout` would be noise, and detecting only the string-argument form is not worth the complexity for a near-extinct idiom; add them via the config list if your codebase still uses the string form.
 - **Java** (`dynamic_exec_calls_java`): `forName` (`Class.forName`), `invoke` (`Method.invoke`), `eval` (JSR-223 `ScriptEngine`), `defineClass`, `loadClass`. Matched by method name regardless of receiver, so a user-defined `forName` would also match (acceptable for an off-by-default rule).
 
-**Rust** is excluded: its rule-8 analogue is the macro system, whose bodies parse as opaque token trees (a documented limitation shared with SAFE801), and `panic`-family macros already have SAFE204.
+**Rust** is excluded: its rule-8 analogue is the macro system, whose bodies parse as opaque token trees (a documented limitation shared with SAFE801), and `panic`-family macros already have SAFE204. **Go** *(added in 2.5.0):* Go has no `eval`; the rule-8 surface is reflection (`reflect` `Call` / `CallSlice` / `MethodByName`) and plugin loading (`plugin` `Open` / `Lookup`), via `dynamic_exec_calls_go`. Matching is by bare method name, so `Open` also matches `os.Open` - narrow the list if noisy.
 
 | Option | Default | Description |
 |---|---|---|
@@ -1522,5 +1525,103 @@ unsafe {
 // value is a Copy type so this can't leak Drop.
 unsafe {
     std::ptr::write(dst, value);
+}
+```
+
+## Go-only rules
+
+The following 2 rules apply only to Go source. They cover Go-idiom patterns the cross-language rules don't translate to cleanly (Go has no try/catch, so the swallowed-error and panic-placement hazards take Go-specific shapes). Both ship disabled by default; opt in via `[tool.safelint.rules.<name>] enabled = true`. See [Go](../languages/go.md) for the full language reference including idiomatic fix patterns.
+
+### SAFE209: `empty_error_check`
+
+**What it flags:** an `if err != nil { }` (or `== nil`) whose body is empty or comment-only. Go only.
+
+Go's error handling is explicit: a function returns an `error` and the caller checks it. Writing the check and then leaving the body empty silently swallows the failure, which is worse than not checking at all (it looks handled). This is Go's analogue of Rust's SAFE206 (`silent_result_discard`) and the spirit of Python's SAFE202 (`empty_except`). A comment-only body fires too: the error was acknowledged and still ignored.
+
+The error identifier is configurable; the default matches Go's conventional `err`. The comparison operand order is not assumed (`err != nil` and `nil != err` both match).
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+| `error_names_go` | `["err"]` | Identifier names treated as the error variable |
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.empty_error_check]
+enabled = true
+error_names_go = ["err", "e", "rerr"]
+```
+
+```toml
+# safelint.toml
+[rules.empty_error_check]
+enabled = true
+error_names_go = ["err", "e", "rerr"]
+```
+
+**Bad:**
+
+```go
+if err != nil {}   // SAFE209 - the error was checked and dropped
+```
+
+**Good:**
+
+```go
+if err != nil {
+    return fmt.Errorf("read config: %w", err)
+}
+```
+
+### SAFE211: `panic_calls_outside_tests`
+
+**What it flags:** `panic(...)` calls in non-`_test.go` files. Go only.
+
+Production Go code should return an `error` up the call stack, not unwind it with `panic`. A `panic` in a library forces every caller to recover or crash, defeating Go's explicit-error contract (Holzmann rule 1, simple control flow). Test files (`_test.go`) are exempt - a `panic` there is an acceptable test-failure signal, mirroring how Rust's SAFE204 exempts `#[test]` / `#[cfg(test)]` contexts.
+
+The flagged call set is configurable; add the resolved barewords `Fatal` / `Fatalf` / `Exit` if your project treats `log.Fatal*` / `os.Exit` as panic-equivalent.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+| `panic_calls_go` | `["panic"]` | Call names that count as panicking |
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.panic_calls_outside_tests]
+enabled = true
+panic_calls_go = ["panic", "Fatal", "Exit"]
+```
+
+```toml
+# safelint.toml
+[rules.panic_calls_outside_tests]
+enabled = true
+panic_calls_go = ["panic", "Fatal", "Exit"]
+```
+
+**Bad:**
+
+```go
+func mustParse(s string) Config {
+    c, err := parse(s)
+    if err != nil {
+        panic(err)   // SAFE211
+    }
+    return c
+}
+```
+
+**Good:**
+
+```go
+func parseConfig(s string) (Config, error) {
+    c, err := parse(s)
+    if err != nil {
+        return Config{}, fmt.Errorf("parse config: %w", err)
+    }
+    return c, nil
 }
 ```

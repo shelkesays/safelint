@@ -88,6 +88,12 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
     if lang_name == "rust":
         stem = src_path.stem
         return [f"{stem}{suf}.rs" for suf in _RUST_TEST_SUFFIXES]
+    if lang_name == "go":
+        # Go's convention is a sibling ``<stem>_test.go`` in the SAME
+        # directory as the source - there is no ``tests/`` directory idiom.
+        # The same-directory lookup is handled in ``_find_test_file``;
+        # ``test_dirs`` does not apply to Go.
+        return [f"{src_path.stem}_test.go"]
     # Python (and any future language without an explicit override).
     return [f"test_{src_path.stem}.py"]
 
@@ -113,12 +119,21 @@ def _test_filename_for_message(src_path: Path, lang_name: str) -> str:
         # see this message since the rule's tree-walk bypass clears
         # the violation before the message is built.
         return f"{src_path.stem}.rs"
+    if lang_name == "go":
+        return f"{src_path.stem}_test.go"
     return f"test_{src_path.stem}.py"
 
 
 def _find_test_file(src_path: Path, test_dirs: list[str], lang_name: str) -> bool:
-    """Return True if any candidate test filename for *src_path* exists under *test_dirs*."""
+    """Return True if any candidate test filename for *src_path* can be found.
+
+    Go looks for the sibling ``<stem>_test.go`` in the source file's own
+    directory (its convention has no ``tests/`` idiom); every other
+    language searches under the configured ``test_dirs``.
+    """
     candidates = _candidate_test_filenames(src_path, lang_name)
+    if lang_name == "go":
+        return any((src_path.parent / name).exists() for name in candidates)
     return any(_test_dir_contains(Path(d), candidates) for d in test_dirs)
 
 
@@ -164,7 +179,9 @@ def _filename_matches_test_pattern(filepath: str, lang_name: str) -> bool:
         return ".test." in name or ".spec." in name
     if lang_name == "java":
         return any(Path(filepath).stem.endswith(suf) for suf in _JAVA_TEST_SUFFIXES)
-    if lang_name == "rust":
+    if lang_name in ("rust", "go"):
+        # Rust: colocated ``<stem>_test.rs``. Go: sibling ``<stem>_test.go``.
+        # Both mark the file itself as a test via the ``_test`` stem suffix.
         return Path(filepath).stem.endswith("_test")
     return name.startswith("test_")
 
@@ -235,6 +252,12 @@ def _paired_test_in_changed_under_test_dirs(src: Path, changed: set[str], test_d
     comparison so a relative ``changed_files`` entry and an absolute
     ``test_dirs`` entry still match - mirrors :func:`_is_test_file`.
     """
+    if lang_name == "go":
+        # Go's paired test is a sibling in the SAME directory, so match the
+        # exact ``<dir>/<stem>_test.go`` path in the changed set rather than
+        # a basename-under-test_dirs match.
+        targets = {(src.parent / name).absolute() for name in _candidate_test_filenames(src, lang_name)}
+        return any(Path(f).absolute() in targets for f in changed)
     candidates = _candidate_test_filenames(src, lang_name)
     td_parts_list = [Path(td).absolute().parts for td in test_dirs]
     changed_under_test_dirs = {f for f in changed if any(_path_components_contain(Path(f).absolute().parts, td_parts) for td_parts in td_parts_list)}
@@ -259,7 +282,7 @@ class TestExistenceRule(BaseRule):
 
     name = "test_existence"
     code = "SAFE701"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "go")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when no matching test file can be found.
@@ -281,12 +304,12 @@ class TestExistenceRule(BaseRule):
         if _find_test_file(src, test_dirs, lang_name):
             return []
         expected = _test_filename_for_message(src, lang_name)
-        dirs = ", ".join(test_dirs)
+        location = "alongside it" if lang_name == "go" else f"under {', '.join(test_dirs)}/"
         return [
             self._make_violation(
                 filepath,
                 0,
-                f"No test file found for {src.name} - expected {expected} under {dirs}/",
+                f"No test file found for {src.name} - expected {expected} {location}",
             )
         ]
 
@@ -305,7 +328,7 @@ class TestCouplingRule(BaseRule):
 
     name = "test_coupling"
     code = "SAFE702"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "go")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when the paired test file was not part of this commit."""
@@ -339,11 +362,11 @@ class TestCouplingRule(BaseRule):
             return []
 
         expected = _test_filename_for_message(src, lang_name)
-        dirs = ", ".join(test_dirs)
+        location = "in the same directory" if lang_name == "go" else f"under {', '.join(test_dirs)}/"
         return [
             self._make_violation(
                 filepath,
                 0,
-                f"{src.name} changed but {expected} was not updated - tests must be updated alongside source changes (under {dirs}/)",
+                f"{src.name} changed but {expected} was not updated - tests must be updated alongside source changes ({location})",
             )
         ]

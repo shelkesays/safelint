@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
@@ -35,6 +36,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
+    "go": _GO_FUNCTION_TYPES,
 }
 
 # Node types that add 1 to cyclomatic complexity. Both languages: every
@@ -97,6 +99,23 @@ _RUST_BRANCHING_TYPES = frozenset(
         "try_expression",
     }
 )
+# Go: ``if`` / ``for`` (the only loop keyword - all four forms parse as
+# ``for_statement``) are control-flow branches. Each switch / select arm
+# adds one branch: ``expression_case`` (value switch), ``type_case``
+# (type switch), and ``communication_case`` (select). The ``default_case``
+# is deliberately excluded - it is the fall-through "else" and adds no
+# decision, the same way Python's bare ``else`` is not counted. ``&&`` /
+# ``||`` add complexity inside ``binary_expression`` (operator filter
+# below); Go has no ternary and no ``??``.
+_GO_BRANCHING_TYPES = frozenset(
+    {
+        "if_statement",
+        "for_statement",
+        "expression_case",
+        "type_case",
+        "communication_case",
+    }
+)
 _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset(
         {
@@ -114,6 +133,7 @@ _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_BRANCHING_TYPES,
     "java": _JAVA_BRANCHING_TYPES,
     "rust": _RUST_BRANCHING_TYPES,
+    "go": _GO_BRANCHING_TYPES,
 }
 
 # JavaScript: ``binary_expression`` covers many operators (``+``, ``>``,
@@ -130,6 +150,9 @@ _JAVA_BRANCHING_BINARY_OPS = frozenset({"&&", "||"})
 # binary operator, and is already counted via the branching-types set).
 _RUST_BRANCHING_BINARY_OPS = frozenset({"&&", "||"})
 
+# Go: ``&&`` / ``||`` short-circuit like the others; no ``??``.
+_GO_BRANCHING_BINARY_OPS = frozenset({"&&", "||"})
+
 # Per-language allow-list for ``binary_expression`` operators that add
 # one to cyclomatic complexity. Languages absent from this map (e.g.
 # Python, where ``boolean_operator`` is its own node type) fall through
@@ -139,6 +162,7 @@ _BRANCHING_BINARY_OPS_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_BRANCHING_BINARY_OPS,
     "java": _JAVA_BRANCHING_BINARY_OPS,
     "rust": _RUST_BRANCHING_BINARY_OPS,
+    "go": _GO_BRANCHING_BINARY_OPS,
 }
 
 
@@ -147,7 +171,7 @@ class ComplexityRule(BaseRule):
 
     name = "complexity"
     code = "SAFE104"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "go")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions whose cyclomatic complexity exceeds the configured maximum."""

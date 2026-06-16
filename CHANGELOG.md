@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+**Go is now a supported language alongside Python, JavaScript, TypeScript, Java, and Rust.** `.go` files are discovered, parsed via Tree-sitter, and run against 18 cross-language rules plus two new Go-only rules, for a total of **40 rules** safelint now ships (15 on by default, 25 opt-in). Go support installs via the new `[go]` extra (`pip install 'safelint[go]'`); the base install still ships no grammars. Additive per the project's semver policy (a new language is MINOR, never MAJOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.
+
+### Added
+
+- **Go as the 6th registered language.** `.go` files are discovered, parsed via Tree-sitter (`tree-sitter-go`, shipped in the opt-in `[go]` extra), and dispatched to the Go-aware rule implementations. 18 cross-language rules apply: the 13 all-six core (SAFE101-105, SAFE303, SAFE304, SAFE501, SAFE603, SAFE701, SAFE702, SAFE801, SAFE802) plus SAFE302 (`global_mutation`), SAFE309 (`dynamic_code_execution`), and SAFE401 (`resource_lifecycle`), which Go shares with the JS family and Java. See the [Go language page](https://shelkesays.github.io/safelint/languages/go/) for the full reference.
+- **SAFE209 `empty_error_check` (Go-only, disabled by default).** Flags `if err != nil { }` (or `== nil`) with an empty or comment-only body - the error was checked and then silently swallowed. The Go analogue of Rust's SAFE206; the error identifier is configurable via `error_names_go` (default `["err"]`).
+- **SAFE211 `panic_calls_outside_tests` (Go-only, disabled by default).** Flags `panic(...)` calls in non-`_test.go` files; production paths should return an `error` rather than unwind the stack. The Go analogue of Rust's SAFE204; configurable via `panic_calls_go` (default `["panic"]`).
+- **Go-specific rule adaptations.** SAFE501 flags the bare `for {}` infinite loop (Go's only loop keyword) with labelled-break resolution; SAFE701 / SAFE702 use the sibling `foo_test.go` convention rather than a `tests/` directory; SAFE802's explicit-discard exemption recognises Go's `_ = f()` and `x, _ := f()` forms; SAFE401 checks for a `defer x.Close()` in the same function body; SAFE105 recognises receiver-qualified self-recursion (`s.Walk(...)`). A new `analysis/dataflow_go.py` taint tracker (iterative worklists) backs SAFE801 / SAFE802. Seven rules are deliberately skipped for Go (SAFE201, SAFE202, SAFE203, SAFE301, SAFE305, SAFE601, SAFE803) because their semantics don't translate cleanly; the rationale is in the language page's "Rules not registered" section.
+- **Bundled Go skill addendum + per-client docs.** `skill_files/languages/go.md` plus Go rows in all 14 AI-client skill files, so every bundled agent knows safelint can lint `.go` and how the Go-specific rules behave.
+
 ### Documentation
 
 - **Development guidance is now version-controlled.** `CLAUDE.md` (the Claude Code project guide), the `add-language-support` development skill (`.claude/skills/add-language-support/`), and the language-expansion plans (`plan/01-go.md` through `plan/04-php.md` plus `plan/README.md`) are tracked, reversing the old keep-CLAUDE.md-local convention: the skill and the plans reference CLAUDE.md's checklists, so the three travel together. Machine-local Claude Code state (`.claude/settings.local.json`, the installed `.claude/skills/safelint/` copy) stays ignored.
@@ -816,7 +826,7 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.2.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.4.0...HEAD
 [2.2.0]: https://github.com/shelkesays/safelint/compare/v2.2.0rc3...v2.2.0
 [2.2.0rc3]: https://github.com/shelkesays/safelint/compare/v2.2.0rc2...v2.2.0rc3
 [2.2.0rc2]: https://github.com/shelkesays/safelint/compare/v2.2.0rc1...v2.2.0rc2
