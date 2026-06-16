@@ -205,11 +205,16 @@ def _java_type_name(type_node: tree_sitter.Node) -> str | None:
 # * Rust ``scoped_identifier`` (``std::fs::read``) - trailing identifier
 #   on ``name``. Returning just the bareword keeps sink-list configs
 #   short - users don't have to enumerate every plausible qualifier.
+# * Go ``selector_expression`` (``fmt.Println`` / ``recv.Method``) -
+#   trailing bareword on ``field``. Returning just ``Println`` keeps
+#   the ``*_go`` sink / I/O lists short (users list ``Println``, not
+#   every package that exposes it).
 _CALLEE_BAREWORD_FIELD: dict[str, str] = {
     "attribute": "attribute",
     "member_expression": "property",
     "field_expression": "field",
     "scoped_identifier": "name",
+    "selector_expression": "field",
 }
 
 

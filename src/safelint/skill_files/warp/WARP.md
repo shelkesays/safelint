@@ -21,6 +21,7 @@ If either check returns non-zero (or the shell reports "command not found" / "is
   | `.ts` / `.tsx` / `.as` | `uv add 'safelint[typescript]'` or `pip install 'safelint[typescript]'` (bundles JS) |
   | `.java` | `uv add 'safelint[java]'` or `pip install 'safelint[java]'` (Spring Boot via `[tool.safelint.java] framework = "spring-boot"`, see `languages/java.md`) |
   | `.rs` | `uv add 'safelint[rust]'` or `pip install 'safelint[rust]'` (Rust-specific rules and Holzmann-inspired additions; see `languages/rust.md`) |
+  | `.go` | `uv add 'safelint[go]'` or `pip install 'safelint[go]'` (Go-specific rules and idiomatic adaptations; see `languages/go.md`) |
   | Multiple languages | Compose, e.g. `pip install 'safelint[python,javascript]'` |
   | Unsure / kitchen-sink | `pip install 'safelint[all]'` |
 
@@ -41,10 +42,11 @@ Look at the project files in cwd to figure out which languages safelint can lint
 | TypeScript (also AssemblyScript) | `.ts`, `.tsx`, `.as` | `languages/typescript.md` |
 | Java (vanilla and Spring Boot) | `.java` | `languages/java.md` |
 | Rust | `.rs` | `languages/rust.md` |
+| Go | `.go` | `languages/go.md` |
 
 (More languages will land over time. To check the live list, run `safelint list-rules --format json` and look at the `languages` field on the returned rules. The legacy lookup is still `python -c "from safelint.languages import supported_extensions; print(sorted(supported_extensions()))"`.)
 
-If the user's project has files matching one or more registered languages, proceed. If safelint doesn't yet support the language they're working in (e.g. they have only `.go` files), tell them so plainly; don't run safelint just to report "0 files checked".
+If the user's project has files matching one or more registered languages, proceed. If safelint doesn't yet support the language they're working in (e.g. they have only `.c` / `.cpp` files), tell them so plainly; don't run safelint just to report "0 files checked".
 
 For deeper, language-specific guidance (install nuance, idiomatic fixes, language-specific rule notes), read the matching `languages/<lang>.md` file from the bundled skill directory. Locate it with `safelint skill path` (prints the on-disk root); the addendums sit at `<that path>/languages/<lang>.md`. Skip the read if the user's request doesn't need that depth (e.g. a simple "run safelint and show me the count").
 
@@ -161,6 +163,8 @@ The rule set is shared across all supported languages. To get the full catalogue
 | SAFE206 | silent_result_discard | *Rust-only.* Empty `Err` arms (`Err(_) => {}`) and empty `if let Err(_) = ... {}` bodies silently swallow errors. Spiritual analogue of SAFE202 (empty_except) for Rust's `Result`/`Option` idioms. `let _ = result;` is the explicit auditable discard and is NOT flagged. |
 | SAFE207 | unlogged_error_branch | *Rust-only.* `Err` arms / `if let Err(...)` bodies that handle the error but neither log it nor propagate it. Exempts bodies containing `return`, `panic!` / `todo!` / `unreachable!` / `unimplemented!`, or a tail `Err(...)` re-raise. Spiritual analogue of SAFE203 (logging_on_error). |
 | SAFE208 | result_unwrap_outside_tests | *Rust-only.* `.unwrap()` / `.expect()` / `.unwrap_unchecked()` outside test code. Broader than SAFE205 (lock-specific) and SAFE803 (nullable-method-specific). Holzmann rule 7 (check return values). |
+| SAFE209 | empty_error_check | *Go-only.* `if err != nil { }` with an empty or comment-only body silently swallows the error. Go analogue of SAFE206; the error name is configurable via `error_names_go`. Disabled by default. |
+| SAFE211 | panic_calls_outside_tests | *Go-only.* `panic(...)` in non-`_test.go` files; production paths should return an `error` instead of unwinding the stack. Go analogue of SAFE204; configurable via `panic_calls_go`. Disabled by default. |
 | SAFE301 | global_state | Global state makes functions impure and breaks local reasoning. |
 | SAFE302 | global_mutation | Reassigning shared module / global state is a Holzmann rule 6 violation. Python `global x; x = ...`; JS/TS writes to `globalThis` / `window` / `process` / etc.; Java non-final `static` field declarations (declaration-site). |
 | SAFE303 | side_effects_hidden | Pure-named functions doing I/O surprise callers. |

@@ -8,7 +8,7 @@ C++ has a hard dependency on C):
 
 | # | Spec | Language | Status | Depends on |
 |---|---|---|---|---|
-| 1 | `plan/01-go.md` | Go (`.go`) | not started | nothing |
+| 1 | `plan/01-go.md` | Go (`.go`) | **shipped** (Unreleased; 18 cross-language rules + SAFE209 / SAFE211) | nothing |
 | 2 | `plan/02-c.md` | C (`.c`, `.h`) | not started | nothing (Go recommended first, roadmap order) |
 | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started | **C shipped** (shared grammar family, shared new rules, `.h` ownership) |
 | 4 | `plan/04-php.md` | PHP (`.php`) | not started | nothing |

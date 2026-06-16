@@ -53,25 +53,36 @@ if TYPE_CHECKING:
 #: * Java: ``forName`` (``Class.forName``), ``invoke`` (``Method.invoke``),
 #:   ``eval`` (JSR-223 ``ScriptEngine``), ``defineClass`` / ``loadClass``
 #:   (custom class loaders).
+#: * Go: Go has no ``eval``; the rule-8 analogue is reflection and plugin
+#:   loading. ``Call`` / ``CallSlice`` / ``MethodByName`` (``reflect``)
+#:   invoke methods chosen at runtime; ``Open`` / ``Lookup`` (``plugin``)
+#:   load and resolve symbols from a shared object. Same bare-method-name
+#:   caveat as Java's ``forName``: matching is by trailing name, so a
+#:   same-named call from another package (notably ``os.Open``) also fires.
+#:   The rule is off by default, so opting in accepts that caveat; narrow
+#:   the list via ``dynamic_exec_calls_go`` if it is noisy.
 _DEFAULT_CALLS_PYTHON = ["eval", "exec", "compile", "__import__"]
 _DEFAULT_CALLS_JAVASCRIPT = ["eval", "Function", "execScript"]
 _DEFAULT_CALLS_JAVA = ["forName", "invoke", "eval", "defineClass", "loadClass"]
+_DEFAULT_CALLS_GO = ["Call", "CallSlice", "MethodByName", "Open", "Lookup"]
 
 _DEFAULTS_BY_LANG: dict[str, list[str]] = {
     "python": _DEFAULT_CALLS_PYTHON,
     "javascript": _DEFAULT_CALLS_JAVASCRIPT,
     "typescript": _DEFAULT_CALLS_JAVASCRIPT,
     "java": _DEFAULT_CALLS_JAVA,
+    "go": _DEFAULT_CALLS_GO,
 }
 
 #: Call-expression node types to inspect per language. Python ``call``;
 #: JS / TS ``call_expression`` plus ``new_expression`` (for ``new Function``);
-#: Java ``method_invocation``.
+#: Java ``method_invocation``; Go ``call_expression``.
 _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({"call"}),
     "javascript": frozenset({"call_expression", "new_expression"}),
     "typescript": frozenset({"call_expression", "new_expression"}),
     "java": frozenset({"method_invocation"}),
+    "go": frozenset({"call_expression"}),
 }
 
 
@@ -121,11 +132,26 @@ def _java_match(call_node: tree_sitter.Node, names: frozenset[str]) -> str | Non
     return name if name is not None and name in names else None
 
 
+def _go_match(call_node: tree_sitter.Node, names: frozenset[str]) -> str | None:
+    """Match a Go reflection / plugin call by bare method name.
+
+    Go reflection (``v.Call(...)`` / ``v.MethodByName(...)``) and plugin
+    loading (``plugin.Open(...)`` / ``p.Lookup(...)``) are always method
+    calls on a receiver, so - like the Java matcher - this resolves the
+    trailing bareword via ``call_name`` rather than requiring a bare
+    callee. The documented consequence is that a same-named call from a
+    different package (e.g. ``os.Open``) also matches.
+    """
+    name = call_name(call_node)
+    return name if name is not None and name in names else None
+
+
 _MATCHERS: dict[str, Callable[[tree_sitter.Node, frozenset[str]], str | None]] = {
     "python": _python_match,
     "javascript": _javascript_match,
     "typescript": _javascript_match,
     "java": _java_match,
+    "go": _go_match,
 }
 
 
@@ -134,7 +160,7 @@ class DynamicCodeExecutionRule(BaseRule):
 
     name = "dynamic_code_execution"
     code = "SAFE309"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "go")
 
     _BASE_KEY: ClassVar[str] = "dynamic_exec_calls"
 

@@ -31,6 +31,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
@@ -58,6 +59,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
+    "go": _GO_FUNCTION_TYPES,
 }
 
 #: The call-expression node type per language. Constructor calls
@@ -70,6 +72,7 @@ _CALL_TYPE_BY_LANG: dict[str, str] = {
     "typescript": "call_expression",
     "rust": "call_expression",
     "java": "method_invocation",
+    "go": "call_expression",
 }
 
 #: Identifiers that name "the current object" per language. A call
@@ -136,10 +139,61 @@ def _java_call_targets_self(call_node: tree_sitter.Node, func_name: str) -> bool
     return obj is None or obj.type == "this"
 
 
-def _targets_self(call_node: tree_sitter.Node, func_name: str, lang: str) -> bool:
+def _go_receiver_name(func: tree_sitter.Node) -> str | None:
+    """Return a Go method's receiver variable name, or None.
+
+    For ``func (s *Svc) Walk()`` returns ``"s"`` - the user-chosen
+    receiver identifier is Go's analogue of ``self`` / ``this``, so a
+    ``s.Walk(...)`` call inside ``Walk`` is self-recursion. Returns None
+    for plain functions (no receiver) and for methods with an unnamed
+    receiver (``func (*Svc) Walk()`` - the receiver can't be referenced,
+    so a receiver-qualified self-call is impossible).
+    """
+    if func.type != "method_declaration":
+        return None
+    receiver = func.child_by_field_name("receiver")
+    if receiver is None:  # pragma: no cover - defensive: method_declaration always has a receiver
+        return None
+    for decl in receiver.named_children:
+        if decl.type != "parameter_declaration":  # pragma: no cover - defensive: receiver list holds only a parameter_declaration
+            continue
+        ident = next((child for child in decl.named_children if child.type == "identifier"), None)
+        if ident is not None:
+            return node_text(ident)
+    return None
+
+
+def _go_call_targets_self(call_node: tree_sitter.Node, func_name: str, receiver_name: str | None) -> bool:
+    """Return True if a Go ``call_expression`` is a direct self-call.
+
+    Plain functions (``receiver_name is None``) self-recurse via a bare
+    ``foo()`` whose callee identifier equals the function name. Methods
+    self-recurse via a receiver-qualified ``s.Walk()`` whose selector
+    operand matches the receiver name and field matches the method name.
+    A bare same-named call inside a method is NOT recursion - it denotes a
+    different package-level function, since a method must be called through
+    its receiver.
+    """
+    callee = call_node.child_by_field_name("function")
+    if callee is None:  # pragma: no cover - defensive: call_expression always has a function field
+        return False
+    if callee.type == "identifier":
+        return receiver_name is None and node_text(callee) == func_name
+    if callee.type == "selector_expression":
+        if receiver_name is None:
+            return False
+        operand = callee.child_by_field_name("operand")
+        field = callee.child_by_field_name("field")
+        return operand is not None and field is not None and node_text(operand) == receiver_name and node_text(field) == func_name
+    return False
+
+
+def _targets_self(call_node: tree_sitter.Node, func_name: str, lang: str, receiver_name: str | None) -> bool:
     """Dispatch self-recursion detection to the per-language predicate."""
     if lang == "java":
         return _java_call_targets_self(call_node, func_name)
+    if lang == "go":
+        return _go_call_targets_self(call_node, func_name, receiver_name)
     return _call_targets_self(call_node, func_name, lang)
 
 
@@ -180,7 +234,7 @@ class NoRecursionRule(BaseRule):
 
     name = "no_recursion"
     code = "SAFE105"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "go")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every function whose body directly calls itself."""
@@ -215,6 +269,7 @@ class NoRecursionRule(BaseRule):
         if name_node is None:
             return []
         func_name = node_text(name_node)
+        receiver_name = _go_receiver_name(func) if lang == "go" else None
         shadowed = func_name in _directly_nested_function_names(func, func_types)
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(func_types)):
@@ -222,7 +277,7 @@ class NoRecursionRule(BaseRule):
                 continue
             if shadowed and _call_is_bare(node, lang):
                 continue
-            if _targets_self(node, func_name, lang):
+            if _targets_self(node, func_name, lang, receiver_name):
                 base = self._make_violation_for_node(
                     filepath,
                     node,

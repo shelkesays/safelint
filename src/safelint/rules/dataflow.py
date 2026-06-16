@@ -5,11 +5,14 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.analysis.dataflow import TaintTracker
+from safelint.analysis.dataflow_go import GoTaintTracker
 from safelint.analysis.dataflow_java import JavaTaintTracker
 from safelint.analysis.dataflow_javascript import JsTaintTracker
 from safelint.analysis.dataflow_rust import RustTaintTracker
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
+from safelint.languages.go import FUNC_LITERAL as _GO_FUNC_LITERAL
+from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
@@ -39,6 +42,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
+    "go": _GO_FUNCTION_TYPES,
 }
 
 
@@ -431,6 +435,46 @@ def _rust_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[
     return set()  # pragma: no cover - defensive: a closure in valid Rust always has an enclosing function
 
 
+def _go_param_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return all parameter names for *func_node* (Go function / method / closure).
+
+    Reads the ``parameters`` field (the ``(...)`` list); a single
+    ``parameter_declaration`` can bind several names (``a, b int``), and
+    ``variadic_parameter_declaration`` binds one (``args ...T``). The
+    method receiver lives on the separate ``receiver`` field, never inside
+    ``parameters``, so it is excluded structurally - the receiver is the
+    method's ``self`` analogue, not an untrusted input.
+    """
+    params_node = func_node.child_by_field_name("parameters")
+    if params_node is None:  # pragma: no cover - defensive: valid Go functions always have a parameters list
+        return set()
+    names: set[str] = set()
+    for child in params_node.named_children:
+        if child.type not in ("parameter_declaration", "variadic_parameter_declaration"):
+            continue
+        names.update(node_text(g) for g in child.named_children if g.type == "identifier")
+    return names
+
+
+def _go_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[int, set[str]]) -> set[str]:
+    """Return the enclosing function / closure's final tainted set for *closure_node*.
+
+    Go ``func_literal`` closures capture variables from the enclosing
+    scope, so a closure body referencing a tainted local must see it as
+    tainted even when the local is bound on an outer function. Mirrors
+    the Java lambda / Rust closure approach: walk parents to the nearest
+    enclosing Go function node and return that scope's cached tainted set.
+    The same over-approximation applies (the enclosing's full tainted set
+    is returned regardless of textual position).
+    """
+    cur = closure_node.parent
+    while cur is not None:
+        if cur.type in _GO_FUNCTION_TYPES:
+            return cache.get(cur.id, set())
+        cur = cur.parent
+    return set()  # pragma: no cover - defensive: a closure in valid Go always has an enclosing function
+
+
 def _java_param_names(func_node: tree_sitter.Node) -> set[str]:
     """Return all parameter names for *func_node* (Java).
 
@@ -498,7 +542,7 @@ class TaintedSinkRule(BaseRule):
 
     name = "tainted_sink"
     code = "SAFE801"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "go")
 
     _DEFAULT_SINKS: ClassVar[list[str]] = [
         "eval",
@@ -694,6 +738,50 @@ class TaintedSinkRule(BaseRule):
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 
+    def _go_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run Go taint analysis on every function / method / closure in *tree*.
+
+        Go's threat surface is shell execution (``os/exec`` ``Command`` /
+        ``CommandContext``), raw SQL (``database/sql`` ``Query`` /
+        ``QueryRow`` / ``Exec``), and plugin loading (``plugin.Open``).
+        Sources are request / environment accessors (``os.Getenv``,
+        ``r.FormValue`` / ``r.PostFormValue`` / ``r.FormFile``).
+
+        Two passes mirror the Java / Rust closure handling. Pass 1
+        analyses ``function_declaration`` / ``method_declaration`` nodes
+        and caches each one's final tainted set. Pass 2 analyses
+        ``func_literal`` closures seeded with the enclosing scope's
+        tainted names so a captured tainted local reaching a sink inside
+        the closure is still caught.
+        """
+        sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", "go", default=[])
+        sinks = frozenset(_validated_string_list(sinks_raw, sinks_key))
+        sanitizers_raw, sanitizers_key = resolve_lang_config_lookup(self.config, "sanitizers", "go", default=[])
+        sanitizers = frozenset(_validated_string_list(sanitizers_raw, sanitizers_key))
+        sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", "go", default=[])
+        sources = frozenset(_validated_string_list(sources_raw, sources_key))
+        assume = self._resolve_assume_taint_preserving()
+        violations: list[Violation] = []
+        tainted_cache: dict[int, set[str]] = {}
+        # Pass 1: named functions and methods (not closures).
+        for node in walk(tree.root_node):
+            if node.type not in _GO_FUNCTION_TYPES or node.type == _GO_FUNC_LITERAL:
+                continue
+            tracker = GoTaintTracker(_go_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker.visit(node)
+            tainted_cache[node.id] = set(tracker.tainted)
+            violations.extend(self._format_hits(filepath, tracker.sink_hits))
+        # Pass 2: closures, seeded with the enclosing scope's tainted set.
+        for node in walk(tree.root_node):
+            if node.type != _GO_FUNC_LITERAL:
+                continue
+            seed = _go_param_names(node) | _go_closure_enclosing_tainted(node, tainted_cache)
+            tracker = GoTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker.visit(node)
+            tainted_cache[node.id] = set(tracker.tainted)
+            violations.extend(self._format_hits(filepath, tracker.sink_hits))
+        return violations
+
     def _format_hits(self, filepath: str, hits: list[tuple[tree_sitter.Node, str, str]]) -> list[Violation]:
         """Convert tracker hits to Violations - same message format for both languages."""
         return [
@@ -714,6 +802,8 @@ class TaintedSinkRule(BaseRule):
             return self._java_check(filepath, tree)
         if lang_name == "rust":
             return self._rust_check(filepath, tree)
+        if lang_name == "go":
+            return self._go_check(filepath, tree)
         return self._python_check(filepath, tree)
 
 
@@ -729,7 +819,7 @@ class ReturnValueIgnoredRule(BaseRule):
 
     name = "return_value_ignored"
     code = "SAFE802"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "go")
 
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",

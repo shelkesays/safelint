@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
@@ -24,6 +25,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
+    "go": _GO_FUNCTION_TYPES,
 }
 
 _PY_SPLAT_PARAM_TYPES = frozenset({"list_splat_pattern", "dictionary_splat_pattern"})
@@ -140,6 +142,8 @@ def _count_args(func_node: tree_sitter.Node, lang_name: str) -> tuple[int, str |
         return 0, None
     if lang_name == "java":
         return _count_java_args(params_node), None
+    if lang_name == "go":
+        return _count_go_args(params_node), None
     counted_types = _COUNTED_PARAM_TYPES_BY_LANG[lang_name]
     counted = [c for c in params_node.named_children if c.type in counted_types]
     first_name: str | None = None
@@ -175,6 +179,30 @@ def _count_java_args(params_node: tree_sitter.Node) -> int:
     return sum(1 for c in params_node.named_children if c.type in _JAVA_COUNTED_PARAM_TYPES)
 
 
+def _count_go_args(params_node: tree_sitter.Node) -> int:
+    """Count Go parameters, counting *names* not declarations.
+
+    A single Go ``parameter_declaration`` can bind several names sharing
+    one type (``a, b int`` is two parameters, one declaration), so the
+    count is the number of bound identifiers, not the number of
+    declarations. ``variadic_parameter_declaration`` (``args ...T``) binds
+    one name. An unnamed parameter (``func f(int, string)`` - legal in Go
+    function types / signatures) has no identifier child and counts as one.
+
+    The method receiver is NOT counted: it lives on the declaration's
+    separate ``receiver`` field, never inside the ``parameters`` field this
+    helper is handed, so it is excluded structurally (Go's analogue of
+    Python ``self`` / Java ``receiver_parameter``).
+    """
+    total = 0
+    for child in params_node.named_children:
+        if child.type not in ("parameter_declaration", "variadic_parameter_declaration"):
+            continue
+        names = sum(1 for g in child.named_children if g.type == "identifier")
+        total += names or 1
+    return total
+
+
 class MaxArgumentsRule(BaseRule):
     """Reject functions whose argument count exceeds the limit.
 
@@ -185,7 +213,7 @@ class MaxArgumentsRule(BaseRule):
 
     name = "max_arguments"
     code = "SAFE103"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "go")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function with more arguments than max_args."""

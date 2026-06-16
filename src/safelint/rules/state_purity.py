@@ -211,6 +211,13 @@ class GlobalMutationRule(BaseRule):
     Java: fires at the declaration site on non-``final`` ``static`` fields
     (Java's shared-mutable-state shape); ``static final`` fields, instance
     fields, and locals are clean.
+    Go: fires at the declaration site on every package-level ``var``
+    (Go's shared-mutable-state shape); ``const`` declarations and
+    block-scoped ``var`` / ``:=`` inside functions are clean. Sentinel
+    errors (``var ErrX = errors.New(...)``) are flagged too - the rule is
+    faithful to the declaration site and does not special-case the
+    initializer; treat them as immutable by suppressing with a per-file
+    ignore or ``//nosafe`` if desired.
 
     The rule's intent ("don't keep shared mutable state at module / global
     scope", Holzmann rule 6) is the same across languages even though the
@@ -219,7 +226,7 @@ class GlobalMutationRule(BaseRule):
 
     name = "global_mutation"
     code = "SAFE302"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "go")
 
     _DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT: ClassVar[list[str]] = [
         "globalThis",  # universal - works in browsers, Node, web workers
@@ -321,7 +328,60 @@ class GlobalMutationRule(BaseRule):
             return self._python_check(filepath, tree)
         if lang_name == "java":
             return self._java_check(filepath, tree)
+        if lang_name == "go":
+            return self._go_check(filepath, tree)
         return self._javascript_check(filepath, tree, lang_name)
+
+    def _go_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag every package-level ``var`` declaration (Go's shared-mutable-state shape).
+
+        Declaration-site detection (like Java): a package ``var`` IS the
+        shared mutable binding regardless of where it is written, and a
+        single pass over the file's top-level ``var_declaration`` children
+        has near-zero false positives. ``const`` declarations are immutable
+        and never fire. Block-scoped ``var`` / ``:=`` inside function bodies
+        are locals - they are nested below a ``block``, never a direct child
+        of ``source_file``, so iterating the root's named children excludes
+        them structurally.
+        """
+        violations: list[Violation] = []
+        for node in tree.root_node.named_children:
+            if node.type == "var_declaration":
+                violations.extend(self._go_var_violations(filepath, node))
+        return violations
+
+    def _go_var_violations(self, filepath: str, var_decl: tree_sitter.Node) -> list[Violation]:
+        """Return violations for every name declared in a package-level ``var`` block.
+
+        The single form ``var x int`` holds the ``var_spec`` directly; the
+        grouped form ``var ( a int; b, c string )`` wraps several
+        ``var_spec`` nodes in a ``var_spec_list``. Walking the declaration
+        finds the specs in both shapes; each spec can bind several names
+        (``var a, b int``), so emit one violation per declared name.
+        """
+        out: list[Violation] = []
+        for spec in walk(var_decl):
+            if spec.type == "var_spec":
+                out.extend(self._go_spec_violations(filepath, spec))
+        return out
+
+    def _go_spec_violations(self, filepath: str, spec: tree_sitter.Node) -> list[Violation]:
+        """Return one violation per declared identifier in a ``var_spec``.
+
+        Only the spec's direct ``identifier`` children are names; the type
+        (``type_identifier``) and any initializer (nested in
+        ``expression_list``) are not direct ``identifier`` children, so they
+        are excluded without extra filtering.
+        """
+        return [
+            self._make_violation_for_node(
+                filepath,
+                ident,
+                f'Package-level var "{node_text(ident)}" is shared mutable state - scope it to its consumer, or use `const` if it never changes (Power of Ten rule 6)',
+            )
+            for ident in spec.named_children
+            if ident.type == "identifier"
+        ]
 
     def _java_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag non-final ``static`` field declarations (Java's shared-mutable-state shape).

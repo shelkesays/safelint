@@ -17,12 +17,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from safelint.languages import go as _go_mod
 from safelint.languages import java as _java_mod
 from safelint.languages import javascript as _javascript_mod
 from safelint.languages import python as _python_mod
 from safelint.languages import rust as _rust_mod
 from safelint.languages import typescript as _typescript_mod
 from safelint.languages._types import LanguageDefinition
+from safelint.languages.go import GO
 from safelint.languages.java import JAVA
 from safelint.languages.javascript import JAVASCRIPT
 from safelint.languages.python import PYTHON
@@ -107,6 +109,21 @@ else:
         _UNAVAILABLE_EXTENSIONS[_ext] = _rust_mod.GRAMMAR_INSTALL_HINT
         _UNAVAILABLE_EXTRA_NAMES[_ext] = _rust_mod.EXTRA_NAME
 
+# Go - only register if ``tree-sitter-go`` is installed (i.e. the
+# ``[go]`` or ``[all]`` extra was selected). Go's runtime and ``go vet``
+# already catch a class of issues; safelint's Go rule scope focuses on
+# function shape, ignored ``error`` returns, empty error-check bodies,
+# ``panic`` placement, bare ``for {}`` loops, package-level shared
+# state, and dataflow sinks. Same shape as the blocks above - keep them
+# parallel so future drift is grep-able.
+if _go_mod._GRAMMAR_AVAILABLE:
+    for _ext in GO.file_extensions:
+        _REGISTRY[_ext] = GO
+else:
+    for _ext in GO.file_extensions:
+        _UNAVAILABLE_EXTENSIONS[_ext] = _go_mod.GRAMMAR_INSTALL_HINT
+        _UNAVAILABLE_EXTRA_NAMES[_ext] = _go_mod.EXTRA_NAME
+
 
 def get_language_for_file(filepath: str) -> LanguageDefinition | None:
     """Return the LanguageDefinition for *filepath* based on its extension, or None.
@@ -169,6 +186,7 @@ def extra_name_for(extension: str) -> str | None:
 
 
 __all__ = [
+    "GO",
     "JAVA",
     "JAVASCRIPT",
     "PYTHON",

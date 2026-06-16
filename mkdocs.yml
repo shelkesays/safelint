@@ -112,6 +112,7 @@ nav:
       - TypeScript: languages/typescript.md
       - Java: languages/java.md
       - Rust: languages/rust.md
+      - Go: languages/go.md
   # CLI commands and flags is a top-level entry (not nested under
   # Configuration) so users searching for "commands" or "list-rules"
   # find it without expanding a section. The page lives at

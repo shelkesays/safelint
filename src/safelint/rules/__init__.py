@@ -10,6 +10,7 @@ from safelint.rules.documentation import MissingAssertionsRule
 from safelint.rules.dynamic_code_execution import DynamicCodeExecutionRule
 from safelint.rules.error_handling import BareExceptRule, EmptyExceptRule, LoggingOnErrorRule
 from safelint.rules.function_length import FunctionLengthRule
+from safelint.rules.go_rules import EmptyErrorCheckRule, PanicCallsOutsideTestsRule
 from safelint.rules.loop_safety import UnboundedLoopRule
 from safelint.rules.max_arguments import MaxArgumentsRule
 from safelint.rules.nesting_depth import NestingDepthRule
@@ -91,6 +92,13 @@ ALL_RULES: list[type[BaseRule]] = [
     TruncatingAsCastRule,
     UndocumentedUnsafeRule,
     InteriorMutableStaticRule,
+    # Go-idiom rules (slotted into category bands per the SafeLint
+    # numbering policy: 2xx error-handling). Both disabled by default;
+    # opt in via [tool.safelint.rules.<name>] enabled = true. Go-only,
+    # so (like the Rust-only rules) they are not listed in
+    # ``execution.order`` in DEFAULTS.
+    EmptyErrorCheckRule,
+    PanicCallsOutsideTestsRule,
 ]
 
 RULE_BY_NAME: dict[str, type[BaseRule]] = {cls.name: cls for cls in ALL_RULES}
@@ -104,6 +112,7 @@ __all__ = [
     "ComplexityRule",
     "DangerousMemOpsRule",
     "DynamicCodeExecutionRule",
+    "EmptyErrorCheckRule",
     "EmptyExceptRule",
     "FunctionLengthRule",
     "GlobalMutationRule",
@@ -117,6 +126,7 @@ __all__ = [
     "NestingDepthRule",
     "NoRecursionRule",
     "NullDereferenceRule",
+    "PanicCallsOutsideTestsRule",
     "PanicMacrosOutsideTestsRule",
     "ResourceLifecycleRule",
     "ResultUnwrapOutsideTestsRule",

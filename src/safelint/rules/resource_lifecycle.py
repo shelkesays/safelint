@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING, ClassVar
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup  # ``_validated_string_list`` re-exported for backwards-compat
 from safelint.languages._node_utils import call_name, resolve_lang_name, walk
 from safelint.languages._node_utils import node_text as _node_text
+from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import CALL, WITH_ITEM
@@ -317,6 +318,80 @@ def _java_ancestor_is_guard(cur: tree_sitter.Node, prev: tree_sitter.Node, var_n
     return finally_clause is not None and _finally_closes_variable(finally_clause, var_name)
 
 
+def _go_acquired_variable_names(call_node: tree_sitter.Node) -> frozenset[str]:
+    """Return the variable names a Go acquirer call is assigned to.
+
+    Handles the three assignment shapes an acquirer can sit in:
+
+    * ``f, err := os.Open(p)`` (``short_var_declaration``) - the call is the
+      ``right`` expression_list; the names come from the ``left`` list.
+    * ``f = os.Open(p)`` (``assignment_statement``) - same ``left`` / ``right``
+      shape.
+    * ``var f = os.Open(p)`` (``var_spec``) - names are the spec's direct
+      ``identifier`` children; the call lives in the trailing
+      ``expression_list``.
+
+    The blank identifier ``_`` is excluded (it discards the value, so there
+    is no handle to close). Returns an empty set for a bare-expression
+    acquirer (``os.Open(p)`` with no assignment) - no handle means it can
+    never be deferred-closed, so it is always a leak.
+    """
+    parent = call_node.parent
+    if parent is None or parent.type != "expression_list":
+        return frozenset()
+    container = parent.parent
+    if container is None:  # pragma: no cover - defensive: expression_list always has a parent
+        return frozenset()
+    if container.type in ("short_var_declaration", "assignment_statement"):
+        left = container.child_by_field_name("left")
+        return _go_identifier_names(left) if left is not None else frozenset()
+    if container.type == "var_spec":
+        return _go_identifier_names(container)
+    return frozenset()
+
+
+def _go_identifier_names(node: tree_sitter.Node) -> frozenset[str]:
+    """Return the non-blank ``identifier`` child names of *node*."""
+    return frozenset(_node_text(c) for c in node.named_children if c.type == "identifier" and _node_text(c) != "_")
+
+
+def _go_enclosing_function(node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the nearest enclosing Go function / method / closure node, or None."""
+    cur = node.parent
+    while cur is not None:
+        if cur.type in _GO_FUNCTION_TYPES:
+            return cur
+        cur = cur.parent
+    return None  # pragma: no cover - defensive: acquirer calls always sit inside a function
+
+
+def _go_defer_closes(func_node: tree_sitter.Node, var_names: frozenset[str]) -> bool:
+    """Return True if *func_node*'s body defers a ``<var>.Close()`` for any tracked handle.
+
+    Walks the function body for ``defer_statement`` nodes, pruning nested
+    function / closure bodies (a ``defer`` inside an inner closure guards
+    that closure's scope, not this one). The recognised safe form is the
+    direct ``defer f.Close()`` - a defer routed through a wrapping closure
+    (``defer func() { f.Close() }()``) is a documented blind spot.
+    """
+    return any(n.type == "defer_statement" and _go_defer_targets(n, var_names) for n in walk(func_node, skip_types=tuple(_GO_FUNCTION_TYPES)))
+
+
+def _go_defer_targets(defer_node: tree_sitter.Node, var_names: frozenset[str]) -> bool:
+    """Return True if *defer_node* is a ``defer <var>.Close()`` for a name in *var_names*."""
+    call = next((c for c in defer_node.named_children if c.type == "call_expression"), None)
+    if call is None:
+        return False
+    fn = call.child_by_field_name("function")
+    if fn is None or fn.type != "selector_expression":
+        return False
+    operand = fn.child_by_field_name("operand")
+    field = fn.child_by_field_name("field")
+    if operand is None or field is None or operand.type != "identifier":
+        return False
+    return _node_text(field) == "Close" and _node_text(operand) in var_names
+
+
 class ResourceLifecycleRule(BaseRule):
     """Require tracked resource-acquisition calls to be wrapped in cleanup-guaranteed scope.
 
@@ -337,7 +412,7 @@ class ResourceLifecycleRule(BaseRule):
 
     name = "resource_lifecycle"
     code = "SAFE401"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "go")
 
     _DEFAULT_TRACKED_JAVASCRIPT: ClassVar[list[str]] = [
         # File / stream APIs.
@@ -387,6 +462,55 @@ class ResourceLifecycleRule(BaseRule):
         # Python-only; the Java path uses the ``tracked_functions_java``
         # per-language config which replaces rather than appends.
     ]
+
+    _DEFAULT_TRACKED_GO: ClassVar[list[str]] = [
+        # ``call_name`` strips the package / receiver, so each entry is the
+        # bare method name. ``Open`` covers both ``os.Open`` and ``sql.Open``;
+        # ``Create`` is ``os.Create``; ``Dial`` / ``Listen`` are the
+        # ``net`` connection / listener acquirers. The safe form is a
+        # ``defer <var>.Close()`` in the same function body.
+        "Open",
+        "Create",
+        "Dial",
+        "Listen",
+    ]
+
+    def _go_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run the Go check: a tracked acquirer must be paired with ``defer <var>.Close()``.
+
+        Go's idiom is ``f, err := os.Open(p); ... ; defer f.Close()`` - the
+        deferred close runs on every exit path from the enclosing function.
+        A tracked acquirer is clean when the function it lives in defers a
+        ``Close()`` on one of the variables it was assigned to; otherwise it
+        leaks. Bare-expression acquirers (no assignment) always fire - there
+        is no handle to defer-close.
+        """
+        raw_tracked, error_key = resolve_lang_config_lookup(self.config, "tracked_functions", "go", default=self._DEFAULT_TRACKED_GO)
+        tracked = frozenset(_validated_string_list(raw_tracked, error_key))
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type != "call_expression":
+                continue
+            name = call_name(node)
+            if not name or name not in tracked or self._go_is_guarded(node):
+                continue
+            violations.append(
+                self._make_violation_for_node(
+                    filepath,
+                    node,
+                    f'"{name}()" acquires a resource with no deferred close - add `defer <resource>.Close()` immediately after acquiring it',
+                )
+            )
+        return violations
+
+    @staticmethod
+    def _go_is_guarded(call_node: tree_sitter.Node) -> bool:
+        """Return True if *call_node*'s acquired handle is deferred-closed in its function."""
+        var_names = _go_acquired_variable_names(call_node)
+        if not var_names:
+            return False
+        func = _go_enclosing_function(call_node)
+        return func is not None and _go_defer_closes(func, var_names)
 
     @staticmethod
     def _python_collect_guarded(tree: tree_sitter.Tree, tracked: frozenset[str]) -> set[int]:
@@ -526,4 +650,6 @@ class ResourceLifecycleRule(BaseRule):
             return self._python_check(filepath, tree)
         if lang_name == "java":
             return self._java_check(filepath, tree)
+        if lang_name == "go":
+            return self._go_check(filepath, tree)
         return self._javascript_check(filepath, tree, lang_name)
