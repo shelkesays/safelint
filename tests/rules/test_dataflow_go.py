@@ -148,6 +148,26 @@ def test_go_unknown_call_not_preserving_is_clean(tmp_path: Path) -> None:
     assert not any(v.code == "SAFE801" for v in _engine(cfg).check_file(str(sample)).violations)
 
 
+def test_go_compound_assignment_preserves_taint(tmp_path: Path) -> None:
+    """``x += clean`` must not clear ``x``'s prior taint (read-modify-write)."""
+    sample = tmp_path / "compound.go"
+    sample.write_text(
+        'package main\nfunc h(r *Request) {\n\tx := r.FormValue("n")\n\tx += "_suffix"\n\texec.Command(x)\n}\n',
+        encoding="utf-8",
+    )
+    assert any(v.code == "SAFE801" for v in _engine(_SAFE801).check_file(str(sample)).violations)
+
+
+def test_go_plain_reassignment_clears_taint(tmp_path: Path) -> None:
+    """A plain ``x = clean`` overwrites and clears prior taint."""
+    sample = tmp_path / "reassign.go"
+    sample.write_text(
+        'package main\nfunc h(r *Request) {\n\tx := r.FormValue("n")\n\tx = "safe"\n\texec.Command(x)\n}\n',
+        encoding="utf-8",
+    )
+    assert not any(v.code == "SAFE801" for v in _engine(_SAFE801).check_file(str(sample)).violations)
+
+
 def test_go_discarded_error_fires_safe802(tmp_path: Path) -> None:
     """A bare ``f.Write(b)`` whose error return is discarded fires SAFE802."""
     sample = tmp_path / "discard.go"

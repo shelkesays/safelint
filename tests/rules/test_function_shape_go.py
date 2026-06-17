@@ -123,10 +123,15 @@ def test_go_other_receiver_call_is_not_recursion(tmp_path: Path) -> None:
     assert not any(v.code == "SAFE105" for v in _engine().check_file(str(sample)).violations)
 
 
-def test_go_unnamed_receiver_method_self_call_not_flagged(tmp_path: Path) -> None:
-    """A method with an unnamed receiver cannot reference itself, so no SAFE105."""
+def test_go_unnamed_receiver_method_bare_call_not_flagged(tmp_path: Path) -> None:
+    """In ``func (*Svc) Walk() { Walk() }`` the bare ``Walk()`` resolves to a package function, not the method.
+
+    An unnamed receiver has no name to qualify a self-call, so SAFE105 must
+    not treat the bare same-named call as recursion (the ``is_method`` flag,
+    not ``receiver_name is None``, makes the distinction).
+    """
     sample = tmp_path / "unnamed.go"
-    sample.write_text("package main\nfunc (*Svc) Walk() {\n\tg()\n}\n", encoding="utf-8")
+    sample.write_text("package main\nfunc (*Svc) Walk() {\n\tWalk()\n}\n", encoding="utf-8")
     assert not any(v.code == "SAFE105" for v in _engine().check_file(str(sample)).violations)
 
 

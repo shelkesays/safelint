@@ -43,6 +43,30 @@ def test_go_bare_lint_ignore_fires_safe603(tmp_path: Path) -> None:
     assert any(v.code == "SAFE603" for v in _engine(cfg).check_file(str(sample)).violations)
 
 
+def test_go_bare_nolint_with_trailing_reason_still_fires(tmp_path: Path) -> None:
+    """``//nolint // reason`` is still blanket - a trailing reason does not scope it to linters."""
+    sample = tmp_path / "nolintreason.go"
+    sample.write_text("package main\n//nolint // legacy code, will fix later\nfunc f() {}\n", encoding="utf-8")
+    cfg = {"rules": {"blanket_suppression": {"enabled": True}}}
+    assert any(v.code == "SAFE603" for v in _engine(cfg).check_file(str(sample)).violations)
+
+
+def test_go_scoped_nolint_with_trailing_reason_is_clean(tmp_path: Path) -> None:
+    """``//nolint:errcheck // reason`` stays scoped - the trailing reason is ignored."""
+    sample = tmp_path / "scopedreason.go"
+    sample.write_text("package main\n//nolint:errcheck // checked elsewhere\nfunc f() {}\n", encoding="utf-8")
+    cfg = {"rules": {"blanket_suppression": {"enabled": True}}}
+    assert not any(v.code == "SAFE603" for v in _engine(cfg).check_file(str(sample)).violations)
+
+
+def test_go_nolint_glued_to_a_word_is_not_a_directive(tmp_path: Path) -> None:
+    """``//nolintfoo`` is not the ``//nolint`` directive (no separator) and is left alone."""
+    sample = tmp_path / "glued.go"
+    sample.write_text("package main\n//nolintfoo bar\nfunc f() {}\n", encoding="utf-8")
+    cfg = {"rules": {"blanket_suppression": {"enabled": True}}}
+    assert not any(v.code == "SAFE603" for v in _engine(cfg).check_file(str(sample)).violations)
+
+
 def test_go_spaced_nolint_is_not_a_directive(tmp_path: Path) -> None:
     """``// nolint`` (space after //) is prose, not a golangci directive - not flagged."""
     sample = tmp_path / "prose.go"

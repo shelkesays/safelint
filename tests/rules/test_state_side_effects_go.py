@@ -47,6 +47,26 @@ def test_go_grouped_var_block_fires_per_name(tmp_path: Path) -> None:
     assert len(safe302) == 3
 
 
+def test_go_blank_interface_assertion_is_not_flagged(tmp_path: Path) -> None:
+    """``var _ io.Reader = (*T)(nil)`` is a compile-time assertion, not mutable state."""
+    sample = tmp_path / "assert.go"
+    sample.write_text("package main\nvar _ io.Reader = (*T)(nil)\n", encoding="utf-8")
+    assert not any(v.code == "SAFE302" for v in _engine().check_file(str(sample)).violations)
+
+
+def test_go_var_inside_func_literal_initializer_not_package_level(tmp_path: Path) -> None:
+    """A local ``var`` inside a package var's func-literal initializer is not package-level state."""
+    sample = tmp_path / "nested.go"
+    sample.write_text(
+        "package main\nvar handler = func() {\n\tvar local int\n\t_ = local\n}\n",
+        encoding="utf-8",
+    )
+    safe302 = [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE302"]
+    # Only the package-level ``handler`` fires; the nested ``local`` does not.
+    assert len(safe302) == 1
+    assert "handler" in safe302[0].message
+
+
 def test_go_pure_named_function_doing_io_fires_safe303(tmp_path: Path) -> None:
     """A ``get``-prefixed function that performs I/O fires SAFE303."""
     sample = tmp_path / "hidden.go"

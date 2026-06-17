@@ -61,6 +61,18 @@ _SPREADING_TYPES = frozenset(
 _CONTAINER_TYPES = frozenset({"composite_literal"})
 
 
+def _is_compound_assignment(node: tree_sitter.Node) -> bool:
+    """Return True if an ``assignment_statement`` uses a compound operator (``+=`` etc.).
+
+    tree-sitter-go represents the assignment operator as an anonymous child
+    token (no named ``operator`` field), so the operator is read from the
+    first non-named child. Plain ``=`` overwrites; anything else
+    (``+=`` / ``-=`` / ``*=`` / ``|=`` / ``&=`` / ...) is read-modify-write.
+    """
+    operator = next((c for c in node.children if not c.is_named), None)
+    return operator is not None and node_text(operator) != "="
+
+
 class GoTaintTracker:
     """Track tainted variable flow through a Go function / method / closure body.
 
@@ -109,13 +121,23 @@ class GoTaintTracker:
             self._visit_call(node)
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
-        """Propagate taint through ``x := value`` / ``x = value`` (left / right lists)."""
+        """Propagate taint through ``x := value`` / ``x = value`` (left / right lists).
+
+        A compound assignment (``x += y`` / ``x |= y`` / ...) is a
+        read-modify-write: the result derives from the old ``x`` as well as
+        the RHS, so taint must be the OR of the two. tree-sitter-go does not
+        expose a named ``operator`` field on ``assignment_statement`` - the
+        operator is an anonymous child - so the compound forms are detected
+        by inspecting that token. ``:=`` (``short_var_declaration``) and plain
+        ``=`` are fresh writes that overwrite the bound name's taint.
+        """
         left = node.child_by_field_name("left")
         right = node.child_by_field_name("right")
         if left is None or right is None:  # pragma: no cover - defensive: both sides always present
             return
         name_nodes = [c for c in left.named_children if c.type == "identifier"]
-        self._propagate(name_nodes, list(right.named_children))
+        keep_existing = node.type == "assignment_statement" and _is_compound_assignment(node)
+        self._propagate(name_nodes, list(right.named_children), keep_existing=keep_existing)
 
     def _visit_var_spec(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``var x = value`` (identifiers + trailing expression_list)."""
@@ -124,21 +146,22 @@ class GoTaintTracker:
         rhs = list(rhs_list.named_children) if rhs_list is not None else []
         self._propagate(name_nodes, rhs)
 
-    def _propagate(self, name_nodes: list[tree_sitter.Node], rhs_exprs: list[tree_sitter.Node]) -> None:
+    def _propagate(self, name_nodes: list[tree_sitter.Node], rhs_exprs: list[tree_sitter.Node], *, keep_existing: bool = False) -> None:
         """Set taint on each bound name from the right-hand expressions.
 
         Equal arity pairs positionally (``a, b := x, y``); otherwise each
         name takes the OR of all right-hand expressions, which covers the
         common ``f, err := os.Open(p)`` shape where a single call produces
-        several values.
+        several values. With *keep_existing* (compound assignment) a clean
+        RHS never clears a name's prior taint.
         """
         if len(name_nodes) == len(rhs_exprs):
             for name_node, rhs in zip(name_nodes, rhs_exprs, strict=True):
-                self._update_name(name_node, is_tainted=self._is_tainted(rhs))
+                self._update_name(name_node, is_tainted=self._is_tainted(rhs), keep_existing=keep_existing)
             return
         any_tainted = any(self._is_tainted(rhs) for rhs in rhs_exprs)
         for name_node in name_nodes:
-            self._update_name(name_node, is_tainted=any_tainted)
+            self._update_name(name_node, is_tainted=any_tainted, keep_existing=keep_existing)
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink with tainted arguments."""
@@ -157,8 +180,12 @@ class GoTaintTracker:
         arg_name = node_text(arg_node) if arg_node.type == "identifier" else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
 
-    def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool) -> None:
-        """Add or remove *target* from the tainted set if it is a non-blank bare name."""
+    def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool, keep_existing: bool = False) -> None:
+        """Add or remove *target* from the tainted set if it is a non-blank bare name.
+
+        With *keep_existing* (a compound read-modify-write assignment) a clean
+        RHS leaves the name's prior taint untouched rather than clearing it.
+        """
         if target.type != "identifier":  # pragma: no cover - defensive: callers pre-filter to identifier nodes
             return
         name = node_text(target)
@@ -166,7 +193,7 @@ class GoTaintTracker:
             return
         if is_tainted:
             self.tainted.add(name)
-        else:
+        elif not keep_existing:
             self.tainted.discard(name)
 
     def _is_tainted(self, node: tree_sitter.Node) -> bool:
