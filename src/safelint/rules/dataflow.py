@@ -13,6 +13,9 @@ from safelint.core._validators import _validated_string_list, resolve_lang_confi
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.go import FUNC_LITERAL as _GO_FUNC_LITERAL
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
+from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
+from safelint.languages.go import PARAMETER_DECLARATION as _GO_PARAMETER_DECLARATION
+from safelint.languages.go import VARIADIC_PARAMETER_DECLARATION as _GO_VARIADIC_PARAMETER_DECLARATION
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import (
@@ -450,9 +453,9 @@ def _go_param_names(func_node: tree_sitter.Node) -> set[str]:
         return set()
     names: set[str] = set()
     for child in params_node.named_children:
-        if child.type not in ("parameter_declaration", "variadic_parameter_declaration"):
+        if child.type not in (_GO_PARAMETER_DECLARATION, _GO_VARIADIC_PARAMETER_DECLARATION):
             continue
-        names.update(node_text(g) for g in child.named_children if g.type == "identifier")
+        names.update(node_text(g) for g in child.named_children if g.type == _GO_IDENTIFIER)
     return names
 
 

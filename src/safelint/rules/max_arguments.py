@@ -6,6 +6,9 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
+from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
+from safelint.languages.go import PARAMETER_DECLARATION as _GO_PARAMETER_DECLARATION
+from safelint.languages.go import VARIADIC_PARAMETER_DECLARATION as _GO_VARIADIC_PARAMETER_DECLARATION
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
@@ -196,9 +199,9 @@ def _count_go_args(params_node: tree_sitter.Node) -> int:
     """
     total = 0
     for child in params_node.named_children:
-        if child.type not in ("parameter_declaration", "variadic_parameter_declaration"):
+        if child.type not in (_GO_PARAMETER_DECLARATION, _GO_VARIADIC_PARAMETER_DECLARATION):
             continue
-        names = sum(1 for g in child.named_children if g.type == "identifier")
+        names = sum(1 for g in child.named_children if g.type == _GO_IDENTIFIER)
         total += names or 1
     return total
 
