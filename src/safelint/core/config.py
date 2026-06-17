@@ -495,6 +495,20 @@ DEFAULTS: dict[str, Any] = {
                 "connect",
                 "createWorker",
             ],
+            # Go: tracked acquirer call names (``call_name`` strips the
+            # package / receiver, so each is the bare method name). The rule
+            # fires when the acquired handle is not paired with a
+            # ``defer <var>.Close()`` in the same function. ``Open`` covers
+            # both ``os.Open`` and ``sql.Open``; ``Create`` is ``os.Create``;
+            # ``Dial`` / ``Listen`` are the ``net`` acquirers. Mirrors the
+            # rule's ``_DEFAULT_TRACKED_GO`` fallback so the Go override
+            # surface is visible in the config schema.
+            "tracked_functions_go": [
+                "Open",
+                "Create",
+                "Dial",
+                "Listen",
+            ],
         },
         "unbounded_loops": {"enabled": True, "severity": "warning"},
         "missing_assertions": {
