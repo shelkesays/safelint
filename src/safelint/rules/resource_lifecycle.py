@@ -392,6 +392,23 @@ def _go_left_idents(container: tree_sitter.Node) -> list[tree_sitter.Node] | Non
     return None
 
 
+def _go_is_returned(call_node: tree_sitter.Node) -> bool:
+    """Return True if *call_node* is directly returned (``return os.Open(p)``).
+
+    A returned acquirer transfers ownership to the caller, who is then
+    responsible for closing it, so it is not a local resource leak. The call
+    sits in the ``return`` statement's ``expression_list`` (Go wraps return
+    values in one even for a single value).
+    """
+    parent = call_node.parent
+    if parent is None:  # pragma: no cover - defensive: a call always has a parent
+        return False
+    if parent.type == "return_statement":  # pragma: no cover - Go wraps return values in an expression_list
+        return True
+    grandparent = parent.parent
+    return parent.type == "expression_list" and grandparent is not None and grandparent.type == "return_statement"
+
+
 def _go_enclosing_function(node: tree_sitter.Node) -> tree_sitter.Node | None:
     """Return the nearest enclosing Go function / method / closure node, or None."""
     cur = node.parent
@@ -586,17 +603,30 @@ class ResourceLifecycleRule(BaseRule):
 
     @staticmethod
     def _go_leak_message(call_node: tree_sitter.Node, name: str) -> str | None:
-        """Return the SAFE401 message for *call_node*, or None when it is properly guarded.
+        """Return the SAFE401 message for *call_node*, or None when it does not leak.
 
-        Tailors the remediation to the acquirer shape: a bare-expression
-        acquirer has no handle to close, so the message says to capture it
-        first; a captured-but-unguarded handle just needs a `defer Close()`.
+        Tailors the outcome to the acquirer shape:
+
+        * directly returned (``return os.Open(p)``) - ownership passes to the
+          caller, who is responsible for closing it, so this is NOT a local
+          leak and does not fire.
+        * bare-expression with no local handle (``os.Open(p);``) - the handle
+          is dropped; capture it and defer-close.
+        * captured at package scope (``var f, _ = os.Open(p)`` at file scope) -
+          ``defer`` is not valid outside a function, so the advice is to move
+          the acquisition into a function or close it explicitly.
+        * captured in a function but not deferred-closed - add the
+          ``defer Close()``.
         """
+        if _go_is_returned(call_node):
+            return None
         var_names = _go_acquired_variable_names(call_node)
         if not var_names:
-            return f'"{name}()" acquires a resource but discards the handle - capture it (e.g. `f, err := {name}(...)`) and add `defer f.Close()` so it is released on every exit path'
+            return f'"{name}()" acquires a resource with no local handle to defer-close - capture it (e.g. `f, err := {name}(...)`) and add `defer f.Close()` so it is released on every exit path'
         func = _go_enclosing_function(call_node)
-        if func is not None and _go_defer_closes(func, var_names, call_node):
+        if func is None:
+            return f'"{name}()" acquires a package-scoped resource that cannot use `defer` (no enclosing function) - acquire it inside a function and `defer` the close, or close it explicitly'
+        if _go_defer_closes(func, var_names, call_node):
             return None
         return f'"{name}()" acquires a resource with no deferred close - add `defer <resource>.Close()` immediately after acquiring it (at the function\'s top level, after the acquisition)'
 

@@ -73,11 +73,20 @@ def test_go_defer_close_on_other_var_does_not_guard(tmp_path: Path) -> None:
     assert any(v.code == "SAFE401" for v in _engine().check_file(str(sample)).violations)
 
 
-def test_go_returned_acquirer_leaks(tmp_path: Path) -> None:
-    """``return os.Open(p)`` has no local handle to defer-close, so it fires SAFE401."""
+def test_go_returned_acquirer_is_clean(tmp_path: Path) -> None:
+    """``return os.Open(p)`` transfers ownership to the caller - not a local leak, so no SAFE401."""
     sample = tmp_path / "returned.go"
     sample.write_text("package main\nfunc f(p string) (*File, error) {\n\treturn os.Open(p)\n}\n", encoding="utf-8")
-    assert any(v.code == "SAFE401" for v in _engine().check_file(str(sample)).violations)
+    assert not any(v.code == "SAFE401" for v in _engine().check_file(str(sample)).violations)
+
+
+def test_go_package_scope_acquirer_fires_with_tailored_message(tmp_path: Path) -> None:
+    """A package-scope ``var f, _ = os.Open(p)`` fires SAFE401 with package-scope guidance (defer is not valid there)."""
+    sample = tmp_path / "pkgscope.go"
+    sample.write_text('package main\nvar f, _ = os.Open("config")\n', encoding="utf-8")
+    safe401 = [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE401"]
+    assert len(safe401) == 1
+    assert "package-scoped" in safe401[0].message
 
 
 def test_go_bare_identifier_defer_does_not_guard(tmp_path: Path) -> None:
