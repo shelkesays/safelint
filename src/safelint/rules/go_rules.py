@@ -25,7 +25,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.core._validators import _validated_string_list
-from safelint.languages._node_utils import node_text, walk
+from safelint.languages._node_utils import call_name, node_text, walk
 from safelint.rules.base import BaseRule
 
 
@@ -163,6 +163,12 @@ class PanicCallsOutsideTestsRule(BaseRule):
         acceptable test-failure signal, so the whole file is exempt - the
         same spirit as Rust's SAFE204 exempting ``#[test]`` / ``#[cfg(test)]``
         contexts.
+
+        The callee name is resolved via ``call_name`` so both the bare
+        builtin (``panic(...)`` -> ``"panic"``) and selector calls
+        (``log.Fatal(...)`` -> ``"Fatal"``, ``os.Exit(...)`` -> ``"Exit"``)
+        match - the latter is what the ``panic_calls_go`` default-config
+        note suggests adding.
         """
         if filepath.endswith("_test.go"):
             return []
@@ -171,14 +177,14 @@ class PanicCallsOutsideTestsRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type != "call_expression":
                 continue
-            function = node.child_by_field_name("function")
-            if function is None or function.type != "identifier" or node_text(function) not in panic_calls:
+            name = call_name(node)
+            if name is None or name not in panic_calls:
                 continue
             violations.append(
                 self._make_violation_for_node(
                     filepath,
                     node,
-                    f'"{node_text(function)}()" called outside a test - production code should return an error, not unwind the stack (Power of Ten rule 1)',
+                    f'"{name}()" called outside a test - production code should return an error, not unwind the stack (Power of Ten rule 1)',
                 )
             )
         return violations

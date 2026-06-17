@@ -118,3 +118,14 @@ def test_go_custom_panic_call_via_config(tmp_path: Path) -> None:
     assert not any(v.code == "SAFE211" for v in _engine(_SAFE211).check_file(str(sample)).violations)
     cfg = {"rules": {"panic_calls_outside_tests": {"enabled": True, "panic_calls_go": ["fatal"]}}}
     assert any(v.code == "SAFE211" for v in _engine(cfg).check_file(str(sample)).violations)
+
+
+def test_go_selector_panic_calls_match_via_config(tmp_path: Path) -> None:
+    """Selector calls like ``log.Fatal`` / ``os.Exit`` match by resolved bareword (`Fatal` / `Exit`)."""
+    sample = tmp_path / "fatalexit.go"
+    sample.write_text('package main\nfunc f() {\n\tlog.Fatal("boom")\n\tos.Exit(1)\n}\n', encoding="utf-8")
+    # Default config (`["panic"]`) does not flag these.
+    assert not any(v.code == "SAFE211" for v in _engine(_SAFE211).check_file(str(sample)).violations)
+    cfg = {"rules": {"panic_calls_outside_tests": {"enabled": True, "panic_calls_go": ["Fatal", "Exit"]}}}
+    fired = [v for v in _engine(cfg).check_file(str(sample)).violations if v.code == "SAFE211"]
+    assert len(fired) == 2
