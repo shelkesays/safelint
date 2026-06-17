@@ -319,7 +319,7 @@ def _java_ancestor_is_guard(cur: tree_sitter.Node, prev: tree_sitter.Node, var_n
 
 
 def _go_acquired_variable_names(call_node: tree_sitter.Node) -> frozenset[str]:
-    """Return the variable names a Go acquirer call is assigned to.
+    """Return the variable name(s) a Go acquirer call is assigned to.
 
     Handles the three assignment shapes an acquirer can sit in:
 
@@ -331,28 +331,65 @@ def _go_acquired_variable_names(call_node: tree_sitter.Node) -> frozenset[str]:
       ``identifier`` children; the call lives in the trailing
       ``expression_list``.
 
+    **Positional mapping:** when several calls share one statement
+    (``a, b := os.Open(p1), os.Open(p2)``) and the LHS / RHS arities match,
+    each call resolves to *only* its positional LHS variable - otherwise a
+    ``defer a.Close()`` would wrongly mark ``b``'s acquirer guarded too.
+    Multi-value single calls (``f, err := os.Open(p)``) keep returning all
+    LHS names so either handle can satisfy the defer check.
+
     The blank identifier ``_`` is excluded (it discards the value, so there
     is no handle to close). Returns an empty set for a bare-expression
     acquirer (``os.Open(p)`` with no assignment) - no handle means it can
     never be deferred-closed, so it is always a leak.
     """
-    parent = call_node.parent
-    if parent is None or parent.type != "expression_list":
+    rhs_list = call_node.parent
+    if rhs_list is None or rhs_list.type != "expression_list":
         return frozenset()
-    container = parent.parent
+    container = rhs_list.parent
     if container is None:  # pragma: no cover - defensive: expression_list always has a parent
         return frozenset()
+    left_idents = _go_left_idents(container)
+    if left_idents is None:
+        return frozenset()
+    positional = _go_positional_name(call_node, left_idents, rhs_list.named_children)
+    if positional is not None:
+        return positional
+    return frozenset(t for t in (_node_text(n) for n in left_idents) if t != "_")
+
+
+def _go_positional_name(call_node: tree_sitter.Node, left_idents: list[tree_sitter.Node], right_exprs: list[tree_sitter.Node]) -> frozenset[str] | None:
+    """Return the positionally-matched LHS name set for *call_node*, or None to fall back.
+
+    Only applies when several RHS calls share the statement and the LHS / RHS
+    arities match (``a, b := f(), g()``); each call then maps to its own LHS
+    variable. Returns None (caller falls back to all LHS names) for the
+    single-call / mismatched-arity cases. A positional match onto ``_``
+    yields an empty set (discarded handle).
+    """
+    if len(right_exprs) <= 1 or len(left_idents) != len(right_exprs):
+        return None
+    idx = next((i for i, expr in enumerate(right_exprs) if expr.id == call_node.id), None)
+    if idx is None:  # pragma: no cover - defensive: call_node is one of rhs_list's children
+        return frozenset()
+    name = _node_text(left_idents[idx])
+    return frozenset({name}) if name != "_" else frozenset()
+
+
+def _go_left_idents(container: tree_sitter.Node) -> list[tree_sitter.Node] | None:
+    """Return the ordered LHS ``identifier`` nodes of an assignment / ``var`` spec, or None.
+
+    Order is preserved (including blank ``_``) so callers can map a RHS call
+    to its positional LHS target. Returns None for any other container
+    (e.g. a ``return`` statement) so a returned acquirer is treated as
+    having no local handle.
+    """
     if container.type in ("short_var_declaration", "assignment_statement"):
         left = container.child_by_field_name("left")
-        return _go_identifier_names(left) if left is not None else frozenset()
+        return [c for c in left.named_children if c.type == "identifier"] if left is not None else []
     if container.type == "var_spec":
-        return _go_identifier_names(container)
-    return frozenset()
-
-
-def _go_identifier_names(node: tree_sitter.Node) -> frozenset[str]:
-    """Return the non-blank ``identifier`` child names of *node*."""
-    return frozenset(_node_text(c) for c in node.named_children if c.type == "identifier" and _node_text(c) != "_")
+        return [c for c in container.named_children if c.type == "identifier"]
+    return None
 
 
 def _go_enclosing_function(node: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -365,16 +402,64 @@ def _go_enclosing_function(node: tree_sitter.Node) -> tree_sitter.Node | None:
     return None  # pragma: no cover - defensive: acquirer calls always sit inside a function
 
 
-def _go_defer_closes(func_node: tree_sitter.Node, var_names: frozenset[str]) -> bool:
-    """Return True if *func_node*'s body defers a ``<var>.Close()`` for any tracked handle.
+# Go control-flow / closure node types that break the "runs on every exit
+# path" guarantee for a ``defer``. A ``defer`` nested inside any of these is
+# conditional and does not reliably close a resource acquired unconditionally.
+_GO_NESTING_TYPES: frozenset[str] = frozenset(
+    {
+        "if_statement",
+        "for_statement",
+        "expression_switch_statement",
+        "type_switch_statement",
+        "select_statement",
+        "communication_case",
+        "expression_case",
+        "type_case",
+        "default_case",
+        "func_literal",
+    }
+)
+
+
+def _go_defer_closes(func_node: tree_sitter.Node, var_names: frozenset[str], acquirer: tree_sitter.Node) -> bool:
+    """Return True if *func_node* defers a ``<var>.Close()`` that actually guards *acquirer*.
 
     Walks the function body for ``defer_statement`` nodes, pruning nested
     function / closure bodies (a ``defer`` inside an inner closure guards
-    that closure's scope, not this one). The recognised safe form is the
-    direct ``defer f.Close()`` - a defer routed through a wrapping closure
-    (``defer func() { f.Close() }()``) is a documented blind spot.
+    that closure's scope, not this one). A defer guards the acquirer only when:
+
+    * it targets one of *var_names* in the ``defer f.Close()`` form (a defer
+      routed through a wrapping closure is a documented blind spot), AND
+    * it appears **after** the acquisition in source order - Go evaluates a
+      deferred call's receiver immediately, so ``defer f.Close()`` written
+      before ``f`` is assigned cannot close it, AND
+    * it sits at the function's top level, not inside a conditional / loop /
+      switch branch (see :data:`_GO_NESTING_TYPES`), so it runs on every exit
+      path from the unconditional acquisition.
     """
-    return any(n.type == "defer_statement" and _go_defer_targets(n, var_names) for n in walk(func_node, skip_types=tuple(_GO_FUNCTION_TYPES)))
+    for node in walk(func_node, skip_types=tuple(_GO_FUNCTION_TYPES)):
+        if node.type != "defer_statement" or not _go_defer_targets(node, var_names):
+            continue
+        if node.start_byte > acquirer.start_byte and _go_defer_is_unconditional(node, func_node):
+            return True
+    return False
+
+
+def _go_defer_is_unconditional(defer_node: tree_sitter.Node, func_node: tree_sitter.Node) -> bool:
+    """Return True if *defer_node* sits at *func_node*'s top level (no conditional ancestor).
+
+    Walks the parent chain from the defer up to the function node; if it
+    crosses any :data:`_GO_NESTING_TYPES` boundary the defer is conditional
+    and does not run on every exit path.
+    """
+    cur = defer_node.parent
+    while cur is not None:
+        if cur.id == func_node.id:
+            return True
+        if cur.type in _GO_NESTING_TYPES:
+            return False
+        cur = cur.parent
+    return True  # pragma: no cover - defensive: the defer always sits within func_node
 
 
 def _go_defer_targets(defer_node: tree_sitter.Node, var_names: frozenset[str]) -> bool:
@@ -492,25 +577,28 @@ class ResourceLifecycleRule(BaseRule):
             if node.type != "call_expression":
                 continue
             name = call_name(node)
-            if not name or name not in tracked or self._go_is_guarded(node):
+            if not name or name not in tracked:
                 continue
-            violations.append(
-                self._make_violation_for_node(
-                    filepath,
-                    node,
-                    f'"{name}()" acquires a resource with no deferred close - add `defer <resource>.Close()` immediately after acquiring it',
-                )
-            )
+            message = self._go_leak_message(node, name)
+            if message is not None:
+                violations.append(self._make_violation_for_node(filepath, node, message))
         return violations
 
     @staticmethod
-    def _go_is_guarded(call_node: tree_sitter.Node) -> bool:
-        """Return True if *call_node*'s acquired handle is deferred-closed in its function."""
+    def _go_leak_message(call_node: tree_sitter.Node, name: str) -> str | None:
+        """Return the SAFE401 message for *call_node*, or None when it is properly guarded.
+
+        Tailors the remediation to the acquirer shape: a bare-expression
+        acquirer has no handle to close, so the message says to capture it
+        first; a captured-but-unguarded handle just needs a `defer Close()`.
+        """
         var_names = _go_acquired_variable_names(call_node)
         if not var_names:
-            return False
+            return f'"{name}()" acquires a resource but discards the handle - capture it (e.g. `f, err := {name}(...)`) and add `defer f.Close()` so it is released on every exit path'
         func = _go_enclosing_function(call_node)
-        return func is not None and _go_defer_closes(func, var_names)
+        if func is not None and _go_defer_closes(func, var_names, call_node):
+            return None
+        return f'"{name}()" acquires a resource with no deferred close - add `defer <resource>.Close()` immediately after acquiring it (at the function\'s top level, after the acquisition)'
 
     @staticmethod
     def _python_collect_guarded(tree: tree_sitter.Tree, tracked: frozenset[str]) -> set[int]:

@@ -74,6 +74,27 @@ def test_go_nil_on_left_side_still_fires(tmp_path: Path) -> None:
     assert any(v.code == "SAFE209" for v in _engine(_SAFE209).check_file(str(sample)).violations)
 
 
+def test_go_err_eq_nil_empty_success_branch_is_clean(tmp_path: Path) -> None:
+    """``if err == nil {}`` (no else) is an empty success path, not a swallowed error."""
+    sample = tmp_path / "eqnil.go"
+    sample.write_text("package main\nfunc f() {\n\tif err == nil {}\n}\n", encoding="utf-8")
+    assert not any(v.code == "SAFE209" for v in _engine(_SAFE209).check_file(str(sample)).violations)
+
+
+def test_go_err_eq_nil_handled_in_else_is_clean(tmp_path: Path) -> None:
+    """``if err == nil { ok() } else { handle() }`` handles the error in the else - clean."""
+    sample = tmp_path / "eqnilhandled.go"
+    sample.write_text("package main\nfunc f() {\n\tif err == nil {\n\t\tok()\n\t} else {\n\t\treturn err\n\t}\n}\n", encoding="utf-8")
+    assert not any(v.code == "SAFE209" for v in _engine(_SAFE209).check_file(str(sample)).violations)
+
+
+def test_go_err_eq_nil_empty_else_fires(tmp_path: Path) -> None:
+    """``if err == nil { ok() } else {}`` swallows the error in the empty else branch."""
+    sample = tmp_path / "eqnilempty.go"
+    sample.write_text("package main\nfunc f() {\n\tif err == nil {\n\t\tok()\n\t} else {}\n}\n", encoding="utf-8")
+    assert any(v.code == "SAFE209" for v in _engine(_SAFE209).check_file(str(sample)).violations)
+
+
 def test_go_panic_in_production_fires_safe211(tmp_path: Path) -> None:
     """A ``panic(...)`` in a non-test file fires SAFE211."""
     sample = tmp_path / "prod.go"

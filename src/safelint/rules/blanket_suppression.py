@@ -110,14 +110,37 @@ def _go_blanket(comment_text: str) -> str | None:
     ``//`` (``//nolint``, not ``// nolint``), so the match requires the
     tight form - a prose comment that merely reads ``// nolint here`` is
     not a real directive and is left alone.
+
+    Only a non-empty ``:`` rule list scopes ``//nolint``. A trailing
+    human-readable reason does NOT scope it: ``//nolint // why`` and
+    ``//nolint:errcheck // why`` both keep their blanket / scoped status from
+    the rule list alone, so the former is still flagged.
     """
     text = comment_text.strip()
     if text.startswith("//nolint"):
-        rest = text[len("//nolint") :]
-        scope = rest[1:].strip() if rest.startswith(":") else rest.strip()
-        return "//nolint" if not scope else None
+        return _go_nolint_label(text[len("//nolint") :])
     if text.startswith("//lint:ignore"):
         return "//lint:ignore" if not text[len("//lint:ignore") :].strip() else None
+    return None
+
+
+def _go_nolint_label(rest: str) -> str | None:
+    """Classify the text following ``//nolint``: blanket -> label, scoped / non-directive -> None.
+
+    *rest* is everything after the literal ``//nolint``:
+
+    * ``""`` / starts with whitespace / starts with ``//`` (a trailing
+      reason) -> bare directive, blanket.
+    * ``:<linters>`` -> scoped to named linters (clean), unless the list is
+      empty (``//nolint:`` -> blanket). A trailing `` // reason`` after the
+      list is stripped before the emptiness check.
+    * anything else (e.g. ``//nolintfoo``) -> not a directive.
+    """
+    if rest.startswith(":"):
+        scope = rest[1:].split("//", 1)[0].strip()
+        return "//nolint" if not scope else None
+    if rest == "" or rest[0].isspace() or rest.startswith("//"):
+        return "//nolint"
     return None
 
 

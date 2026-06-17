@@ -27,7 +27,7 @@ v2.0.0+ ships every language grammar as an opt-in extra. Plain `pip install safe
 
 ## Rules that fire on Go
 
-Go is in scope for 19 cross-language rules plus 2 Go-only rules. 7 cross-language rules are deliberately skipped, see the next section. Like the other languages' optional rules, every dataflow rule and both Go-only rules are disabled by default.
+Go is in scope for 16 cross-language rules plus 2 Go-only rules (18 rules total for Go). 7 cross-language rules are deliberately skipped, see the next section. Like the other languages' optional rules, every dataflow rule and both Go-only rules are disabled by default.
 
 ### Cross-language rules
 

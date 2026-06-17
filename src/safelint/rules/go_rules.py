@@ -24,6 +24,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
+from safelint.core._validators import _validated_string_list
 from safelint.languages._node_utils import node_text, walk
 from safelint.rules.base import BaseRule
 
@@ -39,24 +40,31 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 
 
-def _is_nil_error_condition(condition: tree_sitter.Node, error_names: frozenset[str]) -> bool:
-    """Return True if *condition* compares an error name against ``nil``.
+def _nil_error_operator(condition: tree_sitter.Node, error_names: frozenset[str]) -> str | None:
+    """Return ``"!="`` / ``"=="`` if *condition* compares an error name to ``nil``, else None.
 
     Matches a ``binary_expression`` with an ``!=`` or ``==`` operator where
     one operand is an ``identifier`` whose text is in *error_names* and the
     other is the ``nil`` literal. Operand order is not assumed (``err != nil``
-    and ``nil != err`` both match).
+    and ``nil != err`` both match). The operator is returned so the caller can
+    pick the error-handling branch: ``!=`` puts it in the ``consequence``,
+    ``==`` puts it in the ``else`` (``alternative``).
     """
     if condition.type != "binary_expression":
-        return False
+        return None
     operator = condition.child_by_field_name("operator")
-    if operator is None or node_text(operator) not in ("!=", "=="):
-        return False
+    if operator is None:  # pragma: no cover - defensive: binary_expression always has an operator
+        return None
+    op_text = node_text(operator)
+    if op_text not in ("!=", "=="):
+        return None
     left = condition.child_by_field_name("left")
     right = condition.child_by_field_name("right")
     if left is None or right is None:  # pragma: no cover - defensive: binary_expression always has both
-        return False
-    return _is_err_nil_pair(left, right, error_names) or _is_err_nil_pair(right, left, error_names)
+        return None
+    if _is_err_nil_pair(left, right, error_names) or _is_err_nil_pair(right, left, error_names):
+        return op_text
+    return None
 
 
 def _is_err_nil_pair(err_side: tree_sitter.Node, nil_side: tree_sitter.Node, error_names: frozenset[str]) -> bool:
@@ -88,24 +96,50 @@ class EmptyErrorCheckRule(BaseRule):
     _DEFAULT_ERROR_NAMES: ClassVar[list[str]] = ["err"]
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Flag every ``if <err> != nil`` / ``== nil`` with an empty body."""
-        error_names = frozenset(self.config.get("error_names_go", self._DEFAULT_ERROR_NAMES))
+        """Flag an error nil-check whose error-handling branch is empty.
+
+        The branch that handles the error depends on the operator: ``err
+        != nil`` handles it in the ``consequence``, ``err == nil`` handles
+        it in the ``else`` (``alternative``). Only that branch is checked
+        for emptiness, so ``if err == nil { ... }`` (no else) and
+        ``if err == nil { ... } else if ... {}`` never produce false
+        positives - the error is handled elsewhere.
+        """
+        error_names = frozenset(_validated_string_list(self.config.get("error_names_go", self._DEFAULT_ERROR_NAMES), "error_names_go"))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type != "if_statement":
                 continue
-            condition = node.child_by_field_name("condition")
-            if condition is None or not _is_nil_error_condition(condition, error_names):
-                continue
-            if _block_is_empty(node.child_by_field_name("consequence")):
+            error_block = self._error_branch(node, error_names)
+            if error_block is not None and _block_is_empty(error_block):
                 violations.append(
                     self._make_violation_for_node(
                         filepath,
                         node,
-                        "Error checked but not handled - the `if err != nil` body is empty; handle the error, wrap it, or return it",
+                        "Error checked but not handled - the error-handling branch is empty; handle the error, wrap it, or return it",
                     )
                 )
         return violations
+
+    @staticmethod
+    def _error_branch(if_node: tree_sitter.Node, error_names: frozenset[str]) -> tree_sitter.Node | None:
+        """Return the ``block`` that should handle the error, or None if not an error nil-check.
+
+        ``err != nil`` -> the ``consequence`` block. ``err == nil`` -> the
+        ``alternative`` (else) block, and only when it is a plain ``block``
+        (an else-if chain is an ``if_statement`` and means the error path is
+        handled, so it never fires).
+        """
+        condition = if_node.child_by_field_name("condition")
+        if condition is None:  # pragma: no cover - defensive: if_statement always has a condition
+            return None
+        operator = _nil_error_operator(condition, error_names)
+        if operator is None:
+            return None
+        if operator == "!=":
+            return if_node.child_by_field_name("consequence")
+        alternative = if_node.child_by_field_name("alternative")
+        return alternative if alternative is not None and alternative.type == "block" else None
 
 
 # ---------------------------------------------------------------------------
@@ -132,7 +166,7 @@ class PanicCallsOutsideTestsRule(BaseRule):
         """
         if filepath.endswith("_test.go"):
             return []
-        panic_calls = frozenset(self.config.get("panic_calls_go", self._DEFAULT_PANIC_CALLS))
+        panic_calls = frozenset(_validated_string_list(self.config.get("panic_calls_go", self._DEFAULT_PANIC_CALLS), "panic_calls_go"))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type != "call_expression":

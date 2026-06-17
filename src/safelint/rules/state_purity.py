@@ -355,12 +355,24 @@ class GlobalMutationRule(BaseRule):
 
         The single form ``var x int`` holds the ``var_spec`` directly; the
         grouped form ``var ( a int; b, c string )`` wraps several
-        ``var_spec`` nodes in a ``var_spec_list``. Walking the declaration
-        finds the specs in both shapes; each spec can bind several names
-        (``var a, b int``), so emit one violation per declared name.
+        ``var_spec`` nodes in a ``var_spec_list``. Both shapes are handled by
+        looking only at the declaration's direct ``var_spec`` children (and
+        one level into ``var_spec_list``) - NOT a full ``walk``, which would
+        descend into initialiser expressions and wrongly report a ``var``
+        declared inside a function-literal initialiser as package-level state.
         """
         out: list[Violation] = []
-        for spec in walk(var_decl):
+        for child in var_decl.named_children:
+            if child.type == "var_spec":
+                out.extend(self._go_spec_violations(filepath, child))
+            elif child.type == "var_spec_list":
+                out.extend(self._go_spec_list_violations(filepath, child))
+        return out
+
+    def _go_spec_list_violations(self, filepath: str, spec_list: tree_sitter.Node) -> list[Violation]:
+        """Return violations for every ``var_spec`` inside a grouped ``var ( ... )`` block."""
+        out: list[Violation] = []
+        for spec in spec_list.named_children:
             if spec.type == "var_spec":
                 out.extend(self._go_spec_violations(filepath, spec))
         return out
@@ -371,7 +383,9 @@ class GlobalMutationRule(BaseRule):
         Only the spec's direct ``identifier`` children are names; the type
         (``type_identifier``) and any initializer (nested in
         ``expression_list``) are not direct ``identifier`` children, so they
-        are excluded without extra filtering.
+        are excluded without extra filtering. The blank identifier ``_`` is
+        skipped - ``var _ io.Reader = (*T)(nil)`` is a compile-time interface
+        assertion, not mutable state.
         """
         return [
             self._make_violation_for_node(
@@ -380,7 +394,7 @@ class GlobalMutationRule(BaseRule):
                 f'Package-level var "{node_text(ident)}" is shared mutable state - scope it to its consumer, or use `const` if it never changes (Power of Ten rule 6)',
             )
             for ident in spec.named_children
-            if ident.type == "identifier"
+            if ident.type == "identifier" and node_text(ident) != "_"
         ]
 
     def _java_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:

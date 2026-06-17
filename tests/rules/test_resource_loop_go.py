@@ -101,13 +101,48 @@ def test_go_chained_selector_defer_does_not_guard(tmp_path: Path) -> None:
 
 
 def test_go_var_form_acquirer_with_defer_is_clean(tmp_path: Path) -> None:
-    """A ``var file = os.Open(p)`` paired with ``defer file.Close()`` is clean."""
+    """A ``var file, _ = os.Open(p)`` paired with ``defer file.Close()`` is clean.
+
+    ``os.Open`` returns ``(*os.File, error)``, so the valid ``var`` form binds
+    both results; this exercises the ``var_spec`` acquirer path.
+    """
     sample = tmp_path / "varform.go"
     sample.write_text(
-        "package main\nfunc f(p string) {\n\tvar file = os.Open(p)\n\tdefer file.Close()\n\tuse(file)\n}\n",
+        "package main\nfunc f(p string) {\n\tvar file, _ = os.Open(p)\n\tdefer file.Close()\n\tuse(file)\n}\n",
         encoding="utf-8",
     )
     assert not any(v.code == "SAFE401" for v in _engine().check_file(str(sample)).violations)
+
+
+def test_go_multi_acquirer_only_one_deferred_fires_for_the_other(tmp_path: Path) -> None:
+    """``a, b := os.Open(p1), os.Open(p2)`` with only ``defer a.Close()`` leaks ``b``."""
+    sample = tmp_path / "multi.go"
+    sample.write_text(
+        "package main\nfunc f(p1, p2 string) {\n\ta, b := os.Open(p1), os.Open(p2)\n\tdefer a.Close()\n\tuse(a, b)\n}\n",
+        encoding="utf-8",
+    )
+    safe401 = [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE401"]
+    assert len(safe401) == 1  # only the b acquirer leaks
+
+
+def test_go_defer_before_acquisition_does_not_guard(tmp_path: Path) -> None:
+    """A ``defer f.Close()`` written before ``f`` is acquired cannot close it (Go evaluates the receiver at defer time)."""
+    sample = tmp_path / "deferbefore.go"
+    sample.write_text(
+        "package main\nfunc f(p string) {\n\tdefer f.Close()\n\tf, _ := os.Open(p)\n\tuse(f)\n}\n",
+        encoding="utf-8",
+    )
+    assert any(v.code == "SAFE401" for v in _engine().check_file(str(sample)).violations)
+
+
+def test_go_conditional_defer_does_not_guard(tmp_path: Path) -> None:
+    """A ``defer f.Close()`` nested inside an ``if`` does not run on every exit path."""
+    sample = tmp_path / "conddefer.go"
+    sample.write_text(
+        "package main\nfunc f(p string) {\n\tf, _ := os.Open(p)\n\tif cond {\n\t\tdefer f.Close()\n\t}\n\tuse(f)\n}\n",
+        encoding="utf-8",
+    )
+    assert any(v.code == "SAFE401" for v in _engine().check_file(str(sample)).violations)
 
 
 def test_go_bare_infinite_for_fires_safe501(tmp_path: Path) -> None:
