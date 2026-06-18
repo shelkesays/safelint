@@ -194,7 +194,7 @@ If the new language's API surface is uniform across runtimes (or the runtime fra
 ### 7. Update tests and docs
 
 * Tests under `tests/` should add a per-language test file (e.g. `test_engine_typescript.py`) covering at minimum: discovery picks up the extension, the suppression parser recognises `// nosafe`, and at least one rule fires on a known-bad TS file.
-* The [Rules reference](../configuration/rules.md) rule-by-rule table should grow a "Languages" column; also update its "Currently supported" list and rule-scope table, and **remove the language from "Planned"**. Add a `docs/languages/<lang>.md` page and its `mkdocs.yml` nav entry.
+* The [Rules reference](../configuration/rules.md): add the language to the "Currently supported" list and the "Rule scope (current languages)" table, and **remove it from "Planned"** (the at-a-glance table is generated from `ALL_RULES`, so it picks up the new language automatically). Add a `docs/languages/<lang>.md` page and its `mkdocs.yml` nav entry.
 * `README.md` and `docs/index.md` should list the supported languages prominently (language table + "Rule coverage" paragraph) and refresh every **count** ("N rules", "N languages").
 * **Scattered enumerations** - the easily-missed part. Several docs list *every* language's extension / grammar / accepted `--language` value outside the headline language tables; each needs the new language appended:
     * [CLI reference](../configuration/cli.md): the `--all-files` supported-extension list and the `--language <LANG>` accepted-value list.
