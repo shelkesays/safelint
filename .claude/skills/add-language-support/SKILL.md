@@ -141,13 +141,16 @@ preset). Part C lists the conventions and the validation gate shared by both.
       never MAJOR (project semver policy; JS itself shipped as 1.13.0).
 - [ ] Stale-count + enumeration sweep: `grep -rn` for the old counts
       ("N rules", "five languages", "N cross-language") AND for the
-      previous language's tokens (its extension like `.rs`, its name like
-      `\brust\b`, its grammar `tree-sitter-rust`) across `docs/`,
-      `README.md`, `SECURITY.md`, `src/safelint/skill_files/`. Every
-      extension list, grammar list, `--language` value list, and rule-set
-      enumeration that names the prior languages must gain the new one -
-      these scattered lists (NOT the headline language tables) are the most
-      common miss. Tip: `for f in $(grep -rl '\.rs' docs README.md SECURITY.md); do grep -L '\.go' "$f"; done`
+      previous language's tokens - its extension (e.g. `.rs`), its name as a
+      whole word (`grep -w rust`, since plain `grep` does not treat `\b` as
+      a word boundary), and its grammar (`tree-sitter-rust`) - across
+      `docs/`, `README.md`, `SECURITY.md`, `src/safelint/skill_files/`.
+      Every extension list, grammar list, `--language` value list, and
+      rule-set enumeration that names the prior languages must gain the new
+      one; these scattered lists (NOT the headline language tables) are the
+      most common miss. Tip - substitute the previous language's extension
+      for `<prev-ext>` and the new one for `<new-ext>` (e.g. `.rs` and `.go`
+      when Go follows Rust): `for f in $(grep -rl '<prev-ext>' docs README.md SECURITY.md); do grep -L '<new-ext>' "$f"; done`
       surfaces files that mention the old extension but not the new one.
 - [ ] Do NOT bump the version; releases are the owner's call.
 
