@@ -151,6 +151,45 @@ preset). Part C lists the conventions and the validation gate shared by both.
       surfaces files that mention the old extension but not the new one.
 - [ ] Do NOT bump the version; releases are the owner's call.
 
+### A10. Common pitfalls (review-caught in the Go port - design for these upfront)
+
+Real bugs the bot reviewers caught *after* the Go PR opened. They generalise;
+build them in from the start rather than waiting for review:
+
+- [ ] **Validate config lists.** A new language-only rule that reads a config
+      list (`error_names_<lang>`, `panic_calls_<lang>`, ...) must pass it
+      through `_validated_string_list(...)`. A mistyped scalar
+      (`error_names_go = "err"`) otherwise becomes a set of single characters
+      and silently disables matching.
+- [ ] **Test samples must be VALID in the target language.** Tree-sitter
+      parses leniently, so a *type*-invalid sample (a value returned from a
+      void function, a single-target bind of a multi-value call) does NOT
+      raise a parse error - the test then passes for the wrong reason. Write
+      samples that would actually compile.
+- [ ] **Resolve callee names with `call_name`, not a hand-rolled
+      `identifier`-only check.** It covers BOTH bare calls (`panic(...)`) and
+      qualified / selector / method calls (`log.Fatal(...)`, `pkg.Fn(...)`).
+      Matching only the bare-identifier shape silently drops every configured
+      qualified-call name (this hit SAFE211's `Fatal` / `Exit`).
+- [ ] **Resource-cleanup detection (SAFE401-family).** The cleanup must occur
+      *after* the acquisition and on *all* exit paths - reject cleanups that
+      precede the acquire or sit inside a conditional branch; map a
+      multi-acquirer statement positionally to each handle; a directly
+      returned acquirer transfers ownership (not a local leak). Tailor the
+      message to the shape (no-handle / package-scope cases can't use the
+      normal `defer`/`with`/`finally` fix).
+- [ ] **Declaration-site walks (global-state-family).** Iterate the
+      declaration's direct children; do NOT `walk()` into initializer
+      expressions (a nested local declaration is not module/package-level
+      state). Skip blank / discard identifiers (`_`).
+- [ ] **Compound assignments preserve taint** in the dataflow tracker:
+      `x += clean` is read-modify-write, so it must OR with x's prior taint,
+      not overwrite it.
+- [ ] **Keep the Python that implements all this passing safelint's own
+      rules** - new helpers must obey `function_length` / `nesting_depth` /
+      `complexity` / `no_recursion`; factor into small helpers rather than
+      annotating (the Go port needed several such splits).
+
 ---
 
 ## Part B: Adding a framework / runtime preset
