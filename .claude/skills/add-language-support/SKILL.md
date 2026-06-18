@@ -106,6 +106,19 @@ preset). Part C lists the conventions and the validation gate shared by both.
       `[tool.safelint.rules.<rule>]` (pyproject.toml) and `[rules.<rule>]`
       (standalone safelint.toml). Check `docs/configuration/toml.md` too if
       the language gains a preset axis (see Part B).
+- [ ] **Secondary enumerations** (the docs that list *every* language's
+      extension / grammar / `--language` value OUTSIDE the headline language
+      tables - the v2.5.0 Go addition missed all of these; they are not
+      caught by the language-table edits above):
+      - `docs/configuration/cli.md`: the `--all-files` supported-extension
+        list AND the `--language <LANG>` accepted-value list.
+      - `SECURITY.md` (repo root - `docs/project/security.md` is a
+        build-time copy, edit the root): the supported-versions table
+        ("current" row), the bundled-grammar supply-chain list
+        (`tree-sitter-<lang>`), and the "files read from the working tree"
+        extension list.
+      - `docs/configuration/toml.md`: the "enable opt-in rules" walkthrough
+        (add the language's new opt-in / language-only rules).
 
 ### A8. Bundled AI-client skill files (drift-test enforced)
 
@@ -126,9 +139,16 @@ preset). Part C lists the conventions and the validation gate shared by both.
 
 - [ ] `CHANGELOG.md` under `[Unreleased]` -> Added. New language = MINOR,
       never MAJOR (project semver policy; JS itself shipped as 1.13.0).
-- [ ] Stale-count sweep: `grep -rn` for the old counts ("N rules", "five
-      languages", "N cross-language") across `docs/`, `README.md`,
-      `src/safelint/skill_files/` - this is the most common review finding.
+- [ ] Stale-count + enumeration sweep: `grep -rn` for the old counts
+      ("N rules", "five languages", "N cross-language") AND for the
+      previous language's tokens (its extension like `.rs`, its name like
+      `\brust\b`, its grammar `tree-sitter-rust`) across `docs/`,
+      `README.md`, `SECURITY.md`, `src/safelint/skill_files/`. Every
+      extension list, grammar list, `--language` value list, and rule-set
+      enumeration that names the prior languages must gain the new one -
+      these scattered lists (NOT the headline language tables) are the most
+      common miss. Tip: `for f in $(grep -rl '\.rs' docs README.md SECURITY.md); do grep -L '\.go' "$f"; done`
+      surfaces files that mention the old extension but not the new one.
 - [ ] Do NOT bump the version; releases are the owner's call.
 
 ---
