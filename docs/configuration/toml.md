@@ -392,6 +392,7 @@ Later   - enable opt-in rules as needed:
           - dataflow:   tainted_sink, return_value_ignored, null_dereference
           - rule 8/10:  dynamic_code_execution, blanket_suppression (all languages)
           - Rust:       interior_mutable_static and the other Rust-only rules
+          - Go:         empty_error_check, panic_calls_outside_tests
           - test discipline: missing_assertions (set min_assertions = 2 for the
                         Holzmann density), test_existence, test_coupling
 ```
