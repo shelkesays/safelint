@@ -1,4 +1,4 @@
-# Language-expansion plan: Go, C, C++, PHP
+# Language-expansion plan: C, C++, PHP
 
 **Audience**: the AI coding agent (or human contributor) implementing the next
 language. Each language has its own self-contained spec in this directory.
@@ -6,14 +6,21 @@ Implement **one language per spec, in this exact sequence** (it matches the
 project's published roadmap in `docs/configuration/rules.md` "Planned", and
 C++ has a hard dependency on C):
 
+> **Go (`.go`) shipped in v2.5.0** (6th registered language: 16 cross-language
+> rules + the Go-only SAFE209 `empty_error_check` / SAFE211
+> `panic_calls_outside_tests`). Its spec, `plan/01-go.md`, was removed on
+> completion - the design decisions now live in the
+> [Go language page](../docs/languages/go.md), the `skill_files/languages/go.md`
+> addendum, and the shipped code.
+
 | # | Spec | Language | Status | Depends on |
 |---|---|---|---|---|
-| 1 | `plan/01-go.md` | Go (`.go`) | **shipped** (Unreleased; 16 cross-language rules + SAFE209 / SAFE211) | nothing |
-| 2 | `plan/02-c.md` | C (`.c`, `.h`) | not started | nothing (Go recommended first, roadmap order) |
+| 2 | `plan/02-c.md` | C (`.c`, `.h`) | not started | nothing (next in roadmap order) |
 | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started | **C shipped** (shared grammar family, shared new rules, `.h` ownership) |
 | 4 | `plan/04-php.md` | PHP (`.php`) | not started | nothing |
 
-Update the Status column (and the per-spec status header) as work lands.
+Update the Status column (and the per-spec status header) as work lands; remove
+a spec file once its language ships (as was done for Go).
 
 ## How to use these specs
 
@@ -79,9 +86,9 @@ Update the Status column (and the per-spec status header) as work lands.
 
   ```bash
   uv run python - <<'PY'
-  import tree_sitter, tree_sitter_go  # adjust per language
-  lang = tree_sitter.Language(tree_sitter_go.language())
-  tree = tree_sitter.Parser(lang).parse(b"func main() { go run() }")
+  import tree_sitter, tree_sitter_c  # adjust per language (next up: C)
+  lang = tree_sitter.Language(tree_sitter_c.language())
+  tree = tree_sitter.Parser(lang).parse(b"int main(void) { return f(); }")
   # Iterative on purpose - the same worklist shape production code must use
   # (safelint's own no_recursion rule polices the codebase).
   stack = [(tree.root_node, 0)]
