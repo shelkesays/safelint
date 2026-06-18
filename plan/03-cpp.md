@@ -99,4 +99,13 @@ Shared checklist (plan/README.md), with the C++-specific content:
   new rule codes/names in all 14 client tables; **SAFE201's row text in all
   14 clients says "Python-only" today and must be reworded** (drift test only
   checks presence, not accuracy - this one is on you).
-- CHANGELOG `[Unreleased]`; stale-count sweep.
+- **Scattered enumerations (the Go miss - OUTSIDE the language tables):**
+  `docs/configuration/cli.md` (`--all-files` extension list + `--language`
+  values), `SECURITY.md` (supported-versions table, `tree-sitter-<lang>`
+  grammar list, files-read extension list), `docs/configuration/toml.md`
+  (opt-in-rules walkthrough), and `CONTRIBUTING.md` (language count +
+  examples). C++ adds several extensions (`.cpp` / `.cxx` / `.cc` / `.hpp` /
+  `.hxx` / `.hh`) - every extension list above needs all of them.
+- CHANGELOG `[Unreleased]`; stale-count **and enumeration** sweep: grep the
+  prior language's extension / name / `tree-sitter-<lang>` across `docs/`,
+  `README.md`, `SECURITY.md`, and `src/safelint/skill_files/`.

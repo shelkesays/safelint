@@ -117,5 +117,14 @@ Shared checklist (plan/README.md), with the PHP-specific content:
   gains its next candidates; ask the maintainer which**.
 - Skill files: `languages/php.md` addendum, 14 Step-2 rows, README counts,
   reworded SAFE301 rows in all 14 client tables.
-- CHANGELOG `[Unreleased]`; stale-count sweep (the wording "all-five-languages
-  set" will be long gone by now - sweep whatever the current phrasing is).
+- **Scattered enumerations (the Go miss - OUTSIDE the language tables):**
+  `docs/configuration/cli.md` (`--all-files` extension list + `--language`
+  values), `SECURITY.md` (supported-versions table, `tree-sitter-<lang>`
+  grammar list, files-read extension list), `docs/configuration/toml.md`
+  (opt-in-rules walkthrough), and `CONTRIBUTING.md` (language count +
+  examples).
+- CHANGELOG `[Unreleased]`; stale-count **and enumeration** sweep: grep the
+  prior language's extension / name / `tree-sitter-<lang>` across `docs/`,
+  `README.md`, `SECURITY.md`, and `src/safelint/skill_files/` (the wording
+  "all-five-languages set" will be long gone by now - sweep whatever the
+  current phrasing is).
