@@ -9,7 +9,7 @@ Security fixes ship to the supported lines below. Older lines receive no securit
 | Version line | Status |
 |---|---|
 | **2.5.x** (current; Go support) | ✅ Security fixes |
-| **2.2.x - 2.4.x** (Rust support and later) | ✅ Security fixes through ~6 months after the next minor lands |
+| **2.2.x - 2.4.x** (Rust support) | ✅ Security fixes through ~6 months after the next minor lands |
 | **2.1.x** (Java + Spring Boot) | ❌ Upgrade to a current 2.x line |
 | **2.0.x** (multi-language refactor) | ❌ Upgrade to a current 2.x line |
 | **1.x** | ❌ Upgrade to 2.x |
@@ -51,7 +51,7 @@ The following classes of issue are vulnerabilities for safelint:
 - **Path traversal** in the `safelint skill install` flow. The install command creates files under `.claude/`, `.cursor/`, etc. (project scope) or `~/.claude/skills/safelint/` etc. (user scope). An attacker-controlled `--client` value, environment variable, or auto-detected marker path that allows writes outside those directories is in scope.
 - **Arbitrary file write or read** via crafted TOML config. The `[tool.safelint.*]` config in `pyproject.toml` / `safelint.toml` is parsed with the stdlib `tomllib`. Any field whose value can escape to filesystem or network surface is in scope (e.g. a glob in `per_file_ignores` that traverses outside the project root and bypasses safety checks).
 - **Code execution** in any form. safelint deliberately does not `eval` / `exec` / `subprocess` user code or config. If you find a path that does, that's in scope.
-- **Bundled grammar tampering**. SafeLint depends on `tree-sitter`, `tree-sitter-python`, `tree-sitter-javascript`, `tree-sitter-typescript`, `tree-sitter-java`, `tree-sitter-rust`, and `tree-sitter-go` from PyPI. A typosquat or malicious dependency that ships through the published `safelint` package is in scope; report alongside the PyPI advisory mechanism if applicable.
+- **Bundled grammar tampering**. SafeLint's only unconditional runtime dependency is `tree-sitter`; the per-language grammar packages (`tree-sitter-python`, `tree-sitter-javascript`, `tree-sitter-typescript`, `tree-sitter-java`, `tree-sitter-rust`, `tree-sitter-go`) ship as **optional extras** (the base install ships no grammars), pulled in by the matching `safelint[<lang>]` / `safelint[all]` extra. A typosquat or malicious dependency that ships through the published `safelint` package or one of those extras is in scope; report alongside the PyPI advisory mechanism if applicable.
 - **Symlink races** in the install or skill-status flow. The skill-install logic creates symlinks when `--symlink` is passed; race-conditioned attacks that swap target files are in scope.
 - **Privilege escalation** from the CLI's own permissions. safelint runs with the invoking user's permissions; any path that gains more than that is in scope.
 
