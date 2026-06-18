@@ -549,6 +549,8 @@
       
         
       
+        
+      
     
     
     
@@ -721,6 +723,34 @@
     
   
     Rust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../languages/go/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go
   
 
     
@@ -1645,6 +1675,45 @@
     <span class="md-ellipsis">
       
         SAFE602: undocumented_unsafe
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#go-only-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Go-only rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Go-only rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#safe209-empty_error_check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE209: empty_error_check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe211-panic_calls_outside_tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE211: panic_calls_outside_tests
       
     </span>
   </a>
@@ -3433,6 +3502,45 @@
   
 </li>
       
+        <li class="md-nav__item">
+  <a href="#go-only-rules" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Go-only rules
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Go-only rules">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#safe209-empty_error_check" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE209: empty_error_check
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe211-panic_calls_outside_tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE211: panic_calls_outside_tests
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
     </ul>
   
 </nav>
@@ -3477,11 +3585,11 @@
 <li><strong>TypeScript</strong> (<code>.ts</code>, <code>.tsx</code>), and <strong>AssemblyScript</strong> (<code>.as</code>, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, <code>as</code> casts, non-null assertions, <code>declare global</code> ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See <a href="../../languages/typescript/">TypeScript</a> for the full language reference.</li>
 <li><strong>Java</strong> (<code>.java</code>), new in v2.1.0. 20 rules apply (the 15 cross-language core plus the 5 also registered for Python / JS / TS) plus 4 Spring Boot framework-specific structural rules (<code>SAFE901-904</code>) target Spring annotation patterns. Per-framework <em>defaults</em> (sinks, nullable methods, structural rule enablement) are switchable via the <a href="../../languages/java/#framework-presets"><code>[tool.safelint.java] framework = "..."</code></a> preset (<code>vanilla</code> / <code>spring-boot</code>). See <a href="../../languages/java/">Java</a> for the full language reference.</li>
 <li><strong>Rust</strong> (<code>.rs</code>), new in v2.2.0. 15 of the cross-language rules port cleanly (the all-five-languages set) plus 11 Rust-only rules cover Rust-idiom-specific patterns (panic-in-non-test, lock poisoning, <code>unsafe</code> block documentation, truncating <code>as</code> casts, silent <code>Err</code> arms, dangerous <code>mem::*</code> ops, needless <code>mut</code>, unchecked arithmetic on integer parameters, broad <code>.unwrap()</code> outside tests, interior-mutable <code>static</code>s, plus the empty-<code>Err</code> / unlogged-<code>Err</code> Rust analogues of <code>empty_except</code> / <code>logging_on_error</code>). 7 rules deliberately skipped for Rust because their semantics don't translate cleanly (Rust has no try/catch / <code>global</code> keyword, RAII / Drop covers resource cleanup, and macros are opaque to the rule-8 dynamic-execution check). Recognises both inline <code>#[cfg(test)] mod tests</code> and Cargo <code>tests/&lt;stem&gt;.rs</code> integration-test conventions. See <a href="../../languages/rust/">Rust</a> for the full language reference.</li>
+<li><strong>Go</strong> (<code>.go</code>), new in v2.5.0. 16 cross-language rules apply (the 13 all-six core plus SAFE302 / SAFE309 / SAFE401, which Go shares with Python / JS / TS / Java but Rust skips) and 2 Go-only rules cover Go-idiom patterns: SAFE209 (<code>empty_error_check</code>, the empty <code>if err != nil {}</code> swallow) and SAFE211 (<code>panic_calls_outside_tests</code>). 7 rules deliberately skipped for Go because their semantics don't translate cleanly (no try/catch, no <code>global</code> keyword, no <code>var</code> hoisting, no production assertion idiom, no chained-nullable idiom). Headline Go adaptations: the bare <code>for {}</code> infinite loop (SAFE501), the sibling <code>foo_test.go</code> convention (SAFE701 / SAFE702), the <code>_ = f()</code> explicit-discard exemption (SAFE802), and the <code>defer x.Close()</code> resource form (SAFE401). See <a href="../../languages/go/">Go</a> for the full language reference.</li>
 </ul>
 <h3 id="planned">Planned<a class="headerlink" href="#planned" title="Permanent link">#</a></h3>
 <p>Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see <a href="../../contributing/adding-a-language/">Adding a language</a>) makes each new language incremental, community contributions for any of these are welcome.</p>
 <ol>
-<li><strong>Go</strong> (<code>.go</code>).</li>
 <li><strong>C</strong> (<code>.c</code>, <code>.h</code>), Holzmann's original target language.</li>
 <li><strong>C++</strong> (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.</li>
 <li><strong>PHP</strong> (<code>.php</code>).</li>
@@ -3497,24 +3605,34 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>Cross-language</strong> (Python, JavaScript, TypeScript, Java, Rust)</td>
-<td>15</td>
-<td>SAFE101, SAFE102, SAFE103, SAFE104, SAFE105 (<code>no_recursion</code>), SAFE303, SAFE304, SAFE501, SAFE601, SAFE603 (<code>blanket_suppression</code>), SAFE701, SAFE702, SAFE801, SAFE802, SAFE803 (apply to all five).</td>
+<td><strong>Cross-language</strong> (all six: Python, JavaScript, TypeScript, Java, Rust, Go)</td>
+<td>13</td>
+<td>SAFE101, SAFE102, SAFE103, SAFE104, SAFE105 (<code>no_recursion</code>), SAFE303, SAFE304, SAFE501, SAFE603 (<code>blanket_suppression</code>), SAFE701, SAFE702, SAFE801, SAFE802 (apply to all six).</td>
 </tr>
 <tr>
-<td><strong>Python / JS / TS / Java</strong> (not Rust)</td>
-<td>5</td>
-<td>SAFE202 (<code>empty_except</code>), SAFE203 (<code>logging_on_error</code>), SAFE302 (<code>global_mutation</code>), SAFE309 (<code>dynamic_code_execution</code>), SAFE401 (<code>resource_lifecycle</code>). Rust's analogues are covered separately: SAFE206 / SAFE207 (try/catch), SAFE307 + SAFE602 (mutable statics), Drop (resource lifecycle), and macros are an opaque token-tree limitation for rule 8.</td>
+<td><strong>Python / JS / TS / Java / Rust</strong> (not Go)</td>
+<td>2</td>
+<td>SAFE601 (<code>missing_assertions</code>), SAFE803 (<code>null_dereference</code>); Go has no production assertion idiom and no chained-nullable idiom (nil-pointer analysis needs type information).</td>
+</tr>
+<tr>
+<td><strong>Python / JS / TS / Java / Go</strong> (not Rust)</td>
+<td>3</td>
+<td>SAFE302 (<code>global_mutation</code>), SAFE309 (<code>dynamic_code_execution</code>), SAFE401 (<code>resource_lifecycle</code>). Rust's analogues are covered separately: SAFE307 + SAFE602 (mutable statics), Drop (resource lifecycle), and macros are an opaque token-tree limitation for rule 8. Go fires on package-level <code>var</code> (SAFE302), reflection / plugin loading (SAFE309), and the <code>defer x.Close()</code> form (SAFE401).</td>
+</tr>
+<tr>
+<td><strong>Python / JS / TS / Java</strong> (not Rust, not Go)</td>
+<td>2</td>
+<td>SAFE202 (<code>empty_except</code>), SAFE203 (<code>logging_on_error</code>). Neither Rust nor Go has try/catch; Rust's analogues are SAFE206 / SAFE207, and Go's empty-<code>if err != nil</code> swallow is covered by SAFE209.</td>
 </tr>
 <tr>
 <td><strong>Python-only</strong></td>
 <td>2</td>
-<td>SAFE201 (<code>bare_except</code>), SAFE301 (<code>global_state</code>); JS / TS / Java / Rust have no <code>global</code> keyword and JS / TS / Java catches always bind the error.</td>
+<td>SAFE201 (<code>bare_except</code>), SAFE301 (<code>global_state</code>); JS / TS / Java / Rust / Go have no <code>global</code> keyword and JS / TS / Java catches always bind the error.</td>
 </tr>
 <tr>
 <td><strong>JavaScript-family-only</strong> (JS and TS)</td>
 <td>1</td>
-<td>SAFE305 (<code>wide_scope_declaration</code>); Python / Java / Rust have no <code>var</code> / <code>let</code> / <code>const</code> distinction.</td>
+<td>SAFE305 (<code>wide_scope_declaration</code>); Python / Java / Rust / Go have no <code>var</code> / <code>let</code> / <code>const</code> distinction.</td>
 </tr>
 <tr>
 <td><strong>Java + Spring Boot only</strong></td>
@@ -3525,6 +3643,11 @@
 <td><strong>Rust-only</strong></td>
 <td>11</td>
 <td>SAFE110 (<code>needless_mut</code>), SAFE112 (<code>unchecked_arithmetic_on_input</code>), SAFE204 (<code>panic_macros_outside_tests</code>), SAFE205 (<code>lock_poisoning_ignored</code>), SAFE206 (<code>silent_result_discard</code>, the Rust analogue of SAFE202), SAFE207 (<code>unlogged_error_branch</code>, the Rust analogue of SAFE203), SAFE208 (<code>result_unwrap_outside_tests</code>), SAFE306 (<code>dangerous_mem_ops</code>), SAFE307 (<code>interior_mutable_static</code>), SAFE308 (<code>truncating_as_cast</code>), SAFE602 (<code>undocumented_unsafe</code>); all default-disabled.</td>
+</tr>
+<tr>
+<td><strong>Go-only</strong></td>
+<td>2</td>
+<td>SAFE209 (<code>empty_error_check</code>, the Go analogue of SAFE206), SAFE211 (<code>panic_calls_outside_tests</code>, the Go analogue of SAFE204); both default-disabled.</td>
 </tr>
 </tbody>
 </table>
@@ -3768,6 +3891,18 @@
 <tr>
 <td><a href="#safe307-interior_mutable_static"><code>SAFE307</code></a></td>
 <td><code>interior_mutable_static</code></td>
+<td>warning</td>
+<td>no</td>
+</tr>
+<tr>
+<td><a href="#safe209-empty_error_check"><code>SAFE209</code></a></td>
+<td><code>empty_error_check</code></td>
+<td>warning</td>
+<td>no</td>
+</tr>
+<tr>
+<td><a href="#safe211-panic_calls_outside_tests"><code>SAFE211</code></a></td>
+<td><code>panic_calls_outside_tests</code></td>
 <td>warning</td>
 <td>no</td>
 </tr>
@@ -4131,7 +4266,7 @@
 <p><strong>What it flags:</strong> shared module / global mutable state. Cross-language (Python, JavaScript, TypeScript, Java), the <em>intent</em> (Holzmann rule 6: declare data at the smallest possible scope) is the same, but the syntactic shape differs per language.</p>
 <p><strong>Python:</strong> by default, functions that declare <code>global x</code> and then assign to <code>x</code>. With <code>strict = true</code>, <em>any</em> <code>global</code> declaration is flagged regardless of whether a write follows. This is stricter than <code>SAFE301</code>. The default behaviour is more nuanced than ruff's <code>PLW0603</code> (which fires on any <code>global</code>); set <code>strict = true</code> if your team's policy is to ban the keyword entirely.</p>
 <p><strong>JavaScript:</strong> function-body writes, <code>assignment_expression</code>, <code>augmented_assignment_expression</code>, or <code>update_expression</code> (<code>++</code> / <code>--</code>), whose target is a <code>member_expression</code> or <code>subscript_expression</code> rooted in a configured global namespace. The receiver chain is walked leftward, <code>process.env.NODE_ENV = '...'</code>, <code>process.env['NODE_ENV'] = '...'</code>, and <code>process.exitCode++</code> all resolve to <code>process</code> and fire. Bracket-notation writes (<code>globalThis['x'] = 1</code>, <code>window["config"] = {}</code>) work the same way as dot access. The default namespace list (<code>global_namespaces_javascript</code>) is <code>["globalThis", "window", "global", "self", "process"]</code>; runtime presets adjust this (browser drops <code>process</code>, adds <code>document</code>; Deno adds <code>Deno</code>, drops <code>window</code> and <code>process</code>). Module-level (top-of-file) writes do NOT fire, that's setup, not the bug pattern. Reading a global (<code>return globalThis.env;</code>) does NOT fire, only writes.</p>
-<p><strong>Java</strong> <em>(added in 2.4.0):</em> non-final <code>static</code> field declarations. This is <strong>declaration-site</strong> detection, not write-site: a mutable static field IS the smallest-scope violation regardless of where it is written, and a single tree walk over field declarations has near-zero false positives (the same shape PMD's <code>MutableStaticState</code> flags). <code>static final</code> fields are clean, even when the referent is interiorly mutable (<code>static final List&lt;String&gt; CACHE = new ArrayList&lt;&gt;()</code>) - detecting interior mutability would need type resolution safelint does not do, so it is a documented exclusion. Instance fields and local variables never fire. Interface fields are implicitly <code>public static final</code> and so are never flagged. This fulfils the Java SAFE302 work previously deferred in the language docs. <strong>Rust</strong> is not covered by SAFE302: <code>static mut</code> is unsafe-gated (SAFE602's territory) and safe interior-mutable statics are covered by SAFE307 (<code>interior_mutable_static</code>).</p>
+<p><strong>Java</strong> <em>(added in 2.4.0):</em> non-final <code>static</code> field declarations. This is <strong>declaration-site</strong> detection, not write-site: a mutable static field IS the smallest-scope violation regardless of where it is written, and a single tree walk over field declarations has near-zero false positives (the same shape PMD's <code>MutableStaticState</code> flags). <code>static final</code> fields are clean, even when the referent is interiorly mutable (<code>static final List&lt;String&gt; CACHE = new ArrayList&lt;&gt;()</code>) - detecting interior mutability would need type resolution safelint does not do, so it is a documented exclusion. Instance fields and local variables never fire. Interface fields are implicitly <code>public static final</code> and so are never flagged. This fulfils the Java SAFE302 work previously deferred in the language docs. <strong>Rust</strong> is not covered by SAFE302: <code>static mut</code> is unsafe-gated (SAFE602's territory) and safe interior-mutable statics are covered by SAFE307 (<code>interior_mutable_static</code>). <strong>Go</strong> <em>(added in 2.5.0):</em> declaration-site detection on every package-level <code>var</code>, including sentinel errors (<code>var ErrNotFound = errors.New(...)</code>) - the rule does not special-case the initialiser, so treat sentinels as immutable by suppressing with a per-file ignore or <code>//nosafe</code> if desired. <code>const</code> declarations and block-scoped <code>var</code> / <code>:=</code> inside functions are clean.</p>
 <table>
 <thead>
 <tr>
@@ -4373,7 +4508,7 @@
 <li><strong>JavaScript / TypeScript</strong> (<code>dynamic_exec_calls_javascript</code>): <code>eval</code>, <code>Function</code> (both <code>new Function(...)</code> and the bare <code>Function(...)</code> call), <code>execScript</code>. A bare-identifier callee is required, so <code>obj.eval()</code> does not fire. <code>setTimeout</code> / <code>setInterval</code> with a string first argument (the implicit-eval form) are deliberately not in the defaults: flagging every <code>setTimeout</code> would be noise, and detecting only the string-argument form is not worth the complexity for a near-extinct idiom; add them via the config list if your codebase still uses the string form.</li>
 <li><strong>Java</strong> (<code>dynamic_exec_calls_java</code>): <code>forName</code> (<code>Class.forName</code>), <code>invoke</code> (<code>Method.invoke</code>), <code>eval</code> (JSR-223 <code>ScriptEngine</code>), <code>defineClass</code>, <code>loadClass</code>. Matched by method name regardless of receiver, so a user-defined <code>forName</code> would also match (acceptable for an off-by-default rule).</li>
 </ul>
-<p><strong>Rust</strong> is excluded: its rule-8 analogue is the macro system, whose bodies parse as opaque token trees (a documented limitation shared with SAFE801), and <code>panic</code>-family macros already have SAFE204.</p>
+<p><strong>Rust</strong> is excluded: its rule-8 analogue is the macro system, whose bodies parse as opaque token trees (a documented limitation shared with SAFE801), and <code>panic</code>-family macros already have SAFE204. <strong>Go</strong> <em>(added in 2.5.0):</em> Go has no <code>eval</code>; the rule-8 surface is reflection (<code>reflect</code> <code>Call</code> / <code>CallSlice</code> / <code>MethodByName</code>) and plugin loading (<code>plugin</code> <code>Open</code> / <code>Lookup</code>), via <code>dynamic_exec_calls_go</code>. Matching is by bare method name, so <code>Open</code> also matches <code>os.Open</code> - narrow the list if noisy.</p>
 <table>
 <thead>
 <tr>
@@ -5544,6 +5679,114 @@
 <a id="__codelineno-101-3" name="__codelineno-101-3" href="#__codelineno-101-3"></a><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span>
 <a id="__codelineno-101-4" name="__codelineno-101-4" href="#__codelineno-101-4"></a><span class="w">    </span><span class="n">std</span><span class="p">::</span><span class="n">ptr</span><span class="p">::</span><span class="n">write</span><span class="p">(</span><span class="n">dst</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
 <a id="__codelineno-101-5" name="__codelineno-101-5" href="#__codelineno-101-5"></a><span class="p">}</span>
+</code></pre></div>
+<h2 id="go-only-rules">Go-only rules<a class="headerlink" href="#go-only-rules" title="Permanent link">#</a></h2>
+<p>The following 2 rules apply only to Go source. They cover Go-idiom patterns the cross-language rules don't translate to cleanly (Go has no try/catch, so the swallowed-error and panic-placement hazards take Go-specific shapes). Both ship disabled by default; opt in via <code>[tool.safelint.rules.&lt;name&gt;] enabled = true</code>. See <a href="../../languages/go/">Go</a> for the full language reference including idiomatic fix patterns.</p>
+<h3 id="safe209-empty_error_check">SAFE209: <code>empty_error_check</code><a class="headerlink" href="#safe209-empty_error_check" title="Permanent link">#</a></h3>
+<p><strong>What it flags:</strong> an <code>if err != nil { }</code> (or <code>== nil</code>) whose body is empty or comment-only. Go only.</p>
+<p>Go's error handling is explicit: a function returns an <code>error</code> and the caller checks it. Writing the check and then leaving the body empty silently swallows the failure, which is worse than not checking at all (it looks handled). This is Go's analogue of Rust's SAFE206 (<code>silent_result_discard</code>) and the spirit of Python's SAFE202 (<code>empty_except</code>). A comment-only body fires too: the error was acknowledged and still ignored.</p>
+<p>The error identifier is configurable; the default matches Go's conventional <code>err</code>. The comparison operand order is not assumed (<code>err != nil</code> and <code>nil != err</code> both match).</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code></td>
+<td>Toggle the rule</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>"warning"</code></td>
+<td><code>"error"</code> or <code>"warning"</code></td>
+</tr>
+<tr>
+<td><code>error_names_go</code></td>
+<td><code>["err"]</code></td>
+<td>Identifier names treated as the error variable</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-102-1" name="__codelineno-102-1" href="#__codelineno-102-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-102-2" name="__codelineno-102-2" href="#__codelineno-102-2"></a><span class="k">[tool.safelint.rules.empty_error_check]</span>
+<a id="__codelineno-102-3" name="__codelineno-102-3" href="#__codelineno-102-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-102-4" name="__codelineno-102-4" href="#__codelineno-102-4"></a><span class="n">error_names_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;err&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;e&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rerr&quot;</span><span class="p">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-103-1" name="__codelineno-103-1" href="#__codelineno-103-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-103-2" name="__codelineno-103-2" href="#__codelineno-103-2"></a><span class="k">[rules.empty_error_check]</span>
+<a id="__codelineno-103-3" name="__codelineno-103-3" href="#__codelineno-103-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-103-4" name="__codelineno-103-4" href="#__codelineno-103-4"></a><span class="n">error_names_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;err&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;e&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rerr&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p><strong>Bad:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-104-1" name="__codelineno-104-1" href="#__codelineno-104-1"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{}</span><span class="w">   </span><span class="c1">// SAFE209 - the error was checked and dropped</span>
+</code></pre></div>
+<p><strong>Good:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-105-1" name="__codelineno-105-1" href="#__codelineno-105-1"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-105-2" name="__codelineno-105-2" href="#__codelineno-105-2"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;read config: %w&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<a id="__codelineno-105-3" name="__codelineno-105-3" href="#__codelineno-105-3"></a><span class="p">}</span>
+</code></pre></div>
+<h3 id="safe211-panic_calls_outside_tests">SAFE211: <code>panic_calls_outside_tests</code><a class="headerlink" href="#safe211-panic_calls_outside_tests" title="Permanent link">#</a></h3>
+<p><strong>What it flags:</strong> <code>panic(...)</code> calls in non-<code>_test.go</code> files. Go only.</p>
+<p>Production Go code should return an <code>error</code> up the call stack, not unwind it with <code>panic</code>. A <code>panic</code> in a library forces every caller to recover or crash, defeating Go's explicit-error contract (Holzmann rule 1, simple control flow). Test files (<code>_test.go</code>) are exempt - a <code>panic</code> there is an acceptable test-failure signal, mirroring how Rust's SAFE204 exempts <code>#[test]</code> / <code>#[cfg(test)]</code> contexts.</p>
+<p>The flagged call set is configurable; add the resolved barewords <code>Fatal</code> / <code>Fatalf</code> / <code>Exit</code> if your project treats <code>log.Fatal*</code> / <code>os.Exit</code> as panic-equivalent.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code></td>
+<td>Toggle the rule</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>"warning"</code></td>
+<td><code>"error"</code> or <code>"warning"</code></td>
+</tr>
+<tr>
+<td><code>panic_calls_go</code></td>
+<td><code>["panic"]</code></td>
+<td>Call names that count as panicking</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-106-1" name="__codelineno-106-1" href="#__codelineno-106-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-106-2" name="__codelineno-106-2" href="#__codelineno-106-2"></a><span class="k">[tool.safelint.rules.panic_calls_outside_tests]</span>
+<a id="__codelineno-106-3" name="__codelineno-106-3" href="#__codelineno-106-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-106-4" name="__codelineno-106-4" href="#__codelineno-106-4"></a><span class="n">panic_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;panic&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Fatal&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Exit&quot;</span><span class="p">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-107-1" name="__codelineno-107-1" href="#__codelineno-107-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-107-2" name="__codelineno-107-2" href="#__codelineno-107-2"></a><span class="k">[rules.panic_calls_outside_tests]</span>
+<a id="__codelineno-107-3" name="__codelineno-107-3" href="#__codelineno-107-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-107-4" name="__codelineno-107-4" href="#__codelineno-107-4"></a><span class="n">panic_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;panic&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Fatal&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Exit&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p><strong>Bad:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-108-1" name="__codelineno-108-1" href="#__codelineno-108-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">mustParse</span><span class="p">(</span><span class="nx">s</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="nx">Config</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-108-2" name="__codelineno-108-2" href="#__codelineno-108-2"></a><span class="w">    </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">parse</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span>
+<a id="__codelineno-108-3" name="__codelineno-108-3" href="#__codelineno-108-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-108-4" name="__codelineno-108-4" href="#__codelineno-108-4"></a><span class="w">        </span><span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w">   </span><span class="c1">// SAFE211</span>
+<a id="__codelineno-108-5" name="__codelineno-108-5" href="#__codelineno-108-5"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-108-6" name="__codelineno-108-6" href="#__codelineno-108-6"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">c</span>
+<a id="__codelineno-108-7" name="__codelineno-108-7" href="#__codelineno-108-7"></a><span class="p">}</span>
+</code></pre></div>
+<p><strong>Good:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-109-1" name="__codelineno-109-1" href="#__codelineno-109-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">parseConfig</span><span class="p">(</span><span class="nx">s</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="nx">Config</span><span class="p">,</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-109-2" name="__codelineno-109-2" href="#__codelineno-109-2"></a><span class="w">    </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">parse</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span>
+<a id="__codelineno-109-3" name="__codelineno-109-3" href="#__codelineno-109-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-109-4" name="__codelineno-109-4" href="#__codelineno-109-4"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">Config</span><span class="p">{},</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;parse config: %w&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<a id="__codelineno-109-5" name="__codelineno-109-5" href="#__codelineno-109-5"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-109-6" name="__codelineno-109-6" href="#__codelineno-109-6"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span>
+<a id="__codelineno-109-7" name="__codelineno-109-7" href="#__codelineno-109-7"></a><span class="p">}</span>
 </code></pre></div>
 
 

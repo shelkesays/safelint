@@ -668,6 +668,8 @@
       
         
       
+        
+      
     
     
     
@@ -840,6 +842,34 @@
     
   
     Rust
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../languages/go/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go
   
 
     
@@ -2222,7 +2252,7 @@
 
 
 <h1 id="the-power-of-ten-adapted">The Power of Ten, adapted<a class="headerlink" href="#the-power-of-ten-adapted" title="Permanent link">#</a></h1>
-<p>SafeLint is an adaptation of Gerard Holzmann's <a href="https://spinroot.com/gerard/pdf/P10.pdf">"The Power of Ten - Rules for Developing Safety-Critical Code"</a> (NASA/JPL, 2006). The original ten rules target C for spacecraft flight software; SafeLint translates their <em>intent</em> to Python, JavaScript, TypeScript, Java, and Rust. Some rules map almost directly (bounded function length, assertion density); others have no literal analogue in a garbage-collected or memory-safe language and are adapted, or deliberately left to the compiler.</p>
+<p>SafeLint is an adaptation of Gerard Holzmann's <a href="https://spinroot.com/gerard/pdf/P10.pdf">"The Power of Ten - Rules for Developing Safety-Critical Code"</a> (NASA/JPL, 2006). The original ten rules target C for spacecraft flight software; SafeLint translates their <em>intent</em> to Python, JavaScript, TypeScript, Java, Rust, and Go. Some rules map almost directly (bounded function length, assertion density); others have no literal analogue in a garbage-collected or memory-safe language and are adapted, or deliberately left to the compiler.</p>
 <p>This page maps each of the ten rules to the SafeLint rules that implement it, and records the rationale wherever a clause is adapted away. For the full per-rule configuration, see the <a href="../configuration/rules/">rules reference</a>; for what fires on each language, see the per-language pages under <strong>Languages</strong>.</p>
 <h2 id="coverage-map">Coverage map<a class="headerlink" href="#coverage-map" title="Permanent link">#</a></h2>
 <table>
@@ -2269,7 +2299,7 @@
 <td>6</td>
 <td>Declare data at the smallest possible scope</td>
 <td><a href="../configuration/rules/#safe301-global_state">SAFE301</a> <code>global_state</code>, <a href="../configuration/rules/#safe302-global_mutation">SAFE302</a> <code>global_mutation</code>, <a href="../configuration/rules/#safe305-wide_scope_declaration">SAFE305</a> <code>wide_scope_declaration</code>, <a href="../configuration/rules/#safe307-interior_mutable_static">SAFE307</a> <code>interior_mutable_static</code></td>
-<td>Python <code>global</code>; JS/TS <code>globalThis.*</code> writes and <code>var</code> hoisting; Java non-final <code>static</code> fields; Rust interior-mutable statics.</td>
+<td>Python <code>global</code>; JS/TS <code>globalThis.*</code> writes and <code>var</code> hoisting; Java non-final <code>static</code> fields; Rust interior-mutable statics; Go package-level <code>var</code> declarations.</td>
 </tr>
 <tr>
 <td>7</td>
@@ -2303,8 +2333,8 @@
 <ul>
 <li><strong>Rule 2's non-terminating exception.</strong> The paper exempts loops that are <em>meant</em> to run forever (a process scheduler) and applies the reverse requirement: it must be provable the loop cannot terminate. <a href="../configuration/rules/#safe501-unbounded_loops">SAFE501</a> flags every <code>while true</code> without a break precisely so the intentional cases surface; the justified <code># nosafe: SAFE501</code> annotation is SafeLint's analogue of the paper's documented exception. The paper's suggested mitigation for variable-bound loops (an explicit iteration-cap counter plus an assertion) pairs naturally with <a href="../configuration/rules/#safe601-missing_assertions">SAFE601</a>.</li>
 <li><strong>Rule 5's density and assertion quality.</strong> The paper asks for a minimum of <strong>two</strong> assertions per function on average, requires assertions to be side-effect-free Boolean tests, requires an explicit recovery action when one fails, and disallows assertions a static checker can prove trivially true (<code>assert(true)</code> does not count). SAFE601 implements the density half: <code>min_assertions</code> defaults to 1 (noise control) and <code>min_assertions = 2</code> matches the paper. Side-effect-freeness, recovery actions, and trivial-assertion detection need effect and constant analysis that does not fit a structural rule; they remain review concerns.</li>
-<li><strong>Rule 7's explicit-ignore escape hatch.</strong> The paper permits casting a deliberately ignored return value to <code>(void)</code>. The per-language analogues are recognised by <a href="../configuration/rules/#safe802-return_value_ignored">SAFE802</a>'s shape: a Rust <code>let _ = f();</code> and a Python <code>_ = f()</code> are assignments (not bare expression statements) and therefore do not fire, exactly the audit-able explicit-discard the paper intends.</li>
-<li><strong>Rule 9's function-pointer ban.</strong> Banned in the paper because function pointers defeat static call-graph analysis (including the recursion proof of rule 1). First-class functions are foundational in all five supported languages, so this clause is adapted away; the analyzability cost shows up in SafeLint as the documented <a href="../configuration/rules/#safe105-no_recursion">SAFE105</a> blind spot for anonymous-function recursion.</li>
+<li><strong>Rule 7's explicit-ignore escape hatch.</strong> The paper permits casting a deliberately ignored return value to <code>(void)</code>. The per-language analogues are recognised by <a href="../configuration/rules/#safe802-return_value_ignored">SAFE802</a>'s shape: a Rust <code>let _ = f();</code>, a Python <code>_ = f()</code>, and a Go <code>_ = f()</code> / <code>x, _ := f()</code> are assignments (not bare expression statements) and therefore do not fire, exactly the audit-able explicit-discard the paper intends. Go's blank identifier is the idiomatic form, so it is the closest of any supported language to the paper's literal <code>(void)</code> cast.</li>
+<li><strong>Rule 9's function-pointer ban.</strong> Banned in the paper because function pointers defeat static call-graph analysis (including the recursion proof of rule 1). First-class functions are foundational in all six supported languages, so this clause is adapted away; the analyzability cost shows up in SafeLint as the documented <a href="../configuration/rules/#safe105-no_recursion">SAFE105</a> blind spot for anonymous-function recursion.</li>
 <li><strong>Rule 10's zero-warning policy.</strong> The paper requires rewriting code that confuses an analyser even when the warning looks invalid, rather than suppressing it. <a href="../configuration/rules/#safe603-blanket_suppression">SAFE603</a> enforces the suppression half (blanket silencing of analysers); SafeLint's own source follows the rewrite half (its tree-walkers were converted to iterative form rather than annotated when SAFE105 landed).</li>
 </ul>
 <h2 id="adapted-away-clauses">Adapted-away clauses<a class="headerlink" href="#adapted-away-clauses" title="Permanent link">#</a></h2>
@@ -2319,6 +2349,7 @@
 <p>C's <code>#define</code> macros generate code the compiler (and any analyser) cannot see until expansion, which is why the original rule restricts them. The supported languages have no C-style preprocessor, so the analysability threat is <strong>runtime code generation and reflection</strong>:</p>
 <ul>
 <li><strong>Python, JavaScript, TypeScript, Java</strong> are covered structurally by <a href="../configuration/rules/#safe309-dynamic_code_execution">SAFE309</a> (flag <code>eval</code> / <code>new Function</code> / <code>Class.forName</code> / <code>Method.invoke</code> wherever they appear) and dataflow-wise by <a href="../configuration/rules/#safe801-tainted_sink">SAFE801</a> (flag user input reaching those sinks). The two are complementary and may both fire on one line.</li>
+<li><strong>Go</strong> has no <code>eval</code>; its rule-8 surface is <strong>reflection and plugin loading</strong>. <a href="../configuration/rules/#safe309-dynamic_code_execution">SAFE309</a> flags <code>reflect</code> <code>Call</code> / <code>CallSlice</code> / <code>MethodByName</code> and <code>plugin</code> <code>Open</code> / <code>Lookup</code> structurally, and <a href="../configuration/rules/#safe801-tainted_sink">SAFE801</a> covers user input reaching the <code>os/exec</code> / <code>database/sql</code> / <code>plugin</code> sinks. Go has no C-style preprocessor or conditional-compilation directive (build constraints are file-level, not in-source <code>#ifdef</code>), so there is no cfg-density concern.</li>
 <li><strong>Rust</strong>'s true preprocessor analogue is its <strong>macro system</strong>. Macro bodies parse as opaque token trees that SafeLint does not decode (the same documented limitation that makes <a href="../configuration/rules/#safe801-tainted_sink">SAFE801</a> blind to <code>sqlx::query!</code>), so coverage is limited to <a href="../configuration/rules/#safe204-panic_macros_outside_tests">SAFE204</a> (panic-family macros) and the <code>lazy_static!</code> case caught by <a href="../configuration/rules/#safe307-interior_mutable_static">SAFE307</a>. A general macro-as-codegen rule is not offered.</li>
 <li><strong>Rust conditional compilation</strong> (<code>#[cfg(...)]</code> / <code>#[cfg_attr(...)]</code>) is the direct analogue of the paper's caution against <code>#ifdef</code>: the paper notes that just ten conditional directives can yield up to 2^10 testable versions of the code. SafeLint has <strong>no rule</strong> for cfg-count today; it is recorded under <em>Deferred</em> below as a candidate.</li>
 </ul>
