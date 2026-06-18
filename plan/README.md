@@ -99,6 +99,37 @@ a spec file once its language ships (as was done for Go).
   PY
   ```
 
+## Review-caught pitfalls from the Go port (avoid these upfront)
+
+These are real bugs the bot reviewers caught *after* the Go PR opened. They
+generalise, so design for them from the start rather than waiting for review:
+
+- **Validate config lists.** Any new language-only rule that reads a config
+  list (`error_names_<lang>`, `panic_calls_<lang>`, ...) must pass it through
+  `_validated_string_list(...)`; a mistyped scalar (`error_names_go = "err"`)
+  otherwise becomes a set of single characters and silently breaks matching.
+- **Test samples must be VALID in the target language.** Tree-sitter parses
+  leniently, so a *type*-invalid sample (a value returned from a void
+  function, a single-target bind of a multi-value call) does NOT raise a
+  parse error - the test passes for the wrong reason. Write samples that
+  would actually compile.
+- **Resolve callee names with `call_name`, not a hand-rolled identifier
+  check.** It covers BOTH bare calls (`panic(...)`) and qualified / selector /
+  method calls (`log.Fatal(...)`, `pkg.Fn(...)`). Matching only the bare
+  shape silently drops every configured qualified-call name.
+- **Resource-cleanup detection (SAFE401-family).** The cleanup must occur
+  *after* the acquisition and on *all* exit paths - reject cleanups that
+  precede the acquire or sit inside a conditional branch, and map a
+  multi-acquirer statement positionally to each handle. A returned acquirer
+  transfers ownership (not a local leak). Tailor the message to the shape
+  (no-handle / package-scope cases can't use the normal fix).
+- **Declaration-site walks (global-state-family).** Iterate the declaration's
+  direct children; do NOT `walk()` into initializer expressions (a nested
+  local declaration is not module/package-level state). Skip blank / discard
+  identifiers (`_`).
+- **Compound assignments preserve taint** in the dataflow tracker: `x += clean`
+  is read-modify-write, so it must OR with x's prior taint, not overwrite it.
+
 ## Validation gate (every spec, run all, in order)
 
 ```bash
