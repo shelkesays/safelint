@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.5.0] - 2026-06-18
+
 **Go is now a supported language alongside Python, JavaScript, TypeScript, Java, and Rust.** `.go` files are discovered, parsed via Tree-sitter, and run against 16 cross-language rules plus two new Go-only rules (18 rules total for Go), bringing safelint to **40 rules** (15 on by default, 25 opt-in). Go support installs via the new `[go]` extra (`pip install 'safelint[go]'`); the base install still ships no grammars. Additive per the project's semver policy (a new language is MINOR, never MAJOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.
 
 ### Added
@@ -826,7 +828,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.4.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.5.0...HEAD
+[2.5.0]: https://github.com/shelkesays/safelint/compare/v2.4.0...v2.5.0
 [2.2.0]: https://github.com/shelkesays/safelint/compare/v2.2.0rc3...v2.2.0
 [2.2.0rc3]: https://github.com/shelkesays/safelint/compare/v2.2.0rc2...v2.2.0rc3
 [2.2.0rc2]: https://github.com/shelkesays/safelint/compare/v2.2.0rc1...v2.2.0rc2
