@@ -194,8 +194,13 @@ If the new language's API surface is uniform across runtimes (or the runtime fra
 ### 7. Update tests and docs
 
 * Tests under `tests/` should add a per-language test file (e.g. `test_engine_typescript.py`) covering at minimum: discovery picks up the extension, the suppression parser recognises `// nosafe`, and at least one rule fires on a known-bad TS file.
-* The [Rules reference](../configuration/rules.md) rule-by-rule table should grow a "Languages" column.
-* `README.md` should list the supported languages prominently.
+* The [Rules reference](../configuration/rules.md) rule-by-rule table should grow a "Languages" column; also update its "Currently supported" list and rule-scope table, and **remove the language from "Planned"**. Add a `docs/languages/<lang>.md` page and its `mkdocs.yml` nav entry.
+* `README.md` and `docs/index.md` should list the supported languages prominently (language table + "Rule coverage" paragraph) and refresh every **count** ("N rules", "N languages").
+* **Scattered enumerations** - the easily-missed part. Several docs list *every* language's extension / grammar / accepted `--language` value outside the headline language tables; each needs the new language appended:
+    * [CLI reference](../configuration/cli.md): the `--all-files` supported-extension list and the `--language <LANG>` accepted-value list.
+    * `SECURITY.md` (repo root; `docs/project/security.md` is a build-time copy): the supported-versions table, the bundled-grammar supply-chain list (`tree-sitter-<lang>`), and the "files read from the working tree" extension list.
+    * [Configuration file](../configuration/toml.md): the "enable opt-in rules" walkthrough (add the language's new opt-in / language-only rules).
+* **Sweep as a final step**: `grep -rn` the previous language's extension (e.g. `.rs`), name (e.g. `rust`), and grammar (`tree-sitter-rust`) across `docs/`, `README.md`, `SECURITY.md`, and `src/safelint/skill_files/` to catch any list that still omits the new language.
 * `CHANGELOG.md` gets an entry under **Added**.
 
 ### 8. Update the bundled AI-client skills

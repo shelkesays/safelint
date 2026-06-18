@@ -63,6 +63,16 @@ Update the Status column (and the per-spec status header) as work lands.
   `docs/index.md`, `docs/configuration/rules.md`, the language pages, and
   the skill files. Do not trust counts written in these specs; run the
   stale-count sweep (grep for the previous numbers) as a final step.
+- **Enumerations cascade too** (the v2.5.0 Go miss). Beyond counts and the
+  headline language tables, several docs list *every* language's extension
+  / grammar / `--language` value and must each gain the new one:
+  `docs/configuration/cli.md` (`--all-files` extension list, `--language`
+  values), `SECURITY.md` (supported-versions table, `tree-sitter-<lang>`
+  grammar list, files-read extension list), and `docs/configuration/toml.md`
+  (the opt-in-rules walkthrough). Run an enumeration sweep alongside the
+  count sweep: grep the previous language's extension / name /
+  `tree-sitter-<lang>` across `docs/`, `README.md`, `SECURITY.md`, and
+  `src/safelint/skill_files/`.
 - **Verify Tree-sitter node types by probing, never from memory.** The specs
   name expected node types; confirm each with a quick probe before relying
   on it:
@@ -104,7 +114,9 @@ tag name for the language), per-rule per-language tests (violation + clean),
 `docs/languages/<lang>.md` + mkdocs nav, `rules.md` scope table + **remove
 the language from "Planned"**, README / index tables and counts,
 `docs/power-of-ten.md` fidelity notes where the language changes a
-Holzmann-rule mapping, the shared `skill_files/languages/<lang>.md` addendum,
-the Step-2 registry row in **all 14 client files**, `skill_files/README.md`
-counts / layout, `CHANGELOG.md` under `[Unreleased]`, and the validation
-gate.
+Holzmann-rule mapping, the **scattered enumerations** (`cli.md` `--all-files`
++ `--language` lists, `SECURITY.md` versions / grammars / extensions,
+`toml.md` opt-in-rules walkthrough), the shared
+`skill_files/languages/<lang>.md` addendum, the Step-2 registry row in
+**all 14 client files**, `skill_files/README.md` counts / layout,
+`CHANGELOG.md` under `[Unreleased]`, and the validation gate.
