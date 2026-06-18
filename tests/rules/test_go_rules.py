@@ -39,7 +39,7 @@ def test_go_comment_only_error_body_fires_safe209(tmp_path: Path) -> None:
 def test_go_handled_error_is_clean(tmp_path: Path) -> None:
     """An ``if err != nil`` with a real body is clean."""
     sample = tmp_path / "handled.go"
-    sample.write_text("package main\nfunc f() {\n\tif err != nil {\n\t\treturn err\n\t}\n}\n", encoding="utf-8")
+    sample.write_text("package main\nfunc f() {\n\tif err != nil {\n\t\thandle(err)\n\t}\n}\n", encoding="utf-8")
     assert not any(v.code == "SAFE209" for v in _engine(_SAFE209).check_file(str(sample)).violations)
 
 
@@ -84,7 +84,7 @@ def test_go_err_eq_nil_empty_success_branch_is_clean(tmp_path: Path) -> None:
 def test_go_err_eq_nil_handled_in_else_is_clean(tmp_path: Path) -> None:
     """``if err == nil { ok() } else { handle() }`` handles the error in the else - clean."""
     sample = tmp_path / "eqnilhandled.go"
-    sample.write_text("package main\nfunc f() {\n\tif err == nil {\n\t\tok()\n\t} else {\n\t\treturn err\n\t}\n}\n", encoding="utf-8")
+    sample.write_text("package main\nfunc f() {\n\tif err == nil {\n\t\tok()\n\t} else {\n\t\thandle(err)\n\t}\n}\n", encoding="utf-8")
     assert not any(v.code == "SAFE209" for v in _engine(_SAFE209).check_file(str(sample)).violations)
 
 
