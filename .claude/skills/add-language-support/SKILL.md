@@ -106,7 +106,7 @@ preset). Part C lists the conventions and the validation gate shared by both.
       `[tool.safelint.rules.<rule>]` (pyproject.toml) and `[rules.<rule>]`
       (standalone safelint.toml). Check `docs/configuration/toml.md` too if
       the language gains a preset axis (see Part B).
-- [ ] **Secondary enumerations** (the docs that list *every* language's
+- [ ] **Scattered enumerations** (the docs that list *every* language's
       extension / grammar / `--language` value OUTSIDE the headline language
       tables - the v2.5.0 Go addition missed all of these; they are not
       caught by the language-table edits above):
@@ -150,7 +150,7 @@ preset). Part C lists the conventions and the validation gate shared by both.
       one; these scattered lists (NOT the headline language tables) are the
       most common miss. Tip - substitute the previous language's extension
       for `<prev-ext>` and the new one for `<new-ext>` (e.g. `.rs` and `.go`
-      when Go follows Rust): `for f in $(grep -rl '<prev-ext>' docs README.md SECURITY.md); do grep -L '<new-ext>' "$f"; done`
+      when Go follows Rust): `for f in $(grep -rl '<prev-ext>' docs README.md SECURITY.md src/safelint/skill_files); do grep -L '<new-ext>' "$f"; done`
       surfaces files that mention the old extension but not the new one.
 - [ ] Do NOT bump the version; releases are the owner's call.
 

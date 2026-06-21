@@ -124,7 +124,8 @@ Shared checklist (plan/README.md), with the PHP-specific content:
   (opt-in-rules walkthrough), and `CONTRIBUTING.md` (language count +
   examples).
 - CHANGELOG `[Unreleased]`; stale-count **and enumeration** sweep: grep the
-  prior language's extension / name / `tree-sitter-<lang>` across `docs/`,
+  prior language's extension / name (whole-word, `grep -w`, so short names
+  like `go` / `c` don't over-match) / `tree-sitter-<lang>` across `docs/`,
   `README.md`, `SECURITY.md`, and `src/safelint/skill_files/` (the wording
   "all-five-languages set" will be long gone by now - sweep whatever the
   current phrasing is).
