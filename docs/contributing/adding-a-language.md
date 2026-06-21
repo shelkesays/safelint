@@ -200,7 +200,7 @@ If the new language's API surface is uniform across runtimes (or the runtime fra
     * [CLI reference](../configuration/cli.md): the `--all-files` supported-extension list and the `--language <LANG>` accepted-value list.
     * `SECURITY.md` (repo root; `docs/project/security.md` is a build-time copy): the supported-versions table, the bundled-grammar supply-chain list (`tree-sitter-<lang>`), and the "files read from the working tree" extension list.
     * [Configuration file](../configuration/toml.md): the "enable opt-in rules" walkthrough (add the language's new opt-in / language-only rules).
-* **Sweep as a final step**: `grep -rn` the previous language's extension (e.g. `.rs`), name (e.g. `rust`), and grammar (`tree-sitter-rust`) across `docs/`, `README.md`, `SECURITY.md`, and `src/safelint/skill_files/` to catch any list that still omits the new language.
+* **Sweep as a final step**: `grep -rn` the previous language's extension (e.g. `.rs`), name as a whole word (e.g. `grep -w rust` - so a short name like `go` / `c` doesn't over-match), and grammar (`tree-sitter-rust`) across `docs/`, `README.md`, `SECURITY.md`, and `src/safelint/skill_files/` to catch any list that still omits the new language.
 * `CHANGELOG.md` gets an entry under **Added**.
 
 ### 8. Update the bundled AI-client skills

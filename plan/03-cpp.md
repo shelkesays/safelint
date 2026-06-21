@@ -107,5 +107,6 @@ Shared checklist (plan/README.md), with the C++-specific content:
   examples). C++ adds several extensions (`.cpp` / `.cxx` / `.cc` / `.hpp` /
   `.hxx` / `.hh`) - every extension list above needs all of them.
 - CHANGELOG `[Unreleased]`; stale-count **and enumeration** sweep: grep the
-  prior language's extension / name / `tree-sitter-<lang>` across `docs/`,
+  prior language's extension / name (whole-word, `grep -w`, so short names
+  like `go` / `c` don't over-match) / `tree-sitter-<lang>` across `docs/`,
   `README.md`, `SECURITY.md`, and `src/safelint/skill_files/`.
