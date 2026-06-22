@@ -10,8 +10,8 @@ C++ has a hard dependency on C):
 > rules + the Go-only SAFE209 `empty_error_check` / SAFE211
 > `panic_calls_outside_tests`). Its spec, `plan/01-go.md`, was removed on
 > completion - the design decisions now live in the
-> [Go language page](../docs/languages/go.md), the `skill_files/languages/go.md`
-> addendum, and the shipped code.
+> [Go language page](../docs/languages/go.md), the
+> `src/safelint/skill_files/languages/go.md` addendum, and the shipped code.
 
 | # | Spec | Language | Status | Depends on |
 |---|---|---|---|---|
@@ -155,6 +155,7 @@ the language from "Planned"**, README / index tables and counts,
 Holzmann-rule mapping, the **scattered enumerations** (`cli.md` `--all-files`
 + `--language` lists, `SECURITY.md` versions / grammars / extensions,
 `toml.md` opt-in-rules walkthrough), the shared
-`skill_files/languages/<lang>.md` addendum, the Step-2 registry row in
-**all 14 client files**, `skill_files/README.md` counts / layout,
+`src/safelint/skill_files/languages/<lang>.md` addendum, the Step-2 registry
+row in **all 14 client files**, `src/safelint/skill_files/README.md` counts /
+layout,
 `CHANGELOG.md` under `[Unreleased]`, and the validation gate.
