@@ -13,7 +13,7 @@ C++ has a hard dependency on C):
 > [Go language page](../docs/languages/go.md), the
 > `src/safelint/skill_files/languages/go.md` addendum, and the shipped code.
 
-| # | Spec | Language | Status | Depends on |
+| Spec # | File | Language | Status | Depends on |
 |---|---|---|---|---|
 | 2 | `plan/02-c.md` | C (`.c`, `.h`) | not started | nothing (next in roadmap order) |
 | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started | **C shipped** (shared grammar family, shared new rules, `.h` ownership) |
