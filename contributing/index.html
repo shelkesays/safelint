@@ -2184,10 +2184,10 @@
 <tr>
 <td>A new <strong>AI-client integration</strong> (e.g. JetBrains AI Assistant, a brand-new IDE)</td>
 <td><a href="https://shelkesays.github.io/safelint/contributing/adding-an-ai-client/">Adding an AI client</a>, full walkthrough with a worked example</td>
-<td><code>src/safelint/_skill_install.py</code> (one <code>ClientSpec</code> append), <code>src/safelint/skill_files/&lt;client&gt;/</code>, <code>tests/test_skill_install.py</code>, <code>docs/ai-clients/</code>, <code>skill_files/README.md</code>, <code>CHANGELOG.md</code></td>
+<td><code>src/safelint/_skill_install.py</code> (one <code>ClientSpec</code> append), <code>src/safelint/skill_files/&lt;client&gt;/</code>, <code>tests/test_skill_install.py</code>, <code>docs/ai-clients/</code>, <code>src/safelint/skill_files/README.md</code>, <code>CHANGELOG.md</code></td>
 </tr>
 <tr>
-<td>A new <strong>language</strong> safelint can lint (e.g. TypeScript, Go)</td>
+<td>A new <strong>language</strong> safelint can lint (e.g. C, C++, PHP)</td>
 <td><a href="https://shelkesays.github.io/safelint/contributing/adding-a-language/">Adding a language</a>, full walkthrough</td>
 <td><code>src/safelint/languages/&lt;lang&gt;.py</code>, the Tree-sitter grammar dependency in <code>pyproject.toml</code>, per-rule audit, <code>tests/</code>, <code>docs/configuration/</code>, every bundled AI-client doc</td>
 </tr>
@@ -2216,12 +2216,12 @@
 <li>Write the bundled file by adapting an existing one (Cursor's <code>cursor/safelint.mdc</code> is a clean single-file template). Strip MDC frontmatter if your client doesn't use it.</li>
 <li>Append one <code>ClientSpec</code> entry to <code>_CLIENT_SPECS</code> in <code>src/safelint/_skill_install.py</code>, fields: <code>name</code>, <code>display_name</code>, <code>artefact_label</code>, <code>cwd_markers</code>, <code>home_markers</code>, <code>install_relpath</code>, <code>bundled_relpath</code>, <code>restart_hint</code>, <code>usage_hint</code>, <code>documentation_relpaths</code>. If your client also writes to a <em>cross-agent</em> shared file (like codex's <code>AGENTS.md</code>), set <code>secondary_install_relpath</code> and <code>secondary_install_section_markers</code>, the install primitives handle the rest.</li>
 <li>Mirror an existing client's test block (10–12 tests covering install / symlink / force / overwrite / auto-detect / CLI routing / path-print / peer-exclusion).</li>
-<li>Update the docs-site AI-client pages under <code>docs/ai-clients/</code> (index table, new per-client page, manual-install, mkdocs nav), <code>skill_files/README.md</code>, and <code>CHANGELOG.md</code>.</li>
+<li>Update the docs-site AI-client pages under <code>docs/ai-clients/</code> (index table, new per-client page, manual-install, mkdocs nav), <code>src/safelint/skill_files/README.md</code>, and <code>CHANGELOG.md</code>.</li>
 </ul>
 <p>The security guards (symlink refusal at the secondary destination, <code>skill remove --path PATH</code> install-shape validation, etc.) live in <code>_skill_install.py</code> and apply to your client automatically, no per-client implementation needed.</p>
 <hr />
 <h2 id="adding-a-new-language">Adding a new language<a class="headerlink" href="#adding-a-new-language" title="Permanent link">#</a></h2>
-<p>Five languages are registered today (Python, JavaScript, TypeScript, Java, Rust). Adding a new one (Go, C, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in <a href="https://shelkesays.github.io/safelint/contributing/adding-a-language/">Adding a language</a>.</p>
+<p>Six languages are registered today (Python, JavaScript, TypeScript, Java, Rust, Go). Adding a new one (C, C++, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in <a href="https://shelkesays.github.io/safelint/contributing/adding-a-language/">Adding a language</a> - note its "scattered enumerations" step (the docs that list every language's extension / grammar / <code>--language</code> value outside the headline tables), which is the easiest part to miss.</p>
 <hr />
 <h2 id="ground-rules">Ground rules<a class="headerlink" href="#ground-rules" title="Permanent link">#</a></h2>
 <ul>

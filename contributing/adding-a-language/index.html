@@ -2681,8 +2681,15 @@
 <h3 id="7-update-tests-and-docs">7. Update tests and docs<a class="headerlink" href="#7-update-tests-and-docs" title="Permanent link">#</a></h3>
 <ul>
 <li>Tests under <code>tests/</code> should add a per-language test file (e.g. <code>test_engine_typescript.py</code>) covering at minimum: discovery picks up the extension, the suppression parser recognises <code>// nosafe</code>, and at least one rule fires on a known-bad TS file.</li>
-<li>The <a href="../../configuration/rules/">Rules reference</a> rule-by-rule table should grow a "Languages" column.</li>
-<li><code>README.md</code> should list the supported languages prominently.</li>
+<li>The <a href="../../configuration/rules/">Rules reference</a>: add the language to the "Currently supported" list and the "Rule scope (current languages)" table, and <strong>remove it from "Planned"</strong>. (The generated at-a-glance rules table is <code>Code | Name | Default severity | Enabled by default</code> only - it carries no language column, so it needs no manual edit <em>and</em> does not convey language coverage; that lives in the scope table and the per-language pages.) Add a <code>docs/languages/&lt;lang&gt;.md</code> page and its <code>mkdocs.yml</code> nav entry.</li>
+<li><code>README.md</code> and <code>docs/index.md</code> should list the supported languages prominently (language table + "Rule coverage" paragraph) and refresh every <strong>count</strong> ("N rules", "N languages").</li>
+<li><strong>Scattered enumerations</strong> - the easily-missed part. Several docs list <em>every</em> language's extension / grammar / accepted <code>--language</code> value outside the headline language tables; each needs the new language appended:<ul>
+<li><a href="../../configuration/cli/">CLI reference</a>: the <code>--all-files</code> supported-extension list and the <code>--language &lt;LANG&gt;</code> accepted-value list.</li>
+<li><code>SECURITY.md</code> (repo root; <code>docs/project/security.md</code> is a build-time copy): the supported-versions table, the bundled-grammar supply-chain list (<code>tree-sitter-&lt;lang&gt;</code>), and the "files read from the working tree" extension list.</li>
+<li><a href="../../configuration/toml/">Configuration file</a>: the "enable opt-in rules" walkthrough (add the language's new opt-in / language-only rules).</li>
+</ul>
+</li>
+<li><strong>Sweep as a final step</strong>: <code>grep -rn</code> the previous language's extension (e.g. <code>.rs</code>), name as a whole word (e.g. <code>grep -w rust</code> - so a short name like <code>go</code> / <code>c</code> doesn't over-match), and grammar (<code>tree-sitter-rust</code>) across <code>docs/</code>, <code>README.md</code>, <code>SECURITY.md</code>, and <code>src/safelint/skill_files/</code> to catch any list that still omits the new language.</li>
 <li><code>CHANGELOG.md</code> gets an entry under <strong>Added</strong>.</li>
 </ul>
 <h3 id="8-update-the-bundled-ai-client-skills">8. Update the bundled AI-client skills<a class="headerlink" href="#8-update-the-bundled-ai-client-skills" title="Permanent link">#</a></h3>

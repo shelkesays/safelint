@@ -1970,7 +1970,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#250-2026-06-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5.0 - 2026-06-18
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.5.0 - 2026-06-18">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2004,12 +2015,12 @@
   <a href="#240-2026-06-10" class="md-nav__link">
     <span class="md-ellipsis">
       
-        [2.4.0] - 2026-06-10
+        2.4.0 - 2026-06-10
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[2.4.0] - 2026-06-10">
+    <nav class="md-nav" aria-label="2.4.0 - 2026-06-10">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2065,12 +2076,12 @@
   <a href="#230-2026-06-09" class="md-nav__link">
     <span class="md-ellipsis">
       
-        [2.3.0] - 2026-06-09
+        2.3.0 - 2026-06-09
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[2.3.0] - 2026-06-09">
+    <nav class="md-nav" aria-label="2.3.0 - 2026-06-09">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3490,7 +3501,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#250-2026-06-18" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.5.0 - 2026-06-18
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.5.0 - 2026-06-18">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3524,12 +3546,12 @@
   <a href="#240-2026-06-10" class="md-nav__link">
     <span class="md-ellipsis">
       
-        [2.4.0] - 2026-06-10
+        2.4.0 - 2026-06-10
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[2.4.0] - 2026-06-10">
+    <nav class="md-nav" aria-label="2.4.0 - 2026-06-10">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3585,12 +3607,12 @@
   <a href="#230-2026-06-09" class="md-nav__link">
     <span class="md-ellipsis">
       
-        [2.3.0] - 2026-06-09
+        2.3.0 - 2026-06-09
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[2.3.0] - 2026-06-09">
+    <nav class="md-nav" aria-label="2.3.0 - 2026-06-09">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4904,7 +4926,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.4.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.5.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="250-2026-06-18"><a href="https://github.com/shelkesays/safelint/compare/v2.4.0...v2.5.0">2.5.0</a> - 2026-06-18<a class="headerlink" href="#250-2026-06-18" title="Permanent link">#</a></h2>
 <p><strong>Go is now a supported language alongside Python, JavaScript, TypeScript, Java, and Rust.</strong> <code>.go</code> files are discovered, parsed via Tree-sitter, and run against 16 cross-language rules plus two new Go-only rules (18 rules total for Go), bringing safelint to <strong>40 rules</strong> (15 on by default, 25 opt-in). Go support installs via the new <code>[go]</code> extra (<code>pip install 'safelint[go]'</code>); the base install still ships no grammars. Additive per the project's semver policy (a new language is MINOR, never MAJOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
@@ -4912,14 +4935,14 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><strong>SAFE209 <code>empty_error_check</code> (Go-only, disabled by default).</strong> Flags <code>if err != nil { }</code> (or <code>== nil</code>) with an empty or comment-only body - the error was checked and then silently swallowed. The Go analogue of Rust's SAFE206; the error identifier is configurable via <code>error_names_go</code> (default <code>["err"]</code>).</li>
 <li><strong>SAFE211 <code>panic_calls_outside_tests</code> (Go-only, disabled by default).</strong> Flags <code>panic(...)</code> calls in non-<code>_test.go</code> files; production paths should return an <code>error</code> rather than unwind the stack. The Go analogue of Rust's SAFE204; configurable via <code>panic_calls_go</code> (default <code>["panic"]</code>).</li>
 <li><strong>Go-specific rule adaptations.</strong> SAFE501 flags the bare <code>for {}</code> infinite loop (Go's only loop keyword) with labelled-break resolution; SAFE701 / SAFE702 use the sibling <code>foo_test.go</code> convention rather than a <code>tests/</code> directory; SAFE802's explicit-discard exemption recognises Go's <code>_ = f()</code> and <code>x, _ := f()</code> forms; SAFE401 checks for a <code>defer x.Close()</code> in the same function body; SAFE105 recognises receiver-qualified self-recursion (<code>s.Walk(...)</code>). A new <code>analysis/dataflow_go.py</code> taint tracker (iterative worklists) backs SAFE801 / SAFE802. Seven rules are deliberately skipped for Go (SAFE201, SAFE202, SAFE203, SAFE301, SAFE305, SAFE601, SAFE803) because their semantics don't translate cleanly; the rationale is in the language page's "Rules not registered" section.</li>
-<li><strong>Bundled Go skill addendum + per-client docs.</strong> <code>skill_files/languages/go.md</code> plus Go rows in all 14 AI-client skill files, so every bundled agent knows safelint can lint <code>.go</code> and how the Go-specific rules behave.</li>
+<li><strong>Bundled Go skill addendum + per-client docs.</strong> <code>src/safelint/skill_files/languages/go.md</code> plus Go rows in all 14 AI-client skill files, so every bundled agent knows safelint can lint <code>.go</code> and how the Go-specific rules behave.</li>
 </ul>
 <h3 id="documentation">Documentation<a class="headerlink" href="#documentation" title="Permanent link">#</a></h3>
 <ul>
-<li><strong>Development guidance is now version-controlled.</strong> <code>CLAUDE.md</code> (the Claude Code project guide), the <code>add-language-support</code> development skill (<code>.claude/skills/add-language-support/</code>), and the language-expansion plans (<code>plan/01-go.md</code> through <code>plan/04-php.md</code> plus <code>plan/README.md</code>) are tracked, reversing the old keep-CLAUDE.md-local convention: the skill and the plans reference CLAUDE.md's checklists, so the three travel together. Machine-local Claude Code state (<code>.claude/settings.local.json</code>, the installed <code>.claude/skills/safelint/</code> copy) stays ignored.</li>
+<li><strong>Development guidance is now version-controlled.</strong> <code>CLAUDE.md</code> (the Claude Code project guide), the <code>add-language-support</code> development skill (<code>.claude/skills/add-language-support/</code>), and the language-expansion plans under <code>plan/</code> (<code>plan/README.md</code> plus the per-language specs) are tracked, reversing the old keep-CLAUDE.md-local convention: the skill and the plans reference CLAUDE.md's checklists, so the three travel together. Machine-local Claude Code state (<code>.claude/settings.local.json</code>, the installed <code>.claude/skills/safelint/</code> copy) stays ignored.</li>
 <li><strong>Contributing guide: framework / runtime preset standard.</strong> <code>docs/contributing/adding-a-language.md</code> gains an "Adding a framework / runtime preset" section (config machinery shape, 9xx-band policy for framework rules, preset tests, and the full docs fan-out including both TOML forms), and its Step 8 client-file list is corrected from 12 to all 14 bundled skill files (warp and kiro were missing).</li>
 </ul>
-<h2 id="240-2026-06-10">[2.4.0] - 2026-06-10<a class="headerlink" href="#240-2026-06-10" title="Permanent link">#</a></h2>
+<h2 id="240-2026-06-10"><a href="https://github.com/shelkesays/safelint/compare/v2.3.0...v2.4.0">2.4.0</a> - 2026-06-10<a class="headerlink" href="#240-2026-06-10" title="Permanent link">#</a></h2>
 <p><strong>Power of Ten gap-closure: five new / widened rules.</strong> This release adds four new rules and widens one existing rule to close the most prominent gaps between SafeLint's rule set and Holzmann's ten rules, plus a new docs page mapping the ten rules onto the checks. Additive across the board (per the project's semver policy, new rules and widened language coverage are MINOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.</p>
 <h3 id="added_1">Added<a class="headerlink" href="#added_1" title="Permanent link">#</a></h3>
 <ul>
@@ -4943,7 +4966,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <ul>
 <li><strong>SafeLint now passes its own rule set with no inline suppressions other than the documented <code>SAFE203</code> logging exemptions.</strong> The new <code>SAFE105 no_recursion</code> rule fires on intra-procedural tree-walkers in the dataflow analysers, <code>deep_merge</code>, and a couple of parse-tree helpers; rather than annotate them, those were converted to explicit iterative worklists / loops (mirroring the existing iterative <code>walk()</code>), and the remaining <code>SAFE501</code> worklist-drain annotations and one <code>SAFE304</code> annotation were likewise refactored away. No behaviour change; recursion depth on the affected helpers was always bounded by source-construct nesting.</li>
 </ul>
-<h2 id="230-2026-06-09">[2.3.0] - 2026-06-09<a class="headerlink" href="#230-2026-06-09" title="Permanent link">#</a></h2>
+<h2 id="230-2026-06-09"><a href="https://github.com/shelkesays/safelint/compare/v2.2.0...v2.3.0">2.3.0</a> - 2026-06-09<a class="headerlink" href="#230-2026-06-09" title="Permanent link">#</a></h2>
 <p><strong>Kiro AI client; documentation accuracy pass.</strong> Kiro (<code>kiro.dev</code>, AWS's agentic IDE) joins the registry as the fourteenth supported AI client, additive, one <code>ClientSpec</code>. This release also folds in the post-2.2.0 documentation work: the per-client docs gaps for Warp and OpenCode are closed, <code>docs/configuration/cli.md</code> is restructured into a per-command reference, and the contributing "Adding an AI client" guide plus the AI client integration pages are corrected against the current single-file install architecture. No behaviour change for existing clients or languages.</p>
 <h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">#</a></h3>
 <ul>
