@@ -830,6 +830,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 
 [Unreleased]: https://github.com/shelkesays/safelint/compare/v2.5.0...HEAD
 [2.5.0]: https://github.com/shelkesays/safelint/compare/v2.4.0...v2.5.0
+[2.4.0]: https://github.com/shelkesays/safelint/compare/v2.3.0...v2.4.0
+[2.3.0]: https://github.com/shelkesays/safelint/compare/v2.2.0...v2.3.0
 [2.2.0]: https://github.com/shelkesays/safelint/compare/v2.2.0rc3...v2.2.0
 [2.2.0rc3]: https://github.com/shelkesays/safelint/compare/v2.2.0rc2...v2.2.0rc3
 [2.2.0rc2]: https://github.com/shelkesays/safelint/compare/v2.2.0rc1...v2.2.0rc2
