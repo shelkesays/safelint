@@ -6,7 +6,7 @@ SafeLint is a static-analysis CLI that parses source code via Tree-sitter and wa
 
 Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade.
 
-| Version line | Status |
+| Version(s) | Status |
 |---|---|
 | **2.5.x** (current; Go support) | ✅ Security fixes |
 | **2.2.x - 2.4.x** (Rust support) | ✅ Security fixes through ~6 months after the next minor lands |
