@@ -26,9 +26,9 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 
 Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see [Adding a language](../contributing/adding-a-language.md)) makes each new language incremental, community contributions for any of these are welcome.
 
-1. **C** (`.c`, `.h`), Holzmann's original target language.
-2. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.
-3. **PHP** (`.php`).
+1. **PHP** (`.php`), next up; it has no dependencies and ports the largest share of the existing rule set (try/catch, a literal `global` keyword, `eval`, superglobals).
+2. **C** (`.c`, `.h`), Holzmann's original target language.
+3. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, and it depends on C shipping first.
 
 ### Rule scope (current languages)
 

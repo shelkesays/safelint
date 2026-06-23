@@ -1,10 +1,13 @@
-# Language-expansion plan: C, C++, PHP
+# Language-expansion plan: PHP, C, C++
 
 **Audience**: the AI coding agent (or human contributor) implementing the next
 language. Each language has its own self-contained spec in this directory.
-Implement **one language per spec, in this exact sequence** (it matches the
-project's published roadmap in `docs/configuration/rules.md` "Planned", and
-C++ has a hard dependency on C):
+Implement **one language per spec, in working-priority order**. **PHP is next**
+(it has no dependencies and ports the largest share of the existing rule set);
+C and C++ follow. The one hard ordering rule is that **C must ship before C++**
+(shared grammar family, shared new rules, `.h` ownership) - PHP is independent
+of both. This order matches the project's published roadmap in
+`docs/configuration/rules.md` "Planned":
 
 > **Go (`.go`) shipped in v2.5.0** (6th registered language: 16 cross-language
 > rules + the Go-only SAFE209 `empty_error_check` / SAFE211
@@ -13,11 +16,14 @@ C++ has a hard dependency on C):
 > [Go language page](../docs/languages/go.md), the
 > `src/safelint/skill_files/languages/go.md` addendum, and the shipped code.
 
-| Spec # | File | Language | Status | Depends on |
-|---|---|---|---|---|
-| 2 | `plan/02-c.md` | C (`.c`, `.h`) | not started | nothing (next in roadmap order) |
-| 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started | **C shipped** (shared grammar family, shared new rules, `.h` ownership) |
-| 4 | `plan/04-php.md` | PHP (`.php`) | not started | nothing |
+Rows are in working-priority order; the **Spec #** column is the stable file
+number, not the priority rank.
+
+| Priority | Spec # | File | Language | Status | Depends on |
+|---|---|---|---|---|---|
+| 1 (next) | 4 | `plan/04-php.md` | PHP (`.php`) | **next up** | nothing |
+| 2 | 2 | `plan/02-c.md` | C (`.c`, `.h`) | not started | nothing |
+| 3 | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started | **C shipped** (shared grammar family, shared new rules, `.h` ownership) |
 
 Update the Status column (and the per-spec status header) as work lands; remove
 a spec file once its language ships (as was done for Go).
