@@ -15,6 +15,7 @@ from safelint.languages._node_utils import node_text as _node_text
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.python import CALL, WITH_ITEM
 from safelint.rules.base import BaseRule
 
@@ -59,7 +60,7 @@ def _iter_with_items(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
             yield node
 
 
-def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
+def _is_inside_try_finally(node: tree_sitter.Node, function_types: frozenset[str] = _JS_FUNCTION_TYPES) -> bool:
     """Return True if *node* has an enclosing guarding try/finally within the same function scope.
 
     Walks the parent chain (Tree-sitter Node exposes ``.parent``) and
@@ -94,11 +95,13 @@ def _is_inside_try_finally(node: tree_sitter.Node) -> bool:
     prev = node
     cur = node.parent
     while cur is not None:
-        if cur.type in _JS_FUNCTION_TYPES:
+        if cur.type in function_types:
             # Walked out of the call's function scope without finding a
             # guarding try/finally - anything further up belongs to a
             # different function whose ``finally`` doesn't run when this
-            # call eventually executes.
+            # call eventually executes. *function_types* is the JS family by
+            # default; PHP passes its own set (both share the
+            # ``try_statement`` / ``finally_clause`` shape).
             return False
         # ``prev.type != "finally_clause"`` skips a try_statement whose
         # finally we just came out of - that finally is the *parent* of
@@ -514,7 +517,21 @@ class ResourceLifecycleRule(BaseRule):
 
     name = "resource_lifecycle"
     code = "SAFE401"
-    language = ("python", "javascript", "typescript", "java", "go")
+    language = ("python", "javascript", "typescript", "java", "go", "php")
+
+    _DEFAULT_TRACKED_PHP: ClassVar[list[str]] = [
+        # PHP resource acquirers are global functions; ``call_name`` resolves
+        # ``function_call_expression`` to the bare name. The safe form is a
+        # ``try { ... } finally { fclose($f); }`` (PHP has try/finally), so
+        # the JS-style enclosing-try/finally heuristic applies.
+        "fopen",
+        "fsockopen",
+        "popen",
+        "proc_open",
+        "curl_init",
+        "opendir",
+        "tmpfile",
+    ]
 
     _DEFAULT_TRACKED_JAVASCRIPT: ClassVar[list[str]] = [
         # File / stream APIs.
@@ -761,6 +778,38 @@ class ResourceLifecycleRule(BaseRule):
             violations.append(self._make_violation_for_node(filepath, node, message))
         return violations
 
+    def _php_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run the PHP check: a tracked acquirer must sit inside ``try { ... } finally { ... }``.
+
+        PHP has ``try``/``finally``, so the JS-style heuristic applies: a
+        tracked acquirer call (``fopen`` / ``curl_init`` / ...) is clean when
+        an enclosing ``try_statement`` in the same function scope has a
+        ``finally_clause``. The acquirers are global functions
+        (``function_call_expression``); ``call_name`` resolves the bareword.
+        As with the JS check, this does not verify the finally actually closes
+        the specific handle - it catches the common "opened a handle, no
+        cleanup scope at all" leak.
+        """
+        raw_tracked, error_key = resolve_lang_config_lookup(self.config, "tracked_functions", "php", default=self._DEFAULT_TRACKED_PHP)
+        tracked = frozenset(_validated_string_list(raw_tracked, error_key))
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type != "function_call_expression":
+                continue
+            name = call_name(node)
+            if not name or name not in tracked:
+                continue
+            if _is_inside_try_finally(node, _PHP_FUNCTION_TYPES):
+                continue
+            violations.append(
+                self._make_violation_for_node(
+                    filepath,
+                    node,
+                    f'"{name}()" not wrapped in try/finally - guarantee cleanup (e.g. fclose / curl_close) with try {{ ... }} finally {{ ... }}',
+                )
+            )
+        return violations
+
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag unguarded calls to tracked resource-acquisition functions."""
         lang_name = resolve_lang_name(filepath)
@@ -770,4 +819,6 @@ class ResourceLifecycleRule(BaseRule):
             return self._java_check(filepath, tree)
         if lang_name == "go":
             return self._go_check(filepath, tree)
+        if lang_name == "php":
+            return self._php_check(filepath, tree)
         return self._javascript_check(filepath, tree, lang_name)

@@ -75,7 +75,7 @@ The security guards (symlink refusal at the secondary destination, `skill remove
 
 ## Adding a new language
 
-Six languages are registered today (Python, JavaScript, TypeScript, Java, Rust, Go). Adding a new one (C, C++, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) - note its "scattered enumerations" step (the docs that list every language's extension / grammar / `--language` value outside the headline tables), which is the easiest part to miss.
+Seven languages are registered today (Python, JavaScript, TypeScript, Java, Rust, Go, PHP). Adding a new one (C, C++, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) - note its "scattered enumerations" step (the docs that list every language's extension / grammar / `--language` value outside the headline tables), which is the easiest part to miss.
 
 ---
 

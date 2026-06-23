@@ -8,6 +8,7 @@ from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     FOR_STATEMENT,
@@ -35,6 +36,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
+    "php": _PHP_FUNCTION_TYPES,
 }
 
 # Per-language node-type sets that count as one nesting step.
@@ -64,6 +66,14 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # are NOT counted - the switch / select that contains them is the single
 # nesting step, the same way Python's ``match`` counts once rather than
 # once per ``case_clause``.
+# PHP: ``if_statement`` / ``while_statement`` / ``do_statement`` /
+# ``for_statement`` / ``foreach_statement`` / ``switch_statement`` /
+# ``try_statement`` / ``match_expression``. ``else_if_clause`` is NOT a
+# nesting step - it is a child of its ``if_statement`` (which already
+# counts once), so the elseif body sits at the if's depth+1, mirroring
+# Python's ``elif_clause`` handling. ``case_statement`` /
+# ``match_conditional_expression`` arms are not counted - the enclosing
+# ``switch`` / ``match`` is the single step.
 _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({IF_STATEMENT, FOR_STATEMENT, WHILE_STATEMENT, WITH_STATEMENT, TRY_STATEMENT, MATCH_STATEMENT}),
     "javascript": frozenset({"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"}),
@@ -71,6 +81,7 @@ _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": frozenset({"if_statement", "for_statement", "enhanced_for_statement", "while_statement", "do_statement", "try_statement", "try_with_resources_statement", "switch_expression"}),
     "rust": frozenset({"if_expression", "if_let_expression", "for_expression", "while_expression", "while_let_expression", "loop_expression", "match_expression"}),
     "go": frozenset({"if_statement", "for_statement", "expression_switch_statement", "type_switch_statement", "select_statement"}),
+    "php": frozenset({"if_statement", "while_statement", "do_statement", "for_statement", "foreach_statement", "switch_statement", "try_statement", "match_expression"}),
 }
 
 
@@ -79,7 +90,7 @@ class NestingDepthRule(BaseRule):
 
     name = "nesting_depth"
     code = "SAFE102"
-    language = ("python", "javascript", "typescript", "java", "rust", "go")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function whose maximum control-flow nesting depth exceeds max_depth."""

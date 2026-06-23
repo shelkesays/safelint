@@ -20,6 +20,7 @@ from pathlib import Path
 from safelint.languages import go as _go_mod
 from safelint.languages import java as _java_mod
 from safelint.languages import javascript as _javascript_mod
+from safelint.languages import php as _php_mod
 from safelint.languages import python as _python_mod
 from safelint.languages import rust as _rust_mod
 from safelint.languages import typescript as _typescript_mod
@@ -27,6 +28,7 @@ from safelint.languages._types import LanguageDefinition
 from safelint.languages.go import GO
 from safelint.languages.java import JAVA
 from safelint.languages.javascript import JAVASCRIPT
+from safelint.languages.php import PHP
 from safelint.languages.python import PYTHON
 from safelint.languages.rust import RUST
 from safelint.languages.typescript import TSX, TYPESCRIPT
@@ -124,6 +126,21 @@ else:
         _UNAVAILABLE_EXTENSIONS[_ext] = _go_mod.GRAMMAR_INSTALL_HINT
         _UNAVAILABLE_EXTRA_NAMES[_ext] = _go_mod.EXTRA_NAME
 
+# PHP - only register if ``tree-sitter-php`` is installed (i.e. the
+# ``[php]`` or ``[all]`` extra was selected). PHP ports the widest slice
+# of the cross-language rule set; the ``@`` error-suppression operator
+# (SAFE603) and superglobal taint sources (SAFE801) are its headline
+# additions. Uses the mixed HTML+PHP grammar so templated files parse.
+# Same shape as the blocks above - keep them parallel so future drift is
+# grep-able.
+if _php_mod._GRAMMAR_AVAILABLE:
+    for _ext in PHP.file_extensions:
+        _REGISTRY[_ext] = PHP
+else:
+    for _ext in PHP.file_extensions:
+        _UNAVAILABLE_EXTENSIONS[_ext] = _php_mod.GRAMMAR_INSTALL_HINT
+        _UNAVAILABLE_EXTRA_NAMES[_ext] = _php_mod.EXTRA_NAME
+
 
 def get_language_for_file(filepath: str) -> LanguageDefinition | None:
     """Return the LanguageDefinition for *filepath* based on its extension, or None.
@@ -189,6 +206,7 @@ __all__ = [
     "GO",
     "JAVA",
     "JAVASCRIPT",
+    "PHP",
     "PYTHON",
     "TSX",
     "TYPESCRIPT",

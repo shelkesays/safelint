@@ -51,11 +51,12 @@ Issues = "https://github.com/shelkesays/safelint/issues"
 #     pip install 'safelint[java]'          # adds .java (also has a Spring Boot framework preset)
 #     pip install 'safelint[rust]'          # adds .rs
 #     pip install 'safelint[go]'            # adds .go
+#     pip install 'safelint[php]'           # adds .php
 #     pip install 'safelint[all]'           # everything currently supported
 #
 # Multiple extras compose: ``pip install 'safelint[python,javascript]'``
-# for a Python+JS monorepo, etc. As more languages land (C, C++,
-# PHP), each gets its own extra and is folded into ``[all]``.
+# for a Python+JS monorepo, etc. As more languages land (C, C++),
+# each gets its own extra and is folded into ``[all]``.
 python = [
     "tree-sitter-python>=0.23.0",
 ]
@@ -107,6 +108,17 @@ rust = [
 go = [
     "tree-sitter-go>=0.23.0",
 ]
+# PHP support. PHP ports the largest share of the existing rule set of any
+# language so far: try/catch error-handling (SAFE202 / SAFE203), the literal
+# ``global`` keyword (SAFE301's first non-Python home), ``eval`` (SAFE309),
+# superglobals (``$_GET`` / ``$_POST`` taint sources for SAFE801), and the
+# ``@`` error-suppression operator (SAFE603's most literal target). The
+# ``tree-sitter-php`` package exposes two grammars; safelint uses
+# ``language_php()`` so mixed HTML+PHP templates parse (HTML arrives as inert
+# ``text`` nodes the rules never match).
+php = [
+    "tree-sitter-php>=0.23.0",
+]
 # Convenience: every supported-language grammar in one install. Pin against
 # this when you want safelint to lint anything you throw at it without
 # thinking about per-language extras.
@@ -117,6 +129,7 @@ all = [
     "tree-sitter-java>=0.23.0",
     "tree-sitter-rust>=0.23.0",
     "tree-sitter-go>=0.23.0",
+    "tree-sitter-php>=0.23.0",
 ]
 dev = [
     "pre-commit>=4.5.1",

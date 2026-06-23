@@ -374,229 +374,87 @@ def test_base_rule_default_language_is_python_only() -> None:
     assert BaseRule.language == ("python",)
 
 
-_RULES_WIDENED_FOR_JS_FAMILY: frozenset[str] = frozenset(
-    {
-        # Cross-language rules ported to the JS family but NOT YET ported to
-        # Java. ``language`` should be exactly ``("python", "javascript",
-        # "typescript")``. As the v2.1.0 Java port lands rule-by-rule, each
-        # entry here graduates to ``_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA``.
-        # The split exists so the drift-detection assertion catches partial
-        # ports - a rule's language tuple must always match exactly one of
-        # the documented buckets.
-        #
-        # Empty as of v2.4.0: GlobalMutationRule (SAFE302) graduated to the
-        # JS-family-and-Java bucket when its Java declaration-site check landed.
-    }
-)
+# Expected ``language`` tuple for every rule whose scope differs from the
+# default ``("python",)``. Keyed by class name. The test asserts BOTH
+# directions: every rule's ``.language`` matches its entry here (or the
+# ``("python",)`` default when absent), AND every non-default rule appears
+# here exactly once - so a silent widening or an accidental scope regression
+# both fail CI. Grouped by the distinct scope tuples; the comments record why
+# each rule sits where it does.
+_ALL_SEVEN = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 
-_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA: frozenset[str] = frozenset(
-    {
-        # Cross-language rules ported to JS / TS / Java but deliberately
-        # ported to NEITHER Rust NOR Go. ``language`` should be exactly
-        # ``("python", "javascript", "typescript", "java")``.
-        #
-        # * EmptyExceptRule / LoggingOnErrorRule - SAFE202 / SAFE203: no
-        #   try/catch in Rust OR Go. The Rust analogue (silent
-        #   ``let _ = result;``) and the Go analogue (empty ``if err != nil
-        #   {}`` via the Go-only SAFE209) are separate rule designs, not
-        #   ports. Deferred for Rust, covered by SAFE209 for Go.
-        "EmptyExceptRule",
-        "LoggingOnErrorRule",
-    }
-)
-
-_RULES_PY_JS_TS_JAVA_GO: frozenset[str] = frozenset(
-    {
-        # Cross-language rules ported to JS / TS / Java / Go but deliberately
-        # NOT to Rust. ``language`` should be exactly ``("python",
-        # "javascript", "typescript", "java", "go")``.
-        #
-        # * ResourceLifecycleRule - SAFE401: Rust's RAII (Drop trait) makes
-        #   cleanup language-enforced, so the rule has nothing to add there;
-        #   Go has no RAII, so the ``defer x.Close()`` form IS checked.
-        # * GlobalMutationRule - SAFE302: Java fires on non-final static
-        #   fields, Go on package-level ``var``; Rust's ``static mut`` is
-        #   covered by SAFE602 and safe interior-mutable statics by SAFE307,
-        #   so SAFE302 itself is not ported to Rust.
-        # * DynamicCodeExecutionRule - SAFE309: Rust's rule-8 analogue is
-        #   macros (opaque token trees, not ported); Go's analogue is
-        #   reflection / plugin loading, which IS checked.
-        "ResourceLifecycleRule",
-        "GlobalMutationRule",
-        "DynamicCodeExecutionRule",
-    }
-)
-
-_RULES_PORTED_TO_ALL_FIVE_LANGUAGES: frozenset[str] = frozenset(
-    {
-        # Cross-language rules ported to the original five languages but
-        # deliberately NOT to Go. ``language`` should be exactly
-        # ``("python", "javascript", "typescript", "java", "rust")``.
-        #
-        # * MissingAssertionsRule - SAFE601: Go has no production assertion
-        #   idiom (no ``assert`` keyword / stdlib macro; testify is
-        #   test-only), so the rule has nothing to anchor on.
-        # * NullDereferenceRule - SAFE803: Go has no chained-nullable idiom
-        #   (nil-pointer analysis needs type info; map reads return zero
-        #   values), so it is a documented Go gap.
-        "MissingAssertionsRule",
-        "NullDereferenceRule",
-    }
-)
-
-_RULES_PORTED_TO_ALL_SIX_LANGUAGES: frozenset[str] = frozenset(
-    {
-        # Cross-language rules ported to all six languages.
-        # ``language`` should be exactly ``("python", "javascript",
-        # "typescript", "java", "rust", "go")``. Entries graduate here from
-        # ``_RULES_PORTED_TO_ALL_FIVE_LANGUAGES`` as each rule's Go port lands.
-        "BlanketSuppressionRule",
-        "ComplexityRule",
-        "FunctionLengthRule",
-        "MaxArgumentsRule",
-        "NestingDepthRule",
-        "NoRecursionRule",
-        "ReturnValueIgnoredRule",
-        "SideEffectsHiddenRule",
-        "SideEffectsRule",
-        "TaintedSinkRule",
-        "TestCouplingRule",
-        "TestExistenceRule",
-        "UnboundedLoopRule",
-    }
-)
-
-_RULES_JS_FAMILY_ONLY: frozenset[str] = frozenset(
-    {
-        # JS-family-only rules (``language=("javascript", "typescript")``) -
-        # the hazard has no useful Python translation. ``var`` is
-        # legal in TS too, so SAFE305 fires on both.
-        "WideScopeDeclarationRule",  # SAFE305: ``var`` keyword (no Python equivalent)
-    }
-)
-
-_RULES_JAVA_ONLY: frozenset[str] = frozenset(
-    {
-        # Java-only framework-aware rules (SAFE9xx band,
-        # ``language=("java",)``). The hazards are Spring Boot
-        # annotation patterns that have no analogue in Python / JS /
-        # TS. Default-disabled under the vanilla Java preset; flipped
-        # on by ``[tool.safelint.java] framework = "spring-boot"``.
-        "SpringFieldInjectionRule",  # SAFE901
-        "SpringMissingTransactionalRule",  # SAFE902
-        "SpringUnvalidatedInputRule",  # SAFE903
-        "SpringAsyncCheckedExceptionRule",  # SAFE904
-    }
-)
-
-_RULES_RUST_ONLY: frozenset[str] = frozenset(
-    {
-        # Rust-only language-idiom rules (``language=("rust",)``).
-        # Slotted into existing category bands per the SafeLint
-        # numbering policy (see CLAUDE.md): the band still encodes
-        # category, not language. All disabled by default.
-        "NeedlessMutRule",  # SAFE110 - function shape (Holzmann rule 6)
-        "UncheckedArithmeticOnInputRule",  # SAFE112 - function shape (Holzmann rule 7)
-        "PanicMacrosOutsideTestsRule",  # SAFE204 - error handling
-        "LockPoisoningIgnoredRule",  # SAFE205 - error handling
-        "SilentResultDiscardRule",  # SAFE206 - error handling (Rust analogue of SAFE202)
-        "UnloggedErrorBranchRule",  # SAFE207 - error handling (Rust analogue of SAFE203)
-        "ResultUnwrapOutsideTestsRule",  # SAFE208 - error handling (Holzmann rule 7)
-        "DangerousMemOpsRule",  # SAFE306 - side effects
-        "InteriorMutableStaticRule",  # SAFE307 - state / scope (Holzmann rule 6)
-        "TruncatingAsCastRule",  # SAFE308 - side effects (Holzmann rule 1 + 7)
-        "UndocumentedUnsafeRule",  # SAFE602 - documentation
-    }
-)
-
-_RULES_GO_ONLY: frozenset[str] = frozenset(
-    {
-        # Go-only language-idiom rules (``language=("go",)``). Slotted into
-        # existing category bands per the SafeLint numbering policy (see
-        # CLAUDE.md): the band encodes category, not language. Both disabled
-        # by default.
-        "EmptyErrorCheckRule",  # SAFE209 - error handling (Go analogue of SAFE206)
-        "PanicCallsOutsideTestsRule",  # SAFE211 - error handling (Go analogue of SAFE204)
-    }
-)
+_EXPECTED_LANGUAGES: dict[str, tuple[str, ...]] = {
+    # Cross-language structural / dataflow rules ported to EVERY registered
+    # language.
+    "FunctionLengthRule": _ALL_SEVEN,  # SAFE101
+    "NestingDepthRule": _ALL_SEVEN,  # SAFE102
+    "MaxArgumentsRule": _ALL_SEVEN,  # SAFE103
+    "ComplexityRule": _ALL_SEVEN,  # SAFE104
+    "NoRecursionRule": _ALL_SEVEN,  # SAFE105
+    "UnboundedLoopRule": _ALL_SEVEN,  # SAFE501
+    "BlanketSuppressionRule": _ALL_SEVEN,  # SAFE603
+    "TestExistenceRule": _ALL_SEVEN,  # SAFE701
+    "TestCouplingRule": _ALL_SEVEN,  # SAFE702
+    "SideEffectsHiddenRule": _ALL_SEVEN,  # SAFE303
+    "SideEffectsRule": _ALL_SEVEN,  # SAFE304
+    "TaintedSinkRule": _ALL_SEVEN,  # SAFE801
+    "ReturnValueIgnoredRule": _ALL_SEVEN,  # SAFE802
+    # Ported everywhere EXCEPT Rust (Rust covers these via RAII / SAFE602 /
+    # SAFE307, or its rule-8 analogue is the opaque macro system).
+    "GlobalMutationRule": ("python", "javascript", "typescript", "java", "go", "php"),  # SAFE302
+    "DynamicCodeExecutionRule": ("python", "javascript", "typescript", "java", "go", "php"),  # SAFE309
+    "ResourceLifecycleRule": ("python", "javascript", "typescript", "java", "go", "php"),  # SAFE401
+    # Ported everywhere EXCEPT Go (no production assertion idiom; no
+    # chained-nullable idiom - nil analysis needs type info).
+    "MissingAssertionsRule": ("python", "javascript", "typescript", "java", "rust", "php"),  # SAFE601
+    "NullDereferenceRule": ("python", "javascript", "typescript", "java", "rust", "php"),  # SAFE803
+    # try/catch rules: the languages with try/catch (Rust / Go have neither;
+    # their analogues SAFE206/207 / SAFE209 are separate rule designs).
+    "EmptyExceptRule": ("python", "javascript", "typescript", "java", "php"),  # SAFE202
+    "LoggingOnErrorRule": ("python", "javascript", "typescript", "java", "php"),  # SAFE203
+    # The literal ``global`` keyword: Python and PHP only (PHP is SAFE301's
+    # first non-Python registration).
+    "GlobalStateRule": ("python", "php"),  # SAFE301
+    # JS-family-only: the ``var`` hoisting hazard has no Python / Java / Rust /
+    # Go / PHP analogue.
+    "WideScopeDeclarationRule": ("javascript", "typescript"),  # SAFE305
+    # Java-only Spring Boot framework rules (SAFE9xx band).
+    "SpringFieldInjectionRule": ("java",),  # SAFE901
+    "SpringMissingTransactionalRule": ("java",),  # SAFE902
+    "SpringUnvalidatedInputRule": ("java",),  # SAFE903
+    "SpringAsyncCheckedExceptionRule": ("java",),  # SAFE904
+    # Rust-only language-idiom rules (slotted into category bands).
+    "NeedlessMutRule": ("rust",),  # SAFE110
+    "UncheckedArithmeticOnInputRule": ("rust",),  # SAFE112
+    "PanicMacrosOutsideTestsRule": ("rust",),  # SAFE204
+    "LockPoisoningIgnoredRule": ("rust",),  # SAFE205
+    "SilentResultDiscardRule": ("rust",),  # SAFE206
+    "UnloggedErrorBranchRule": ("rust",),  # SAFE207
+    "ResultUnwrapOutsideTestsRule": ("rust",),  # SAFE208
+    "DangerousMemOpsRule": ("rust",),  # SAFE306
+    "InteriorMutableStaticRule": ("rust",),  # SAFE307
+    "TruncatingAsCastRule": ("rust",),  # SAFE308
+    "UndocumentedUnsafeRule": ("rust",),  # SAFE602
+    # Go-only language-idiom rules.
+    "EmptyErrorCheckRule": ("go",),  # SAFE209
+    "PanicCallsOutsideTestsRule": ("go",),  # SAFE211
+}
 
 
 def test_widened_rules_match_the_documented_allow_list() -> None:
-    """The set of rules with non-default ``language`` matches the documented allow-list.
+    """Every rule's ``language`` tuple matches its documented expectation exactly.
 
-    Catches two failure modes:
+    Catches two failure modes in both directions:
 
-    * A rule silently grows its language tuple (e.g. someone adds
-      a new language mid-port without finishing the work). The
-      allow-list surfaces that as a test failure rather than letting
-      half-ported behaviour ship.
-    * A rule listed here regresses to the default ``("python",)`` -
-      the test fails too, prompting the contributor to remove the entry
-      from the allow-list along with the deliberate scope reduction.
+    * A rule silently grows or shrinks its language tuple (e.g. a new language
+      added mid-port, or an accidental scope regression to ``("python",)``):
+      the per-rule assertion fails.
+    * The allow-list drifts from the registry (a rule renamed / removed, or a
+      stale entry left behind): the set-equality assertion fails.
     """
-    cross_lang_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript")}
-    cross_lang_with_java_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript", "java")}
-    py_js_ts_java_go_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript", "java", "go")}
-    cross_lang_all_five_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript", "java", "rust")}
-    cross_lang_all_six_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("python", "javascript", "typescript", "java", "rust", "go")}
-    js_family_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("javascript", "typescript")}
-    java_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("java",)}
-    rust_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("rust",)}
-    go_only_actual = {cls.__name__ for cls in ALL_RULES if cls.language == ("go",)}
-    assert cross_lang_actual == _RULES_WIDENED_FOR_JS_FAMILY, (
-        f"Cross-language allow-list out of sync. Actually ('python', 'javascript', 'typescript'): {sorted(cross_lang_actual)}; documented: {sorted(_RULES_WIDENED_FOR_JS_FAMILY)}"
-    )
-    assert cross_lang_with_java_actual == _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA, (
-        "Cross-language-with-Java allow-list out of sync. "
-        f"Actually ('python', 'javascript', 'typescript', 'java'): {sorted(cross_lang_with_java_actual)}; "
-        f"documented: {sorted(_RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA)}"
-    )
-    assert py_js_ts_java_go_actual == _RULES_PY_JS_TS_JAVA_GO, (
-        "JS-family-with-Java-and-Go allow-list out of sync. "
-        f"Actually ('python', 'javascript', 'typescript', 'java', 'go'): {sorted(py_js_ts_java_go_actual)}; "
-        f"documented: {sorted(_RULES_PY_JS_TS_JAVA_GO)}"
-    )
-    assert cross_lang_all_five_actual == _RULES_PORTED_TO_ALL_FIVE_LANGUAGES, (
-        "All-five-languages allow-list out of sync. "
-        f"Actually ('python', 'javascript', 'typescript', 'java', 'rust'): {sorted(cross_lang_all_five_actual)}; "
-        f"documented: {sorted(_RULES_PORTED_TO_ALL_FIVE_LANGUAGES)}"
-    )
-    assert cross_lang_all_six_actual == _RULES_PORTED_TO_ALL_SIX_LANGUAGES, (
-        "All-six-languages allow-list out of sync. "
-        f"Actually ('python', 'javascript', 'typescript', 'java', 'rust', 'go'): {sorted(cross_lang_all_six_actual)}; "
-        f"documented: {sorted(_RULES_PORTED_TO_ALL_SIX_LANGUAGES)}"
-    )
-    assert js_family_only_actual == _RULES_JS_FAMILY_ONLY, (
-        f"JS-family-only allow-list out of sync. Actually ('javascript', 'typescript'): {sorted(js_family_only_actual)}; documented: {sorted(_RULES_JS_FAMILY_ONLY)}"
-    )
-    assert java_only_actual == _RULES_JAVA_ONLY, f"Java-only allow-list out of sync. Actually ('java',): {sorted(java_only_actual)}; documented: {sorted(_RULES_JAVA_ONLY)}"
-    assert rust_only_actual == _RULES_RUST_ONLY, f"Rust-only allow-list out of sync. Actually ('rust',): {sorted(rust_only_actual)}; documented: {sorted(_RULES_RUST_ONLY)}"
-    assert go_only_actual == _RULES_GO_ONLY, f"Go-only allow-list out of sync. Actually ('go',): {sorted(go_only_actual)}; documented: {sorted(_RULES_GO_ONLY)}"
-
     for cls in ALL_RULES:
-        if cls.__name__ in _RULES_PORTED_TO_ALL_SIX_LANGUAGES:
-            assert cls.language == ("python", "javascript", "typescript", "java", "rust", "go"), f"{cls.__name__} should be all six languages; got {cls.language}"
-        elif cls.__name__ in _RULES_PORTED_TO_ALL_FIVE_LANGUAGES:
-            assert cls.language == ("python", "javascript", "typescript", "java", "rust"), f"{cls.__name__} should be ('python', 'javascript', 'typescript', 'java', 'rust'); got {cls.language}"
-        elif cls.__name__ in _RULES_PY_JS_TS_JAVA_GO:
-            assert cls.language == ("python", "javascript", "typescript", "java", "go"), f"{cls.__name__} should be ('python', 'javascript', 'typescript', 'java', 'go'); got {cls.language}"
-        elif cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA:
-            assert cls.language == ("python", "javascript", "typescript", "java"), f"{cls.__name__} should be ('python', 'javascript', 'typescript', 'java'); got {cls.language}"
-        elif cls.__name__ in _RULES_WIDENED_FOR_JS_FAMILY:
-            assert cls.language == ("python", "javascript", "typescript"), f"{cls.__name__} should be ('python', 'javascript', 'typescript'); got {cls.language}"
-        elif cls.__name__ in _RULES_JS_FAMILY_ONLY:
-            assert cls.language == ("javascript", "typescript"), f"{cls.__name__} should be ('javascript', 'typescript'); got {cls.language}"
-        elif cls.__name__ in _RULES_JAVA_ONLY:
-            assert cls.language == ("java",), f"{cls.__name__} should be ('java',); got {cls.language}"
-        elif cls.__name__ in _RULES_RUST_ONLY:
-            assert cls.language == ("rust",), f"{cls.__name__} should be ('rust',); got {cls.language}"
-        elif cls.__name__ in _RULES_GO_ONLY:
-            assert cls.language == ("go",), f"{cls.__name__} should be ('go',); got {cls.language}"
-        else:
-            buckets = (
-                "_RULES_WIDENED_FOR_JS_FAMILY, _RULES_WIDENED_FOR_JS_FAMILY_AND_JAVA, "
-                "_RULES_PY_JS_TS_JAVA_GO, _RULES_PORTED_TO_ALL_FIVE_LANGUAGES, "
-                "_RULES_PORTED_TO_ALL_SIX_LANGUAGES, _RULES_JS_FAMILY_ONLY, "
-                "_RULES_JAVA_ONLY, _RULES_RUST_ONLY, or _RULES_GO_ONLY"
-            )
-            assert cls.language == ("python",), f"{cls.__name__} has unexpected language={cls.language}; add it to {buckets} if intentional"
+        expected = _EXPECTED_LANGUAGES.get(cls.__name__, ("python",))
+        assert cls.language == expected, f"{cls.__name__}: language {cls.language} != expected {expected} (update _EXPECTED_LANGUAGES in this test if the change is intentional)"
+    documented = set(_EXPECTED_LANGUAGES)
+    non_default = {cls.__name__ for cls in ALL_RULES if cls.language != ("python",)}
+    assert documented == non_default, f"allow-list out of sync with ALL_RULES; symmetric difference: {sorted(documented ^ non_default)}"

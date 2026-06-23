@@ -61,10 +61,19 @@ if TYPE_CHECKING:
 #:   same-named call from another package (notably ``os.Open``) also fires.
 #:   The rule is off by default, so opting in accepts that caveat; narrow
 #:   the list via ``dynamic_exec_calls_go`` if it is noisy.
+#: * PHP: ``eval`` (parses as a plain ``function_call_expression``, not a
+#:   dedicated node), ``assert`` (its string form evaluates code in older
+#:   PHP), ``create_function`` (legacy runtime-function builder), and the
+#:   ``call_user_func`` / ``call_user_func_array`` runtime dispatchers. All
+#:   are global functions, so only the ``function_call_expression`` shape is
+#:   inspected (a method ``$obj->eval()`` does not fire). Variable
+#:   ``include`` / ``require`` are SAFE801 (tainted_sink) territory, not
+#:   structural dynamic execution, so they are deliberately excluded here.
 _DEFAULT_CALLS_PYTHON = ["eval", "exec", "compile", "__import__"]
 _DEFAULT_CALLS_JAVASCRIPT = ["eval", "Function", "execScript"]
 _DEFAULT_CALLS_JAVA = ["forName", "invoke", "eval", "defineClass", "loadClass"]
 _DEFAULT_CALLS_GO = ["Call", "CallSlice", "MethodByName", "Open", "Lookup"]
+_DEFAULT_CALLS_PHP = ["eval", "assert", "create_function", "call_user_func", "call_user_func_array"]
 
 _DEFAULTS_BY_LANG: dict[str, list[str]] = {
     "python": _DEFAULT_CALLS_PYTHON,
@@ -72,17 +81,21 @@ _DEFAULTS_BY_LANG: dict[str, list[str]] = {
     "typescript": _DEFAULT_CALLS_JAVASCRIPT,
     "java": _DEFAULT_CALLS_JAVA,
     "go": _DEFAULT_CALLS_GO,
+    "php": _DEFAULT_CALLS_PHP,
 }
 
 #: Call-expression node types to inspect per language. Python ``call``;
 #: JS / TS ``call_expression`` plus ``new_expression`` (for ``new Function``);
-#: Java ``method_invocation``; Go ``call_expression``.
+#: Java ``method_invocation``; Go ``call_expression``; PHP
+#: ``function_call_expression`` (the dynamic-exec builtins are all global
+#: functions).
 _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({"call"}),
     "javascript": frozenset({"call_expression", "new_expression"}),
     "typescript": frozenset({"call_expression", "new_expression"}),
     "java": frozenset({"method_invocation"}),
     "go": frozenset({"call_expression"}),
+    "php": frozenset({"function_call_expression"}),
 }
 
 
@@ -146,12 +159,24 @@ def _go_match(call_node: tree_sitter.Node, names: frozenset[str]) -> str | None:
     return name if name is not None and name in names else None
 
 
+def _php_match(call_node: tree_sitter.Node, names: frozenset[str]) -> str | None:
+    """Match a PHP dynamic-execution call by bare function name (``eval``, ``call_user_func``, ...).
+
+    Only ``function_call_expression`` nodes reach this matcher (see
+    ``_CALL_TYPES_BY_LANG``), so ``call_name`` resolves the global function's
+    bareword; method / scoped calls of the same name never fire.
+    """
+    name = call_name(call_node)
+    return name if name is not None and name in names else None
+
+
 _MATCHERS: dict[str, Callable[[tree_sitter.Node, frozenset[str]], str | None]] = {
     "python": _python_match,
     "javascript": _javascript_match,
     "typescript": _javascript_match,
     "java": _java_match,
     "go": _go_match,
+    "php": _php_match,
 }
 
 
@@ -160,7 +185,7 @@ class DynamicCodeExecutionRule(BaseRule):
 
     name = "dynamic_code_execution"
     code = "SAFE309"
-    language = ("python", "javascript", "typescript", "java", "go")
+    language = ("python", "javascript", "typescript", "java", "go", "php")
 
     _BASE_KEY: ClassVar[str] = "dynamic_exec_calls"
 

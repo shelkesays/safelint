@@ -72,14 +72,13 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
     (e.g. Kotlin / Groovy sources at ``src/test/groovy``); the
     candidate-list generation only owns the filename convention.
     """
-    if lang_name == "javascript":
+    if lang_name in ("javascript", "typescript"):
+        # ``.test.<ext>`` / ``.spec.<ext>`` for the language-family's own
+        # extension set (a ``.ts`` source pairs with ``.test.ts``, not
+        # ``.test.js``).
         stem = src_path.stem
-        infixes = (".test", ".spec")
-        return [f"{stem}{infix}{ext}" for infix in infixes for ext in _JS_EXTENSIONS]
-    if lang_name == "typescript":
-        stem = src_path.stem
-        infixes = (".test", ".spec")
-        return [f"{stem}{infix}{ext}" for infix in infixes for ext in _TS_EXTENSIONS]
+        extensions = _JS_EXTENSIONS if lang_name == "javascript" else _TS_EXTENSIONS
+        return [f"{stem}{infix}{ext}" for infix in (".test", ".spec") for ext in extensions]
     if lang_name == "java":
         stem = src_path.stem
         suffix_forms = [f"{stem}{suf}.java" for suf in _JAVA_TEST_SUFFIXES]
@@ -94,6 +93,11 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
         # The same-directory lookup is handled in ``_find_test_file``;
         # ``test_dirs`` does not apply to Go.
         return [f"{src_path.stem}_test.go"]
+    if lang_name == "php":
+        # PHPUnit's convention is ``<ClassName>Test.php`` (StudlyCaps), found
+        # under ``test_dirs`` (default ``tests/``; PHPUnit projects also nest
+        # ``tests/Unit`` / ``tests/Feature``, which the rglob search covers).
+        return [f"{src_path.stem}Test.php"]
     # Python (and any future language without an explicit override).
     return [f"test_{src_path.stem}.py"]
 
@@ -121,6 +125,8 @@ def _test_filename_for_message(src_path: Path, lang_name: str) -> str:
         return f"{src_path.stem}.rs"
     if lang_name == "go":
         return f"{src_path.stem}_test.go"
+    if lang_name == "php":
+        return f"{src_path.stem}Test.php"
     return f"test_{src_path.stem}.py"
 
 
@@ -183,6 +189,9 @@ def _filename_matches_test_pattern(filepath: str, lang_name: str) -> bool:
         # Rust: colocated ``<stem>_test.rs``. Go: sibling ``<stem>_test.go``.
         # Both mark the file itself as a test via the ``_test`` stem suffix.
         return Path(filepath).stem.endswith("_test")
+    if lang_name == "php":
+        # PHPUnit's ``<ClassName>Test.php`` (StudlyCaps suffix).
+        return Path(filepath).stem.endswith("Test")
     return name.startswith("test_")
 
 
@@ -282,7 +291,7 @@ class TestExistenceRule(BaseRule):
 
     name = "test_existence"
     code = "SAFE701"
-    language = ("python", "javascript", "typescript", "java", "rust", "go")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when no matching test file can be found.
@@ -328,7 +337,7 @@ class TestCouplingRule(BaseRule):
 
     name = "test_coupling"
     code = "SAFE702"
-    language = ("python", "javascript", "typescript", "java", "rust", "go")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when the paired test file was not part of this commit."""

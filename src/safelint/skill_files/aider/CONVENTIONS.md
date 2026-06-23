@@ -30,6 +30,7 @@ If either check returns non-zero (or the shell reports "command not found" / "is
   | `.java` | `uv add 'safelint[java]'` or `pip install 'safelint[java]'` (Spring Boot via `[tool.safelint.java] framework = "spring-boot"`, see `languages/java.md`) |
   | `.rs` | `uv add 'safelint[rust]'` or `pip install 'safelint[rust]'` (Rust-specific rules and Holzmann-inspired additions; see `languages/rust.md`) |
   | `.go` | `uv add 'safelint[go]'` or `pip install 'safelint[go]'` (Go-specific rules and idiomatic adaptations; see `languages/go.md`) |
+  | `.php` | `uv add 'safelint[php]'` or `pip install 'safelint[php]'` (PHP-specific rules and idiomatic adaptations; see `languages/php.md`) |
   | Multiple languages | Compose, e.g. `pip install 'safelint[python,javascript]'` |
   | Unsure / kitchen-sink | `pip install 'safelint[all]'` |
 
@@ -51,6 +52,7 @@ Look at the project files in cwd to figure out which languages safelint can lint
 | Java (vanilla and Spring Boot) | `.java` | `languages/java.md` |
 | Rust | `.rs` | `languages/rust.md` |
 | Go | `.go` | `languages/go.md` |
+| PHP | `.php` | `languages/php.md` |
 
 (More languages will land over time. To check the live list, run `python -c "from safelint.languages import supported_extensions; print(sorted(supported_extensions()))"`.)
 

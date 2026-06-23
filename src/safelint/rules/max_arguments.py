@@ -11,6 +11,7 @@ from safelint.languages.go import PARAMETER_DECLARATION as _GO_PARAMETER_DECLARA
 from safelint.languages.go import VARIADIC_PARAMETER_DECLARATION as _GO_VARIADIC_PARAMETER_DECLARATION
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.rules.base import BaseRule
@@ -29,6 +30,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
+    "php": _PHP_FUNCTION_TYPES,
 }
 
 _PY_SPLAT_PARAM_TYPES = frozenset({"list_splat_pattern", "dictionary_splat_pattern"})
@@ -106,12 +108,28 @@ _RUST_COUNTED_PARAM_TYPES = frozenset(
     }
 )
 
+# PHP ``formal_parameters`` children that count toward the limit.
+# ``simple_parameter``: ``$a`` / ``int $b = 1`` (typed and/or defaulted).
+# ``variadic_parameter``: ``...$args``. ``property_promotion_parameter``:
+# a constructor-promoted property (``private int $x``) - a real
+# constructor parameter, so it counts. PHP has no ``self`` / ``cls``
+# convention, so every parameter counts; the field name is ``parameters``
+# (same as Python / JS), so PHP routes through the generic counting path.
+_PHP_COUNTED_PARAM_TYPES = frozenset(
+    {
+        "simple_parameter",
+        "variadic_parameter",
+        "property_promotion_parameter",
+    }
+)
+
 _COUNTED_PARAM_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": _PY_COUNTED_PARAM_TYPES,
     "javascript": _JS_COUNTED_PARAM_TYPES,
     "typescript": _TS_COUNTED_PARAM_TYPES,
     "java": _JAVA_COUNTED_PARAM_TYPES,
     "rust": _RUST_COUNTED_PARAM_TYPES,
+    "php": _PHP_COUNTED_PARAM_TYPES,
 }
 
 
@@ -216,7 +234,7 @@ class MaxArgumentsRule(BaseRule):
 
     name = "max_arguments"
     code = "SAFE103"
-    language = ("python", "javascript", "typescript", "java", "rust", "go")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function with more arguments than max_args."""

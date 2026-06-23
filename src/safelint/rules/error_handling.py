@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     ATTRIBUTE,
@@ -29,6 +30,7 @@ _CATCH_CLAUSE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": frozenset({"catch_clause"}),
     "typescript": frozenset({"catch_clause"}),
     "java": frozenset({"catch_clause"}),
+    "php": frozenset({"catch_clause"}),
 }
 
 # Per-language: function-defining node types (used to skip nested
@@ -40,6 +42,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": _JS_FUNCTION_TYPES,
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
+    "php": _PHP_FUNCTION_TYPES,
 }
 
 # Per-language: re-raise statement types. ``except: raise`` (Python),
@@ -73,6 +76,13 @@ _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # cover comment-only bodies (tree-sitter-java emits comments as
     # named block children, unlike JS where they're extras).
     "java": frozenset({"empty_statement", "line_comment", "block_comment"}),
+    # PHP: bare ``;`` is ``empty_statement``; tree-sitter-php emits both
+    # ``//`` / ``#`` line comments and ``/* */`` block comments as a single
+    # ``comment`` node that is a *named* child of the body block (like Java,
+    # unlike JS where comments are extras), so a comment-only catch body
+    # such as ``catch (\E $e) { /* todo */ }`` matches the empty-handler
+    # intent.
+    "php": frozenset({"empty_statement", "comment"}),
 }
 
 # Per-language: literal expression node types that count as "comment-like"
@@ -121,6 +131,12 @@ _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": _JS_LITERAL_EXPR_TYPES,
     "typescript": _JS_LITERAL_EXPR_TYPES,
     "java": _JAVA_LITERAL_EXPR_TYPES,
+    # PHP: ``integer`` / ``float`` numeric literals, ``boolean`` (one node
+    # type for both ``true`` and ``false``), and ``null``. Plain string
+    # literals (``'TODO'`` / ``"TODO"``) are delegated to
+    # ``_php_string_is_literal`` so interpolating double-quoted strings are
+    # not treated as no-op markers.
+    "php": frozenset({"integer", "float", "boolean", "null"}),
 }
 
 
@@ -155,7 +171,10 @@ def _is_noop_body(body_node: tree_sitter.Node | None, lang_name: str) -> bool:
     if body_node is None or not body_node.named_children:
         return True
     children = body_node.named_children
-    if lang_name == "java":
+    # Java and PHP both emit comments as named block children, so a
+    # comment-only body has several no-op children; accept when *every*
+    # statement is a no-op (covers the multi-comment case).
+    if lang_name in ("java", "php"):
         return all(_stmt_is_noop(child, lang_name) for child in children)
     if len(children) != 1:
         return False
@@ -200,11 +219,28 @@ def _java_string_is_literal(node: tree_sitter.Node) -> bool:
     return node.type == "string_literal" and not node.named_children and bool(node_text(node))
 
 
+def _php_string_is_literal(node: tree_sitter.Node) -> bool:
+    """Return True for a PHP plain string literal with no interpolation.
+
+    Single-quoted ``'TODO'`` (``string``) never interpolates. Double-quoted
+    ``"TODO"`` (``encapsed_string``) interpolates only when it contains a
+    variable / expression child, so a plain double-quoted literal whose only
+    named children are ``string_content`` counts as a no-op marker, while
+    ``"$err"`` (with a ``variable_name`` child) does not.
+    """
+    if node.type == "string":
+        return bool(node_text(node))
+    if node.type != "encapsed_string":
+        return False
+    return all(child.type == "string_content" for child in node.named_children) and bool(node_text(node))
+
+
 _STRING_LITERAL_PREDICATES: dict[str, Callable[[tree_sitter.Node], bool]] = {
     "python": _python_string_is_literal,
     "javascript": _js_string_is_literal,
     "typescript": _js_string_is_literal,
     "java": _java_string_is_literal,
+    "php": _php_string_is_literal,
 }
 
 
@@ -235,29 +271,24 @@ def _java_catch_formal_parameter(catch_node: tree_sitter.Node) -> tree_sitter.No
     return next((c for c in catch_node.named_children if c.type == "catch_formal_parameter"), None)
 
 
-def _caught_binding_name(catch_node: tree_sitter.Node, lang_name: str) -> str | None:
-    """Return the variable name bound by the catch clause, or None if there isn't one.
-
-    * JavaScript / TypeScript: ``catch (e)`` exposes the binding directly
-      via the ``parameter`` field on ``catch_clause``. ``catch {}``
-      (optional-binding form, ES2019+) has no parameter and returns None.
-    * Java: ``catch (Type e)`` exposes the binding via the ``name`` field
-      of a ``catch_formal_parameter`` named child of ``catch_clause``.
-      Multi-catch ``catch (A | B e)`` follows the same shape - only the
-      variable name is needed for the re-raise comparison.
-
-    Returns the raw identifier text (e.g. ``"e"``) ready for the caller
-    to compare against the body's ``throw e;`` argument. ``call_name``
-    style normalisation is not appropriate here - exact byte equality
-    is the contract.
-    """
-    if lang_name in ("javascript", "typescript"):
-        param_node = catch_node.child_by_field_name("parameter")
-        if param_node is None or param_node.type != "identifier":
-            return None
-        return node_text(param_node)
-    if lang_name != "java":
+def _js_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
+    """Return the JS / TS ``catch (e)`` binding, or None for ``catch {}`` (optional-binding)."""
+    param_node = catch_node.child_by_field_name("parameter")
+    if param_node is None or param_node.type != "identifier":
         return None
+    return node_text(param_node)
+
+
+def _php_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
+    r"""Return the PHP ``catch (\Type $e)`` binding (``$e``), or None for the non-capturing form."""
+    name_node = catch_node.child_by_field_name("name")
+    if name_node is None or name_node.type != "variable_name":
+        return None
+    return node_text(name_node)
+
+
+def _java_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
+    """Return the Java ``catch (Type e)`` binding from its ``catch_formal_parameter``, or None."""
     formal = _java_catch_formal_parameter(catch_node)
     if formal is None:
         return None
@@ -265,6 +296,64 @@ def _caught_binding_name(catch_node: tree_sitter.Node, lang_name: str) -> str | 
     if name_node is None or name_node.type != "identifier":
         return None
     return node_text(name_node)
+
+
+def _caught_binding_name(catch_node: tree_sitter.Node, lang_name: str) -> str | None:
+    """Return the variable name bound by the catch clause, or None if there isn't one.
+
+    Dispatches per language: JavaScript / TypeScript expose the binding via
+    the ``parameter`` field (``catch (e)``); PHP via the ``name`` field (a
+    ``variable_name``, ``catch (Type $e)``); Java via the ``name`` field of
+    a ``catch_formal_parameter``. Returns the raw identifier text (e.g.
+    ``"e"`` / ``"$e"``) ready for the caller to compare against the body's
+    ``throw`` argument - exact byte equality is the contract.
+    """
+    extractor = _CAUGHT_BINDING_EXTRACTORS.get(lang_name)
+    return extractor(catch_node) if extractor is not None else None
+
+
+_CAUGHT_BINDING_EXTRACTORS: dict[str, Callable[[tree_sitter.Node], str | None]] = {
+    "javascript": _js_caught_binding_name,
+    "typescript": _js_caught_binding_name,
+    "php": _php_caught_binding_name,
+    "java": _java_caught_binding_name,
+}
+
+
+def _php_only_reraises(catch_node: tree_sitter.Node, stmts: list[tree_sitter.Node]) -> bool:
+    """Return True for a PHP catch body that is just ``throw $e;`` of the caught binding.
+
+    PHP 8's ``throw`` is an expression, so the re-raise is nested:
+    ``expression_statement`` -> ``throw_expression`` -> ``variable_name``.
+    Only re-throwing the *exact* caught variable counts; ``throw new E()``
+    or ``throw $other`` constructs / forwards a different value and still
+    needs logging.
+    """
+    if len(stmts) != 1 or stmts[0].type != "expression_statement":
+        return False
+    inner = stmts[0].named_children
+    if len(inner) != 1 or inner[0].type != "throw_expression":
+        return False
+    operand = inner[0].named_children
+    if len(operand) != 1 or operand[0].type != "variable_name":
+        return False
+    bound = _caught_binding_name(catch_node, "php")
+    return bound is not None and node_text(operand[0]) == bound
+
+
+def _throw_reraises_caught_binding(throw_stmt: tree_sitter.Node, catch_node: tree_sitter.Node, lang_name: str) -> bool:
+    """Return True for a JS / TS / Java ``throw <e>;`` that re-throws the exact caught binding.
+
+    ``throw <identifier>;`` only counts as a re-raise when ``<identifier>`` is
+    the precise name bound by the ``catch`` clause. Without a caught binding
+    (``catch {}``) there is no name to re-raise, so any throw there is a fresh
+    error and the rule still requires logging.
+    """
+    children = throw_stmt.named_children
+    if len(children) != 1 or children[0].type != "identifier":
+        return False
+    param_text = _caught_binding_name(catch_node, lang_name)
+    return param_text is not None and node_text(children[0]) == param_text
 
 
 def _iter_catch_clauses(tree: tree_sitter.Tree, lang_name: str) -> Iterator[tree_sitter.Node]:
@@ -374,15 +463,16 @@ class EmptyExceptRule(BaseRule):
 
     name = "empty_except"
     code = "SAFE202"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "php")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every catch handler whose body is effectively empty."""
         lang_name = resolve_lang_name(filepath)
         # Match the violation message to the source language's terminology -
-        # JavaScript / Java developers don't write ``except`` blocks. Same
-        # message-selection pattern as ``LoggingOnErrorRule``.
-        message = "Empty catch block - add error handling or a logging call" if lang_name in ("javascript", "typescript", "java") else "Empty except block - add error handling or a logging call"
+        # JavaScript / Java / PHP developers don't write ``except`` blocks.
+        # Same message-selection pattern as ``LoggingOnErrorRule``.
+        block_word = "catch" if lang_name in ("javascript", "typescript", "java", "php") else "except"
+        message = f"Empty {block_word} block - add error handling or a logging call"
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if _is_noop_body(_catch_body(clause), lang_name)]
 
 
@@ -396,7 +486,7 @@ class LoggingOnErrorRule(BaseRule):
 
     name = "logging_on_error"
     code = "SAFE203"
-    language = ("python", "javascript", "typescript", "java")
+    language = ("python", "javascript", "typescript", "java", "php")
 
     # Union of method names treated as "logging" across registered
     # languages. Python stdlib ``logging`` exposes ``debug`` / ``info`` /
@@ -427,6 +517,15 @@ class LoggingOnErrorRule(BaseRule):
             "fine",
             "finer",
             "finest",
+            # PHP: the ``error_log`` builtin plus the PSR-3 severity levels
+            # not already listed (``info`` / ``warning`` / ``error`` /
+            # ``debug`` / ``critical`` overlap with the Python set above).
+            # ``$logger->notice($e)`` resolves via ``call_name`` to
+            # ``"notice"``; ``error_log($e)`` to ``"error_log"``.
+            "error_log",
+            "notice",
+            "alert",
+            "emergency",
         }
     )
 
@@ -462,24 +561,17 @@ class LoggingOnErrorRule(BaseRule):
         if body_node is None:  # pragma: no cover
             return False
         stmts = body_node.named_children
+        # PHP's ``throw`` is an expression nested under expression_statement,
+        # so it does not fit the flat statement-type check below.
+        if lang_name == "php":
+            return _php_only_reraises(except_node, stmts)
         reraise_types = _RERAISE_STATEMENT_TYPES_BY_LANG[lang_name]
         if len(stmts) != 1 or stmts[0].type not in reraise_types:
             return False
-        children = stmts[0].named_children
         if lang_name == "python":
             # Bare ``raise`` has no children.
-            return not children
-        # JS / TS / Java: ``throw <identifier>;`` only counts as a re-raise
-        # when ``<identifier>`` is the exact name bound by the
-        # ``catch`` clause. Without a caught binding (``catch {}``)
-        # there is no name to re-raise, so any throw there is a fresh
-        # error and the rule still requires logging.
-        if len(children) != 1 or children[0].type != "identifier":
-            return False
-        param_text = _caught_binding_name(except_node, lang_name)
-        if param_text is None:
-            return False
-        return node_text(children[0]) == param_text
+            return not stmts[0].named_children
+        return _throw_reraises_caught_binding(stmts[0], except_node, lang_name)
 
     def _has_log_call(self, except_node: tree_sitter.Node, function_types: frozenset[str]) -> bool:
         """Return True when the handler body contains at least one logging call.
@@ -517,7 +609,7 @@ class LoggingOnErrorRule(BaseRule):
         # immediately visible).
         message = (
             "Catch block missing logging call - errors must be logged before being swallowed"
-            if lang_name in ("javascript", "typescript", "java")
+            if lang_name in ("javascript", "typescript", "java", "php")
             else "Except block missing logging call - errors must be logged before being swallowed"
         )
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if self._is_unlogged(clause, lang_name, function_types)]

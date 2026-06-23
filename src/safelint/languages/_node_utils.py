@@ -117,7 +117,24 @@ def node_text(node: tree_sitter.Node) -> str:
 #:   ``call_name`` resolves them via the ``constructor`` field)
 #: * Java: ``method_invocation`` (regular calls) and
 #:   ``object_creation_expression`` (``new Foo(...)``)
-CALL_TYPES: frozenset[str] = frozenset({"call", "call_expression", "new_expression", "method_invocation", "object_creation_expression"})
+#: * PHP: ``function_call_expression`` (``foo(...)``),
+#:   ``member_call_expression`` (``$o->m(...)``),
+#:   ``nullsafe_member_call_expression`` (``$o?->m(...)``), and
+#:   ``scoped_call_expression`` (``Cls::m(...)``). PHP ``new`` shares
+#:   ``object_creation_expression`` (already listed).
+CALL_TYPES: frozenset[str] = frozenset(
+    {
+        "call",
+        "call_expression",
+        "new_expression",
+        "method_invocation",
+        "object_creation_expression",
+        "function_call_expression",
+        "member_call_expression",
+        "nullsafe_member_call_expression",
+        "scoped_call_expression",
+    }
+)
 
 
 def resolve_lang_name(filepath: str) -> str:
@@ -240,6 +257,50 @@ def _python_js_call_name(call_node: tree_sitter.Node) -> str | None:
     return node_text(target) if target else None
 
 
+def _php_trailing_name(callee: tree_sitter.Node) -> str | None:
+    r"""Resolve a PHP ``name`` / ``qualified_name`` callee to its bareword.
+
+    ``foo`` is a bare ``name`` (returned directly). ``\Foo\Bar\baz`` is a
+    ``qualified_name`` whose trailing ``name`` child (``baz``) is the
+    bareword - the namespace prefix lives in a separate ``namespace_name``
+    child, so the only direct ``name`` child is the callable. Returning just
+    the bareword keeps the ``*_php`` sink / I/O config lists short (users
+    list ``system``, not every namespace that re-exports it).
+    """
+    if callee.type == "name":
+        return node_text(callee)
+    if callee.type != "qualified_name":  # pragma: no cover - defensive: only name/qualified_name reach here
+        return None
+    trailing = None
+    for child in callee.named_children:
+        if child.type == "name":
+            trailing = child
+    return node_text(trailing) if trailing is not None else None
+
+
+def _php_call_name(call_node: tree_sitter.Node) -> str | None:
+    r"""Return the bareword callable name for a PHP call node.
+
+    * ``function_call_expression`` (``foo(...)`` / ``\Foo\bar(...)``) -
+      callee on the ``function`` field, a ``name`` or ``qualified_name``.
+    * ``member_call_expression`` (``$obj->m(...)``),
+      ``nullsafe_member_call_expression`` (``$obj?->m(...)``), and
+      ``scoped_call_expression`` (``Cls::m(...)`` / ``self::m(...)``) all
+      carry the method bareword on the ``name`` field.
+
+    PHP ``object_creation_expression`` (``new Cls(...)``) is intentionally
+    not handled - it shares its node type with Java's dispatch entry, and
+    PHP rules resolve sinks via function / member / scoped calls rather than
+    ``new``.
+    """
+    if call_node.type == "function_call_expression":
+        func = call_node.child_by_field_name("function")
+        return _php_trailing_name(func) if func is not None else None
+    # member / nullsafe-member / scoped calls: method bareword on ``name``.
+    name_node = call_node.child_by_field_name("name")
+    return node_text(name_node) if name_node is not None else None
+
+
 # Per-call-node-type dispatch: each entry returns the bareword name (or
 # ``None``). Kept as a table so adding a new language's call shape is a
 # one-line append, and ``call_name`` stays small (no growing chain of
@@ -247,11 +308,15 @@ def _python_js_call_name(call_node: tree_sitter.Node) -> str | None:
 _CALL_NAME_DISPATCH: dict[str, Callable[[tree_sitter.Node], str | None]] = {
     "method_invocation": _java_method_invocation_name,
     "object_creation_expression": _java_object_creation_name,
+    "function_call_expression": _php_call_name,
+    "member_call_expression": _php_call_name,
+    "nullsafe_member_call_expression": _php_call_name,
+    "scoped_call_expression": _php_call_name,
 }
 
 
 def call_name(call_node: tree_sitter.Node) -> str | None:
-    """Return the bare callable name from a call node, or None if unresolvable.
+    r"""Return the bare callable name from a call node, or None if unresolvable.
 
     Handles call shapes across every registered language:
 
@@ -270,6 +335,13 @@ def call_name(call_node: tree_sitter.Node) -> str | None:
       ``type`` field carries a ``type_identifier`` or
       ``scoped_type_identifier`` → ``"Foo"`` for the simple case,
       ``"WriteStream"`` for ``new java.io.WriteStream(...)``.
+    * PHP ``foo(...)`` / ``\Foo\bar(...)`` - ``function_call_expression``
+      with the callee on the ``function`` field (``name`` /
+      ``qualified_name``) → ``"foo"`` / ``"bar"``.
+    * PHP ``$obj->m(...)`` / ``$obj?->m(...)`` / ``Cls::m(...)`` -
+      ``member_call_expression`` / ``nullsafe_member_call_expression`` /
+      ``scoped_call_expression`` with the method bareword on the ``name``
+      field → ``"m"``.
 
     Returns ``None`` for callees the rule layer can't resolve to a
     bareword (subscripted calls like ``x[0]()``, immediately-invoked

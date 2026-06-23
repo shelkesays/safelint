@@ -8,6 +8,7 @@ from safelint.core._validators import _validated_string_list, resolve_lang_confi
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.javascript import VARIABLE_DECLARATION as _JS_VARIABLE_DECLARATION
+from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.python import (
     ASSIGNMENT,
     ASYNC_FUNCTION_DEF,
@@ -83,6 +84,62 @@ def _python_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None
         left = node.child_by_field_name("left")
         return left if left is not None and left.type == IDENTIFIER else None
     return None
+
+
+# --- PHP helpers (SAFE301 global_state, SAFE302 global_mutation) -------------
+# A ``global`` declared inside a nested closure belongs to that closure, so the
+# per-function walks stop at nested PHP function nodes. Methods are separate
+# functions (each handled by ``_iter_php_functions``), and a bare ``global``
+# only ever appears inside a function/method body, so functions are the only
+# scope boundary needed.
+_PHP_NESTED_SCOPE_TYPES = tuple(_PHP_FUNCTION_TYPES)
+
+
+def _iter_php_functions(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
+    """Yield every PHP function / method / closure definition in *tree*."""
+    for node in walk(tree.root_node):
+        if node.type in _PHP_FUNCTION_TYPES:
+            yield node
+
+
+def _iter_php_global_statements(func_node: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
+    """Yield every ``global $x, $y;`` statement inside *func_node*.
+
+    Stops at nested function definitions: a ``global`` declared in an inner
+    closure belongs to that closure's scope, not the outer function's.
+    """
+    for child in walk(func_node, skip_types=_PHP_NESTED_SCOPE_TYPES):
+        if child.type == "global_declaration":
+            yield child
+
+
+def _php_global_identifiers(global_stmt: tree_sitter.Node) -> list[tree_sitter.Node]:
+    """Return the ``variable_name`` nodes named in a PHP ``global`` statement."""
+    return [c for c in global_stmt.named_children if c.type == "variable_name"]
+
+
+def _php_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the LHS node of a PHP assignment / compound assignment, else None."""
+    if node.type in ("assignment_expression", "augmented_assignment_expression"):
+        return node.child_by_field_name("left")
+    return None
+
+
+def _php_subscript_root(target: tree_sitter.Node) -> str | None:
+    """Return the root ``variable_name`` text of a (possibly chained) subscript, else None.
+
+    ``$GLOBALS['x']`` -> ``"$GLOBALS"``; ``$GLOBALS['a']['b']`` -> ``"$GLOBALS"``
+    (the outer subscript's base is the inner subscript, so walk leftward to the
+    root variable). Returns None when the base is not a bare variable.
+    """
+    cur: tree_sitter.Node | None = target
+    while cur is not None:
+        if cur.type != "subscript_expression":
+            break
+        cur = cur.named_children[0] if cur.named_children else None
+    if cur is None or cur.type != "variable_name":
+        return None
+    return node_text(cur)
 
 
 #: Node types that are pure compile-time / no-op-at-runtime annotations
@@ -171,17 +228,19 @@ def _javascript_global_namespace_root(target: tree_sitter.Node) -> str | None:
 class GlobalStateRule(BaseRule):
     """Reject use of the ``global`` keyword inside functions.
 
-    Python-only: there is no JavaScript equivalent of the ``global``
-    keyword. JavaScript's ``global_mutation`` (SAFE302) covers JS's
-    "writes to module-level state" cases; SAFE301 has no JS analogue
-    that isn't already covered there.
+    Python and PHP only: both have a literal ``global`` keyword that pulls
+    module / file-scope state into a function. JavaScript / TypeScript / Java
+    / Rust / Go have no such keyword (their shared-mutable-state shapes are
+    covered by ``global_mutation`` SAFE302), so SAFE301 has no analogue
+    there. PHP is SAFE301's first non-Python registration.
     """
 
     name = "global_state"
     code = "SAFE301"
+    language = ("python", "php")
 
     def _violations_for_func(self, filepath: str, func: tree_sitter.Node) -> list[Violation]:
-        """Return one violation per ``global`` statement inside *func*."""
+        """Return one violation per ``global`` statement inside *func* (Python)."""
         func_name = _func_name(func)
         return [
             self._make_violation_for_node(
@@ -192,9 +251,25 @@ class GlobalStateRule(BaseRule):
             for stmt in _iter_global_statements(func)
         ]
 
+    def _php_violations_for_func(self, filepath: str, func: tree_sitter.Node) -> list[Violation]:
+        """Return one violation per ``global`` statement inside *func* (PHP)."""
+        func_name = _func_name(func)
+        return [
+            self._make_violation_for_node(
+                filepath,
+                stmt,
+                f'Function "{func_name}" declares global: {", ".join(node_text(c) for c in _php_global_identifiers(stmt))} - use dependency injection instead',
+            )
+            for stmt in _iter_php_global_statements(func)
+        ]
+
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function that declares a global variable."""
         violations: list[Violation] = []
+        if resolve_lang_name(filepath) == "php":
+            for func in _iter_php_functions(tree):
+                violations.extend(self._php_violations_for_func(filepath, func))
+            return violations
         for func in _iter_python_functions(tree):
             violations.extend(self._violations_for_func(filepath, func))
         return violations
@@ -226,7 +301,7 @@ class GlobalMutationRule(BaseRule):
 
     name = "global_mutation"
     code = "SAFE302"
-    language = ("python", "javascript", "typescript", "java", "go")
+    language = ("python", "javascript", "typescript", "java", "go", "php")
 
     _DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT: ClassVar[list[str]] = [
         "globalThis",  # universal - works in browsers, Node, web workers
@@ -330,6 +405,8 @@ class GlobalMutationRule(BaseRule):
             return self._java_check(filepath, tree)
         if lang_name == "go":
             return self._go_check(filepath, tree)
+        if lang_name == "php":
+            return self._php_check(filepath, tree)
         return self._javascript_check(filepath, tree, lang_name)
 
     def _go_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
@@ -462,6 +539,82 @@ class GlobalMutationRule(BaseRule):
         violations: list[Violation] = []
         for func in _iter_python_functions(tree):
             violations.extend(self._python_violations_for_func(filepath, func))
+        return violations
+
+    @staticmethod
+    def _php_collect_global_names(func_node: tree_sitter.Node) -> set[str]:
+        """Return all variable names declared via ``global`` inside *func_node* (PHP)."""
+        return {node_text(ident) for stmt in _iter_php_global_statements(func_node) for ident in _php_global_identifiers(stmt)}
+
+    @staticmethod
+    def _php_mutating_assignments(func_node: tree_sitter.Node, global_names: set[str]) -> list[tuple[tree_sitter.Node, str]]:
+        """Return (assignment_node, name) for each write to a declared global in *func_node* (PHP)."""
+        results: list[tuple[tree_sitter.Node, str]] = []
+        for node in walk(func_node, skip_types=_PHP_NESTED_SCOPE_TYPES):
+            target = _php_assignment_target(node)
+            if target is not None and target.type == "variable_name" and node_text(target) in global_names:
+                results.append((node, node_text(target)))
+        return results
+
+    def _php_violations_for_func(self, filepath: str, func: tree_sitter.Node) -> list[Violation]:
+        """Return violations for ``global $x; $x = ...`` writes inside *func* (PHP).
+
+        Mirrors the Python shape: a ``global`` declaration brings file-scope
+        state into the function, and a later write to that name mutates shared
+        state. ``strict`` mode fires on the ``global`` declaration itself.
+        """
+        global_names = self._php_collect_global_names(func)
+        if not global_names:
+            return []
+        func_name = _func_name(func)
+        if self.config.get("strict", False):
+            return [
+                self._make_violation_for_node(
+                    filepath,
+                    stmt,
+                    f'Function "{func_name}" declares global: {", ".join(node_text(c) for c in _php_global_identifiers(stmt))} - globals must not be used (strict mode)',
+                )
+                for stmt in _iter_php_global_statements(func)
+            ]
+        return [
+            self._make_violation_for_node(
+                filepath,
+                assignment,
+                f'Function "{func_name}" writes to global "{name}" - globals must not be mutated',
+            )
+            for assignment, name in self._php_mutating_assignments(func, global_names)
+        ]
+
+    def _php_globals_writes(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Return violations for ``$GLOBALS[...]`` superglobal writes anywhere in *tree* (PHP).
+
+        ``$GLOBALS['x'] = ...`` mutates shared state without needing a
+        ``global`` declaration, so this is a separate, file-wide pass. The
+        two PHP shapes are disjoint (bare variable vs ``$GLOBALS`` subscript),
+        so there is no double counting with ``_php_violations_for_func``.
+        """
+        out: list[Violation] = []
+        for node in walk(tree.root_node):
+            target = _php_assignment_target(node)
+            if target is None or target.type != "subscript_expression":
+                continue
+            if _php_subscript_root(target) != "$GLOBALS":
+                continue
+            out.append(
+                self._make_violation_for_node(
+                    filepath,
+                    node,
+                    f'Write to "{node_text(target)}" mutates the $GLOBALS superglobal - shared state must not be mutated (Power of Ten rule 6)',
+                )
+            )
+        return out
+
+    def _php_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run the PHP-specific check (``global`` keyword + write, plus ``$GLOBALS[...]`` writes)."""
+        violations: list[Violation] = []
+        for func in _iter_php_functions(tree):
+            violations.extend(self._php_violations_for_func(filepath, func))
+        violations.extend(self._php_globals_writes(filepath, tree))
         return violations
 
     def _javascript_check(self, filepath: str, tree: tree_sitter.Tree, lang_name: str) -> list[Violation]:
