@@ -3590,9 +3590,9 @@
 <h3 id="planned">Planned<a class="headerlink" href="#planned" title="Permanent link">#</a></h3>
 <p>Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see <a href="../../contributing/adding-a-language/">Adding a language</a>) makes each new language incremental, community contributions for any of these are welcome.</p>
 <ol>
+<li><strong>PHP</strong> (<code>.php</code>), next up; it has no dependencies and ports the largest share of the existing rule set (try/catch, a literal <code>global</code> keyword, <code>eval</code>, superglobals).</li>
 <li><strong>C</strong> (<code>.c</code>, <code>.h</code>), Holzmann's original target language.</li>
-<li><strong>C++</strong> (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, hence the later position.</li>
-<li><strong>PHP</strong> (<code>.php</code>).</li>
+<li><strong>C++</strong> (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, and it depends on C shipping first.</li>
 </ol>
 <h3 id="rule-scope-current-languages">Rule scope (current languages)<a class="headerlink" href="#rule-scope-current-languages" title="Permanent link">#</a></h3>
 <table>
