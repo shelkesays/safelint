@@ -17,7 +17,7 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 
 **Rule coverage:** 13 rules apply across all six languages (the cross-language core, including `no_recursion` and `blanket_suppression`); 2 more apply to Python / JS / TS / Java / Rust but not Go (`missing_assertions`, `null_dereference`); 3 apply to Python / JS / TS / Java / Go but not Rust (`global_mutation`, `dynamic_code_execution`, `resource_lifecycle`); 2 apply to Python / JavaScript / TypeScript / Java only (`empty_except`, `logging_on_error`); 1 is JavaScript-family-only (`wide_scope_declaration`); 2 are Python-only (`bare_except`, `global_state`); 4 are Java + Spring Boot only (`spring_*`); 11 are Rust-only (including `interior_mutable_static`); and 2 are Go-only (`empty_error_check`, `panic_calls_outside_tests`). Rules are skipped per language where the semantics don't translate (Go has no try/catch, `global` keyword, `var` hoisting, production assertion idiom, or chained-nullable idiom; Rust's `Result`/`Option`/`Drop` model covers its skips with Rust-specific replacements).
 
-**Planned future languages** (in working-priority order, no timelines committed): C, C++, PHP. See the [language-coverage roadmap](configuration/rules.md#planned).
+**Planned future languages** (in working-priority order, no timelines committed): PHP, C, C++. See the [language-coverage roadmap](configuration/rules.md#planned).
 
 ## Quick start
 

@@ -1,7 +1,9 @@
 # PHP language support - implementation spec
 
-**Status**: not started. Read `plan/README.md` first, then the standing
-references. Independent of the C/C++ work; sequenced last per the roadmap.
+**Status**: next up (selected as the next language to implement). Read
+`plan/README.md` first, then the standing references. Independent of the
+C/C++ work; promoted ahead of them because it has no dependencies and ports
+the largest share of the existing rule set.
 
 **Why PHP is a strong fit**: PHP ports MORE of the existing rule set than any
 language so far - it has try/catch (2xx ports), a literal `global` keyword
