@@ -8,6 +8,7 @@ from safelint.core._validators import _validated_string_list, resolve_lang_confi
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.python import ASSERT_STATEMENT, ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.rules.base import BaseRule
@@ -25,6 +26,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
+    "php": _PHP_FUNCTION_TYPES,
 }
 
 
@@ -171,7 +173,7 @@ class MissingAssertionsRule(BaseRule):
 
     name = "missing_assertions"
     code = "SAFE601"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "php")
 
     def _assertion_count(self, func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str], minimum: int) -> int:
         """Dispatch to the language-appropriate assertion counter (early-exits at *minimum*).
@@ -201,6 +203,14 @@ class MissingAssertionsRule(BaseRule):
             raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", "rust", default=[])
             assertion_calls = frozenset(_validated_string_list(raw, error_key))
             return _rust_assertion_count(func_node, function_types, assertion_calls, minimum)
+        if lang_name == "php":
+            # PHP has no ``assert`` keyword; ``assert()`` is a function and
+            # PHPUnit assertions are method calls (``assertSame`` /
+            # ``assertEquals`` / ``expectException`` / ...). The generic
+            # call-based counter handles both forms via ``assertion_calls_php``.
+            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", "php", default=[])
+            assertion_calls = frozenset(_validated_string_list(raw, error_key))
+            return _javascript_assertion_count(func_node, function_types, assertion_calls, minimum)
         # JS-family (JS / TS): TypeScript inherits the JS list by default
         # via the TS→JS fallback in ``get_per_language_config``.
         raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", lang_name, default=[])

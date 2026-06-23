@@ -34,6 +34,7 @@ from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.rules.base import BaseRule, Suggestion
@@ -60,19 +61,26 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
+    "php": _PHP_FUNCTION_TYPES,
 }
 
-#: The call-expression node type per language. Constructor calls
-#: (``new_expression`` / ``object_creation_expression``) are deliberately
-#: excluded - constructing an instance is not a self-recursive *function*
-#: call in the sense rule 1 cares about.
-_CALL_TYPE_BY_LANG: dict[str, str] = {
-    "python": "call",
-    "javascript": "call_expression",
-    "typescript": "call_expression",
-    "rust": "call_expression",
-    "java": "method_invocation",
-    "go": "call_expression",
+#: The call-expression node type(s) per language. Most languages have a
+#: single call node type; PHP spreads calls across three
+#: (``function_call_expression`` for bare ``foo()``,
+#: ``member_call_expression`` for ``$this->foo()``,
+#: ``scoped_call_expression`` for ``self::foo()`` / ``static::foo()``), so
+#: the value is a set. Constructor calls (``new_expression`` /
+#: ``object_creation_expression``) are deliberately excluded - constructing
+#: an instance is not a self-recursive *function* call in the sense rule 1
+#: cares about.
+_CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
+    "python": frozenset({"call"}),
+    "javascript": frozenset({"call_expression"}),
+    "typescript": frozenset({"call_expression"}),
+    "rust": frozenset({"call_expression"}),
+    "java": frozenset({"method_invocation"}),
+    "go": frozenset({"call_expression"}),
+    "php": frozenset({"function_call_expression", "member_call_expression", "scoped_call_expression"}),
 }
 
 #: Identifiers that name "the current object" per language. A call
@@ -190,12 +198,39 @@ def _go_call_targets_self(call_node: tree_sitter.Node, func_name: str, receiver_
     return False
 
 
+def _php_call_targets_self(call_node: tree_sitter.Node, func_name: str) -> bool:
+    """Return True if a PHP call node is a direct self-call to *func_name*.
+
+    Fires for a bare ``foo()`` (``function_call_expression`` whose
+    ``function`` field is a ``name`` matching the function), a
+    ``$this->foo()`` (``member_call_expression`` whose object is ``$this``),
+    or a ``self::foo()`` / ``static::foo()``
+    (``scoped_call_expression`` whose scope is the ``self`` / ``static``
+    ``relative_scope``). A call through any other object or class
+    (``$other->foo()`` / ``Other::foo()``) is not self-recursion.
+    """
+    if call_node.type == "function_call_expression":
+        callee = call_node.child_by_field_name("function")
+        return callee is not None and callee.type == "name" and node_text(callee) == func_name
+    name = call_node.child_by_field_name("name")
+    if name is None or node_text(name) != func_name:
+        return False
+    if call_node.type == "member_call_expression":
+        obj = call_node.child_by_field_name("object")
+        return obj is not None and node_text(obj) == "$this"
+    # scoped_call_expression: ``self::`` / ``static::`` recursion only.
+    scope = call_node.child_by_field_name("scope")
+    return scope is not None and scope.type == "relative_scope" and node_text(scope) in ("self", "static")
+
+
 def _targets_self(call_node: tree_sitter.Node, func_name: str, lang: str, receiver_name: str | None, *, is_method: bool) -> bool:
     """Dispatch self-recursion detection to the per-language predicate."""
     if lang == "java":
         return _java_call_targets_self(call_node, func_name)
     if lang == "go":
         return _go_call_targets_self(call_node, func_name, receiver_name, is_method=is_method)
+    if lang == "php":
+        return _php_call_targets_self(call_node, func_name)
     return _call_targets_self(call_node, func_name, lang)
 
 
@@ -236,18 +271,18 @@ class NoRecursionRule(BaseRule):
 
     name = "no_recursion"
     code = "SAFE105"
-    language = ("python", "javascript", "typescript", "java", "rust", "go")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every function whose body directly calls itself."""
         lang = resolve_lang_name(filepath)
         func_types = _FUNCTION_TYPES_BY_LANG[lang]
-        call_type = _CALL_TYPE_BY_LANG[lang]
+        call_types = _CALL_TYPES_BY_LANG[lang]
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type not in func_types:
                 continue
-            violations.extend(self._check_function(filepath, node, func_types, call_type, lang))
+            violations.extend(self._check_function(filepath, node, func_types, call_types, lang))
         return violations
 
     def _check_function(
@@ -255,7 +290,7 @@ class NoRecursionRule(BaseRule):
         filepath: str,
         func: tree_sitter.Node,
         func_types: frozenset[str],
-        call_type: str,
+        call_types: frozenset[str],
         lang: str,
     ) -> list[Violation]:
         """Return one violation per direct self-call inside *func*.
@@ -276,7 +311,7 @@ class NoRecursionRule(BaseRule):
         shadowed = func_name in _directly_nested_function_names(func, func_types)
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(func_types)):
-            if node.type != call_type:
+            if node.type not in call_types:
                 continue
             if shadowed and _call_is_bare(node, lang):
                 continue

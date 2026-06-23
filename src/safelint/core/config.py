@@ -208,6 +208,12 @@ DEFAULTS: dict[str, Any] = {
             # by bare method name, so ``Open`` also catches ``os.Open`` -
             # narrow this list if that is noisy (the rule is off by default).
             "dynamic_exec_calls_go": ["Call", "CallSlice", "MethodByName", "Open", "Lookup"],
+            # PHP: ``eval`` (a language construct that parses as a call),
+            # ``assert`` (its string form evaluates code), ``create_function``
+            # (legacy runtime function builder), and the ``call_user_func`` /
+            # ``call_user_func_array`` dispatchers. Variable ``include`` /
+            # ``require`` are SAFE801 (tainted_sink) territory, not here.
+            "dynamic_exec_calls_php": ["eval", "assert", "create_function", "call_user_func", "call_user_func_array"],
         },
         "side_effects_hidden": {
             "enabled": True,
@@ -340,6 +346,30 @@ DEFAULTS: dict[str, Any] = {
                 "Exec",  # (*sql.DB).Exec
                 "Query",  # (*sql.DB).Query
             ],
+            # PHP I/O primitives (function-call forms ``call_name`` resolves).
+            # ``echo`` / ``print`` are language constructs (statement / unary
+            # expression), not calls, so they are not listed here.
+            "io_functions_php": [
+                "print_r",
+                "var_dump",
+                "var_export",
+                "printf",
+                "vprintf",
+                "fprintf",
+                "fwrite",
+                "fputs",
+                "fread",
+                "fgets",
+                "readfile",
+                "file_get_contents",
+                "file_put_contents",
+                "fopen",
+                "curl_exec",
+                "mail",
+                "header",
+                "setcookie",
+                "error_log",
+            ],
             "pure_prefixes": [
                 "calculate",
                 "compute",
@@ -444,6 +474,31 @@ DEFAULTS: dict[str, Any] = {
                 "Dial",
                 "Listen",
             ],
+            # PHP: same function-call I/O primitives as SAFE303's
+            # ``io_functions_php`` - the SAFE304 list is kept identical here
+            # rather than narrowed, since the PHP primitives are unambiguous
+            # global builtins (unlike Go's method-name overlaps).
+            "io_functions_php": [
+                "print_r",
+                "var_dump",
+                "var_export",
+                "printf",
+                "vprintf",
+                "fprintf",
+                "fwrite",
+                "fputs",
+                "fread",
+                "fgets",
+                "readfile",
+                "file_get_contents",
+                "file_put_contents",
+                "fopen",
+                "curl_exec",
+                "mail",
+                "header",
+                "setcookie",
+                "error_log",
+            ],
             "io_name_keywords": [
                 "print",
                 "log",
@@ -508,6 +563,17 @@ DEFAULTS: dict[str, Any] = {
                 "Create",
                 "Dial",
                 "Listen",
+            ],
+            # PHP resource acquirers (global functions). The safe form is a
+            # ``try { ... } finally { fclose($f); }`` (PHP has try/finally).
+            "tracked_functions_php": [
+                "fopen",
+                "fsockopen",
+                "popen",
+                "proc_open",
+                "curl_init",
+                "opendir",
+                "tmpfile",
             ],
         },
         "unbounded_loops": {"enabled": True, "severity": "warning"},
@@ -606,6 +672,28 @@ DEFAULTS: dict[str, Any] = {
                 "prop_assert",
                 "prop_assert_eq",
                 "prop_assert_ne",
+            ],
+            # PHP has no ``assert`` keyword (``assert()`` is a function);
+            # PHPUnit assertions are method calls. ``call_name`` resolves both
+            # the bare ``assert(...)`` and ``$this->assertSame(...)`` forms.
+            "assertion_calls_php": [
+                "assert",
+                "assertSame",
+                "assertEquals",
+                "assertNotEquals",
+                "assertTrue",
+                "assertFalse",
+                "assertNull",
+                "assertNotNull",
+                "assertEmpty",
+                "assertNotEmpty",
+                "assertCount",
+                "assertContains",
+                "assertInstanceOf",
+                "assertThat",
+                "expectException",
+                "expectExceptionMessage",
+                "fail",
             ],
         },
         "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
@@ -908,6 +996,55 @@ DEFAULTS: dict[str, Any] = {
                 "PostFormValue",  # (*http.Request).PostFormValue(key)
                 "FormFile",  # (*http.Request).FormFile(key)
             ],
+            # PHP: the classic web-taint setup. Sinks are command execution
+            # (``exec`` / ``system`` / ``shell_exec`` / ``passthru`` /
+            # ``proc_open`` / ``popen``), code execution (``eval``),
+            # deserialisation (``unserialize``), and raw SQL (``query`` -
+            # mysqli / PDO method, ``mysqli_query`` / ``pg_query``). Variable
+            # ``include`` / ``require`` with a non-literal path are handled
+            # structurally by the tracker, not via this name list.
+            "sinks_php": [
+                "eval",
+                "exec",
+                "system",
+                "shell_exec",
+                "passthru",
+                "popen",
+                "proc_open",
+                "unserialize",
+                "query",
+                "mysqli_query",
+                "pg_query",
+            ],
+            # PHP sanitizers. ``intval`` / ``floatval`` coerce to numbers;
+            # ``escapeshellarg`` / ``escapeshellcmd`` neutralise shell
+            # metacharacters. ``htmlspecialchars`` is deliberately EXCLUDED -
+            # it is HTML-context-only (clears XSS, not SQLi / command
+            # injection), the same rationale as Java's encoder exclusions;
+            # add it via ``sanitizers_php`` if your sinks are HTML-only.
+            "sanitizers_php": [
+                "intval",
+                "floatval",
+                "escapeshellarg",
+                "escapeshellcmd",
+                "sanitize",
+                "validate",
+                "escape",
+                "quote",
+            ],
+            # PHP sources are the superglobals - reading any key from them
+            # (``$_GET['id']``) yields attacker-controlled data. These are
+            # variable names (a subscript-read *shape*), not call names; the
+            # tracker seeds taint on any subscript whose base is one of these.
+            "sources_php": [
+                "$_GET",
+                "$_POST",
+                "$_REQUEST",
+                "$_COOKIE",
+                "$_SERVER",
+                "$_FILES",
+                "$_ENV",
+            ],
         },
         "return_value_ignored": {
             "enabled": False,
@@ -1069,6 +1206,24 @@ DEFAULTS: dict[str, Any] = {
                 "Commit",
                 "Rollback",
             ],
+            # PHP functions whose return value signals success / failure and
+            # is commonly ignored when called as a bare expression statement
+            # (``fwrite($h, $data);`` discards the byte count / ``false`` on
+            # error). ``call_name`` resolves both global functions and
+            # ``$obj->method()`` forms.
+            "flagged_calls_php": [
+                "fwrite",
+                "fputs",
+                "fclose",
+                "unlink",
+                "rename",
+                "copy",
+                "mkdir",
+                "rmdir",
+                "file_put_contents",
+                "mail",
+                "session_start",
+            ],
         },
         "null_dereference": {
             "enabled": False,
@@ -1165,6 +1320,24 @@ DEFAULTS: dict[str, Any] = {
                 "checked_sub",
                 "checked_mul",
                 "checked_div",
+            ],
+            # PHP methods / functions that return ``false`` or ``null`` on
+            # absence and are hazardous to chain into without a check. The
+            # nullsafe operator ``?->`` is the recognised safe form (handled
+            # in the tracker). NOTE: many PHP builtins return ``false`` (not
+            # ``null``) on failure (``array_search`` / ``strpos``); the rule
+            # focuses on genuinely null-returning calls to limit false
+            # positives - the false-vs-null distinction is documented on the
+            # language page.
+            "nullable_methods_php": [
+                "current",  # current() on an empty / exhausted array
+                "next",
+                "prev",
+                "end",
+                "reset",
+                "createFromFormat",  # DateTime::createFromFormat returns false on bad input
+                "find",  # ORM finders (Doctrine / Eloquent) return null when absent
+                "first",
             ],
         },
         # Spring Boot framework-aware rules (SAFE9xx band). Java-only.

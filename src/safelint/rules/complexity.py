@@ -8,6 +8,7 @@ from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     BOOLEAN_OPERATOR,
@@ -37,6 +38,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
+    "php": _PHP_FUNCTION_TYPES,
 }
 
 # Node types that add 1 to cyclomatic complexity. Both languages: every
@@ -116,6 +118,30 @@ _GO_BRANCHING_TYPES = frozenset(
         "communication_case",
     }
 )
+# PHP: ``if_statement`` plus ``else_if_clause`` (PHP's ``elseif`` is a
+# distinct node, counted like Python's ``elif_clause``); the four loop
+# forms (``while`` / ``do`` / ``for`` / ``foreach``); each switch arm
+# (``case_statement`` - ``default_statement`` excluded as the
+# fall-through else) and each ``match`` arm
+# (``match_conditional_expression`` - ``match_default_expression``
+# excluded); ``catch_clause``; and the ternary
+# (``conditional_expression``). ``&&`` / ``||`` / ``??`` plus the
+# keyword forms ``and`` / ``or`` add complexity inside
+# ``binary_expression`` (operator filter below).
+_PHP_BRANCHING_TYPES = frozenset(
+    {
+        "if_statement",
+        "else_if_clause",
+        "while_statement",
+        "do_statement",
+        "for_statement",
+        "foreach_statement",
+        "case_statement",
+        "match_conditional_expression",
+        "catch_clause",
+        "conditional_expression",
+    }
+)
 _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset(
         {
@@ -134,6 +160,7 @@ _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_BRANCHING_TYPES,
     "rust": _RUST_BRANCHING_TYPES,
     "go": _GO_BRANCHING_TYPES,
+    "php": _PHP_BRANCHING_TYPES,
 }
 
 # JavaScript: ``binary_expression`` covers many operators (``+``, ``>``,
@@ -153,6 +180,11 @@ _RUST_BRANCHING_BINARY_OPS = frozenset({"&&", "||"})
 # Go: ``&&`` / ``||`` short-circuit like the others; no ``??``.
 _GO_BRANCHING_BINARY_OPS = frozenset({"&&", "||"})
 
+# PHP: ``&&`` / ``||`` / ``??`` plus the lower-precedence keyword
+# operators ``and`` / ``or`` (``xor`` excluded - it does not
+# short-circuit, so it adds no decision path).
+_PHP_BRANCHING_BINARY_OPS = frozenset({"&&", "||", "??", "and", "or"})
+
 # Per-language allow-list for ``binary_expression`` operators that add
 # one to cyclomatic complexity. Languages absent from this map (e.g.
 # Python, where ``boolean_operator`` is its own node type) fall through
@@ -163,6 +195,7 @@ _BRANCHING_BINARY_OPS_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_BRANCHING_BINARY_OPS,
     "rust": _RUST_BRANCHING_BINARY_OPS,
     "go": _GO_BRANCHING_BINARY_OPS,
+    "php": _PHP_BRANCHING_BINARY_OPS,
 }
 
 
@@ -171,7 +204,7 @@ class ComplexityRule(BaseRule):
 
     name = "complexity"
     code = "SAFE104"
-    language = ("python", "javascript", "typescript", "java", "rust", "go")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions whose cyclomatic complexity exceeds the configured maximum."""

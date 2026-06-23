@@ -393,6 +393,8 @@ Later   - enable opt-in rules as needed:
           - rule 8/10:  dynamic_code_execution, blanket_suppression (all languages)
           - Rust:       interior_mutable_static and the other Rust-only rules
           - Go:         empty_error_check, panic_calls_outside_tests
+          - PHP:        global_state (PHP is the first non-Python language it
+                        applies to; no PHP-only rules, all PHP coverage is shared)
           - test discipline: missing_assertions (set min_assertions = 2 for the
                         Holzmann density), test_existence, test_coupling
 ```

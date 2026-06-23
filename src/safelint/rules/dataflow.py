@@ -8,6 +8,7 @@ from safelint.analysis.dataflow import TaintTracker
 from safelint.analysis.dataflow_go import GoTaintTracker
 from safelint.analysis.dataflow_java import JavaTaintTracker
 from safelint.analysis.dataflow_javascript import JsTaintTracker
+from safelint.analysis.dataflow_php import PhpTaintTracker
 from safelint.analysis.dataflow_rust import RustTaintTracker
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
@@ -18,6 +19,7 @@ from safelint.languages.go import PARAMETER_DECLARATION as _GO_PARAMETER_DECLARA
 from safelint.languages.go import VARIADIC_PARAMETER_DECLARATION as _GO_VARIADIC_PARAMETER_DECLARATION
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     ATTRIBUTE,
@@ -46,7 +48,31 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
+    "php": _PHP_FUNCTION_TYPES,
 }
+
+
+def _php_param_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return all parameter names (``$x`` form) for a PHP function / method / closure.
+
+    Reads the ``parameters`` field (``formal_parameters``). Each
+    ``simple_parameter`` / ``variadic_parameter`` / ``property_promotion_parameter``
+    wraps a ``variable_name`` whose text (including the ``$``) is the bound
+    name. PHP has no ``self`` / ``cls`` convention, so every parameter seeds
+    the tainted set. Closure ``use (...)`` captures are a documented v1
+    limitation (not seeded).
+    """
+    params_node = func_node.child_by_field_name("parameters")
+    if params_node is None:  # pragma: no cover - defensive: valid PHP functions always have a parameters list
+        return set()
+    names: set[str] = set()
+    for child in params_node.named_children:
+        if child.type not in ("simple_parameter", "variadic_parameter", "property_promotion_parameter"):
+            continue
+        var = next((c for c in child.named_children if c.type == "variable_name"), None)
+        if var is not None:
+            names.add(node_text(var))
+    return names
 
 
 # Pass-through wrappers in the JS / TS grammar: nodes whose *runtime
@@ -545,7 +571,7 @@ class TaintedSinkRule(BaseRule):
 
     name = "tainted_sink"
     code = "SAFE801"
-    language = ("python", "javascript", "typescript", "java", "rust", "go")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 
     _DEFAULT_SINKS: ClassVar[list[str]] = [
         "eval",
@@ -785,6 +811,41 @@ class TaintedSinkRule(BaseRule):
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 
+    def _php_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run PHP taint analysis on the script top-level scope and every function.
+
+        PHP's threat surface is the classic web-taint flow: superglobal sources
+        (``$_GET`` / ``$_POST`` / ...) into command execution (``exec`` /
+        ``system`` / ``shell_exec`` / ``proc_open``), code execution
+        (``eval``), deserialisation (``unserialize``), raw SQL (``->query`` /
+        ``mysqli_query``), and dynamic ``include`` / ``require``.
+
+        A first pass analyses the script's top-level scope (PHP code commonly
+        lives outside any function), then each function / method / closure is
+        analysed with its own parameters seeded. The top-level pass uses an
+        empty seed; superglobal sources taint structurally regardless.
+        """
+        sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", "php", default=[])
+        sinks = frozenset(_validated_string_list(sinks_raw, sinks_key))
+        sanitizers_raw, sanitizers_key = resolve_lang_config_lookup(self.config, "sanitizers", "php", default=[])
+        sanitizers = frozenset(_validated_string_list(sanitizers_raw, sanitizers_key))
+        sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", "php", default=[])
+        sources = frozenset(_validated_string_list(sources_raw, sources_key))
+        assume = self._resolve_assume_taint_preserving()
+        violations: list[Violation] = []
+        # Top-level (script) scope - ``visit`` prunes function bodies, which
+        # are analysed separately below.
+        top = PhpTaintTracker(set(), sinks, sanitizers, sources, assume_taint_preserving=assume)
+        top.visit(tree.root_node)
+        violations.extend(self._format_hits(filepath, top.sink_hits))
+        for node in walk(tree.root_node):
+            if node.type not in _PHP_FUNCTION_TYPES:
+                continue
+            tracker = PhpTaintTracker(_php_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker.visit(node)
+            violations.extend(self._format_hits(filepath, tracker.sink_hits))
+        return violations
+
     def _format_hits(self, filepath: str, hits: list[tuple[tree_sitter.Node, str, str]]) -> list[Violation]:
         """Convert tracker hits to Violations - same message format for both languages."""
         return [
@@ -807,6 +868,8 @@ class TaintedSinkRule(BaseRule):
             return self._rust_check(filepath, tree)
         if lang_name == "go":
             return self._go_check(filepath, tree)
+        if lang_name == "php":
+            return self._php_check(filepath, tree)
         return self._python_check(filepath, tree)
 
 
@@ -822,7 +885,7 @@ class ReturnValueIgnoredRule(BaseRule):
 
     name = "return_value_ignored"
     code = "SAFE802"
-    language = ("python", "javascript", "typescript", "java", "rust", "go")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
@@ -894,6 +957,8 @@ def _null_dereference_message(method: str, lang_name: str) -> str:
         return f'Result of "{method}()" is immediately dereferenced without a null check - guard with "if (result != null)" or wrap in Optional.ofNullable(...)'
     if lang_name == "rust":
         return f'Result of "{method}()" is immediately unwrapped without an Option/Result check - guard with "if let Some(x) = ..." / "match" or propagate with "?"'
+    if lang_name == "php":
+        return f'Result of "{method}()" is immediately dereferenced without a null check - guard with the nullsafe operator ("$result?->field") or "if ($result !== null)"'
     return f'Result of "{method}()" is immediately dereferenced without a None check - guard with "if result is not None"'
 
 
@@ -902,7 +967,7 @@ class NullDereferenceRule(BaseRule):
 
     name = "null_dereference"
     code = "SAFE803"
-    language = ("python", "javascript", "typescript", "java", "rust")
+    language = ("python", "javascript", "typescript", "java", "rust", "php")
 
     _RUST_UNWRAP_METHODS: ClassVar[frozenset[str]] = frozenset(
         {
@@ -1021,6 +1086,34 @@ class NullDereferenceRule(BaseRule):
         name = call_name(receiver)
         return name if name and name in nullable else None
 
+    _PHP_RECEIVER_CALL_TYPES: ClassVar[frozenset[str]] = frozenset(
+        {
+            "function_call_expression",
+            "member_call_expression",
+            "nullsafe_member_call_expression",
+            "scoped_call_expression",
+        }
+    )
+
+    def _php_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
+        """Return the method name if *node* is an unsafe PHP dereference, else None.
+
+        Fires when a plain ``->`` chain (``member_call_expression`` /
+        ``member_access_expression``) is rooted in a nullable-returning call:
+        ``$repo->find($id)->getName()`` dereferences the result of ``find()``
+        (which returns null on a miss) without a guard. The nullsafe forms
+        (``nullsafe_member_call_expression`` / ``nullsafe_member_access_expression``,
+        the ``?->`` operator) are the safe idiom and are excluded by node type,
+        exactly like JS optional chaining (``?.``).
+        """
+        if node.type not in ("member_call_expression", "member_access_expression"):
+            return None
+        obj = node.child_by_field_name("object")
+        if obj is None or obj.type not in self._PHP_RECEIVER_CALL_TYPES:
+            return None
+        name = call_name(obj)
+        return name if name and name in nullable else None
+
     def _javascript_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
         """Return the method name if *node* is an unsafe JavaScript dereference, else None.
 
@@ -1079,6 +1172,10 @@ class NullDereferenceRule(BaseRule):
             raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", "rust", default=[])
             nullable = frozenset(_validated_string_list(raw, error_key))
             deref_hit = self._rust_deref_hit
+        elif lang_name == "php":
+            raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", "php", default=[])
+            nullable = frozenset(_validated_string_list(raw, error_key))
+            deref_hit = self._php_deref_hit
         else:
             # JS-family (JS / TS): TypeScript inherits the JS list by default.
             raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", lang_name, default=[])

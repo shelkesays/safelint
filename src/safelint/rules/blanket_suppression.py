@@ -51,6 +51,16 @@ _JS_TS_NOCHECK = re.compile(r"^@ts-nocheck\b")
 # ``allow(...)`` attribute for blanket lint names.
 _RUST_STRING_LITERAL = re.compile(r'"(?:[^"\\]|\\.)*"')
 
+# PHP comment directives. Bare ``phpcs:ignore`` / ``phpcs:disable`` (no sniff
+# list) silence every PHP_CodeSniffer sniff; the scoped
+# ``phpcs:ignore Squiz.Foo.Bar`` form is clean. ``@phpstan-ignore-line`` /
+# ``@phpstan-ignore-next-line`` suppress every PHPStan error on the line (the
+# scoped ``@phpstan-ignore <identifier>`` form is clean). ``@psalm-suppress
+# all`` is Psalm's blanket form (scoped ``@psalm-suppress SomeIssue`` is clean).
+_PHP_PHPCS_BARE = re.compile(r"^phpcs:(?:ignore|disable)$", re.IGNORECASE)
+_PHP_PHPSTAN_LINE = re.compile(r"^@phpstan-ignore(?:-line|-next-line)$", re.IGNORECASE)
+_PHP_PSALM_ALL = re.compile(r"^@psalm-suppress\s+all$", re.IGNORECASE)
+
 
 def _python_blanket(comment_text: str) -> str | None:
     """Return the blanket-directive label for a Python comment, or None."""
@@ -169,9 +179,39 @@ def _rust_blanket(attr_text: str) -> str | None:
     return None
 
 
+def _strip_php_comment_markers(comment_text: str) -> str:
+    """Strip ``//`` / ``#`` / ``/* ... */`` markers from a PHP comment."""
+    text = comment_text.strip()
+    if text.startswith("//"):
+        return text[2:].strip()
+    if text.startswith("#"):
+        return text[1:].strip()
+    if text.startswith("/*"):
+        text = text[2:].removesuffix("*/")
+    return text.strip()
+
+
+def _php_blanket(comment_text: str) -> str | None:
+    """Return the blanket-directive label for a PHP comment, or None.
+
+    Bare ``phpcs:ignore`` / ``phpcs:disable`` (no sniff list),
+    ``@phpstan-ignore-line`` / ``@phpstan-ignore-next-line`` (no identifier),
+    and ``@psalm-suppress all`` are blanket. Their scoped counterparts
+    (``phpcs:ignore Squiz.Foo``, ``@phpstan-ignore <id>``,
+    ``@psalm-suppress SomeIssue``) target named checks and are left alone.
+    """
+    body = _strip_php_comment_markers(comment_text)
+    if _PHP_PHPCS_BARE.match(body) or _PHP_PHPSTAN_LINE.match(body):
+        return body
+    if _PHP_PSALM_ALL.match(body):
+        return "@psalm-suppress all"
+    return None
+
+
 # Comment-based blanket detectors keyed by language. Languages absent
-# here (and not handled by the dedicated Java / Rust attribute scans)
-# fall back to the JS-family detector in ``_comment_check``.
+# here (and not handled by the dedicated Java / Rust attribute scans, or
+# PHP's combined comment + ``@``-operator scan) fall back to the JS-family
+# detector in ``_comment_check``.
 _COMMENT_DETECTORS_BY_LANG = {
     "python": _python_blanket,
     "go": _go_blanket,
@@ -183,7 +223,7 @@ class BlanketSuppressionRule(BaseRule):
 
     name = "blanket_suppression"
     code = "SAFE603"
-    language = ("python", "javascript", "typescript", "java", "rust", "go")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every blanket foreign-analyser suppression in *filepath*."""
@@ -192,7 +232,37 @@ class BlanketSuppressionRule(BaseRule):
             return self._java_check(filepath, tree)
         if lang == "rust":
             return self._rust_check(filepath, tree)
+        if lang == "php":
+            return self._php_check(filepath, tree)
         return self._comment_check(filepath, tree, lang)
+
+    def _php_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Scan PHP for blanket directive comments AND the ``@`` error-suppression operator.
+
+        PHP needs both a comment scan (``phpcs:ignore`` / ``@phpstan-ignore-line``
+        / ``@psalm-suppress all``) and a node scan: the ``@`` operator
+        (``error_suppression_expression``) is PHP's most literal "silence the
+        analyser" construct, so every use is flagged.
+        """
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            violation = self._php_node_violation(filepath, node)
+            if violation is not None:
+                violations.append(violation)
+        return violations
+
+    def _php_node_violation(self, filepath: str, node: tree_sitter.Node) -> Violation | None:
+        """Return a SAFE603 violation for a PHP comment directive or ``@`` operator, else None."""
+        if node.type == "comment":
+            label = _php_blanket(node_text(node))
+            return self._violation(filepath, node, label) if label is not None else None
+        if node.type == "error_suppression_expression":
+            return self._make_violation_for_node(
+                filepath,
+                node,
+                'The "@" error-suppression operator silences all errors from this expression - handle the error explicitly instead (Power of Ten rule 10)',
+            )
+        return None
 
     def _comment_check(self, filepath: str, tree: tree_sitter.Tree, lang: str) -> list[Violation]:
         """Scan comment nodes for Python / Go / JS-family blanket directives."""

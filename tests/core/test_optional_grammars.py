@@ -46,6 +46,9 @@ from safelint.languages import (
     javascript as _javascript_mod,
 )
 from safelint.languages import (
+    php as _php_mod,
+)
+from safelint.languages import (
     python as _python_mod,
 )
 from safelint.languages import (
@@ -227,6 +230,33 @@ def test_registry_skips_go_when_grammar_unavailable(monkeypatch: pytest.MonkeyPa
         importlib.reload(languages)
 
 
+def test_php_parser_factory_raises_when_grammar_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``_create_php_parser`` errors clearly when the grammar isn't installed."""
+    monkeypatch.setattr(_php_mod, "_PHP_TS_LANGUAGE", None)
+    with pytest.raises(ImportError, match=r"tree-sitter-php is not installed.*safelint\[php\]"):
+        _php_mod._create_php_parser()
+
+
+def test_php_install_hint_names_the_right_extra() -> None:
+    """The hint string matches what users actually need to type."""
+    assert _php_mod.GRAMMAR_INSTALL_HINT == "pip install 'safelint[php]'"
+
+
+def test_registry_skips_php_when_grammar_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
+    """When ``_GRAMMAR_AVAILABLE`` is False for PHP, ``.php`` is unavailable; other languages stay available."""
+    monkeypatch.setattr(_php_mod, "_GRAMMAR_AVAILABLE", False)
+    reloaded = importlib.reload(languages)
+    try:
+        assert ".php" not in reloaded.supported_extensions()
+        assert reloaded.unavailable_extensions()[".php"] == _php_mod.GRAMMAR_INSTALL_HINT
+        # Other languages stay available since their grammars are independent.
+        assert ".py" in reloaded.supported_extensions()
+        assert ".go" in reloaded.supported_extensions()
+    finally:
+        monkeypatch.setattr(_php_mod, "_GRAMMAR_AVAILABLE", True)
+        importlib.reload(languages)
+
+
 def test_registry_skips_typescript_when_grammar_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
     """When TS grammar isn't installed, ``.ts`` / ``.tsx`` / ``.as`` are unavailable, JS stays available."""
     monkeypatch.setattr(_typescript_mod, "_GRAMMAR_AVAILABLE", False)
@@ -296,7 +326,7 @@ def test_every_language_has_its_own_extra() -> None:
     # Keep the exclusion list explicit so adding a new tooling extra
     # forces a deliberate update here.
     language_extras = provides_extras - {"dev", "docs"}
-    expected = {"python", "javascript", "typescript", "java", "rust", "go", "all"}
+    expected = {"python", "javascript", "typescript", "java", "rust", "go", "php", "all"}
     missing = expected - language_extras
     unexpected = language_extras - expected
     assert not missing, f"v2.x contract: every supported language must have its own opt-in extra. Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"
