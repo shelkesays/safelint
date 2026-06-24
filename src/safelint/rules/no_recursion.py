@@ -198,7 +198,7 @@ def _go_call_targets_self(call_node: tree_sitter.Node, func_name: str, receiver_
     return False
 
 
-def _php_call_targets_self(call_node: tree_sitter.Node, func_name: str) -> bool:
+def _php_call_targets_self(call_node: tree_sitter.Node, func_name: str, *, is_method: bool) -> bool:
     """Return True if a PHP call node is a direct self-call to *func_name*.
 
     Fires for a bare ``foo()`` (``function_call_expression`` whose
@@ -208,10 +208,22 @@ def _php_call_targets_self(call_node: tree_sitter.Node, func_name: str) -> bool:
     (``scoped_call_expression`` whose scope is the ``self`` / ``static``
     ``relative_scope``). A call through any other object or class
     (``$other->foo()`` / ``Other::foo()``) is not self-recursion.
+
+    Inside a class method (``is_method``), a bare ``foo()`` is NOT recursion:
+    PHP resolves an unqualified call to a global / namespaced function, never
+    to the enclosing method, so a method recurses only through
+    ``$this->`` / ``self::`` / ``static::``.
     """
     if call_node.type == "function_call_expression":
+        if is_method:
+            return False
         callee = call_node.child_by_field_name("function")
         return callee is not None and callee.type == "name" and node_text(callee) == func_name
+    return _php_qualified_self_call(call_node, func_name)
+
+
+def _php_qualified_self_call(call_node: tree_sitter.Node, func_name: str) -> bool:
+    """Return True if a PHP ``$this->`` / ``self::`` / ``static::`` call targets *func_name*."""
     name = call_node.child_by_field_name("name")
     if name is None or node_text(name) != func_name:
         return False
@@ -230,7 +242,7 @@ def _targets_self(call_node: tree_sitter.Node, func_name: str, lang: str, receiv
     if lang == "go":
         return _go_call_targets_self(call_node, func_name, receiver_name, is_method=is_method)
     if lang == "php":
-        return _php_call_targets_self(call_node, func_name)
+        return _php_call_targets_self(call_node, func_name, is_method=is_method)
     return _call_targets_self(call_node, func_name, lang)
 
 
@@ -306,8 +318,12 @@ class NoRecursionRule(BaseRule):
         if name_node is None:
             return []
         func_name = node_text(name_node)
-        is_method = lang == "go" and func.type == "method_declaration"
-        receiver_name = _go_receiver_name(func) if is_method else None
+        # Both Go and PHP name their method node ``method_declaration``. The
+        # ``is_method`` flag suppresses bare-call self-recursion for methods
+        # (a bare ``foo()`` denotes a package-level / global function, not the
+        # method). Only Go carries a user-named receiver to resolve.
+        is_method = func.type == "method_declaration" and lang in ("go", "php")
+        receiver_name = _go_receiver_name(func) if (is_method and lang == "go") else None
         shadowed = func_name in _directly_nested_function_names(func, func_types)
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(func_types)):

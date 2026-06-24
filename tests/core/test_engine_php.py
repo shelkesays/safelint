@@ -66,13 +66,25 @@ def test_engine_emits_safe000_on_unparseable_php(tmp_path: Path) -> None:
     assert any(v.code == "SAFE000" for v in result.violations), "Expected SAFE000 on broken PHP source"
 
 
-def test_engine_skips_python_only_rules_on_php(tmp_path: Path) -> None:
-    """Python-only rules (e.g. SAFE201 bare_except, SAFE301 global_state) never fire on PHP."""
+def test_engine_skips_unregistered_rules_on_php(tmp_path: Path) -> None:
+    """SAFE201 bare_except is not registered for PHP, so it never fires (even on try/catch)."""
     sample = tmp_path / "state.php"
-    sample.write_text("<?php\n$counter = 0;\n", encoding="utf-8")
+    sample.write_text("<?php\ntry { risky(); } catch (\\Throwable $e) { error_log($e); }\n", encoding="utf-8")
     codes = {v.code for v in _engine().check_file(str(sample)).violations}
     assert "SAFE201" not in codes
-    assert "SAFE301" not in codes
+
+
+def test_safe301_global_state_dispatches_on_php(tmp_path: Path) -> None:
+    """SAFE301 global_state IS registered for PHP (its first non-Python home) and fires on ``global``.
+
+    SAFE301 is opt-in, so it is enabled explicitly here; this guards the PHP
+    dispatch against regression (the rule must reach PHP files, not be skipped
+    as Python-only).
+    """
+    sample = tmp_path / "g.php"
+    sample.write_text("<?php\nfunction f() { global $cfg; return $cfg; }\n", encoding="utf-8")
+    result = _engine({"rules": {"global_state": {"enabled": True}}}).check_file(str(sample))
+    assert any(v.code == "SAFE301" for v in result.violations)
 
 
 def test_php_known_bad_file_fires_safe101(tmp_path: Path) -> None:

@@ -75,6 +75,10 @@ A few PHP-vs-other-languages shapes the rule engine contends with, worth knowing
 - **The nullsafe operator `?->`.** SAFE803 treats `$x?->y` as the safe dereference form; only an unguarded `->` / `::` off a nullable-returning call fires.
 - **PHPUnit `*Test.php` under `tests/`.** SAFE701 / SAFE702 use the `<ClassName>Test.php` convention rather than a sibling file or `_test` suffix.
 
+## Known limitation: case-sensitive function-name matching
+
+PHP function and method names are **case-insensitive at runtime** (`System(...)` calls the same builtin as `system(...)`), but SafeLint matches resolved call names against the configured lists (`sinks_php`, `io_functions_php`, `dynamic_exec_calls_php`, `assertion_calls_php`, ...) **case-sensitively**. The shipped defaults are lowercase, so canonically-cased code (the overwhelming norm, and what IDEs / formatters produce) matches as expected; a deliberately mixed-case spelling like `SYSTEM($_GET['x'])` would currently evade the corresponding rule. Variable names (including the superglobals `$_GET` / `$_POST`) are genuinely case-sensitive in PHP and are matched exactly. If your code base mixes the case of builtin calls, add the alternate spellings to the relevant `_php` config list. (Superglobal *variable* names are unaffected.)
+
 ## Configuration
 
 SafeLint config is read from `[tool.safelint]` in `pyproject.toml` (if your PHP project also has one) or from a standalone `safelint.toml` at the project root. Pure-PHP projects typically prefer the standalone form, which drops the `[tool.safelint]` prefix.

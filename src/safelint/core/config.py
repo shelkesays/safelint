@@ -1321,23 +1321,24 @@ DEFAULTS: dict[str, Any] = {
                 "checked_mul",
                 "checked_div",
             ],
-            # PHP methods / functions that return ``false`` or ``null`` on
-            # absence and are hazardous to chain into without a check. The
-            # nullsafe operator ``?->`` is the recognised safe form (handled
-            # in the tracker). NOTE: many PHP builtins return ``false`` (not
-            # ``null``) on failure (``array_search`` / ``strpos``); the rule
-            # focuses on genuinely null-returning calls to limit false
-            # positives - the false-vs-null distinction is documented on the
-            # language page.
+            # PHP methods that return ``null`` on absence and are hazardous to
+            # chain into without a check (SAFE803's guard advice - the nullsafe
+            # ``?->`` operator or a ``!== null`` check - only addresses
+            # ``null``). The default list is deliberately limited to genuinely
+            # null-returning calls: the ORM finder convention (Doctrine
+            # ``find`` / ``findOneBy``, Eloquent ``first`` / ``firstWhere``)
+            # returns null when no row matches. PHP builtins that return
+            # ``false`` on failure (``array_search`` / ``strpos`` / the array
+            # pointer functions ``current`` / ``next`` / ``reset``,
+            # ``DateTime::createFromFormat``) are NOT listed - a ``false``
+            # result is not guarded by ``?->`` / ``!== null``, so flagging them
+            # would mis-advise. Add any project-specific null-returning methods
+            # via ``nullable_methods_php``.
             "nullable_methods_php": [
-                "current",  # current() on an empty / exhausted array
-                "next",
-                "prev",
-                "end",
-                "reset",
-                "createFromFormat",  # DateTime::createFromFormat returns false on bad input
-                "find",  # ORM finders (Doctrine / Eloquent) return null when absent
+                "find",
+                "findOneBy",
                 "first",
+                "firstWhere",
             ],
         },
         # Spring Boot framework-aware rules (SAFE9xx band). Java-only.

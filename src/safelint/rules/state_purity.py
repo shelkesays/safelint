@@ -119,9 +119,17 @@ def _php_global_identifiers(global_stmt: tree_sitter.Node) -> list[tree_sitter.N
 
 
 def _php_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None:
-    """Return the LHS node of a PHP assignment / compound assignment, else None."""
+    """Return the mutated target of a PHP assignment / compound assignment / inc-dec, else None.
+
+    ``$x = ...`` / ``$x += ...`` expose the target on the ``left`` field;
+    ``$x++`` / ``--$x`` (``update_expression``) expose it on the ``argument``
+    field. Catching the increment / decrement forms means a write to a
+    declared global via ``$counter++`` is flagged like ``$counter = ...``.
+    """
     if node.type in ("assignment_expression", "augmented_assignment_expression"):
         return node.child_by_field_name("left")
+    if node.type == "update_expression":
+        return node.child_by_field_name("argument")
     return None
 
 
