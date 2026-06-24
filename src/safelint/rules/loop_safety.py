@@ -472,7 +472,11 @@ def _is_literal_true(condition: tree_sitter.Node, lang_name: str) -> bool:
     # token text must be inspected; the others emit a dedicated ``true`` node.
     if lang_name not in ("rust", "php"):
         return True
-    return node_text(condition) == "true"
+    text = node_text(condition)
+    # PHP boolean literals are case-insensitive (``true`` / ``TRUE`` / ``True``
+    # all denote the same value), so ``while (TRUE)`` must still fire SAFE501.
+    # Rust's ``true`` is case-sensitive, so it keeps the exact comparison.
+    return text.lower() == "true" if lang_name == "php" else text == "true"
 
 
 class UnboundedLoopRule(BaseRule):

@@ -328,9 +328,15 @@ def _php_only_reraises(catch_node: tree_sitter.Node, stmts: list[tree_sitter.Nod
     Only re-throwing the *exact* caught variable counts; ``throw new E()``
     or ``throw $other`` constructs / forwards a different value and still
     needs logging.
+
+    Comment children are skipped first: tree-sitter-php emits comments as
+    named body nodes, so ``catch (Exception $e) { /* why */ throw $e; }``
+    would otherwise reach here with two statements and be misread as a swallow.
     """
-    if len(stmts) != 1 or stmts[0].type != "expression_statement":
+    real = [s for s in stmts if s.type != "comment"]
+    if len(real) != 1 or real[0].type != "expression_statement":
         return False
+    stmts = real
     inner = stmts[0].named_children
     if len(inner) != 1 or inner[0].type != "throw_expression":
         return False
