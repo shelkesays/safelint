@@ -80,3 +80,9 @@ def test_docblock_blanket_suppression_fires(tmp_path: Path) -> None:
 def test_scoped_docblock_suppression_is_clean(tmp_path: Path) -> None:
     """A scoped ``/** @psalm-suppress SomeIssue */`` targets a named check and is clean (control)."""
     assert "SAFE603" not in _codes(tmp_path, "/** @psalm-suppress SomeIssue */\n$x = 1;", "blanket_suppression")
+
+
+def test_multiline_docblock_blanket_suppression_fires(tmp_path: Path) -> None:
+    """A directive on any line of a multi-line docblock is recognised (SAFE603)."""
+    body = "/**\n * Does a thing.\n * @psalm-suppress all\n */\n$x = 1;"
+    assert "SAFE603" in _codes(tmp_path, body, "blanket_suppression")

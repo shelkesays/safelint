@@ -179,21 +179,33 @@ def _rust_blanket(attr_text: str) -> str | None:
     return None
 
 
-def _strip_php_comment_markers(comment_text: str) -> str:
-    """Strip ``//`` / ``#`` / ``/* ... */`` / ``/** ... */`` markers from a PHP comment.
+def _php_comment_lines(comment_text: str) -> list[str]:
+    """Return the cleaned content lines of a PHP comment.
 
-    Docblock comments (``/** @psalm-suppress all */``) leave a continuation
-    ``*`` after the ``/*`` is removed, so any leading ``*`` characters are
-    stripped too - otherwise ``@psalm-suppress all`` would not match.
+    ``//`` / ``#`` line comments yield a single line. ``/* ... */`` and
+    ``/** ... */`` block / docblock comments yield every line with the ``/*``
+    / ``*/`` markers and each line's leading ``*`` continuation stripped, so a
+    directive sitting on **any** line of a multi-line docblock (not just a
+    single-line ``/** @psalm-suppress all */``) is seen.
     """
     text = comment_text.strip()
     if text.startswith("//"):
-        return text[2:].strip()
+        return [text[2:].strip()]
     if text.startswith("#"):
-        return text[1:].strip()
+        return [text[1:].strip()]
     if text.startswith("/*"):
-        text = text[2:].removesuffix("*/").strip().lstrip("*")
-    return text.strip()
+        inner = text[2:].removesuffix("*/")
+        return [line.strip().lstrip("*").strip() for line in inner.splitlines()]
+    return [text.strip()]
+
+
+def _php_blanket_line(line: str) -> str | None:
+    """Return the blanket-directive label for a single cleaned comment line, or None."""
+    if _PHP_PHPCS_BARE.match(line) or _PHP_PHPSTAN_LINE.match(line):
+        return line
+    if _PHP_PSALM_ALL.match(line):
+        return "@psalm-suppress all"
+    return None
 
 
 def _php_blanket(comment_text: str) -> str | None:
@@ -204,12 +216,13 @@ def _php_blanket(comment_text: str) -> str | None:
     and ``@psalm-suppress all`` are blanket. Their scoped counterparts
     (``phpcs:ignore Squiz.Foo``, ``@phpstan-ignore <id>``,
     ``@psalm-suppress SomeIssue``) target named checks and are left alone.
+    Every line of a multi-line docblock is checked, so the directive is found
+    wherever it sits.
     """
-    body = _strip_php_comment_markers(comment_text)
-    if _PHP_PHPCS_BARE.match(body) or _PHP_PHPSTAN_LINE.match(body):
-        return body
-    if _PHP_PSALM_ALL.match(body):
-        return "@psalm-suppress all"
+    for line in _php_comment_lines(comment_text):
+        label = _php_blanket_line(line)
+        if label is not None:
+            return label
     return None
 
 
