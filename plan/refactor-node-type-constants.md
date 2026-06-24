@@ -15,7 +15,7 @@ single-pass win.
 
 ## Why
 
-Each per-language rule in `rules/` keeps its node-type / operator sets in
+Each per-language rule in `src/safelint/rules/` keeps its node-type / operator sets in
 per-language tables (e.g. `_BRANCHING_TYPES_BY_LANG`, `_DEPTH_NODE_TYPES_BY_LANG`,
 `_CALL_TYPES_BY_LANG`, `_WHILE_STATEMENT_BY_LANG`). Today **every language's row
 in those tables uses raw Tree-sitter string literals** (`"if_statement"`,
@@ -60,14 +60,14 @@ C/C++):
 - `state_purity.py` - the per-language assignment / global helpers.
 - `side_effects.py`, `dynamic_code_execution.py`, `resource_lifecycle.py`,
   `blanket_suppression.py` - the per-language call-node / directive checks.
-- `dataflow.py` and `analysis/dataflow_<lang>.py` - the per-language param /
-  call / propagation node-type literals.
-- `languages/_node_utils.py` - `CALL_TYPES`, `_CALL_NAME_DISPATCH` keys, the
-  per-language `call_name` helpers.
+- `src/safelint/rules/dataflow.py` and `src/safelint/analysis/dataflow_<lang>.py`
+  - the per-language param / call / propagation node-type literals.
+- `src/safelint/languages/_node_utils.py` - `CALL_TYPES`, `_CALL_NAME_DISPATCH`
+  keys, the per-language `call_name` helpers.
 
 ## Prerequisite
 
-Audit each `languages/<lang>.py` module first: some node types referenced in the
+Audit each `src/safelint/languages/<lang>.py` module first: some node types referenced in the
 rule tables are **not yet exported** as constants (operators like `"&&"` /
 `"||"`, the `"comment"` / `"boolean"` literals, switch-arm node types, etc.).
 Add the missing constants to the language modules before the rule-side sweep, so
