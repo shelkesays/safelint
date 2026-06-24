@@ -21,12 +21,21 @@ number, not the priority rank.
 
 | Priority | Spec # | File | Language | Status | Depends on |
 |---|---|---|---|---|---|
-| 1 (next) | 4 | `plan/04-php.md` | PHP (`.php`) | **next up** | nothing |
+| 1 | 4 | `plan/04-php.md` | PHP (`.php`) | **in review (PR #75)** | nothing |
 | 2 | 2 | `plan/02-c.md` | C (`.c`, `.h`) | not started | nothing |
 | 3 | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started | **C shipped** (shared grammar family, shared new rules, `.h` ownership) |
 
 Update the Status column (and the per-spec status header) as work lands; remove
 a spec file once its language ships (as was done for Go).
+
+## Deferred cross-language refactors (run AFTER the languages above)
+
+These are not language additions; they are codebase-wide sweeps best done once
+the language set is stable, so they don't have to be redone per language.
+
+| File | What | Run when |
+|---|---|---|
+| `plan/refactor-node-type-constants.md` | Convert the per-language node-type / operator tables in `rules/` from raw Tree-sitter string literals to imported `languages/<lang>.py` constants, for **all** languages at once (pure refactor, no behaviour change). Deferred out of the PHP PR because it is cross-language, not PHP-specific. | After C **and** C++ ship. |
 
 ## How to use these specs
 
