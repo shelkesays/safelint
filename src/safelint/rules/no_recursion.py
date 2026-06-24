@@ -80,7 +80,7 @@ _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "rust": frozenset({"call_expression"}),
     "java": frozenset({"method_invocation"}),
     "go": frozenset({"call_expression"}),
-    "php": frozenset({"function_call_expression", "member_call_expression", "scoped_call_expression"}),
+    "php": frozenset({"function_call_expression", "member_call_expression", "nullsafe_member_call_expression", "scoped_call_expression"}),
 }
 
 #: Identifiers that name "the current object" per language. A call
@@ -227,7 +227,9 @@ def _php_qualified_self_call(call_node: tree_sitter.Node, func_name: str) -> boo
     name = call_node.child_by_field_name("name")
     if name is None or node_text(name) != func_name:
         return False
-    if call_node.type == "member_call_expression":
+    if call_node.type in ("member_call_expression", "nullsafe_member_call_expression"):
+        # ``$this->foo()`` and ``$this?->foo()`` both recurse - ``$this`` is
+        # never null, so the nullsafe form still calls (and recurses into) foo.
         obj = call_node.child_by_field_name("object")
         return obj is not None and node_text(obj) == "$this"
     # scoped_call_expression: ``self::`` / ``static::`` recursion only.

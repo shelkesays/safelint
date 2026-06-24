@@ -47,6 +47,11 @@ def test_this_qualified_method_call_is_recursion(tmp_path: Path) -> None:
     assert "SAFE105" in _codes(tmp_path, "class C { function foo() { return $this->foo(); } }", "no_recursion")
 
 
+def test_nullsafe_this_call_is_recursion(tmp_path: Path) -> None:
+    """``$this?->foo()`` recurses too (``$this`` is never null), so it fires SAFE105."""
+    assert "SAFE105" in _codes(tmp_path, "class C { function foo() { return $this?->foo(); } }", "no_recursion")
+
+
 def test_uppercase_while_true_fires(tmp_path: Path) -> None:
     """PHP booleans are case-insensitive: ``while (TRUE)`` fires SAFE501."""
     assert "SAFE501" in _codes(tmp_path, "while (TRUE) { work(); }", "unbounded_loops")
