@@ -551,6 +551,8 @@
       
         
       
+        
+      
     
     
     
@@ -751,6 +753,34 @@
     
   
     Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../languages/php/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PHP
   
 
     
@@ -3044,8 +3074,10 @@
 <a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>          - rule 8/10:  dynamic_code_execution, blanket_suppression (all languages)
 <a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>          - Rust:       interior_mutable_static and the other Rust-only rules
 <a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>          - Go:         empty_error_check, panic_calls_outside_tests
-<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>          - test discipline: missing_assertions (set min_assertions = 2 for the
-<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>                        Holzmann density), test_existence, test_coupling
+<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>          - PHP:        global_state (PHP is the first non-Python language it
+<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>                        applies to; no PHP-only rules, all PHP coverage is shared)
+<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>          - test discipline: missing_assertions (set min_assertions = 2 for the
+<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>                        Holzmann density), test_existence, test_coupling
 </code></pre></div>
 <p>All of these are off by default; see the <a href="../rules/">Rules reference</a> for each rule's config knobs. <code>no_recursion</code> (SAFE105) is the one new rule that is <strong>on by default</strong> (at <code>warning</code> severity), so no opt-in step is needed for it.</p>
 

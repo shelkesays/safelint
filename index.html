@@ -640,6 +640,8 @@
       
         
       
+        
+      
     
     
     
@@ -840,6 +842,34 @@
     
   
     Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="languages/php/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PHP
   
 
     
@@ -2195,7 +2225,7 @@
 
 <h1 id="safelint">SafeLint<a class="headerlink" href="#safelint" title="Permanent link">#</a></h1>
 <blockquote>
-<p>Holzmann "Power of Ten" safety lint rules for modern <strong>Python, JavaScript, TypeScript, Java</strong> (with <strong>Spring Boot</strong> framework preset), <strong>Rust</strong>, and <strong>Go</strong>, adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint, SpotBugs, Checkstyle, clippy, go vet) doesn't reach.</p>
+<p>Holzmann "Power of Ten" safety lint rules for modern <strong>Python, JavaScript, TypeScript, Java</strong> (with <strong>Spring Boot</strong> framework preset), <strong>Rust</strong>, <strong>Go</strong>, and <strong>PHP</strong>, adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint, SpotBugs, Checkstyle, clippy, go vet) doesn't reach.</p>
 </blockquote>
 <p>SafeLint complements your existing linters. Where ruff handles style and pylint catches general defects, SafeLint enforces a focused set of <em>safety</em> rules: the kind you'd want in code that has to be reviewable, testable, and predictably-terminating. See <a href="power-of-ten/">The Power of Ten, adapted</a> for how each of Holzmann's ten rules maps onto SafeLint's checks across the supported languages. It's a CLI, a <a href="pre-commit/">pre-commit hook</a>, a JSON / SARIF emitter for editor and CI consumers, and an <a href="ai-clients/">AI-client skill</a> that fourteen agents (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp, Kiro) speak.</p>
 <h2 id="currently-supported-languages">Currently supported languages<a class="headerlink" href="#currently-supported-languages" title="Permanent link">#</a></h2>
@@ -2236,12 +2266,17 @@
 <tr>
 <td><strong>Go</strong></td>
 <td><code>.go</code></td>
-<td>16 cross-language rules apply (the 13 all-six core plus <code>global_mutation</code> / <code>dynamic_code_execution</code> / <code>resource_lifecycle</code>); 2 Go-only rules cover Go-idiom patterns: <code>empty_error_check</code> (the empty <code>if err != nil {}</code> swallow) and <code>panic_calls_outside_tests</code> (18 rules total for Go). Headline adaptations: the bare <code>for {}</code> infinite loop, the sibling <code>foo_test.go</code> convention, the <code>_ = f()</code> explicit-discard exemption, and the <code>defer x.Close()</code> resource form. See <a href="languages/go/">Go</a>. New in v2.5.0.</td>
+<td>16 cross-language rules apply (the 13 all-seven core plus <code>global_mutation</code> / <code>dynamic_code_execution</code> / <code>resource_lifecycle</code>); 2 Go-only rules cover Go-idiom patterns: <code>empty_error_check</code> (the empty <code>if err != nil {}</code> swallow) and <code>panic_calls_outside_tests</code> (18 rules total for Go). Headline adaptations: the bare <code>for {}</code> infinite loop, the sibling <code>foo_test.go</code> convention, the <code>_ = f()</code> explicit-discard exemption, and the <code>defer x.Close()</code> resource form. See <a href="languages/go/">Go</a>. New in v2.5.0.</td>
+</tr>
+<tr>
+<td><strong>PHP</strong></td>
+<td><code>.php</code></td>
+<td>21 rules apply, the widest coverage of any non-Python language (only <code>bare_except</code> and <code>wide_scope_declaration</code> are skipped). First non-Python home for <code>global_state</code> (PHP has a literal <code>global</code> keyword). Headline highlights: the <code>@</code>-operator error-suppression idiom, superglobal taint sources (<code>$_GET</code> / <code>$_POST</code> / <code>$_REQUEST</code>) feeding <code>tainted_sink</code>, and the <code>break N;</code> / <code>continue N;</code> multi-level loop forms. See <a href="languages/php/">PHP</a>.</td>
 </tr>
 </tbody>
 </table>
-<p><strong>Rule coverage:</strong> 13 rules apply across all six languages (the cross-language core, including <code>no_recursion</code> and <code>blanket_suppression</code>); 2 more apply to Python / JS / TS / Java / Rust but not Go (<code>missing_assertions</code>, <code>null_dereference</code>); 3 apply to Python / JS / TS / Java / Go but not Rust (<code>global_mutation</code>, <code>dynamic_code_execution</code>, <code>resource_lifecycle</code>); 2 apply to Python / JavaScript / TypeScript / Java only (<code>empty_except</code>, <code>logging_on_error</code>); 1 is JavaScript-family-only (<code>wide_scope_declaration</code>); 2 are Python-only (<code>bare_except</code>, <code>global_state</code>); 4 are Java + Spring Boot only (<code>spring_*</code>); 11 are Rust-only (including <code>interior_mutable_static</code>); and 2 are Go-only (<code>empty_error_check</code>, <code>panic_calls_outside_tests</code>). Rules are skipped per language where the semantics don't translate (Go has no try/catch, <code>global</code> keyword, <code>var</code> hoisting, production assertion idiom, or chained-nullable idiom; Rust's <code>Result</code>/<code>Option</code>/<code>Drop</code> model covers its skips with Rust-specific replacements).</p>
-<p><strong>Planned future languages</strong> (in working-priority order, no timelines committed): PHP, C, C++. See the <a href="configuration/rules/#planned">language-coverage roadmap</a>.</p>
+<p><strong>Rule coverage:</strong> 13 rules apply across all seven languages (the cross-language core, including <code>no_recursion</code> and <code>blanket_suppression</code>); 2 more apply to Python / JS / TS / Java / Rust / PHP but not Go (<code>missing_assertions</code>, <code>null_dereference</code>); 3 apply to Python / JS / TS / Java / Go / PHP but not Rust (<code>global_mutation</code>, <code>dynamic_code_execution</code>, <code>resource_lifecycle</code>); 2 apply to Python / JavaScript / TypeScript / Java / PHP only (<code>empty_except</code>, <code>logging_on_error</code>); 1 is JavaScript-family-only (<code>wide_scope_declaration</code>); 1 applies to Python + PHP (<code>global_state</code>); 1 is Python-only (<code>bare_except</code>); 4 are Java + Spring Boot only (<code>spring_*</code>); 11 are Rust-only (including <code>interior_mutable_static</code>); and 2 are Go-only (<code>empty_error_check</code>, <code>panic_calls_outside_tests</code>). Rules are skipped per language where the semantics don't translate (Go has no try/catch, <code>global</code> keyword, <code>var</code> hoisting, production assertion idiom, or chained-nullable idiom; Rust's <code>Result</code>/<code>Option</code>/<code>Drop</code> model covers its skips with Rust-specific replacements).</p>
+<p><strong>Planned future languages</strong> (in working-priority order, no timelines committed): C, C++. See the <a href="configuration/rules/#planned">language-coverage roadmap</a>.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python]&#39;</span><span class="w">         </span><span class="c1"># adds .py, .pyw</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[javascript]&#39;</span><span class="w">     </span><span class="c1"># adds .js, .mjs, .cjs</span>
@@ -2249,13 +2284,14 @@
 <a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[java]&#39;</span><span class="w">           </span><span class="c1"># adds .java (Spring Boot framework preset available)</span>
 <a id="__codelineno-0-5" name="__codelineno-0-5" href="#__codelineno-0-5"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[rust]&#39;</span><span class="w">           </span><span class="c1"># adds .rs</span>
 <a id="__codelineno-0-6" name="__codelineno-0-6" href="#__codelineno-0-6"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[go]&#39;</span><span class="w">             </span><span class="c1"># adds .go</span>
-<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span><span class="w">            </span><span class="c1"># every supported language</span>
-<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python,rust]&#39;</span><span class="w">    </span><span class="c1"># multiple extras compose (e.g. PyO3 / maturin)</span>
-<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a><span class="c1"># uv add &#39;safelint[typescript]&#39; works the same way.</span>
-<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a>
-<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                    </span><span class="c1"># lint a directory</span>
-<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">           </span><span class="c1"># lint everything (default is git-modified only)</span>
-<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>src/<span class="w">      </span><span class="c1"># machine-readable output for editors / CI</span>
+<a id="__codelineno-0-7" name="__codelineno-0-7" href="#__codelineno-0-7"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[php]&#39;</span><span class="w">            </span><span class="c1"># adds .php</span>
+<a id="__codelineno-0-8" name="__codelineno-0-8" href="#__codelineno-0-8"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span><span class="w">            </span><span class="c1"># every supported language</span>
+<a id="__codelineno-0-9" name="__codelineno-0-9" href="#__codelineno-0-9"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python,rust]&#39;</span><span class="w">    </span><span class="c1"># multiple extras compose (e.g. PyO3 / maturin)</span>
+<a id="__codelineno-0-10" name="__codelineno-0-10" href="#__codelineno-0-10"></a><span class="c1"># uv add &#39;safelint[typescript]&#39; works the same way.</span>
+<a id="__codelineno-0-11" name="__codelineno-0-11" href="#__codelineno-0-11"></a>
+<a id="__codelineno-0-12" name="__codelineno-0-12" href="#__codelineno-0-12"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                    </span><span class="c1"># lint a directory</span>
+<a id="__codelineno-0-13" name="__codelineno-0-13" href="#__codelineno-0-13"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">           </span><span class="c1"># lint everything (default is git-modified only)</span>
+<a id="__codelineno-0-14" name="__codelineno-0-14" href="#__codelineno-0-14"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>src/<span class="w">      </span><span class="c1"># machine-readable output for editors / CI</span>
 </code></pre></div>
 <p>Pick the extras that match the languages you actually lint. Every grammar ships as an opt-in extra so a Python-only project never pays for JavaScript / TypeScript grammars, a Go/JS-only project never pays for the Python grammar, and so on. <code>pip install safelint</code> alone installs only the engine; safelint emits a one-line install hint on first run telling you which extra to add for the files it found.</p>
 <h2 id="where-to-go-from-here">Where to go from here<a class="headerlink" href="#where-to-go-from-here" title="Permanent link">#</a></h2>

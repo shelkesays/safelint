@@ -12,13 +12,13 @@
         <meta name="author" content="Rahul Shelke">
       
       
-        <link rel="canonical" href="https://shelkesays.github.io/safelint/languages/go/">
+        <link rel="canonical" href="https://shelkesays.github.io/safelint/languages/php/">
       
       
-        <link rel="prev" href="../rust/">
+        <link rel="prev" href="../go/">
       
       
-        <link rel="next" href="../php/">
+        <link rel="next" href="../../configuration/cli/">
       
       
         
@@ -29,7 +29,7 @@
     
     
       
-        <title>Go - SafeLint</title>
+        <title>PHP - SafeLint</title>
       
     
     
@@ -80,7 +80,7 @@
     <div data-md-component="skip">
       
         
-        <a href="#go" class="md-skip">
+        <a href="#php" class="md-skip">
           Skip to content
         </a>
       
@@ -113,7 +113,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Go
+              PHP
             
           </span>
         </div>
@@ -747,6 +747,34 @@
                 
   
   
+  
+  
+    <li class="md-nav__item">
+      <a href="../go/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
     
   
   
@@ -766,7 +794,7 @@
   <span class="md-ellipsis">
     
   
-    Go
+    PHP
   
 
     
@@ -784,7 +812,7 @@
   <span class="md-ellipsis">
     
   
-    Go
+    PHP
   
 
     
@@ -832,15 +860,26 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rules-that-fire-on-go" class="md-nav__link">
+  <a href="#suppression-directives" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rules that fire on Go
+        Suppression directives
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Rules that fire on Go">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rules-that-fire-on-php" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rules that fire on PHP
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rules that fire on PHP">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -855,21 +894,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#go-only-rules" class="md-nav__link">
+  <a href="#rules-not-registered-for-php" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Go-only rules
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rules-not-registered-for-go" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rules not registered for Go
+        Rules not registered for PHP
       
     </span>
   </a>
@@ -882,10 +910,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#key-go-adaptations" class="md-nav__link">
+  <a href="#key-php-adaptations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Go adaptations
+        Key PHP adaptations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#known-limitation-case-sensitive-function-name-matching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitation: case-sensitive function-name matching
       
     </span>
   </a>
@@ -932,10 +971,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#integration-with-the-go-tool-chain" class="md-nav__link">
+  <a href="#integration-with-the-php-tool-chain" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Integration with the Go tool chain
+        Integration with the PHP tool chain
       
     </span>
   </a>
@@ -957,34 +996,6 @@
   
 </nav>
       
-    </li>
-  
-
-              
-            
-              
-                
-  
-  
-  
-  
-    <li class="md-nav__item">
-      <a href="../php/" class="md-nav__link">
-        
-  
-  
-  <span class="md-ellipsis">
-    
-  
-    PHP
-  
-
-    
-  </span>
-  
-  
-
-      </a>
     </li>
   
 
@@ -2284,15 +2295,26 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#rules-that-fire-on-go" class="md-nav__link">
+  <a href="#suppression-directives" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Rules that fire on Go
+        Suppression directives
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Rules that fire on Go">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#rules-that-fire-on-php" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Rules that fire on PHP
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Rules that fire on PHP">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2307,21 +2329,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#go-only-rules" class="md-nav__link">
+  <a href="#rules-not-registered-for-php" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Go-only rules
-      
-    </span>
-  </a>
-  
-</li>
-        
-          <li class="md-nav__item">
-  <a href="#rules-not-registered-for-go" class="md-nav__link">
-    <span class="md-ellipsis">
-      
-        Rules not registered for Go
+        Rules not registered for PHP
       
     </span>
   </a>
@@ -2334,10 +2345,21 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#key-go-adaptations" class="md-nav__link">
+  <a href="#key-php-adaptations" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Key Go adaptations
+        Key PHP adaptations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#known-limitation-case-sensitive-function-name-matching" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Known limitation: case-sensitive function-name matching
       
     </span>
   </a>
@@ -2384,10 +2406,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#integration-with-the-go-tool-chain" class="md-nav__link">
+  <a href="#integration-with-the-php-tool-chain" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Integration with the Go tool chain
+        Integration with the PHP tool chain
       
     </span>
   </a>
@@ -2422,7 +2444,7 @@
 
 
   
-    <a href="https://github.com/shelkesays/safelint/edit/main/docs/languages/go.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+    <a href="https://github.com/shelkesays/safelint/edit/main/docs/languages/php.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
       
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"/></svg>
     </a>
@@ -2430,316 +2452,293 @@
   
 
 
-<h1 id="go">Go<a class="headerlink" href="#go" title="Permanent link">#</a></h1>
-<p>SafeLint analyses Go source for the Holzmann "Power of Ten" safety rules and Go-language-specific patterns: function shape (length, nesting depth, cyclomatic complexity, argument count), error-handling discipline (ignored <code>error</code> returns, empty <code>if err != nil {}</code> bodies, <code>panic</code> outside tests), loop safety (the bare <code>for {}</code> while-true shape), package-level shared state, resource lifecycle via <code>defer x.Close()</code>, and dataflow taint into <code>os/exec</code> / <code>database/sql</code> / <code>plugin</code> sinks. Go support landed in <strong>v2.5.0</strong>, with a rule scope deliberately narrowed to Go idioms. SafeLint does NOT replace <code>gofmt</code> / <code>go vet</code> / <code>golangci-lint</code>; it runs alongside them and targets the engineering-discipline patterns those tools leave alone.</p>
+<h1 id="php">PHP<a class="headerlink" href="#php" title="Permanent link">#</a></h1>
+<p>SafeLint analyses PHP source for the Holzmann "Power of Ten" safety rules and PHP-language-specific patterns: function shape (length, nesting depth, cyclomatic complexity, argument count), error-handling discipline (empty <code>catch {}</code> bodies, unlogged catches), global state (the <code>global</code> keyword and <code>$GLOBALS</code> writes), resource lifecycle via <code>try { } finally { }</code>, loop safety (the <code>while (true)</code> / <code>for (;;)</code> shapes with numeric-level <code>break N</code> resolution), suppression hygiene (the <code>@</code> error-suppression operator), and dataflow taint into <code>eval</code> / <code>exec</code> / <code>unserialize</code> / raw-SQL sinks from the web superglobals. PHP is the <strong>7th registered language</strong> and adds no new rule codes: it is the widest <em>port</em> of the existing rule set. SafeLint does NOT replace PHP_CodeSniffer / PHPStan / Psalm; it runs alongside them and targets the engineering-discipline patterns those tools leave alone.</p>
 <h2 id="file-extensions">File extensions<a class="headerlink" href="#file-extensions" title="Permanent link">#</a></h2>
 <ul>
-<li><strong><code>.go</code></strong>, parsed by <code>tree-sitter-go</code>. Picked up by <code>safelint check</code> (directory mode, <code>--all-files</code> mode, and the pre-commit hook). Sibling <code>_test.go</code> files are linted too, but a few rules treat them specially: SAFE701 / SAFE702 recognise <code>foo_test.go</code> as the test pair for <code>foo.go</code> (and never ask a <code>_test.go</code> file to have its own test), and SAFE211 only fires on <code>panic(...)</code> in non-<code>_test.go</code> files.</li>
+<li><strong><code>.php</code></strong>, parsed by <code>tree-sitter-php</code>. Picked up by <code>safelint check</code> (directory mode, <code>--all-files</code> mode, and the pre-commit hook). SafeLint uses the mixed HTML+PHP grammar (<code>language_php()</code>) so templated <code>.php</code> files parse: HTML outside <code>&lt;?php ?&gt;</code> tags arrives as inert <code>text</code> nodes that the rules never match, and only the PHP regions inside the tags are analysed.</li>
 </ul>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[go]&#39;</span><span class="w">         </span><span class="c1"># adds the tree-sitter-go grammar</span>
-<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>.<span class="w">                   </span><span class="c1"># lint a directory (git-modified files by default)</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[php]&#39;</span><span class="w">         </span><span class="c1"># adds the tree-sitter-php grammar</span>
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                </span><span class="c1"># lint a directory (git-modified files by default)</span>
 <a id="__codelineno-0-3" name="__codelineno-0-3" href="#__codelineno-0-3"></a>safelint<span class="w"> </span>check<span class="w"> </span>--all-files<span class="w"> </span>.<span class="w">       </span><span class="c1"># lint everything under cwd</span>
-<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>.<span class="w">     </span><span class="c1"># machine-readable for editors / CI</span>
+<a id="__codelineno-0-4" name="__codelineno-0-4" href="#__codelineno-0-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>--format<span class="w"> </span>json<span class="w"> </span>src/<span class="w">  </span><span class="c1"># machine-readable for editors / CI</span>
 </code></pre></div>
 <p>In a project that already uses <code>uv</code>, add it as a dev dependency:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>add<span class="w"> </span>--dev<span class="w"> </span><span class="s1">&#39;safelint[go]&#39;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>uv<span class="w"> </span>add<span class="w"> </span>--dev<span class="w"> </span><span class="s1">&#39;safelint[php]&#39;</span>
 </code></pre></div>
-<p>safelint is a Python package, not a Go module. A <code>go.mod</code> is not required; safelint walks the source tree directly and auto-detects by file extension. Run it from the module / repository root. If your Go project has no Python tool chain, <code>pipx install 'safelint[go]'</code> isolates the install.</p>
-<p>v2.0.0+ ships every language grammar as an opt-in extra. Plain <code>pip install safelint</code> installs only the engine and would skip every <code>.go</code> file with an install hint (<code>safelint: warning: skipping .go files, install with: pip install 'safelint[go]'</code>) on first run. The exit code is 2 only when EVERY candidate file is skipped (the typical Go-only project); in a mixed Python + Go repo, safelint emits the <code>.go</code> skip warning and continues linting the supported files normally.</p>
-<h2 id="rules-that-fire-on-go">Rules that fire on Go<a class="headerlink" href="#rules-that-fire-on-go" title="Permanent link">#</a></h2>
-<p>Go is in scope for 16 cross-language rules plus 2 Go-only rules (18 rules total for Go). 7 cross-language rules are deliberately skipped, see the next section. Like the other languages' optional rules, every dataflow rule and both Go-only rules are disabled by default.</p>
+<p>safelint is a Python package, not a Composer package. A <code>composer.json</code> is not required; safelint walks the source tree directly and auto-detects by file extension. Run it from the project root. If your PHP project has no Python tool chain, <code>pipx install 'safelint[php]'</code> isolates the install.</p>
+<p>v2.0.0+ ships every language grammar as an opt-in extra. Plain <code>pip install safelint</code> installs only the engine and would skip every <code>.php</code> file with an install hint (<code>safelint: warning: skipping .php files, install with: pip install 'safelint[php]'</code>) on first run. The exit code is 2 only when EVERY candidate file is skipped (the typical PHP-only project); in a mixed Python + PHP repo, safelint emits the <code>.php</code> skip warning and continues linting the supported files normally.</p>
+<h2 id="suppression-directives">Suppression directives<a class="headerlink" href="#suppression-directives" title="Permanent link">#</a></h2>
+<p>PHP supports <strong>line-comment directives only</strong> (<code>//</code>): <code>// nosafe</code>, <code>// nosafe: SAFE501</code>, <code>// safelint: ignore: SAFE101</code>. The <code>#</code> shell-style and <code>/* */</code> block-comment forms are a <strong>documented non-feature</strong> for directives: a <code># nosafe</code> or <code>/* nosafe */</code> is parsed as ordinary text and does not suppress anything. Use the <code>//</code> form.</p>
+<h2 id="rules-that-fire-on-php">Rules that fire on PHP<a class="headerlink" href="#rules-that-fire-on-php" title="Permanent link">#</a></h2>
+<p><strong>21 rules apply to PHP.</strong> PHP is in scope for 13 cross-language rules (the all-seven-languages set), plus a set of rules shared with most other languages, plus the try/catch rules and SAFE301. 2 cross-language rules are deliberately skipped, see the next section. Like the other languages' optional rules, every dataflow rule and several state / suppression rules are disabled by default.</p>
 <h3 id="cross-language-rules">Cross-language rules<a class="headerlink" href="#cross-language-rules" title="Permanent link">#</a></h3>
 <table>
 <thead>
 <tr>
 <th>Code</th>
 <th>Rule</th>
-<th>Notes for Go</th>
+<th>Notes for PHP</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><a href="../../configuration/rules/#safe101-function_length">SAFE101</a></td>
 <td><code>function_length</code></td>
-<td>Counts source lines on <code>function_declaration</code> / <code>method_declaration</code> / <code>func_literal</code>. Default cap is 60. Closure bodies count toward their own size, not the enclosing function.</td>
+<td>Counts source lines on <code>function_definition</code> / <code>method_declaration</code> / anonymous functions and arrow functions. Default cap is 60. Closure bodies count toward their own size, not the enclosing function.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe102-nesting_depth">SAFE102</a></td>
 <td><code>nesting_depth</code></td>
-<td>Counts <code>if_statement</code> / <code>for_statement</code> / <code>expression_switch_statement</code> / <code>type_switch_statement</code> / <code>select_statement</code>. Default max 2. Per-arm <code>case</code> nodes are not counted; the switch / select counts once.</td>
+<td>Counts <code>if_statement</code> / <code>for_statement</code> / <code>foreach_statement</code> / <code>while_statement</code> / <code>do_statement</code> / <code>switch_statement</code> / <code>try_statement</code>. Default max 2. Per-arm <code>case</code> nodes are not counted; the switch counts once.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe103-max_arguments">SAFE103</a></td>
 <td><code>max_arguments</code></td>
-<td>Counts parameter <em>names</em>: <code>a, b int</code> is two parameters from one declaration. <code>args ...T</code> (variadic) counts as one. The method receiver is on a separate field and is NOT counted (Go's <code>self</code> analogue). Default cap 7.</td>
+<td>Counts declared parameters. Variadic <code>...$args</code> counts as one. Promoted constructor parameters (<code>public int $x</code>) count as parameters. Default cap 7.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe104-complexity">SAFE104</a></td>
 <td><code>complexity</code></td>
-<td>Cyclomatic complexity: every <code>if</code> / <code>for</code> / <code>expression_case</code> / <code>type_case</code> / <code>communication_case</code> adds one; <code>&amp;&amp;</code> / <code>\|\|</code> inside <code>binary_expression</code> each add one. The <code>default</code> case is not counted (it adds no decision). Default cap 10.</td>
+<td>Cyclomatic complexity: every <code>if</code> / <code>for</code> / <code>foreach</code> / <code>while</code> / <code>do</code> / <code>case</code> / <code>catch</code> adds one; <code>&amp;&amp;</code> / <code>\|\|</code> (and <code>and</code> / <code>or</code>) each add one. The <code>default</code> case is not counted (it adds no decision). Default cap 10.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe105-no_recursion">SAFE105</a></td>
 <td><code>no_recursion</code></td>
-<td>Flags a <code>function_declaration</code> calling itself bare (<code>recurse(n-1)</code>) or a <code>method_declaration</code> calling itself receiver-qualified (<code>s.Walk(...)</code> inside <code>func (s *Svc) Walk()</code>). A bare same-named call inside a method denotes a package function, not the method, and does not fire. Direct self-recursion only (mutual recursion is out of scope). Enabled by default at warning severity.</td>
+<td>Flags a <code>function_definition</code> calling itself bare (<code>recurse($n - 1)</code>) or a <code>method_declaration</code> calling itself via <code>$this-&gt;walk(...)</code> / <code>self::walk(...)</code> / <code>static::walk(...)</code> inside <code>walk()</code>. A call on another object does not fire. Direct self-recursion only (mutual recursion is out of scope). Enabled by default at warning severity.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe301-global_state">SAFE301</a></td>
+<td><code>global_state</code></td>
+<td><strong>PHP is this rule's first non-Python registration.</strong> PHP has a literal <code>global</code> keyword, so SAFE301 fires on a <code>global $config;</code> statement inside a function - the direct analogue of Python's <code>global</code> declaration. Enabled by default at warning severity.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe302-global_mutation">SAFE302</a></td>
 <td><code>global_mutation</code></td>
-<td>Declaration-site detection (like Java): fires on every package-level <code>var</code>, including sentinel errors (<code>var ErrNF = errors.New(...)</code>). <code>const</code> declarations and block-scoped <code>var</code> / <code>:=</code> inside functions are clean. Severity <code>error</code> and enabled by default, so Go projects see it out of the box. Suppress sentinels you treat as immutable via a per-file ignore or <code>// nosafe</code>.</td>
+<td>Fires on writes to global state. In PHP that is a write through a <code>global</code>-declared name and, additionally, a write to the <code>$GLOBALS[...]</code> superglobal (<code>$GLOBALS['x'] = ...</code>). Reads are clean; only mutations fire.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe303-side_effects_hidden">SAFE303</a></td>
 <td><code>side_effects_hidden</code></td>
-<td>Fires when a function with a "pure" name prefix (<code>get</code> / <code>compute</code> / <code>is</code> / <code>validate</code> / etc.) contains an I/O call. Default <code>io_functions_go</code>: <code>Print</code> / <code>Println</code> / <code>Printf</code> / <code>Fprintf</code> (fmt), <code>Open</code> / <code>Create</code> / <code>ReadFile</code> / <code>WriteFile</code> (os), <code>Get</code> / <code>Post</code> / <code>Do</code> (net/http), <code>Dial</code> / <code>Listen</code> (net), <code>Exec</code> / <code>Query</code> (database/sql). <code>call_name</code> strips the package, so <code>fmt.Println</code> matches <code>Println</code>.</td>
+<td>Fires when a function with a "pure" name prefix (<code>get</code> / <code>compute</code> / <code>is</code> / <code>validate</code> / etc.) contains an I/O call. Default <code>io_functions_php</code> covers output (<code>print_r</code> / <code>var_dump</code> / <code>printf</code> / <code>fwrite</code>), filesystem (<code>fopen</code> / <code>readfile</code> / <code>file_get_contents</code> / <code>file_put_contents</code>), network (<code>curl_exec</code> / <code>mail</code>), and HTTP side-effects (<code>header</code> / <code>setcookie</code>).</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe304-side_effects">SAFE304</a></td>
 <td><code>side_effects</code></td>
-<td>Fires when any function not name-signalled for I/O contains an I/O call. Uses a deliberately narrower <code>io_functions_go</code> subset than SAFE303 (the ambiguous-as-method-name <code>Get</code> / <code>Post</code> / <code>Do</code> / <code>Exec</code> / <code>Query</code> are dropped to cut false positives). The <code>io_name_keywords</code> exemption suppresses functions whose names already signal I/O.</td>
+<td>Fires on any function (not name-signalled for I/O) containing an I/O call. The <code>io_functions_php</code> list is kept <strong>identical</strong> to SAFE303 here (not narrowed as for Go) because the PHP primitives are unambiguous global builtins with no method-name overlap. The <code>io_name_keywords</code> exemption suppresses functions whose names already signal I/O.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe309-dynamic_code_execution">SAFE309</a></td>
 <td><code>dynamic_code_execution</code></td>
-<td>Go has no <code>eval</code>; the analysability threat is reflection and plugin loading. Default <code>dynamic_exec_calls_go</code>: <code>Call</code> / <code>CallSlice</code> / <code>MethodByName</code> (reflect), <code>Open</code> / <code>Lookup</code> (plugin). Matching is by bare name, so <code>Open</code> also matches <code>os.Open</code>; narrow the list if noisy. Disabled by default.</td>
+<td>Structural flag for runtime code evaluation. Default <code>dynamic_exec_calls_php</code>: <code>eval</code> (a language construct that parses as a call), <code>assert</code> (its string form evaluates code), <code>create_function</code> (the legacy runtime function builder), and the <code>call_user_func</code> / <code>call_user_func_array</code> dispatchers. Variable <code>include</code> / <code>require</code> is SAFE801 (taint) territory, not here. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe401-resource_lifecycle">SAFE401</a></td>
 <td><code>resource_lifecycle</code></td>
-<td>Go has no RAII, so the safe form is a <code>defer &lt;var&gt;.Close()</code> in the same function body. Fires on a tracked acquirer (<code>tracked_functions_go</code>: <code>Open</code> / <code>Create</code> / <code>Dial</code> / <code>Listen</code>) whose handle is not deferred-closed. A bare-expression acquirer (no assignment) always fires - there is no handle to close. A <code>defer</code> routed through a wrapping closure is a documented blind spot.</td>
+<td>PHP has no RAII or <code>with</code> block, so the safe form is a <code>try { } finally { }</code> that closes the handle. Fires on a tracked acquirer (<code>tracked_functions_php</code>: <code>fopen</code> / <code>fsockopen</code> / <code>popen</code> / <code>proc_open</code> / <code>curl_init</code> / <code>opendir</code> / <code>tmpfile</code>) whose handle is not closed in a <code>finally</code>.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe501-unbounded_loops">SAFE501</a></td>
 <td><code>unbounded_loops</code></td>
-<td>Go's only loop keyword is <code>for</code>. The bare <code>for {}</code> (no condition, no three-clause header, no <code>range</code>) is Go's <code>while true</code>; SAFE501 flags it when it has no exiting break. Labelled break (<code>outer: for { for { break outer } }</code>) is correctly resolved: a <code>break outer</code> exits the labelled loop (and any loop it passes through). Conditioned (<code>for cond {}</code>), three-clause (<code>for i := 0; ...</code>), and <code>for range</code> loops are bounded shapes and never fire.</td>
+<td>Flags <code>while (true)</code> and <code>for (;;)</code> (the empty three-clause header) without an exiting break. <strong>Numeric <code>break N</code> levels are resolved</strong>: PHP's <code>break 2;</code> exits two enclosing loops / switches at once, so a <code>break 2</code> inside a nested loop correctly counts as exiting the outer <code>while (true)</code>. Conditioned (<code>while ($cond)</code>), <code>for</code>, and <code>foreach</code> loops are bounded shapes and never fire.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
+<td><code>missing_assertions</code></td>
+<td>Counts assertion calls per function. Default <code>assertion_calls_php</code> covers <code>assert</code> plus the PHPUnit family (<code>assertSame</code> / <code>assertEquals</code> / <code>assertTrue</code> / <code>assertNull</code> / <code>assertCount</code> / <code>assertInstanceOf</code> / <code>assertThat</code> / <code>expectException</code> / <code>fail</code> etc.). <code>min_assertions</code> defaults to 1; set 2 to match the paper. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe603-blanket_suppression">SAFE603</a></td>
 <td><code>blanket_suppression</code></td>
-<td>Flags blanket golangci / staticcheck directives (Holzmann rule 10): bare <code>//nolint</code> (all linters) and bare <code>//lint:ignore</code> (no checks). Scoped forms (<code>//nolint:errcheck</code>, <code>//lint:ignore SA1000 reason</code>) are clean. The directives are recognised only with no space after <code>//</code> (golangci's requirement), so a prose <code>// nolint here</code> comment is not flagged. Disabled by default.</td>
+<td>The headline PHP target is the <strong><code>@</code> error-suppression operator</strong> (<code>@file_get_contents(...)</code>): every use is flagged, since <code>@</code> silences the analyser and the runtime alike. Also flags bare <code>phpcs:ignore</code> (no sniff named), <code>@phpstan-ignore-line</code>, and <code>@psalm-suppress all</code>. Scoped forms (<code>phpcs:ignore Generic.Files.LineLength</code>, <code>@phpstan-ignore-next-line specific.error</code>) are clean. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe701-test_existence">SAFE701</a></td>
 <td><code>test_existence</code></td>
-<td>Go's test convention is the sibling <code>&lt;stem&gt;_test.go</code> <em>in the same directory</em> as the source file, not a <code>tests/</code> directory. SAFE701 looks for that sibling; a <code>_test.go</code> file is itself a test and is skipped. The sibling convention is the headline Go adaptation. Disabled by default.</td>
+<td>PHP's convention is the PHPUnit <code>&lt;ClassName&gt;Test.php</code> file under <code>tests/</code>. SAFE701 looks for that pair; a <code>*Test.php</code> file is itself a test and is skipped. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe702-test_coupling">SAFE702</a></td>
 <td><code>test_coupling</code></td>
-<td>Same sibling convention: when <code>foo.go</code> changes, its sibling <code>foo_test.go</code> must change too. Test files are exempt from the coupling check. Disabled by default.</td>
+<td>Same PHPUnit convention: when <code>Foo.php</code> changes, its <code>FooTest.php</code> under <code>tests/</code> must change too. Test files are exempt from the coupling check. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe801-tainted_sink">SAFE801</a></td>
 <td><code>tainted_sink</code></td>
-<td>Parameters seeded as tainted on function entry, tracked by <code>analysis/dataflow_go.py</code> (iterative worklists). Default vanilla sinks (<code>sinks_go</code>): <code>Command</code> / <code>CommandContext</code> (os/exec), <code>Query</code> / <code>QueryRow</code> / <code>Exec</code> (database/sql raw SQL), <code>Open</code> (plugin). Vanilla sources (<code>sources_go</code>): <code>Getenv</code> (os), <code>FormValue</code> / <code>PostFormValue</code> / <code>FormFile</code> (net/http request). Sanitizers (<code>sanitizers_go</code>): narrow generic set (<code>sanitize</code> / <code>validate</code> / <code>escape</code> / <code>quote</code>). Collision rule: selector matching is name-only (no type info), so a name that is both a sink and a source resolves as the sink (<code>Query</code> is kept as a sink and dropped from sources). <code>os.Args</code> and <code>Header.Get</code> are omitted from default sources (non-call / collision-prone); add them via config if needed. Disabled by default.</td>
+<td>Models the classic PHP web-taint flow, tracked by <code>analysis/dataflow_php.py</code> (iterative worklists). <strong>Sources</strong> (<code>sources_php</code>) are the superglobals - reading any key from one (<code>$_GET['id']</code>) yields attacker-controlled data: <code>$_GET</code> / <code>$_POST</code> / <code>$_REQUEST</code> / <code>$_COOKIE</code> / <code>$_SERVER</code> / <code>$_FILES</code> / <code>$_ENV</code>. <strong>Sinks</strong> (<code>sinks_php</code>): <code>eval</code> / <code>exec</code> / <code>system</code> / <code>shell_exec</code> / <code>passthru</code> / <code>popen</code> / <code>proc_open</code> (command), <code>unserialize</code> (object-injection), <code>query</code> / <code>mysqli_query</code> / <code>pg_query</code> (raw SQL), plus dynamic <code>include</code> / <code>require</code>. <strong>Sanitizers</strong> (<code>sanitizers_php</code>): <code>intval</code> / <code>floatval</code> (numeric coercion), <code>escapeshellarg</code> / <code>escapeshellcmd</code> (shell neutralisation), plus the generic <code>sanitize</code> / <code>validate</code> / <code>escape</code> / <code>quote</code>. <strong><code>htmlspecialchars</code> is deliberately excluded</strong> - it is HTML-context-only (clears XSS, not SQLi / command injection); add it via config if your sinks are HTML-only. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe802-return_value_ignored">SAFE802</a></td>
 <td><code>return_value_ignored</code></td>
-<td>The flagship Go rule: ignoring <code>error</code> returns. Fires on a bare call statement whose <code>error</code> return is discarded. Default <code>flagged_calls_go</code>: <code>Write</code> / <code>Close</code> (io), <code>Remove</code> / <code>RemoveAll</code> / <code>Rename</code> / <code>Mkdir</code> / <code>MkdirAll</code> / <code>Chmod</code> / <code>Chown</code> / <code>Setenv</code> / <code>Truncate</code> (os), <code>Commit</code> / <code>Rollback</code> (database/sql). The explicit discards <code>_ = f()</code> and <code>x, _ := f()</code> are assignments, not expression statements, so they never fire - they are Go's auditable <code>(void)</code>-cast analogue. Disabled by default.</td>
+<td>Fires on a bare call statement whose meaningful return is discarded. Default <code>flagged_calls_php</code>: <code>fwrite</code> / <code>fputs</code> / <code>fclose</code>, <code>unlink</code> / <code>rename</code> / <code>copy</code> / <code>mkdir</code> / <code>rmdir</code>, <code>file_put_contents</code>, <code>mail</code>, <code>session_start</code> - functions whose <code>false</code>-on-failure return signals an error you must check. Disabled by default.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe803-null_dereference">SAFE803</a></td>
+<td><code>null_dereference</code></td>
+<td>Fires on a method / property access chained off a call whose name is in <code>nullable_methods_php</code> without a null guard. Default set: array-pointer functions (<code>current</code> / <code>next</code> / <code>prev</code> / <code>end</code> / <code>reset</code>), <code>DateTime::createFromFormat</code> (returns <code>false</code> on bad input), and ORM finders (<code>find</code> / <code>first</code>, which return <code>null</code> when absent). The <strong>nullsafe operator <code>?-&gt;</code></strong> is recognised as the safe form: <code>$repo-&gt;find($id)?-&gt;name</code> does not fire. Disabled by default.</td>
 </tr>
 </tbody>
 </table>
-<h3 id="go-only-rules">Go-only rules<a class="headerlink" href="#go-only-rules" title="Permanent link">#</a></h3>
+<h3 id="rules-not-registered-for-php">Rules not registered for PHP<a class="headerlink" href="#rules-not-registered-for-php" title="Permanent link">#</a></h3>
 <table>
 <thead>
 <tr>
 <th>Code</th>
 <th>Rule</th>
-<th>Notes</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td><a href="../../configuration/rules/">SAFE209</a></td>
-<td><code>empty_error_check</code></td>
-<td>Flags <code>if err != nil { }</code> (or <code>== nil</code>) with an empty or comment-only body - the error was checked and then silently swallowed. The condition shape matched is a binary <code>!=</code> / <code>==</code> comparison where one operand's identifier text is <code>err</code> (configurable via <code>error_names_go</code>, default <code>["err"]</code>) and the other is <code>nil</code>. Go analogue of Rust's SAFE206 <code>silent_result_discard</code>. Disabled by default.</td>
-</tr>
-<tr>
-<td><a href="../../configuration/rules/">SAFE211</a></td>
-<td><code>panic_calls_outside_tests</code></td>
-<td>Flags <code>panic(...)</code> calls in non-<code>_test.go</code> files; production paths should return an <code>error</code>, not unwind the stack. Configurable via <code>panic_calls_go</code> (default <code>["panic"]</code>; add resolved barewords like <code>Fatal</code> / <code>Exit</code> if you treat those as panic-equivalent). Go analogue of Rust's SAFE204 <code>panic_macros_outside_tests</code>. Disabled by default.</td>
-</tr>
-</tbody>
-</table>
-<h3 id="rules-not-registered-for-go">Rules not registered for Go<a class="headerlink" href="#rules-not-registered-for-go" title="Permanent link">#</a></h3>
-<table>
-<thead>
-<tr>
-<th>Code</th>
-<th>Rule</th>
-<th>Why skipped for Go</th>
+<th>Why skipped for PHP</th>
 </tr>
 </thead>
 <tbody>
 <tr>
 <td><a href="../../configuration/rules/#safe201-bare_except">SAFE201</a></td>
 <td><code>bare_except</code></td>
-<td>Go has no try/catch. No bare-catch hazard exists.</td>
-</tr>
-<tr>
-<td><a href="../../configuration/rules/#safe202-empty_except">SAFE202</a></td>
-<td><code>empty_except</code></td>
-<td>Go has no try/catch. The spirit ("silently swallow an error") is covered by <strong>SAFE209 <code>empty_error_check</code></strong> (empty <code>if err != nil {}</code> bodies) plus <strong>SAFE802</strong> (discarded <code>error</code> returns).</td>
-</tr>
-<tr>
-<td><a href="../../configuration/rules/#safe203-logging_on_error">SAFE203</a></td>
-<td><code>logging_on_error</code></td>
-<td>Same as SAFE202 - Go has no catch blocks. Unlogged-error handling is partially covered by SAFE209 / SAFE802.</td>
-</tr>
-<tr>
-<td><a href="../../configuration/rules/#safe301-global_state">SAFE301</a></td>
-<td><code>global_state</code></td>
-<td>Go has no <code>global</code> keyword; package-level shared state is covered by the <strong>SAFE302 <code>global_mutation</code></strong> port (declaration-site detection on package <code>var</code>).</td>
+<td>PHP 7+ <code>catch</code> always carries a type - <code>catch (\Throwable $e)</code> is the typed catch-all, which is auditable rather than a bare-catch hazard. The "swallowed / unlogged catch" spirit is covered by <strong>SAFE202 <code>empty_except</code></strong> and <strong>SAFE203 <code>logging_on_error</code></strong>, the same treatment as Java.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305</a></td>
 <td><code>wide_scope_declaration</code></td>
-<td>Go has no <code>var</code> hoisting; <code>:=</code> is block-scoped, so there is no narrow-the-scope hazard to flag.</td>
-</tr>
-<tr>
-<td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
-<td><code>missing_assertions</code></td>
-<td>Go has no production assertion idiom (no <code>assert</code> keyword or stdlib macro; testify is test-only). Registering a heuristic would be noisy; revisit if demand appears.</td>
-</tr>
-<tr>
-<td><a href="../../configuration/rules/#safe803-null_dereference">SAFE803</a></td>
-<td><code>null_dereference</code></td>
-<td>Go has no chained-nullable idiom to anchor on - nil-pointer analysis needs type information, and map reads return zero values rather than nil. Documented gap.</td>
+<td>PHP has no <code>var</code> / <code>let</code> / <code>const</code> declaration-keyword distinction at function scope; a variable simply exists where first assigned. There is no narrow-the-declaration hazard to flag.</td>
 </tr>
 </tbody>
 </table>
-<h2 id="key-go-adaptations">Key Go adaptations<a class="headerlink" href="#key-go-adaptations" title="Permanent link">#</a></h2>
-<p>A few Go-vs-other-languages shapes the rule engine contends with, worth knowing when reading violations:</p>
+<h2 id="key-php-adaptations">Key PHP adaptations<a class="headerlink" href="#key-php-adaptations" title="Permanent link">#</a></h2>
+<p>A few PHP-vs-other-languages shapes the rule engine contends with, worth knowing when reading violations:</p>
 <ul>
-<li><strong>One loop keyword.</strong> Go's only loop is <code>for</code>. The bare <code>for {}</code> (no condition, no three-clause header, no <code>range</code>) is Go's <code>while true</code>; SAFE501 flags it when it has no exiting break. Conditioned, three-clause, and <code>for range</code> loops are bounded shapes and never fire.</li>
-<li><strong>Sibling test files.</strong> Go's test convention is <code>foo_test.go</code> <em>in the same directory</em> as <code>foo.go</code>, not a <code>tests/</code> directory. SAFE701 / SAFE702 look for the sibling, and a <code>_test.go</code> file is itself recognised as a test (never asked to have its own test).</li>
-<li><strong>Explicit error discard.</strong> <code>_ = f()</code> and <code>x, _ := f()</code> are Go's auditable "I am intentionally ignoring this" form (the <code>(void)</code>-cast analogue). SAFE802 only fires on a <em>bare</em> call statement (<code>f.Write(b)</code>) whose error return is silently dropped; the blank-identifier forms never fire.</li>
-<li><strong>Receiver as <code>self</code>.</strong> A method's receiver name is user-chosen (<code>func (s *Svc) Walk()</code>). SAFE105 treats an <code>s.Walk(...)</code> call inside <code>Walk</code> as self-recursion, matching the receiver identifier rather than a fixed <code>self</code> / <code>this</code>.</li>
-<li><strong>Package-level <code>var</code> is shared state.</strong> SAFE302 fires at the declaration site on every package-level <code>var</code>, including sentinel errors (<code>var ErrX = errors.New(...)</code>); <code>const</code> and block-scoped <code>var</code> / <code>:=</code> are clean.</li>
-<li><strong><code>defer x.Close()</code> is the resource form.</strong> Go has no RAII, so SAFE401 looks for a <code>defer &lt;var&gt;.Close()</code> in the same function body as the acquirer rather than a <code>with</code> block or try-with-resources.</li>
+<li><strong>Mixed HTML + PHP.</strong> <code>.php</code> files routinely interleave HTML and <code>&lt;?php ?&gt;</code> blocks. SafeLint parses with the mixed grammar so the HTML arrives as inert <code>text</code> nodes the rules never match; only the code inside the PHP tags is analysed. A pure-template file with no PHP logic produces no violations.</li>
+<li><strong>The <code>@</code> operator is the most literal "suppress the analyser" construct.</strong> SAFE603's headline PHP target is <code>@expr</code>, which silences both the runtime warning and any analyser. Every <code>@</code> use is flagged (Holzmann rule 10).</li>
+<li><strong><code>global</code> keyword + <code>$GLOBALS</code>.</strong> PHP is the first non-Python language to register SAFE301 (<code>global_state</code>) because it has a literal <code>global</code> keyword. SAFE302 additionally flags <code>$GLOBALS[...]</code> superglobal writes.</li>
+<li><strong>Numeric <code>break N</code>.</strong> PHP's <code>break</code> takes an optional level: <code>break 2;</code> exits two enclosing loops / switches. SAFE501 resolves the level when deciding whether a <code>while (true)</code> has an exiting break.</li>
+<li><strong>The nullsafe operator <code>?-&gt;</code>.</strong> SAFE803 treats <code>$x?-&gt;y</code> as the safe dereference form; only an unguarded <code>-&gt;</code> / <code>::</code> off a nullable-returning call fires.</li>
+<li><strong>PHPUnit <code>*Test.php</code> under <code>tests/</code>.</strong> SAFE701 / SAFE702 use the <code>&lt;ClassName&gt;Test.php</code> convention rather than a sibling file or <code>_test</code> suffix.</li>
 </ul>
+<h2 id="known-limitation-case-sensitive-function-name-matching">Known limitation: case-sensitive function-name matching<a class="headerlink" href="#known-limitation-case-sensitive-function-name-matching" title="Permanent link">#</a></h2>
+<p>PHP function and method names are <strong>case-insensitive at runtime</strong> (<code>System(...)</code> calls the same builtin as <code>system(...)</code>), but SafeLint matches resolved call names against the configured lists (<code>sinks_php</code>, <code>io_functions_php</code>, <code>dynamic_exec_calls_php</code>, <code>assertion_calls_php</code>, ...) <strong>case-sensitively</strong>. The shipped defaults are lowercase, so canonically-cased code (the overwhelming norm, and what IDEs / formatters produce) matches as expected; a deliberately mixed-case spelling like <code>SYSTEM($_GET['x'])</code> would currently evade the corresponding rule. Variable names (including the superglobals <code>$_GET</code> / <code>$_POST</code>) are genuinely case-sensitive in PHP and are matched exactly. If your code base mixes the case of builtin calls, add the alternate spellings to the relevant <code>_php</code> config list. (Superglobal <em>variable</em> names are unaffected.)</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
-<p>SafeLint config is read from <code>[tool.safelint]</code> in <code>pyproject.toml</code> (if your Go project also has one) or from a standalone <code>safelint.toml</code> at the project root. Pure-Go projects typically prefer the standalone form, which drops the <code>[tool.safelint]</code> prefix.</p>
+<p>SafeLint config is read from <code>[tool.safelint]</code> in <code>pyproject.toml</code> (if your PHP project also has one) or from a standalone <code>safelint.toml</code> at the project root. Pure-PHP projects typically prefer the standalone form, which drops the <code>[tool.safelint]</code> prefix.</p>
 <h3 id="per-rule-toml-overrides">Per-rule TOML overrides<a class="headerlink" href="#per-rule-toml-overrides" title="Permanent link">#</a></h3>
-<p>Override any per-language config list with the <code>_go</code> suffix. Each example is shown in <strong>both forms</strong>: <code>[tool.safelint.rules.&lt;rule&gt;]</code> for <code>pyproject.toml</code> and <code>[rules.&lt;rule&gt;]</code> for a standalone <code>safelint.toml</code>.</p>
-<p><strong>SAFE304 <code>side_effects</code> - <code>io_functions_go</code>:</strong></p>
+<p>Override any per-language config list with the <code>_php</code> suffix. Each example is shown in <strong>both forms</strong>: <code>[tool.safelint.rules.&lt;rule&gt;]</code> for <code>pyproject.toml</code> and <code>[rules.&lt;rule&gt;]</code> for a standalone <code>safelint.toml</code>.</p>
+<p><strong>SAFE303 / SAFE304 <code>side_effects</code> - <code>io_functions_php</code>:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># pyproject.toml</span>
 <a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">[tool.safelint.rules.side_effects]</span>
-<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">io_functions_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Println&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Printf&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;WriteFile&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Open&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># narrower than the default</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">io_functions_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;var_dump&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;printf&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fwrite&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;file_put_contents&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># narrower than the default</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># safelint.toml</span>
 <a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">[rules.side_effects]</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">io_functions_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Println&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Printf&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;WriteFile&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Open&quot;</span><span class="p">]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">io_functions_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;var_dump&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;printf&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fwrite&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;file_put_contents&quot;</span><span class="p">]</span>
 </code></pre></div>
-<p><strong>SAFE401 <code>resource_lifecycle</code> - <code>tracked_functions_go</code>:</strong></p>
+<p><strong>SAFE309 <code>dynamic_code_execution</code> - <code>dynamic_exec_calls_php</code>:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">[tool.safelint.rules.resource_lifecycle]</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">tracked_functions_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Open&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Create&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Dial&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Listen&quot;</span><span class="p">]</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="k">[tool.safelint.rules.dynamic_code_execution]</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="n">dynamic_exec_calls_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assert&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;create_function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;call_user_func&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;call_user_func_array&quot;</span><span class="p">]</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">[rules.resource_lifecycle]</span>
-<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">tracked_functions_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Open&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Create&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Dial&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Listen&quot;</span><span class="p">]</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="k">[rules.dynamic_code_execution]</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="n">dynamic_exec_calls_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assert&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;create_function&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;call_user_func&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;call_user_func_array&quot;</span><span class="p">]</span>
 </code></pre></div>
-<p><strong>SAFE801 <code>tainted_sink</code> - <code>sinks_go</code> / <code>sources_go</code> / <code>sanitizers_go</code>:</strong></p>
+<p><strong>SAFE401 <code>resource_lifecycle</code> - <code>tracked_functions_php</code>:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
-<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">                                              </span><span class="c1"># dataflow rules are opt-in</span>
-<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a><span class="n">sinks_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Command&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;CommandContext&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Query&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Exec&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># shell + raw SQL</span>
-<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a><span class="n">sources_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Getenv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;FormValue&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;PostFormValue&quot;</span><span class="p">]</span>
-<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a><span class="n">sanitizers_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sanitize&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;validate&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escape&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;quote&quot;</span><span class="p">]</span>
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a><span class="k">[tool.safelint.rules.resource_lifecycle]</span>
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">tracked_functions_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;fopen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fsockopen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;popen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;proc_open&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;curl_init&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;opendir&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;tmpfile&quot;</span><span class="p">]</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">[rules.tainted_sink]</span>
-<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">sinks_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Command&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;CommandContext&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Query&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Exec&quot;</span><span class="p">]</span>
-<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a><span class="n">sources_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Getenv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;FormValue&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;PostFormValue&quot;</span><span class="p">]</span>
-<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a><span class="n">sanitizers_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sanitize&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;validate&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escape&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;quote&quot;</span><span class="p">]</span>
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">[rules.resource_lifecycle]</span>
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">tracked_functions_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;fopen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fsockopen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;popen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;proc_open&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;curl_init&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;opendir&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;tmpfile&quot;</span><span class="p">]</span>
 </code></pre></div>
-<p><strong>SAFE802 <code>return_value_ignored</code> - <code>flagged_calls_go</code>:</strong></p>
+<p><strong>SAFE601 <code>missing_assertions</code> - <code>assertion_calls_php</code>:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">[tool.safelint.rules.return_value_ignored]</span>
+<a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">[tool.safelint.rules.missing_assertions]</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">flagged_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Write&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Close&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Remove&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Commit&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Rollback&quot;</span><span class="p">]</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">min_assertions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span>
+<a id="__codelineno-8-5" name="__codelineno-8-5" href="#__codelineno-8-5"></a><span class="n">assertion_calls_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;assert&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assertSame&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assertEquals&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assertTrue&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assertThat&quot;</span><span class="p">]</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-9-1" name="__codelineno-9-1" href="#__codelineno-9-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">[rules.return_value_ignored]</span>
+<a id="__codelineno-9-2" name="__codelineno-9-2" href="#__codelineno-9-2"></a><span class="k">[rules.missing_assertions]</span>
 <a id="__codelineno-9-3" name="__codelineno-9-3" href="#__codelineno-9-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">flagged_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Write&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Close&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Remove&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Commit&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Rollback&quot;</span><span class="p">]</span>
+<a id="__codelineno-9-4" name="__codelineno-9-4" href="#__codelineno-9-4"></a><span class="n">min_assertions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span>
+<a id="__codelineno-9-5" name="__codelineno-9-5" href="#__codelineno-9-5"></a><span class="n">assertion_calls_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;assert&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assertSame&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assertEquals&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assertTrue&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assertThat&quot;</span><span class="p">]</span>
 </code></pre></div>
-<p><strong>SAFE209 <code>empty_error_check</code> - <code>error_names_go</code>:</strong></p>
+<p><strong>SAFE801 <code>tainted_sink</code> - <code>sinks_php</code> / <code>sanitizers_php</code> / <code>sources_php</code>:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-10-1" name="__codelineno-10-1" href="#__codelineno-10-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">[tool.safelint.rules.empty_error_check]</span>
-<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">error_names_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;err&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;e&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># also treat a `e != nil` check as an error check</span>
+<a id="__codelineno-10-2" name="__codelineno-10-2" href="#__codelineno-10-2"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
+<a id="__codelineno-10-3" name="__codelineno-10-3" href="#__codelineno-10-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">                                                      </span><span class="c1"># dataflow rules are opt-in</span>
+<a id="__codelineno-10-4" name="__codelineno-10-4" href="#__codelineno-10-4"></a><span class="n">sinks_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;exec&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;system&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;shell_exec&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;unserialize&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;query&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;mysqli_query&quot;</span><span class="p">]</span>
+<a id="__codelineno-10-5" name="__codelineno-10-5" href="#__codelineno-10-5"></a><span class="n">sources_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$_GET&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_POST&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_REQUEST&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_COOKIE&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_SERVER&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_FILES&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_ENV&quot;</span><span class="p">]</span>
+<a id="__codelineno-10-6" name="__codelineno-10-6" href="#__codelineno-10-6"></a><span class="n">sanitizers_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;intval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escapeshellarg&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escapeshellcmd&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;htmlspecialchars&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># add htmlspecialchars for HTML-only sinks</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-11-1" name="__codelineno-11-1" href="#__codelineno-11-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="k">[rules.empty_error_check]</span>
+<a id="__codelineno-11-2" name="__codelineno-11-2" href="#__codelineno-11-2"></a><span class="k">[rules.tainted_sink]</span>
 <a id="__codelineno-11-3" name="__codelineno-11-3" href="#__codelineno-11-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">error_names_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;err&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;e&quot;</span><span class="p">]</span>
+<a id="__codelineno-11-4" name="__codelineno-11-4" href="#__codelineno-11-4"></a><span class="n">sinks_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;eval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;exec&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;system&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;shell_exec&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;unserialize&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;query&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;mysqli_query&quot;</span><span class="p">]</span>
+<a id="__codelineno-11-5" name="__codelineno-11-5" href="#__codelineno-11-5"></a><span class="n">sources_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;$_GET&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_POST&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_REQUEST&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_COOKIE&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_SERVER&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_FILES&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;$_ENV&quot;</span><span class="p">]</span>
+<a id="__codelineno-11-6" name="__codelineno-11-6" href="#__codelineno-11-6"></a><span class="n">sanitizers_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;intval&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escapeshellarg&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escapeshellcmd&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;htmlspecialchars&quot;</span><span class="p">]</span>
 </code></pre></div>
-<p><strong>SAFE211 <code>panic_calls_outside_tests</code> - <code>panic_calls_go</code>:</strong></p>
+<p><strong>SAFE802 <code>return_value_ignored</code> - <code>flagged_calls_php</code>:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-12-1" name="__codelineno-12-1" href="#__codelineno-12-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="k">[tool.safelint.rules.panic_calls_outside_tests]</span>
+<a id="__codelineno-12-2" name="__codelineno-12-2" href="#__codelineno-12-2"></a><span class="k">[tool.safelint.rules.return_value_ignored]</span>
 <a id="__codelineno-12-3" name="__codelineno-12-3" href="#__codelineno-12-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">panic_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;panic&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Fatal&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Exit&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># treat log.Fatal / os.Exit as panic-equivalent</span>
+<a id="__codelineno-12-4" name="__codelineno-12-4" href="#__codelineno-12-4"></a><span class="n">flagged_calls_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;fwrite&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fclose&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;unlink&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rename&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;file_put_contents&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;mail&quot;</span><span class="p">]</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-13-1" name="__codelineno-13-1" href="#__codelineno-13-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">[rules.panic_calls_outside_tests]</span>
+<a id="__codelineno-13-2" name="__codelineno-13-2" href="#__codelineno-13-2"></a><span class="k">[rules.return_value_ignored]</span>
 <a id="__codelineno-13-3" name="__codelineno-13-3" href="#__codelineno-13-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">panic_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;panic&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Fatal&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Exit&quot;</span><span class="p">]</span>
+<a id="__codelineno-13-4" name="__codelineno-13-4" href="#__codelineno-13-4"></a><span class="n">flagged_calls_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;fwrite&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fclose&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;unlink&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rename&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;file_put_contents&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;mail&quot;</span><span class="p">]</span>
 </code></pre></div>
-<p><strong>SAFE309 <code>dynamic_code_execution</code> - <code>dynamic_exec_calls_go</code>:</strong></p>
+<p><strong>SAFE803 <code>null_dereference</code> - <code>nullable_methods_php</code>:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-14-1" name="__codelineno-14-1" href="#__codelineno-14-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="k">[tool.safelint.rules.dynamic_code_execution]</span>
+<a id="__codelineno-14-2" name="__codelineno-14-2" href="#__codelineno-14-2"></a><span class="k">[tool.safelint.rules.null_dereference]</span>
 <a id="__codelineno-14-3" name="__codelineno-14-3" href="#__codelineno-14-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="n">dynamic_exec_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Call&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;CallSlice&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;MethodByName&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Lookup&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># drop the os.Open-colliding Open</span>
+<a id="__codelineno-14-4" name="__codelineno-14-4" href="#__codelineno-14-4"></a><span class="n">nullable_methods_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;current&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;next&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;end&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;reset&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;createFromFormat&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;find&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;first&quot;</span><span class="p">]</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-15-1" name="__codelineno-15-1" href="#__codelineno-15-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">[rules.dynamic_code_execution]</span>
+<a id="__codelineno-15-2" name="__codelineno-15-2" href="#__codelineno-15-2"></a><span class="k">[rules.null_dereference]</span>
 <a id="__codelineno-15-3" name="__codelineno-15-3" href="#__codelineno-15-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">dynamic_exec_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Call&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;CallSlice&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;MethodByName&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Lookup&quot;</span><span class="p">]</span>
+<a id="__codelineno-15-4" name="__codelineno-15-4" href="#__codelineno-15-4"></a><span class="n">nullable_methods_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;current&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;next&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;end&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;reset&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;createFromFormat&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;find&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;first&quot;</span><span class="p">]</span>
 </code></pre></div>
 <h3 id="enabling-the-disabled-by-default-rules">Enabling the disabled-by-default rules<a class="headerlink" href="#enabling-the-disabled-by-default-rules" title="Permanent link">#</a></h3>
-<p>Both Go-only rules and every dataflow rule ship disabled by default. Opt-in via TOML (shown here in <code>pyproject.toml</code> form; the standalone <code>safelint.toml</code> form drops the <code>tool.safelint.</code> prefix):</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">[tool.safelint.rules.empty_error_check]</span>
+<p>The dataflow rules (SAFE801 / SAFE802 / SAFE803), SAFE309, SAFE601, and SAFE603 ship disabled by default. Opt-in via TOML (shown here in <code>pyproject.toml</code> form; the standalone <code>safelint.toml</code> form drops the <code>tool.safelint.</code> prefix):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-16-1" name="__codelineno-16-1" href="#__codelineno-16-1"></a><span class="k">[tool.safelint.rules.dynamic_code_execution]</span>
 <a id="__codelineno-16-2" name="__codelineno-16-2" href="#__codelineno-16-2"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-16-3" name="__codelineno-16-3" href="#__codelineno-16-3"></a>
-<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="k">[tool.safelint.rules.panic_calls_outside_tests]</span>
+<a id="__codelineno-16-4" name="__codelineno-16-4" href="#__codelineno-16-4"></a><span class="k">[tool.safelint.rules.missing_assertions]</span>
 <a id="__codelineno-16-5" name="__codelineno-16-5" href="#__codelineno-16-5"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-16-6" name="__codelineno-16-6" href="#__codelineno-16-6"></a>
-<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
+<a id="__codelineno-16-7" name="__codelineno-16-7" href="#__codelineno-16-7"></a><span class="k">[tool.safelint.rules.blanket_suppression]</span>
 <a id="__codelineno-16-8" name="__codelineno-16-8" href="#__codelineno-16-8"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-16-9" name="__codelineno-16-9" href="#__codelineno-16-9"></a>
-<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="k">[tool.safelint.rules.return_value_ignored]</span>
+<a id="__codelineno-16-10" name="__codelineno-16-10" href="#__codelineno-16-10"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
 <a id="__codelineno-16-11" name="__codelineno-16-11" href="#__codelineno-16-11"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-16-12" name="__codelineno-16-12" href="#__codelineno-16-12"></a>
-<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a><span class="k">[tool.safelint.rules.dynamic_code_execution]</span>
+<a id="__codelineno-16-13" name="__codelineno-16-13" href="#__codelineno-16-13"></a><span class="k">[tool.safelint.rules.return_value_ignored]</span>
 <a id="__codelineno-16-14" name="__codelineno-16-14" href="#__codelineno-16-14"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-16-15" name="__codelineno-16-15" href="#__codelineno-16-15"></a>
+<a id="__codelineno-16-16" name="__codelineno-16-16" href="#__codelineno-16-16"></a><span class="k">[tool.safelint.rules.null_dereference]</span>
+<a id="__codelineno-16-17" name="__codelineno-16-17" href="#__codelineno-16-17"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
-<h2 id="integration-with-the-go-tool-chain">Integration with the Go tool chain<a class="headerlink" href="#integration-with-the-go-tool-chain" title="Permanent link">#</a></h2>
-<p>SafeLint runs alongside the standard Go tool chain; it doesn't replace any of it. Typical wiring:</p>
+<h2 id="integration-with-the-php-tool-chain">Integration with the PHP tool chain<a class="headerlink" href="#integration-with-the-php-tool-chain" title="Permanent link">#</a></h2>
+<p>SafeLint runs alongside the standard PHP tool chain; it doesn't replace any of it. Typical wiring:</p>
 <ul>
-<li><strong><code>gofmt</code></strong> handles formatting; safelint doesn't lint style.</li>
-<li><strong><code>go vet</code></strong> and <strong><code>golangci-lint</code></strong> cover a broad surface of correctness and idiomatic-Go lints. SafeLint targets the engineering-discipline patterns (function shape, error-handling discipline, package-level state, dataflow taint) those tools leave alone; use them together, they complement.</li>
+<li><strong>PHP_CodeSniffer</strong> (<code>phpcs</code>) handles coding-standard / formatting checks; safelint doesn't lint style.</li>
+<li><strong>PHPStan</strong> and <strong>Psalm</strong> cover a broad surface of type-level and correctness analysis. SafeLint targets the engineering-discipline patterns (function shape, error-handling discipline, global state, dataflow taint) those tools leave alone or treat differently; use them together, they complement.</li>
 <li><strong>Pre-commit</strong>: drop into <code>.pre-commit-config.yaml</code>:</li>
 </ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-17-1" name="__codelineno-17-1" href="#__codelineno-17-1"></a><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
 <a id="__codelineno-17-2" name="__codelineno-17-2" href="#__codelineno-17-2"></a><span class="w">  </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.5.0</span><span class="w">  </span><span class="c1"># or whatever the latest tag is</span>
 <a id="__codelineno-17-3" name="__codelineno-17-3" href="#__codelineno-17-3"></a><span class="w">  </span><span class="nt">hooks</span><span class="p">:</span>
 <a id="__codelineno-17-4" name="__codelineno-17-4" href="#__codelineno-17-4"></a><span class="w">    </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
-<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">      </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[go]&#39;</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">      </span><span class="c1"># For a polyglot repo with Python + Go:</span>
-<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">      </span><span class="c1"># additional_dependencies: [&#39;safelint[python,go]&#39;]</span>
+<a id="__codelineno-17-5" name="__codelineno-17-5" href="#__codelineno-17-5"></a><span class="w">      </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[php]&#39;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-17-6" name="__codelineno-17-6" href="#__codelineno-17-6"></a><span class="w">      </span><span class="c1"># For a polyglot repo with Python + PHP:</span>
+<a id="__codelineno-17-7" name="__codelineno-17-7" href="#__codelineno-17-7"></a><span class="w">      </span><span class="c1"># additional_dependencies: [&#39;safelint[python,php]&#39;]</span>
 </code></pre></div>
-<p>Pre-commit routes <code>.go</code> files via the <code>go</code> filetype tag in <code>types_or</code> (pre-commit's <code>identify</code> library recognises it).</p>
+<p>Pre-commit routes <code>.php</code> files via the <code>php</code> filetype tag in <code>types_or</code> (pre-commit's <code>identify</code> library recognises it).</p>
 <ul>
-<li><strong>CI</strong>: invoke <code>safelint check . --fail-on warning</code> (or <code>--mode ci</code>) in your build pipeline. Exit code 0 / 1 / 2 maps cleanly to "passed" / "violations found" / "setup error - install hint emitted on stderr".</li>
+<li><strong>CI</strong>: invoke <code>safelint check src/ --fail-on warning</code> (or <code>--mode ci</code>) in your build pipeline. Exit code 0 / 1 / 2 maps cleanly to "passed" / "violations found" / "setup error - install hint emitted on stderr".</li>
 <li><strong>IDE</strong>: any JSON-output-consuming editor plugin (the safelint JSON schema is stable in v2.0.0+) can surface violations inline.</li>
 </ul>
 <h2 id="future-framework-presets">Future: framework presets<a class="headerlink" href="#future-framework-presets" title="Permanent link">#</a></h2>
-<p>Go has no framework preset in this release. A future <code>[tool.safelint.go] framework</code> axis (gin / echo / chi) would extend <code>sources_go</code> with framework request accessors (<code>c.Param</code> / <code>c.Query</code> / <code>c.PostForm</code>), analogous to the Java <code>spring-boot</code> framework knob and the JS runtime presets. Any Gin / Echo / chi structural rules would take the 9xx framework-specific band. Track via <a href="https://github.com/shelkesays/safelint/issues">GitHub issues</a>.</p>
+<p>PHP is the most framework-shaped of the supported languages, but this release ships <strong>no</strong> framework preset; the vanilla rule set is what runs. A future <code>[tool.safelint.php] framework</code> axis (tokens <code>laravel</code> / <code>symfony</code> / <code>wordpress</code>, lowercase) is on the roadmap, following the precedent of the Java <code>[tool.safelint.java] framework = "spring-boot"</code> knob. It would extend <code>sources_php</code> with framework request accessors (Laravel's <code>request()-&gt;input(...)</code>, Symfony's <code>$request-&gt;query-&gt;get(...)</code>, WordPress's <code>$_REQUEST</code> wrappers) and add framework-specific structural rules in the 9xx band. This is deferred to a follow-up and is <strong>not</strong> implemented today. Track via <a href="https://github.com/shelkesays/safelint/issues">GitHub issues</a>.</p>
 
 
 
@@ -2777,7 +2776,7 @@
       <nav class="md-footer__inner md-grid" aria-label="Footer" >
         
           
-          <a href="../rust/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Rust">
+          <a href="../go/" class="md-footer__link md-footer__link--prev" aria-label="Previous: Go">
             <div class="md-footer__button md-icon">
               
               <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
@@ -2787,20 +2786,20 @@
                 Previous
               </span>
               <div class="md-ellipsis">
-                Rust
+                Go
               </div>
             </div>
           </a>
         
         
           
-          <a href="../php/" class="md-footer__link md-footer__link--next" aria-label="Next: PHP">
+          <a href="../../configuration/cli/" class="md-footer__link md-footer__link--next" aria-label="Next: CLI commands and flags">
             <div class="md-footer__title">
               <span class="md-footer__direction">
                 Next
               </span>
               <div class="md-ellipsis">
-                PHP
+                CLI commands and flags
               </div>
             </div>
             <div class="md-footer__button md-icon">

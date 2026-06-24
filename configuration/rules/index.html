@@ -551,6 +551,8 @@
       
         
       
+        
+      
     
     
     
@@ -751,6 +753,34 @@
     
   
     Go
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../languages/php/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    PHP
   
 
     
@@ -3585,12 +3615,12 @@
 <li><strong>TypeScript</strong> (<code>.ts</code>, <code>.tsx</code>), and <strong>AssemblyScript</strong> (<code>.as</code>, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, <code>as</code> casts, non-null assertions, <code>declare global</code> ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See <a href="../../languages/typescript/">TypeScript</a> for the full language reference.</li>
 <li><strong>Java</strong> (<code>.java</code>), new in v2.1.0. 20 rules apply (the 15 cross-language core plus the 5 also registered for Python / JS / TS) plus 4 Spring Boot framework-specific structural rules (<code>SAFE901-904</code>) target Spring annotation patterns. Per-framework <em>defaults</em> (sinks, nullable methods, structural rule enablement) are switchable via the <a href="../../languages/java/#framework-presets"><code>[tool.safelint.java] framework = "..."</code></a> preset (<code>vanilla</code> / <code>spring-boot</code>). See <a href="../../languages/java/">Java</a> for the full language reference.</li>
 <li><strong>Rust</strong> (<code>.rs</code>), new in v2.2.0. 15 of the cross-language rules port cleanly (the all-five-languages set) plus 11 Rust-only rules cover Rust-idiom-specific patterns (panic-in-non-test, lock poisoning, <code>unsafe</code> block documentation, truncating <code>as</code> casts, silent <code>Err</code> arms, dangerous <code>mem::*</code> ops, needless <code>mut</code>, unchecked arithmetic on integer parameters, broad <code>.unwrap()</code> outside tests, interior-mutable <code>static</code>s, plus the empty-<code>Err</code> / unlogged-<code>Err</code> Rust analogues of <code>empty_except</code> / <code>logging_on_error</code>). 7 rules deliberately skipped for Rust because their semantics don't translate cleanly (Rust has no try/catch / <code>global</code> keyword, RAII / Drop covers resource cleanup, and macros are opaque to the rule-8 dynamic-execution check). Recognises both inline <code>#[cfg(test)] mod tests</code> and Cargo <code>tests/&lt;stem&gt;.rs</code> integration-test conventions. See <a href="../../languages/rust/">Rust</a> for the full language reference.</li>
-<li><strong>Go</strong> (<code>.go</code>), new in v2.5.0. 16 cross-language rules apply (the 13 all-six core plus SAFE302 / SAFE309 / SAFE401, which Go shares with Python / JS / TS / Java but Rust skips) and 2 Go-only rules cover Go-idiom patterns: SAFE209 (<code>empty_error_check</code>, the empty <code>if err != nil {}</code> swallow) and SAFE211 (<code>panic_calls_outside_tests</code>). 7 rules deliberately skipped for Go because their semantics don't translate cleanly (no try/catch, no <code>global</code> keyword, no <code>var</code> hoisting, no production assertion idiom, no chained-nullable idiom). Headline Go adaptations: the bare <code>for {}</code> infinite loop (SAFE501), the sibling <code>foo_test.go</code> convention (SAFE701 / SAFE702), the <code>_ = f()</code> explicit-discard exemption (SAFE802), and the <code>defer x.Close()</code> resource form (SAFE401). See <a href="../../languages/go/">Go</a> for the full language reference.</li>
+<li><strong>Go</strong> (<code>.go</code>), new in v2.5.0. 16 cross-language rules apply (the 13 all-seven core plus SAFE302 / SAFE309 / SAFE401, which Go shares with Python / JS / TS / Java / PHP but Rust skips) and 2 Go-only rules cover Go-idiom patterns: SAFE209 (<code>empty_error_check</code>, the empty <code>if err != nil {}</code> swallow) and SAFE211 (<code>panic_calls_outside_tests</code>). 7 rules deliberately skipped for Go because their semantics don't translate cleanly (no try/catch, no <code>global</code> keyword, no <code>var</code> hoisting, no production assertion idiom, no chained-nullable idiom). Headline Go adaptations: the bare <code>for {}</code> infinite loop (SAFE501), the sibling <code>foo_test.go</code> convention (SAFE701 / SAFE702), the <code>_ = f()</code> explicit-discard exemption (SAFE802), and the <code>defer x.Close()</code> resource form (SAFE401). See <a href="../../languages/go/">Go</a> for the full language reference.</li>
+<li><strong>PHP</strong> (<code>.php</code>). 21 rules apply and only 2 are skipped (SAFE201 <code>bare_except</code> and SAFE305 <code>wide_scope_declaration</code>), the widest rule coverage of any non-Python language because PHP ports the largest share of the existing rule set. PHP is the <strong>first non-Python home for SAFE301 (<code>global_state</code>)</strong>: PHP has a literal <code>global</code> keyword, so the rule fires on <code>global $config;</code>-style declarations exactly as it does on Python. PHP also has try/catch (SAFE202 / SAFE203 apply), <code>eval</code> and dynamic-call surfaces (SAFE309), and resource lifecycles (SAFE401). Headline PHP highlights: the <code>@</code>-operator error-suppression idiom, superglobal taint sources (<code>$_GET</code> / <code>$_POST</code> / <code>$_REQUEST</code> / etc.) feeding SAFE801, and the <code>break N;</code> / <code>continue N;</code> multi-level loop forms. See <a href="../../languages/php/">PHP</a> for the full language reference.</li>
 </ul>
 <h3 id="planned">Planned<a class="headerlink" href="#planned" title="Permanent link">#</a></h3>
 <p>Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see <a href="../../contributing/adding-a-language/">Adding a language</a>) makes each new language incremental, community contributions for any of these are welcome.</p>
 <ol>
-<li><strong>PHP</strong> (<code>.php</code>), next up; it has no dependencies and ports the largest share of the existing rule set (try/catch, a literal <code>global</code> keyword, <code>eval</code>, superglobals).</li>
 <li><strong>C</strong> (<code>.c</code>, <code>.h</code>), Holzmann's original target language.</li>
 <li><strong>C++</strong> (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, and it depends on C shipping first.</li>
 </ol>
@@ -3605,34 +3635,39 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>Cross-language</strong> (all six: Python, JavaScript, TypeScript, Java, Rust, Go)</td>
+<td><strong>Cross-language</strong> (all seven: Python, JavaScript, TypeScript, Java, Rust, Go, PHP)</td>
 <td>13</td>
-<td>SAFE101, SAFE102, SAFE103, SAFE104, SAFE105 (<code>no_recursion</code>), SAFE303, SAFE304, SAFE501, SAFE603 (<code>blanket_suppression</code>), SAFE701, SAFE702, SAFE801, SAFE802 (apply to all six).</td>
+<td>SAFE101, SAFE102, SAFE103, SAFE104, SAFE105 (<code>no_recursion</code>), SAFE303, SAFE304, SAFE501, SAFE603 (<code>blanket_suppression</code>), SAFE701, SAFE702, SAFE801, SAFE802 (apply to all seven).</td>
 </tr>
 <tr>
-<td><strong>Python / JS / TS / Java / Rust</strong> (not Go)</td>
+<td><strong>Python / JS / TS / Java / Rust / PHP</strong> (not Go)</td>
 <td>2</td>
 <td>SAFE601 (<code>missing_assertions</code>), SAFE803 (<code>null_dereference</code>); Go has no production assertion idiom and no chained-nullable idiom (nil-pointer analysis needs type information).</td>
 </tr>
 <tr>
-<td><strong>Python / JS / TS / Java / Go</strong> (not Rust)</td>
+<td><strong>Python / JS / TS / Java / Go / PHP</strong> (not Rust)</td>
 <td>3</td>
 <td>SAFE302 (<code>global_mutation</code>), SAFE309 (<code>dynamic_code_execution</code>), SAFE401 (<code>resource_lifecycle</code>). Rust's analogues are covered separately: SAFE307 + SAFE602 (mutable statics), Drop (resource lifecycle), and macros are an opaque token-tree limitation for rule 8. Go fires on package-level <code>var</code> (SAFE302), reflection / plugin loading (SAFE309), and the <code>defer x.Close()</code> form (SAFE401).</td>
 </tr>
 <tr>
-<td><strong>Python / JS / TS / Java</strong> (not Rust, not Go)</td>
+<td><strong>Python / JS / TS / Java / PHP</strong> (not Rust, not Go)</td>
 <td>2</td>
 <td>SAFE202 (<code>empty_except</code>), SAFE203 (<code>logging_on_error</code>). Neither Rust nor Go has try/catch; Rust's analogues are SAFE206 / SAFE207, and Go's empty-<code>if err != nil</code> swallow is covered by SAFE209.</td>
 </tr>
 <tr>
+<td><strong>Python + PHP</strong></td>
+<td>1</td>
+<td>SAFE301 (<code>global_state</code>); both have a literal <code>global</code> keyword, JS / TS / Java / Rust / Go do not.</td>
+</tr>
+<tr>
 <td><strong>Python-only</strong></td>
-<td>2</td>
-<td>SAFE201 (<code>bare_except</code>), SAFE301 (<code>global_state</code>); JS / TS / Java / Rust / Go have no <code>global</code> keyword and JS / TS / Java catches always bind the error.</td>
+<td>1</td>
+<td>SAFE201 (<code>bare_except</code>); JS / TS / Java catches always bind the error, and Rust / Go / PHP have no bare-catch equivalent.</td>
 </tr>
 <tr>
 <td><strong>JavaScript-family-only</strong> (JS and TS)</td>
 <td>1</td>
-<td>SAFE305 (<code>wide_scope_declaration</code>); Python / Java / Rust / Go have no <code>var</code> / <code>let</code> / <code>const</code> distinction.</td>
+<td>SAFE305 (<code>wide_scope_declaration</code>); Python / Java / Rust / Go / PHP have no <code>var</code> / <code>let</code> / <code>const</code> distinction.</td>
 </tr>
 <tr>
 <td><strong>Java + Spring Boot only</strong></td>
@@ -4235,7 +4270,7 @@
 <h2 id="state-and-purity-rules">State and purity rules<a class="headerlink" href="#state-and-purity-rules" title="Permanent link">#</a></h2>
 <p>These check for use of global variables and unexpected side effects in functions.</p>
 <h3 id="safe301-global_state">SAFE301: <code>global_state</code><a class="headerlink" href="#safe301-global_state" title="Permanent link">#</a></h3>
-<p><strong>What it flags:</strong> Functions that declare the <code>global</code> keyword. <strong>Python-only</strong>, JavaScript has no <code>global</code> read-only declaration form; on JS this rule would always be a strict subset of SAFE302 (<code>global_mutation</code>), so it isn't separately registered. JS users get the same protection from SAFE302 alone.</p>
+<p><strong>What it flags:</strong> Functions that declare the <code>global</code> keyword. <strong>Python and PHP</strong> (the two languages with a literal <code>global</code> declaration form). JavaScript has no <code>global</code> read-only declaration form; on JS this rule would always be a strict subset of SAFE302 (<code>global_mutation</code>), so it isn't separately registered. JS users get the same protection from SAFE302 alone.</p>
 <p>Using <code>global</code> means a function reads or writes shared state outside its own scope. This makes functions hard to test and creates hidden dependencies between parts of your code. Pass values as arguments instead.</p>
 <table>
 <thead>
