@@ -152,7 +152,22 @@ preset). Part C lists the conventions and the validation gate shared by both.
       for `<prev-ext>` and the new one for `<new-ext>` (e.g. `.rs` and `.go`
       when Go follows Rust): `for f in $(grep -rl '<prev-ext>' docs README.md SECURITY.md src/safelint/skill_files); do grep -L '<new-ext>' "$f"; done`
       surfaces files that mention the old extension but not the new one.
-- [ ] Do NOT bump the version; releases are the owner's call.
+- [ ] **Bump the version - this is the most-missed step (missed twice).** A
+      new language is additive = next `X.Y.0`. The work lands via the release
+      branch flow (see CLAUDE.md "Release workflow"): the `feature/* ->
+      development` PR carries the **RC** bump (`project.version = "X.Y.0rcN"`,
+      e.g. `2.6.0rc1`); the later `development -> main` PR flips it to the
+      production `"X.Y.0"`. Do NOT leave `project.version` at the previous
+      release. Keep the `CHANGELOG.md` heading at `## [Unreleased]` - it is
+      dated only at the production tag. The owner controls release timing and
+      tagging; the number itself is derived by the additive=MINOR convention,
+      so apply it as part of finishing the work rather than waiting to be
+      reminded.
+- [ ] **`SECURITY.md` supported-versions table**: add the new release line as
+      "current" (e.g. `**X.Y.x** (current; <Lang> support)`) and demote the
+      prior current line into the maintained band. This rides in the
+      production (`development -> main`) bump, and is part of the same
+      scattered-enumeration family as the sweep above.
 
 ### A10. Common pitfalls (review-caught in the Go port - design for these upfront)
 

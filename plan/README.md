@@ -53,8 +53,15 @@ the language set is stable, so they don't have to be redone per language.
    references above; the spec does not repeat them except where the language
    deviates.
 3. Each spec ships as **one comprehensive MINOR release** worth of work. Do
-   not split a language across releases, and do not bump the version
-   (releases are the owner's call).
+   not split a language across releases. **Do bump the version - it is the
+   most-missed step.** A new language is additive = next `X.Y.0`. Land the
+   work via the release-branch flow (see CLAUDE.md "Release workflow"):
+   the `feature/* → development` PR carries the **RC** bump
+   (`project.version = "X.Y.0rcN"`), and the later `development → main` PR
+   flips it to the production `"X.Y.0"`; the `CHANGELOG.md` heading stays
+   `## [Unreleased]` until the production tag. The owner controls release
+   timing and tagging, but do not leave `project.version` at the previous
+   release.
 
 ## Non-negotiables (digest; full detail in CLAUDE.md)
 

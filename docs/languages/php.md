@@ -235,7 +235,7 @@ SafeLint runs alongside the standard PHP tool chain; it doesn't replace any of i
 
   ```yaml
   - repo: https://github.com/shelkesays/safelint
-    rev: v2.5.0  # or whatever the latest tag is
+    rev: v2.6.0  # or whatever the latest tag is
     hooks:
       - id: safelint
         additional_dependencies: ['safelint[php]']
