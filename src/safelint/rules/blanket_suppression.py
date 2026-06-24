@@ -180,14 +180,19 @@ def _rust_blanket(attr_text: str) -> str | None:
 
 
 def _strip_php_comment_markers(comment_text: str) -> str:
-    """Strip ``//`` / ``#`` / ``/* ... */`` markers from a PHP comment."""
+    """Strip ``//`` / ``#`` / ``/* ... */`` / ``/** ... */`` markers from a PHP comment.
+
+    Docblock comments (``/** @psalm-suppress all */``) leave a continuation
+    ``*`` after the ``/*`` is removed, so any leading ``*`` characters are
+    stripped too - otherwise ``@psalm-suppress all`` would not match.
+    """
     text = comment_text.strip()
     if text.startswith("//"):
         return text[2:].strip()
     if text.startswith("#"):
         return text[1:].strip()
     if text.startswith("/*"):
-        text = text[2:].removesuffix("*/")
+        text = text[2:].removesuffix("*/").strip().lstrip("*")
     return text.strip()
 
 

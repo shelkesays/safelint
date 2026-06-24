@@ -65,3 +65,13 @@ def test_rethrow_with_leading_comment_is_clean(tmp_path: Path) -> None:
 def test_increment_of_declared_global_is_mutation(tmp_path: Path) -> None:
     """``global $c; $c++;`` is a write to shared global state (SAFE302)."""
     assert "SAFE302" in _codes(tmp_path, "function f() { global $c; $c++; }", "global_mutation")
+
+
+def test_docblock_blanket_suppression_fires(tmp_path: Path) -> None:
+    """A docblock ``/** @psalm-suppress all */`` is recognised despite the continuation ``*``."""
+    assert "SAFE603" in _codes(tmp_path, "/** @psalm-suppress all */\n$x = 1;", "blanket_suppression")
+
+
+def test_scoped_docblock_suppression_is_clean(tmp_path: Path) -> None:
+    """A scoped ``/** @psalm-suppress SomeIssue */`` targets a named check and is clean (control)."""
+    assert "SAFE603" not in _codes(tmp_path, "/** @psalm-suppress SomeIssue */\n$x = 1;", "blanket_suppression")
