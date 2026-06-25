@@ -148,14 +148,15 @@ preset). Part C lists the conventions and the validation gate shared by both.
       previous language's tokens - its extension (e.g. `.rs`), its name as a
       whole word (`grep -w rust`, since plain `grep` does not treat `\b` as
       a word boundary), and its grammar (`tree-sitter-rust`) - across
-      `docs/`, `README.md`, `SECURITY.md`, `pyproject.toml`,
+      `docs/`, `README.md`, `SECURITY.md`, `pyproject.toml`, `plan/README.md`
+      (the roadmap title / table / counts go stale too),
       `src/safelint/skill_files/`.
       Every extension list, grammar list, `--language` value list, and
       rule-set enumeration that names the prior languages must gain the new
       one; these scattered lists (NOT the headline language tables) are the
       most common miss. Tip - substitute the previous language's extension
       for `<prev-ext>` and the new one for `<new-ext>` (e.g. `.rs` and `.go`
-      when Go follows Rust): `for f in $(grep -rl '<prev-ext>' docs README.md SECURITY.md src/safelint/skill_files); do grep -L '<new-ext>' "$f"; done`
+      when Go follows Rust): `for f in $(grep -rl '<prev-ext>' docs README.md SECURITY.md pyproject.toml plan/README.md src/safelint/skill_files); do grep -L '<new-ext>' "$f"; done`
       surfaces files that mention the old extension but not the new one.
 - [ ] **Bump the version - this is the most-missed step (missed twice).** A
       new language is additive = next `X.Y.0`. The work lands via the release

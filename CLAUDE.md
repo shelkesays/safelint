@@ -123,7 +123,7 @@ Invoke the **`add-language-support`** project skill (`.claude/skills/add-languag
 
 GitHub Actions (`ci.yml`) runs the same lint/format/type checks on a single Python version, then the pytest suite across Python 3.11 / 3.12 / 3.13 / 3.14. Tag pushes (`vX.Y.Z`) trigger `publish.yml`, which uses PyPI Trusted Publishing (OIDC), no token-based publishing.
 
-Release mechanics: the package version is **static** in `pyproject.toml` (no `setuptools_scm` / dynamic version). `publish.yml`'s first step verifies the pushed `vX.Y.Z` tag equals `project.version` and fails the release on a mismatch, so `project.version` must already hold the release number before tagging - nothing bumps it automatically. `publish.yml` matches PEP 440 pre-release tags too (`v2.6.0rc1`, `a1`, `b2`, `.dev1`), so RC tags publish as pre-releases.
+Release mechanics: the package version is **static** in `pyproject.toml` (no `setuptools_scm` / dynamic version). `publish.yml`'s first step verifies the pushed `vX.Y.Z` tag equals `project.version` and fails the release on a mismatch, so `project.version` must already hold the release number before tagging - nothing bumps it automatically. `publish.yml` matches PEP 440 pre-release tags too (full forms: `v2.6.0rc1`, `v2.6.0a1`, `v2.6.0b2`, `v2.6.0.dev1` - the suffix always follows the base version), so RC tags publish as pre-releases.
 
 **Release workflow (branch flow - do not skip the version bump).** Development happens on a `feature/*` branch, which **PRs into the `development` release branch, NOT directly into `main`**. The version bump is part of this flow and is the step most often missed - it has been missed twice, so treat it as mandatory:
 
