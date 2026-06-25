@@ -193,7 +193,7 @@ uv run pytest                                  # coverage gate fail_under = 97
 uv run ruff check src/ tests/
 uv run ruff format --check src/ tests/
 uv run ty check src/
-uv run safelint check src/ --all-files         # zero blocking violations
+uv run safelint check src/ --all-files --fail-on=error   # exactly as CI runs it; zero blocking violations
 uv run mkdocs build --strict
 ```
 
