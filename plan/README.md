@@ -36,6 +36,7 @@ the language set is stable, so they don't have to be redone per language.
 | File | What | Run when |
 |---|---|---|
 | `plan/refactor-node-type-constants.md` | Convert the per-language node-type / operator tables in `src/safelint/rules/` from raw Tree-sitter string literals to imported `src/safelint/languages/<lang>.py` constants, for **all** languages at once (pure refactor, no behaviour change). Deferred out of the PHP PR because it is cross-language, not PHP-specific. | After C **and** C++ ship. |
+| `plan/security-hardening.md` | Defence-in-depth fixes from the 2026-06-25 internal security audit: `test_dirs` containment, `skill install/remove` symlink/TOCTOU hardening, cache `mkstemp`. **No HIGH/MEDIUM findings; none introduced by recent work** - all LOW / hardening, none default-flow-exploitable. | Low urgency; next maintenance pass. |
 
 ## How to use these specs
 
