@@ -1,13 +1,11 @@
-# Language-expansion plan: PHP, C, C++
+# Language-expansion plan: C, C++
 
 **Audience**: the AI coding agent (or human contributor) implementing the next
 language. Each language has its own self-contained spec in this directory.
-Implement **one language per spec, in working-priority order**. **PHP is next**
-(it has no dependencies and ports the largest share of the existing rule set);
-C and C++ follow. The one hard ordering rule is that **C must ship before C++**
-(shared grammar family, shared new rules, `.h` ownership) - PHP is independent
-of both. This order matches the project's published roadmap in
-`docs/configuration/rules.md` "Planned":
+Implement **one language per spec, in working-priority order**. **C is next**;
+C++ follows. The one hard ordering rule is that **C must ship before C++**
+(shared grammar family, shared new rules, `.h` ownership). This order matches
+the project's published roadmap in `docs/configuration/rules.md` "Planned":
 
 > **Go (`.go`) shipped in v2.5.0** (6th registered language: 16 cross-language
 > rules + the Go-only SAFE209 `empty_error_check` / SAFE211
@@ -16,14 +14,21 @@ of both. This order matches the project's published roadmap in
 > [Go language page](../docs/languages/go.md), the
 > `src/safelint/skill_files/languages/go.md` addendum, and the shipped code.
 
+> **PHP (`.php`) shipped in v2.6.0** (7th registered language: 21
+> cross-language rules - the widest port yet, including SAFE301
+> `global_state`'s first non-Python home; only SAFE201 `bare_except` and
+> SAFE305 `wide_scope_declaration` are skipped). Its spec, `plan/04-php.md`,
+> was removed on completion - the design decisions now live in the
+> [PHP language page](../docs/languages/php.md), the
+> `src/safelint/skill_files/languages/php.md` addendum, and the shipped code.
+
 Rows are in working-priority order; the **Spec #** column is the stable file
 number, not the priority rank.
 
 | Priority | Spec # | File | Language | Status | Depends on |
 |---|---|---|---|---|---|
-| 1 | 4 | `plan/04-php.md` | PHP (`.php`) | **in review (PR #75)** | nothing |
-| 2 | 2 | `plan/02-c.md` | C (`.c`, `.h`) | not started | nothing |
-| 3 | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started | **C shipped** (shared grammar family, shared new rules, `.h` ownership) |
+| 1 (next) | 2 | `plan/02-c.md` | C (`.c`, `.h`) | not started | nothing |
+| 2 | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started | **C shipped** (shared grammar family, shared new rules, `.h` ownership) |
 
 Update the Status column (and the per-spec status header) as work lands; remove
 a spec file once its language ships (as was done for Go).
