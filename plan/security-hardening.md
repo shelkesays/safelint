@@ -44,14 +44,15 @@ places that touch the dangerous surface:
   file I/O, no subprocess, no deserialisation. Nothing below was added by the
   PHP work; these are pre-existing LOW / defence-in-depth items.
 
-## Findings (all LOW / hardening; none default-flow-exploitable)
+## Findings
 
-Remediation checklist (detailed write-ups follow):
+All findings are LOW / hardening; none are exploitable in the default
+no-flag flow. Remediation checklist (detailed write-ups follow):
 
 - [ ] H1 - `skill remove --path` symlinked-ancestor containment
-- [ ] H2 - install write TOCTOU symlink race (`O_NOFOLLOW` / `O_EXCL`)
+- [ ] H2 - install write TOCTOU symlink race (`os.open` `O_NOFOLLOW` / `O_EXCL`)
 - [ ] H3 - `test_dirs` config glob containment vs project root
-- [ ] H4 - cache tmp write via `mkstemp` (`O_EXCL` / `O_NOFOLLOW`)
+- [ ] H4 - cache tmp write via `mkstemp` (`O_EXCL` + unguessable name)
 - [ ] H5 - `_maybe_seed_secondary_for_opencode` dangling-symlink `touch()` guard
 
 ### H1 - `skill remove --path` validates the path tail lexically; a symlinked ancestor can escape
