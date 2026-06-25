@@ -5,12 +5,12 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "safelint"
 version = "2.6.0"
-description = "Engineering safety lint rules and pre-commit integration for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, and Go codebases"
+description = "Engineering safety lint rules and pre-commit integration for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, and PHP codebases"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
-keywords = ["lint", "pre-commit", "static-analysis", "safety", "python", "javascript", "typescript", "java", "spring-boot", "rust", "go"]
+keywords = ["lint", "pre-commit", "static-analysis", "safety", "python", "javascript", "typescript", "java", "spring-boot", "rust", "go", "php"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",

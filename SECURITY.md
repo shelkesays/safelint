@@ -9,7 +9,7 @@ Security fixes ship to the supported lines below. Older lines receive no securit
 | Version(s) | Status |
 |---|---|
 | **2.6.x** (current; PHP support) | ✅ Security fixes |
-| **2.2.x - 2.5.x** (Rust, Go) | ✅ Security fixes through ~6 months after the next minor lands |
+| **2.2.x - 2.5.x** (Rust in 2.2.x-2.4.x; Go in 2.5.x) | ✅ Security fixes through ~6 months after the next minor lands |
 | **2.1.x** (Java + Spring Boot) | ❌ Upgrade to a current 2.x line |
 | **2.0.x** (multi-language refactor) | ❌ Upgrade to a current 2.x line |
 | **1.x** | ❌ Upgrade to 2.x |
