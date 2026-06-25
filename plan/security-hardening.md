@@ -96,9 +96,15 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - **Preconditions / why LOW**: needs existing write access to the install
   parent (`.claude/skills/safelint/` etc.) AND winning a tight race; the
   payload written is fixed bundled skill text, not attacker-chosen.
-- **Fix**: open the destination with `os.open(..., O_CREAT | O_EXCL | O_NOFOLLOW)`
-  for the copy (write via the fd), and create symlinks without a prior
-  check-then-act window, rather than relying on a preceding `exists()` check.
+- **Fix**: on POSIX, open the destination with
+  `os.open(..., O_CREAT | O_EXCL | O_NOFOLLOW)` for the copy (write via the
+  fd) and create symlinks without a prior check-then-act window, rather than
+  relying on a preceding `exists()` check. **`os.O_NOFOLLOW` is POSIX-only**
+  (it does not exist on Windows, which safelint supports), so guard the flag
+  behind a `hasattr(os, "O_NOFOLLOW")` / platform check; on Windows fall back
+  to `O_CREAT | O_EXCL` (creation fails if the name already exists, closing
+  the predictable-target race) plus an `is_symlink()` check immediately before
+  the write. The remediation's tests should cover both code paths.
 
 ### H3 - `test_dirs` config globs outside the project root (read/stat only)
 
