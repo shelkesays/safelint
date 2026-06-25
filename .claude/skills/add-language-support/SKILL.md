@@ -139,12 +139,17 @@ preset). Part C lists the conventions and the validation gate shared by both.
 
 - [ ] `CHANGELOG.md` under `[Unreleased]` -> Added. New language = MINOR,
       never MAJOR (project semver policy; JS itself shipped as 1.13.0).
+- [ ] **`pyproject.toml` package metadata**: `project.description` and
+      `project.keywords` enumerate the supported languages - add the new one
+      to both (the v2.6.0 PHP release missed this; PyPI showed a stale
+      language list). These are part of the scattered-enumeration family.
 - [ ] Stale-count + enumeration sweep: `grep -rn` for the old counts
       ("N rules", "five languages", "N cross-language") AND for the
       previous language's tokens - its extension (e.g. `.rs`), its name as a
       whole word (`grep -w rust`, since plain `grep` does not treat `\b` as
       a word boundary), and its grammar (`tree-sitter-rust`) - across
-      `docs/`, `README.md`, `SECURITY.md`, `src/safelint/skill_files/`.
+      `docs/`, `README.md`, `SECURITY.md`, `pyproject.toml`,
+      `src/safelint/skill_files/`.
       Every extension list, grammar list, `--language` value list, and
       rule-set enumeration that names the prior languages must gain the new
       one; these scattered lists (NOT the headline language tables) are the
