@@ -16,7 +16,22 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 | **Go** | `.go` | 16 cross-language rules apply (the 13 all-seven core plus `global_mutation` / `dynamic_code_execution` / `resource_lifecycle`); 2 Go-only rules cover Go-idiom patterns: `empty_error_check` (the empty `if err != nil {}` swallow) and `panic_calls_outside_tests` (18 rules total for Go). Headline adaptations: the bare `for {}` infinite loop, the sibling `foo_test.go` convention, the `_ = f()` explicit-discard exemption, and the `defer x.Close()` resource form. See [Go](languages/go.md). New in v2.5.0. |
 | **PHP** | `.php` | 21 rules apply, the widest coverage of any non-Python language (only `bare_except` and `wide_scope_declaration` are skipped). First non-Python home for `global_state` (PHP has a literal `global` keyword). Headline highlights: the `@`-operator error-suppression idiom, superglobal taint sources (`$_GET` / `$_POST` / `$_REQUEST`) feeding `tainted_sink`, and the `break N;` / `continue N;` multi-level loop forms. See [PHP](languages/php.md). New in v2.6.0. |
 
-**Rule coverage:** 13 rules apply across all seven languages (the cross-language core, including `no_recursion` and `blanket_suppression`); 2 more apply to Python / JS / TS / Java / Rust / PHP but not Go (`missing_assertions`, `null_dereference`); 3 apply to Python / JS / TS / Java / Go / PHP but not Rust (`global_mutation`, `dynamic_code_execution`, `resource_lifecycle`); 2 apply to Python / JavaScript / TypeScript / Java / PHP only (`empty_except`, `logging_on_error`); 1 is JavaScript-family-only (`wide_scope_declaration`); 1 applies to Python + PHP (`global_state`); 1 is Python-only (`bare_except`); 4 are Java + Spring Boot only (`spring_*`); 11 are Rust-only (including `interior_mutable_static`); and 2 are Go-only (`empty_error_check`, `panic_calls_outside_tests`). Rules are skipped per language where the semantics don't translate (Go has no try/catch, `global` keyword, `var` hoisting, production assertion idiom, or chained-nullable idiom; Rust's `Result`/`Option`/`Drop` model covers its skips with Rust-specific replacements).
+**Rule coverage** - 40 rules total, scoped per language:
+
+| Applies to | # | Rules |
+|---|---|---|
+| **All seven** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP) | 13 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
+| Python / JS / TS / Java / Rust / PHP (not Go) | 2 | `missing_assertions`, `null_dereference` |
+| Python / JS / TS / Java / Go / PHP (not Rust) | 3 | `global_mutation`, `dynamic_code_execution`, `resource_lifecycle` |
+| Python / JS / TS / Java / PHP | 2 | `empty_except`, `logging_on_error` |
+| Python + PHP | 1 | `global_state` |
+| Python only | 1 | `bare_except` |
+| JavaScript family (JS / TS) | 1 | `wide_scope_declaration` (`var` → `let` / `const`) |
+| Java + Spring Boot only | 4 | `spring_*` (SAFE901-904) |
+| Rust only | 11 | `needless_mut`, `unchecked_arithmetic_on_input`, `panic_macros_outside_tests`, `lock_poisoning_ignored`, `silent_result_discard`, `unlogged_error_branch`, `result_unwrap_outside_tests`, `dangerous_mem_ops`, `interior_mutable_static`, `truncating_as_cast`, `undocumented_unsafe` |
+| Go only | 2 | `empty_error_check`, `panic_calls_outside_tests` |
+
+Rules are skipped per language where the semantics don't translate - e.g. Go has no try/catch, `global` keyword, `var` hoisting, production assertion idiom, or chained-nullable idiom; Rust's `Result` / `Option` / `Drop` model covers its skips with Rust-specific replacements.
 
 **Planned future languages** (in working-priority order, no timelines committed): C, C++. See the [language-coverage roadmap](configuration/rules.md#planned).
 
