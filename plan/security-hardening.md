@@ -11,17 +11,21 @@ checkbox to close in a focused PR.
 A SPOC-led read-only audit of safelint's filesystem / subprocess / config
 surface, calibrated against the documented threat model in `SECURITY.md`
 (safelint parses but never executes the linted code, makes no network
-requests, opens no sockets). Three modules were deep-read because they are the
-only places that touch the dangerous surface:
+requests, opens no sockets). These modules were deep-read because they are the
+places that touch the dangerous surface:
 
 - `src/safelint/_skill_install.py` - file writes, symlinks, `shutil.rmtree`,
   `Path.unlink` (the `skill install / remove / status / path` command).
-- `src/safelint/cli.py` + `core/engine.py` + `core/runner.py` - the only
-  `subprocess` use (shelling to `git` for changed-file detection) and file
-  discovery.
-- `src/safelint/core/config.py` + `core/_cache.py` + `core/_validators.py` -
-  TOML config loading, the config-discovery parent walk, `per_file_ignores` /
-  `test_dirs` globs, and the on-disk result cache.
+- `src/safelint/cli.py` + `src/safelint/core/engine.py` +
+  `src/safelint/core/runner.py` - the only `subprocess` use (shelling to `git`
+  for changed-file detection) and file discovery.
+- `src/safelint/core/config.py` + `src/safelint/core/_cache.py` +
+  `src/safelint/core/_validators.py` - TOML config loading, the
+  config-discovery parent walk, `per_file_ignores` globs, and the on-disk
+  result cache.
+- `src/safelint/rules/test_coverage.py` - the `test_dirs` config value is the
+  one config field that reaches the filesystem (`rglob`), so this rule is part
+  of the audited surface (see H3).
 
 ## Headline
 
@@ -55,9 +59,18 @@ only places that touch the dangerous surface:
   against an attacker-influenced location, and `--path` is the documented
   "unusual location" opt-in escape hatch where the user already takes
   responsibility. Not reachable in the default no-flag flow.
-- **Fix**: after the tail match, reject if any ancestor of `path` is a symlink
-  (`any(p.is_symlink() for p in path.parents)`), or `resolve()` the parent and
-  confirm the final component is removed under a non-symlinked directory.
+- **Fix**: containment, NOT a blanket symlink-ancestor rejection. `--path` is
+  *designed* to accept unusual real parent directories when the tail matches -
+  `tests/test_skill_install.py::test_remove_path_accepts_unusual_parent_with_known_install_shape`
+  documents this, and a legitimately symlinked parent (e.g. `~/projects` ->
+  `/mnt/work/projects`) must still work, so `any(p.is_symlink() for p in
+  path.parents)` would over-reject. Instead, only guard against a symlink
+  *redirecting the delete to a different real tree*: `realpath` the path's
+  parent and confirm the leaf being removed still ends with the matched
+  install tail under that resolved parent, and keep `_remove_existing`'s
+  existing terminal-symlink handling (it unlinks the link, not its target).
+  Given this is an opt-in, user-named escape hatch, treating the residual
+  ancestor-symlink case as accepted-and-documented risk is also defensible.
 
 ### [ ] H2 - install write is check-then-act (TOCTOU symlink race)
 
@@ -151,7 +164,18 @@ Low urgency (no HIGH/MEDIUM, none default-flow-exploitable). Bundle as one
    tests that assert refusal on a symlinked ancestor / raced target.
 3. H4 + H5 (cache `mkstemp`, seed guard) - defence-in-depth, opportunistic.
 
-Validation gate for the remediation PR: `uv run pytest` (coverage >= 97),
-`ruff`, `ty`, `uv run safelint check src/ --all-files`, `mkdocs build --strict`,
-plus new tests proving each guard (symlinked-ancestor `--path` refused, raced
-install target not followed, `test_dirs` escape contained).
+Validation gate for the remediation PR (the project's standard `uv run`
+invocation, matching CI):
+
+```bash
+uv run pytest                                  # coverage gate fail_under = 97
+uv run ruff check src/ tests/
+uv run ruff format --check src/ tests/
+uv run ty check src/
+uv run safelint check src/ --all-files         # zero blocking violations
+uv run mkdocs build --strict
+```
+
+Plus new tests proving each guard (a `--path` whose parent symlink redirects
+to a different tree is refused while a real unusual parent still works, the
+raced install target is not followed, the `test_dirs` escape is contained).
