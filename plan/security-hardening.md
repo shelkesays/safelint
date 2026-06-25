@@ -165,9 +165,15 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 
 ## Verified clean (recorded so the covered surface is auditable)
 
-- **git subprocess** (`cli.py`): all four calls list-form, compile-time-constant
-  argv, no `shell=True`, `git` resolved via `shutil.which` (absolute,
-  None-checked), robust fall-back-to-scan-all error handling. No injection.
+- **git subprocess** (`cli.py`): all four calls are list-form (never
+  `shell=True`); the argv is a fixed string-literal subcommand + flags with
+  **no interpolated or attacker-influenced element** (the only variable is
+  `git_bin`, in argv[0]). `git` is resolved via `shutil.which("git")`
+  (None-checked, falls back to scan-all if absent) - note `shutil.which`
+  returns whatever PATH resolves to, so it is not *guaranteed* absolute if
+  PATH itself holds relative entries; that is the standard PATH-trust
+  assumption every git-shelling tool makes, not a safelint-specific flaw.
+  Robust error handling. No injection.
 - **File discovery** (`engine.py`): `os.walk(followlinks=False)` (no descent
   into symlinked dirs / no symlink-cycle) + `is_file()` pre-read guard. A
   symlinked file resolving to a regular file is read, but reading only lints
