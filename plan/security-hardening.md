@@ -31,8 +31,9 @@ places that touch the dangerous surface:
 
 - **No HIGH or MEDIUM findings.** No `eval` / `exec` / `subprocess` of user
   code or config; no `pickle` / `marshal` / `yaml.load` (the cache uses JSON
-  deliberately). The git subprocess is list-form with compile-time-constant
-  argv (no injection). File discovery does not descend into symlinked
+  deliberately). The git subprocess is list-form with a fixed literal
+  subcommand + flags and no interpolated / attacker-influenced argv element
+  (no injection; see "Verified clean"). File discovery does not descend into symlinked
   *directories* (`os.walk(followlinks=False)`); a symlinked *file* that
   resolves to a regular file is still read, but reading it only lints it, and
   parse errors report just a token kind + coordinates, never file contents
