@@ -2275,7 +2275,69 @@
 </tr>
 </tbody>
 </table>
-<p><strong>Rule coverage:</strong> 13 rules apply across all seven languages (the cross-language core, including <code>no_recursion</code> and <code>blanket_suppression</code>); 2 more apply to Python / JS / TS / Java / Rust / PHP but not Go (<code>missing_assertions</code>, <code>null_dereference</code>); 3 apply to Python / JS / TS / Java / Go / PHP but not Rust (<code>global_mutation</code>, <code>dynamic_code_execution</code>, <code>resource_lifecycle</code>); 2 apply to Python / JavaScript / TypeScript / Java / PHP only (<code>empty_except</code>, <code>logging_on_error</code>); 1 is JavaScript-family-only (<code>wide_scope_declaration</code>); 1 applies to Python + PHP (<code>global_state</code>); 1 is Python-only (<code>bare_except</code>); 4 are Java + Spring Boot only (<code>spring_*</code>); 11 are Rust-only (including <code>interior_mutable_static</code>); and 2 are Go-only (<code>empty_error_check</code>, <code>panic_calls_outside_tests</code>). Rules are skipped per language where the semantics don't translate (Go has no try/catch, <code>global</code> keyword, <code>var</code> hoisting, production assertion idiom, or chained-nullable idiom; Rust's <code>Result</code>/<code>Option</code>/<code>Drop</code> model covers its skips with Rust-specific replacements).</p>
+<p><strong>Rule coverage</strong> - 40 rules total, scoped per language:</p>
+<table>
+<thead>
+<tr>
+<th>Applies to</th>
+<th>#</th>
+<th>Rules</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>All seven</strong> (Python, JavaScript, TypeScript, Java, Rust, Go, PHP)</td>
+<td>13</td>
+<td>the cross-language core: <code>function_length</code>, <code>nesting_depth</code>, <code>max_arguments</code>, <code>complexity</code>, <code>no_recursion</code>, <code>side_effects_hidden</code>, <code>side_effects</code>, <code>unbounded_loops</code>, <code>blanket_suppression</code>, <code>test_existence</code>, <code>test_coupling</code>, <code>tainted_sink</code>, <code>return_value_ignored</code></td>
+</tr>
+<tr>
+<td>Python / JS / TS / Java / Rust / PHP (not Go)</td>
+<td>2</td>
+<td><code>missing_assertions</code>, <code>null_dereference</code></td>
+</tr>
+<tr>
+<td>Python / JS / TS / Java / Go / PHP (not Rust)</td>
+<td>3</td>
+<td><code>global_mutation</code>, <code>dynamic_code_execution</code>, <code>resource_lifecycle</code></td>
+</tr>
+<tr>
+<td>Python / JS / TS / Java / PHP</td>
+<td>2</td>
+<td><code>empty_except</code>, <code>logging_on_error</code></td>
+</tr>
+<tr>
+<td>Python + PHP</td>
+<td>1</td>
+<td><code>global_state</code></td>
+</tr>
+<tr>
+<td>Python only</td>
+<td>1</td>
+<td><code>bare_except</code></td>
+</tr>
+<tr>
+<td>JavaScript family (JS / TS)</td>
+<td>1</td>
+<td><code>wide_scope_declaration</code> (<code>var</code> → <code>let</code> / <code>const</code>)</td>
+</tr>
+<tr>
+<td>Java + Spring Boot only</td>
+<td>4</td>
+<td><code>spring_*</code> (SAFE901-904)</td>
+</tr>
+<tr>
+<td>Rust only</td>
+<td>11</td>
+<td><code>needless_mut</code>, <code>unchecked_arithmetic_on_input</code>, <code>panic_macros_outside_tests</code>, <code>lock_poisoning_ignored</code>, <code>silent_result_discard</code>, <code>unlogged_error_branch</code>, <code>result_unwrap_outside_tests</code>, <code>dangerous_mem_ops</code>, <code>interior_mutable_static</code>, <code>truncating_as_cast</code>, <code>undocumented_unsafe</code></td>
+</tr>
+<tr>
+<td>Go only</td>
+<td>2</td>
+<td><code>empty_error_check</code>, <code>panic_calls_outside_tests</code></td>
+</tr>
+</tbody>
+</table>
+<p>Rules are skipped per language where the semantics don't translate - e.g. Go has no try/catch, <code>global</code> keyword, <code>var</code> hoisting, production assertion idiom, or chained-nullable idiom; Rust's <code>Result</code> / <code>Option</code> / <code>Drop</code> model covers its skips with Rust-specific replacements.</p>
 <p><strong>Planned future languages</strong> (in working-priority order, no timelines committed): C, C++. See the <a href="configuration/rules/#planned">language-coverage roadmap</a>.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python]&#39;</span><span class="w">         </span><span class="c1"># adds .py, .pyw</span>
