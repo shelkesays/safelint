@@ -3,8 +3,8 @@
 **Type**: defensive-security hardening backlog (not a feature). Authorised
 internal audit of safelint's own codebase.
 
-**Status**: findings documented; remediation not started. Each item below is a
-checkbox to close in a focused PR.
+**Status**: findings documented; remediation not started. The checklist under
+[Findings](#findings) tracks the items to close in a focused PR.
 
 ## Scope and method
 
@@ -32,9 +32,11 @@ places that touch the dangerous surface:
 - **No HIGH or MEDIUM findings.** No `eval` / `exec` / `subprocess` of user
   code or config; no `pickle` / `marshal` / `yaml.load` (the cache uses JSON
   deliberately). The git subprocess is list-form with compile-time-constant
-  argv (no injection). File discovery does not follow symlinks
-  (`os.walk(followlinks=False)`) and parse errors report only a token kind +
-  coordinates, never file contents (no read-leak primitive). The
+  argv (no injection). File discovery does not descend into symlinked
+  *directories* (`os.walk(followlinks=False)`); a symlinked *file* that
+  resolves to a regular file is still read, but reading it only lints it, and
+  parse errors report just a token kind + coordinates, never file contents
+  (no read-leak primitive). The
   `--client` / auto-detect / `AGENTS.md`-symlink-refusal / `--path` tail-match
   guards described in the README are present and largely sound.
 - **The recent PHP language addition introduced no new security surface.** The
@@ -44,7 +46,15 @@ places that touch the dangerous surface:
 
 ## Findings (all LOW / hardening; none default-flow-exploitable)
 
-### [ ] H1 - `skill remove --path` validates the path tail lexically; a symlinked ancestor can escape
+Remediation checklist (detailed write-ups follow):
+
+- [ ] H1 - `skill remove --path` symlinked-ancestor containment
+- [ ] H2 - install write TOCTOU symlink race (`O_NOFOLLOW` / `O_EXCL`)
+- [ ] H3 - `test_dirs` config glob containment vs project root
+- [ ] H4 - cache tmp write via `mkstemp` (`O_EXCL` / `O_NOFOLLOW`)
+- [ ] H5 - `_maybe_seed_secondary_for_opencode` dangling-symlink `touch()` guard
+
+### H1 - `skill remove --path` validates the path tail lexically; a symlinked ancestor can escape
 
 - **Severity**: LOW. **Location**: `src/safelint/_skill_install.py`
   (`_path_looks_like_safelint_install` ~L1641, `_remove_path` ~L1672,
@@ -72,7 +82,7 @@ places that touch the dangerous surface:
   Given this is an opt-in, user-named escape hatch, treating the residual
   ancestor-symlink case as accepted-and-documented risk is also defensible.
 
-### [ ] H2 - install write is check-then-act (TOCTOU symlink race)
+### H2 - install write is check-then-act (TOCTOU symlink race)
 
 - **Severity**: LOW. **Location**: `src/safelint/_skill_install.py`
   (`_install_one` ~L1061, `_install_copy` ~L776 `shutil.copyfile`,
@@ -89,7 +99,7 @@ places that touch the dangerous surface:
   for the copy (write via the fd), and create symlinks without a prior
   check-then-act window, rather than relying on a preceding `exists()` check.
 
-### [ ] H3 - `test_dirs` config globs outside the project root (read/stat only)
+### H3 - `test_dirs` config globs outside the project root (read/stat only)
 
 - **Severity**: LOW. **Location**: `src/safelint/rules/test_coverage.py`
   (`_test_dir_contains` ~L286 `test_dir.rglob(name)`, reached via
@@ -111,7 +121,7 @@ places that touch the dangerous surface:
   root after `(root / td).resolve()` / `is_relative_to(root)`, or skip entries
   with `..` / absolute components.
 
-### [ ] H4 - cache tmp write/rename has no `O_EXCL` / `O_NOFOLLOW` (defence-in-depth)
+### H4 - cache tmp write/rename has no `O_EXCL` / `O_NOFOLLOW` (defence-in-depth)
 
 - **Severity**: LOW (hardening). **Location**: `src/safelint/core/_cache.py`
   (~L224-227: `tmp = path.with_suffix(".json.tmp")`, `tmp.write_text(...)`,
@@ -127,24 +137,34 @@ places that touch the dangerous surface:
 - **Fix**: write the tmp file via `tempfile.mkstemp(dir=cache_dir)`
   (`O_CREAT | O_EXCL`) so a pre-planted tmp name / symlink can't be followed.
 
-### [ ] H5 - `_maybe_seed_secondary_for_opencode` touch() lacks a local symlink guard (informational)
+### H5 - `_maybe_seed_secondary_for_opencode` touch() follows a dangling `AGENTS.md` symlink
 
-- **Severity**: informational (no exploit). **Location**:
-  `src/safelint/_skill_install.py` (~L671 `secondary.touch()`).
-- **What**: `touch()` is only reached when `secondary.exists()` is False (a
-  pre-existing `AGENTS.md` symlink short-circuits via `exists()` following it,
-  and the subsequent `_install_secondary` refuses symlinks), so it is safe in
-  practice. Adding a local `if secondary.is_symlink(): return` would make the
-  invariant explicit rather than emergent.
-- **Fix**: add the explicit local guard (clarity / defence-in-depth only).
+- **Severity**: LOW. **Location**: `src/safelint/_skill_install.py`
+  (~L671: `if secondary.exists(): return` then `secondary.touch()`).
+- **What**: a *non-dangling* `AGENTS.md` symlink is short-circuited
+  (`exists()` follows it -> True -> return, and the later `_install_secondary`
+  refuses symlinks). But `Path.exists()` returns **False for a dangling
+  symlink**, so if `AGENTS.md` is a dangling symlink (e.g. ->
+  `/victim/newfile`, target absent), `exists()` is False and `touch()`
+  **follows the symlink and creates an empty file at the link target**. A
+  file-creation primitive, not a content-write.
+- **Preconditions / why LOW**: needs an attacker-planted dangling symlink at
+  the project's `AGENTS.md`, a victim with `.opencode/` present, and a
+  project-scope install run; the created file is empty and lands somewhere the
+  victim can already write. No content control.
+- **Fix**: add an explicit `if secondary.is_symlink(): return` (or
+  `secondary.lstat()`-based check) before `touch()` - it must catch the
+  dangling case that `exists()` misses.
 
 ## Verified clean (recorded so the covered surface is auditable)
 
 - **git subprocess** (`cli.py`): all four calls list-form, compile-time-constant
   argv, no `shell=True`, `git` resolved via `shutil.which` (absolute,
   None-checked), robust fall-back-to-scan-all error handling. No injection.
-- **File discovery** (`engine.py`): `os.walk(followlinks=False)` + `is_file()`
-  pre-read guard; parse errors emit kind + coordinates only (no content leak).
+- **File discovery** (`engine.py`): `os.walk(followlinks=False)` (no descent
+  into symlinked dirs / no symlink-cycle) + `is_file()` pre-read guard. A
+  symlinked file resolving to a regular file is read, but reading only lints
+  it and parse errors emit kind + coordinates only (no content leak).
 - **`per_file_ignores` / `exclude_paths`**: string-only `fnmatch.fnmatchcase`
   against in-tree paths; never reach the filesystem.
 - **Config-discovery parent walk**: only changes which rules fire; no
