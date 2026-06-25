@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.0] - 2026-06-25
+
 **PHP is now a supported language alongside Python, JavaScript, TypeScript, Java, Rust, and Go.** `.php` files are discovered, parsed via Tree-sitter (using the mixed HTML+PHP grammar so templated files parse), and run against **21 existing rules** - the widest port of the rule set of any language so far. PHP adds NO new rule codes, so safelint stays at **40 rules**; it becomes the 7th registered language. PHP support installs via the new `[php]` extra (`pip install 'safelint[php]'`); the base install still ships no grammars. Additive per the project's semver policy (a new language is MINOR, never MAJOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.
 
 ### Added
@@ -837,7 +839,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.5.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.6.0...HEAD
+[2.6.0]: https://github.com/shelkesays/safelint/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/shelkesays/safelint/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/shelkesays/safelint/compare/v2.3.0...v2.4.0
 [2.3.0]: https://github.com/shelkesays/safelint/compare/v2.2.0...v2.3.0
