@@ -808,6 +808,10 @@ def _walk_unavailable_extensions(
     """Directory-walk half of :func:`_scan_for_unavailable_extensions`."""
     seen: set[str] = set()
     target_set = set(unavailable)
+    # ``os.walk`` (not ``Path.walk``) with ``followlinks=False`` - no symlink
+    # descent / no symlink-cycle, same posture as the engine's file discovery.
+    # ``Path.walk`` is 3.12+ and ``requires-python`` is ``>=3.11``, so this
+    # stays ``os.walk`` until the floor moves; see ``engine._walk_supported_files``.
     for dirpath, dirnames, filenames in os.walk(target, followlinks=False):
         dir_path = Path(dirpath)
         dirnames[:] = [d for d in dirnames if d not in _GRAMMAR_SCAN_EXCLUDED_DIRS and not (excludes and _dir_matches_exclude(dir_path / d, excludes))]

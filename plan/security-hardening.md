@@ -55,7 +55,7 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - [x] H3 - `test_dirs` config glob containment vs project root (done - PR #81)
 - [x] H4 - cache tmp write via `mkstemp` (`O_EXCL` + unguessable name) (done - PR #83)
 - [x] H5 - `_maybe_seed_secondary_for_opencode` dangling-symlink `touch()` guard (done - PR #83)
-- [ ] H6 - prefer `pathlib.Path` over `os.path`/`os` where a safe equivalent exists (cleanup; last item before closing the plan)
+- [x] H6 - prefer `pathlib.Path` over `os.path`/`os` where a safe equivalent exists (done - PR #84)
 
 ### H1 - `skill remove --path` validates the path tail lexically; a symlinked ancestor can escape
 
@@ -232,13 +232,24 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
     **keep**. `normpath` collapses `..` **lexically without touching the
     filesystem**; `Path.resolve()` would hit the fs and follow symlinks, which
     is exactly what H3 must avoid. There is no pure-`pathlib` lexical-collapse
-    equivalent, so this `os.path` use is correct and must stay (it already
-    carries an inline comment saying so).
-- **Fix / outcome**: the only genuinely migratable case was the H1 path, now
-  done. The remaining `os` uses are justified; closing H6 is mostly recording
-  *why* each stays so the decision is auditable. If a future change introduces
+    equivalent, so this `os.path` use is correct and must stay.
+  - `_cache.py` `tempfile.mkstemp` + `os.fdopen` (the H4 exclusive-create temp)
+    - **keep**. There is no pathlib equivalent for an atomic exclusive temp
+    create; the raw fd from `mkstemp` is written through `os.fdopen` without
+    reopening by name. Added in PR #83, documented inline.
+  - `cli.py` `os.environ.get("PRE_COMMIT")` - **keep**. Environment lookup;
+    `Path` has no bearing, and no deceptive pathlib lookalike, so no inline
+    note needed.
+- **Fix / outcome (PR #84)**: the only genuinely migratable case was the H1
+  path, done in PR #82. The remaining `os` uses are justified. The two with a
+  *deceptive* pathlib lookalike - `os.walk` (looks like `Path.walk`, but that
+  is 3.12+ and the floor is 3.11) and `os.path.normpath` (looks like
+  `Path.resolve`, but that touches the fs) - now carry explicit "do not tidy
+  to `Path`" inline comments at every call site (`engine._walk_supported_files`,
+  `cli._walk_unavailable_extensions`, `test_coverage._contained_test_dir`).
+  `os.fdopen` (H4) and `os.environ` need no note. If a future change introduces
   a new `os.path` call, default to `Path` unless one of the above exceptions
-  applies.
+  applies. **This closes the audit's remediation list - H1-H6 all done.**
 
 ## Verified clean (recorded so the covered surface is auditable)
 
