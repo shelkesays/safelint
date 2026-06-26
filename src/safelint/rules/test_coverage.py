@@ -159,7 +159,10 @@ def _contained_test_dir(test_dir: str, root: Path) -> Path | None:
     onto *root*, its ``..`` segments collapsed **lexically** (``os.path.normpath``
     - no filesystem access, so a non-existent or symlinked path neither raises
     nor is followed during this check), and dropped if the collapsed path
-    escapes *root*.
+    escapes *root*. ``os.path.normpath`` is deliberate here (not the
+    otherwise-preferred ``pathlib``): there is no pure-``Path`` lexical
+    ``..``-collapse, and ``Path.resolve()`` would hit the filesystem and follow
+    symlinks - exactly what this containment check must avoid. Do not swap it.
 
     An **absolute** entry is honoured as-is: it is an explicit, deliberate path
     named by the config author (and a supported feature - the test suite passes
