@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -140,7 +141,41 @@ def _find_test_file(src_path: Path, test_dirs: list[str], lang_name: str) -> boo
     candidates = _candidate_test_filenames(src_path, lang_name)
     if lang_name == "go":
         return any((src_path.parent / name).exists() for name in candidates)
-    return any(_test_dir_contains(Path(d), candidates) for d in test_dirs)
+    # Anchor every ``test_dirs`` entry inside the project root before globbing:
+    # a crafted config value (``"../../etc"`` / ``"/etc"``) would otherwise make
+    # the ``rglob`` below walk outside the project. Entries that escape are
+    # dropped (no paired test is found there); see ``_contained_test_dir``.
+    root = Path.cwd().resolve()
+    contained = [d for d in (_contained_test_dir(td, root) for td in test_dirs) if d is not None]
+    return any(_test_dir_contains(d, candidates) for d in contained)
+
+
+def _contained_test_dir(test_dir: str, root: Path) -> Path | None:
+    """Resolve a ``test_dirs`` entry, containing *relative* ones inside *root*.
+
+    Closes the H3 finding's headline case: a **relative** ``test_dirs`` value
+    that climbs out of the project root via ``..`` (``"../../etc"``) would let
+    the filesystem ``rglob`` probe outside the tree. A relative entry is joined
+    onto *root*, its ``..`` segments collapsed **lexically** (``os.path.normpath``
+    - no filesystem access, so a non-existent or symlinked path neither raises
+    nor is followed during this check), and dropped if the collapsed path
+    escapes *root*.
+
+    An **absolute** entry is honoured as-is: it is an explicit, deliberate path
+    named by the config author (and a supported feature - the test suite passes
+    ``str(tmp_path / "tests")``), not an implicit traversal. *root* is the
+    process cwd, which is the project root for a normal ``safelint`` run but not
+    necessarily for an absolute entry pointing elsewhere, so containing absolute
+    paths here would over-reject legitimate configs (the same over-rejection
+    trap as H1). The residual absolute-path probe is near-zero risk - the rules
+    are opt-in, the result is a single existence bit flipping a SAFE701/702
+    violation in the user's own terminal, with no exfiltration channel.
+    """
+    p = Path(test_dir)
+    if p.is_absolute():
+        return Path(os.path.normpath(p))
+    collapsed = Path(os.path.normpath(root / p))
+    return collapsed if collapsed.is_relative_to(root) else None
 
 
 def _path_components_contain(haystack: tuple[str, ...], needle: tuple[str, ...]) -> bool:

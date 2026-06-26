@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Contain `test_dirs` filesystem search to the project root (audit finding H3).** A relative `test_dirs` config value that climbs out of the project root via `..` (e.g. `["../../etc"]`) previously let SAFE701 / SAFE702's `rglob` probe directories outside the tree (read/stat only - a single existence bit, no exfiltration). Relative entries are now collapsed lexically and dropped if they escape the root; absolute `test_dirs` remain honoured (an explicit, supported config choice). LOW severity, opt-in rules; from the 2026-06-25 internal security audit (see `plan/security-hardening.md`). First of the audit's hardening items.
+
 ## [2.6.0] - 2026-06-25
 
 **PHP is now a supported language alongside Python, JavaScript, TypeScript, Java, Rust, and Go.** `.php` files are discovered, parsed via Tree-sitter (using the mixed HTML+PHP grammar so templated files parse), and run against **21 existing rules** - the widest port of the rule set of any language so far. PHP adds NO new rule codes, so safelint stays at **40 rules**; it becomes the 7th registered language. PHP support installs via the new `[php]` extra (`pip install 'safelint[php]'`); the base install still ships no grammars. Additive per the project's semver policy (a new language is MINOR, never MAJOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.
