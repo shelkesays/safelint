@@ -965,7 +965,11 @@ class SafetyEngine:
         (e.g. ``a/sub -> ..``) cannot cause infinite descent: when this
         flag is off, ``os.walk`` does not follow symlinks to
         subdirectories during descent. Matches what ruff and flake8
-        do by default.
+        do by default. ``os.walk`` (not the otherwise-preferred
+        ``pathlib.Path.walk``) is deliberate: ``Path.walk`` only exists
+        on Python 3.12+, and ``requires-python`` is ``>=3.11`` - so this
+        stays ``os.walk`` until the floor moves. Do not "tidy" it to
+        ``Path.walk`` without bumping the floor first.
 
         ``os.walk`` lists every non-directory entry in *filenames*, which
         includes FIFOs, sockets, device files, and broken symlinks. The
