@@ -52,7 +52,7 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 
 - [ ] H1 - `skill remove --path` symlinked-ancestor containment
 - [ ] H2 - install write TOCTOU symlink race (`os.open` `O_NOFOLLOW` / `O_EXCL`)
-- [ ] H3 - `test_dirs` config glob containment vs project root
+- [x] H3 - `test_dirs` config glob containment vs project root (done - PR #81)
 - [ ] H4 - cache tmp write via `mkstemp` (`O_EXCL` + unguessable name)
 - [ ] H5 - `_maybe_seed_secondary_for_opencode` dangling-symlink `touch()` guard
 
@@ -124,10 +124,18 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
   the leak is only filesystem-structure existence bits. (`per_file_ignores` /
   `exclude_paths` are NOT affected - they are string-only `fnmatch` against
   already-discovered in-tree paths.)
-- **Fix**: anchor and contain `test_dirs` entries against the resolved project
-  root before globbing - reject absolute paths and any entry that escapes the
-  root after `(root / td).resolve()` / `is_relative_to(root)`, or skip entries
-  with `..` / absolute components.
+- **Fix** (done, PR #81 / `2.6.1rc1`): `_find_test_file` routes each entry
+  through `_contained_test_dir`. **Relative** entries are collapsed lexically
+  (`os.path.normpath` - no filesystem access, so a non-existent / symlinked
+  path neither raises nor is followed) and dropped if they escape the project
+  root. **Absolute** entries are honoured as-is - they are an explicit,
+  supported config choice (the test suite passes `str(tmp_path / "tests")`),
+  and `cwd` is not reliably the project root for an absolute entry, so
+  containing them would over-reject legitimate configs (the H1 over-rejection
+  lesson). The residual absolute-path probe is near-zero risk (read/stat-only
+  existence bit, opt-in rules, no exfiltration). The original "reject absolute
+  paths" recommendation was revised here after the test suite showed absolute
+  `test_dirs` is a supported feature.
 
 ### H4 - cache tmp write/rename has no `O_EXCL` / `O_NOFOLLOW` (defence-in-depth)
 
