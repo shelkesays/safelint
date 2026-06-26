@@ -8,9 +8,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from safelint.core import _cache as cache_mod
 from safelint.core._cache import (
     CACHE_DIR_NAME,
     LintCache,
+    _atomic_write_json,
     compute_engine_fingerprint,
     compute_file_key,
 )
@@ -188,6 +190,53 @@ def test_lint_cache_put_ignores_planted_deterministic_tmp_symlink(tmp_path: Path
     out = cache.get("k1")
     assert out is not None
     assert out[0][0] == v
+
+
+class _InjectedOSError(OSError):
+    """Sentinel ``OSError`` subclass for the cache fault-injection tests.
+
+    A dedicated subclass lets ``pytest.raises`` target exactly the injected
+    failure (satisfying ruff PT011) without a message string (TRY003), while
+    still being caught by ``_atomic_write_json``'s ``except OSError`` cleanup.
+    """
+
+
+def test_atomic_write_json_closes_fd_and_cleans_up_when_fdopen_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If ``os.fdopen`` fails, the raw mkstemp fd is closed (no leak) and the temp is removed (H4 robustness).
+
+    Directly exercises the fd-leak guard: ``os.fdopen`` raising before it
+    takes ownership of the descriptor must not leak that descriptor.
+    """
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    closed: list[int] = []
+    real_close = cache_mod.os.close
+    monkeypatch.setattr(cache_mod.os, "close", lambda fd: (closed.append(fd), real_close(fd))[1])
+    # os.fdopen raises before taking ownership of the fd (the leak window).
+    monkeypatch.setattr(cache_mod.os, "fdopen", lambda *a, **k: (_ for _ in ()).throw(_InjectedOSError))
+
+    with pytest.raises(_InjectedOSError):
+        _atomic_write_json(cache_dir, cache_dir / "k.json", {"violations": [], "suppressed": []})
+
+    assert closed, "the raw fd must be closed when fdopen fails, or it leaks"
+    assert list(cache_dir.glob("*.json.tmp")) == [], "temp file must be cleaned up"
+    assert not (cache_dir / "k.json").exists()
+
+
+def test_atomic_write_json_cleans_up_when_rename_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If the final atomic rename fails, the orphan temp is removed and the error propagates."""
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+
+    def boom_replace(self: Path, target: Path) -> None:
+        raise _InjectedOSError
+
+    monkeypatch.setattr(cache_mod.Path, "replace", boom_replace)
+
+    with pytest.raises(_InjectedOSError):
+        _atomic_write_json(cache_dir, cache_dir / "k.json", {"violations": [], "suppressed": []})
+
+    assert list(cache_dir.glob("*.json.tmp")) == [], "temp file must be cleaned up after a failed rename"
 
 
 def test_lint_cache_get_is_resilient_to_corrupt_payload(tmp_path: Path) -> None:

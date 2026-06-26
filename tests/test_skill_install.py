@@ -105,7 +105,7 @@ def test_install_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert not (home / ".claude").exists()
 
 
-@pytest.mark.skipif(sys.platform == "win32", reason="O_NOFOLLOW is POSIX-only; the O_EXCL guard is covered by the existing copy tests on Windows")
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
 def test_install_copy_refuses_symlink_planted_at_target(tmp_path: Path) -> None:
     """``_install_copy`` must not follow a symlink planted at the target between check and write (H2).
 
