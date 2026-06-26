@@ -669,7 +669,14 @@ def _maybe_seed_secondary_for_opencode(spec: ClientSpec, *, project: bool) -> No
     if not (cwd / ".opencode").exists():
         return
     secondary = cwd / Path(*spec.secondary_install_relpath)
-    if secondary.exists():
+    # ``is_symlink()`` first (lstat-based, True even for a *dangling* symlink):
+    # ``exists()`` follows the link and returns False when the target is
+    # absent, so a dangling ``AGENTS.md`` symlink would otherwise slip
+    # through to ``touch()``, which follows the link and creates an empty
+    # file at the attacker-chosen target (audit finding H5). A non-dangling
+    # symlink is also refused here - we never seed through a link, and the
+    # downstream ``_install_secondary`` already declines to write symlinks.
+    if secondary.is_symlink() or secondary.exists():
         return
     secondary.touch()
 
