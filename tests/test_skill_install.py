@@ -956,6 +956,27 @@ def test_install_opencode_with_existing_agents_md_preserves_content(monkeypatch:
     assert "<!-- safelint:begin -->" in content
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_install_opencode_does_not_follow_dangling_agents_md_symlink(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """A *dangling* ``AGENTS.md`` symlink must not be followed by the OpenCode seed step (H5).
+
+    ``Path.exists()`` follows the link and returns False when the target
+    is absent, so without the ``is_symlink()`` guard the seed step's
+    ``touch()`` would follow the dangling link and create an empty file at
+    the attacker-chosen target. The guard refuses to seed through a symlink.
+    """
+    _, cwd = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    (cwd / ".opencode").mkdir()
+    victim = tmp_path / "victim_target.txt"  # outside cwd, target absent
+    assert not victim.exists()
+    (cwd / "AGENTS.md").symlink_to(victim)  # dangling symlink
+
+    rc = _skill_install.run_install(_make_args(client="auto"))
+    assert rc == 0
+    # The seed step must NOT have created the victim file through the link.
+    assert not victim.exists(), "dangling AGENTS.md symlink must not be followed into a victim target"
+
+
 def test_install_codex_without_opencode_does_not_create_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Without ``.opencode/``, the auto-create is silent and AGENTS.md is NOT spawned.
 

@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import sys
 from typing import TYPE_CHECKING
+
+import pytest
 
 from safelint.core._cache import (
     CACHE_DIR_NAME,
@@ -156,6 +159,35 @@ def test_lint_cache_get_returns_none_for_missing_key(tmp_path: Path) -> None:
     """A key never written is a clean miss."""
     cache = LintCache(tmp_path / "cache")
     assert cache.get("never-stored") is None
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_lint_cache_put_ignores_planted_deterministic_tmp_symlink(tmp_path: Path) -> None:
+    """A symlink planted at the old predictable ``<key>.json.tmp`` name is not followed (H4).
+
+    Before the ``mkstemp`` hardening the temp file had a deterministic
+    ``<key>.json.tmp`` name; an attacker with write access to the cache dir
+    could pre-plant a symlink there and have ``put`` write through it.
+    ``mkstemp`` now creates the temp with an unguessable random name (and
+    ``O_EXCL | O_NOFOLLOW``), so the planted symlink is simply ignored and
+    its target is never touched.
+    """
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    victim = tmp_path / "victim.txt"
+    victim.write_text("SECRET - DO NOT CLOBBER\n", encoding="utf-8")
+    (cache_dir / "k1.json.tmp").symlink_to(victim)  # the pre-hardening predictable tmp path
+
+    cache = LintCache(cache_dir)
+    v = Violation(rule="r", code="SAFE001", filepath="f.py", lineno=1, message="m", severity="error")
+    cache.put("k1", [v], [])
+
+    # Victim untouched: the planted symlink was not the write target.
+    assert victim.read_text(encoding="utf-8") == "SECRET - DO NOT CLOBBER\n"
+    # The cache still wrote correctly through the random temp and round-trips.
+    out = cache.get("k1")
+    assert out is not None
+    assert out[0][0] == v
 
 
 def test_lint_cache_get_is_resilient_to_corrupt_payload(tmp_path: Path) -> None:
