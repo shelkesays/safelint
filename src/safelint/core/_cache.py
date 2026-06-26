@@ -265,7 +265,9 @@ class LintCache:
         # Atomic write via an exclusive-create temp + rename (see
         # ``_atomic_write_json`` for the H4 symlink/TOCTOU rationale). Best
         # effort: any filesystem failure (disk full, permissions, races) just
-        # means no cache entry for this run - never fail the lint. Untestable
-        # without filesystem fault injection.
+        # means no cache entry for this run - never fail the lint. The helper's
+        # failure paths (fd cleanup, temp removal) are covered by fault-injection
+        # tests in ``tests/core/test_cache.py``; this ``suppress`` is the final
+        # swallow that keeps ``put`` best-effort.
         with contextlib.suppress(OSError):
             _atomic_write_json(self.cache_dir, path, payload)
