@@ -619,6 +619,14 @@ def _print_target_exists_error(target: Path) -> None:
     print(f"safelint: error: {target} already exists. Use --force to replace it.", file=sys.stderr)
 
 
+def _print_target_race_error(target: Path) -> None:
+    """Print the "appeared concurrently" error for the exclusive-create race (H2)."""
+    print(
+        f"safelint: error: {target} was created by another process during install. Nothing was overwritten; re-run the command.",
+        file=sys.stderr,
+    )
+
+
 def _print_user_scope_unsupported_error(spec: ClientSpec) -> None:
     """Print the "this client is project-scope only" error to stderr.
 
@@ -1090,6 +1098,15 @@ def _secondary_status(spec: ClientSpec, *, project: bool) -> str:
 # ---------------------------------------------------------------------------
 
 
+def _write_install(source: Path, target: Path, *, symlink: bool) -> str:
+    """Place the bundled artefact at *target* (symlink or exclusive-create copy); return the kind label."""
+    if symlink:
+        _install_symlink(source, target)
+        return "symlinked"
+    _install_copy(source, target)
+    return "copied"
+
+
 def _install_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) -> int:
     """Install *spec* at the chosen scope. Returns 0 on success, 1 on a known failure."""
     source = _spec_bundled_source(spec)
@@ -1101,12 +1118,16 @@ def _install_one(spec: ClientSpec, *, project: bool, args: argparse.Namespace) -
             return 1
         _remove_existing(target)
 
-    if args.symlink:
-        _install_symlink(source, target)
-        kind = "symlinked"
-    else:
-        _install_copy(source, target)
-        kind = "copied"
+    try:
+        kind = _write_install(source, target, symlink=args.symlink)
+    # Both the exclusive-create copy (H2) and ``symlink_to`` raise
+    # FileExistsError if a file or symlink appears at *target* between the
+    # check above and the write - the planted-symlink race the hardening
+    # defends against. Report it as a handled failure (the install wrote
+    # nothing) instead of letting the traceback escape ``run_install``.
+    except FileExistsError:  # nosafe: SAFE203
+        _print_target_race_error(target)
+        return 1
 
     scope = "project" if project else "user"
     _print_install_success(spec, target=target, kind=kind, scope=scope)
