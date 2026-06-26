@@ -788,19 +788,20 @@ def _install_symlink(source: Path, target: Path) -> None:
     target.symlink_to(source, target_is_directory=False)
 
 
-def _write_new_file_exclusive(target: Path, data: bytes) -> None:
-    """Write *data* to a freshly-created *target*, refusing to clobber or follow an existing path.
+def _write_new_file_exclusive(source: Path, target: Path) -> None:
+    """Stream-copy *source* to a freshly-created *target*, refusing to clobber or follow an existing path.
 
     ``"x"`` mode is ``O_CREAT | O_EXCL``: the create fails with
     ``FileExistsError`` if anything already occupies *target*. POSIX
     specifies that ``O_CREAT | O_EXCL`` fails on a symbolic link too
     (``EEXIST``, regardless of the link's contents), so this also refuses
     to follow a symlink planted at *target* without needing ``O_NOFOLLOW``;
-    Windows relies on the same exclusive-create check. The "write" in the
-    name is deliberate - it tells SAFE304 this function is I/O by intent.
+    Windows relies on the same exclusive-create check. The content is streamed
+    (``shutil.copyfileobj``) rather than buffered whole in memory. The "write"
+    in the name is deliberate - it tells SAFE304 this function is I/O by intent.
     """
-    with target.open("xb") as fh:
-        fh.write(data)
+    with source.open("rb") as src, target.open("xb") as dst:
+        shutil.copyfileobj(src, dst)
 
 
 def _install_copy(source: Path, target: Path) -> None:
@@ -816,7 +817,7 @@ def _install_copy(source: Path, target: Path) -> None:
     instead of silently clobbering.
     """
     target.parent.mkdir(parents=True, exist_ok=True)
-    _write_new_file_exclusive(target, source.read_bytes())
+    _write_new_file_exclusive(source, target)
 
 
 # ---------------------------------------------------------------------------
