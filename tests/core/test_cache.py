@@ -170,9 +170,9 @@ def test_lint_cache_put_ignores_planted_deterministic_tmp_symlink(tmp_path: Path
     Before the ``mkstemp`` hardening the temp file had a deterministic
     ``<key>.json.tmp`` name; an attacker with write access to the cache dir
     could pre-plant a symlink there and have ``put`` write through it.
-    ``mkstemp`` now creates the temp with an unguessable random name (and
-    ``O_EXCL | O_NOFOLLOW``), so the planted symlink is simply ignored and
-    its target is never touched.
+    ``mkstemp`` now creates the temp with an unguessable random name under
+    ``O_CREAT | O_EXCL`` (plus ``O_NOFOLLOW`` where the platform provides it),
+    so the planted symlink is simply ignored and its target is never touched.
     """
     cache_dir = tmp_path / "cache"
     cache_dir.mkdir()
