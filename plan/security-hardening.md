@@ -178,8 +178,10 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
   `tempfile.mkstemp(dir=self.cache_dir, suffix=".json.tmp")` and writes through
   the returned fd with `os.fdopen(...)` inside a `with` (never reopening by
   name), then `Path(tmp).replace(path)`. `mkstemp` opens with
-  `O_CREAT | O_EXCL | O_NOFOLLOW` under an unguessable random name, so the old
-  predictable `<key>.json.tmp` symlink-plant is structurally defeated. The
+  `O_CREAT | O_EXCL` (plus `O_NOFOLLOW` where the platform provides it - POSIX,
+  not Windows) under an unguessable random name; the cross-platform property
+  comes from `O_EXCL` + the unpredictable name, so the old predictable
+  `<key>.json.tmp` symlink-plant is structurally defeated. The
   raw-fd path is the one place `os` is justified here (no pathlib equivalent
   for an atomic exclusive temp create); documented inline for H6. Fail-open
   posture preserved (two `except OSError` arms, `# nosafe: SAFE203`). Test:
