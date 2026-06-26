@@ -172,6 +172,45 @@ def compute_file_key(source: bytes, engine_fingerprint: str, filepath: str) -> s
     return digest.hexdigest()
 
 
+def _atomic_write_json(cache_dir: Path, dest: Path, payload: dict[str, Any]) -> None:
+    """Serialise *payload* to *dest* via an exclusive-create temp + atomic rename.
+
+    ``tempfile.mkstemp`` creates the temp with ``O_CREAT | O_EXCL | O_NOFOLLOW``
+    under an unguessable random name, so a pre-planted symlink / predictable tmp
+    name in an attacker-writable cache dir can't be followed or clobbered (audit
+    finding H4). There is no pathlib equivalent for an atomic exclusive temp
+    create, so the raw fd from ``mkstemp`` - and the ``os.fdopen`` that writes
+    through it without ever reopening by name - are deliberate.
+
+    Raises ``OSError`` on any filesystem failure; the caller is best-effort and
+    swallows it. The temp file is always cleaned up, and the fd never leaks even
+    if ``os.fdopen`` fails before taking ownership of it: the explicit
+    ``os.close`` runs only on that path (never a double-close, since once
+    ``os.fdopen`` succeeds the ``with`` owns and closes the descriptor).
+    """
+    fd, tmp_name = tempfile.mkstemp(dir=cache_dir, suffix=".json.tmp")
+    tmp = Path(tmp_name)
+    try:
+        handle = os.fdopen(fd, "w", encoding="utf-8")  # takes ownership of fd
+    # Cleanup-and-reraise (not a swallow): close the raw fd so it can't leak,
+    # drop the temp, and let the error propagate to the best-effort caller.
+    except OSError:  # nosafe: SAFE203
+        with contextlib.suppress(OSError):
+            os.close(fd)  # reached only when fdopen did NOT take ownership
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise
+    try:
+        with handle:
+            handle.write(json.dumps(payload))
+        tmp.replace(dest)
+    # Cleanup-and-reraise: drop the orphan temp; the error propagates upward.
+    except OSError:  # nosafe: SAFE203
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+        raise
+
+
 class LintCache:
     """JSON-on-disk cache for ``(violations, suppressed)`` keyed by file hash.
 
@@ -220,30 +259,10 @@ class LintCache:
             "violations": [asdict(v) for v in violations],
             "suppressed": [asdict(v) for v in suppressed],
         }
-        # Atomic-ish write: write to a temp file in the same directory,
-        # then rename. Avoids partial-write garbage that future reads
-        # would then need to skip. ``tempfile.mkstemp`` creates the temp
-        # with ``O_CREAT | O_EXCL | O_NOFOLLOW`` under an unguessable random
-        # name, so a pre-planted symlink / predictable tmp name in an
-        # attacker-writable cache dir can't be followed or clobbered (audit
-        # finding H4). There is no pathlib equivalent for an atomic
-        # exclusive temp create, so the raw fd from mkstemp - and the
-        # ``os.fdopen`` that writes through it without ever reopening by
-        # name - are deliberate.
-        try:
-            fd, tmp_name = tempfile.mkstemp(dir=self.cache_dir, suffix=".json.tmp")
-        # Fail-open: disk full / permission denied while creating the temp.
-        except OSError:  # nosafe: SAFE203
-            return
-        tmp = Path(tmp_name)
-        try:
-            with os.fdopen(fd, "w", encoding="utf-8") as fh:
-                fh.write(json.dumps(payload))
-            tmp.replace(path)
-        # Same fail-open posture: if the write / rename fails we just don't
-        # have a cache entry for this run. Untestable without filesystem
-        # fault injection.
-        except OSError:  # nosafe: SAFE203
-            # Clean up the temp file if the write / rename failed; double-fail is fine.
-            with contextlib.suppress(OSError):
-                tmp.unlink()
+        # Atomic write via an exclusive-create temp + rename (see
+        # ``_atomic_write_json`` for the H4 symlink/TOCTOU rationale). Best
+        # effort: any filesystem failure (disk full, permissions, races) just
+        # means no cache entry for this run - never fail the lint. Untestable
+        # without filesystem fault injection.
+        with contextlib.suppress(OSError):
+            _atomic_write_json(self.cache_dir, path, payload)

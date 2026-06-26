@@ -141,10 +141,12 @@ def _find_test_file(src_path: Path, test_dirs: list[str], lang_name: str) -> boo
     candidates = _candidate_test_filenames(src_path, lang_name)
     if lang_name == "go":
         return any((src_path.parent / name).exists() for name in candidates)
-    # Anchor every ``test_dirs`` entry inside the project root before globbing:
-    # a crafted config value (``"../../etc"`` / ``"/etc"``) would otherwise make
-    # the ``rglob`` below walk outside the project. Entries that escape are
-    # dropped (no paired test is found there); see ``_contained_test_dir``.
+    # Anchor every *relative* ``test_dirs`` entry inside the project root before
+    # globbing: a crafted relative value (``"../../etc"``) would otherwise make
+    # the ``rglob`` below walk outside the project, so relative entries that
+    # escape the root are dropped (no paired test is found there). Absolute
+    # entries (``"/etc"``) are honoured as-is by design - an explicit, supported
+    # config choice, not an implicit traversal. See ``_contained_test_dir``.
     root = Path.cwd().resolve()
     contained = [d for d in (_contained_test_dir(td, root) for td in test_dirs) if d is not None]
     return any(_test_dir_contains(d, candidates) for d in contained)
