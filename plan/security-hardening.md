@@ -50,11 +50,12 @@ places that touch the dangerous surface:
 All findings are LOW / hardening; none are exploitable in the default
 no-flag flow. Remediation checklist (detailed write-ups follow):
 
-- [ ] H1 - `skill remove --path` symlinked-ancestor containment
-- [ ] H2 - install write TOCTOU symlink race (`os.open` `O_NOFOLLOW` / `O_EXCL`)
+- [x] H1 - `skill remove --path` symlinked-ancestor containment (done - PR #82)
+- [x] H2 - install write TOCTOU symlink race (exclusive `"xb"` create) (done - PR #82)
 - [x] H3 - `test_dirs` config glob containment vs project root (done - PR #81)
 - [ ] H4 - cache tmp write via `mkstemp` (`O_EXCL` + unguessable name)
 - [ ] H5 - `_maybe_seed_secondary_for_opencode` dangling-symlink `touch()` guard
+- [ ] H6 - prefer `pathlib.Path` over `os.path`/`os` where a safe equivalent exists (cleanup; last item before closing the plan)
 
 ### H1 - `skill remove --path` validates the path tail lexically; a symlinked ancestor can escape
 
@@ -83,6 +84,17 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
   existing terminal-symlink handling (it unlinks the link, not its target).
   Given this is an opt-in, user-named escape hatch, treating the residual
   ancestor-symlink case as accepted-and-documented risk is also defensible.
+- **Fixed (PR #82)**: added `_resolved_install_shape_ok`, which re-runs the
+  tail match on `path.parent.resolve(strict=False) / path.name`. `_remove_path`
+  now requires both the lexical and the resolved match. `Path.resolve(strict=False)`
+  does not raise on a missing path or symlink loop, so there is no `except`
+  to trip SAFE203, and it rewrites only the symlinked prefix - a real unusual parent (or a platform prefix
+  symlink like macOS's `/var` -> `/private/var`) leaves the install tail
+  intact and still passes. The leaf name is appended verbatim so
+  `_remove_existing`'s terminal-symlink handling is preserved. Tests:
+  `test_remove_path_refuses_symlinked_ancestor_redirect` (redirect blocked)
+  and `test_remove_path_accepts_shape_preserving_symlinked_parent` (dotfile
+  symlink still works, no over-rejection).
 
 ### H2 - install write is check-then-act (TOCTOU symlink race)
 
@@ -106,6 +118,16 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
   to `O_CREAT | O_EXCL` (creation fails if the name already exists, closing
   the predictable-target race) plus an `is_symlink()` check immediately before
   the write. The remediation's tests should cover both code paths.
+- **Fixed (PR #82)**: `_install_copy` now writes through a new
+  `_write_new_file_exclusive` helper using `Path.open("xb")` (exclusive
+  create). POSIX makes `O_CREAT | O_EXCL` fail on a symlink too (`EEXIST`,
+  regardless of the link target), so this covers the planted-symlink case
+  without an explicit `O_NOFOLLOW` / `os.open` (simpler, and keeps the helper
+  inside pathlib); Windows gets the same exclusive-create guarantee. The
+  helper name carries "write" so SAFE304 reads it as I/O-by-intent, and the
+  `with` keeps SAFE401 happy. Tests: `test_install_copy_refuses_symlink_planted_at_target`
+  (symlink at target -> `FileExistsError`, victim untouched) and
+  `test_install_copy_writes_fresh_file_content` (happy path).
 
 ### H3 - `test_dirs` config globs outside the project root (read/stat only)
 
@@ -171,6 +193,37 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - **Fix**: add an explicit `if secondary.is_symlink(): return` (or
   `secondary.lstat()`-based check) before `touch()` - it must catch the
   dangling case that `exists()` misses.
+
+### H6 - prefer `pathlib.Path` over `os.path` / `os` where a safe equivalent exists
+
+- **Severity**: cleanup / consistency (no vulnerability of its own). **Scope**:
+  whole `src/` tree. This is the final pass before closing the plan: a
+  `Path`-first codebase reads better and gives fewer footguns than ad-hoc
+  `os.path` string munging, but the migration must be **case-by-case** - some
+  `os` calls have no clean `Path` equivalent and must stay (documented inline
+  so a later reviewer does not "tidy" them into a regression).
+- **What** (audit of remaining `os` usages, 2026-06-26):
+  - `_skill_install._resolved_install_shape_ok` - **already migrated** in
+    PR #82 from `os.path.realpath` to `Path.resolve(strict=False)` (the H1
+    fix), and that file no longer imports `os`.
+  - `cli.py` / `engine.py` `os.walk(target, followlinks=False)` - **keep**.
+    `Path.walk(follow_symlinks=False)` only exists on Python 3.12+, but
+    `requires-python = ">=3.11"`, and the `followlinks=False` is a deliberate
+    security control (no symlink-dir descent / cycle). Revisit only if the
+    Python floor moves to 3.12.
+  - `cli.py` `os.environ.get("PRE_COMMIT")` - **keep**. Environment lookup;
+    `Path` has no bearing.
+  - `test_coverage.py` `os.path.normpath` (the H3 lexical containment) -
+    **keep**. `normpath` collapses `..` **lexically without touching the
+    filesystem**; `Path.resolve()` would hit the fs and follow symlinks, which
+    is exactly what H3 must avoid. There is no pure-`pathlib` lexical-collapse
+    equivalent, so this `os.path` use is correct and must stay (it already
+    carries an inline comment saying so).
+- **Fix / outcome**: the only genuinely migratable case was the H1 path, now
+  done. The remaining `os` uses are justified; closing H6 is mostly recording
+  *why* each stays so the decision is auditable. If a future change introduces
+  a new `os.path` call, default to `Path` unless one of the above exceptions
+  applies.
 
 ## Verified clean (recorded so the covered surface is auditable)
 
