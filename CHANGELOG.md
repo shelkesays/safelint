@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.6.1] - 2026-06-26
+
+**Security-hardening release.** Six findings (H1-H6) from the 2026-06-25 internal security audit, all **LOW** severity and none reachable in the default no-flag flow: symlink/TOCTOU defences across `skill remove --path`, `skill install` (copy), the result-cache temp write, and the OpenCode seed step, plus containment of the `test_dirs` config search to the project root and an `os` -> `pathlib` cleanup. No rule, CLI, or config-key behaviour changes; purely defensive. See `plan/security-hardening.md` for the full audit record.
+
 ### Security
 
 - **Contain `test_dirs` filesystem search to the project root (audit finding H3).** A relative `test_dirs` config value that climbs out of the project root via `..` (e.g. `["../../etc"]`) previously let SAFE701 / SAFE702's `rglob` probe directories outside the tree (read/stat only - a single existence bit, no exfiltration). Relative entries are now collapsed lexically and dropped if they escape the root; absolute `test_dirs` remain honoured (an explicit, supported config choice). LOW severity, opt-in rules; from the 2026-06-25 internal security audit (see `plan/security-hardening.md`). First of the audit's hardening items.
@@ -847,7 +851,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.6.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.6.1...HEAD
+[2.6.1]: https://github.com/shelkesays/safelint/compare/v2.6.0...v2.6.1
 [2.6.0]: https://github.com/shelkesays/safelint/compare/v2.5.0...v2.6.0
 [2.5.0]: https://github.com/shelkesays/safelint/compare/v2.4.0...v2.5.0
 [2.4.0]: https://github.com/shelkesays/safelint/compare/v2.3.0...v2.4.0
