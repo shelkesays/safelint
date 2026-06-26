@@ -105,6 +105,42 @@ def test_install_copy_project_scope(monkeypatch: pytest.MonkeyPatch, tmp_path: P
     assert not (home / ".claude").exists()
 
 
+@pytest.mark.skipif(sys.platform == "win32", reason="O_NOFOLLOW is POSIX-only; the O_EXCL guard is covered by the existing copy tests on Windows")
+def test_install_copy_refuses_symlink_planted_at_target(tmp_path: Path) -> None:
+    """``_install_copy`` must not follow a symlink planted at the target between check and write (H2).
+
+    The TOCTOU window: ``_install_one`` checks for an existing target and
+    (under ``--force``) removes it before the copy. A symlink appearing in
+    that window would let plain ``shutil.copyfile`` truncate whatever it
+    points at. Exclusive create (``O_CREAT | O_EXCL`` via ``"xb"`` mode,
+    which POSIX makes fail on a symlink too) makes the write raise
+    ``FileExistsError`` instead of clobbering the victim.
+    """
+    victim = tmp_path / "victim.txt"
+    victim.write_text("SECRET - DO NOT CLOBBER\n", encoding="utf-8")
+    source = tmp_path / "source.md"
+    source.write_text("new skill content\n", encoding="utf-8")
+    target = tmp_path / "target.md"
+    target.symlink_to(victim)  # planted in the TOCTOU window
+
+    with pytest.raises(FileExistsError):
+        _skill_install._install_copy(source, target)
+    # Victim untouched.
+    assert victim.read_text(encoding="utf-8") == "SECRET - DO NOT CLOBBER\n"
+
+
+def test_install_copy_writes_fresh_file_content(tmp_path: Path) -> None:
+    """``_install_copy`` writes source bytes verbatim to a non-existent target (happy path for the hardened write)."""
+    source = tmp_path / "source.md"
+    source.write_text("bundled skill body\n", encoding="utf-8")
+    target = tmp_path / "nested" / "dir" / "target.md"
+
+    _skill_install._install_copy(source, target)
+    assert target.is_file()
+    assert not target.is_symlink()
+    assert target.read_text(encoding="utf-8") == "bundled skill body\n"
+
+
 # ---------------------------------------------------------------------------
 # run_install: symlink mode
 # ---------------------------------------------------------------------------
@@ -3161,6 +3197,56 @@ def test_remove_path_accepts_unusual_parent_with_known_install_shape(tmp_path: P
     rc = _skill_install.run_remove(_make_remove_args(path=odd_install))
     assert rc == 0
     assert not odd_install.exists()
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_remove_path_refuses_symlinked_ancestor_redirect(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """``--path`` must refuse a path whose *lexical* tail matches but whose ancestor symlink redirects elsewhere (H1).
+
+    The lexical tail ``.cursor/rules/safelint.mdc`` matches Cursor's
+    ``install_relpath``, so the shape guard alone would accept it - but
+    ``rules`` is a symlink into an unrelated tree, so removing the leaf
+    would delete a victim file. ``_resolved_install_shape_ok`` re-checks
+    the tail after resolving ancestors and rejects the redirect.
+    """
+    victim = tmp_path / "victim"
+    victim.mkdir()
+    decoy = victim / "safelint.mdc"
+    decoy.write_text("VICTIM DATA - DO NOT DELETE\n", encoding="utf-8")
+    install = tmp_path / "fake" / ".cursor"
+    install.mkdir(parents=True)
+    (install / "rules").symlink_to(victim, target_is_directory=True)
+    attack_path = install / "rules" / "safelint.mdc"  # resolves into victim/
+    assert attack_path.exists()  # reachable through the symlinked ancestor
+
+    rc = _skill_install.run_remove(_make_remove_args(path=attack_path))
+    assert rc == 1
+    # Victim file untouched.
+    assert decoy.read_text(encoding="utf-8") == "VICTIM DATA - DO NOT DELETE\n"
+    err = capsys.readouterr().err
+    assert "refusing to remove" in err
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_remove_path_accepts_shape_preserving_symlinked_parent(tmp_path: Path) -> None:
+    """A symlinked parent that still resolves to an install-shaped tail stays removable (no over-rejection).
+
+    Dotfile setups commonly symlink ``~/.cursor`` to a managed clone that
+    keeps the same directory names. Resolving the ancestor leaves the
+    ``.cursor/rules/safelint.mdc`` tail intact, so removal is allowed.
+    """
+    real = tmp_path / "dotfiles" / ".cursor" / "rules"
+    real.mkdir(parents=True)
+    leaf = real / "safelint.mdc"
+    leaf.write_text("safelint cursor rule\n", encoding="utf-8")
+    link_home = tmp_path / "home"
+    link_home.mkdir()
+    (link_home / ".cursor").symlink_to(tmp_path / "dotfiles" / ".cursor", target_is_directory=True)
+    via_link = link_home / ".cursor" / "rules" / "safelint.mdc"
+
+    rc = _skill_install.run_remove(_make_remove_args(path=via_link))
+    assert rc == 0
+    assert not leaf.exists()
 
 
 def test_path_looks_like_safelint_install_recognises_every_registered_client() -> None:

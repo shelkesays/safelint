@@ -773,10 +773,35 @@ def _install_symlink(source: Path, target: Path) -> None:
     target.symlink_to(source, target_is_directory=False)
 
 
+def _write_new_file_exclusive(target: Path, data: bytes) -> None:
+    """Write *data* to a freshly-created *target*, refusing to clobber or follow an existing path.
+
+    ``"x"`` mode is ``O_CREAT | O_EXCL``: the create fails with
+    ``FileExistsError`` if anything already occupies *target*. POSIX
+    specifies that ``O_CREAT | O_EXCL`` fails on a symbolic link too
+    (``EEXIST``, regardless of the link's contents), so this also refuses
+    to follow a symlink planted at *target* without needing ``O_NOFOLLOW``;
+    Windows relies on the same exclusive-create check. The "write" in the
+    name is deliberate - it tells SAFE304 this function is I/O by intent.
+    """
+    with target.open("xb") as fh:
+        fh.write(data)
+
+
 def _install_copy(source: Path, target: Path) -> None:
-    """Copy *source* to *target* as a single file."""
+    """Copy *source* to *target* as a single fresh file.
+
+    Writes via :func:`_write_new_file_exclusive` (exclusive create) rather
+    than ``shutil.copyfile``. ``_install_one`` checks for an existing target
+    and removes it under ``--force`` before reaching here, leaving a window
+    in which a symlink planted at *target* could redirect ``shutil.copyfile``
+    onto an unrelated file. The exclusive create closes that window: it fails
+    rather than truncating whatever a freshly-appeared *target* points at.
+    The resulting ``FileExistsError`` surfaces the concurrent-create case
+    instead of silently clobbering.
+    """
     target.parent.mkdir(parents=True, exist_ok=True)
-    shutil.copyfile(source, target)
+    _write_new_file_exclusive(target, source.read_bytes())
 
 
 # ---------------------------------------------------------------------------
@@ -1658,6 +1683,34 @@ def _path_looks_like_safelint_install(path: Path) -> bool:
     return False
 
 
+def _resolved_install_shape_ok(path: Path) -> bool:
+    """Re-check the install shape after resolving *path*'s ancestor symlinks.
+
+    ``_path_looks_like_safelint_install`` matches the *lexical* tail, so a
+    symlinked ancestor that redirects the removal onto an unrelated real
+    tree (``~/x/.cursor/rules`` -> ``/victim/data``) would still pass it.
+    Resolving the parent and re-running the tail match closes that gap: a
+    symlink that lands on a non-install-shaped location fails here, while
+    genuinely unusual *real* parents - and symlinks that still resolve to
+    an install-shaped tail - keep working.
+
+    Two deliberate choices:
+
+    - ``Path.resolve(strict=False)`` resolves ancestor symlinks without
+      raising on a missing path or a symlink loop, so it needs no ``except``
+      (which would trip SAFE203). It rewrites only the symlinked *prefix*;
+      an unusual-but-real parent, or a platform prefix symlink like macOS's
+      ``/var`` -> ``/private/var``, leaves the install-shaped tail intact
+      and still matches.
+    - The leaf name is appended verbatim rather than resolved.
+      ``_remove_existing`` deliberately unlinks a leaf symlink as the link
+      itself (not its target), so following the leaf would mischaracterise
+      what actually gets removed.
+    """
+    resolved = path.parent.resolve(strict=False) / path.name
+    return _path_looks_like_safelint_install(resolved)
+
+
 def _print_remove_path_unrecognised(path: Path) -> None:
     """Stderr error emitted when ``--path PATH`` doesn't look like a safelint install."""
     print(
@@ -1674,16 +1727,19 @@ def _remove_path(path: Path, *, dry_run: bool) -> int:
 
     **Security guard:** the path's tail must match some registered
     client's ``install_relpath`` (see
-    :func:`_path_looks_like_safelint_install`). This prevents typos
-    and shell-expansion accidents (e.g. ``--path ~/.config`` instead
-    of ``--path ~/.cursor/rules/safelint.mdc``) from triggering
-    ``shutil.rmtree`` on the wrong directory. Truly unusual install
-    locations should be removed manually with ``rm``.
+    :func:`_path_looks_like_safelint_install`), *and* that tail must
+    still match after resolving ancestor symlinks (see
+    :func:`_resolved_install_shape_ok`). The first check prevents typos
+    and shell-expansion accidents (e.g. ``--path ~/.config`` instead of
+    ``--path ~/.cursor/rules/safelint.mdc``); the second prevents a
+    symlinked ancestor from redirecting the removal onto an unrelated
+    real tree. Truly unusual install locations should be removed
+    manually with ``rm``.
     """
     if not path.exists() and not path.is_symlink():
         _print_remove_path_missing(path)
         return 1
-    if not _path_looks_like_safelint_install(path):
+    if not _path_looks_like_safelint_install(path) or not _resolved_install_shape_ok(path):
         _print_remove_path_unrecognised(path)
         return 1
     shape = "symlink" if path.is_symlink() else "copy"
