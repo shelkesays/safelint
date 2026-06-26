@@ -141,6 +141,26 @@ def test_install_copy_writes_fresh_file_content(tmp_path: Path) -> None:
     assert target.read_text(encoding="utf-8") == "bundled skill body\n"
 
 
+def test_install_concurrent_create_is_reported_not_crashed(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A ``FileExistsError`` from the exclusive-create write (the H2 race) is a handled failure, not a traceback.
+
+    The exclusive create raises ``FileExistsError`` when something appears at
+    the target between ``_install_one``'s check and the write. ``run_install``
+    documents that unexpected errors propagate, so without handling this the
+    defended-against race would surface as a user-visible traceback. It must
+    instead print a clear message and return exit code 1.
+    """
+    home, _ = _redirect_home_and_cwd(monkeypatch, tmp_path)
+    monkeypatch.setattr(_skill_install, "_install_copy", lambda *_args: (_ for _ in ()).throw(FileExistsError))
+
+    rc = _skill_install.run_install(_make_args(client="claude"))
+    assert rc == 1
+    err = capsys.readouterr().err
+    assert "created by another process" in err
+    # Nothing was installed.
+    assert not (home / ".claude" / "skills" / "safelint" / "SKILL.md").exists()
+
+
 # ---------------------------------------------------------------------------
 # run_install: symlink mode
 # ---------------------------------------------------------------------------

@@ -175,12 +175,15 @@ def compute_file_key(source: bytes, engine_fingerprint: str, filepath: str) -> s
 def _atomic_write_json(cache_dir: Path, dest: Path, payload: dict[str, Any]) -> None:
     """Serialise *payload* to *dest* via an exclusive-create temp + atomic rename.
 
-    ``tempfile.mkstemp`` creates the temp with ``O_CREAT | O_EXCL | O_NOFOLLOW``
-    under an unguessable random name, so a pre-planted symlink / predictable tmp
-    name in an attacker-writable cache dir can't be followed or clobbered (audit
-    finding H4). There is no pathlib equivalent for an atomic exclusive temp
-    create, so the raw fd from ``mkstemp`` - and the ``os.fdopen`` that writes
-    through it without ever reopening by name - are deliberate.
+    ``tempfile.mkstemp`` creates the temp with ``O_CREAT | O_EXCL`` (plus
+    ``O_NOFOLLOW`` where the platform provides it - POSIX, not Windows) under an
+    unguessable random name. The security property holds cross-platform from
+    ``O_EXCL`` + the unpredictable name: a pre-planted symlink / predictable tmp
+    name in an attacker-writable cache dir can't be clobbered, and ``O_EXCL``
+    fails on an existing symlink too (audit finding H4). There is no pathlib
+    equivalent for an atomic exclusive temp create, so the raw fd from
+    ``mkstemp`` - and the ``os.fdopen`` that writes through it without ever
+    reopening by name - are deliberate.
 
     Raises ``OSError`` on any filesystem failure; the caller is best-effort and
     swallows it. The temp file is always cleaned up, and the fd never leaks even
