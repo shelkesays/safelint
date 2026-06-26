@@ -53,8 +53,8 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - [x] H1 - `skill remove --path` symlinked-ancestor containment (done - PR #82)
 - [x] H2 - install write TOCTOU symlink race (exclusive `"xb"` create) (done - PR #82)
 - [x] H3 - `test_dirs` config glob containment vs project root (done - PR #81)
-- [ ] H4 - cache tmp write via `mkstemp` (`O_EXCL` + unguessable name)
-- [ ] H5 - `_maybe_seed_secondary_for_opencode` dangling-symlink `touch()` guard
+- [x] H4 - cache tmp write via `mkstemp` (`O_EXCL` + unguessable name) (done - PR #83)
+- [x] H5 - `_maybe_seed_secondary_for_opencode` dangling-symlink `touch()` guard (done - PR #83)
 - [ ] H6 - prefer `pathlib.Path` over `os.path`/`os` where a safe equivalent exists (cleanup; last item before closing the plan)
 
 ### H1 - `skill remove --path` validates the path tail lexically; a symlinked ancestor can escape
@@ -174,6 +174,16 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
   (it is `find_config_root()/".safelint_cache"`, a hardcoded constant).
 - **Fix**: write the tmp file via `tempfile.mkstemp(dir=cache_dir)`
   (`O_CREAT | O_EXCL`) so a pre-planted tmp name / symlink can't be followed.
+- **Fixed (PR #83)**: `LintCache.put` now creates the temp via
+  `tempfile.mkstemp(dir=self.cache_dir, suffix=".json.tmp")` and writes through
+  the returned fd with `os.fdopen(...)` inside a `with` (never reopening by
+  name), then `Path(tmp).replace(path)`. `mkstemp` opens with
+  `O_CREAT | O_EXCL | O_NOFOLLOW` under an unguessable random name, so the old
+  predictable `<key>.json.tmp` symlink-plant is structurally defeated. The
+  raw-fd path is the one place `os` is justified here (no pathlib equivalent
+  for an atomic exclusive temp create); documented inline for H6. Fail-open
+  posture preserved (two `except OSError` arms, `# nosafe: SAFE203`). Test:
+  `test_lint_cache_put_ignores_planted_deterministic_tmp_symlink`.
 
 ### H5 - `_maybe_seed_secondary_for_opencode` touch() follows a dangling `AGENTS.md` symlink
 
@@ -193,6 +203,11 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - **Fix**: add an explicit `if secondary.is_symlink(): return` (or
   `secondary.lstat()`-based check) before `touch()` - it must catch the
   dangling case that `exists()` misses.
+- **Fixed (PR #83)**: the guard is now `if secondary.is_symlink() or
+  secondary.exists(): return`. `is_symlink()` is lstat-based so it is True for
+  a dangling symlink (the case `exists()` misses), and it sits first so a
+  symlinked `AGENTS.md` - dangling or not - is never seeded through. Test:
+  `test_install_opencode_does_not_follow_dangling_agents_md_symlink`.
 
 ### H6 - prefer `pathlib.Path` over `os.path` / `os` where a safe equivalent exists
 

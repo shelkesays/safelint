@@ -40,6 +40,9 @@ import contextlib
 from dataclasses import asdict
 import hashlib
 import json
+import os
+from pathlib import Path
+import tempfile
 from typing import TYPE_CHECKING, Any
 
 from safelint.rules.base import Suggestion, TextEdit, Violation
@@ -47,7 +50,6 @@ from safelint.rules.base import Suggestion, TextEdit, Violation
 
 if TYPE_CHECKING:
     from collections.abc import Iterable
-    from pathlib import Path
 
 
 CACHE_DIR_NAME = ".safelint_cache"
@@ -220,15 +222,28 @@ class LintCache:
         }
         # Atomic-ish write: write to a temp file in the same directory,
         # then rename. Avoids partial-write garbage that future reads
-        # would then need to skip.
-        tmp = path.with_suffix(".json.tmp")
+        # would then need to skip. ``tempfile.mkstemp`` creates the temp
+        # with ``O_CREAT | O_EXCL | O_NOFOLLOW`` under an unguessable random
+        # name, so a pre-planted symlink / predictable tmp name in an
+        # attacker-writable cache dir can't be followed or clobbered (audit
+        # finding H4). There is no pathlib equivalent for an atomic
+        # exclusive temp create, so the raw fd from mkstemp - and the
+        # ``os.fdopen`` that writes through it without ever reopening by
+        # name - are deliberate.
         try:
-            tmp.write_text(json.dumps(payload), encoding="utf-8")
-            tmp.replace(path)
-        # Same fail-open posture: if the rename fails we just don't have
-        # a cache entry for this run. Untestable without filesystem fault
-        # injection.
+            fd, tmp_name = tempfile.mkstemp(dir=self.cache_dir, suffix=".json.tmp")
+        # Fail-open: disk full / permission denied while creating the temp.
         except OSError:  # nosafe: SAFE203
-            # Clean up the temp file if rename failed; double-fail is fine.
+            return
+        tmp = Path(tmp_name)
+        try:
+            with os.fdopen(fd, "w", encoding="utf-8") as fh:
+                fh.write(json.dumps(payload))
+            tmp.replace(path)
+        # Same fail-open posture: if the write / rename fails we just don't
+        # have a cache entry for this run. Untestable without filesystem
+        # fault injection.
+        except OSError:  # nosafe: SAFE203
+            # Clean up the temp file if the write / rename failed; double-fail is fine.
             with contextlib.suppress(OSError):
                 tmp.unlink()
