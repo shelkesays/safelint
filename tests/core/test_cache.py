@@ -239,6 +239,21 @@ def test_atomic_write_json_cleans_up_when_rename_fails(tmp_path: Path, monkeypat
     assert list(cache_dir.glob("*.json.tmp")) == [], "temp file must be cleaned up after a failed rename"
 
 
+def test_atomic_write_json_creates_no_temp_on_serialisation_failure(tmp_path: Path) -> None:
+    """A non-serialisable payload raises before any temp file is created (no orphan ``.json.tmp``).
+
+    ``json.dumps`` runs before ``mkstemp``, so a serialisation error can't leave
+    a temp behind - upholding the helper's "always cleaned up" guarantee.
+    """
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+
+    with pytest.raises(TypeError):
+        _atomic_write_json(cache_dir, cache_dir / "k.json", {"bad": object()})
+
+    assert list(cache_dir.glob("*.json.tmp")) == [], "no temp file may be created when serialisation fails"
+
+
 def test_lint_cache_get_is_resilient_to_corrupt_payload(tmp_path: Path) -> None:
     """A truncated / non-JSON cache file is treated as a miss, not a crash."""
     cache_dir = tmp_path / "cache"
