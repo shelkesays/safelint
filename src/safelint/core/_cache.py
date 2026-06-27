@@ -190,7 +190,10 @@ def _atomic_write_json(cache_dir: Path, dest: Path, payload: dict[str, Any]) -> 
     if ``os.fdopen`` fails before taking ownership of it: the explicit
     ``os.close`` runs only on that path (never a double-close, since once
     ``os.fdopen`` succeeds the ``with`` owns and closes the descriptor).
+    Serialisation happens *before* ``mkstemp`` so a non-serialisable payload
+    raises without ever creating a temp file to orphan.
     """
+    data = json.dumps(payload)  # before mkstemp: a serialisation error leaves no temp behind
     fd, tmp_name = tempfile.mkstemp(dir=cache_dir, suffix=".json.tmp")
     tmp = Path(tmp_name)
     try:
@@ -205,7 +208,7 @@ def _atomic_write_json(cache_dir: Path, dest: Path, payload: dict[str, Any]) -> 
         raise
     try:
         with handle:
-            handle.write(json.dumps(payload))
+            handle.write(data)
         tmp.replace(dest)
     # Cleanup-and-reraise: drop the orphan temp; the error propagates upward.
     except OSError:  # nosafe: SAFE203
