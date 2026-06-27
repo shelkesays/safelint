@@ -37,6 +37,7 @@ project scope (no home fallback).
 from __future__ import annotations
 
 import argparse
+import contextlib
 from dataclasses import dataclass
 import hashlib
 from importlib import resources
@@ -679,14 +680,15 @@ def _maybe_seed_secondary_for_opencode(spec: ClientSpec, *, project: bool) -> No
     secondary = cwd / Path(*spec.secondary_install_relpath)
     # ``is_symlink()`` first (lstat-based, True even for a *dangling* symlink):
     # ``exists()`` follows the link and returns False when the target is
-    # absent, so a dangling ``AGENTS.md`` symlink would otherwise slip
-    # through to ``touch()``, which follows the link and creates an empty
-    # file at the attacker-chosen target (audit finding H5). A non-dangling
-    # symlink is also refused here - we never seed through a link, and the
-    # downstream ``_install_secondary`` already declines to write symlinks.
+    # absent, so a dangling ``AGENTS.md`` symlink would otherwise slip through
+    # and get followed, creating an empty file at the attacker-chosen target
+    # (audit finding H5). This pre-check is the fast path; the actual seed uses
+    # exclusive create, so even a symlink appearing in the check-then-write
+    # window is refused (not followed). ``_install_secondary`` likewise declines
+    # to write symlinks.
     if secondary.is_symlink() or secondary.exists():
         return
-    secondary.touch()
+    _write_empty_file_exclusive(secondary)
 
 
 def _print_no_clients_error(*, scope_description: str) -> None:
@@ -802,6 +804,20 @@ def _write_new_file_exclusive(source: Path, target: Path) -> None:
     """
     with source.open("rb") as src, target.open("xb") as dst:
         shutil.copyfileobj(src, dst)
+
+
+def _write_empty_file_exclusive(path: Path) -> None:
+    """Create *path* as an empty file via exclusive create; no-op if it already exists.
+
+    Exclusive create (``"xb"`` / ``O_CREAT | O_EXCL``) closes the TOCTOU window a
+    plain ``touch()`` leaves: a file or symlink appearing between the caller's
+    pre-check and this create makes ``open`` raise ``FileExistsError`` (``O_EXCL``
+    fails on an existing symlink too), which is suppressed as a no-op - so the
+    seed never writes *through* a symlink race (audit finding H5). The "write"
+    in the name tells SAFE304 this function is I/O by intent.
+    """
+    with contextlib.suppress(FileExistsError), path.open("xb"):
+        pass
 
 
 def _install_copy(source: Path, target: Path) -> None:
@@ -1726,17 +1742,24 @@ def _resolved_install_shape_ok(path: Path) -> bool:
     Two deliberate choices:
 
     - ``Path.resolve(strict=False)`` resolves ancestor symlinks without
-      raising on a missing path or a symlink loop, so it needs no ``except``
-      (which would trip SAFE203). It rewrites only the symlinked *prefix*;
+      raising on a *missing* path. It rewrites only the symlinked *prefix*;
       an unusual-but-real parent, or a platform prefix symlink like macOS's
       ``/var`` -> ``/private/var``, leaves the install-shaped tail intact
-      and still matches.
+      and still matches. It *can* raise ``RuntimeError`` on an infinite
+      symlink loop in an ancestor (and ``OSError`` on some platforms), so
+      resolution failure is caught and treated as a non-match - a looped
+      ``--path`` is refused cleanly rather than tracebacking out of
+      ``_remove_path``.
     - The leaf name is appended verbatim rather than resolved.
       ``_remove_existing`` deliberately unlinks a leaf symlink as the link
       itself (not its target), so following the leaf would mischaracterise
       what actually gets removed.
     """
-    resolved = path.parent.resolve(strict=False) / path.name
+    try:
+        resolved = path.parent.resolve(strict=False) / path.name
+    # A symlink loop in an ancestor raises; refuse the path rather than crash.
+    except (OSError, RuntimeError):  # nosafe: SAFE203
+        return False
     return _path_looks_like_safelint_install(resolved)
 
 

@@ -87,10 +87,14 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - **Fixed (PR #82)**: added `_resolved_install_shape_ok`, which re-runs the
   tail match on `path.parent.resolve(strict=False) / path.name`. `_remove_path`
   now requires both the lexical and the resolved match. `Path.resolve(strict=False)`
-  does not raise on a missing path or symlink loop, so there is no `except`
-  to trip SAFE203, and it rewrites only the symlinked prefix - a real unusual parent (or a platform prefix
+  does not raise on a missing path, and it rewrites only the symlinked prefix - a real unusual parent (or a platform prefix
   symlink like macOS's `/var` -> `/private/var`) leaves the install tail
-  intact and still passes. The leaf name is appended verbatim so
+  intact and still passes. It *can* raise `RuntimeError` on an ancestor symlink
+  loop (per the docs; platform-dependent), so the resolve is wrapped and a
+  resolution failure is treated as a non-match (refused) - though in practice
+  `_remove_path`'s `exists()` / `is_symlink()` pre-check already short-circuits
+  loop/missing paths before this runs (a review-found robustness fix, PR #86).
+  The leaf name is appended verbatim so
   `_remove_existing`'s terminal-symlink handling is preserved. Tests:
   `test_remove_path_refuses_symlinked_ancestor_redirect` (redirect blocked)
   and `test_remove_path_accepts_shape_preserving_symlinked_parent` (dotfile
@@ -205,11 +209,16 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - **Fix**: add an explicit `if secondary.is_symlink(): return` (or
   `secondary.lstat()`-based check) before `touch()` - it must catch the
   dangling case that `exists()` misses.
-- **Fixed (PR #83)**: the guard is now `if secondary.is_symlink() or
-  secondary.exists(): return`. `is_symlink()` is lstat-based so it is True for
-  a dangling symlink (the case `exists()` misses), and it sits first so a
-  symlinked `AGENTS.md` - dangling or not - is never seeded through. Test:
-  `test_install_opencode_does_not_follow_dangling_agents_md_symlink`.
+- **Fixed (PR #83, hardened in #86)**: the guard is `if secondary.is_symlink()
+  or secondary.exists(): return` (`is_symlink()` is lstat-based, True for a
+  dangling symlink - the case `exists()` misses - and sits first). A review on
+  #86 noted that the pre-check is still check-then-act, so the seed now also
+  writes via an exclusive create (`_write_empty_file_exclusive`, `"xb"` /
+  `O_CREAT | O_EXCL`) instead of `touch()`: a symlink appearing in the
+  check-then-write window makes the create fail (`FileExistsError`, treated as a
+  no-op) rather than being followed, closing the residual TOCTOU race. Tests:
+  `test_install_opencode_does_not_follow_dangling_agents_md_symlink` plus
+  `test_write_empty_file_exclusive_*` (creates / no-op-on-symlink / no-op-on-file).
 
 ### H6 - prefer `pathlib.Path` over `os.path` / `os` where a safe equivalent exists
 

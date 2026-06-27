@@ -8,7 +8,6 @@ entries remain honoured (a supported, explicit config choice). See
 
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING
 
 from safelint.core.config import DEFAULTS, deep_merge
@@ -17,6 +16,8 @@ from safelint.rules.test_coverage import _contained_test_dir
 
 
 if TYPE_CHECKING:
+    from pathlib import Path
+
     import pytest
 
 
@@ -82,4 +83,7 @@ def test_contained_test_dir_unit(tmp_path: Path) -> None:
     assert _contained_test_dir("../escape", root) is None
     assert _contained_test_dir("../../etc", root) is None
     # An absolute entry is returned as-is (normalised), regardless of root.
-    assert _contained_test_dir("/var/tmp/tests", root) == Path("/var/tmp/tests")
+    # Build from tmp_path so the path is absolute on every OS (a hard-coded
+    # "/var/..." is relative on Windows and would skip the absolute branch there).
+    external = tmp_path / "elsewhere" / "tests"
+    assert _contained_test_dir(str(external), root) == external
