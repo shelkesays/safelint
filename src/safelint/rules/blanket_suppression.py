@@ -154,6 +154,27 @@ def _go_nolint_label(rest: str) -> str | None:
     return None
 
 
+# clang-tidy's NOLINT family. Bare ``// NOLINT`` / ``// NOLINTNEXTLINE`` (and
+# the ``NOLINTBEGIN`` / ``NOLINTEND`` block markers) suppress *every* check; a
+# parenthesised check list (``// NOLINT(bugprone-foo)``) scopes it and is clean.
+# A space after ``//`` is allowed (clang-tidy accepts ``// NOLINT``); the keyword
+# is case-sensitive uppercase, so prose ``// nolint here`` is left alone. The
+# lookahead keeps ``NOLINTFOO`` from matching the bare ``NOLINT``.
+_C_NOLINT = re.compile(r"^//\s*(NOLINT(?:NEXTLINE|BEGIN|END)?)(?=\(|\s|$)(\([^)]*\))?")
+
+
+def _c_blanket(comment_text: str) -> str | None:
+    """Return the blanket-directive label for a C comment, or None.
+
+    A bare clang-tidy ``NOLINT`` form is blanket; a parenthesised check list
+    (even empty) scopes it and is treated as clean.
+    """
+    match = _C_NOLINT.match(comment_text.strip())
+    if match is None:
+        return None
+    return None if match.group(2) else f"// {match.group(1)}"
+
+
 def _rust_blanket(attr_text: str) -> str | None:
     """Return the blanket-allow label for a Rust attribute, or None.
 
@@ -233,6 +254,7 @@ def _php_blanket(comment_text: str) -> str | None:
 _COMMENT_DETECTORS_BY_LANG = {
     "python": _python_blanket,
     "go": _go_blanket,
+    "c": _c_blanket,
 }
 
 
@@ -241,7 +263,7 @@ class BlanketSuppressionRule(BaseRule):
 
     name = "blanket_suppression"
     code = "SAFE603"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every blanket foreign-analyser suppression in *filepath*."""

@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
-from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
+from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
@@ -29,6 +30,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
+    "c": _C_FUNCTION_TYPES,
 }
 
 
@@ -118,7 +120,7 @@ def _rust_macro_name_text(macro_invocation: tree_sitter.Node) -> str | None:
     return None  # pragma: no cover - defensive: macro field is always identifier or scoped_identifier
 
 
-def _func_display_name(func_node: tree_sitter.Node) -> str:
+def _func_display_name(func_node: tree_sitter.Node, lang_name: str) -> str:
     """Return the function's effective name for display / prefix matching.
 
     Direct ``name`` field wins (Python ``def foo``, JS named function
@@ -134,7 +136,7 @@ def _func_display_name(func_node: tree_sitter.Node) -> str:
     name's lowercase prefix) silently drops every named arrow binding
     that's exactly the case the rule is designed to catch.
     """
-    name_node = func_node.child_by_field_name("name")
+    name_node = function_name_node(func_node, lang_name)
     if name_node is not None:
         return node_text(name_node)
     parent = func_node.parent
@@ -150,7 +152,7 @@ class SideEffectsHiddenRule(BaseRule):
 
     name = "side_effects_hidden"
     code = "SAFE303"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
@@ -165,7 +167,7 @@ class SideEffectsHiddenRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
-            func_name = _func_display_name(node)
+            func_name = _func_display_name(node, lang_name)
             name_lower = func_name.lower()
             if not any(name_lower.startswith(p) or name_lower == p.rstrip("_") for p in pure_prefixes):
                 continue
@@ -187,7 +189,7 @@ class SideEffectsRule(BaseRule):
 
     name = "side_effects"
     code = "SAFE304"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""
@@ -203,7 +205,7 @@ class SideEffectsRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
-            func_name = _func_display_name(node)
+            func_name = _func_display_name(node, lang_name)
             name_lower = func_name.lower()
             if any(kw in name_lower for kw in io_keywords):
                 continue

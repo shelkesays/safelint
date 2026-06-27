@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages import get_language_for_file
-from safelint.languages._node_utils import end_lineno, lineno, node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import end_lineno, function_name_node, lineno, node_text, resolve_lang_name, walk
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
@@ -148,10 +148,7 @@ class FunctionLengthRule(BaseRule):
                 continue
             length = self._function_size(node, count_mode, lang_name, function_types, comment_prefix)
             if length > max_lines:
-                name_node = node.child_by_field_name("name")
-                if name_node is None and lang_name == "c":
-                    decl = node.child_by_field_name("declarator")
-                    name_node = decl.child_by_field_name("declarator") if decl is not None else None
+                name_node = function_name_node(node, lang_name)
                 func_name = node_text(name_node) if name_node else "<anonymous>"
                 unit = _UNIT_BY_MODE.get(count_mode, "lines")
                 violations.append(

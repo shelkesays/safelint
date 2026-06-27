@@ -73,34 +73,31 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
     (e.g. Kotlin / Groovy sources at ``src/test/groovy``); the
     candidate-list generation only owns the filename convention.
     """
+    stem = src_path.stem
     if lang_name in ("javascript", "typescript"):
         # ``.test.<ext>`` / ``.spec.<ext>`` for the language-family's own
         # extension set (a ``.ts`` source pairs with ``.test.ts``, not
         # ``.test.js``).
-        stem = src_path.stem
         extensions = _JS_EXTENSIONS if lang_name == "javascript" else _TS_EXTENSIONS
         return [f"{stem}{infix}{ext}" for infix in (".test", ".spec") for ext in extensions]
-    if lang_name == "java":
-        stem = src_path.stem
-        suffix_forms = [f"{stem}{suf}.java" for suf in _JAVA_TEST_SUFFIXES]
-        prefix_form = [f"Test{stem}.java"]
-        return [*suffix_forms, *prefix_form]
-    if lang_name == "rust":
-        stem = src_path.stem
-        return [f"{stem}{suf}.rs" for suf in _RUST_TEST_SUFFIXES]
-    if lang_name == "go":
-        # Go's convention is a sibling ``<stem>_test.go`` in the SAME
-        # directory as the source - there is no ``tests/`` directory idiom.
-        # The same-directory lookup is handled in ``_find_test_file``;
-        # ``test_dirs`` does not apply to Go.
-        return [f"{src_path.stem}_test.go"]
-    if lang_name == "php":
-        # PHPUnit's convention is ``<ClassName>Test.php`` (StudlyCaps), found
-        # under ``test_dirs`` (default ``tests/``; PHPUnit projects also nest
-        # ``tests/Unit`` / ``tests/Feature``, which the rglob search covers).
-        return [f"{src_path.stem}Test.php"]
+    # Per-language filename conventions (single-return dispatch):
+    # * java - Maven Surefire / Failsafe + Spring Boot suffixes plus the
+    #   legacy ``Test<Class>`` prefix.
+    # * rust - Cargo's ``<stem>.rs`` integration test (+ colocated suffix).
+    # * go - sibling ``<stem>_test.go`` (same dir; ``test_dirs`` N/A, handled
+    #   in ``_find_test_file``).
+    # * php - PHPUnit's ``<Class>Test.php`` under ``test_dirs``.
+    # * c - weak conventions (Unity / Check / CMocka): both ``<stem>_test.c``
+    #   and ``test_<stem>.c``; C projects usually override ``test_dirs``.
+    candidates_by_lang: dict[str, list[str]] = {
+        "java": [f"{stem}{suf}.java" for suf in _JAVA_TEST_SUFFIXES] + [f"Test{stem}.java"],
+        "rust": [f"{stem}{suf}.rs" for suf in _RUST_TEST_SUFFIXES],
+        "go": [f"{stem}_test.go"],
+        "php": [f"{stem}Test.php"],
+        "c": [f"{stem}_test.c", f"test_{stem}.c"],
+    }
     # Python (and any future language without an explicit override).
-    return [f"test_{src_path.stem}.py"]
+    return candidates_by_lang.get(lang_name, [f"test_{stem}.py"])
 
 
 def _test_filename_for_message(src_path: Path, lang_name: str) -> str:
@@ -112,23 +109,21 @@ def _test_filename_for_message(src_path: Path, lang_name: str) -> str:
     common modern convention); for Java, the JUnit 5 default
     ``<ClassName>Test.java``.
     """
+    stem = src_path.stem
     if lang_name in ("javascript", "typescript"):
         # Default to the Jest-style ``.test.<source-extension>`` form so the
         # suggestion matches the source file's own extension.
-        return f"{src_path.stem}.test{src_path.suffix}"
-    if lang_name == "java":
-        return f"{src_path.stem}Test.java"
-    if lang_name == "rust":
-        # Cargo's integration-test convention - bare ``<stem>.rs`` under
-        # ``tests/``. Inline ``#[cfg(test)] mod tests { }`` users won't
-        # see this message since the rule's tree-walk bypass clears
-        # the violation before the message is built.
-        return f"{src_path.stem}.rs"
-    if lang_name == "go":
-        return f"{src_path.stem}_test.go"
-    if lang_name == "php":
-        return f"{src_path.stem}Test.php"
-    return f"test_{src_path.stem}.py"
+        return f"{stem}.test{src_path.suffix}"
+    # Canonical example filename per language (rust: Cargo's ``<stem>.rs``
+    # integration test; c: the ``<stem>_test.c`` form).
+    message_name_by_lang: dict[str, str] = {
+        "java": f"{stem}Test.java",
+        "rust": f"{stem}.rs",
+        "go": f"{stem}_test.go",
+        "php": f"{stem}Test.php",
+        "c": f"{stem}_test.c",
+    }
+    return message_name_by_lang.get(lang_name, f"test_{stem}.py")
 
 
 def _find_test_file(src_path: Path, test_dirs: list[str], lang_name: str) -> bool:
@@ -331,7 +326,7 @@ class TestExistenceRule(BaseRule):
 
     name = "test_existence"
     code = "SAFE701"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when no matching test file can be found.
@@ -377,7 +372,7 @@ class TestCouplingRule(BaseRule):
 
     name = "test_coupling"
     code = "SAFE702"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when the paired test file was not part of this commit."""
