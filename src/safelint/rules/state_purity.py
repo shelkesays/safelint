@@ -35,6 +35,29 @@ def _func_name(func_node: tree_sitter.Node) -> str:
     return node_text(name_node) if name_node else "<anonymous>"
 
 
+def _c_declarator_identifier(node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the name ``identifier`` from a C declaration's declarator child, or None.
+
+    Direct declarator forms on a ``declaration``: a bare ``identifier``
+    (``int x;``), ``init_declarator`` (``int x = 1;``), ``pointer_declarator``
+    (``int *p;``), and ``array_declarator`` (``int a[10];``). Each wraps its
+    inner name on the ``declarator`` field, so the unwrap is an iterative loop
+    (bounded; SAFE105 polices recursion in this codebase) down to the
+    ``identifier``. Non-declarator children (``primitive_type``,
+    ``type_qualifier``, ``storage_class_specifier``) return None.
+    """
+    if node.type not in ("init_declarator", "pointer_declarator", "array_declarator", "identifier"):
+        return None
+    cur: tree_sitter.Node | None = node
+    for _ in range(16):  # bounded unwrap; never recurse
+        if cur is None:
+            return None
+        if cur.type == "identifier":
+            return cur
+        cur = cur.child_by_field_name("declarator")
+    return None
+
+
 def _iter_python_functions(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
     """Yield every Python function (sync or async) definition in *tree*."""
     for node in walk(tree.root_node):
@@ -309,7 +332,7 @@ class GlobalMutationRule(BaseRule):
 
     name = "global_mutation"
     code = "SAFE302"
-    language = ("python", "javascript", "typescript", "java", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "go", "php", "c")
 
     _DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT: ClassVar[list[str]] = [
         "globalThis",  # universal - works in browsers, Node, web workers
@@ -415,7 +438,57 @@ class GlobalMutationRule(BaseRule):
             return self._go_check(filepath, tree)
         if lang_name == "php":
             return self._php_check(filepath, tree)
+        if lang_name == "c":
+            return self._c_check(filepath, tree)
         return self._javascript_check(filepath, tree, lang_name)
+
+    def _c_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag every file-scope mutable variable declaration (C's shared-mutable-state shape).
+
+        Declaration-site detection (like Java / Go): a file-scope variable IS
+        the shared mutable binding regardless of where it is written. Iterating
+        the translation unit's direct children excludes block-scoped locals
+        structurally (they nest under a ``compound_statement``). ``const``
+        declarations are immutable and never fire; function prototypes
+        (``int f(void);``), ``typedef``s, and ``extern`` forward references are
+        not definitions of state and are skipped. ``static`` file-scope
+        variables DO count - they are shared within the translation unit.
+        A file-scope function-pointer variable (``int (*fp)(int);``) is parsed
+        as carrying a ``function_declarator`` and is conservatively skipped here;
+        SAFE313 flags function-pointer declarators instead.
+        """
+        violations: list[Violation] = []
+        for node in tree.root_node.named_children:
+            if node.type == "declaration" and not self._c_declaration_is_exempt(node):
+                violations.extend(self._c_declaration_violations(filepath, node))
+        return violations
+
+    @staticmethod
+    def _c_declaration_is_exempt(decl: tree_sitter.Node) -> bool:
+        """Return True for file-scope declarations that are not mutable variable definitions."""
+        for child in decl.named_children:
+            if child.type == "type_qualifier" and node_text(child) == "const":
+                return True
+            if child.type == "storage_class_specifier" and node_text(child) in ("typedef", "extern"):
+                return True
+            if child.type == "function_declarator":  # a prototype, not a variable
+                return True
+        return False
+
+    def _c_declaration_violations(self, filepath: str, decl: tree_sitter.Node) -> list[Violation]:
+        """Return one violation per declared variable name in a file-scope declaration."""
+        out: list[Violation] = []
+        for child in decl.named_children:
+            ident = _c_declarator_identifier(child)
+            if ident is not None and node_text(ident) != "_":
+                out.append(
+                    self._make_violation_for_node(
+                        filepath,
+                        ident,
+                        f'File-scope variable "{node_text(ident)}" is shared mutable state - scope it to its consumer, or use `const` if it never changes (Power of Ten rule 6)',
+                    )
+                )
+        return out
 
     def _go_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every package-level ``var`` declaration (Go's shared-mutable-state shape).
