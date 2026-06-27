@@ -150,7 +150,7 @@ repos:
         # specs parallel. SafeLint also drops anything not in
         # ``supported_extensions()`` defensively, so the filter just keeps
         # non-source files (Markdown, Makefiles) out in the first place.
-        types_or: [python, javascript, ts, tsx, java, rust, go, php]
+        types_or: [python, javascript, ts, tsx, java, rust, go, php, c]
         files: ^src/
         # Mirror the published hook spec in ``.pre-commit-hooks.yaml``: one
         # process per run so the suppression summary aggregates across all

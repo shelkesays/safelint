@@ -17,6 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from safelint.languages import c as _c_mod
 from safelint.languages import go as _go_mod
 from safelint.languages import java as _java_mod
 from safelint.languages import javascript as _javascript_mod
@@ -25,6 +26,7 @@ from safelint.languages import python as _python_mod
 from safelint.languages import rust as _rust_mod
 from safelint.languages import typescript as _typescript_mod
 from safelint.languages._types import LanguageDefinition
+from safelint.languages.c import C
 from safelint.languages.go import GO
 from safelint.languages.java import JAVA
 from safelint.languages.javascript import JAVASCRIPT
@@ -141,6 +143,21 @@ else:
         _UNAVAILABLE_EXTENSIONS[_ext] = _php_mod.GRAMMAR_INSTALL_HINT
         _UNAVAILABLE_EXTRA_NAMES[_ext] = _php_mod.EXTRA_NAME
 
+# C - only register if ``tree-sitter-c`` is installed (i.e. the ``[c]`` or
+# ``[all]`` extra was selected). C is Holzmann's original language: it ports
+# the 16 cross-language rules and adds five C-only rules (SAFE106 / SAFE310-313)
+# that express the Power-of-Ten clauses every other language adapts away. ``.h``
+# headers register to C (a C++ project's ``.h`` files lint as C; documented).
+# Same shape as the blocks above - keep them parallel so future drift is
+# grep-able.
+if _c_mod._GRAMMAR_AVAILABLE:
+    for _ext in C.file_extensions:
+        _REGISTRY[_ext] = C
+else:
+    for _ext in C.file_extensions:
+        _UNAVAILABLE_EXTENSIONS[_ext] = _c_mod.GRAMMAR_INSTALL_HINT
+        _UNAVAILABLE_EXTRA_NAMES[_ext] = _c_mod.EXTRA_NAME
+
 
 def get_language_for_file(filepath: str) -> LanguageDefinition | None:
     """Return the LanguageDefinition for *filepath* based on its extension, or None.
@@ -210,6 +227,7 @@ __all__ = [
     "PYTHON",
     "TSX",
     "TYPESCRIPT",
+    "C",
     "LanguageDefinition",
     "extra_name_for",
     "get_language_for_file",
