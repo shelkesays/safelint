@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
 from safelint.languages.go import PARAMETER_DECLARATION as _GO_PARAMETER_DECLARATION
@@ -31,6 +32,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
+    "c": _C_FUNCTION_TYPES,
 }
 
 _PY_SPLAT_PARAM_TYPES = frozenset({"list_splat_pattern", "dictionary_splat_pattern"})
@@ -130,6 +132,10 @@ _COUNTED_PARAM_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_COUNTED_PARAM_TYPES,
     "rust": _RUST_COUNTED_PARAM_TYPES,
     "php": _PHP_COUNTED_PARAM_TYPES,
+    # C: each ``parameter_declaration`` is one parameter. ``int f(void)`` has a
+    # single ``void`` parameter_declaration; counting it as one never produces a
+    # false positive at the default max of 7, so it is not special-cased.
+    "c": frozenset({"parameter_declaration"}),
 }
 
 
@@ -156,6 +162,12 @@ def _count_args(func_node: tree_sitter.Node, lang_name: str) -> tuple[int, str |
     expose the parameter list through ``func_node.child_by_field_name("parameters")``.
     """
     params_node = func_node.child_by_field_name("parameters")
+    if params_node is None and lang_name == "c":
+        # C nests the parameter list under the ``function_declarator``
+        # (``func_node.declarator.parameters``), not directly on the
+        # ``function_definition`` like the other languages.
+        decl = func_node.child_by_field_name("declarator")
+        params_node = decl.child_by_field_name("parameters") if decl is not None else None
     # Every function definition has a parameters list (possibly empty).
     # This guard fires only on malformed AST that Tree-sitter produced
     # with errors, in which case zero args is a safe answer.
@@ -234,7 +246,7 @@ class MaxArgumentsRule(BaseRule):
 
     name = "max_arguments"
     code = "SAFE103"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function with more arguments than max_args."""
@@ -250,6 +262,9 @@ class MaxArgumentsRule(BaseRule):
                 count -= 1
             if count > max_args:
                 name_node = node.child_by_field_name("name")
+                if name_node is None and lang_name == "c":
+                    decl = node.child_by_field_name("declarator")
+                    name_node = decl.child_by_field_name("declarator") if decl is not None else None
                 func_name = node_text(name_node) if name_node else "<anonymous>"
                 violations.append(
                     self._make_violation_for_node(
