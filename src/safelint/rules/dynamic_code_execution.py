@@ -74,6 +74,7 @@ _DEFAULT_CALLS_JAVASCRIPT = ["eval", "Function", "execScript"]
 _DEFAULT_CALLS_JAVA = ["forName", "invoke", "eval", "defineClass", "loadClass"]
 _DEFAULT_CALLS_GO = ["Call", "CallSlice", "MethodByName", "Open", "Lookup"]
 _DEFAULT_CALLS_PHP = ["eval", "assert", "create_function", "call_user_func", "call_user_func_array"]
+_DEFAULT_CALLS_C = ["dlopen", "dlsym"]
 
 _DEFAULTS_BY_LANG: dict[str, list[str]] = {
     "python": _DEFAULT_CALLS_PYTHON,
@@ -82,6 +83,7 @@ _DEFAULTS_BY_LANG: dict[str, list[str]] = {
     "java": _DEFAULT_CALLS_JAVA,
     "go": _DEFAULT_CALLS_GO,
     "php": _DEFAULT_CALLS_PHP,
+    "c": _DEFAULT_CALLS_C,
 }
 
 #: Call-expression node types to inspect per language. Python ``call``;
@@ -96,6 +98,7 @@ _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": frozenset({"method_invocation"}),
     "go": frozenset({"call_expression"}),
     "php": frozenset({"function_call_expression"}),
+    "c": frozenset({"call_expression"}),
 }
 
 
@@ -170,6 +173,18 @@ def _php_match(call_node: tree_sitter.Node, names: frozenset[str]) -> str | None
     return name if name is not None and name in names else None
 
 
+def _c_match(call_node: tree_sitter.Node, names: frozenset[str]) -> str | None:
+    """Match a C dynamic-loader call by bare function name (``dlopen`` / ``dlsym``).
+
+    Only ``call_expression`` nodes reach this matcher (see
+    ``_CALL_TYPES_BY_LANG``); ``call_name`` resolves the bare ``identifier``
+    callee. C has no ``eval`` - runtime code loading goes through the dynamic
+    linker, so the default set is narrow.
+    """
+    name = call_name(call_node)
+    return name if name is not None and name in names else None
+
+
 _MATCHERS: dict[str, Callable[[tree_sitter.Node, frozenset[str]], str | None]] = {
     "python": _python_match,
     "javascript": _javascript_match,
@@ -177,6 +192,7 @@ _MATCHERS: dict[str, Callable[[tree_sitter.Node, frozenset[str]], str | None]] =
     "java": _java_match,
     "go": _go_match,
     "php": _php_match,
+    "c": _c_match,
 }
 
 
@@ -185,7 +201,7 @@ class DynamicCodeExecutionRule(BaseRule):
 
     name = "dynamic_code_execution"
     code = "SAFE309"
-    language = ("python", "javascript", "typescript", "java", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "go", "php", "c")
 
     _BASE_KEY: ClassVar[str] = "dynamic_exec_calls"
 
