@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
@@ -37,6 +38,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
+    "c": _C_FUNCTION_TYPES,
 }
 
 # Per-language node-type sets that count as one nesting step.
@@ -82,6 +84,9 @@ _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "rust": frozenset({"if_expression", "if_let_expression", "for_expression", "while_expression", "while_let_expression", "loop_expression", "match_expression"}),
     "go": frozenset({"if_statement", "for_statement", "expression_switch_statement", "type_switch_statement", "select_statement"}),
     "php": frozenset({"if_statement", "while_statement", "do_statement", "for_statement", "foreach_statement", "switch_statement", "try_statement", "match_expression"}),
+    # C: the four loop forms, ``if``, and ``switch``. No try/catch; ``goto``
+    # targets are flat labels, not nesting.
+    "c": frozenset({"if_statement", "for_statement", "while_statement", "do_statement", "switch_statement"}),
 }
 
 
@@ -90,7 +95,7 @@ class NestingDepthRule(BaseRule):
 
     name = "nesting_depth"
     code = "SAFE102"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function whose maximum control-flow nesting depth exceeds max_depth."""

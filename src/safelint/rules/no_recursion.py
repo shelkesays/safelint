@@ -31,6 +31,7 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
@@ -62,6 +63,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
+    "c": _C_FUNCTION_TYPES,
 }
 
 #: The call-expression node type(s) per language. Most languages have a
@@ -81,6 +83,7 @@ _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": frozenset({"method_invocation"}),
     "go": frozenset({"call_expression"}),
     "php": frozenset({"function_call_expression", "member_call_expression", "nullsafe_member_call_expression", "scoped_call_expression"}),
+    "c": frozenset({"call_expression"}),
 }
 
 #: Identifiers that name "the current object" per language. A call
@@ -280,12 +283,33 @@ def _directly_nested_function_names(func: tree_sitter.Node, func_types: frozense
     return names
 
 
+def _c_function_name(func: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the ``identifier`` node naming a C ``function_definition``, or None.
+
+    C nests the name under the ``declarator`` field rather than exposing a
+    ``name`` field: ``function_definition.declarator`` is a ``function_declarator``
+    (or a ``pointer_declarator`` wrapping one, for pointer-returning functions),
+    whose own ``declarator`` is the name ``identifier``. The walk is iterative
+    (SAFE105 polices this codebase) and unwraps pointer/array declarators on
+    both levels.
+    """
+    decl = func.child_by_field_name("declarator")
+    while decl is not None and decl.type in ("pointer_declarator", "array_declarator"):
+        decl = decl.child_by_field_name("declarator")
+    if decl is None or decl.type != "function_declarator":
+        return None
+    inner = decl.child_by_field_name("declarator")
+    while inner is not None and inner.type in ("pointer_declarator", "parenthesized_declarator"):
+        inner = inner.child_by_field_name("declarator")
+    return inner if inner is not None and inner.type == "identifier" else None
+
+
 class NoRecursionRule(BaseRule):
     """Flag functions that call themselves directly (Power of Ten rule 1)."""
 
     name = "no_recursion"
     code = "SAFE105"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every function whose body directly calls itself."""
@@ -316,7 +340,7 @@ class NoRecursionRule(BaseRule):
         nested binding (not recursion), so bare self-calls are skipped while
         ``self``/``this``-qualified ones still count.
         """
-        name_node = func.child_by_field_name("name")
+        name_node = _c_function_name(func) if lang == "c" else func.child_by_field_name("name")
         if name_node is None:
             return []
         func_name = node_text(name_node)
