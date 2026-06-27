@@ -997,6 +997,41 @@ def test_install_opencode_does_not_follow_dangling_agents_md_symlink(monkeypatch
     assert not victim.exists(), "dangling AGENTS.md symlink must not be followed into a victim target"
 
 
+def test_write_empty_file_exclusive_creates_when_absent(tmp_path: Path) -> None:
+    """``_write_empty_file_exclusive`` creates an empty file when the path is free."""
+    target = tmp_path / "AGENTS.md"
+    _skill_install._write_empty_file_exclusive(target)
+    assert target.is_file()
+    assert not target.is_symlink()
+    assert target.read_bytes() == b""
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_write_empty_file_exclusive_does_not_follow_planted_symlink(tmp_path: Path) -> None:
+    """A symlink occupying the path is a no-op, not followed - closes the H5 seed TOCTOU race.
+
+    Exclusive create (``"xb"``/``O_EXCL``) fails on an existing symlink, and the
+    helper swallows that as a no-op, so even a symlink appearing in the
+    check-then-write window can't redirect the seed onto a victim file.
+    """
+    victim = tmp_path / "victim.txt"  # target absent (dangling) - the dangerous case
+    planted = tmp_path / "AGENTS.md"
+    planted.symlink_to(victim)
+
+    _skill_install._write_empty_file_exclusive(planted)  # must not raise, must not follow
+
+    assert not victim.exists(), "exclusive create must not be followed through the planted symlink"
+    assert planted.is_symlink(), "the planted symlink itself is left untouched"
+
+
+def test_write_empty_file_exclusive_is_noop_when_file_exists(tmp_path: Path) -> None:
+    """An existing regular file at the path is left untouched (no clobber, no raise)."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("existing content\n", encoding="utf-8")
+    _skill_install._write_empty_file_exclusive(target)
+    assert target.read_text(encoding="utf-8") == "existing content\n"
+
+
 def test_install_codex_without_opencode_does_not_create_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """Without ``.opencode/``, the auto-create is silent and AGENTS.md is NOT spawned.
 
@@ -3288,6 +3323,23 @@ def test_remove_path_accepts_shape_preserving_symlinked_parent(tmp_path: Path) -
     rc = _skill_install.run_remove(_make_remove_args(path=via_link))
     assert rc == 0
     assert not leaf.exists()
+
+
+def test_resolved_install_shape_ok_refuses_on_resolve_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """If ``Path.resolve`` raises (e.g. a symlink loop -> ``RuntimeError``), the guard refuses, not crashes.
+
+    ``_remove_path``'s existence check short-circuits most loop/missing paths
+    before this runs, but ``_resolved_install_shape_ok`` still catches a
+    resolution failure defensively so no caller can traceback through it.
+    """
+
+    def boom_resolve(self: Path, *, strict: bool = False) -> Path:
+        raise RuntimeError
+
+    monkeypatch.setattr(_skill_install.Path, "resolve", boom_resolve)
+    # A canonical Cursor-shaped path (would pass the lexical check).
+    p = tmp_path / ".cursor" / "rules" / "safelint.mdc"
+    assert _skill_install._resolved_install_shape_ok(p) is False
 
 
 def test_path_looks_like_safelint_install_recognises_every_registered_client() -> None:
