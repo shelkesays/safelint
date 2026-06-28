@@ -95,8 +95,12 @@ def test_c_cast_expression_propagates_taint(tmp_path: Path) -> None:
     assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
 
 
-def test_c_struct_field_propagates_receiver_taint(tmp_path: Path) -> None:
-    """A field access (``cfg->cmd``) propagates the tainted receiver."""
+def test_c_reassignment_then_subscript_propagates_taint(tmp_path: Path) -> None:
+    """A reassigned pointer stays tainted, and a subsequent ``cfg[0]`` index keeps it.
+
+    (Struct ``->`` field propagation is covered separately by
+    ``test_c_struct_field_access_propagates_taint``.)
+    """
     src = "void f(char **argv) {\n    char **cfg = argv;\n    system(cfg[0]);\n}\n"
     assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
 

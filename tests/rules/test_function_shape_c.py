@@ -72,11 +72,29 @@ def test_c_too_many_arguments_fires_safe103(tmp_path: Path) -> None:
     assert "many" in safe103[0].message
 
 
-def test_c_void_parameter_is_not_counted_as_an_argument(tmp_path: Path) -> None:
-    """``int f(void)`` is a zero-argument function; SAFE103 must not fire on it."""
+def test_c_void_parameter_counts_as_zero_arguments(tmp_path: Path) -> None:
+    """``int f(void)`` is a zero-argument function; with ``max_args = 0`` it must stay clean."""
     sample = tmp_path / "void.c"
     sample.write_text("int f(void) {\n    return 0;\n}\n", encoding="utf-8")
-    assert not any(v.code == "SAFE103" for v in _engine().check_file(str(sample)).violations)
+    engine = _engine({"rules": {"max_arguments": {"max_args": 0}}})
+    assert not any(v.code == "SAFE103" for v in engine.check_file(str(sample)).violations)
+
+
+def test_c_one_real_parameter_counts_for_safe103(tmp_path: Path) -> None:
+    """A single real parameter is one arg (distinct from the lone ``void`` case)."""
+    sample = tmp_path / "one.c"
+    sample.write_text("int f(int a) {\n    return a;\n}\n", encoding="utf-8")
+    engine = _engine({"rules": {"max_arguments": {"max_args": 0}}})
+    assert any(v.code == "SAFE103" for v in engine.check_file(str(sample)).violations)
+
+
+def test_c_pointer_returning_function_args_are_counted(tmp_path: Path) -> None:
+    """A pointer-returning function nests its params under a wrapped declarator; they must still count."""
+    sample = tmp_path / "ptr_args.c"
+    sample.write_text("char *make(int a, int b, int c, int d, int e, int f, int g, int h) {\n    return 0;\n}\n", encoding="utf-8")
+    safe103 = [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE103"]
+    assert len(safe103) == 1
+    assert "8 arguments" in safe103[0].message
 
 
 def test_c_high_complexity_fires_safe104(tmp_path: Path) -> None:

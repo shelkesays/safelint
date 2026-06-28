@@ -132,10 +132,8 @@ _COUNTED_PARAM_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_COUNTED_PARAM_TYPES,
     "rust": _RUST_COUNTED_PARAM_TYPES,
     "php": _PHP_COUNTED_PARAM_TYPES,
-    # C: each ``parameter_declaration`` is one parameter. ``int f(void)`` has a
-    # single ``void`` parameter_declaration; counting it as one never produces a
-    # false positive at the default max of 7, so it is not special-cased.
-    "c": frozenset({"parameter_declaration"}),
+    # C is counted by ``_count_c_args`` (it unwraps the declarator and treats a
+    # lone ``void`` as zero), so it has no entry here.
 }
 
 
@@ -154,6 +152,39 @@ def _python_param_identifier(child: tree_sitter.Node) -> str | None:
     return node_text(name_node) if name_node else None
 
 
+def _is_c_void_param(param: tree_sitter.Node) -> bool:
+    """Return True if *param* is a lone ``void`` (``int f(void)`` - zero arguments).
+
+    A ``void`` parameter has a ``primitive_type`` child whose text is ``void``
+    and no declarator (an actual ``void *`` argument carries a
+    ``pointer_declarator``, so it is not matched).
+    """
+    return param.child_by_field_name("declarator") is None and any(c.type == "primitive_type" and node_text(c) == "void" for c in param.named_children)
+
+
+def _count_c_args(func_node: tree_sitter.Node) -> int:
+    """Count C parameters, unwrapping the declarator and treating a lone ``void`` as zero.
+
+    Parameters nest under ``function_declarator.parameters``; the function's own
+    declarator may be wrapped in a ``pointer_declarator`` for a pointer-returning
+    function (``char *foo(...)``), so the declarator chain is unwrapped to the
+    ``function_declarator`` first (bounded loop). ``int f(void)`` is C's spelling
+    for *no* parameters and counts as zero.
+    """
+    decl = func_node.child_by_field_name("declarator")
+    for _ in range(16):
+        if decl is None or decl.type == "function_declarator":
+            break
+        decl = decl.child_by_field_name("declarator")
+    params_node = decl.child_by_field_name("parameters") if decl is not None and decl.type == "function_declarator" else None
+    if params_node is None:  # pragma: no cover - defensive: a function_definition always has a parameter list
+        return 0
+    params = [c for c in params_node.named_children if c.type == "parameter_declaration"]
+    if len(params) == 1 and _is_c_void_param(params[0]):
+        return 0
+    return len(params)
+
+
 def _count_args(func_node: tree_sitter.Node, lang_name: str) -> tuple[int, str | None]:
     """Return (count, first_param_name) for *func_node*.
 
@@ -161,13 +192,14 @@ def _count_args(func_node: tree_sitter.Node, lang_name: str) -> tuple[int, str |
     ``self`` / ``cls``); JavaScript callers ignore it. Both languages
     expose the parameter list through ``func_node.child_by_field_name("parameters")``.
     """
+    if lang_name == "c":
+        # C nests parameters under the ``function_declarator`` (which may itself
+        # be wrapped in a ``pointer_declarator`` for a pointer-returning
+        # function), and ``int f(void)`` is the spelling for *zero* parameters.
+        # ``_count_c_args`` handles both; the generic ``parameters``-field path
+        # below would miss the wrapped declarator and miscount the lone ``void``.
+        return _count_c_args(func_node), None
     params_node = func_node.child_by_field_name("parameters")
-    if params_node is None and lang_name == "c":
-        # C nests the parameter list under the ``function_declarator``
-        # (``func_node.declarator.parameters``), not directly on the
-        # ``function_definition`` like the other languages.
-        decl = func_node.child_by_field_name("declarator")
-        params_node = decl.child_by_field_name("parameters") if decl is not None else None
     # Every function definition has a parameters list (possibly empty).
     # This guard fires only on malformed AST that Tree-sitter produced
     # with errors, in which case zero args is a safe answer.
