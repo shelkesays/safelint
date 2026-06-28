@@ -20,7 +20,8 @@ Per-C quirks worth calling out:
 * ``cast_expression`` (``(char *)x``), ``parenthesized_expression``,
   ``pointer_expression`` (``*p``), unary / binary expressions, and
   ``field_expression`` (``s.field`` / ``p->field``) all pass taint through.
-* The blank identifier ``_`` never enters the tainted set.
+* Unlike Go / Python, C has no blank identifier, so a variable named ``_`` is
+  tracked like any other.
 """
 
 from __future__ import annotations
