@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.analysis.dataflow import TaintTracker
+from safelint.analysis.dataflow_c import CTaintTracker
 from safelint.analysis.dataflow_go import GoTaintTracker
 from safelint.analysis.dataflow_java import JavaTaintTracker
 from safelint.analysis.dataflow_javascript import JsTaintTracker
@@ -12,6 +13,7 @@ from safelint.analysis.dataflow_php import PhpTaintTracker
 from safelint.analysis.dataflow_rust import RustTaintTracker
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
+from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.go import FUNC_LITERAL as _GO_FUNC_LITERAL
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
@@ -49,7 +51,49 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
+    "c": _C_FUNCTION_TYPES,
 }
+
+
+def _c_function_declarator(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Unwrap pointer / array declarators to the ``function_declarator``, or None (bounded loop)."""
+    cur = node
+    for _ in range(16):
+        if cur is None or cur.type == "function_declarator":
+            return cur
+        cur = cur.child_by_field_name("declarator")
+    return None
+
+
+def _c_param_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Unwrap a parameter's declarator to its name ``identifier``, or None (bounded loop)."""
+    cur = node
+    for _ in range(16):
+        if cur is None or cur.type == "identifier":
+            return cur
+        cur = cur.child_by_field_name("declarator")
+    return None
+
+
+def _c_param_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return all parameter names for a C ``function_definition``.
+
+    Parameters nest under ``function_declarator.parameters`` (the function's own
+    declarator may be wrapped in a ``pointer_declarator`` for a pointer-returning
+    function). Each ``parameter_declaration``'s declarator names one parameter,
+    unwrapping pointer / array layers; ``void`` and unnamed prototype parameters
+    contribute nothing. ``argv`` enters tainted this way.
+    """
+    func_decl = _c_function_declarator(func_node.child_by_field_name("declarator"))
+    params_node = func_decl.child_by_field_name("parameters") if func_decl is not None else None
+    if params_node is None:
+        return set()
+    names: set[str] = set()
+    for child in params_node.named_children:
+        ident = _c_param_identifier(child.child_by_field_name("declarator"))
+        if ident is not None:
+            names.add(node_text(ident))
+    return names
 
 
 def _php_param_names(func_node: tree_sitter.Node) -> set[str]:
@@ -571,7 +615,7 @@ class TaintedSinkRule(BaseRule):
 
     name = "tainted_sink"
     code = "SAFE801"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     _DEFAULT_SINKS: ClassVar[list[str]] = [
         "eval",
@@ -846,6 +890,32 @@ class TaintedSinkRule(BaseRule):
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 
+    def _c_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run C taint analysis: seed each function's parameters and track to sinks.
+
+        C executable code lives only inside functions, so there is no top-level
+        pass (unlike PHP). ``argv`` and other parameters seed the tainted set;
+        call-based sources (``getenv`` / ``fgets`` / ``scanf`` / ``read`` /
+        ``recv``) inject taint inside the body, and the classic command-exec /
+        unbounded-copy sinks (``system`` / ``strcpy`` / ``sprintf`` / ...) are
+        flagged when reached by a tainted argument.
+        """
+        sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", "c", default=[])
+        sinks = frozenset(_validated_string_list(sinks_raw, sinks_key))
+        sanitizers_raw, sanitizers_key = resolve_lang_config_lookup(self.config, "sanitizers", "c", default=[])
+        sanitizers = frozenset(_validated_string_list(sanitizers_raw, sanitizers_key))
+        sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", "c", default=[])
+        sources = frozenset(_validated_string_list(sources_raw, sources_key))
+        assume = self._resolve_assume_taint_preserving()
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type not in _C_FUNCTION_TYPES:
+                continue
+            tracker = CTaintTracker(_c_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker.visit(node)
+            violations.extend(self._format_hits(filepath, tracker.sink_hits))
+        return violations
+
     def _format_hits(self, filepath: str, hits: list[tuple[tree_sitter.Node, str, str]]) -> list[Violation]:
         """Convert tracker hits to Violations - same message format for both languages."""
         return [
@@ -860,17 +930,19 @@ class TaintedSinkRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run taint analysis on every function in *tree*, dispatching on language."""
         lang_name = resolve_lang_name(filepath)
+        # JS / TS share a checker that needs the language name; the rest take
+        # ``(filepath, tree)`` and dispatch through the table (single return,
+        # Python is the fallback).
         if lang_name in ("javascript", "typescript"):
             return self._javascript_check(filepath, tree, lang_name)
-        if lang_name == "java":
-            return self._java_check(filepath, tree)
-        if lang_name == "rust":
-            return self._rust_check(filepath, tree)
-        if lang_name == "go":
-            return self._go_check(filepath, tree)
-        if lang_name == "php":
-            return self._php_check(filepath, tree)
-        return self._python_check(filepath, tree)
+        checks = {
+            "java": self._java_check,
+            "rust": self._rust_check,
+            "go": self._go_check,
+            "php": self._php_check,
+            "c": self._c_check,
+        }
+        return checks.get(lang_name, self._python_check)(filepath, tree)
 
 
 class ReturnValueIgnoredRule(BaseRule):
@@ -885,7 +957,7 @@ class ReturnValueIgnoredRule(BaseRule):
 
     name = "return_value_ignored"
     code = "SAFE802"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
