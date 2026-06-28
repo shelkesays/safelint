@@ -141,12 +141,14 @@ class CTaintTracker:
         self.sink_hits.append((call_node, arg_name, sink))
 
     def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool, keep_existing: bool = False) -> None:
-        """Add or remove *target* from the tainted set if it is a non-blank bare name."""
+        """Add or remove *target* from the tainted set if it is a bare name.
+
+        No ``_`` blank-identifier skip: unlike Go / Python, C has no blank
+        identifier, so a variable legitimately named ``_`` is tracked normally.
+        """
         if target.type != "identifier":  # pragma: no cover - callers pre-filter to identifier nodes
             return
         name = node_text(target)
-        if name == "_":  # pragma: no cover - ``_`` is the blank-identifier convention; uncommon as a C variable
-            return
         if is_tainted:
             self.tainted.add(name)
         elif not keep_existing:

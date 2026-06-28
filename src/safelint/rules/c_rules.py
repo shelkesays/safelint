@@ -120,8 +120,8 @@ def _macro_replacement_text(node: tree_sitter.Node) -> str:
 
 
 def _is_unbalanced(text: str) -> bool:
-    """Return True if *text* has unbalanced ``()`` or ``{}`` (a non-complete syntactic unit)."""
-    return text.count("(") != text.count(")") or text.count("{") != text.count("}")
+    """Return True if *text* has unbalanced ``()``, ``{}``, or ``[]`` (a non-complete syntactic unit)."""
+    return text.count("(") != text.count(")") or text.count("{") != text.count("}") or text.count("[") != text.count("]")
 
 
 class ComplexMacroRule(BaseRule):
