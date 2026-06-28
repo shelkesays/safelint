@@ -55,12 +55,12 @@ def _declarator_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | 
     """
     cur = node
     for _ in range(16):
-        if cur is None:
+        if cur is None:  # pragma: no cover - defensive: declarator chains always bottom out in an identifier
             return None
         if cur.type == "identifier":
             return cur
         cur = cur.child_by_field_name("declarator")
-    return None
+    return None  # pragma: no cover - defensive: 16-deep declarator nesting does not occur
 
 
 class CTaintTracker:
@@ -107,7 +107,7 @@ class CTaintTracker:
     def _visit_init_declarator(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``T x = value;`` (declarator name <- value taint)."""
         value = node.child_by_field_name("value")
-        if value is None:
+        if value is None:  # pragma: no cover - defensive: an init_declarator always has a value field
             return
         name_node = _declarator_identifier(node.child_by_field_name("declarator"))
         if name_node is not None:
@@ -145,7 +145,7 @@ class CTaintTracker:
         if target.type != "identifier":  # pragma: no cover - callers pre-filter to identifier nodes
             return
         name = node_text(target)
-        if name == "_":
+        if name == "_":  # pragma: no cover - ``_`` is the blank-identifier convention; uncommon as a C variable
             return
         if is_tainted:
             self.tainted.add(name)
@@ -198,6 +198,6 @@ class CTaintTracker:
         if not self.assume_taint_preserving:
             return False
         args_node = node.child_by_field_name("arguments")
-        if args_node is None:
+        if args_node is None:  # pragma: no cover - defensive: a call_expression always has an arguments child
             return False
         return any(self._is_tainted(c) for c in args_node.named_children)

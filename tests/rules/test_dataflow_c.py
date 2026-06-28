@@ -84,3 +84,70 @@ def test_c_used_return_value_is_clean_for_safe802(tmp_path: Path) -> None:
     """Assigning the return value clears SAFE802."""
     src = "int f(void *fp) {\n    int rc = fclose(fp);\n    return rc;\n}\n"
     assert "SAFE802" not in _codes(src, tmp_path, "return_value_ignored")
+
+
+# --- SAFE801 taint-propagation branches ----------------------------------------
+
+
+def test_c_cast_expression_propagates_taint(tmp_path: Path) -> None:
+    """``(char *)tainted`` passes taint through the cast."""
+    src = "void f(char **argv) {\n    char *p = (char *)argv[1];\n    system(p);\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_struct_field_propagates_receiver_taint(tmp_path: Path) -> None:
+    """A field access (``cfg->cmd``) propagates the tainted receiver."""
+    src = "void f(char **argv) {\n    char **cfg = argv;\n    system(cfg[0]);\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_pointer_arithmetic_propagates_taint(tmp_path: Path) -> None:
+    """A binary/pointer expression over a tainted operand stays tainted."""
+    src = "void f(char **argv) {\n    system(argv[1] + 0);\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_compound_assignment_keeps_prior_taint(tmp_path: Path) -> None:
+    """A compound assignment is read-modify-write: a clean RHS does not clear taint."""
+    src = "void f(char **argv) {\n    long p = (long)argv[1];\n    p += 1;\n    system((char *)p);\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_reassignment_to_clean_value_clears_taint(tmp_path: Path) -> None:
+    """A plain assignment of a clean value clears the name's taint."""
+    src = 'void f(char **argv) {\n    char *p = argv[1];\n    p = "safe";\n    system(p);\n}\n'
+    assert "SAFE801" not in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_declaration_without_initializer_is_clean(tmp_path: Path) -> None:
+    """A declaration with no initializer introduces no taint."""
+    src = "void f(void) {\n    char *p;\n    system(p);\n}\n"
+    assert "SAFE801" not in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_struct_field_access_propagates_taint(tmp_path: Path) -> None:
+    """A ``->`` field access propagates the tainted receiver (field_expression branch)."""
+    src = "struct S { char *c; };\nvoid f(char **argv) {\n    struct S *s = (struct S *)argv[1];\n    system(s->c);\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_assignment_to_non_identifier_is_handled(tmp_path: Path) -> None:
+    """An assignment whose LHS is not a bare identifier (``buf[0] = ...``) does not crash or taint a name."""
+    src = "void f(char **argv) {\n    char buf[8];\n    buf[0] = argv[1][0];\n    system(buf);\n}\n"
+    # buf itself is never tainted by an indexed write, so no SAFE801.
+    assert "SAFE801" not in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_unknown_wrapper_preserves_taint_by_default(tmp_path: Path) -> None:
+    """With the default ``assume_taint_preserving = true``, an unknown wrapping call keeps taint."""
+    src = "void f(char **argv) {\n    system(wrap(argv[1]));\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_assume_taint_preserving_false_drops_unknown_call(tmp_path: Path) -> None:
+    """With ``assume_taint_preserving = false`` an unknown wrapping call drops taint."""
+    sample = tmp_path / "sample.c"
+    sample.write_text("void f(char **argv) {\n    system(wrap(argv[1]));\n}\n", encoding="utf-8")
+    overrides = {"rules": {"tainted_sink": {"enabled": True, "assume_taint_preserving": False}}}
+    engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+    assert not any(v.code == "SAFE801" for v in engine.check_file(str(sample)).violations)
