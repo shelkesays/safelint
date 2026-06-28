@@ -311,3 +311,54 @@ uv run mkdocs build --strict
 Plus new tests proving each guard (a `--path` whose parent symlink redirects
 to a different tree is refused while a real unusual parent still works, the
 raced install target is not followed, the `test_dirs` escape is contained).
+
+---
+
+## SOC sign-off: C language addition (v2.7.0, PR #87)
+
+Security review of the C-support branch (`feature/c-language-support`), reviewing
+**only what the change introduced**, not pre-existing surface. **Verdict: no
+security issues introduced; no behavioural regression to the other seven
+languages.** Reviewed 2026-06-28.
+
+safelint's threat model is unchanged and narrow: it reads source, parses with
+Tree-sitter, and emits violations; it never executes the analysed code, opens
+no network connections, and deserialises nothing.
+
+- **Code execution: none.** The `system` / `popen` / `execl` / `dlopen` strings
+  that appear in the diff are **config data** - C function names safelint
+  *matches against in the user's code* (SAFE801 sinks, SAFE309/310 call lists),
+  never invoked by safelint. No `subprocess` / `eval` / `exec` / `compile` /
+  `pickle` / `__import__` / `socket` / file-write in any new code.
+- **ReDoS: none.** One new regex, `_C_NOLINT`
+  (`^//\s*(NOLINT(?:NEXTLINE|BEGIN|END)?)(?=\(|\s|$)(\([^)]*\))?`), has no nested
+  quantifiers and no ambiguous alternation under a quantifier; `\s*` and
+  `[^)]*` are linear, so it is linear in comment length. The macro-balance check
+  (SAFE311) is `str.count()`, O(n).
+- **Unbounded loops: none.** Every new loop is bounded - `for _ in range(16/32)`
+  (declarator unwraps), `for ... in walk()/named_children` (finite AST), and the
+  one `while len(stack) > 0` is an iterative worklist over a finite tree. No
+  `while` on attacker-controlled input.
+- **Path containment intact.** The H3 control (`_contained_test_dir` /
+  `_find_test_file`) was **not modified**; the C test-file search reuses it. The
+  diff to `test_coverage.py` only changed candidate-filename generation. Adding
+  `.h` to the registry only means safelint parses `.h` files (its purpose);
+  parse errors still emit coordinates only, no content leak.
+- **Supply chain.** One new grammar, `tree-sitter-c` (official, pinned
+  `>=0.23.0`, hash-locked in `uv.lock`) - same trust model as the seven existing
+  grammars, already in SECURITY.md's documented scope. No new risk class.
+- **Cache / skill-install surface (H1-H6) untouched.**
+
+**Regression (other languages).** The branch edits shared files (the function-
+shape rules, `side_effects`, `state_purity`, `test_coverage`, `loop_safety`,
+`dataflow`, `_node_utils`, `config.py`), so non-C behaviour was re-verified:
+
+- Full suite green - 1717 passed, including all 671 existing per-language rule
+  tests (Python / JS / TS / Java / Rust / Go / PHP).
+- The shared refactors are behaviour-preserving: the new
+  `_node_utils.function_name_node(node, lang)` returns
+  `child_by_field_name("name")` for every non-C language (identical to the old
+  inline code); `_func_display_name` keeps its JS anonymous-binding fallback;
+  the `test_coverage` / `dataflow` dict-dispatch refactors (done for `PLR0911`)
+  produce identical routing; and every `_BY_LANG` / `language`-tuple change is
+  purely additive (a `"c"` entry appended, no existing entry touched).
