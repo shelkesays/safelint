@@ -1568,6 +1568,25 @@ DEFAULTS: dict[str, Any] = {
             # ``Exit``) if your project treats those as panic-equivalent.
             "panic_calls_go": ["panic"],
         },
+        # C-only rules (the "Power of Ten homecoming"). SAFE106 is enabled at
+        # warning severity (``goto err`` cleanup is idiomatic, so it surfaces
+        # without blocking ``--fail-on=error``); the other four are opt-in.
+        "nonlocal_jumps": {
+            "enabled": True,
+            "severity": "warning",
+            # Call names treated as non-local jumps alongside ``goto``.
+            "nonlocal_jump_calls_c": ["setjmp", "longjmp", "sigsetjmp", "siglongjmp"],
+        },
+        "dynamic_allocation": {
+            "enabled": False,
+            "severity": "warning",
+            # Heap allocation / free calls. ``malloc`` family plus ``strdup``;
+            # add project allocators (``xmalloc`` / arena helpers) as needed.
+            "allocation_calls_c": ["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup"],
+        },
+        "complex_macro": {"enabled": False, "severity": "warning"},
+        "conditional_compilation": {"enabled": False, "severity": "warning"},
+        "restricted_pointers": {"enabled": False, "severity": "warning"},
     },
 }
 
