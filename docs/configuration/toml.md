@@ -395,8 +395,11 @@ Later   - enable opt-in rules as needed:
           - Go:         empty_error_check, panic_calls_outside_tests
           - PHP:        global_state (PHP is the first non-Python language it
                         applies to; no PHP-only rules, all PHP coverage is shared)
+          - C:          dynamic_allocation, complex_macro, conditional_compilation,
+                        restricted_pointers (the rule 3 / 8 / 9 "homecoming";
+                        nonlocal_jumps is already on at warning severity)
           - test discipline: missing_assertions (set min_assertions = 2 for the
                         Holzmann density), test_existence, test_coupling
 ```
 
-All of these are off by default; see the [Rules reference](rules.md) for each rule's config knobs. `no_recursion` (SAFE105) is the one new rule that is **on by default** (at `warning` severity), so no opt-in step is needed for it.
+All of these are off by default; see the [Rules reference](rules.md) for each rule's config knobs. `no_recursion` (SAFE105) and the C-only `nonlocal_jumps` (SAFE106) are the rules that are **on by default** (at `warning` severity), so no opt-in step is needed for them.

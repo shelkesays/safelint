@@ -29,14 +29,17 @@ Originally designed for mission-critical systems, these principles apply to any 
 | **Rust** | `.rs` | 15 cross-language rules port cleanly (the all-five-languages set); 11 Rust-only rules cover Rust-idiom patterns (panic-in-non-test, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer params, broad `.unwrap()` outside tests, interior-mutable `static`s, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. New in v2.2.0. |
 | **Go** | `.go` | 16 cross-language rules apply (the 13 all-seven core plus `global_mutation` / `dynamic_code_execution` / `resource_lifecycle`); 2 Go-only rules cover Go-idiom patterns: `empty_error_check` (the empty `if err != nil {}` swallow) and `panic_calls_outside_tests` (18 rules total for Go). Headline adaptations: the bare `for {}` infinite loop, the sibling `foo_test.go` convention, the `_ = f()` explicit-discard exemption, and the `defer x.Close()` resource form. New in v2.5.0. |
 | **PHP** | `.php` | 21 rules apply, the widest coverage of any non-Python language (only `bare_except` and `wide_scope_declaration` are skipped). First non-Python home for `global_state` (PHP has a literal `global` keyword). Headline highlights: the `@`-operator error-suppression idiom, superglobal taint sources (`$_GET` / `$_POST` / `$_REQUEST`) feeding `tainted_sink`, and the `break N;` / `continue N;` multi-level loop forms. New in v2.6.0. |
+| **C** | `.c`, `.h` | 21 rules apply: the 16 cross-language ports plus **5 new C-only rules** (Holzmann's original language, clauses every other language adapts away): `nonlocal_jumps` (`goto` / `setjmp`, rule 1), `dynamic_allocation` (`malloc` family, rule 3), `complex_macro` + `conditional_compilation` (preprocessor, rule 8), `restricted_pointers` (rule 9). `nonlocal_jumps` is enabled (warning); the rest opt-in. `.h` lints as C. New in v2.7.0. |
 
-**Rule coverage** - 40 rules total, scoped per language:
+**Rule coverage** - 45 rules total, scoped per language:
 
 | Applies to | # | Rules |
 |---|---|---|
-| **All seven** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP) | 13 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
-| Python / JS / TS / Java / Rust / PHP (not Go) | 2 | `missing_assertions`, `null_dereference` |
-| Python / JS / TS / Java / Go / PHP (not Rust) | 3 | `global_mutation`, `dynamic_code_execution`, `resource_lifecycle` |
+| **All eight** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C) | 13 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
+| Python / JS / TS / Java / Rust / PHP / C (not Go) | 1 | `missing_assertions` |
+| Python / JS / TS / Java / Rust / PHP (not Go, not C) | 1 | `null_dereference` |
+| Python / JS / TS / Java / Go / PHP / C (not Rust) | 2 | `global_mutation`, `dynamic_code_execution` |
+| Python / JS / TS / Java / Go / PHP (not Rust, not C) | 1 | `resource_lifecycle` |
 | Python / JS / TS / Java / PHP | 2 | `empty_except`, `logging_on_error` |
 | Python + PHP | 1 | `global_state` |
 | Python only | 1 | `bare_except` |
@@ -44,10 +47,11 @@ Originally designed for mission-critical systems, these principles apply to any 
 | Java + Spring Boot only | 4 | `spring_*` (SAFE901-904) |
 | Rust only | 11 | `needless_mut`, `unchecked_arithmetic_on_input`, `panic_macros_outside_tests`, `lock_poisoning_ignored`, `silent_result_discard`, `unlogged_error_branch`, `result_unwrap_outside_tests`, `dangerous_mem_ops`, `interior_mutable_static`, `truncating_as_cast`, `undocumented_unsafe` |
 | Go only | 2 | `empty_error_check`, `panic_calls_outside_tests` |
+| C only | 5 | `nonlocal_jumps`, `dynamic_allocation`, `complex_macro`, `conditional_compilation`, `restricted_pointers` |
 
 Rules are skipped per language where the semantics don't translate - e.g. Go has no try/catch, `global` keyword, `var` hoisting, production assertion idiom, or chained-nullable idiom; Rust's `Result` / `Option` / `Drop` model covers its skips with Rust-specific replacements.
 
-**Planned future languages** (working-priority order, no timelines committed): C, C++. SafeLint's registry-driven design makes each addition incremental; see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
+**Planned future languages** (no timelines committed): C++. SafeLint's registry-driven design makes each addition incremental; see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
 
 SafeLint integrates with pre-commit and CI pipelines to prevent unsafe code from entering your codebase.
 
@@ -71,7 +75,7 @@ SafeLint catches these early, automatically, regardless of who wrote the code.
 
 ## Power of Ten - adapted for modern languages
 
-In 1987, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly four decades later, the same failure patterns appear in every fast-moving codebase. SafeLint is those ten rules, adapted for modern languages (Python, JavaScript, TypeScript, Java with the Spring Boot framework preset, Rust, Go, and PHP today; further languages in future releases) and automated.
+In 2006, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly two decades later, the same failure patterns appear in every fast-moving codebase. SafeLint is those ten rules, adapted for modern languages (Python, JavaScript, TypeScript, Java with the Spring Boot framework preset, Rust, Go, PHP, and C today; further languages in future releases) and automated.
 
 | # | Holzmann's Rule | SafeLint Rule | Code |
 |---|---|---|---|
@@ -104,6 +108,7 @@ pip install 'safelint[java]'           # adds .java (Spring Boot framework prese
 pip install 'safelint[rust]'           # adds .rs
 pip install 'safelint[go]'             # adds .go
 pip install 'safelint[php]'            # adds .php
+pip install 'safelint[c]'              # adds .c, .h
 pip install 'safelint[all]'            # every supported language
 
 # Multiple extras compose, for monorepos:
@@ -240,7 +245,7 @@ SafeLint will now run on every `git commit` and block the commit if it finds err
 
 ## What it checks
 
-SafeLint ships **40 rules** across the Holzmann safety categories. **15 are on by default**; **25 are opt-in** (the dataflow trio is opt-in for performance reasons; the test-discipline and assertion rules are opt-in because they only make sense in projects that follow paired-test conventions; `dynamic_code_execution` and `blanket_suppression` are opt-in because they are deliberately opinionated; the four Java + Spring Boot rules are opt-in under vanilla and flipped on automatically by the `spring-boot` framework preset; the eleven Rust-only rules and the two Go-only rules are all opt-in since they encode strict Holzmann-style guidance that's stricter than typical idiom).
+SafeLint ships **45 rules** across the Holzmann safety categories. **16 are on by default**; **29 are opt-in** (the dataflow trio is opt-in for performance reasons; the test-discipline and assertion rules are opt-in because they only make sense in projects that follow paired-test conventions; `dynamic_code_execution` and `blanket_suppression` are opt-in because they are deliberately opinionated; the four Java + Spring Boot rules are opt-in under vanilla and flipped on automatically by the `spring-boot` framework preset; the eleven Rust-only rules and the two Go-only rules are all opt-in; the five C-only rules are opt-in except SAFE106 `nonlocal_jumps`, which is on at warning severity since they encode strict Holzmann-style guidance that's stricter than typical idiom).
 
 ### Default-on rules (15)
 
