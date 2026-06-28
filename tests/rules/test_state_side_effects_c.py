@@ -57,6 +57,11 @@ def test_c_function_prototype_is_clean_for_safe302(tmp_path: Path) -> None:
     assert "SAFE302" not in _codes("int helper(int x);\nint h(void) { return helper(1); }\n", tmp_path)
 
 
+def test_c_function_pointer_global_fires_safe302(tmp_path: Path) -> None:
+    """A file-scope function-pointer *variable* is mutable state (distinct from a prototype)."""
+    assert "SAFE302" in _codes("int (*fp)(int);\nint f(void) { return fp ? 1 : 0; }\n", tmp_path)
+
+
 def test_c_local_variable_is_clean_for_safe302(tmp_path: Path) -> None:
     """A block-scoped local is not file-scope state."""
     assert "SAFE302" not in _codes("int f(void) {\n    int local = 0;\n    return local;\n}\n", tmp_path)

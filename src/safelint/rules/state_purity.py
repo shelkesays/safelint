@@ -40,13 +40,15 @@ def _c_declarator_identifier(node: tree_sitter.Node) -> tree_sitter.Node | None:
 
     Direct declarator forms on a ``declaration``: a bare ``identifier``
     (``int x;``), ``init_declarator`` (``int x = 1;``), ``pointer_declarator``
-    (``int *p;``), and ``array_declarator`` (``int a[10];``). Each wraps its
-    inner name on the ``declarator`` field, so the unwrap is an iterative loop
+    (``int *p;``), ``array_declarator`` (``int a[10];``), and the
+    ``function_declarator`` of a function-pointer variable (``int (*fp)(int);``,
+    whose declarator is a ``parenthesized_declarator``). Each wraps its inner
+    name on the ``declarator`` field, so the unwrap is an iterative loop
     (bounded; SAFE105 polices recursion in this codebase) down to the
     ``identifier``. Non-declarator children (``primitive_type``,
     ``type_qualifier``, ``storage_class_specifier``) return None.
     """
-    if node.type not in ("init_declarator", "pointer_declarator", "array_declarator", "identifier"):
+    if node.type not in ("init_declarator", "pointer_declarator", "array_declarator", "function_declarator", "parenthesized_declarator", "identifier"):
         return None
     cur: tree_sitter.Node | None = node
     for _ in range(16):  # bounded unwrap; never recurse
@@ -54,8 +56,25 @@ def _c_declarator_identifier(node: tree_sitter.Node) -> tree_sitter.Node | None:
             return None
         if cur.type == "identifier":
             return cur
-        cur = cur.child_by_field_name("declarator")
+        nxt = cur.child_by_field_name("declarator")
+        # ``parenthesized_declarator`` (``(*fp)``) wraps its inner declarator as
+        # a plain named child rather than on a ``declarator`` field.
+        if nxt is None and cur.type == "parenthesized_declarator" and cur.named_children:
+            nxt = cur.named_children[0]
+        cur = nxt
     return None
+
+
+def _c_is_function_prototype(function_declarator: tree_sitter.Node) -> bool:
+    """Return True if a ``function_declarator`` is a real prototype, not a function-pointer variable.
+
+    A prototype (``int foo(void);``) names an ``identifier`` directly; a
+    file-scope function-pointer *variable* (``int (*fp)(int);``) wraps a
+    ``parenthesized_declarator`` and IS mutable shared state, so it must NOT be
+    exempted from SAFE302.
+    """
+    inner = function_declarator.child_by_field_name("declarator")
+    return inner is None or inner.type != "parenthesized_declarator"
 
 
 def _iter_python_functions(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
@@ -453,9 +472,10 @@ class GlobalMutationRule(BaseRule):
         (``int f(void);``), ``typedef``s, and ``extern`` forward references are
         not definitions of state and are skipped. ``static`` file-scope
         variables DO count - they are shared within the translation unit.
-        A file-scope function-pointer variable (``int (*fp)(int);``) is parsed
-        as carrying a ``function_declarator`` and is conservatively skipped here;
-        SAFE313 flags function-pointer declarators instead.
+        A file-scope function-pointer *variable* (``int (*fp)(int);``) is
+        mutable shared state and DOES fire: it is distinguished from a real
+        prototype by ``_c_is_function_prototype`` (the function-pointer wraps a
+        ``parenthesized_declarator``, a prototype names an identifier directly).
         """
         violations: list[Violation] = []
         for node in tree.root_node.named_children:
@@ -471,7 +491,7 @@ class GlobalMutationRule(BaseRule):
                 return True
             if child.type == "storage_class_specifier" and node_text(child) in ("typedef", "extern"):
                 return True
-            if child.type == "function_declarator":  # a prototype, not a variable
+            if child.type == "function_declarator" and _c_is_function_prototype(child):
                 return True
         return False
 
