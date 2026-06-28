@@ -142,6 +142,12 @@ def test_c_assignment_to_non_identifier_is_handled(tmp_path: Path) -> None:
     assert "SAFE801" not in _codes(src, tmp_path, "tainted_sink")
 
 
+def test_c_underscore_variable_is_tracked(tmp_path: Path) -> None:
+    """C has no blank identifier, so a variable named ``_`` carries taint normally."""
+    src = "void f(char **argv) {\n    char *_ = argv[1];\n    system(_);\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
+
+
 def test_c_unknown_wrapper_preserves_taint_by_default(tmp_path: Path) -> None:
     """With the default ``assume_taint_preserving = true``, an unknown wrapping call keeps taint."""
     src = "void f(char **argv) {\n    system(wrap(argv[1]));\n}\n"

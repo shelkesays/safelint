@@ -480,7 +480,9 @@ class GlobalMutationRule(BaseRule):
         out: list[Violation] = []
         for child in decl.named_children:
             ident = _c_declarator_identifier(child)
-            if ident is not None and node_text(ident) != "_":
+            # No ``_`` blank-identifier skip here: unlike Go / Python, C has no
+            # blank identifier, so ``int _;`` is a real file-scope mutable variable.
+            if ident is not None:
                 out.append(
                     self._make_violation_for_node(
                         filepath,
