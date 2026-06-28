@@ -326,7 +326,7 @@ def test_every_language_has_its_own_extra() -> None:
     # Keep the exclusion list explicit so adding a new tooling extra
     # forces a deliberate update here.
     language_extras = provides_extras - {"dev", "docs"}
-    expected = {"python", "javascript", "typescript", "java", "rust", "go", "php", "all"}
+    expected = {"python", "javascript", "typescript", "java", "rust", "go", "php", "c", "all"}
     missing = expected - language_extras
     unexpected = language_extras - expected
     assert not missing, f"v2.x contract: every supported language must have its own opt-in extra. Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"
