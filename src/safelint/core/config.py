@@ -1100,6 +1100,41 @@ DEFAULTS: dict[str, Any] = {
                 "$_FILES",
                 "$_ENV",
             ],
+            # C sinks: command execution (``system`` / ``popen`` / the ``exec``
+            # family), and the classic unbounded string / buffer copies
+            # (``sprintf`` / ``strcpy`` / ``strcat`` / ``gets`` / ``memcpy``).
+            "sinks_c": [
+                "system",
+                "popen",
+                "execl",
+                "execlp",
+                "execv",
+                "execvp",
+                "sprintf",
+                "strcpy",
+                "strcat",
+                "gets",
+                "memcpy",
+            ],
+            # C sources: environment / input readers. ``argv`` enters tainted via
+            # function-parameter seeding, so it is not listed as a call source.
+            "sources_c": [
+                "getenv",
+                "fgets",
+                "scanf",
+                "gets",
+                "read",
+                "recv",
+            ],
+            # C sanitizers: a narrow generic set (project validators). Extend via
+            # ``sanitizers_c`` for project-specific input-cleaning helpers.
+            "sanitizers_c": [
+                "sanitize",
+                "validate",
+                "escape",
+                "escapeshellarg",
+                "snprintf",
+            ],
         },
         "return_value_ignored": {
             "enabled": False,
@@ -1278,6 +1313,21 @@ DEFAULTS: dict[str, Any] = {
                 "file_put_contents",
                 "mail",
                 "session_start",
+            ],
+            # C functions whose return value signals success / failure (or a
+            # truncation count) and is commonly discarded. ``malloc``-family is
+            # covered by SAFE310 instead, not here. An explicit ``(void)f()``
+            # cast wraps the call so it is no longer a bare expression-statement
+            # call and does NOT fire.
+            "flagged_calls_c": [
+                "fclose",
+                "fwrite",
+                "fread",
+                "remove",
+                "rename",
+                "fflush",
+                "setvbuf",
+                "snprintf",
             ],
         },
         "null_dereference": {
