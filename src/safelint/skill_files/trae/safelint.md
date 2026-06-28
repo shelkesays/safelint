@@ -23,6 +23,7 @@ If either check returns non-zero (or the shell reports "command not found" / "is
   | `.rs` | `uv add 'safelint[rust]'` or `pip install 'safelint[rust]'` (Rust-specific rules and Holzmann-inspired additions; see `languages/rust.md`) |
   | `.go` | `uv add 'safelint[go]'` or `pip install 'safelint[go]'` (Go-specific rules and idiomatic adaptations; see `languages/go.md`) |
   | `.php` | `uv add 'safelint[php]'` or `pip install 'safelint[php]'` (PHP-specific rules and idiomatic adaptations; see `languages/php.md`) |
+  | `.c`, `.h` | `uv add 'safelint[c]'` or `pip install 'safelint[c]'` (C-specific rules and the Power-of-Ten "homecoming"; see `languages/c.md`) |
   | Multiple languages | Compose, e.g. `pip install 'safelint[python,javascript]'` |
   | Unsure / kitchen-sink | `pip install 'safelint[all]'` |
 
@@ -45,6 +46,7 @@ Look at the project files in cwd to figure out which languages safelint can lint
 | Rust | `.rs` | `languages/rust.md` |
 | Go | `.go` | `languages/go.md` |
 | PHP | `.php` | `languages/php.md` |
+| C | `.c`, `.h` | `languages/c.md` |
 
 (More languages will land over time. To check the live list, run `python -c "from safelint.languages import supported_extensions; print(sorted(supported_extensions()))"`.)
 
@@ -167,6 +169,11 @@ The rule set is shared across all supported languages. Universal rationale crib 
 | SAFE208 | result_unwrap_outside_tests | *Rust-only.* `.unwrap()` / `.expect()` / `.unwrap_unchecked()` outside test code. Broader than SAFE205 (lock-specific) and SAFE803 (nullable-method-specific). Holzmann rule 7 (check return values). |
 | SAFE209 | empty_error_check | *Go-only.* `if err != nil { }` with an empty or comment-only body silently swallows the error. Go analogue of SAFE206; configurable via `error_names_go`. Disabled by default. |
 | SAFE211 | panic_calls_outside_tests | *Go-only.* `panic(...)` in non-`_test.go` files; production paths should return an `error`. Go analogue of SAFE204; configurable via `panic_calls_go`. Disabled by default. |
+| SAFE106 | nonlocal_jumps | *C-only.* Every `goto` and `setjmp`/`longjmp` family call - non-local jumps bypass structured control flow (Power of Ten rule 1). **Enabled** at warning severity; annotate a sanctioned `goto err` cleanup with `// nosafe: SAFE106`. |
+| SAFE310 | dynamic_allocation | *C-only.* Calls to the `malloc` family (`malloc`/`calloc`/`realloc`/`aligned_alloc`/`free`/`strdup`) - rule 3 bans dynamic memory after init. Disabled by default; configurable via `allocation_calls_c`. |
+| SAFE311 | complex_macro | *C-only.* Function-like macros using `##` token paste or `__VA_ARGS__`, and object-like macros whose replacement is not a balanced syntactic unit (rule 8). Disabled by default. |
+| SAFE312 | conditional_compilation | *C-only.* Every `#if`/`#ifdef`/`#ifndef` beyond the include-guard idiom - each doubles the build configurations to test (rule 8). Disabled by default. |
+| SAFE313 | restricted_pointers | *C-only.* Declarators with more than one pointer level (`int **p`) and function-pointer declarators (rule 9). Disabled by default. |
 | SAFE301 | global_state | Global state makes functions impure and breaks local reasoning. |
 | SAFE302 | global_mutation | Reassigning shared module / global state is a Holzmann rule 6 violation. Python `global x; x = ...`; JS/TS writes to `globalThis` / `window` / `process` / etc.; Java non-final `static` field declarations (declaration-site). |
 | SAFE303 | side_effects_hidden | Pure-named functions doing I/O surprise callers. |
