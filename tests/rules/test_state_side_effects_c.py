@@ -42,6 +42,11 @@ def test_c_static_file_scope_variable_fires_safe302(tmp_path: Path) -> None:
     assert "SAFE302" in _codes("static int cache = 0;\nint g(void) { return cache; }\n", tmp_path)
 
 
+def test_c_underscore_global_is_not_skipped_for_safe302(tmp_path: Path) -> None:
+    """C has no blank identifier, so a file-scope ``int _;`` is real mutable state."""
+    assert "SAFE302" in _codes("int _ = 0;\nint f(void) { return _; }\n", tmp_path)
+
+
 def test_c_const_global_is_clean_for_safe302(tmp_path: Path) -> None:
     """A ``const`` file-scope variable is immutable and never fires."""
     assert "SAFE302" not in _codes("const int LIMIT = 10;\nint h(void) { return LIMIT; }\n", tmp_path)

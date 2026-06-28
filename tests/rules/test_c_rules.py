@@ -85,6 +85,11 @@ def test_c_unbalanced_object_macro_fires_safe311(tmp_path: Path) -> None:
     assert "SAFE311" in _codes("#define OPEN if (\n", tmp_path, ["complex_macro"])
 
 
+def test_c_unbalanced_square_bracket_macro_fires_safe311(tmp_path: Path) -> None:
+    """An object-like macro with an unbalanced ``[`` is not a complete syntactic unit."""
+    assert "SAFE311" in _codes("#define BAD arr[\n", tmp_path, ["complex_macro"])
+
+
 def test_c_simple_macro_is_clean_for_safe311(tmp_path: Path) -> None:
     """A simple, balanced macro is clean."""
     assert "SAFE311" not in _codes("#define MAX 10\n#define SQ(x) ((x) * (x))\n", tmp_path, ["complex_macro"])
