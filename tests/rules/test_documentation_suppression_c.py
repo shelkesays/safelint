@@ -82,6 +82,11 @@ def test_c_wildcard_nolint_fires_safe603(tmp_path: Path) -> None:
     assert "SAFE603" in _codes("n.c", "int f(void) { return bad(); } // NOLINT(*)\n", tmp_path, _SUPPRESS_ON)
 
 
+def test_c_whitespace_padded_wildcard_nolint_fires_safe603(tmp_path: Path) -> None:
+    """A tab-padded wildcard ``// NOLINT(\\t*\\t)`` is still the blanket wildcard."""
+    assert "SAFE603" in _codes("n.c", "int f(void) { return bad(); } // NOLINT(\t*\t)\n", tmp_path, _SUPPRESS_ON)
+
+
 def test_c_prose_nolint_is_not_a_directive(tmp_path: Path) -> None:
     """Lowercase prose ``// nolint`` is not the clang-tidy keyword."""
     assert "SAFE603" not in _codes("n.c", "int f(void) { return bad(); } // nolint, just prose\n", tmp_path, _SUPPRESS_ON)

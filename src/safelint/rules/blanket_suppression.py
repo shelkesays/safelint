@@ -176,7 +176,7 @@ def _c_blanket(comment_text: str) -> str | None:
     if match is None:
         return None
     args = match.group(2)
-    if args and args.replace(" ", "") != "(*)":
+    if args and re.sub(r"\s", "", args) != "(*)":
         return None
     return f"// {match.group(1)}"
 
