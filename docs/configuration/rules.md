@@ -628,7 +628,7 @@ allocation_calls_c = ["malloc", "calloc", "realloc", "aligned_alloc", "free", "s
 
 **What it flags:** Preprocessor macros that are not simple, complete syntactic units. **C-only**, new in v2.7.0. Holzmann's rule 8 ("limit the preprocessor to header files and simple macros").
 
-Fires on function-like macros that use token pasting (`##`) or variadic `__VA_ARGS__`, and on object-like macros whose replacement text is not a balanced syntactic unit (heuristic: unbalanced `()` / `{}`). **Disabled by default.**
+Fires on function-like macros that use token pasting (`##`) or variadic `__VA_ARGS__`, and on object-like macros whose replacement text is not a balanced syntactic unit (heuristic: unbalanced `()` / `{}` / `[]`, ignoring brackets inside string and character literals). **Disabled by default.**
 
 ```toml
 # pyproject.toml
