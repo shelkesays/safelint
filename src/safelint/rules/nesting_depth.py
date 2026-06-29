@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
@@ -109,7 +109,7 @@ class NestingDepthRule(BaseRule):
                 continue
             depth = self._max_depth(node, function_types, depth_types)
             if depth > max_depth:
-                name_node = node.child_by_field_name("name")
+                name_node = function_name_node(node, lang_name)
                 func_name = node_text(name_node) if name_node else "<anonymous>"
                 violations.append(
                     self._make_violation_for_node(

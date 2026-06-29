@@ -95,6 +95,16 @@ def test_c_simple_macro_is_clean_for_safe311(tmp_path: Path) -> None:
     assert "SAFE311" not in _codes("#define MAX 10\n#define SQ(x) ((x) * (x))\n", tmp_path, ["complex_macro"])
 
 
+def test_c_bracket_inside_string_literal_is_clean_for_safe311(tmp_path: Path) -> None:
+    """A bracket inside a string literal (``#define OPEN "["``) is balanced - it does not count."""
+    assert "SAFE311" not in _codes('#define OPEN "["\n#define PAREN "("\n', tmp_path, ["complex_macro"])
+
+
+def test_c_escaped_quote_in_string_literal_is_clean_for_safe311(tmp_path: Path) -> None:
+    """An escaped quote does not end the literal, so a trailing ``(`` inside it stays stripped."""
+    assert "SAFE311" not in _codes('#define MSG "say \\"hi\\" ("\n', tmp_path, ["complex_macro"])
+
+
 # --- SAFE312 conditional_compilation (opt-in) ----------------------------------
 
 
@@ -111,6 +121,12 @@ def test_c_if_directive_fires_safe312(tmp_path: Path) -> None:
 def test_c_include_guard_is_clean_for_safe312(tmp_path: Path) -> None:
     """An ``#ifndef X`` + ``#define X`` include guard is exempt."""
     assert "SAFE312" not in _codes("#ifndef HEADER_H\n#define HEADER_H\nint x;\n#endif\n", tmp_path, ["conditional_compilation"])
+
+
+def test_c_ifndef_with_unrelated_define_first_fires_safe312(tmp_path: Path) -> None:
+    """An ``#ifndef X`` whose first body statement is not ``#define X`` is a real conditional."""
+    src = "#ifndef DEBUG\nint enabled;\n#define DEBUG 1\n#endif\n"
+    assert "SAFE312" in _codes(src, tmp_path, ["conditional_compilation"])
 
 
 # --- SAFE313 restricted_pointers (opt-in) --------------------------------------

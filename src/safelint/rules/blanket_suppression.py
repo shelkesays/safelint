@@ -167,12 +167,18 @@ def _c_blanket(comment_text: str) -> str | None:
     """Return the blanket-directive label for a C comment, or None.
 
     A bare clang-tidy ``NOLINT`` form is blanket; a parenthesised check list
-    (even empty) scopes it and is treated as clean.
+    (``// NOLINT(bugprone-foo)``) scopes it and is treated as clean. The one
+    parenthesised form that is *still* blanket is the wildcard ``NOLINT(*)`` -
+    clang-tidy treats ``(*)`` as "every check", so it suppresses everything just
+    like the bare form.
     """
     match = _C_NOLINT.match(comment_text.strip())
     if match is None:
         return None
-    return None if match.group(2) else f"// {match.group(1)}"
+    args = match.group(2)
+    if args and args.replace(" ", "") != "(*)":
+        return None
+    return f"// {match.group(1)}"
 
 
 def _rust_blanket(attr_text: str) -> str | None:

@@ -59,9 +59,15 @@ def test_c_literal_argument_is_clean_for_safe801(tmp_path: Path) -> None:
     assert "SAFE801" not in _codes(src, tmp_path, "tainted_sink")
 
 
-def test_c_compound_assignment_preserves_taint_for_safe801(tmp_path: Path) -> None:
-    """A read-modify-write (``buf += ...``-style via concat helper) keeps prior taint."""
+def test_c_self_assignment_preserves_taint_for_safe801(tmp_path: Path) -> None:
+    """A self-assignment (``p = p``) does not clear an already-tainted variable."""
     src = "void f(char **argv) {\n    char *p = argv[1];\n    p = p;\n    system(p);\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_ternary_result_propagates_taint_for_safe801(tmp_path: Path) -> None:
+    """A conditional (ternary) expression with a tainted arm yields a tainted value."""
+    src = "void f(char **argv, int c) {\n    char *p = c ? argv[1] : argv[2];\n    system(p);\n}\n"
     assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
 
 

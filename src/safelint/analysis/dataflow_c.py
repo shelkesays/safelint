@@ -44,6 +44,7 @@ _SPREADING_TYPES = frozenset(
         "parenthesized_expression",
         "pointer_expression",  # ``*p`` / ``&p``
         "comma_expression",
+        "conditional_expression",  # ``cond ? tainted : clean`` - either branch taints
     }
 )
 
@@ -156,23 +157,50 @@ class CTaintTracker:
             self.tainted.discard(name)
 
     def _is_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* may carry tainted data (iterative worklist, OR semantics)."""
+        """Return True if *node* may carry tainted data (iterative worklist, OR semantics).
+
+        Fully iterative (no recursion - the analysis-module guideline): each
+        worklist node is reduced by ``_taint_step`` to ``(tainted_here, children
+        to examine)``. A sanitizer call clears (no children); a source call
+        taints; an unknown call under ``assume_taint_preserving`` taints iff one
+        of its arguments is tainted, so those arguments stay on the worklist.
+        """
         stack = [node]
         while len(stack) > 0:
-            current = stack.pop()
-            if self._node_directly_tainted(current):
+            terminal, children = self._taint_step(stack.pop())
+            if terminal:
                 return True
-            stack.extend(self._taint_propagating_children(current))
+            stack.extend(children)
         return False
 
-    def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* is a leaf that itself carries taint."""
+    def _taint_step(self, node: tree_sitter.Node) -> tuple[bool, list[tree_sitter.Node]]:
+        """Reduce one worklist node to ``(is_tainted_here, children_to_examine)``."""
         node_type = node.type
         if node_type == "identifier":
-            return node_text(node) in self.tainted
+            return node_text(node) in self.tainted, []
         if node_type == "call_expression":
-            return self._call_tainted(node)
-        return False
+            return self._classify_call(node)
+        return False, self._taint_propagating_children(node)
+
+    def _classify_call(self, node: tree_sitter.Node) -> tuple[bool, list[tree_sitter.Node]]:
+        """Classify a call: ``(is_source, args_to_descend_into)``.
+
+        A sanitizer clears -> ``(False, [])`` (its arguments are not followed).
+        A source taints -> ``(True, [])``. An unknown call propagates only under
+        ``assume_taint_preserving``, in which case its argument nodes are
+        returned for the worklist to examine; otherwise it clears.
+        """
+        name = call_name(node)
+        if name in self.sanitizers:
+            return False, []
+        if name in self.sources:
+            return True, []
+        if not self.assume_taint_preserving:
+            return False, []
+        args_node = node.child_by_field_name("arguments")
+        if args_node is None:  # pragma: no cover - defensive: a call_expression always has an arguments child
+            return False, []
+        return False, list(args_node.named_children)
 
     @staticmethod
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
@@ -190,17 +218,3 @@ class CTaintTracker:
         if node_type in _SPREADING_TYPES:
             return list(node.named_children)
         return []
-
-    def _call_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if this call produces a tainted value (sanitizer clears, source injects)."""
-        name = call_name(node)
-        if name in self.sanitizers:
-            return False
-        if name in self.sources:
-            return True
-        if not self.assume_taint_preserving:
-            return False
-        args_node = node.child_by_field_name("arguments")
-        if args_node is None:  # pragma: no cover - defensive: a call_expression always has an arguments child
-            return False
-        return any(self._is_tainted(c) for c in args_node.named_children)

@@ -77,6 +77,29 @@ def _c_is_function_prototype(function_declarator: tree_sitter.Node) -> bool:
     return inner is None or inner.type != "parenthesized_declarator"
 
 
+def _c_unwrap_init(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the underlying declarator, unwrapping a single ``init_declarator`` (``int *p = 0`` -> ``*p``)."""
+    if declarator.type == "init_declarator":
+        return declarator.child_by_field_name("declarator")
+    return declarator
+
+
+def _c_is_mutable_pointer(declarator: tree_sitter.Node) -> bool:
+    """Return True if *declarator* binds a mutable pointer.
+
+    A ``pointer_declarator`` (``int *p``) whose pointer is not itself
+    ``const``-qualified is a mutable pointer. ``const int *p`` declares a *const
+    pointee* but a mutable pointer, so the binding is still shared mutable state
+    and a declaration-level ``const`` does NOT exempt it. ``const int *const p``
+    (the pointer itself is ``const``) carries a ``type_qualifier`` inside the
+    ``pointer_declarator`` and is genuinely immutable.
+    """
+    inner = _c_unwrap_init(declarator)
+    if inner is None or inner.type != "pointer_declarator":
+        return False
+    return not any(c.type == "type_qualifier" and node_text(c) == "const" for c in inner.named_children)
+
+
 def _iter_python_functions(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
     """Yield every Python function (sync or async) definition in *tree*."""
     for node in walk(tree.root_node):
@@ -485,24 +508,24 @@ class GlobalMutationRule(BaseRule):
 
     @staticmethod
     def _c_declaration_is_exempt(decl: tree_sitter.Node) -> bool:
-        """Return True for file-scope declarations that are not mutable variable definitions."""
-        for child in decl.named_children:
-            if child.type == "type_qualifier" and node_text(child) == "const":
-                return True
-            if child.type == "storage_class_specifier" and node_text(child) in ("typedef", "extern"):
-                return True
-            if child.type == "function_declarator" and _c_is_function_prototype(child):
-                return True
-        return False
+        """Return True for whole declarations that are never mutable variable definitions.
+
+        Only ``typedef`` and ``extern`` exempt the entire declaration. ``const``
+        and function-prototype exemptions are decided *per declarator* in
+        ``_c_declaration_violations`` - a declaration-level ``const`` does not
+        protect a mutable pointer (``const int *p`` still fires).
+        """
+        return any(child.type == "storage_class_specifier" and node_text(child) in ("typedef", "extern") for child in decl.named_children)
 
     def _c_declaration_violations(self, filepath: str, decl: tree_sitter.Node) -> list[Violation]:
         """Return one violation per declared variable name in a file-scope declaration."""
+        decl_const = any(child.type == "type_qualifier" and node_text(child) == "const" for child in decl.named_children)
         out: list[Violation] = []
         for child in decl.named_children:
             ident = _c_declarator_identifier(child)
             # No ``_`` blank-identifier skip here: unlike Go / Python, C has no
             # blank identifier, so ``int _;`` is a real file-scope mutable variable.
-            if ident is not None:
+            if ident is not None and not self._c_declarator_is_exempt(child, decl_const=decl_const):
                 out.append(
                     self._make_violation_for_node(
                         filepath,
@@ -511,6 +534,20 @@ class GlobalMutationRule(BaseRule):
                     )
                 )
         return out
+
+    @staticmethod
+    def _c_declarator_is_exempt(declarator: tree_sitter.Node, *, decl_const: bool) -> bool:
+        """Return True if a single *declarator* is not a mutable variable binding.
+
+        A function prototype (``int f(void);``) is never a variable. Under a
+        declaration-level ``const`` an immutable object is exempt, but a mutable
+        pointer (``const int *p`` - const pointee, mutable pointer) still fires.
+        """
+        if declarator.type == "function_declarator" and _c_is_function_prototype(declarator):
+            return True
+        if not decl_const:
+            return False
+        return not _c_is_mutable_pointer(declarator)
 
     def _go_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every package-level ``var`` declaration (Go's shared-mutable-state shape).
