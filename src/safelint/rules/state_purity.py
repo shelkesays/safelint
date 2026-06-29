@@ -77,6 +77,29 @@ def _c_is_function_prototype(function_declarator: tree_sitter.Node) -> bool:
     return inner is None or inner.type != "parenthesized_declarator"
 
 
+def _c_inner_function_declarator(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the ``function_declarator`` at the head of *declarator*, or None.
+
+    Unwraps a leading ``init_declarator`` / ``pointer_declarator`` chain: a
+    *pointer-returning* prototype (``char *foo(void);``) wraps its
+    ``function_declarator`` in a ``pointer_declarator``, so the prototype check
+    must look past the pointer. The walk stops at the first non-wrapper node,
+    so a function-pointer *variable* (``int (*fp)(int);`` - a ``function_declarator``
+    around a ``parenthesized_declarator``) is returned as-is and later classified
+    by ``_c_is_function_prototype``. Bounded loop; never recurses.
+    """
+    cur: tree_sitter.Node | None = declarator
+    for _ in range(16):
+        if cur is None:
+            return None
+        if cur.type == "function_declarator":
+            return cur
+        if cur.type not in ("init_declarator", "pointer_declarator"):
+            return None
+        cur = cur.child_by_field_name("declarator")
+    return None
+
+
 def _c_unwrap_init(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
     """Return the underlying declarator, unwrapping a single ``init_declarator`` (``int *p = 0`` -> ``*p``)."""
     if declarator.type == "init_declarator":
@@ -539,11 +562,13 @@ class GlobalMutationRule(BaseRule):
     def _c_declarator_is_exempt(declarator: tree_sitter.Node, *, decl_const: bool) -> bool:
         """Return True if a single *declarator* is not a mutable variable binding.
 
-        A function prototype (``int f(void);``) is never a variable. Under a
-        declaration-level ``const`` an immutable object is exempt, but a mutable
-        pointer (``const int *p`` - const pointee, mutable pointer) still fires.
+        A function prototype (``int f(void);`` or the pointer-returning
+        ``char *foo(void);``) is never a variable. Under a declaration-level
+        ``const`` an immutable object is exempt, but a mutable pointer
+        (``const int *p`` - const pointee, mutable pointer) still fires.
         """
-        if declarator.type == "function_declarator" and _c_is_function_prototype(declarator):
+        fn = _c_inner_function_declarator(declarator)
+        if fn is not None and _c_is_function_prototype(fn):
             return True
         if not decl_const:
             return False

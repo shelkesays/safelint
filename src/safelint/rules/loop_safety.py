@@ -304,14 +304,36 @@ def _is_c_infinite_for(node: tree_sitter.Node) -> bool:
     return node.child_by_field_name("condition") is None
 
 
-def _c_has_goto_exit(loop_node: tree_sitter.Node) -> bool:
-    """Return True if *loop_node*'s body contains a ``goto`` (a potential loop exit).
+def _c_labels_defined_in(loop_node: tree_sitter.Node, skip: tuple[str, ...]) -> set[str]:
+    """Return the set of label names defined within *loop_node* (skipping nested functions)."""
+    names: set[str] = set()
+    for child in walk(loop_node, skip_types=skip):
+        if child.type != "labeled_statement":
+            continue
+        label = child.child_by_field_name("label")
+        if label is not None:
+            names.add(node_text(label))
+    return names
 
-    ``goto`` is not lexically scoped, so any ``goto`` in the body may jump out
-    of the loop. Skipping only nested function bodies (not nested loops) keeps
-    the conservative "any goto could be the exit" posture.
+
+def _c_has_goto_exit(loop_node: tree_sitter.Node) -> bool:
+    """Return True if *loop_node*'s body contains a ``goto`` that leaves the loop.
+
+    A ``goto`` whose target label is defined *within* the loop body is intra-loop
+    control flow (a jump to a label still inside the loop), not an exit, so it
+    does not satisfy rule 5's bound requirement - a ``while (1)`` that only ever
+    jumps back inside itself is still unbounded. Only a ``goto`` targeting a label
+    outside the loop counts as an exit. Nested function bodies are skipped.
     """
-    return any(child.type == "goto_statement" for child in walk(loop_node, skip_types=tuple(_C_FUNCTION_TYPES)))
+    skip = tuple(_C_FUNCTION_TYPES)
+    inner_labels = _c_labels_defined_in(loop_node, skip)
+    for child in walk(loop_node, skip_types=skip):
+        if child.type != "goto_statement":
+            continue
+        target = child.child_by_field_name("label")
+        if target is not None and node_text(target) not in inner_labels:
+            return True
+    return False
 
 
 def _is_go_infinite_for(node: tree_sitter.Node) -> bool:
