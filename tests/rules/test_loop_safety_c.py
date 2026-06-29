@@ -45,6 +45,12 @@ def test_c_goto_out_of_loop_counts_as_an_exit(tmp_path: Path) -> None:
     assert not _has_safe501(src, tmp_path)
 
 
+def test_c_goto_to_in_loop_label_is_still_unbounded(tmp_path: Path) -> None:
+    """A ``goto`` to a label *inside* the loop is intra-loop control flow, not an exit - still fires."""
+    src = "void f(int x) {\n    while (1) {\nretry:\n        if (x) goto retry;\n    }\n}\n"
+    assert _has_safe501(src, tmp_path)
+
+
 def test_c_bounded_for_is_clean(tmp_path: Path) -> None:
     assert not _has_safe501("void f(int n) {\n    for (int i = 0; i < n; i++) {\n    }\n}\n", tmp_path)
 
