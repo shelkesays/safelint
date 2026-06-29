@@ -52,6 +52,16 @@ def test_c_const_global_is_clean_for_safe302(tmp_path: Path) -> None:
     assert "SAFE302" not in _codes("const int LIMIT = 10;\nint h(void) { return LIMIT; }\n", tmp_path)
 
 
+def test_c_const_pointer_to_const_global_is_clean_for_safe302(tmp_path: Path) -> None:
+    """``const int *const p`` is a const pointer to const - genuinely immutable."""
+    assert "SAFE302" not in _codes("const int *const P = 0;\nint h(void) { return P ? 1 : 0; }\n", tmp_path)
+
+
+def test_c_pointer_to_const_global_fires_safe302(tmp_path: Path) -> None:
+    """``const int *p`` has a const pointee but a MUTABLE pointer - shared mutable state."""
+    assert "SAFE302" in _codes("const int *p;\nint h(void) { return p ? 1 : 0; }\n", tmp_path)
+
+
 def test_c_function_prototype_is_clean_for_safe302(tmp_path: Path) -> None:
     """A function prototype is not a variable definition."""
     assert "SAFE302" not in _codes("int helper(int x);\nint h(void) { return helper(1); }\n", tmp_path)

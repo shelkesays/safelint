@@ -1128,12 +1128,14 @@ DEFAULTS: dict[str, Any] = {
             ],
             # C sanitizers: a narrow generic set (project validators). Extend via
             # ``sanitizers_c`` for project-specific input-cleaning helpers.
+            # ``snprintf`` is deliberately NOT here - it bounds the write length
+            # but does not neutralise attacker-controlled *content*, so treating
+            # it as a sanitizer would clear taint before sinks like ``system`` /
+            # ``exec*`` and hide real findings.
             "sanitizers_c": [
                 "sanitize",
                 "validate",
                 "escape",
-                "escapeshellarg",
-                "snprintf",
             ],
         },
         "return_value_ignored": {

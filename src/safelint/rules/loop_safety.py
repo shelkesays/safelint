@@ -572,6 +572,8 @@ class UnboundedLoopRule(BaseRule):
             return "while (true)"
         if lang_name == "rust":
             return "while true"
+        if lang_name == "c":
+            return "while (1)"
         return "while True"
 
     def _check_while_node(self, filepath: str, node: tree_sitter.Node, lang_name: str) -> Violation | None:
