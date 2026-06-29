@@ -516,9 +516,11 @@ def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
         # labelled-break paths.
         return _php_has_exiting_break(while_node)
     if lang_name == "c":
-        # C has no labelled break; a ``goto`` out of the loop is the multi-level
-        # escape. Treat any ``goto`` in the body as a potential exit
-        # (conservative - avoids false positives on ``goto err`` cleanup loops).
+        # C has no labelled break; a ``goto`` leaving the loop is the multi-level
+        # escape. ``_c_has_goto_exit`` counts a ``goto`` as an exit only when its
+        # target label is defined outside the loop body - a ``goto`` to an in-loop
+        # label is intra-loop control flow, not an exit, so a ``while (1)`` that
+        # only jumps back inside itself stays unbounded.
         return _has_direct_break(while_node, lang_name) or _c_has_goto_exit(while_node)
     if _has_direct_break(while_node, lang_name):
         return True
