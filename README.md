@@ -247,7 +247,7 @@ SafeLint will now run on every `git commit` and block the commit if it finds err
 
 SafeLint ships **45 rules** across the Holzmann safety categories. **16 are on by default**; **29 are opt-in** (the dataflow trio is opt-in for performance reasons; the test-discipline and assertion rules are opt-in because they only make sense in projects that follow paired-test conventions; `dynamic_code_execution` and `blanket_suppression` are opt-in because they are deliberately opinionated; the four Java + Spring Boot rules are opt-in under vanilla and flipped on automatically by the `spring-boot` framework preset; the eleven Rust-only rules and the two Go-only rules are all opt-in; the five C-only rules are opt-in except SAFE106 `nonlocal_jumps`, which is on at warning severity since they encode strict Holzmann-style guidance that's stricter than typical idiom).
 
-### Default-on rules (15)
+### Default-on rules (16)
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|
@@ -256,6 +256,7 @@ SafeLint ships **45 rules** across the Holzmann safety categories. **16 are on b
 | [SAFE103](https://shelkesays.github.io/safelint/configuration/rules/#safe103-max_arguments) | `max_arguments` | error | Functions with more than 7 parameters |
 | [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity) | `complexity` | error | Functions with high cyclomatic complexity |
 | [SAFE105](https://shelkesays.github.io/safelint/configuration/rules/#safe105-no_recursion) | `no_recursion` | warning | Functions that call themselves directly (Holzmann rule 1) |
+| [SAFE106](https://shelkesays.github.io/safelint/configuration/rules/#safe106-nonlocal_jumps) | `nonlocal_jumps` | warning | `goto` / `setjmp` / `longjmp` non-local jumps *(C-only; Holzmann rule 1)* |
 | [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except) | `bare_except` | error | `except:` with no exception type *(Python-only)* |
 | [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except) | `empty_except` | error | `except` / `catch` blocks that do nothing |
 | [SAFE203](https://shelkesays.github.io/safelint/configuration/rules/#safe203-logging_on_error) | `logging_on_error` | warning | Except / catch blocks that swallow errors silently |
@@ -267,7 +268,7 @@ SafeLint ships **45 rules** across the Holzmann safety categories. **16 are on b
 | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) | `resource_lifecycle` | error | Files or connections opened outside a `with` block (Python), without paired `try`/`finally` cleanup (JS / TS), or outside try-with-resources / a `finally` close (Java) |
 | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) | `unbounded_loops` | warning | `while True` loops with no `break` |
 
-### Opt-in rules (23): enable via `[tool.safelint.rules.<name>] enabled = true`
+### Opt-in rules (29): enable via `[tool.safelint.rules.<name>] enabled = true`
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|
@@ -296,6 +297,10 @@ SafeLint ships **45 rules** across the Holzmann safety categories. **16 are on b
 | [SAFE307](https://shelkesays.github.io/safelint/configuration/rules/#safe307-interior_mutable_static) | `interior_mutable_static` | warning | `static` holding `Mutex` / `RwLock` / `OnceLock` / `Atomic*` / `lazy_static!` global mutable state (Holzmann rule 6) *(Rust-only)* |
 | [SAFE308](https://shelkesays.github.io/safelint/configuration/rules/#safe308-truncating_as_cast) | `truncating_as_cast` | warning | `as u8` / `as i32` / etc. casts that silently truncate (use `TryFrom`) *(Rust-only; Holzmann rule 1 + 7)* |
 | [SAFE602](https://shelkesays.github.io/safelint/configuration/rules/#safe602-undocumented_unsafe) | `undocumented_unsafe` | warning | `unsafe { ... }` blocks lacking a `// SAFETY:` comment *(Rust-only)* |
+| [SAFE310](https://shelkesays.github.io/safelint/configuration/rules/#safe310-dynamic_allocation) | `dynamic_allocation` | warning | Calls to the heap-allocation family (`malloc` / `calloc` / `realloc` / `free` / `strdup`) *(C-only; Holzmann rule 3)* |
+| [SAFE311](https://shelkesays.github.io/safelint/configuration/rules/#safe311-complex_macro) | `complex_macro` | warning | Macros using `##` / `__VA_ARGS__`, or object-like macros with an unbalanced replacement *(C-only; Holzmann rule 8)* |
+| [SAFE312](https://shelkesays.github.io/safelint/configuration/rules/#safe312-conditional_compilation) | `conditional_compilation` | warning | `#if` / `#ifdef` / `#ifndef` directives beyond the include-guard idiom *(C-only; Holzmann rule 8)* |
+| [SAFE313](https://shelkesays.github.io/safelint/configuration/rules/#safe313-restricted_pointers) | `restricted_pointers` | warning | More than one level of pointer indirection (`int **p`) or function-pointer declarators (`void (*fp)(int)`) *(C-only; Holzmann rule 9)* |
 
 Plus **`SAFE004 unused_suppression`** (engine meta-check, on by default), flags stale `# nosafe` directives that no longer suppress anything. Disable globally via `ignore = ["SAFE004"]` if undesired.
 
