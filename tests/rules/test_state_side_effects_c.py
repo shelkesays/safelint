@@ -82,6 +82,19 @@ def test_c_local_variable_is_clean_for_safe302(tmp_path: Path) -> None:
     assert "SAFE302" not in _codes("int f(void) {\n    int local = 0;\n    return local;\n}\n", tmp_path)
 
 
+# --- SAFE303 side_effects_hidden (enabled by default) --------------------------
+
+
+def test_c_pure_named_function_with_io_fires_safe303(tmp_path: Path) -> None:
+    """A pure-sounding name (``compute_``) that calls an I/O primitive fires SAFE303."""
+    assert "SAFE303" in _codes('int compute_total(int x) {\n    printf("%d", x);\n    return x;\n}\n', tmp_path)
+
+
+def test_c_pure_named_function_without_io_is_clean_for_safe303(tmp_path: Path) -> None:
+    """A pure-named function that does no I/O is clean."""
+    assert "SAFE303" not in _codes("int compute_total(int a, int b) {\n    return a + b;\n}\n", tmp_path)
+
+
 # --- SAFE304 side_effects (enabled by default) ---------------------------------
 
 
