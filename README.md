@@ -75,19 +75,21 @@ SafeLint catches these early, automatically, regardless of who wrote the code.
 
 ## Power of Ten - adapted for modern languages
 
-In 2006, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly two decades later, the same failure patterns appear in every fast-moving codebase. SafeLint is those ten rules, adapted for modern languages (Python, JavaScript, TypeScript, Java with the Spring Boot framework preset, Rust, Go, PHP, and C today; further languages in future releases) and automated.
+In 2006, Holzmann wrote ten rules for spacecraft software at NASA/JPL. The same failure patterns they guard against still surface in fast-moving codebases everywhere. SafeLint is those ten rules, adapted for modern languages (Python, JavaScript, TypeScript, Java with the Spring Boot framework preset, Rust, Go, PHP, and C today; further languages in future releases) and automated.
+
+C is Holzmann's original target, so it gets several rules as literal clauses that other languages adapt away (`nonlocal_jumps`, `dynamic_allocation`, `complex_macro`, `conditional_compilation`, `restricted_pointers`); the per-language mapping is on the [Power of Ten page](https://shelkesays.github.io/safelint/power-of-ten/).
 
 | # | Holzmann's Rule | SafeLint Rule | Code |
 |---|---|---|---|
-| 1 | No complex control flow - no `goto`, no deep recursion | `nesting_depth`, `complexity` | [SAFE102](https://shelkesays.github.io/safelint/configuration/rules/#safe102-nesting_depth), [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity) |
+| 1 | No complex control flow - no `goto`, no deep recursion | `nesting_depth`, `complexity`, `nonlocal_jumps` | [SAFE102](https://shelkesays.github.io/safelint/configuration/rules/#safe102-nesting_depth), [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity), [SAFE106](https://shelkesays.github.io/safelint/configuration/rules/#safe106-nonlocal_jumps) *(C: literal `goto` / `setjmp`)* |
 | 2 | All loops must have a fixed upper bound | `unbounded_loops` | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) |
-| 3 | No dynamic memory allocation after startup | `resource_lifecycle` | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle), *adapted: managed runtimes allocate dynamically by default; the rule becomes "acquired resources must have guaranteed cleanup"* |
+| 3 | No dynamic memory allocation after startup | `resource_lifecycle`, `dynamic_allocation` | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) *(adapted: managed runtimes allocate dynamically by default; the rule becomes "acquired resources must have guaranteed cleanup")*, [SAFE310](https://shelkesays.github.io/safelint/configuration/rules/#safe310-dynamic_allocation) *(C: literal `malloc` family)* |
 | 4 | Functions must fit on one printed page | `function_length` | [SAFE101](https://shelkesays.github.io/safelint/configuration/rules/#safe101-function_length) |
 | 5 | Use at least two assertions per function | `missing_assertions` | [SAFE601](https://shelkesays.github.io/safelint/configuration/rules/#safe601-missing_assertions) |
 | 6 | Declare variables at the smallest scope | `wide_scope_declaration` | [SAFE305](https://shelkesays.github.io/safelint/configuration/rules/#safe305-wide_scope_declaration) *(JavaScript, `var` → `let` / `const`; Python's lexical scoping handles this natively)* |
 | 7 | Check the return value of every non-void function | `return_value_ignored`, `bare_except`, `empty_except`, `logging_on_error` | [SAFE802](https://shelkesays.github.io/safelint/configuration/rules/#safe802-return_value_ignored), [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except), [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except), [SAFE203](https://shelkesays.github.io/safelint/configuration/rules/#safe203-logging_on_error) |
-| 8 | Limit preprocessor use | - | *(not applicable to Python or JavaScript)* |
-| 9 | Restrict pointer use - no chained indirection | `null_dereference` | [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference) |
+| 8 | Limit preprocessor use | `complex_macro`, `conditional_compilation` | [SAFE311](https://shelkesays.github.io/safelint/configuration/rules/#safe311-complex_macro), [SAFE312](https://shelkesays.github.io/safelint/configuration/rules/#safe312-conditional_compilation) *(C-only; no preprocessor in the other languages)* |
+| 9 | Restrict pointer use - no chained indirection | `null_dereference`, `restricted_pointers` | [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference), [SAFE313](https://shelkesays.github.io/safelint/configuration/rules/#safe313-restricted_pointers) *(C: literal multi-level / function pointers)* |
 | 10 | Compile with all warnings; use static analysis | SafeLint itself | - |
 
 Original paper: [spinroot.com/gerard/pdf/P10.pdf](https://spinroot.com/gerard/pdf/P10.pdf)
