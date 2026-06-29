@@ -87,6 +87,21 @@ def test_c_whitespace_padded_wildcard_nolint_fires_safe603(tmp_path: Path) -> No
     assert "SAFE603" in _codes("n.c", "int f(void) { return bad(); } // NOLINT(\t*\t)\n", tmp_path, _SUPPRESS_ON)
 
 
+def test_c_block_comment_nolint_fires_safe603(tmp_path: Path) -> None:
+    """A bare block-comment ``/* NOLINT */`` is blanket too - clang-tidy honours it."""
+    assert "SAFE603" in _codes("n.c", "int f(void) { return bad(); } /* NOLINT */\n", tmp_path, _SUPPRESS_ON)
+
+
+def test_c_block_comment_wildcard_nolint_fires_safe603(tmp_path: Path) -> None:
+    """A block-comment wildcard ``/* NOLINT(*) */`` is the blanket wildcard."""
+    assert "SAFE603" in _codes("n.c", "int f(void) { return bad(); } /* NOLINT(*) */\n", tmp_path, _SUPPRESS_ON)
+
+
+def test_c_scoped_block_comment_nolint_is_clean_for_safe603(tmp_path: Path) -> None:
+    """A check-scoped block comment ``/* NOLINT(bugprone-foo) */`` is auditable and clean."""
+    assert "SAFE603" not in _codes("n.c", "int f(void) { return bad(); } /* NOLINT(bugprone-foo) */\n", tmp_path, _SUPPRESS_ON)
+
+
 def test_c_prose_nolint_is_not_a_directive(tmp_path: Path) -> None:
     """Lowercase prose ``// nolint`` is not the clang-tidy keyword."""
     assert "SAFE603" not in _codes("n.c", "int f(void) { return bad(); } // nolint, just prose\n", tmp_path, _SUPPRESS_ON)
