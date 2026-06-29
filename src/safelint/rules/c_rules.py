@@ -119,9 +119,46 @@ def _macro_replacement_text(node: tree_sitter.Node) -> str:
     return node_text(value) if value is not None else ""
 
 
+def _scan_char(ch: str, quote: str, *, escaped: bool) -> tuple[bool, str, bool]:
+    """Advance the quote-stripping state machine one char; return ``(keep, quote, escaped)``.
+
+    ``quote`` is the active delimiter (``""`` when outside a literal). Characters
+    inside a string or char literal are never kept, so brackets within them do
+    not affect the balance count.
+    """
+    if quote == "":
+        if ch in ('"', "'"):
+            return False, ch, False
+        return True, "", False
+    if escaped:
+        return False, quote, False
+    if ch == "\\":
+        return False, quote, True
+    if ch == quote:
+        return False, "", False
+    return False, quote, False
+
+
+def _strip_quoted(text: str) -> str:
+    """Return *text* with the contents of string/char literals removed."""
+    out: list[str] = []
+    quote = ""
+    escaped = False
+    for ch in text:
+        keep, quote, escaped = _scan_char(ch, quote, escaped=escaped)
+        if keep:
+            out.append(ch)
+    return "".join(out)
+
+
 def _is_unbalanced(text: str) -> bool:
-    """Return True if *text* has unbalanced ``()``, ``{}``, or ``[]`` (a non-complete syntactic unit)."""
-    return text.count("(") != text.count(")") or text.count("{") != text.count("}") or text.count("[") != text.count("]")
+    """Return True if *text* has unbalanced ``()``, ``{}``, or ``[]`` (a non-complete syntactic unit).
+
+    Brackets inside string and char literals (e.g. ``#define OPEN "["``) are
+    stripped first so they do not register as unbalanced.
+    """
+    stripped = _strip_quoted(text)
+    return stripped.count("(") != stripped.count(")") or stripped.count("{") != stripped.count("}") or stripped.count("[") != stripped.count("]")
 
 
 class ComplexMacroRule(BaseRule):
@@ -160,22 +197,41 @@ class ComplexMacroRule(BaseRule):
 # ---------------------------------------------------------------------------
 
 
-def _is_include_guard(node: tree_sitter.Node) -> bool:
-    """Return True if *node* is an ``#ifndef X`` whose body opens with ``#define X``.
+def _ifndef_guard_name(node: tree_sitter.Node) -> str | None:
+    """Return the guard macro name of an ``#ifndef X`` directive, or None.
 
     The grammar uses ``preproc_ifdef`` for both ``#ifdef`` and ``#ifndef``; only
-    the ``#ifndef`` form paired with a matching ``#define`` is the include-guard
-    idiom (and the only conditional that is exempt). The directive keyword is the
-    node's first child token.
+    the ``#ifndef`` form is the include-guard candidate. The directive keyword is
+    the node's first child token.
     """
     if node.type != "preproc_ifdef":
-        return False
+        return None
     first = node.children[0] if node.children else None
     if first is None or node_text(first) != "#ifndef":
-        return False
+        return None
     name = node.child_by_field_name("name")
-    guard = node_text(name) if name is not None else None
-    return guard is not None and any(child.type == "preproc_def" and (defined := child.child_by_field_name("name")) is not None and node_text(defined) == guard for child in node.named_children)
+    return node_text(name) if name is not None else None
+
+
+def _first_body_define_name(node: tree_sitter.Node) -> str | None:
+    """Return the macro name defined by the *first* body statement of *node*, or None.
+
+    ``named_children`` is ``[condition-name, first-body, ...]`` so the opener is
+    index 1. Requiring the ``#define`` to be first - rather than merely present
+    somewhere in the block - stops an unrelated ``#define`` deeper in the body
+    from disguising a real conditional as an include guard.
+    """
+    opener = node.named_children[1] if len(node.named_children) > 1 else None
+    if opener is None or opener.type != "preproc_def":
+        return None
+    defined = opener.child_by_field_name("name")
+    return node_text(defined) if defined is not None else None
+
+
+def _is_include_guard(node: tree_sitter.Node) -> bool:
+    """Return True if *node* is an ``#ifndef X`` whose body *opens* with ``#define X``."""
+    guard = _ifndef_guard_name(node)
+    return guard is not None and _first_body_define_name(node) == guard
 
 
 class ConditionalCompilationRule(BaseRule):

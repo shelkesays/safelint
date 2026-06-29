@@ -4,7 +4,7 @@ SafeLint is a static-analysis CLI that parses source code via Tree-sitter and wa
 
 ## Supported versions
 
-Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade. C (`.c`, `.h`) is the most recent language addition; it ships on the current supported line.
+Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade. PHP (`.php`) is the most recent *released* language addition; C (`.c`, `.h`) lands in the 2.7.0 line (in RC at the time of writing) and the supported-versions table is updated to a 2.7.x "current" row at that production release.
 
 | Version(s) | Status |
 |---|---|
