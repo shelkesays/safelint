@@ -15,6 +15,12 @@ if TYPE_CHECKING:
 
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
+from safelint.rules.c_rules import (
+    ComplexMacroRule,
+    ConditionalCompilationRule,
+    DynamicAllocationRule,
+    RestrictedPointersRule,
+)
 
 
 def _codes(src: str, tmp_path: Path, enable: list[str] | None = None) -> set[str]:
@@ -23,6 +29,14 @@ def _codes(src: str, tmp_path: Path, enable: list[str] | None = None) -> set[str
     overrides = {"rules": {r: {"enabled": True} for r in (enable or [])}}
     engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
     return {v.code for v in engine.check_file(str(sample)).violations}
+
+
+def test_c_opt_in_rules_are_silent_by_default(tmp_path: Path) -> None:
+    """SAFE310-313 are opt-in: source that would trip all four reports none with no overrides."""
+    src = "#define CAT(a, b) a##b\n#ifdef DEBUG\nint d;\n#endif\nint **pp;\nvoid f(void) {\n    void *p = malloc(8);\n    free(p);\n}\n"
+    codes = _codes(src, tmp_path)  # no overrides -> built-in defaults
+    opt_in = {DynamicAllocationRule.code, ComplexMacroRule.code, ConditionalCompilationRule.code, RestrictedPointersRule.code}
+    assert codes.isdisjoint(opt_in)
 
 
 # --- SAFE106 nonlocal_jumps (enabled by default, severity=warning) -------------
