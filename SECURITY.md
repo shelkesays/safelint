@@ -4,12 +4,12 @@ SafeLint is a static-analysis CLI that parses source code via Tree-sitter and wa
 
 ## Supported versions
 
-Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade. PHP (`.php`) is the most recent *released* language addition; C (`.c`, `.h`) lands in the 2.7.0 line (in RC at the time of writing) and the supported-versions table is updated to a 2.7.x "current" row at that production release.
+Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade. C (`.c`, `.h`) is the most recent language addition; it ships on the current supported line.
 
 | Version(s) | Status |
 |---|---|
-| **2.6.x** (current; PHP support) | ✅ Security fixes |
-| **2.2.x - 2.5.x** (Rust in 2.2.x-2.4.x; Go in 2.5.x) | ✅ Security fixes through ~6 months after the next minor lands |
+| **2.7.x** (current; C support) | ✅ Security fixes |
+| **2.2.x - 2.6.x** (Rust in 2.2.x-2.4.x; Go in 2.5.x; PHP in 2.6.x) | ✅ Security fixes through ~6 months after the next minor lands |
 | **2.1.x** (Java + Spring Boot) | ❌ Upgrade to a current 2.x line |
 | **2.0.x** (multi-language refactor) | ❌ Upgrade to a current 2.x line |
 | **1.x** | ❌ Upgrade to 2.x |
