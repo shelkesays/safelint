@@ -75,7 +75,7 @@ def _python_blanket(comment_text: str) -> str | None:
 
 
 def _strip_comment_markers(comment_text: str) -> str:
-    """Strip ``//`` / ``/* ... */`` markers from a JS-family comment."""
+    """Strip ``//`` / ``/* ... */`` markers from a C-family comment (JS / TS / C)."""
     text = comment_text.strip()
     if text.startswith("//"):
         return text[2:].strip()
@@ -154,25 +154,28 @@ def _go_nolint_label(rest: str) -> str | None:
     return None
 
 
-# clang-tidy's NOLINT family. Bare ``// NOLINT`` / ``// NOLINTNEXTLINE`` (and
-# the ``NOLINTBEGIN`` / ``NOLINTEND`` block markers) suppress *every* check; a
-# parenthesised check list (``// NOLINT(bugprone-foo)``) scopes it and is clean.
-# A space after ``//`` is allowed (clang-tidy accepts ``// NOLINT``); the keyword
-# is case-sensitive uppercase, so prose ``// nolint here`` is left alone. The
-# lookahead keeps ``NOLINTFOO`` from matching the bare ``NOLINT``.
-_C_NOLINT = re.compile(r"^//\s*(NOLINT(?:NEXTLINE|BEGIN|END)?)(?=\(|\s|$)(\([^)]*\))?")
+# clang-tidy's NOLINT family. Bare ``NOLINT`` / ``NOLINTNEXTLINE`` (and the
+# ``NOLINTBEGIN`` / ``NOLINTEND`` block markers) suppress *every* check; a
+# parenthesised check list (``NOLINT(bugprone-foo)``) scopes it and is clean.
+# Matched against the comment *body* (markers already stripped), so it fires for
+# both line (``// NOLINT``) and block (``/* NOLINT */``) comments - clang-tidy
+# honours NOLINT in either form. The keyword is case-sensitive uppercase, so
+# prose ``nolint here`` is left alone; the lookahead keeps ``NOLINTFOO`` from
+# matching the bare ``NOLINT``.
+_C_NOLINT = re.compile(r"^(NOLINT(?:NEXTLINE|BEGIN|END)?)(?=\(|\s|$)(\([^)]*\))?")
 
 
 def _c_blanket(comment_text: str) -> str | None:
     """Return the blanket-directive label for a C comment, or None.
 
     A bare clang-tidy ``NOLINT`` form is blanket; a parenthesised check list
-    (``// NOLINT(bugprone-foo)``) scopes it and is treated as clean. The one
+    (``NOLINT(bugprone-foo)``) scopes it and is treated as clean. The one
     parenthesised form that is *still* blanket is the wildcard ``NOLINT(*)`` -
     clang-tidy treats ``(*)`` as "every check", so it suppresses everything just
-    like the bare form.
+    like the bare form. Comment markers are stripped first, so the directive is
+    recognised in both ``//`` and ``/* ... */`` comments.
     """
-    match = _C_NOLINT.match(comment_text.strip())
+    match = _C_NOLINT.match(_strip_comment_markers(comment_text))
     if match is None:
         return None
     args = match.group(2)
