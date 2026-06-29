@@ -67,6 +67,11 @@ def test_c_function_prototype_is_clean_for_safe302(tmp_path: Path) -> None:
     assert "SAFE302" not in _codes("int helper(int x);\nint h(void) { return helper(1); }\n", tmp_path)
 
 
+def test_c_pointer_returning_prototype_is_clean_for_safe302(tmp_path: Path) -> None:
+    """A pointer-returning prototype (``char *foo(void);``) wraps its declarator but is still a prototype."""
+    assert "SAFE302" not in _codes("char *foo(void);\nchar *g(void) { return foo(); }\n", tmp_path)
+
+
 def test_c_function_pointer_global_fires_safe302(tmp_path: Path) -> None:
     """A file-scope function-pointer *variable* is mutable state (distinct from a prototype)."""
     assert "SAFE302" in _codes("int (*fp)(int);\nint f(void) { return fp ? 1 : 0; }\n", tmp_path)
