@@ -9,7 +9,7 @@
     ``.pre-commit-config.yaml``: ``['safelint[python]']``,
     ``['safelint[javascript]']``, ``['safelint[typescript]']``,
     ``['safelint[java]']``, ``['safelint[rust]']``, ``['safelint[go]']``,
-    ``['safelint[php]']``, or ``['safelint[all]']``. Without an extra, the hook installs only the
+    ``['safelint[php]']``, ``['safelint[c]']``, or ``['safelint[all]']``. Without an extra, the hook installs only the
     engine and exits with a clear install hint on first run.
   entry: safelint
   language: python  # the hook runtime - not the language being linted

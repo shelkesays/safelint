@@ -353,8 +353,11 @@ no network connections, and deserialises nothing.
 shape rules, `side_effects`, `state_purity`, `test_coverage`, `loop_safety`,
 `dataflow`, `_node_utils`, `config.py`), so non-C behaviour was re-verified:
 
-- Full suite green - 1717 passed, including all 671 existing per-language rule
-  tests (Python / JS / TS / Java / Rust / Go / PHP).
+- Full suite green at the time of this security review (1717 passed, including
+  all 671 existing per-language rule tests for Python / JS / TS / Java / Rust /
+  Go / PHP). The suite has since grown as later review rounds added C
+  regression tests; the relevant invariant is that the full suite stays green,
+  not the exact count.
 - The shared refactors are behaviour-preserving: the new
   `_node_utils.function_name_node(node, lang)` returns
   `child_by_field_name("name")` for every non-C language (identical to the old

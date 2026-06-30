@@ -177,9 +177,10 @@ def function_name_node(func_node: tree_sitter.Node, lang_name: str) -> tree_sitt
         return func_node.child_by_field_name("name")
     node = func_node.child_by_field_name("declarator")
     passed_function_declarator = False
-    for _ in range(16):
-        if node is None:
-            return None
+    # The Tree-sitter declarator chain is finite and acyclic (each hop descends
+    # to a child), so a plain ``while`` walk terminates without a fixed cap - a
+    # cap would silently drop legal-but-deep declarators and lose name attribution.
+    while node is not None:
         if node.type == "identifier":
             return node if passed_function_declarator else None
         if node.type == "function_declarator":

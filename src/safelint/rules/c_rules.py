@@ -151,14 +151,27 @@ def _strip_quoted(text: str) -> str:
     return "".join(out)
 
 
+_BRACKET_PAIRS = {")": "(", "}": "{", "]": "["}
+
+
 def _is_unbalanced(text: str) -> bool:
-    """Return True if *text* has unbalanced ``()``, ``{}``, or ``[]`` (a non-complete syntactic unit).
+    """Return True if *text*'s ``()`` / ``{}`` / ``[]`` are not properly nested and matched.
 
     Brackets inside string and char literals (e.g. ``#define OPEN "["``) are
-    stripped first so they do not register as unbalanced.
+    stripped first so they do not register as unbalanced. Stack-based matching
+    (not bare counting) so order/nesting errors like ``)(`` or ``([)]`` - which
+    have equal open/close counts - are still caught as non-complete units.
     """
     stripped = _strip_quoted(text)
-    return stripped.count("(") != stripped.count(")") or stripped.count("{") != stripped.count("}") or stripped.count("[") != stripped.count("]")
+    stack: list[str] = []
+    for ch in stripped:
+        if ch in "({[":
+            stack.append(ch)
+            continue
+        opener = _BRACKET_PAIRS.get(ch)
+        if opener is not None and (not stack or stack.pop() != opener):
+            return True
+    return bool(stack)
 
 
 class ComplexMacroRule(BaseRule):

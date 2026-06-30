@@ -112,7 +112,11 @@ def test_c_prose_nolint_is_not_a_directive(tmp_path: Path) -> None:
 
 def test_c_source_without_test_fires_safe701(tmp_path: Path) -> None:
     """A C source with no paired test file fires SAFE701 when enabled."""
-    overrides = {"rules": {"test_existence": {"enabled": True}}}
+    # Point ``test_dirs`` at an isolated empty dir so the assertion does not
+    # depend on unrelated files under the repository's real ``tests/`` tree.
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    overrides = {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(test_dir)]}}}
     assert "SAFE701" in _codes("widget.c", "int widget(void) { return 1; }\n", tmp_path, overrides)
 
 
@@ -122,6 +126,14 @@ def test_c_source_with_sibling_test_is_clean_for_safe701(tmp_path: Path) -> None
     (tmp_path / "tests" / "widget_test.c").write_text("void t(void) { assert(1); }\n", encoding="utf-8")
     overrides = {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(tmp_path / "tests")]}}}
     assert "SAFE701" not in _codes("widget.c", "int widget(void) { return 1; }\n", tmp_path, overrides)
+
+
+def test_c_test_file_itself_is_not_flagged_by_safe701(tmp_path: Path) -> None:
+    """A ``<stem>_test.c`` is recognised as a test file, so SAFE701 does not ask it to have its own test."""
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    overrides = {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(test_dir)]}}}
+    assert "SAFE701" not in _codes("widget_test.c", "void t(void) { assert(1); }\n", tmp_path, overrides)
 
 
 # --- SAFE702 test_coupling (opt-in) --------------------------------------------

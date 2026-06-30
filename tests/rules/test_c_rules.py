@@ -119,6 +119,16 @@ def test_c_escaped_quote_in_string_literal_is_clean_for_safe311(tmp_path: Path) 
     assert "SAFE311" not in _codes('#define MSG "say \\"hi\\" ("\n', tmp_path, ["complex_macro"])
 
 
+def test_c_misordered_brackets_fire_safe311(tmp_path: Path) -> None:
+    """Equal open/close counts but wrong order (``)(``) is still not a complete syntactic unit."""
+    assert "SAFE311" in _codes("#define BAD )(\n", tmp_path, ["complex_macro"])
+
+
+def test_c_mismatched_nested_brackets_fire_safe311(tmp_path: Path) -> None:
+    """Interleaved brackets (``([)]``) are balanced by count but not by nesting."""
+    assert "SAFE311" in _codes("#define BAD ([)]\n", tmp_path, ["complex_macro"])
+
+
 # --- SAFE312 conditional_compilation (opt-in) ----------------------------------
 
 

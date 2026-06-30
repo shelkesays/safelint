@@ -179,7 +179,9 @@ def _count_c_args(func_node: tree_sitter.Node) -> int:
     params_node = decl.child_by_field_name("parameters") if decl is not None and decl.type == "function_declarator" else None
     if params_node is None:  # pragma: no cover - defensive: a function_definition always has a parameter list
         return 0
-    params = [c for c in params_node.named_children if c.type == "parameter_declaration"]
+    # ``variadic_parameter`` is the ``...`` ellipsis - a real parameter slot, so
+    # ``int log(int a, ...)`` counts as 2 (omitting it leaves the count one short).
+    params = [c for c in params_node.named_children if c.type in ("parameter_declaration", "variadic_parameter")]
     if len(params) == 1 and _is_c_void_param(params[0]):
         return 0
     return len(params)

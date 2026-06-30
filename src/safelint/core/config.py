@@ -1116,15 +1116,19 @@ DEFAULTS: dict[str, Any] = {
                 "gets",
                 "memcpy",
             ],
-            # C sources: environment / input readers. ``argv`` enters tainted via
-            # function-parameter seeding, so it is not listed as a call source.
+            # C sources: only *return-value* input readers. ``getenv`` /
+            # ``fgets`` / ``gets`` return the tainted data (``fgets`` / ``gets``
+            # return their destination buffer), so the assignment-based tracker
+            # taints the right variable. ``read`` / ``recv`` / ``scanf`` are
+            # deliberately excluded: they return a count / status and write the
+            # input into an out-parameter, so listing them would taint the count
+            # variable rather than the buffer. They can be added once
+            # ``CTaintTracker`` models destination-buffer tainting. ``argv``
+            # enters tainted via function-parameter seeding, not as a call source.
             "sources_c": [
                 "getenv",
                 "fgets",
-                "scanf",
                 "gets",
-                "read",
-                "recv",
             ],
             # C sanitizers: a narrow generic set (project validators). Extend via
             # ``sanitizers_c`` for project-specific input-cleaning helpers.

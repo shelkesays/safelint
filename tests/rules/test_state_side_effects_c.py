@@ -52,6 +52,11 @@ def test_c_const_global_is_clean_for_safe302(tmp_path: Path) -> None:
     assert "SAFE302" not in _codes("const int LIMIT = 10;\nint h(void) { return LIMIT; }\n", tmp_path)
 
 
+def test_c_typedef_is_clean_for_safe302(tmp_path: Path) -> None:
+    """A ``typedef`` is a type alias, not a variable definition - exempt."""
+    assert "SAFE302" not in _codes("typedef int myint;\nint h(myint x) { return x; }\n", tmp_path)
+
+
 def test_c_const_pointer_to_const_global_is_clean_for_safe302(tmp_path: Path) -> None:
     """``const int *const p`` is a const pointer to const - genuinely immutable."""
     assert "SAFE302" not in _codes("const int *const P = 0;\nint h(void) { return P ? 1 : 0; }\n", tmp_path)
@@ -75,6 +80,16 @@ def test_c_pointer_returning_prototype_is_clean_for_safe302(tmp_path: Path) -> N
 def test_c_function_pointer_global_fires_safe302(tmp_path: Path) -> None:
     """A file-scope function-pointer *variable* is mutable state (distinct from a prototype)."""
     assert "SAFE302" in _codes("int (*fp)(int);\nint f(void) { return fp ? 1 : 0; }\n", tmp_path)
+
+
+def test_c_extern_forward_reference_is_clean_for_safe302(tmp_path: Path) -> None:
+    """``extern int g;`` (no initialiser) is a forward reference, not a definition - exempt."""
+    assert "SAFE302" not in _codes("extern int g;\nint h(void) { return g; }\n", tmp_path)
+
+
+def test_c_extern_with_initializer_fires_safe302(tmp_path: Path) -> None:
+    """``extern int g = 1;`` is a definition of file-scope mutable state, so it still fires."""
+    assert "SAFE302" in _codes("extern int g = 1;\nint h(void) { return g; }\n", tmp_path)
 
 
 def test_c_local_variable_is_clean_for_safe302(tmp_path: Path) -> None:
