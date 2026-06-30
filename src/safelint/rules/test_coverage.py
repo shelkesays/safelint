@@ -213,6 +213,8 @@ def _filename_matches_test_pattern(filepath: str, lang_name: str) -> bool:
     * Rust: stem ending in ``_test`` (colocated convention). Bare
       ``<stem>.rs`` under ``tests/`` is handled by path-component
       matching at the call site, not here.
+    * C: stem ending in ``_test`` or starting with ``test_`` (Unity /
+      Check / CMocka both conventions).
     * Python (fallback): filename starting with ``test_``.
     """
     name = Path(filepath).name
@@ -227,6 +229,11 @@ def _filename_matches_test_pattern(filepath: str, lang_name: str) -> bool:
     if lang_name == "php":
         # PHPUnit's ``<ClassName>Test.php`` (StudlyCaps suffix).
         return Path(filepath).stem.endswith("Test")
+    if lang_name == "c":
+        # Unity / Check / CMocka use both ``<stem>_test.c`` and ``test_<stem>.c``;
+        # recognise either so a canonical C test is not treated as production code.
+        stem = Path(filepath).stem
+        return stem.endswith("_test") or stem.startswith("test_")
     return name.startswith("test_")
 
 

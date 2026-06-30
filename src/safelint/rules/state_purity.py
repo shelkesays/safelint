@@ -533,12 +533,19 @@ class GlobalMutationRule(BaseRule):
     def _c_declaration_is_exempt(decl: tree_sitter.Node) -> bool:
         """Return True for whole declarations that are never mutable variable definitions.
 
-        Only ``typedef`` and ``extern`` exempt the entire declaration. ``const``
-        and function-prototype exemptions are decided *per declarator* in
-        ``_c_declaration_violations`` - a declaration-level ``const`` does not
+        ``extern`` exempts the declaration only as a *forward reference* (no
+        initialiser): ``extern int g;`` promises ``g`` is defined elsewhere, but
+        ``extern int g = 1;`` is itself the definition of file-scope mutable
+        state, so SAFE302 must still fire. (``typedef`` never reaches here - the
+        grammar parses it as a ``type_definition``, not a ``declaration``.)
+        ``const`` and function-prototype exemptions are decided *per declarator*
+        in ``_c_declaration_violations`` - a declaration-level ``const`` does not
         protect a mutable pointer (``const int *p`` still fires).
         """
-        return any(child.type == "storage_class_specifier" and node_text(child) in ("typedef", "extern") for child in decl.named_children)
+        specifiers = {node_text(child) for child in decl.named_children if child.type == "storage_class_specifier"}
+        if "extern" not in specifiers:
+            return False
+        return not any(child.type == "init_declarator" for child in decl.named_children)
 
     def _c_declaration_violations(self, filepath: str, decl: tree_sitter.Node) -> list[Violation]:
         """Return one violation per declared variable name in a file-scope declaration."""

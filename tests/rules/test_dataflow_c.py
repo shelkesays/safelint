@@ -71,6 +71,24 @@ def test_c_ternary_result_propagates_taint_for_safe801(tmp_path: Path) -> None:
     assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
 
 
+def test_c_inline_assignment_in_sink_arg_fires_safe801(tmp_path: Path) -> None:
+    """An inline assignment used directly as a sink argument (``system((cmd = argv[1]))``) flows taint."""
+    src = "void f(char **argv) {\n    char *cmd;\n    system((cmd = argv[1]));\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_out_param_reader_is_not_a_return_source_for_safe801(tmp_path: Path) -> None:
+    """``scanf`` writes its input into an out-parameter and is not a return-value source, so it does not taint a local buffer."""
+    src = 'void f(void) {\n    char buf[64];\n    scanf("%63s", buf);\n    system(buf);\n}\n'
+    assert "SAFE801" not in _codes(src, tmp_path, "tainted_sink")
+
+
+def test_c_inline_compound_assignment_in_sink_keeps_taint_for_safe801(tmp_path: Path) -> None:
+    """An inline compound assignment (``acc += 1``) reads the prior tainted LHS, so the value stays tainted."""
+    src = "void f(char **argv) {\n    char *acc = argv[1];\n    system((acc += 1));\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, "tainted_sink")
+
+
 # --- SAFE802 return_value_ignored (opt-in) -------------------------------------
 
 

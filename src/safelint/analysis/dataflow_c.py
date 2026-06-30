@@ -49,6 +49,23 @@ _SPREADING_TYPES = frozenset(
 )
 
 
+def _assignment_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
+    """Return the children whose taint flows into an inline ``assignment_expression``'s value.
+
+    ``(cmd = argv[1])`` used directly as a sink argument has the value of its RHS,
+    so the RHS is followed. A compound assignment (``cmd += argv[1]``) reads the
+    prior LHS as well, so both sides are followed in that case.
+    """
+    right = node.child_by_field_name("right")
+    children = [right] if right is not None else []
+    operator = node.child_by_field_name("operator")
+    if operator is not None and node_text(operator) != "=":
+        left = node.child_by_field_name("left")
+        if left is not None:
+            children.append(left)
+    return children
+
+
 def _declarator_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
     """Return the name ``identifier`` from a declarator, unwrapping pointer / array layers.
 
@@ -215,6 +232,9 @@ class CTaintTracker:
         if node_type == "cast_expression":
             # ``(T)expr`` - propagate the operand, never the type_descriptor.
             return [c for c in node.named_children if c.type != "type_descriptor"]
+        if node_type == "assignment_expression":
+            # An inline ``(x = rhs)`` carries its RHS's value into the sink.
+            return _assignment_propagating_children(node)
         if node_type in _SPREADING_TYPES:
             return list(node.named_children)
         return []

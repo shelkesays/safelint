@@ -97,6 +97,15 @@ def test_c_pointer_returning_function_args_are_counted(tmp_path: Path) -> None:
     assert "8 arguments" in safe103[0].message
 
 
+def test_c_variadic_ellipsis_counts_toward_safe103(tmp_path: Path) -> None:
+    """The ``...`` ellipsis is a parameter slot: 7 named + variadic = 8 > 7 fires SAFE103."""
+    sample = tmp_path / "vararg.c"
+    sample.write_text("int rec(int a, int b, int c, int d, int e, int f, int g, ...) {\n    return a;\n}\n", encoding="utf-8")
+    safe103 = [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE103"]
+    assert len(safe103) == 1
+    assert "8 arguments" in safe103[0].message
+
+
 def test_c_high_complexity_fires_safe104(tmp_path: Path) -> None:
     """Cyclomatic complexity over the default 10 fires SAFE104; ``&&`` counts."""
     sample = tmp_path / "complex.c"
