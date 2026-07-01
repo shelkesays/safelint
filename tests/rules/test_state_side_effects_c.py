@@ -92,6 +92,15 @@ def test_c_extern_with_initializer_fires_safe302(tmp_path: Path) -> None:
     assert "SAFE302" in _codes("extern int g = 1;\nint h(void) { return g; }\n", tmp_path)
 
 
+def test_c_mixed_extern_declaration_flags_only_the_initialised_declarator(tmp_path: Path) -> None:
+    """In ``extern int a, b = 1;`` only ``b`` (initialised = a definition) fires; ``a`` stays a forward reference."""
+    sample = tmp_path / "sample.c"
+    sample.write_text("extern int a, b = 1;\nint h(void) { return a + b; }\n", encoding="utf-8")
+    msgs = [v.message for v in SafetyEngine(DEFAULTS).check_file(str(sample)).violations if v.code == "SAFE302"]
+    assert len(msgs) == 1
+    assert '"b"' in msgs[0]
+
+
 def test_c_local_variable_is_clean_for_safe302(tmp_path: Path) -> None:
     """A block-scoped local is not file-scope state."""
     assert "SAFE302" not in _codes("int f(void) {\n    int local = 0;\n    return local;\n}\n", tmp_path)
