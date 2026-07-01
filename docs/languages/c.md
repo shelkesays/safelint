@@ -137,7 +137,7 @@ allocation_calls_c = ["malloc", "calloc", "realloc", "aligned_alloc", "free", "s
 [tool.safelint.rules.tainted_sink]
 enabled = true
 sinks_c = ["system", "popen", "execl", "execlp", "execv", "execvp", "sprintf", "strcpy", "strcat", "gets", "memcpy"]
-sources_c = ["getenv", "fgets", "scanf", "read", "recv"]
+sources_c = ["getenv", "fgets", "gets"]
 sanitizers_c = ["sanitize", "validate", "escape"]
 ```
 
@@ -146,6 +146,6 @@ sanitizers_c = ["sanitize", "validate", "escape"]
 [rules.tainted_sink]
 enabled = true
 sinks_c = ["system", "popen", "execl", "execlp", "execv", "execvp", "sprintf", "strcpy", "strcat", "gets", "memcpy"]
-sources_c = ["getenv", "fgets", "scanf", "read", "recv"]
+sources_c = ["getenv", "fgets", "gets"]
 sanitizers_c = ["sanitize", "validate", "escape"]
 ```
