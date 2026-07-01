@@ -525,37 +525,26 @@ class GlobalMutationRule(BaseRule):
         """
         violations: list[Violation] = []
         for node in tree.root_node.named_children:
-            if node.type == "declaration" and not self._c_declaration_is_exempt(node):
+            if node.type == "declaration":
                 violations.extend(self._c_declaration_violations(filepath, node))
         return violations
 
-    @staticmethod
-    def _c_declaration_is_exempt(decl: tree_sitter.Node) -> bool:
-        """Return True for whole declarations that are never mutable variable definitions.
-
-        ``extern`` exempts the declaration only as a *forward reference* (no
-        initialiser): ``extern int g;`` promises ``g`` is defined elsewhere, but
-        ``extern int g = 1;`` is itself the definition of file-scope mutable
-        state, so SAFE302 must still fire. (``typedef`` never reaches here - the
-        grammar parses it as a ``type_definition``, not a ``declaration``.)
-        ``const`` and function-prototype exemptions are decided *per declarator*
-        in ``_c_declaration_violations`` - a declaration-level ``const`` does not
-        protect a mutable pointer (``const int *p`` still fires).
-        """
-        specifiers = {node_text(child) for child in decl.named_children if child.type == "storage_class_specifier"}
-        if "extern" not in specifiers:
-            return False
-        return not any(child.type == "init_declarator" for child in decl.named_children)
-
     def _c_declaration_violations(self, filepath: str, decl: tree_sitter.Node) -> list[Violation]:
-        """Return one violation per declared variable name in a file-scope declaration."""
+        """Return one violation per declared variable name in a file-scope declaration.
+
+        ``const`` and ``extern`` are declaration-level specifiers but their
+        exemptions are per declarator: ``const int *p`` (mutable pointer) still
+        fires despite the ``const``, and in a mixed ``extern int a, b = 1;`` the
+        forward reference ``a`` is exempt while the definition ``b`` fires.
+        """
         decl_const = any(child.type == "type_qualifier" and node_text(child) == "const" for child in decl.named_children)
+        decl_extern = any(child.type == "storage_class_specifier" and node_text(child) == "extern" for child in decl.named_children)
         out: list[Violation] = []
         for child in decl.named_children:
             ident = _c_declarator_identifier(child)
             # No ``_`` blank-identifier skip here: unlike Go / Python, C has no
             # blank identifier, so ``int _;`` is a real file-scope mutable variable.
-            if ident is not None and not self._c_declarator_is_exempt(child, decl_const=decl_const):
+            if ident is not None and not self._c_declarator_is_exempt(child, decl_const=decl_const, decl_extern=decl_extern):
                 out.append(
                     self._make_violation_for_node(
                         filepath,
@@ -566,16 +555,21 @@ class GlobalMutationRule(BaseRule):
         return out
 
     @staticmethod
-    def _c_declarator_is_exempt(declarator: tree_sitter.Node, *, decl_const: bool) -> bool:
-        """Return True if a single *declarator* is not a mutable variable binding.
+    def _c_declarator_is_exempt(declarator: tree_sitter.Node, *, decl_const: bool, decl_extern: bool) -> bool:
+        """Return True if a single *declarator* is not a mutable variable definition.
 
         A function prototype (``int f(void);`` or the pointer-returning
         ``char *foo(void);``) is never a variable. Under a declaration-level
-        ``const`` an immutable object is exempt, but a mutable pointer
-        (``const int *p`` - const pointee, mutable pointer) still fires.
+        ``extern`` a declarator *without* an initialiser is a forward reference,
+        not a definition (so ``extern int a, b = 1;`` exempts ``a`` but not the
+        initialised ``b``). Under a declaration-level ``const`` an immutable
+        object is exempt, but a mutable pointer (``const int *p`` - const
+        pointee, mutable pointer) still fires.
         """
         fn = _c_inner_function_declarator(declarator)
         if fn is not None and _c_is_function_prototype(fn):
+            return True
+        if decl_extern and declarator.type != "init_declarator":
             return True
         if not decl_const:
             return False
