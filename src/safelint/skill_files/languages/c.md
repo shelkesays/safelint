@@ -52,7 +52,7 @@ C ships its grammar (`tree-sitter-c`) as the opt-in `[c]` extra; the base instal
 | SAFE603 | blanket_suppression | clang-tidy's bare `// NOLINT` / `// NOLINTNEXTLINE` (all checks). Scoped `// NOLINT(bugprone-foo)` is clean. Disabled by default. |
 | SAFE701 | test_existence | Looks for `<stem>_test.c` / `test_<stem>.c` under `test_dirs` (default `tests`). C conventions vary (Unity / Check / CMocka); usually override `test_dirs`. Disabled by default. |
 | SAFE702 | test_coupling | Same `<stem>_test.c` / `test_<stem>.c` convention. Disabled by default. |
-| SAFE801 | tainted_sink | Sinks (`sinks_c`): `system` / `popen` / `execl` family / `sprintf` / `strcpy` / `strcat` / `gets` / `memcpy`. Sources (`sources_c`): `getenv` / `fgets` / `scanf` / `read` / `recv` (plus `argv` via parameter seeding). Sanitizers (`sanitizers_c`): narrow generic set. Disabled by default. |
+| SAFE801 | tainted_sink | Sinks (`sinks_c`): `system` / `popen` / `execl` family / `sprintf` / `strcpy` / `strcat` / `gets` / `memcpy`. Sources (`sources_c`): `getenv` / `fgets` / `gets` (return-value sources only; plus `argv` via parameter seeding). Out-parameter readers (`scanf` / `read` / `recv`) are excluded until the tracker taints destination buffers. Sanitizers (`sanitizers_c`): narrow generic set. Disabled by default. |
 | SAFE802 | return_value_ignored | A bare flagged call whose return is discarded. Default `flagged_calls_c`: `fclose` / `fwrite` / `fread` / `remove` / `rename` / `fflush` / `setvbuf` / `snprintf`. `(void)f()` is exempt. Disabled by default. |
 
 ## Deliberately skipped rules
