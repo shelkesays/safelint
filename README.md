@@ -29,14 +29,17 @@ Originally designed for mission-critical systems, these principles apply to any 
 | **Rust** | `.rs` | 15 cross-language rules port cleanly (the all-five-languages set); 11 Rust-only rules cover Rust-idiom patterns (panic-in-non-test, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer params, broad `.unwrap()` outside tests, interior-mutable `static`s, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. New in v2.2.0. |
 | **Go** | `.go` | 16 cross-language rules apply (the 13 all-seven core plus `global_mutation` / `dynamic_code_execution` / `resource_lifecycle`); 2 Go-only rules cover Go-idiom patterns: `empty_error_check` (the empty `if err != nil {}` swallow) and `panic_calls_outside_tests` (18 rules total for Go). Headline adaptations: the bare `for {}` infinite loop, the sibling `foo_test.go` convention, the `_ = f()` explicit-discard exemption, and the `defer x.Close()` resource form. New in v2.5.0. |
 | **PHP** | `.php` | 21 rules apply, the widest coverage of any non-Python language (only `bare_except` and `wide_scope_declaration` are skipped). First non-Python home for `global_state` (PHP has a literal `global` keyword). Headline highlights: the `@`-operator error-suppression idiom, superglobal taint sources (`$_GET` / `$_POST` / `$_REQUEST`) feeding `tainted_sink`, and the `break N;` / `continue N;` multi-level loop forms. New in v2.6.0. |
+| **C** | `.c`, `.h` | 21 rules apply: the 16 cross-language ports plus **5 new C-only rules** (Holzmann's original language, clauses every other language adapts away): `nonlocal_jumps` (`goto` / `setjmp`, rule 1), `dynamic_allocation` (`malloc` family, rule 3), `complex_macro` + `conditional_compilation` (preprocessor, rule 8), `restricted_pointers` (rule 9). `nonlocal_jumps` is enabled (warning); the rest opt-in. `.h` lints as C. New in v2.7.0. |
 
-**Rule coverage** - 40 rules total, scoped per language:
+**Rule coverage** - 45 rules total, scoped per language:
 
 | Applies to | # | Rules |
 |---|---|---|
-| **All seven** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP) | 13 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
-| Python / JS / TS / Java / Rust / PHP (not Go) | 2 | `missing_assertions`, `null_dereference` |
-| Python / JS / TS / Java / Go / PHP (not Rust) | 3 | `global_mutation`, `dynamic_code_execution`, `resource_lifecycle` |
+| **All eight** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C) | 13 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
+| Python / JS / TS / Java / Rust / PHP / C (not Go) | 1 | `missing_assertions` |
+| Python / JS / TS / Java / Rust / PHP (not Go, not C) | 1 | `null_dereference` |
+| Python / JS / TS / Java / Go / PHP / C (not Rust) | 2 | `global_mutation`, `dynamic_code_execution` |
+| Python / JS / TS / Java / Go / PHP (not Rust, not C) | 1 | `resource_lifecycle` |
 | Python / JS / TS / Java / PHP | 2 | `empty_except`, `logging_on_error` |
 | Python + PHP | 1 | `global_state` |
 | Python only | 1 | `bare_except` |
@@ -44,10 +47,11 @@ Originally designed for mission-critical systems, these principles apply to any 
 | Java + Spring Boot only | 4 | `spring_*` (SAFE901-904) |
 | Rust only | 11 | `needless_mut`, `unchecked_arithmetic_on_input`, `panic_macros_outside_tests`, `lock_poisoning_ignored`, `silent_result_discard`, `unlogged_error_branch`, `result_unwrap_outside_tests`, `dangerous_mem_ops`, `interior_mutable_static`, `truncating_as_cast`, `undocumented_unsafe` |
 | Go only | 2 | `empty_error_check`, `panic_calls_outside_tests` |
+| C only | 5 | `nonlocal_jumps`, `dynamic_allocation`, `complex_macro`, `conditional_compilation`, `restricted_pointers` |
 
 Rules are skipped per language where the semantics don't translate - e.g. Go has no try/catch, `global` keyword, `var` hoisting, production assertion idiom, or chained-nullable idiom; Rust's `Result` / `Option` / `Drop` model covers its skips with Rust-specific replacements.
 
-**Planned future languages** (working-priority order, no timelines committed): C, C++. SafeLint's registry-driven design makes each addition incremental; see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
+**Planned future languages** (no timelines committed): C++. SafeLint's registry-driven design makes each addition incremental; see the [language-coverage roadmap](https://shelkesays.github.io/safelint/configuration/rules/#planned), and [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) if you'd like to help.
 
 SafeLint integrates with pre-commit and CI pipelines to prevent unsafe code from entering your codebase.
 
@@ -71,19 +75,21 @@ SafeLint catches these early, automatically, regardless of who wrote the code.
 
 ## Power of Ten - adapted for modern languages
 
-In 1987, Holzmann wrote ten rules for spacecraft software at NASA/JPL. Nearly four decades later, the same failure patterns appear in every fast-moving codebase. SafeLint is those ten rules, adapted for modern languages (Python, JavaScript, TypeScript, Java with the Spring Boot framework preset, Rust, Go, and PHP today; further languages in future releases) and automated.
+In 2006, Holzmann wrote ten rules for spacecraft software at NASA/JPL. The same failure patterns they guard against still surface in fast-moving codebases everywhere. SafeLint is those ten rules, adapted for modern languages (Python, JavaScript, TypeScript, Java with the Spring Boot framework preset, Rust, Go, PHP, and C today; further languages in future releases) and automated.
+
+C is Holzmann's original target, so it gets several rules as literal clauses that other languages adapt away (`nonlocal_jumps`, `dynamic_allocation`, `complex_macro`, `conditional_compilation`, `restricted_pointers`); the per-language mapping is on the [Power of Ten page](https://shelkesays.github.io/safelint/power-of-ten/).
 
 | # | Holzmann's Rule | SafeLint Rule | Code |
 |---|---|---|---|
-| 1 | No complex control flow - no `goto`, no deep recursion | `nesting_depth`, `complexity` | [SAFE102](https://shelkesays.github.io/safelint/configuration/rules/#safe102-nesting_depth), [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity) |
+| 1 | No complex control flow - no `goto`, no deep recursion | `nesting_depth`, `complexity`, `nonlocal_jumps` | [SAFE102](https://shelkesays.github.io/safelint/configuration/rules/#safe102-nesting_depth), [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity), [SAFE106](https://shelkesays.github.io/safelint/configuration/rules/#safe106-nonlocal_jumps) *(C: literal `goto` / `setjmp`)* |
 | 2 | All loops must have a fixed upper bound | `unbounded_loops` | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) |
-| 3 | No dynamic memory allocation after startup | `resource_lifecycle` | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle), *adapted: managed runtimes allocate dynamically by default; the rule becomes "acquired resources must have guaranteed cleanup"* |
+| 3 | No dynamic memory allocation after startup | `resource_lifecycle`, `dynamic_allocation` | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) *(adapted: managed runtimes allocate dynamically by default; the rule becomes "acquired resources must have guaranteed cleanup")*, [SAFE310](https://shelkesays.github.io/safelint/configuration/rules/#safe310-dynamic_allocation) *(C: literal `malloc` family)* |
 | 4 | Functions must fit on one printed page | `function_length` | [SAFE101](https://shelkesays.github.io/safelint/configuration/rules/#safe101-function_length) |
 | 5 | Use at least two assertions per function | `missing_assertions` | [SAFE601](https://shelkesays.github.io/safelint/configuration/rules/#safe601-missing_assertions) |
 | 6 | Declare variables at the smallest scope | `wide_scope_declaration` | [SAFE305](https://shelkesays.github.io/safelint/configuration/rules/#safe305-wide_scope_declaration) *(JavaScript, `var` → `let` / `const`; Python's lexical scoping handles this natively)* |
 | 7 | Check the return value of every non-void function | `return_value_ignored`, `bare_except`, `empty_except`, `logging_on_error` | [SAFE802](https://shelkesays.github.io/safelint/configuration/rules/#safe802-return_value_ignored), [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except), [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except), [SAFE203](https://shelkesays.github.io/safelint/configuration/rules/#safe203-logging_on_error) |
-| 8 | Limit preprocessor use | - | *(not applicable to Python or JavaScript)* |
-| 9 | Restrict pointer use - no chained indirection | `null_dereference` | [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference) |
+| 8 | Limit preprocessor use | `complex_macro`, `conditional_compilation` | [SAFE311](https://shelkesays.github.io/safelint/configuration/rules/#safe311-complex_macro), [SAFE312](https://shelkesays.github.io/safelint/configuration/rules/#safe312-conditional_compilation) *(C-only; no preprocessor in the other languages)* |
+| 9 | Restrict pointer use - no chained indirection | `null_dereference`, `restricted_pointers` | [SAFE803](https://shelkesays.github.io/safelint/configuration/rules/#safe803-null_dereference), [SAFE313](https://shelkesays.github.io/safelint/configuration/rules/#safe313-restricted_pointers) *(C: literal multi-level / function pointers)* |
 | 10 | Compile with all warnings; use static analysis | SafeLint itself | - |
 
 Original paper: [spinroot.com/gerard/pdf/P10.pdf](https://spinroot.com/gerard/pdf/P10.pdf)
@@ -104,6 +110,7 @@ pip install 'safelint[java]'           # adds .java (Spring Boot framework prese
 pip install 'safelint[rust]'           # adds .rs
 pip install 'safelint[go]'             # adds .go
 pip install 'safelint[php]'            # adds .php
+pip install 'safelint[c]'              # adds .c, .h
 pip install 'safelint[all]'            # every supported language
 
 # Multiple extras compose, for monorepos:
@@ -240,9 +247,9 @@ SafeLint will now run on every `git commit` and block the commit if it finds err
 
 ## What it checks
 
-SafeLint ships **40 rules** across the Holzmann safety categories. **15 are on by default**; **25 are opt-in** (the dataflow trio is opt-in for performance reasons; the test-discipline and assertion rules are opt-in because they only make sense in projects that follow paired-test conventions; `dynamic_code_execution` and `blanket_suppression` are opt-in because they are deliberately opinionated; the four Java + Spring Boot rules are opt-in under vanilla and flipped on automatically by the `spring-boot` framework preset; the eleven Rust-only rules and the two Go-only rules are all opt-in since they encode strict Holzmann-style guidance that's stricter than typical idiom).
+SafeLint ships **45 rules** across the Holzmann safety categories. **16 are on by default**; **29 are opt-in** (the dataflow trio is opt-in for performance reasons; the test-discipline and assertion rules are opt-in because they only make sense in projects that follow paired-test conventions; `dynamic_code_execution` and `blanket_suppression` are opt-in because they are deliberately opinionated; the four Java + Spring Boot rules are opt-in under vanilla and flipped on automatically by the `spring-boot` framework preset; the eleven Rust-only rules and the two Go-only rules are all opt-in; the five C-only rules are opt-in except SAFE106 `nonlocal_jumps`, which is on at warning severity since they encode strict Holzmann-style guidance that's stricter than typical idiom).
 
-### Default-on rules (15)
+### Default-on rules (16)
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|
@@ -251,6 +258,7 @@ SafeLint ships **40 rules** across the Holzmann safety categories. **15 are on b
 | [SAFE103](https://shelkesays.github.io/safelint/configuration/rules/#safe103-max_arguments) | `max_arguments` | error | Functions with more than 7 parameters |
 | [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity) | `complexity` | error | Functions with high cyclomatic complexity |
 | [SAFE105](https://shelkesays.github.io/safelint/configuration/rules/#safe105-no_recursion) | `no_recursion` | warning | Functions that call themselves directly (Holzmann rule 1) |
+| [SAFE106](https://shelkesays.github.io/safelint/configuration/rules/#safe106-nonlocal_jumps) | `nonlocal_jumps` | warning | `goto` / `setjmp` / `longjmp` non-local jumps *(C-only; Holzmann rule 1)* |
 | [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except) | `bare_except` | error | `except:` with no exception type *(Python-only)* |
 | [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except) | `empty_except` | error | `except` / `catch` blocks that do nothing |
 | [SAFE203](https://shelkesays.github.io/safelint/configuration/rules/#safe203-logging_on_error) | `logging_on_error` | warning | Except / catch blocks that swallow errors silently |
@@ -262,7 +270,7 @@ SafeLint ships **40 rules** across the Holzmann safety categories. **15 are on b
 | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) | `resource_lifecycle` | error | Files or connections opened outside a `with` block (Python), without paired `try`/`finally` cleanup (JS / TS), or outside try-with-resources / a `finally` close (Java) |
 | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) | `unbounded_loops` | warning | `while True` loops with no `break` |
 
-### Opt-in rules (23): enable via `[tool.safelint.rules.<name>] enabled = true`
+### Opt-in rules (29): enable via `[tool.safelint.rules.<name>] enabled = true`
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|
@@ -291,6 +299,10 @@ SafeLint ships **40 rules** across the Holzmann safety categories. **15 are on b
 | [SAFE307](https://shelkesays.github.io/safelint/configuration/rules/#safe307-interior_mutable_static) | `interior_mutable_static` | warning | `static` holding `Mutex` / `RwLock` / `OnceLock` / `Atomic*` / `lazy_static!` global mutable state (Holzmann rule 6) *(Rust-only)* |
 | [SAFE308](https://shelkesays.github.io/safelint/configuration/rules/#safe308-truncating_as_cast) | `truncating_as_cast` | warning | `as u8` / `as i32` / etc. casts that silently truncate (use `TryFrom`) *(Rust-only; Holzmann rule 1 + 7)* |
 | [SAFE602](https://shelkesays.github.io/safelint/configuration/rules/#safe602-undocumented_unsafe) | `undocumented_unsafe` | warning | `unsafe { ... }` blocks lacking a `// SAFETY:` comment *(Rust-only)* |
+| [SAFE310](https://shelkesays.github.io/safelint/configuration/rules/#safe310-dynamic_allocation) | `dynamic_allocation` | warning | Calls to the heap-allocation family (`malloc` / `calloc` / `realloc` / `free` / `strdup`) *(C-only; Holzmann rule 3)* |
+| [SAFE311](https://shelkesays.github.io/safelint/configuration/rules/#safe311-complex_macro) | `complex_macro` | warning | Macros using `##` / `__VA_ARGS__`, or object-like macros with an unbalanced replacement *(C-only; Holzmann rule 8)* |
+| [SAFE312](https://shelkesays.github.io/safelint/configuration/rules/#safe312-conditional_compilation) | `conditional_compilation` | warning | `#if` / `#ifdef` / `#ifndef` directives beyond the include-guard idiom *(C-only; Holzmann rule 8)* |
+| [SAFE313](https://shelkesays.github.io/safelint/configuration/rules/#safe313-restricted_pointers) | `restricted_pointers` | warning | More than one level of pointer indirection (`int **p`) or function-pointer declarators (`void (*fp)(int)`) *(C-only; Holzmann rule 9)* |
 
 Plus **`SAFE004 unused_suppression`** (engine meta-check, on by default), flags stale `# nosafe` directives that no longer suppress anything. Disable globally via `ignore = ["SAFE004"]` if undesired.
 

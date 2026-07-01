@@ -4,7 +4,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
+from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
 from safelint.languages.go import PARAMETER_DECLARATION as _GO_PARAMETER_DECLARATION
@@ -31,6 +32,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
+    "c": _C_FUNCTION_TYPES,
 }
 
 _PY_SPLAT_PARAM_TYPES = frozenset({"list_splat_pattern", "dictionary_splat_pattern"})
@@ -130,6 +132,8 @@ _COUNTED_PARAM_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_COUNTED_PARAM_TYPES,
     "rust": _RUST_COUNTED_PARAM_TYPES,
     "php": _PHP_COUNTED_PARAM_TYPES,
+    # C is counted by ``_count_c_args`` (it unwraps the declarator and treats a
+    # lone ``void`` as zero), so it has no entry here.
 }
 
 
@@ -148,6 +152,41 @@ def _python_param_identifier(child: tree_sitter.Node) -> str | None:
     return node_text(name_node) if name_node else None
 
 
+def _is_c_void_param(param: tree_sitter.Node) -> bool:
+    """Return True if *param* is a lone ``void`` (``int f(void)`` - zero arguments).
+
+    A ``void`` parameter has a ``primitive_type`` child whose text is ``void``
+    and no declarator (an actual ``void *`` argument carries a
+    ``pointer_declarator``, so it is not matched).
+    """
+    return param.child_by_field_name("declarator") is None and any(c.type == "primitive_type" and node_text(c) == "void" for c in param.named_children)
+
+
+def _count_c_args(func_node: tree_sitter.Node) -> int:
+    """Count C parameters, unwrapping the declarator and treating a lone ``void`` as zero.
+
+    Parameters nest under ``function_declarator.parameters``; the function's own
+    declarator may be wrapped in a ``pointer_declarator`` for a pointer-returning
+    function (``char *foo(...)``), so the declarator chain is unwrapped to the
+    ``function_declarator`` first (bounded loop). ``int f(void)`` is C's spelling
+    for *no* parameters and counts as zero.
+    """
+    decl = func_node.child_by_field_name("declarator")
+    for _ in range(16):
+        if decl is None or decl.type == "function_declarator":
+            break
+        decl = decl.child_by_field_name("declarator")
+    params_node = decl.child_by_field_name("parameters") if decl is not None and decl.type == "function_declarator" else None
+    if params_node is None:  # pragma: no cover - defensive: a function_definition always has a parameter list
+        return 0
+    # ``variadic_parameter`` is the ``...`` ellipsis - a real parameter slot, so
+    # ``int log(int a, ...)`` counts as 2 (omitting it leaves the count one short).
+    params = [c for c in params_node.named_children if c.type in ("parameter_declaration", "variadic_parameter")]
+    if len(params) == 1 and _is_c_void_param(params[0]):
+        return 0
+    return len(params)
+
+
 def _count_args(func_node: tree_sitter.Node, lang_name: str) -> tuple[int, str | None]:
     """Return (count, first_param_name) for *func_node*.
 
@@ -155,6 +194,13 @@ def _count_args(func_node: tree_sitter.Node, lang_name: str) -> tuple[int, str |
     ``self`` / ``cls``); JavaScript callers ignore it. Both languages
     expose the parameter list through ``func_node.child_by_field_name("parameters")``.
     """
+    if lang_name == "c":
+        # C nests parameters under the ``function_declarator`` (which may itself
+        # be wrapped in a ``pointer_declarator`` for a pointer-returning
+        # function), and ``int f(void)`` is the spelling for *zero* parameters.
+        # ``_count_c_args`` handles both; the generic ``parameters``-field path
+        # below would miss the wrapped declarator and miscount the lone ``void``.
+        return _count_c_args(func_node), None
     params_node = func_node.child_by_field_name("parameters")
     # Every function definition has a parameters list (possibly empty).
     # This guard fires only on malformed AST that Tree-sitter produced
@@ -234,7 +280,7 @@ class MaxArgumentsRule(BaseRule):
 
     name = "max_arguments"
     code = "SAFE103"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function with more arguments than max_args."""
@@ -249,7 +295,7 @@ class MaxArgumentsRule(BaseRule):
             if first_name in ("self", "cls"):
                 count -= 1
             if count > max_args:
-                name_node = node.child_by_field_name("name")
+                name_node = function_name_node(node, lang_name)
                 func_name = node_text(name_node) if name_node else "<anonymous>"
                 violations.append(
                     self._make_violation_for_node(

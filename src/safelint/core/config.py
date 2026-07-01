@@ -214,6 +214,11 @@ DEFAULTS: dict[str, Any] = {
             # ``call_user_func_array`` dispatchers. Variable ``include`` /
             # ``require`` are SAFE801 (tainted_sink) territory, not here.
             "dynamic_exec_calls_php": ["eval", "assert", "create_function", "call_user_func", "call_user_func_array"],
+            # C: no ``eval``; the dynamic surface is runtime code loading via the
+            # dynamic linker (``dlopen`` opens a shared object, ``dlsym``
+            # resolves a symbol from it). Narrow by design; extend if a project
+            # uses other loader shims.
+            "dynamic_exec_calls_c": ["dlopen", "dlsym"],
         },
         "side_effects_hidden": {
             "enabled": True,
@@ -370,6 +375,28 @@ DEFAULTS: dict[str, Any] = {
                 "setcookie",
                 "error_log",
             ],
+            # C I/O primitives (``call_name`` resolves the bare ``identifier``
+            # callee). Covers stdio (``printf`` family, ``fopen`` / ``fread`` /
+            # ``fwrite`` / ``fgets`` / ``getchar`` / ``putchar`` / ``puts`` /
+            # ``scanf``), the POSIX byte I/O (``read`` / ``write``), the BSD
+            # socket I/O (``recv`` / ``send``), and the shell escape (``system``).
+            "io_functions_c": [
+                "printf",
+                "fprintf",
+                "puts",
+                "putchar",
+                "fopen",
+                "fread",
+                "fwrite",
+                "fgets",
+                "scanf",
+                "getchar",
+                "read",
+                "write",
+                "recv",
+                "send",
+                "system",
+            ],
             "pure_prefixes": [
                 "calculate",
                 "compute",
@@ -498,6 +525,26 @@ DEFAULTS: dict[str, Any] = {
                 "header",
                 "setcookie",
                 "error_log",
+            ],
+            # C I/O primitives for SAFE304 - same list as SAFE303's
+            # ``io_functions_c`` above (the C primitives are unambiguous
+            # libc/POSIX functions).
+            "io_functions_c": [
+                "printf",
+                "fprintf",
+                "puts",
+                "putchar",
+                "fopen",
+                "fread",
+                "fwrite",
+                "fgets",
+                "scanf",
+                "getchar",
+                "read",
+                "write",
+                "recv",
+                "send",
+                "system",
             ],
             "io_name_keywords": [
                 "print",
@@ -694,6 +741,14 @@ DEFAULTS: dict[str, Any] = {
                 "expectException",
                 "expectExceptionMessage",
                 "fail",
+            ],
+            # C: the literal ``assert(...)`` macro from ``<assert.h>`` - the
+            # paper's own example language finally gets rule 5 verbatim. Parses
+            # as a plain ``call_expression``; ``call_name`` resolves it. Add a
+            # project's unit-test assertion macros (e.g. ``ck_assert``,
+            # ``TEST_ASSERT``) via config if needed.
+            "assertion_calls_c": [
+                "assert",
             ],
         },
         "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
@@ -1045,6 +1100,47 @@ DEFAULTS: dict[str, Any] = {
                 "$_FILES",
                 "$_ENV",
             ],
+            # C sinks: command execution (``system`` / ``popen`` / the ``exec``
+            # family), and the classic unbounded string / buffer copies
+            # (``sprintf`` / ``strcpy`` / ``strcat`` / ``gets`` / ``memcpy``).
+            "sinks_c": [
+                "system",
+                "popen",
+                "execl",
+                "execlp",
+                "execv",
+                "execvp",
+                "sprintf",
+                "strcpy",
+                "strcat",
+                "gets",
+                "memcpy",
+            ],
+            # C sources: only *return-value* input readers. ``getenv`` /
+            # ``fgets`` / ``gets`` return the tainted data (``fgets`` / ``gets``
+            # return their destination buffer), so the assignment-based tracker
+            # taints the right variable. ``read`` / ``recv`` / ``scanf`` are
+            # deliberately excluded: they return a count / status and write the
+            # input into an out-parameter, so listing them would taint the count
+            # variable rather than the buffer. They can be added once
+            # ``CTaintTracker`` models destination-buffer tainting. ``argv``
+            # enters tainted via function-parameter seeding, not as a call source.
+            "sources_c": [
+                "getenv",
+                "fgets",
+                "gets",
+            ],
+            # C sanitizers: a narrow generic set (project validators). Extend via
+            # ``sanitizers_c`` for project-specific input-cleaning helpers.
+            # ``snprintf`` is deliberately NOT here - it bounds the write length
+            # but does not neutralise attacker-controlled *content*, so treating
+            # it as a sanitizer would clear taint before sinks like ``system`` /
+            # ``exec*`` and hide real findings.
+            "sanitizers_c": [
+                "sanitize",
+                "validate",
+                "escape",
+            ],
         },
         "return_value_ignored": {
             "enabled": False,
@@ -1223,6 +1319,21 @@ DEFAULTS: dict[str, Any] = {
                 "file_put_contents",
                 "mail",
                 "session_start",
+            ],
+            # C functions whose return value signals success / failure (or a
+            # truncation count) and is commonly discarded. ``malloc``-family is
+            # covered by SAFE310 instead, not here. An explicit ``(void)f()``
+            # cast wraps the call so it is no longer a bare expression-statement
+            # call and does NOT fire.
+            "flagged_calls_c": [
+                "fclose",
+                "fwrite",
+                "fread",
+                "remove",
+                "rename",
+                "fflush",
+                "setvbuf",
+                "snprintf",
             ],
         },
         "null_dereference": {
@@ -1463,6 +1574,25 @@ DEFAULTS: dict[str, Any] = {
             # ``Exit``) if your project treats those as panic-equivalent.
             "panic_calls_go": ["panic"],
         },
+        # C-only rules (the "Power of Ten homecoming"). SAFE106 is enabled at
+        # warning severity (``goto err`` cleanup is idiomatic, so it surfaces
+        # without blocking ``--fail-on=error``); the other four are opt-in.
+        "nonlocal_jumps": {
+            "enabled": True,
+            "severity": "warning",
+            # Call names treated as non-local jumps alongside ``goto``.
+            "nonlocal_jump_calls_c": ["setjmp", "longjmp", "sigsetjmp", "siglongjmp"],
+        },
+        "dynamic_allocation": {
+            "enabled": False,
+            "severity": "warning",
+            # Heap allocation / free calls. ``malloc`` family plus ``strdup``;
+            # add project allocators (``xmalloc`` / arena helpers) as needed.
+            "allocation_calls_c": ["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup"],
+        },
+        "complex_macro": {"enabled": False, "severity": "warning"},
+        "conditional_compilation": {"enabled": False, "severity": "warning"},
+        "restricted_pointers": {"enabled": False, "severity": "warning"},
     },
 }
 

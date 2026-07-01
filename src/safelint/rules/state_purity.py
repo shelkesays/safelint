@@ -35,6 +35,94 @@ def _func_name(func_node: tree_sitter.Node) -> str:
     return node_text(name_node) if name_node else "<anonymous>"
 
 
+def _c_declarator_identifier(node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the name ``identifier`` from a C declaration's declarator child, or None.
+
+    Direct declarator forms on a ``declaration``: a bare ``identifier``
+    (``int x;``), ``init_declarator`` (``int x = 1;``), ``pointer_declarator``
+    (``int *p;``), ``array_declarator`` (``int a[10];``), and the
+    ``function_declarator`` of a function-pointer variable (``int (*fp)(int);``,
+    whose declarator is a ``parenthesized_declarator``). Each wraps its inner
+    name on the ``declarator`` field, so the unwrap is an iterative loop
+    (bounded; SAFE105 polices recursion in this codebase) down to the
+    ``identifier``. Non-declarator children (``primitive_type``,
+    ``type_qualifier``, ``storage_class_specifier``) return None.
+    """
+    if node.type not in ("init_declarator", "pointer_declarator", "array_declarator", "function_declarator", "parenthesized_declarator", "identifier"):
+        return None
+    cur: tree_sitter.Node | None = node
+    for _ in range(16):  # bounded unwrap; never recurse
+        if cur is None:
+            return None
+        if cur.type == "identifier":
+            return cur
+        nxt = cur.child_by_field_name("declarator")
+        # ``parenthesized_declarator`` (``(*fp)``) wraps its inner declarator as
+        # a plain named child rather than on a ``declarator`` field.
+        if nxt is None and cur.type == "parenthesized_declarator" and cur.named_children:
+            nxt = cur.named_children[0]
+        cur = nxt
+    return None
+
+
+def _c_is_function_prototype(function_declarator: tree_sitter.Node) -> bool:
+    """Return True if a ``function_declarator`` is a real prototype, not a function-pointer variable.
+
+    A prototype (``int foo(void);``) names an ``identifier`` directly; a
+    file-scope function-pointer *variable* (``int (*fp)(int);``) wraps a
+    ``parenthesized_declarator`` and IS mutable shared state, so it must NOT be
+    exempted from SAFE302.
+    """
+    inner = function_declarator.child_by_field_name("declarator")
+    return inner is None or inner.type != "parenthesized_declarator"
+
+
+def _c_inner_function_declarator(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the ``function_declarator`` at the head of *declarator*, or None.
+
+    Unwraps a leading ``init_declarator`` / ``pointer_declarator`` chain: a
+    *pointer-returning* prototype (``char *foo(void);``) wraps its
+    ``function_declarator`` in a ``pointer_declarator``, so the prototype check
+    must look past the pointer. The walk stops at the first non-wrapper node,
+    so a function-pointer *variable* (``int (*fp)(int);`` - a ``function_declarator``
+    around a ``parenthesized_declarator``) is returned as-is and later classified
+    by ``_c_is_function_prototype``. Bounded loop; never recurses.
+    """
+    cur: tree_sitter.Node | None = declarator
+    for _ in range(16):
+        if cur is None:
+            return None
+        if cur.type == "function_declarator":
+            return cur
+        if cur.type not in ("init_declarator", "pointer_declarator"):
+            return None
+        cur = cur.child_by_field_name("declarator")
+    return None
+
+
+def _c_unwrap_init(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the underlying declarator, unwrapping a single ``init_declarator`` (``int *p = 0`` -> ``*p``)."""
+    if declarator.type == "init_declarator":
+        return declarator.child_by_field_name("declarator")
+    return declarator
+
+
+def _c_is_mutable_pointer(declarator: tree_sitter.Node) -> bool:
+    """Return True if *declarator* binds a mutable pointer.
+
+    A ``pointer_declarator`` (``int *p``) whose pointer is not itself
+    ``const``-qualified is a mutable pointer. ``const int *p`` declares a *const
+    pointee* but a mutable pointer, so the binding is still shared mutable state
+    and a declaration-level ``const`` does NOT exempt it. ``const int *const p``
+    (the pointer itself is ``const``) carries a ``type_qualifier`` inside the
+    ``pointer_declarator`` and is genuinely immutable.
+    """
+    inner = _c_unwrap_init(declarator)
+    if inner is None or inner.type != "pointer_declarator":
+        return False
+    return not any(c.type == "type_qualifier" and node_text(c) == "const" for c in inner.named_children)
+
+
 def _iter_python_functions(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
     """Yield every Python function (sync or async) definition in *tree*."""
     for node in walk(tree.root_node):
@@ -309,7 +397,7 @@ class GlobalMutationRule(BaseRule):
 
     name = "global_mutation"
     code = "SAFE302"
-    language = ("python", "javascript", "typescript", "java", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "go", "php", "c")
 
     _DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT: ClassVar[list[str]] = [
         "globalThis",  # universal - works in browsers, Node, web workers
@@ -415,7 +503,77 @@ class GlobalMutationRule(BaseRule):
             return self._go_check(filepath, tree)
         if lang_name == "php":
             return self._php_check(filepath, tree)
+        if lang_name == "c":
+            return self._c_check(filepath, tree)
         return self._javascript_check(filepath, tree, lang_name)
+
+    def _c_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag every file-scope mutable variable declaration (C's shared-mutable-state shape).
+
+        Declaration-site detection (like Java / Go): a file-scope variable IS
+        the shared mutable binding regardless of where it is written. Iterating
+        the translation unit's direct children excludes block-scoped locals
+        structurally (they nest under a ``compound_statement``). ``const``
+        declarations are immutable and never fire; function prototypes
+        (``int f(void);``), ``typedef``s, and ``extern`` forward references are
+        not definitions of state and are skipped. ``static`` file-scope
+        variables DO count - they are shared within the translation unit.
+        A file-scope function-pointer *variable* (``int (*fp)(int);``) is
+        mutable shared state and DOES fire: it is distinguished from a real
+        prototype by ``_c_is_function_prototype`` (the function-pointer wraps a
+        ``parenthesized_declarator``, a prototype names an identifier directly).
+        """
+        violations: list[Violation] = []
+        for node in tree.root_node.named_children:
+            if node.type == "declaration":
+                violations.extend(self._c_declaration_violations(filepath, node))
+        return violations
+
+    def _c_declaration_violations(self, filepath: str, decl: tree_sitter.Node) -> list[Violation]:
+        """Return one violation per declared variable name in a file-scope declaration.
+
+        ``const`` and ``extern`` are declaration-level specifiers but their
+        exemptions are per declarator: ``const int *p`` (mutable pointer) still
+        fires despite the ``const``, and in a mixed ``extern int a, b = 1;`` the
+        forward reference ``a`` is exempt while the definition ``b`` fires.
+        """
+        decl_const = any(child.type == "type_qualifier" and node_text(child) == "const" for child in decl.named_children)
+        decl_extern = any(child.type == "storage_class_specifier" and node_text(child) == "extern" for child in decl.named_children)
+        out: list[Violation] = []
+        for child in decl.named_children:
+            ident = _c_declarator_identifier(child)
+            # No ``_`` blank-identifier skip here: unlike Go / Python, C has no
+            # blank identifier, so ``int _;`` is a real file-scope mutable variable.
+            if ident is not None and not self._c_declarator_is_exempt(child, decl_const=decl_const, decl_extern=decl_extern):
+                out.append(
+                    self._make_violation_for_node(
+                        filepath,
+                        ident,
+                        f'File-scope variable "{node_text(ident)}" is shared mutable state - scope it to its consumer, or use `const` if it never changes (Power of Ten rule 6)',
+                    )
+                )
+        return out
+
+    @staticmethod
+    def _c_declarator_is_exempt(declarator: tree_sitter.Node, *, decl_const: bool, decl_extern: bool) -> bool:
+        """Return True if a single *declarator* is not a mutable variable definition.
+
+        A function prototype (``int f(void);`` or the pointer-returning
+        ``char *foo(void);``) is never a variable. Under a declaration-level
+        ``extern`` a declarator *without* an initialiser is a forward reference,
+        not a definition (so ``extern int a, b = 1;`` exempts ``a`` but not the
+        initialised ``b``). Under a declaration-level ``const`` an immutable
+        object is exempt, but a mutable pointer (``const int *p`` - const
+        pointee, mutable pointer) still fires.
+        """
+        fn = _c_inner_function_declarator(declarator)
+        if fn is not None and _c_is_function_prototype(fn):
+            return True
+        if decl_extern and declarator.type != "init_declarator":
+            return True
+        if not decl_const:
+            return False
+        return not _c_is_mutable_pointer(declarator)
 
     def _go_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every package-level ``var`` declaration (Go's shared-mutable-state shape).

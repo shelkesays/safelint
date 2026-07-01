@@ -161,6 +161,34 @@ def _java_method_invocation_name(call_node: tree_sitter.Node) -> str | None:
     return node_text(name_node) if name_node and name_node.type == "identifier" else None
 
 
+def function_name_node(func_node: tree_sitter.Node, lang_name: str) -> tree_sitter.Node | None:
+    """Return the ``identifier`` node that names *func_node*, or None.
+
+    Most languages expose the name on the ``name`` field. C is the exception:
+    it nests the name under the ``declarator`` field -
+    ``function_definition.declarator`` is a ``function_declarator`` (optionally
+    wrapped in a ``pointer_declarator`` for pointer-returning functions), whose
+    own ``declarator`` is the name ``identifier``. The unwrap descends the
+    ``declarator`` chain with a bounded loop (never recursion - SAFE105 polices
+    this codebase) and only returns once it has passed through the
+    ``function_declarator``, so a non-function declarator never yields a name.
+    """
+    if lang_name != "c":
+        return func_node.child_by_field_name("name")
+    node = func_node.child_by_field_name("declarator")
+    passed_function_declarator = False
+    # The Tree-sitter declarator chain is finite and acyclic (each hop descends
+    # to a child), so a plain ``while`` walk terminates without a fixed cap - a
+    # cap would silently drop legal-but-deep declarators and lose name attribution.
+    while node is not None:
+        if node.type == "identifier":
+            return node if passed_function_declarator else None
+        if node.type == "function_declarator":
+            passed_function_declarator = True
+        node = node.child_by_field_name("declarator")
+    return None
+
+
 def _last_type_identifier(type_node: tree_sitter.Node) -> tree_sitter.Node | None:
     """Return the last ``type_identifier`` named child of *type_node*, or None."""
     last_id = None

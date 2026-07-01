@@ -1,6 +1,6 @@
 # SafeLint
 
-> Holzmann "Power of Ten" safety lint rules for modern **Python, JavaScript, TypeScript, Java** (with **Spring Boot** framework preset), **Rust**, **Go**, and **PHP**, adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint, SpotBugs, Checkstyle, clippy, go vet) doesn't reach.
+> Holzmann "Power of Ten" safety lint rules for modern **Python, JavaScript, TypeScript, Java** (with **Spring Boot** framework preset), **Rust**, **Go**, **PHP**, and **C**, adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint, SpotBugs, Checkstyle, clippy, go vet) doesn't reach.
 
 SafeLint complements your existing linters. Where ruff handles style and pylint catches general defects, SafeLint enforces a focused set of *safety* rules: the kind you'd want in code that has to be reviewable, testable, and predictably-terminating. See [The Power of Ten, adapted](power-of-ten.md) for how each of Holzmann's ten rules maps onto SafeLint's checks across the supported languages. It's a CLI, a [pre-commit hook](pre-commit.md), a JSON / SARIF emitter for editor and CI consumers, and an [AI-client skill](ai-clients/index.md) that fourteen agents (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp, Kiro) speak.
 
@@ -15,14 +15,17 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 | **Rust** | `.rs` | 15 cross-language rules port cleanly (the all-five-languages set); 11 Rust-only rules cover panic placement, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer params, broad `.unwrap()` outside tests, interior-mutable `static`s, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`. Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. See [Rust](languages/rust.md). New in v2.2.0. |
 | **Go** | `.go` | 16 cross-language rules apply (the 13 all-seven core plus `global_mutation` / `dynamic_code_execution` / `resource_lifecycle`); 2 Go-only rules cover Go-idiom patterns: `empty_error_check` (the empty `if err != nil {}` swallow) and `panic_calls_outside_tests` (18 rules total for Go). Headline adaptations: the bare `for {}` infinite loop, the sibling `foo_test.go` convention, the `_ = f()` explicit-discard exemption, and the `defer x.Close()` resource form. See [Go](languages/go.md). New in v2.5.0. |
 | **PHP** | `.php` | 21 rules apply, the widest coverage of any non-Python language (only `bare_except` and `wide_scope_declaration` are skipped). First non-Python home for `global_state` (PHP has a literal `global` keyword). Headline highlights: the `@`-operator error-suppression idiom, superglobal taint sources (`$_GET` / `$_POST` / `$_REQUEST`) feeding `tainted_sink`, and the `break N;` / `continue N;` multi-level loop forms. See [PHP](languages/php.md). New in v2.6.0. |
+| **C** | `.c`, `.h` | 21 rules apply: the 16 cross-language ports plus **5 new C-only rules** - Holzmann's original language gets clauses every other language adapts away, expressed literally: `nonlocal_jumps` (`goto` / `setjmp`, rule 1), `dynamic_allocation` (`malloc` family, rule 3), `complex_macro` + `conditional_compilation` (the preprocessor, rule 8), and `restricted_pointers` (rule 9). `nonlocal_jumps` is enabled (warning); the other four are opt-in. `.h` headers lint as C. See [C](languages/c.md). New in v2.7.0. |
 
-**Rule coverage** - 40 rules total, scoped per language:
+**Rule coverage** - 45 rules total, scoped per language:
 
 | Applies to | # | Rules |
 |---|---|---|
-| **All seven** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP) | 13 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
-| Python / JS / TS / Java / Rust / PHP (not Go) | 2 | `missing_assertions`, `null_dereference` |
-| Python / JS / TS / Java / Go / PHP (not Rust) | 3 | `global_mutation`, `dynamic_code_execution`, `resource_lifecycle` |
+| **All eight** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C) | 13 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
+| Python / JS / TS / Java / Rust / PHP / C (not Go) | 1 | `missing_assertions` |
+| Python / JS / TS / Java / Rust / PHP (not Go, not C) | 1 | `null_dereference` |
+| Python / JS / TS / Java / Go / PHP / C (not Rust) | 2 | `global_mutation`, `dynamic_code_execution` |
+| Python / JS / TS / Java / Go / PHP (not Rust, not C) | 1 | `resource_lifecycle` |
 | Python / JS / TS / Java / PHP | 2 | `empty_except`, `logging_on_error` |
 | Python + PHP | 1 | `global_state` |
 | Python only | 1 | `bare_except` |
@@ -30,10 +33,11 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 | Java + Spring Boot only | 4 | `spring_*` (SAFE901-904) |
 | Rust only | 11 | `needless_mut`, `unchecked_arithmetic_on_input`, `panic_macros_outside_tests`, `lock_poisoning_ignored`, `silent_result_discard`, `unlogged_error_branch`, `result_unwrap_outside_tests`, `dangerous_mem_ops`, `interior_mutable_static`, `truncating_as_cast`, `undocumented_unsafe` |
 | Go only | 2 | `empty_error_check`, `panic_calls_outside_tests` |
+| C only | 5 | `nonlocal_jumps`, `dynamic_allocation`, `complex_macro`, `conditional_compilation`, `restricted_pointers` |
 
-Rules are skipped per language where the semantics don't translate - e.g. Go has no try/catch, `global` keyword, `var` hoisting, production assertion idiom, or chained-nullable idiom; Rust's `Result` / `Option` / `Drop` model covers its skips with Rust-specific replacements.
+Rules are skipped per language where the semantics don't translate - e.g. Go has no try/catch, `global` keyword, `var` hoisting, production assertion idiom, or chained-nullable idiom; Rust's `Result` / `Option` / `Drop` model covers its skips with Rust-specific replacements; C skips try/catch rules, `global_state`, `wide_scope_declaration`, and (documented gaps) `resource_lifecycle` / `null_dereference`.
 
-**Planned future languages** (in working-priority order, no timelines committed): C, C++. See the [language-coverage roadmap](configuration/rules.md#planned).
+**Planned future languages** (no timelines committed): C++. See the [language-coverage roadmap](configuration/rules.md#planned).
 
 ## Quick start
 
@@ -45,6 +49,7 @@ pip install 'safelint[java]'           # adds .java (Spring Boot framework prese
 pip install 'safelint[rust]'           # adds .rs
 pip install 'safelint[go]'             # adds .go
 pip install 'safelint[php]'            # adds .php
+pip install 'safelint[c]'              # adds .c, .h
 pip install 'safelint[all]'            # every supported language
 pip install 'safelint[python,rust]'    # multiple extras compose (e.g. PyO3 / maturin)
 # uv add 'safelint[typescript]' works the same way.

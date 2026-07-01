@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages import get_language_for_file
-from safelint.languages._node_utils import end_lineno, lineno, node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import end_lineno, function_name_node, lineno, node_text, resolve_lang_name, walk
+from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
@@ -32,6 +33,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
+    "c": _C_FUNCTION_TYPES,
 }
 
 # ``count_mode = "statements"`` is language-aware: each language has a
@@ -123,7 +125,7 @@ class FunctionLengthRule(BaseRule):
 
     name = "function_length"
     code = "SAFE101"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function or async function exceeding the configured size."""
@@ -146,7 +148,7 @@ class FunctionLengthRule(BaseRule):
                 continue
             length = self._function_size(node, count_mode, lang_name, function_types, comment_prefix)
             if length > max_lines:
-                name_node = node.child_by_field_name("name")
+                name_node = function_name_node(node, lang_name)
                 func_name = node_text(name_node) if name_node else "<anonymous>"
                 unit = _UNIT_BY_MODE.get(count_mode, "lines")
                 violations.append(

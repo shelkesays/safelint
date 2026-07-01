@@ -30,7 +30,8 @@ from __future__ import annotations
 from dataclasses import replace
 from typing import TYPE_CHECKING
 
-from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
+from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
@@ -62,6 +63,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "rust": _RUST_FUNCTION_TYPES,
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
+    "c": _C_FUNCTION_TYPES,
 }
 
 #: The call-expression node type(s) per language. Most languages have a
@@ -81,6 +83,7 @@ _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": frozenset({"method_invocation"}),
     "go": frozenset({"call_expression"}),
     "php": frozenset({"function_call_expression", "member_call_expression", "nullsafe_member_call_expression", "scoped_call_expression"}),
+    "c": frozenset({"call_expression"}),
 }
 
 #: Identifiers that name "the current object" per language. A call
@@ -285,7 +288,7 @@ class NoRecursionRule(BaseRule):
 
     name = "no_recursion"
     code = "SAFE105"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every function whose body directly calls itself."""
@@ -316,7 +319,7 @@ class NoRecursionRule(BaseRule):
         nested binding (not recursion), so bare self-calls are skipped while
         ``self``/``this``-qualified ones still count.
         """
-        name_node = func.child_by_field_name("name")
+        name_node = function_name_node(func, lang)
         if name_node is None:
             return []
         func_name = node_text(name_node)

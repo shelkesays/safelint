@@ -4,12 +4,12 @@ SafeLint is a static-analysis CLI that parses source code via Tree-sitter and wa
 
 ## Supported versions
 
-Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade. PHP (`.php`) is the most recent language addition; it ships on the current supported line.
+Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade. C (`.c`, `.h`) is the most recent language addition; it ships on the current supported line.
 
 | Version(s) | Status |
 |---|---|
-| **2.6.x** (current; PHP support) | ✅ Security fixes |
-| **2.2.x - 2.5.x** (Rust in 2.2.x-2.4.x; Go in 2.5.x) | ✅ Security fixes through ~6 months after the next minor lands |
+| **2.7.x** (current; C support) | ✅ Security fixes |
+| **2.2.x - 2.6.x** (Rust in 2.2.x-2.4.x; Go in 2.5.x; PHP in 2.6.x) | ✅ Security fixes through ~6 months after the next minor lands |
 | **2.1.x** (Java + Spring Boot) | ❌ Upgrade to a current 2.x line |
 | **2.0.x** (multi-language refactor) | ❌ Upgrade to a current 2.x line |
 | **1.x** | ❌ Upgrade to 2.x |
@@ -51,7 +51,7 @@ The following classes of issue are vulnerabilities for safelint:
 - **Path traversal** in the `safelint skill install` flow. The install command creates files under `.claude/`, `.cursor/`, etc. (project scope) or `~/.claude/skills/safelint/` etc. (user scope). An attacker-controlled `--client` value, environment variable, or auto-detected marker path that allows writes outside those directories is in scope.
 - **Arbitrary file write or read** via crafted TOML config. The `[tool.safelint.*]` config in `pyproject.toml` / `safelint.toml` is parsed with the stdlib `tomllib`. Any field whose value can escape to filesystem or network surface is in scope (e.g. a glob in `per_file_ignores` that traverses outside the project root and bypasses safety checks).
 - **Code execution** in any form. safelint deliberately does not `eval` / `exec` / `subprocess` user code or config. If you find a path that does, that's in scope.
-- **Bundled grammar tampering**. SafeLint's only unconditional runtime dependency is `tree-sitter`; the per-language grammar packages (`tree-sitter-python`, `tree-sitter-javascript`, `tree-sitter-typescript`, `tree-sitter-java`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-php`) ship as **optional extras** (the base install ships no grammars), pulled in by the matching `safelint[<lang>]` / `safelint[all]` extra. A typosquat or malicious dependency that ships through the published `safelint` package or one of those extras is in scope; report alongside the PyPI advisory mechanism if applicable.
+- **Bundled grammar tampering**. SafeLint's only unconditional runtime dependency is `tree-sitter`; the per-language grammar packages (`tree-sitter-python`, `tree-sitter-javascript`, `tree-sitter-typescript`, `tree-sitter-java`, `tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-php`, `tree-sitter-c`) ship as **optional extras** (the base install ships no grammars), pulled in by the matching `safelint[<lang>]` / `safelint[all]` extra. A typosquat or malicious dependency that ships through the published `safelint` package or one of those extras is in scope; report alongside the PyPI advisory mechanism if applicable.
 - **Symlink races** in the install or skill-status flow. The skill-install logic creates symlinks when `--symlink` is passed; race-conditioned attacks that swap target files are in scope.
 - **Privilege escalation** from the CLI's own permissions. safelint runs with the invoking user's permissions; any path that gains more than that is in scope.
 
@@ -72,7 +72,7 @@ These are not vulnerabilities for safelint. Please file them as regular issues i
 
 For context when assessing severity, safelint's runtime model:
 
-- Reads `.py` / `.pyw` / `.js` / `.mjs` / `.cjs` / `.ts` / `.tsx` / `.as` / `.java` / `.rs` / `.go` / `.php` files from the working directory tree.
+- Reads `.py` / `.pyw` / `.js` / `.mjs` / `.cjs` / `.ts` / `.tsx` / `.as` / `.java` / `.rs` / `.go` / `.php` / `.c` / `.h` files from the working directory tree.
 - Reads `pyproject.toml` / `safelint.toml` from the project root (and parent directories walked for the config-discovery rule).
 - Reads bundled skill files from the installed package's `skill_files/` directory.
 - Writes violations to stdout / stderr (text, JSON, or SARIF format).

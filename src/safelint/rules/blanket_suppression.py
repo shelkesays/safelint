@@ -75,7 +75,7 @@ def _python_blanket(comment_text: str) -> str | None:
 
 
 def _strip_comment_markers(comment_text: str) -> str:
-    """Strip ``//`` / ``/* ... */`` markers from a JS-family comment."""
+    """Strip ``//`` / ``/* ... */`` markers from a C-family comment (JS / TS / C)."""
     text = comment_text.strip()
     if text.startswith("//"):
         return text[2:].strip()
@@ -152,6 +152,36 @@ def _go_nolint_label(rest: str) -> str | None:
     if rest == "" or rest[0].isspace() or rest.startswith("//"):
         return "//nolint"
     return None
+
+
+# clang-tidy's NOLINT family. Bare ``NOLINT`` / ``NOLINTNEXTLINE`` (and the
+# ``NOLINTBEGIN`` / ``NOLINTEND`` block markers) suppress *every* check; a
+# parenthesised check list (``NOLINT(bugprone-foo)``) scopes it and is clean.
+# Matched against the comment *body* (markers already stripped), so it fires for
+# both line (``// NOLINT``) and block (``/* NOLINT */``) comments - clang-tidy
+# honours NOLINT in either form. The keyword is case-sensitive uppercase, so
+# prose ``nolint here`` is left alone; the lookahead keeps ``NOLINTFOO`` from
+# matching the bare ``NOLINT``.
+_C_NOLINT = re.compile(r"^(NOLINT(?:NEXTLINE|BEGIN|END)?)(?=\(|\s|$)(\([^)]*\))?")
+
+
+def _c_blanket(comment_text: str) -> str | None:
+    """Return the blanket-directive label for a C comment, or None.
+
+    A bare clang-tidy ``NOLINT`` form is blanket; a parenthesised check list
+    (``NOLINT(bugprone-foo)``) scopes it and is treated as clean. The one
+    parenthesised form that is *still* blanket is the wildcard ``NOLINT(*)`` -
+    clang-tidy treats ``(*)`` as "every check", so it suppresses everything just
+    like the bare form. Comment markers are stripped first, so the directive is
+    recognised in both ``//`` and ``/* ... */`` comments.
+    """
+    match = _C_NOLINT.match(_strip_comment_markers(comment_text))
+    if match is None:
+        return None
+    args = match.group(2)
+    if args and re.sub(r"\s", "", args) != "(*)":
+        return None
+    return f"// {match.group(1)}"
 
 
 def _rust_blanket(attr_text: str) -> str | None:
@@ -233,6 +263,7 @@ def _php_blanket(comment_text: str) -> str | None:
 _COMMENT_DETECTORS_BY_LANG = {
     "python": _python_blanket,
     "go": _go_blanket,
+    "c": _c_blanket,
 }
 
 
@@ -241,7 +272,7 @@ class BlanketSuppressionRule(BaseRule):
 
     name = "blanket_suppression"
     code = "SAFE603"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every blanket foreign-analyser suppression in *filepath*."""

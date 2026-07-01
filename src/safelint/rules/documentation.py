@@ -5,7 +5,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
-from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
+from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
@@ -27,6 +28,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "java": _JAVA_FUNCTION_TYPES,
     "rust": _RUST_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
+    "c": _C_FUNCTION_TYPES,
 }
 
 
@@ -173,7 +175,7 @@ class MissingAssertionsRule(BaseRule):
 
     name = "missing_assertions"
     code = "SAFE601"
-    language = ("python", "javascript", "typescript", "java", "rust", "php")
+    language = ("python", "javascript", "typescript", "java", "rust", "php", "c")
 
     def _assertion_count(self, func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str], minimum: int) -> int:
         """Dispatch to the language-appropriate assertion counter (early-exits at *minimum*).
@@ -252,7 +254,7 @@ class MissingAssertionsRule(BaseRule):
             count = self._assertion_count(node, lang_name, function_types, minimum)
             if count >= minimum:
                 continue
-            name_node = node.child_by_field_name("name")
+            name_node = function_name_node(node, lang_name)
             func_name = node_text(name_node) if name_node else "<anonymous>"
             violations.append(
                 self._make_violation_for_node(

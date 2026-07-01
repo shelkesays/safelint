@@ -33,6 +33,9 @@ import pytest
 
 from safelint import languages
 from safelint.languages import (
+    c as _c_mod,
+)
+from safelint.languages import (
     go as _go_mod,
 )
 from safelint.languages import (
@@ -69,6 +72,18 @@ def test_python_parser_factory_raises_when_grammar_missing(monkeypatch: pytest.M
 def test_python_install_hint_names_the_right_extra() -> None:
     """The hint string matches what users actually need to type."""
     assert _python_mod.GRAMMAR_INSTALL_HINT == "pip install 'safelint[python]'"
+
+
+def test_c_parser_factory_raises_when_grammar_missing(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``_create_c_parser`` errors clearly when the grammar isn't installed."""
+    monkeypatch.setattr(_c_mod, "_C_TS_LANGUAGE", None)
+    with pytest.raises(ImportError, match=r"tree-sitter-c is not installed.*safelint\[c\]"):
+        _c_mod._create_c_parser()
+
+
+def test_c_install_hint_names_the_right_extra() -> None:
+    """The C hint string matches what users actually need to type."""
+    assert _c_mod.GRAMMAR_INSTALL_HINT == "pip install 'safelint[c]'"
 
 
 def test_registry_skips_python_when_grammar_unavailable(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -326,7 +341,7 @@ def test_every_language_has_its_own_extra() -> None:
     # Keep the exclusion list explicit so adding a new tooling extra
     # forces a deliberate update here.
     language_extras = provides_extras - {"dev", "docs"}
-    expected = {"python", "javascript", "typescript", "java", "rust", "go", "php", "all"}
+    expected = {"python", "javascript", "typescript", "java", "rust", "go", "php", "c", "all"}
     missing = expected - language_extras
     unexpected = language_extras - expected
     assert not missing, f"v2.x contract: every supported language must have its own opt-in extra. Missing from wheel metadata: {sorted(missing)}. Provides-Extra: {sorted(provides_extras)}"

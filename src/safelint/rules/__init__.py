@@ -4,6 +4,13 @@ from __future__ import annotations
 
 from safelint.rules.base import BaseRule, Violation
 from safelint.rules.blanket_suppression import BlanketSuppressionRule
+from safelint.rules.c_rules import (
+    ComplexMacroRule,
+    ConditionalCompilationRule,
+    DynamicAllocationRule,
+    NonlocalJumpsRule,
+    RestrictedPointersRule,
+)
 from safelint.rules.complexity import ComplexityRule
 from safelint.rules.dataflow import NullDereferenceRule, ReturnValueIgnoredRule, TaintedSinkRule
 from safelint.rules.documentation import MissingAssertionsRule
@@ -99,6 +106,15 @@ ALL_RULES: list[type[BaseRule]] = [
     # ``execution.order`` in DEFAULTS.
     EmptyErrorCheckRule,
     PanicCallsOutsideTestsRule,
+    # C-only rules - the "Power of Ten homecoming" (1xx / 3xx bands). C-only,
+    # so (like the Rust- and Go-only rules) they are not listed in
+    # ``execution.order``. SAFE106 is enabled (severity=warning); the other
+    # four are disabled by default.
+    NonlocalJumpsRule,
+    DynamicAllocationRule,
+    ComplexMacroRule,
+    ConditionalCompilationRule,
+    RestrictedPointersRule,
 ]
 
 RULE_BY_NAME: dict[str, type[BaseRule]] = {cls.name: cls for cls in ALL_RULES}
@@ -109,8 +125,11 @@ __all__ = [
     "BareExceptRule",
     "BaseRule",
     "BlanketSuppressionRule",
+    "ComplexMacroRule",
     "ComplexityRule",
+    "ConditionalCompilationRule",
     "DangerousMemOpsRule",
+    "DynamicAllocationRule",
     "DynamicCodeExecutionRule",
     "EmptyErrorCheckRule",
     "EmptyExceptRule",
@@ -125,10 +144,12 @@ __all__ = [
     "NeedlessMutRule",
     "NestingDepthRule",
     "NoRecursionRule",
+    "NonlocalJumpsRule",
     "NullDereferenceRule",
     "PanicCallsOutsideTestsRule",
     "PanicMacrosOutsideTestsRule",
     "ResourceLifecycleRule",
+    "RestrictedPointersRule",
     "ResultUnwrapOutsideTestsRule",
     "ReturnValueIgnoredRule",
     "SideEffectsHiddenRule",
