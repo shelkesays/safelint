@@ -1,9 +1,12 @@
 # C++ language support - implementation spec
 
-**Status**: not started. **Hard prerequisite: the C spec (`plan/02-c.md`) must
-be shipped first.** C++ reuses C's new rule set (SAFE106/310/311/312/313 widen
-to C++), shares the grammar family, and inherits the `.h` ownership decision.
-Read `plan/README.md` first, then the standing references.
+**Status**: not started. **Prerequisite satisfied: C shipped in v2.7.0
+(2026-07-02).** C++ reuses C's new rule set (SAFE106/310/311/312/313 widen
+to C++), shares the grammar family, and inherits the `.h` ownership decision
+(already live: `.h` lints as C). Read `plan/README.md` first, then the
+standing references, then **section 0 below** - it carries binding
+requirements from the C post-release audit and the context-resilience
+protocol for the implementing agent.
 
 **Scope**: one comprehensive MINOR release. Grammar `tree-sitter-cpp`,
 extensions `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`. Line comments `//`.
@@ -13,6 +16,146 @@ headers lint as C).
 **Why C++ is later on the roadmap**: templates, ADL, and the preprocessor make
 rule design harder. Keep v1 scope disciplined: port the cross-language set,
 widen the C rules, add a small C++-idiom set. Resist template-aware analysis.
+
+---
+
+## 0. Audit-derived requirements (binding; from the C v2.7.0 post-release audit)
+
+The C release was audited against its spec and against the Power of Ten paper
+on 2026-07-02 (remediation spec: `plan/c-audit-remediation.md`, scheduled to
+run AFTER this C++ work per the owner). The audit found the C implementation
+behaviourally correct but caught repeatable process gaps. This section exists
+so the C++ release does not repeat them and so the implementing agent cannot
+lose the original design intent to context loss. **Every item here is a
+ship-blocker for the C++ PR unless marked optional.**
+
+### 0.1 Context-resilience protocol (follow exactly)
+
+- This spec is the **single source of truth**. Work batch by batch (the
+  section order below is the batch order), one coherent commit per batch,
+  full validation gate before each commit. Position must be recoverable from
+  `git log --oneline` alone.
+- **After any context compaction, session restart, or hand-off: re-read this
+  ENTIRE spec plus `plan/README.md` "Non-negotiables"**, then `git log` /
+  `git status` to re-derive the next batch. Never resume from a summary's
+  memory of the spec; resume from the spec.
+- **Verify every Tree-sitter node type by probing** (plan/README.md has the
+  probe snippet) and **verify every quoted anchor text before editing a
+  doc** - if the text is not found verbatim, re-locate by grep and adapt;
+  never guess.
+- If the repository state contradicts this spec in a way it does not
+  anticipate, stop and ask the owner rather than improvising.
+
+### 0.2 C behaviour must not regress (the widening risk)
+
+This work widens SAFE106/310/311/312/313 (and possibly the dataflow tracker)
+from `("c",)` to `("c", "cpp")`. Widening must be **purely additive**: every
+audited C behaviour must be byte-for-byte identical after this PR.
+
+- **Before touching any C rule**, commit the behavioural pin test specified
+  in `plan/c-audit-remediation.md` WP0
+  (`tests/rules/test_c_power_of_ten_pin.py`) if it does not exist yet. It
+  encodes the audit's minimal reproducer for every C rule, including the
+  review-hardened subtleties (goto-out-of-loop vs goto-within-loop for
+  SAFE501, initialised-`extern` and pointer-returning-prototype for SAFE302,
+  `(void)` cast for SAFE802, misordered brackets and string-literal brackets
+  for SAFE311, include-guard-first-statement for SAFE312, scoped vs bare
+  NOLINT for SAFE603). It must be green before, during, and after the C++
+  work.
+- The C tracker (`analysis/dataflow_c.py`) embodies review fixes that are
+  easy to lose when extending or copying into `dataflow_cpp.py`: ternary
+  (`conditional_expression`) propagation, inline `assignment_expression`
+  propagation into sink arguments (RHS always, LHS too for compound
+  assignments), compound assignments preserving prior taint, fully
+  iterative walks (no recursion, the analysis-module rule), and sanitizer
+  calls whose arguments are NOT descended into. Carry all of these over;
+  add a C++ test for each.
+
+### 0.3 Ship-time test requirements the C release missed (do not repeat)
+
+1. **Engine-level suite `tests/core/test_engine_cpp.py` in the same PR.**
+   C shipped without one (Go/JS/TS/PHP all have one); it is being backfilled
+   in the remediation plan. For C++, mirror `tests/core/test_engine_go.py`:
+   all six extensions in `supported_extensions()`, language resolution per
+   extension, a clean end-to-end run, `SAFE000` on unparseable input, and
+   directory discovery (a dir with `.cpp` + `.hpp` + a non-source file
+   discovers exactly the two).
+2. **Config-override tests for EVERY list knob, in the same PR.** C shipped
+   fires/clean but no knob-override tests. For each `_cpp` list this spec
+   introduces (`io_functions_cpp`, `dynamic_exec_calls_cpp`,
+   `assertion_calls_cpp`, `sinks_cpp` / `sources_cpp` / `sanitizers_cpp`,
+   `flagged_calls_cpp`, and any list on SAFE315/316), add BOTH directions:
+   a custom entry fires, and a default entry no longer fires under the
+   override (replaced, not merged). Route every new list through
+   `_validated_string_list` (the Go-port pitfall).
+3. **Decide and test the knob story for the widened C rules.** SAFE106/310
+   read `_c`-suffixed keys (`nonlocal_jump_calls_c`, `allocation_calls_c`).
+   Decide explicitly: do `.cpp` files honour the same `_c` keys, or do they
+   get `_cpp` variants? Document the decision on BOTH language pages and
+   test the override path for BOTH languages (whichever design you pick,
+   an override must demonstrably affect `.cpp` files).
+4. **Contract locks for default-on rules.** SAFE106 stays
+   `enabled = true, severity = "warning"` after widening - assert it
+   explicitly against `DEFAULTS` (see remediation WP3c for the shape). Any
+   NEW C++ rule that ships default-on needs the same lock; SAFE315/316 are
+   opt-in, so for them the default-disabled smoke assertion (mirror
+   `test_c_opt_in_rules_are_silent_by_default` in
+   `tests/rules/test_c_rules.py`) is the required lock.
+
+### 0.4 Paper-fidelity notes land in the SAME PR as the behaviour
+
+The C audit found undocumented paper gaps because fidelity notes were treated
+as separate from rule work. For C++, every deviation ships with its note in
+`docs/power-of-ten.md` in the same PR:
+
+- **Extend the two C gap notes to C++** (they will exist in
+  `docs/power-of-ten.md` "Deferred and out-of-scope" after the remediation
+  plan runs; if this C++ work runs FIRST, write them now covering both
+  languages - the texts are in `plan/c-audit-remediation.md` WP1a/WP1b):
+  recursive macro calls (rule 8) and typedef-hidden indirection (rule 9,
+  where C++ adds `using intp = int *;` aliases as a second hiding form).
+- **SAFE313's smart-pointer exemption is itself a paper deviation** - the
+  paper's rule 9 bans everything beyond one dereference; exempting
+  `unique_ptr` / `shared_ptr` / `weak_ptr` is the modern-C++ concession.
+  Record it as a "Fidelity notes from the paper" bullet, not silently.
+- **SAFE601's `static_assert` exclusion** (compile-time, does not count
+  toward runtime assertion density) - already spec'd below; the note goes in
+  rules.md AND the fidelity section.
+- **Rule 1 and lambdas**: SAFE105's documented anonymous-function blind spot
+  now applies to `lambda_expression` recursion; extend the existing note if
+  the wording is Python/JS-specific.
+
+### 0.5 Enumeration debt interacts with this release
+
+`plan/c-audit-remediation.md` WP2 lists doc enumerations that STILL say
+"Seven languages" (they predate C). Since this C++ work runs first, **your
+mandatory stale-count/enumeration sweep must fix them in one hop to the
+NINE-language state** (do not "fix" them to eight in a C++ PR). The known
+list (verify by grep, not from memory): `CONTRIBUTING.md` ~39/~78 +
+`docs/contributing/index.md` ~43/~82, `docs/json-schema.md` ~9, `README.md`
+"One hook, every language" prose + quoted `types_or`,
+`src/safelint/skill_files/README.md` ~3, and the four "all-seven core"
+labels (`README.md` ~30, `docs/index.md` ~16, `docs/configuration/rules.md`
+~23, `docs/languages/php.md` ~34 - use the count-free "all-language core").
+Then run the remediation plan's WP2 sweep greps to prove zero stragglers.
+
+Also: when creating `sources_cpp`, copy the **shipped, trimmed** C
+philosophy (return-value sources only: `getenv` / `fgets` / `gets`), NOT the
+original C spec's list - `scanf` / `read` / `recv` were removed in review
+because out-parameter readers taint the count variable, not the buffer. The
+same reasoning applies to any C++ candidate (`std::getline` writes an
+out-parameter too; if you want it as a source, that needs the
+destination-buffer modelling the tracker does not have - leave it out and
+document).
+
+### 0.6 Pre-flight plan hygiene (step 0 of the work)
+
+Before the language work starts: delete `plan/02-c.md` (C shipped; its
+decisions live in `docs/languages/c.md` + rules.md + the shipped code -
+verify the SAFE106 enabled/warning rationale is on the language page before
+deleting), add the "C shipped in v2.7.0" blockquote to `plan/README.md`
+(mirroring Go/PHP), remove C from the priority table, and mark this spec
+in-progress. This keeps every future agent's first context read accurate.
 
 ---
 
