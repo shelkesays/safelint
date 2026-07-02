@@ -57,9 +57,11 @@ from `("c",)` to `("c", "cpp")`. Widening must be **purely additive**: every
 audited C behaviour must be byte-for-byte identical after this PR.
 
 - The behavioural pin test `tests/rules/test_c_power_of_ten_pin.py` already
-  exists (shipped in 2.7.1). It encodes the audit's minimal reproducer for
-  every C rule, including the review-hardened subtleties (goto-out-of-loop vs
-  goto-within-loop for SAFE501, initialised-`extern` and pointer-returning-
+  exists (shipped in 2.7.1). It is a **representative cross-rule tripwire**
+  (not one-per-rule, not exhaustive - the per-rule `tests/rules/test_*_c.py`
+  files are the complete coverage), focused on the behaviours most at risk
+  from this widening, including the review-hardened subtleties (goto-out-of-loop
+  vs goto-within-loop for SAFE501, initialised-`extern` and pointer-returning-
   prototype for SAFE302, `(void)` cast for SAFE802, misordered brackets and
   string-literal brackets for SAFE311, include-guard-first-statement for
   SAFE312, scoped vs bare NOLINT for SAFE603). **It must stay green before,
