@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [2.7.0] - 2026-07-02
 
 **C is now a supported language alongside Python, JavaScript, TypeScript, Java, Rust, Go, and PHP.** `.c` and `.h` files are discovered, parsed via Tree-sitter (`tree-sitter-c`, shipped in the opt-in `[c]` extra), and run against **21 rules** - the 16 cross-language ports plus **5 new C-only rules**, the largest rule addition of any language. C is Holzmann's original "Power of Ten" target, so the new rules express clauses every other language adapts away, literally. safelint grows to **45 rules** and **8 registered languages**. Additive per the project's semver policy (a new language is MINOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.
 
