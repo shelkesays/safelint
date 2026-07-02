@@ -95,7 +95,10 @@ lock: if a future refactor (notably the C++ widening) changes one of these
 audited C behaviours, the matching named case flips. It is NOT one-per-rule
 and NOT complete - the per-rule ``tests/rules/test_*_c.py`` files are the
 exhaustive coverage; this pin just trips fast on the behaviours most at risk.
-Each case is the audit's minimal reproducer.
+Each case is the audit's minimal reproducer, using only built-in types
+(``void *``, never library typedefs like ``FILE`` / ``jmp_buf``) so it matches
+the shipped C test style and a parse quirk can never masquerade as a
+behaviour regression.
 """
 
 from __future__ import annotations
@@ -120,7 +123,7 @@ _OPT_IN = {"rules": {n: {"enabled": True} for n in (
 # (case id, source, code, fires?)
 _CASES = [
     ("goto fires SAFE106", "void f(int x){ if(x) goto out; out: return; }", "SAFE106", True),
-    ("setjmp fires SAFE106", "int f(void){ jmp_buf b; return setjmp(b); }", "SAFE106", True),
+    ("setjmp fires SAFE106", "void f(void *b){ setjmp(b); }", "SAFE106", True),
     ("plain flow clean SAFE106", "int f(int x){ return x + 1; }", "SAFE106", False),
     ("direct recursion fires SAFE105", "int fact(int n){ return n < 2 ? 1 : n * fact(n - 1); }", "SAFE105", True),
     ("while(1) bare fires SAFE501", "void f(void){ while(1) { } }", "SAFE501", True),
@@ -134,8 +137,8 @@ _CASES = [
     ("extern fwd-ref clean SAFE302", "extern int g;\nint f(void){ return g; }", "SAFE302", False),
     ("initialised extern fires SAFE302", "extern int g = 1;\nint f(void){ return g; }", "SAFE302", True),
     ("pointer-returning prototype clean SAFE302", "char *foo(void);\nchar *g(void){ return foo(); }", "SAFE302", False),
-    ("ignored fclose fires SAFE802", "void f(FILE *fp){ fclose(fp); }", "SAFE802", True),
-    ("(void) cast discard clean SAFE802", "void f(FILE *fp){ (void)fclose(fp); }", "SAFE802", False),
+    ("ignored fclose fires SAFE802", "void f(void *fp){ fclose(fp); }", "SAFE802", True),
+    ("(void) cast discard clean SAFE802", "void f(void *fp){ (void)fclose(fp); }", "SAFE802", False),
     ("token paste fires SAFE311", "#define CAT(a, b) a##b\n", "SAFE311", True),
     ("bracket in string literal clean SAFE311", '#define OPEN "["\n', "SAFE311", False),
     ("misordered brackets fire SAFE311", "#define BAD )(\n", "SAFE311", True),
