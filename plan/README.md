@@ -1,11 +1,17 @@
 # Language-expansion plan: C, C++
 
 **Audience**: the AI coding agent (or human contributor) implementing the next
-language. Each language has its own self-contained spec in this directory.
-Implement **one language per spec, in working-priority order**. **C++ is
-next** (C shipped in v2.7.0; the hard C-before-C++ ordering is satisfied).
-After C++, run `plan/c-audit-remediation.md` (owner-decided order,
-2026-07-02: C++ first, then the audit gap fixes). This matches the
+piece of work. Each item has its own self-contained spec in this directory.
+Implement **one spec at a time, in working-priority order**.
+
+**Next up: `plan/c-audit-remediation.md`, shipping as 2.7.1.** Then **C++
+(`plan/03-cpp.md`) as 2.8.0.** (Owner decision 2026-07-02, revised: close the C
+audit gaps FIRST, because the C++ work widens exactly the rules and dataflow
+tracker those gaps guard - the missing config-override regression tests, the
+SAFE106 contract lock, and the behavioural pin must exist before C++ touches
+those rules, or a C++ refactor could silently regress C behaviour. The
+enumeration sweep and fidelity notes ride along in the same 2.7.1.) C shipped
+in v2.7.0, so the hard C-before-C++ ordering is satisfied. This matches the
 project's published roadmap in `docs/configuration/rules.md` "Planned":
 
 > **Go (`.go`) shipped in v2.5.0** (6th registered language: 16 cross-language
@@ -26,11 +32,11 @@ project's published roadmap in `docs/configuration/rules.md` "Planned":
 Rows are in working-priority order; the **Spec #** column is the stable file
 number, not the priority rank.
 
-| Priority | Spec # | File | Language | Status | Depends on |
+| Priority | Spec # | File | Item | Status | Depends on |
 |---|---|---|---|---|---|
-| shipped | 2 | `plan/02-c.md` | C (`.c`, `.h`) | **shipped in v2.7.0** (2026-07-02; 8th language, 21 rules = 16 ports + 5 C-only SAFE106/310-313). Spec deletion + shipped-blockquote are step 0 of the C++ spec / WP4 of the remediation spec. | - |
-| 1 (next) | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started - **read its section 0 first** (binding audit-derived requirements) | C shipped in v2.7.0 (satisfied) |
-| 2 | - | `plan/c-audit-remediation.md` | (not a language) C post-release audit gap fixes: fidelity notes, stale enumerations, missing tests, plan hygiene | not started | Runs AFTER C++ per owner decision; executable standalone if C++ stalls |
+| shipped | 2 | `plan/02-c.md` | C (`.c`, `.h`) language support | **shipped in v2.7.0** (2026-07-02; 8th language, 21 rules = 16 ports + 5 C-only SAFE106/310-313). This file carries a verified status table; it is **deleted by the remediation spec's WP4** once its 2 pending sub-tasks (config-override tests, enumeration sweep) close. | - |
+| 1 (next) | - | `plan/c-audit-remediation.md` | (not a language) C post-release audit gap fixes -> **ships as 2.7.1**: regression guards (pin test, config-override tests, SAFE106 lock), fidelity notes, enumeration sweep, plan hygiene | not started | C shipped (satisfied). Must land before C++ so the guards exist before C++ widens SAFE106/310-313 + the dataflow tracker. |
+| 2 | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) -> **2.8.0** | not started - **read its section 0 first** (binding audit-derived requirements) | **2.7.1 remediation shipped** (regression guards + closed C baseline in place) |
 
 Update the Status column (and the per-spec status header) as work lands; remove
 a spec file once its language ships (as was done for Go).

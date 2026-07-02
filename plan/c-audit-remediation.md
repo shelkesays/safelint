@@ -1,9 +1,14 @@
 # C support post-release audit - remediation spec
 
-**Status**: not started. **Scheduling (owner decision, 2026-07-02): C++
-(`plan/03-cpp.md`) is worked FIRST; this plan runs after C++ ships.** See
-"Sequencing" below for how that ordering changes each work package - this
-spec is written to be executable in either order without loss.
+**Status**: not started. **Scheduling (owner decision, 2026-07-02, revised):
+this plan runs FIRST and ships as 2.7.1, BEFORE C++ (`plan/03-cpp.md`).**
+Rationale: the C++ work widens SAFE106/310/311/312/313 from `("c",)` to
+`("c","cpp")` and extends `dataflow_c` into `dataflow_cpp` - exactly the rules
+and tracker whose regression guards this plan adds (config-override tests, the
+SAFE106 contract lock, the behavioural pin). Those guards must exist before
+C++ touches that code, or a C++ refactor could silently regress C behaviour
+with nothing to catch it. Closing the C gaps as a self-contained 2.7.1 gives
+C++ a fully-closed, fully-guarded baseline.
 
 **Origin**: a full verification audit of the shipped C support (v2.7.0,
 2026-07-02) against `plan/02-c.md` (now captured in the shipped docs) and
@@ -147,33 +152,38 @@ Commit this as WP0 with the full validation gate green. If any case fails
 at WP0 time, the repository has drifted since the audit - STOP and report;
 do not adjust the expectations to match.
 
-## Sequencing (this plan runs AFTER C++ per the owner)
+## Sequencing (this plan runs FIRST, ships as 2.7.1, then C++)
 
-- **If C++ has already shipped when you run this** (the intended order):
-  `plan/03-cpp.md`'s "Audit-derived requirements" section made the C++ agent
-  fix the stale enumerations (its sweep goes straight to nine languages) and
-  do the plan hygiene for C. In that case WP2 and WP4 become **verification
-  passes**: run their greps/checks, fix only stragglers, and record "already
-  done by C++" per item in the commit message. WP1 and WP3 are unaffected
-  except where noted (WP1 notes must then cover C AND C++ together, since
-  SAFE311/312/313 widen to C++).
-- **If C++ has NOT shipped** (fallback): execute every WP exactly as
-  written; counts go to "eight", and `plan/03-cpp.md` step 0 items that
-  overlap WP4 are then already done for it.
-- WP0 (the pin) is order-independent and also required by the C++ plan
-  before it widens the C rules - whichever work runs first commits it.
+- Execute every WP exactly as written. This is the intended order: C++ has
+  NOT shipped yet, so all counts go to **eight** languages (not nine), and
+  every fidelity note in WP1 is C-only (C++ will *extend* them when it
+  widens SAFE311/312/313 - that is the C++ plan's job, per its section 0.4).
+- WP0 (the behavioural pin) is the load-bearing reason this runs first: it
+  and the WP3b config-override tests are the regression guards that must be
+  in place before C++ widens SAFE106/310/311/312/313 and the dataflow
+  tracker. The C++ plan's section 0.2 assumes these already exist.
+- WP4 deletes `plan/02-c.md` (C is fully closed once this plan lands). The
+  C++ plan's step-0 hygiene then finds it already gone - that is expected.
 
 ## Release mechanics
 
-- Branch `feature/c-audit-remediation` off `development`; PR into
-  `development`. **NEVER push directly to `main`** - everything reaches
-  `main` via PR, no exceptions (including doc-only commits).
-- **No version bump.** Docs + tests only; rides with the next release. The
-  owner controls versioning; do not pre-empt.
-- If `CHANGELOG.md` has no `## [Unreleased]` heading when you start (it was
-  renamed to `## [2.7.0] - 2026-07-02` at the tag), **add a fresh
-  `## [Unreleased]`** above the newest release heading and record this work
-  under it.
+- This ships as **2.7.1** (a patch: the runtime is behaviourally unchanged;
+  the shipped delta is the corrected bundled skill-file docs plus new
+  tests). Follow the branch flow (CLAUDE.md "Release workflow"):
+  - Branch `feature/c-audit-remediation` off `development`; PR into
+    `development`. **NEVER push directly to `main`** - everything reaches
+    `main` via PR, no exceptions (including doc-only commits).
+  - The `feature -> development` PR bumps `project.version` to **`2.7.1`**
+    (a patch needs no RC round unless the owner asks; RC is the X.Y.0-minor
+    convention). The later `development -> main` PR keeps it at `2.7.1`.
+  - The owner controls release timing and tagging; do not tag. But DO bump
+    `project.version` - leaving it at `2.7.0` is the most-missed step.
+- `CHANGELOG.md` currently has no `## [Unreleased]` heading (it was renamed
+  to `## [2.7.0] - 2026-07-02` at the tag). **Add a fresh `## [Unreleased]`**
+  above `## [2.7.0]` and record this work under it (a `### Fixed` for the
+  doc/enumeration corrections, `### Added` for the new tests is fine). It
+  flips to `## [2.7.1] - <date>` only at the production tag, per
+  `feedback_changelog_unreleased_marker` - do not date it yourself.
 
 ## Non-goals (do NOT do these)
 
@@ -197,9 +207,9 @@ do not adjust the expectations to match.
 
 The page's own contract: gaps are "recorded so they are recognised as
 deliberate decisions, not oversights". Two paper sub-clauses SAFE311/SAFE313
-do not cover are recorded nowhere; one note went stale when C shipped.
-If C++ has shipped, write each note to cover both languages (the rules are
-widened to `("c", "cpp")` by then).
+do not cover are recorded nowhere; one note went stale when C shipped. Write
+each note **C-only** (SAFE311/312/313 are `("c",)` at this point); the C++
+work extends them to C++ later per its section 0.4.
 
 ### WP1a - Rule 8: recursive macro calls (undocumented gap)
 
@@ -251,9 +261,6 @@ void f(intp *pp) { }   /* two real levels; SAFE313 does not fire */
    >   The paper bans exactly this hiding, so paper-strict projects should
    >   also avoid pointer typedefs by convention.
 
-   (If C++ has shipped, extend the parenthetical: C++ `using intp = int *;`
-   aliases hide levels the same way.)
-
 2. `docs/configuration/rules.md`, `### SAFE313` section (anchor: the
    sentence ending "**expressed literally**."): qualify in the same
    paragraph: "The check is syntactic (declarator shape only): a pointer
@@ -280,11 +287,9 @@ Go's blank identifier is the closest analogue."
 
 ## WP2 - Stale-enumeration sweep
 
-Exact texts as verified 2026-07-02. **If C++ shipped first, its sweep should
-have fixed these to the nine-language state - verify each and fix
-stragglers only.** Target count: "Eight" (or "Nine" post-C++); prefer
-count-free phrasings where suggested so the next language does not re-stale
-them.
+Exact texts as verified 2026-07-02. Target count: **"Eight"** (C is the
+eighth language). Prefer count-free phrasings where suggested so the next
+language (C++) does not re-stale them.
 
 1. `CONTRIBUTING.md` (~78) and its mirror `docs/contributing/index.md`
    (~82), identical sentence - anchor: "Seven languages are registered
@@ -301,16 +306,15 @@ them.
    that statement stays true).
 4. `README.md`, "One hook, every language" (~222-226) - two edits:
    - anchor: "handles Python, JavaScript, TypeScript, Java, Rust, Go, and
-     PHP; there's no" - add C (and C++ if shipped).
+     PHP; there's no" - add C.
    - anchor: "sets `types_or: [python, javascript, ts, tsx, java, rust, go,
      php]`" - append `c` so the quoted spec matches the real
      `.pre-commit-hooks.yaml` (which already has `c`). Verified: pre-commit's
      `identify` tags both `.c` AND `.h` with `c`, so no extra header tag is
-     needed. (Post-C++: mirror whatever tag the C++ work added - verify
-     against the real manifest, do not guess.)
+     needed.
 5. `src/safelint/skill_files/README.md` (~3) - anchor: "currently Python,
-   JavaScript, TypeScript, Java, Rust, Go, and PHP (mirroring". Add C (and
-   C++ if shipped). The "fourteen AI clients" count is correct; leave it.
+   JavaScript, TypeScript, Java, Rust, Go, and PHP (mirroring". Add C. The
+   "fourteen AI clients" count is correct; leave it.
 6. "all-seven core" labels - the 13-rule count is right; the "seven" label
    is stale (those 13 are shared by ALL registered languages). Four spots,
    ONE consistent replacement - use "the 13 all-language core" (count-free,
@@ -321,9 +325,8 @@ them.
      all-seven core")
    - `docs/languages/php.md` (~34: "the all-seven-languages set")
    NOT stale, leave alone: `docs/power-of-ten.md` "the seven memory-managed
-   languages" (C is the eighth language but is not memory-managed; C++
-   likewise makes it "the seven" still... verify the sentence still reads
-   correctly post-C++ and adjust only if its meaning broke).
+   languages" (C is the eighth language but is not memory-managed, so "seven
+   memory-managed" is still correct).
 7. **Pre-existing (pre-C) staleness - separate commit, clearly labelled as
    unrelated to the C release:**
    - `src/safelint/skill_files/claude/SKILL.md` (~3) frontmatter - anchor:
@@ -408,32 +411,33 @@ def test_safe106_defaults_enabled_at_warning_severity() -> None:
 
 This is a contract lock: SAFE106 is the only default-on C-only rule, and
 visible-but-non-blocking at `--fail-on=error` is load-bearing for adoption.
-Re-tiering it must be a conscious, test-breaking act. (Post-C++: the C++
-plan requires the same lock to hold with the widened tuple; if a combined
-test already exists by then, this WP is satisfied - verify, don't
-duplicate.)
+Re-tiering it must be a conscious, test-breaking act. (The C++ plan section
+0.3 requires this same lock to still hold after it widens the tuple; leaving
+it here gives C++ the guard it depends on.)
 
 ## WP4 - Plan-directory hygiene
 
 `plan/README.md`'s convention: "remove a spec file once its language ships".
-**If C++ shipped first, its step 0 did all of this - verify and skip.**
+C shipped in v2.7.0 and this 2.7.1 closes its last sub-tasks, so the C spec
+is fully done and gets removed here.
 
 1. **Delete `plan/02-c.md`.** Its design decisions live in the shipped docs
    (audit-confirmed); the SAFE106 maintainer-decision rationale
    (enabled/warning, `// nosafe: SAFE106` for sanctioned `goto err` chains)
    is stated in `docs/languages/c.md` - verify that before deleting.
-2. **Update `plan/README.md`**: add a "C shipped in v2.7.0" blockquote next
-   to the Go / PHP ones (8th language, 21 rules = 16 ports + 5 C-only
-   SAFE106/310-313, spec removed on completion, decisions in
-   `docs/languages/c.md` + skill addendum + shipped code); remove the C row
-   from the priority table if still present; reword C++'s "Depends on" to
-   "C shipped in v2.7.0".
-3. **`plan/03-cpp.md`**: its `.h` note should reference the SHIPPED C
-   behaviour, not a future decision (if the C++ work has not already
-   reworded it).
+2. **Update `plan/README.md`**: add a "C shipped in v2.7.0 (gaps closed in
+   2.7.1)" blockquote next to the Go / PHP ones (8th language, 21 rules =
+   16 ports + 5 C-only SAFE106/310-313, decisions in `docs/languages/c.md`
+   + skill addendum + shipped code); remove BOTH the C row and this
+   remediation row from the priority table; make **C++ the "1 (next)" row**
+   with "Depends on: 2.7.1 remediation shipped".
+3. **`plan/03-cpp.md`**: confirm its `.h` note references the SHIPPED C
+   behaviour (already reworded), and that its section 0 still reads
+   correctly now that its assumed guards (pin test, override tests, SAFE106
+   lock) are in place - no edit expected, just a read-through.
 4. **Delete THIS file** (`plan/c-audit-remediation.md`) in the final commit
-   of its own PR, and remove its row from `plan/README.md` - completed plans
-   do not linger (same convention as language specs).
+   of its own PR - completed plans do not linger (same convention as
+   language specs). Its row is removed from `plan/README.md` in step 2.
 
 ## Validation gate (all, in order; run per-WP where cheap, always at the end)
 
@@ -459,12 +463,13 @@ after any skill-file edit.
 - [ ] WP1b: typedef-hidden-indirection gap in power-of-ten.md Deferred +
       SAFE313 section + languages/c.md; "expressed literally" qualified.
 - [ ] WP1c: rule-7 fidelity note names C's literal `(void)` cast.
-- [ ] WP2 items 1-6 applied (or verified done by C++); item 7 in a clearly
-      separated commit; all four sweep greps clean.
+- [ ] WP2 items 1-6 applied (to the eight-language state); item 7 in a
+      clearly separated commit; all four sweep greps clean.
 - [ ] WP3a: `tests/core/test_engine_c.py` - five behaviours incl. `.h`.
 - [ ] WP3b: 5 override tests (3 SAFE106 incl. the goto scope guard, 2 SAFE310).
 - [ ] WP3c: SAFE106 enabled/warning contract lock.
 - [ ] WP4: 02-c.md gone, README table/blockquotes correct, 03-cpp.md
       coherent, THIS file deleted and de-indexed.
 - [ ] `## [Unreleased]` present in CHANGELOG.md with this work recorded.
+- [ ] `project.version` bumped to `2.7.1` on the `feature -> development` PR.
 - [ ] Full validation gate green; PR into `development` (never direct to main).
