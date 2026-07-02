@@ -72,16 +72,30 @@ git diff --name-only development...HEAD -- src/safelint/ | grep -v '^src/safelin
 **Lock 2 - behavioural pin.** Save the script below as
 `tests/rules/test_c_power_of_ten_pin.py` (it doubles as a permanent
 regression test; that is its value beyond this plan). It distils the audit's
-live battery: every C rule's fire AND clean case, including the subtle
-behaviours later review rounds fixed. Run it BEFORE any other WP (must be
-100% green on the unchanged branch point) and again at the end.
+live battery: **a representative fire and/or clean case for the C behaviours
+most at risk from the C++ widening** - the five C-only rules plus the
+dataflow / loop / state paths and every review-hardened subtlety (goto in vs
+out of a loop, initialised `extern`, pointer-returning prototype, `(void)`
+cast, misordered/string-literal brackets, include-guard-first-statement,
+scoped vs bare NOLINT). It is deliberately NOT exhaustive: the pure
+function-shape rules (SAFE101-104) and the test-coverage rules
+(SAFE304/701/702) are covered by their own `tests/rules/test_*_c.py` files
+and are not repeated here, and some rules carry only a fire OR a clean case
+where that is the behaviour worth pinning. Do not read a rule's absence, or a
+missing fire/clean counterpart, as a regression - the per-rule test files are
+the exhaustive coverage; this pin is the fast cross-rule tripwire. Run it
+BEFORE any other WP (must be 100% green on the unchanged branch point) and
+again at the end.
 
 ```python
-"""Power-of-Ten behavioural pin for C - one fire + one clean case per C rule.
+"""Power-of-Ten behavioural pin for C - representative cases, not exhaustive.
 
-Written by the v2.7.0 post-release audit as a compact regression lock: if a
-future refactor changes any C rule's observable behaviour, exactly one of
-these named cases flips. Each case is the audit's minimal reproducer.
+Written by the v2.7.0 post-release audit as a compact cross-rule regression
+lock: if a future refactor (notably the C++ widening) changes one of these
+audited C behaviours, the matching named case flips. It is NOT one-per-rule
+and NOT complete - the per-rule ``tests/rules/test_*_c.py`` files are the
+exhaustive coverage; this pin just trips fast on the behaviours most at risk.
+Each case is the audit's minimal reproducer.
 """
 
 from __future__ import annotations
@@ -178,12 +192,20 @@ do not adjust the expectations to match.
     convention). The later `development -> main` PR keeps it at `2.7.1`.
   - The owner controls release timing and tagging; do not tag. But DO bump
     `project.version` - leaving it at `2.7.0` is the most-missed step.
-- `CHANGELOG.md` currently has no `## [Unreleased]` heading (it was renamed
-  to `## [2.7.0] - 2026-07-02` at the tag). **Add a fresh `## [Unreleased]`**
-  above `## [2.7.0]` and record this work under it (a `### Fixed` for the
-  doc/enumeration corrections, `### Added` for the new tests is fine). It
-  flips to `## [2.7.1] - <date>` only at the production tag, per
-  `feedback_changelog_unreleased_marker` - do not date it yourself.
+- `CHANGELOG.md` state differs by branch, so **reconcile at branch time**
+  rather than assuming: `main` dated the C entry to `## [2.7.0] - 2026-07-02`
+  at the tag, but `development` (which this work branches from) may still
+  carry that same content under `## [Unreleased]` if it was not synced from
+  `main`. Target end state: exactly ONE `## [Unreleased]` holding only the
+  2.7.1 work, sitting above a dated `## [2.7.0] - 2026-07-02` section. So: if
+  the top heading is still `## [Unreleased]` with the *2.7.0* content, first
+  date that block to `## [2.7.0] - 2026-07-02` (matching `main`), then add a
+  fresh empty `## [Unreleased]` above it; if a dated `## [2.7.0]` is already
+  present, just add the fresh `## [Unreleased]`. Record this work under it
+  (`### Fixed` for the doc/enumeration corrections, `### Added` for the new
+  tests). Do NOT create a second `## [Unreleased]`. The 2.7.1 heading is
+  dated only at the production tag, per `feedback_changelog_unreleased_marker`
+  - do not date it yourself.
 
 ## Non-goals (do NOT do these)
 
