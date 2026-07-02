@@ -506,7 +506,7 @@ and the GitHub Actions / dependency surface.
   no injection channel); `SAFE000` emits node-kind + coordinates only, never
   source content.
 - **Repo-wide sweep**: zero `eval` / `exec` / `compile` / `pickle` / `marshal`
-  / `yaml.load` / `ast.literal_eval`; zero network / socket; the five
+  / `yaml.load` / `ast.literal_eval`; zero network / socket; the four
   subprocess calls are all the list-form git invocations (`timeout=10`,
   `check=False`, `shutil.which("git")` at argv[0], no interpolated element);
   one env read (`PRE_COMMIT`, affects only hint wording); every regex is linear
