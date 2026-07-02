@@ -3,8 +3,11 @@
 **Type**: defensive-security hardening backlog (not a feature). Authorised
 internal audit of safelint's own codebase.
 
-**Status**: findings documented; remediation not started. The checklist under
-[Findings](#findings) tracks the items to close in a focused PR.
+**Status**: original findings H1-H6 all remediated (PRs #81-#84, #86); see the
+[Findings](#findings) checklist. A follow-up full-repo SOC re-scan on
+2026-07-02 (after the C release) recorded new items under
+[Follow-up audit](#follow-up-audit-2026-07-02-full-repo-soc-re-scan) below;
+those are the open remediation backlog.
 
 ## Scope and method
 
@@ -56,6 +59,9 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - [x] H4 - cache tmp write via `mkstemp` (`O_EXCL` + unguessable name) (done - PR #83)
 - [x] H5 - `_maybe_seed_secondary_for_opencode` dangling-symlink `touch()` guard (done - PR #83)
 - [x] H6 - prefer `pathlib.Path` over `os.path`/`os` where a safe equivalent exists (done - PR #84)
+- [ ] H7 - `_install_secondary` / `_remove_secondary` `AGENTS.md` merge write is still check-then-act (the H2 TOCTOU class, unhardened on this path) (open; from the 2026-07-02 re-scan)
+- [ ] H8 - `_remove_path` validates the resolved parent shape but deletes the unresolved path (ancestor-swap race) (open; residual, same class as H1)
+- [ ] H9 - GitHub Actions pinned to mutable refs; the OIDC-privileged `publish.yml` uses a moving branch ref (`pypa/gh-action-pypi-publish@release/v1`) (open; CI/CD supply-chain hardening)
 
 ### H1 - `skill remove --path` validates the path tail lexically; a symlinked ancestor can escape
 
@@ -365,3 +371,200 @@ shape rules, `side_effects`, `state_purity`, `test_coverage`, `loop_safety`,
   the `test_coverage` / `dataflow` dict-dispatch refactors (done for `PLR0911`)
   produce identical routing; and every `_BY_LANG` / `language`-tuple change is
   purely additive (a `"c"` entry appended, no existing entry touched).
+
+---
+
+## Follow-up audit (2026-07-02): full-repo SOC re-scan
+
+**Type**: authorised internal defensive re-audit of safelint's own codebase,
+after the C release (v2.7.0). **Method**: three parallel read-only surface
+sweeps - (1) the skill-install flow (`_skill_install.py`), (2) the config /
+cache / CLI / engine surface, (3) a repo-wide dangerous-pattern sweep plus a
+line-by-line delta review of every `src/` change since the C SOC sign-off
+commit (`734b26e`, 2026-06-28). Cross-checked against the H1-H6 remediations
+and the GitHub Actions / dependency surface.
+
+### Headline
+
+- **No HIGH or MEDIUM findings.** The original H1-H6 fixes were re-verified as
+  correctly implemented and tested (evidence below). No `eval` / `exec` /
+  `subprocess`-of-user-code / deserialisation / network / new file I/O anywhere;
+  the only subprocess remains the four list-form `git` calls; the only writes
+  remain the sanctioned skill-installer (exclusive-create) and cache
+  (`mkstemp`) paths.
+- **The C language addition introduced no new security surface** and two of its
+  changes are net security-positive (see delta review). Confirmed against the
+  earlier C SOC sign-off.
+- **Three new LOW / hardening items** (H7-H9). None is exploitable in the
+  default no-flag flow; H7/H8 need a local attacker with directory-write access
+  plus a race win, H9 is CI/CD supply-chain defence-in-depth.
+
+### H7 - `AGENTS.md` secondary-file merge write is check-then-act (TOCTOU, the H2 class left open on this path)
+
+- **Severity**: LOW. **Location**: `src/safelint/_skill_install.py`
+  `_install_secondary` (~L1056-1065) and `_remove_secondary` (~L1075-1088),
+  gated by `_secondary_target_writable_or_warn` (~L1021-1030).
+- **What**: the writable-guard checks `target.is_symlink()` / `target.is_file()`,
+  then the caller does `target.read_text()` and `target.write_text(...)`.
+  `write_text` follows symlinks. A statically-committed malicious `AGENTS.md`
+  symlink is caught by the check; the gap is a swap *after* the check - a
+  concurrent local attacker replaces the regular `AGENTS.md` with a symlink to
+  an arbitrary victim-writable file between the check and `write_text`, and
+  safelint then writes the merged text (existing content + the fixed bundled
+  section) through the link.
+- **Preconditions / why LOW**: local write access to the directory holding
+  `AGENTS.md` (project cwd or home) AND winning a tight race; the payload is
+  not fully attacker-controlled (existing content plus a fixed bundled
+  section). Not reachable in any default flow.
+- **Why flagged**: this is the *identical* TOCTOU class as H2, which the plan
+  judged worth fixing via exclusive create. H2 hardened the primary-file write;
+  this secondary-file merge path is the one remaining `write_text`-follows-
+  symlink site in the module, so leaving it non-atomic is inconsistent with the
+  closed H2.
+- **Fix**: write the merged content to an exclusive-create temp in the same
+  directory and `os.replace()` it into place, or open the destination with
+  `os.open(..., O_CREAT | O_TRUNC | O_NOFOLLOW)` (POSIX; `hasattr` guard for
+  Windows, mirroring the H2 write-note) so a symlink appearing in the window
+  makes the write fail rather than being followed. A merge (read-modify-write)
+  cannot use plain `"xb"` because the target legitimately pre-exists, so this
+  needs the temp-plus-replace shape, not the H2 exclusive-create helper as-is.
+
+### H8 - `_remove_path` validates the resolved parent shape but deletes the unresolved path (ancestor-swap race)
+
+- **Severity**: LOW (residual; same class as H1). **Location**:
+  `src/safelint/_skill_install.py` `_remove_path` (~L1791-1804).
+- **What**: `_resolved_install_shape_ok(path)` (the H1 guard) resolves the
+  ancestors at check time; `_remove_existing(path)` then operates on the
+  *original unresolved* `path`. In the no-race case this is intentional and
+  correct (the `test_remove_path_accepts_shape_preserving_symlinked_parent`
+  behaviour depends on deleting the unresolved leaf so terminal-symlink
+  handling is preserved). The gap is purely the race: an attacker who controls
+  an ancestor directory swaps an ancestor symlink between the `resolve()`
+  validation and `_remove_existing`, redirecting the `unlink` / `rmtree` onto a
+  different real tree.
+- **Preconditions / why LOW**: `--path` is the documented opt-in "unusual
+  location" escape hatch (user already accepts responsibility), AND the attack
+  needs ancestor-directory write access AND a race win. `_remove_existing`
+  unlinks a leaf symlink as the link (never follows it) and only reaches
+  `shutil.rmtree` for a real directory target (rmtree refuses a symlinked
+  top-level target), so the residual is confined to the ancestor-swap race, not
+  the leaf.
+- **Fix** (defensible to accept-and-document instead, given the opt-in escape
+  hatch): resolve once and operate on the resolved path, or open the parent
+  directory and remove the leaf relative to a directory fd (`os.unlink(name,
+  dir_fd=...)`) so the validated parent and the acted-on parent are the same
+  object. Weigh against H1's deliberate "delete the unresolved leaf so terminal
+  symlinks are unlinked as links" behaviour - any fix must preserve that.
+
+### H9 - GitHub Actions pinned to mutable refs (CI/CD supply-chain hardening)
+
+- **Severity**: LOW (hardening). **Location**: `.github/workflows/*.yml`.
+- **What**: third-party actions are pinned to mutable refs - `actions/checkout@v4`,
+  `actions/upload-artifact@v4`, `actions/download-artifact@v4` (major-version
+  tags), `astral-sh/setup-uv@v8.1.0` (patch tag), and most notably
+  `pypa/gh-action-pypi-publish@release/v1` - a **moving branch ref** - in
+  `publish.yml`, the one workflow that holds `id-token: write` (PyPI OIDC
+  trusted publishing). A compromised or force-moved upstream ref would run in
+  the release job's privileged context.
+- **Preconditions / why LOW**: requires upstream action compromise (or a
+  maintainer-account / tag-move on the action repo); not a safelint-code flaw.
+  The blast radius is bounded by OIDC (no long-lived PyPI token to steal) and
+  by least-privilege `permissions:` blocks (`contents: read` on ci/publish,
+  scoped `id-token: write` only on the publish job).
+- **Fix**: pin every third-party action to a full commit SHA (with a trailing
+  `# vX.Y.Z` comment for readability), prioritising `publish.yml`'s
+  `gh-action-pypi-publish` since it runs in the OIDC-privileged step. Dependabot
+  can keep SHA pins updated (`package-ecosystem: github-actions`).
+- **Note**: workflows are otherwise clean - no `pull_request_target`, no
+  `github.event.*` / `head_ref` interpolation into `run:` blocks (no script
+  injection), and the `publish.yml` tag-verify step reads the tag via the
+  `GITHUB_REF` env var expansion (`TAG="${GITHUB_REF#refs/tags/v}"`), not via a
+  `${{ }}` template into shell, so it is injection-safe.
+
+### Re-verified clean (recorded so the covered surface stays auditable)
+
+- **H1 / H2 / H5** (skill-install): implementations and tests present and
+  correct - `_resolved_install_shape_ok` (called from `_remove_path`, resolve
+  failure treated as refusal), `_write_new_file_exclusive` (`"xb"`), and the
+  `_maybe_seed_secondary_for_opencode` `is_symlink() or exists()` guard plus
+  `_write_empty_file_exclusive`. `skill status` / `path` do not print file
+  bytes from a symlinked location (no read-leak primitive). `--client` is
+  argparse-`choices`-restricted and every `install_relpath` is a fixed literal,
+  so no traversal composition.
+- **H3 / H4** (config / cache): `test_dirs` reaches the filesystem only through
+  the `_contained_test_dir`-filtered `rglob`; the other two `test_dirs` sites
+  (`_is_test_file`, `_paired_test_in_changed_under_test_dirs`) use `.absolute()`
+  for lexical string-component comparison only (no fs access), so nothing
+  bypasses containment. Cache `put` uses `mkstemp` + `os.fdopen` + `replace`
+  and fails open; cache `get` treats malformed JSON / missing keys / wrong types
+  / extra keys as a clean miss (no crash, no unvalidated replay without the
+  attacker already owning the cache dir).
+- **Config / output surface**: TOML via stdlib `tomllib`; rule config resolved
+  by dict-key lookup with no `getattr` / `eval` / import from config values;
+  preset resolution deep-copies and falls back on unknown names (never raises);
+  JSON / SARIF go to stdout only via `json.dumps(ensure_ascii=False)` (escaped,
+  no injection channel); `SAFE000` emits node-kind + coordinates only, never
+  source content.
+- **Repo-wide sweep**: zero `eval` / `exec` / `compile` / `pickle` / `marshal`
+  / `yaml.load` / `ast.literal_eval`; zero network / socket; the five
+  subprocess calls are all the list-form git invocations (`timeout=10`,
+  `check=False`, `shutil.which("git")` at argv[0], no interpolated element);
+  one env read (`PRE_COMMIT`, affects only hint wording); every regex is linear
+  (no nested quantifiers / ambiguous alternation - including the Rust
+  string-stripper `"(?:[^"\\]|\\.)*"` whose alternatives are disjoint on the
+  first char, and the config-supplied Rust name matcher which is `re.escape`d);
+  every `while` loop terminates (worklists over finite trees, parent-chain
+  climbs, strict child-descent, sibling chains); the C `_scan_char` /
+  `_strip_quoted` scanners are single-pass `for` loops whose index advances
+  unconditionally.
+- **Delta since the C SOC sign-off (`734b26e`)**: 19 `src/` commits, all pure
+  Tree-sitter analysis logic. `dataflow_c` folded the recursive `_call_tainted`
+  into the iterative worklist (`_classify_call` now returns argument nodes
+  instead of recursing - termination re-verified: each pushed node is a strict
+  descendant, entered at most once). `_node_utils.function_name_node`'s
+  `range(16)` cap became `while node is not None` over the finite acyclic
+  declarator chain (terminates). New `_C_NOLINT` regex and `re.sub(r"\s",...)`
+  are linear. **Two changes are net security-positive**: trimming
+  `scanf`/`read`/`recv` from `sources_c` (removes false tainting of count
+  variables) and the intra-loop-goto tightening in `loop_safety` (closes a
+  SAFE501 false-negative). No new I/O / subprocess / network / deserialisation
+  / env read introduced.
+- **Supply chain**: one runtime dependency (`tree-sitter>=0.23.0`); all eight
+  grammars are opt-in extras (`tree-sitter-<lang>>=0.23.0`); `uv.lock` is
+  hash-pinned (sha256) with every artifact URL on `files.pythonhosted.org`;
+  publishing is PyPI Trusted Publishing (OIDC), no long-lived token. Dependabot:
+  0 open alerts as of the scan.
+
+### Corrections to the C SOC sign-off text (descriptions drifted post-sign-off; re-verified clean)
+
+The 2026-06-28 sign-off above described code that later review rounds changed;
+the delta review re-verified each as clean, but the sign-off's wording is now
+stale and is corrected here rather than rewritten in place (it is a
+point-in-time record):
+
+- "the macro-balance check (SAFE311) is `str.count()`, O(n)" - it is now a
+  stack-based bracket matcher over the quote-stripped text (still linear,
+  single pass), not `str.count()`.
+- the quoted `_C_NOLINT` pattern (`^//\s*(NOLINT...`) - the shipped pattern
+  dropped the `^//\s*` prefix and matches against the marker-stripped comment
+  body (`^(NOLINT...`), so it now also covers block-comment `/* NOLINT */`.
+- "every new loop is bounded - `for _ in range(16/32)`" - several declarator
+  walks are now unbounded `while node is not None` loops; they still terminate
+  on the finite acyclic Tree-sitter tree (re-verified), but the stated
+  invariant is "terminates on a finite tree", not "fixed iteration cap".
+
+### Remediation sequencing for H7-H9
+
+Low urgency (no HIGH/MEDIUM; none default-flow-exploitable). Bundle with the
+next maintenance pass, or fold into the C++ / audit-remediation work:
+
+1. **H9** (SHA-pin actions) - smallest, self-contained, no code; do first.
+   Add a `github-actions` Dependabot ecosystem to keep pins fresh.
+2. **H7** (secondary-write temp-plus-replace) - the notable one; mirror H2's
+   posture on the merge path. Needs a test asserting a symlink planted at
+   `AGENTS.md` in the write window is not followed.
+3. **H8** (resolve-once / `dir_fd` remove, or accept-and-document) - decide
+   between hardening and documenting the opt-in escape-hatch residual; either
+   is defensible. Preserve H1's unlink-the-leaf-as-a-link behaviour.
+
+Same validation gate as above applies to any remediation PR.
