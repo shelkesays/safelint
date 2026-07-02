@@ -2,10 +2,11 @@
 
 **Audience**: the AI coding agent (or human contributor) implementing the next
 language. Each language has its own self-contained spec in this directory.
-Implement **one language per spec, in working-priority order**. **C is next**;
-C++ follows. The one hard ordering rule is that **C must ship before C++**
-(shared grammar family, shared new rules, `.h` ownership). This order matches
-the project's published roadmap in `docs/configuration/rules.md` "Planned":
+Implement **one language per spec, in working-priority order**. **C++ is
+next** (C shipped in v2.7.0; the hard C-before-C++ ordering is satisfied).
+After C++, run `plan/c-audit-remediation.md` (owner-decided order,
+2026-07-02: C++ first, then the audit gap fixes). This matches the
+project's published roadmap in `docs/configuration/rules.md` "Planned":
 
 > **Go (`.go`) shipped in v2.5.0** (6th registered language: 16 cross-language
 > rules + the Go-only SAFE209 `empty_error_check` / SAFE211
@@ -27,8 +28,9 @@ number, not the priority rank.
 
 | Priority | Spec # | File | Language | Status | Depends on |
 |---|---|---|---|---|---|
-| 1 (next) | 2 | `plan/02-c.md` | C (`.c`, `.h`) | not started | nothing |
-| 2 | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started | **C shipped** (shared grammar family, shared new rules, `.h` ownership) |
+| shipped | 2 | `plan/02-c.md` | C (`.c`, `.h`) | **shipped in v2.7.0** (2026-07-02; 8th language, 21 rules = 16 ports + 5 C-only SAFE106/310-313). Spec deletion + shipped-blockquote are step 0 of the C++ spec / WP4 of the remediation spec. | - |
+| 1 (next) | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) | not started - **read its section 0 first** (binding audit-derived requirements) | C shipped in v2.7.0 (satisfied) |
+| 2 | - | `plan/c-audit-remediation.md` | (not a language) C post-release audit gap fixes: fidelity notes, stale enumerations, missing tests, plan hygiene | not started | Runs AFTER C++ per owner decision; executable standalone if C++ stalls |
 
 Update the Status column (and the per-spec status header) as work lands; remove
 a spec file once its language ships (as was done for Go).
