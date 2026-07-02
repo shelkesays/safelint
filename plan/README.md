@@ -34,7 +34,7 @@ number, not the priority rank.
 
 | Priority | Spec # | File | Item | Status | Depends on |
 |---|---|---|---|---|---|
-| shipped | 2 | `plan/02-c.md` | C (`.c`, `.h`) language support | **shipped in v2.7.0** (2026-07-02; 8th language, 21 rules = 16 ports + 5 C-only SAFE106/310-313). This file carries a verified status table; it is **deleted by the remediation spec's WP4** once its 2 pending sub-tasks (config-override tests, enumeration sweep) close. | - |
+| shipped | 2 | `plan/02-c.md` | C (`.c`, `.h`) language support | **shipped in v2.7.0** (2026-07-02; 8th language, 21 rules = 16 ports + 5 C-only SAFE106/310-313). **Deliberately retained (not a convention lapse):** the language shipped, but 2 spec sub-tasks (config-override tests, enumeration sweep) are still open, so this file carries a verified status table until they land and is **deleted by the remediation spec's WP4**. | - |
 | 1 (next) | - | `plan/c-audit-remediation.md` | (not a language) C post-release audit gap fixes -> **ships as 2.7.1**: regression guards (pin test, config-override tests, SAFE106 lock), fidelity notes, enumeration sweep, plan hygiene | not started | C shipped (satisfied). Must land before C++ so the guards exist before C++ widens SAFE106/310-313 + the dataflow tracker. |
 | 2 | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) -> **2.8.0** | not started - **read its section 0 first** (binding audit-derived requirements) | **2.7.1 remediation shipped** (regression guards + closed C baseline in place) |
 

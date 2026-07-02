@@ -67,8 +67,9 @@ audited C behaviour must be byte-for-byte identical after this PR.
   regressed C behaviour; revert and rework rather than editing the pin. (If,
   unexpectedly, this file is absent - e.g. 2.7.1 did not land first - STOP
   and raise it; do not widen the C rules without this guard.)
-- The C tracker (`analysis/dataflow_c.py`) embodies review fixes that are
-  easy to lose when extending or copying into `dataflow_cpp.py`: ternary
+- The C tracker (`src/safelint/analysis/dataflow_c.py`) embodies review fixes
+  that are easy to lose when extending or copying into
+  `src/safelint/analysis/dataflow_cpp.py`: ternary
   (`conditional_expression`) propagation, inline `assignment_expression`
   propagation into sink arguments (RHS always, LHS too for compound
   assignments), compound assignments preserving prior taint, fully
@@ -198,7 +199,7 @@ release flow. On completion, delete this spec and add a "C++ shipped in
 | SAFE601 | `assertion_calls_cpp`: `assert` plus gtest's `EXPECT_*` / `ASSERT_*` macro-call names (they parse as `call_expression`). `static_assert` is compile-time and does NOT count toward the runtime-density rule (document). |
 | SAFE603 | As C (bare `NOLINT` / `NOLINTNEXTLINE`), plus bare `// clang-format off` is NOT a lint suppression (do not flag). |
 | SAFE701 / SAFE702 | `foo_test.cpp` / `test_foo.cpp` / gtest `foo_unittest.cpp` candidates; default `test_dirs = ["tests", "test"]`, document overrides. |
-| SAFE801 / SAFE802 | Reuse / extend `analysis/dataflow_c.py` into `dataflow_cpp.py` (the AST is a superset; a shared module with a language flag is acceptable if it stays under the self-lint caps). Sinks add `system`-equivalents and `popen`; flagged calls add `c_str`-into-system patterns only via the sink list, not new analysis. |
+| SAFE801 / SAFE802 | Reuse / extend `src/safelint/analysis/dataflow_c.py` into `src/safelint/analysis/dataflow_cpp.py` (the AST is a superset; a shared module with a language flag is acceptable if it stays under the self-lint caps). Sinks add `system`-equivalents and `popen`; flagged calls add `c_str`-into-system patterns only via the sink list, not new analysis. |
 | SAFE106 / SAFE310 / SAFE311 / SAFE312 / SAFE313 (from C) | **Widen the C-only tuples to `("c", "cpp")`.** SAFE310 additionally recognises `new_expression` / `delete_expression` as dynamic allocation in C++. SAFE313 exempts smart-pointer types (`unique_ptr`, `shared_ptr`, `weak_ptr`) from the pointer-level count. |
 
 ### Deliberately skipped
