@@ -65,8 +65,12 @@ Two hard invariants pin "no functionality regression":
 `src/safelint/skill_files/**` (bundled docs, not code). At the end:
 
 ```bash
-git diff --name-only development...HEAD -- src/safelint/ | grep -v '^src/safelint/skill_files/'
-# MUST print nothing. Any hit = an unauthorised source change; revert it.
+# Passes (exit 0) when the only src/safelint/ changes are under skill_files/.
+# The `|| true` neutralises grep's exit-1-on-no-match so this is safe under
+# `set -e` / `pipefail`; the `[ -z ]` check is what decides pass/fail.
+leaked="$(git diff --name-only development...HEAD -- src/safelint/ \
+  | grep -v '^src/safelint/skill_files/' || true)"
+[ -z "$leaked" ] || { printf 'Lock 1 FAILED - unauthorised source change(s):\n%s\n' "$leaked"; exit 1; }
 ```
 
 **Lock 2 - behavioural pin.** Save the script below as
