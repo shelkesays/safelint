@@ -11,8 +11,14 @@ tracker those gaps guard - the missing config-override regression tests, the
 SAFE106 contract lock, and the behavioural pin must exist before C++ touches
 those rules, or a C++ refactor could silently regress C behaviour. The
 enumeration sweep and fidelity notes ride along in the same 2.7.1.) C shipped
-in v2.7.0, so the hard C-before-C++ ordering is satisfied. This matches the
-project's published roadmap in `docs/configuration/rules.md` "Planned":
+in v2.7.0, so the hard C-before-C++ ordering is satisfied.
+`docs/configuration/rules.md` "Planned" lists **C++ as the next planned
+language**; the 2.7.1 remediation is not a roadmap language but an internal
+prerequisite that lands *before* that C++ item (it closes the C regression
+guards C++ depends on). The Go and PHP entries below are not from that
+"Planned" section - they record the shipped-language history and the
+convention this plan directory follows: a spec file is removed once its
+language ships.
 
 > **Go (`.go`) shipped in v2.5.0** (6th registered language: 16 cross-language
 > rules + the Go-only SAFE209 `empty_error_check` / SAFE211
