@@ -388,7 +388,7 @@ and the GitHub Actions / dependency surface.
 
 - **No HIGH or MEDIUM findings.** The original H1-H6 fixes were re-verified as
   correctly implemented and tested (evidence below). No `eval` / `exec` /
-  `subprocess`-of-user-code / deserialisation / network / new file I/O anywhere;
+  `subprocess` of user code / deserialisation / network / new file I/O anywhere;
   the only subprocess remains the four list-form `git` calls; the only writes
   remain the sanctioned skill-installer (exclusive-create) and cache
   (`mkstemp`) paths.
