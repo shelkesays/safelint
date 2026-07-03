@@ -376,8 +376,12 @@ historical and must NOT be edited):
 grep -rn "Seven languages\|seven supported languages\|all-seven\|all seven" \
   README.md CONTRIBUTING.md docs/ src/safelint/skill_files/ | grep -v CHANGELOG
 grep -rn "e.g. C, C++" README.md CONTRIBUTING.md docs/
-grep -rnE "types_or.*php\]" README.md docs/
 grep -rn "currently Python, JavaScript, and TypeScript" docs/ src/
+# README pre-commit example: positive assertion that `c` was ADDED (the old
+# negative `types_or.*php\]` form passed even with `c` missing under some
+# spacings, so it did not actually validate the change):
+grep -qF 'types_or: [python, javascript, ts, tsx, java, rust, go, php, c]' README.md \
+  || echo "FAIL: README pre-commit types_or example not updated to include c"
 ```
 
 ## WP3 - Test gaps (the original C spec asked for these)
@@ -407,9 +411,29 @@ have knobs. (SAFE311/312/313 expose no per-rule knob; their `enabled`
 toggling is already full coverage.) Both knobs already pass through
 `_validated_string_list` (verified in the audit:
 `src/safelint/rules/c_rules.py` reads `nonlocal_jump_calls_c` and
-`allocation_calls_c` through it), so ONLY tests are needed - do not touch
-the rule code. Add to `tests/rules/test_c_rules.py` using its existing
-`_codes` helper:
+`allocation_calls_c` through it), so ONLY tests are needed - **do not touch
+the rule code**.
+
+**First, a fixture gap to close:** the existing `_codes(src, tmp_path,
+enable=None)` helper in `tests/rules/test_c_rules.py` only sets
+`{"enabled": True}` per rule name - it CANNOT express a list override like
+`nonlocal_jump_calls_c=[...]`, so these cases are not writable against it as-is.
+Add a small config-aware helper alongside `_codes` (do not change `_codes`'s
+signature - other tests use it), e.g.:
+
+```python
+def _codes_with_config(src: str, tmp_path: Path, rule_config: dict) -> set[str]:
+    """Like `_codes`, but takes an explicit ``{rule_name: {..config..}}`` mapping
+    so tests can exercise list knobs, not just the `enabled` toggle."""
+    sample = tmp_path / "sample.c"
+    sample.write_text(src, encoding="utf-8")
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": rule_config}))
+    return {v.code for v in engine.check_file(str(sample)).violations}
+```
+
+Then wire the cases below to `_codes_with_config` (SAFE106 is default-on, so
+its config only needs the list; SAFE310 is opt-in, so include
+`"enabled": True` alongside its list):
 
 1. **SAFE106 `nonlocal_jump_calls_c`** (three cases):
    - Custom list honoured: override to `["my_longjmp_wrapper"]`; a sample
