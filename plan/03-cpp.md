@@ -23,12 +23,21 @@ widen the C rules, add a small C++-idiom set. Resist template-aware analysis.
 
 The C release was audited against its spec and against the Power of Ten paper
 on 2026-07-02. The audit found the C implementation behaviourally correct but
-caught repeatable process gaps, which were **closed in 2.7.1 BEFORE this C++
-work** (remediation spec: `plan/c-audit-remediation.md`, owner-sequenced ahead
-of C++). So when you start C++, the C baseline is already fully closed and
-guarded - the behavioural pin (`tests/rules/test_c_power_of_ten_pin.py`), the
-SAFE106/310 config-override tests, the SAFE106 contract lock, `test_engine_c.py`,
-the paper-fidelity notes, and the eight-language enumeration state all exist.
+caught repeatable process gaps, which were **closed in the 2.7.1 release
+BEFORE this C++ work** (owner-sequenced ahead of C++). That work shipped these
+concrete artifacts, which now exist in the tree and are the baseline you build
+on (the remediation plan file itself is removed on completion, so this spec
+does not depend on it):
+
+- the behavioural pin `tests/rules/test_c_power_of_ten_pin.py`,
+- the SAFE106 / SAFE310 config-override tests in `tests/rules/test_c_rules.py`
+  (via a config-aware helper `_codes_with_config`),
+- the SAFE106 enabled/warning contract lock,
+- the engine-level suite `tests/core/test_engine_c.py`,
+- the C paper-fidelity notes in `docs/power-of-ten.md`,
+- and the eight-language enumeration state across the docs / skill files.
+
+So when you start C++, that C baseline is already fully closed and guarded.
 This section tells you how to **build on** that baseline without regressing it
 and without repeating the misses. **Every item here is a ship-blocker for the
 C++ PR unless marked optional.**
@@ -104,7 +113,10 @@ audited C behaviour must be byte-for-byte identical after this PR.
    files, and the existing C override tests must still pass unchanged).
 4. **Contract locks for default-on rules.** SAFE106 stays
    `enabled = true, severity = "warning"` after widening - assert it
-   explicitly against `DEFAULTS` (see remediation WP3c for the shape). Any
+   explicitly against `DEFAULTS` (`assert DEFAULTS["rules"]["nonlocal_jumps"]
+   == {"enabled": True, "severity": "warning", ...}`; the 2.7.1 lock test
+   `test_safe106_defaults_enabled_at_warning_severity` already exists - keep it
+   green). Any
    NEW C++ rule that ships default-on needs the same lock; SAFE315/316 are
    opt-in, so for them the default-disabled smoke assertion (mirror
    `test_c_opt_in_rules_are_silent_by_default` in
@@ -140,12 +152,14 @@ as separate from rule work. For C++, every deviation ships with its note in
 `docs/json-schema.md`, the "all-seven core" labels, and the README pre-commit
 example are all resolved). Your mandatory stale-count/enumeration sweep is
 therefore a clean **eight -> nine** step: grep the previous language's
-extension / name / `tree-sitter-<lang>` per the plan/README.md convention,
-plus re-grep the just-updated spots (they will now read "eight" / list C, and
-must gain C++). Do NOT assume the sweep is trivial - C++ adds SIX extensions
-(`.cpp` / `.cxx` / `.cc` / `.hpp` / `.hxx` / `.hh`), so every extension list
-needs all of them. Run the remediation plan's WP2 sweep greps afterwards to
-prove zero stragglers.
+extension / name / `tree-sitter-<lang>` per the `plan/README.md` "Enumerations
+cascade" convention, plus re-grep the just-updated spots (they will now read
+"eight" / list C, and must gain C++). Do NOT assume the sweep is trivial - C++
+adds SIX extensions (`.cpp` / `.cxx` / `.cc` / `.hpp` / `.hxx` / `.hh`), so
+every extension list needs all of them. Afterwards prove zero stragglers with
+greps for the previous state - e.g. `grep -rn "eight\|all-eight\|... php, c\]"
+README.md CONTRIBUTING.md docs/ src/safelint/skill_files/` (adapt to whatever
+"eight"-state phrasings 2.7.1 left) - each must now read nine / include C++.
 
 Also: when creating `sources_cpp`, copy the **shipped, trimmed** C
 philosophy (return-value sources only: `getenv` / `fgets` / `gets`), NOT the
@@ -158,9 +172,9 @@ document).
 
 ### 0.6 Pre-flight plan hygiene (step 0 of the work)
 
-2.7.1's WP4 already deleted `plan/02-c.md` and made C++ the "1 (next)" row in
-`plan/README.md`. So step 0 here is lighter: confirm `plan/02-c.md` is gone
-(if it somehow survived - 2.7.1 slipped - delete it, verifying the SAFE106
+The 2.7.1 release already deleted `plan/02-c.md` and made C++ the "1 (next)"
+row in `plan/README.md`. So step 0 here is lighter: confirm `plan/02-c.md` is
+gone (if it somehow survived - 2.7.1 slipped - delete it, verifying the SAFE106
 enabled/warning rationale is on `docs/languages/c.md` first), mark this spec
 in-progress in `plan/README.md`, and add the C++ RC version bump per the
 release flow. On completion, delete this spec and add a "C++ shipped in
