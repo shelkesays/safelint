@@ -38,9 +38,11 @@ written down here so no context loss can corrupt the work.
    Each commit message names the WP. This makes position recoverable from
    `git log --oneline` alone.
 2. **After any context compaction, session restart, or hand-off**: re-read
-   this ENTIRE file, then run `git log --oneline development..HEAD` and
-   `git status` to re-derive exactly which WP is next. Never resume from
-   memory of the plan; resume from the plan.
+   this ENTIRE file, then run `git fetch origin development -q && git log
+   --oneline origin/development..HEAD` and `git status` to re-derive exactly
+   which WP is next (compare against the fetched `origin/development`, the same
+   authoritative base Lock 1 uses, not a possibly-stale local ref). Never
+   resume from memory of the plan; resume from the plan.
 3. **Verify every anchor before editing.** Each WP quotes the exact current
    text it expects. Before each edit, confirm the quoted text exists
    verbatim (grep for a distinctive fragment). If it does not match - the
