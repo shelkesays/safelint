@@ -530,7 +530,7 @@ and the GitHub Actions / dependency surface.
   SAFE501 false-negative). No new I/O / subprocess / network / deserialisation
   / env read introduced.
 - **Supply chain**: one runtime dependency (`tree-sitter>=0.23.0`); all eight
-  grammars are opt-in extras (`tree-sitter-<lang>>=0.23.0`); `uv.lock` is
+  grammars are opt-in extras (`tree-sitter-<lang>` pinned `>=0.23.0`); `uv.lock` is
   hash-pinned (sha256) with every artifact URL on `files.pythonhosted.org`;
   publishing is PyPI Trusted Publishing (OIDC), no long-lived token. Dependabot:
   0 open alerts as of the scan.
