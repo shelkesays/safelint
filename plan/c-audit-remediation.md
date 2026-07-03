@@ -65,10 +65,19 @@ Two hard invariants pin "no functionality regression":
 `src/safelint/skill_files/**` (bundled docs, not code). At the end:
 
 ```bash
-# Passes (exit 0) when the only src/safelint/ changes are under skill_files/.
-# The `|| true` neutralises grep's exit-1-on-no-match so this is safe under
-# `set -e` / `pipefail`; the `[ -z ]` check is what decides pass/fail.
-leaked="$(git diff --name-only development...HEAD -- src/safelint/ \
+git fetch origin development -q
+# (a) Staleness guard - the branch must already contain origin/development's tip,
+# so the file check below reflects only YOUR changes, not a stale delta. (This is
+# the separate concern - being behind base - kept out of the file check so its
+# message stays accurate.)
+git merge-base --is-ancestor origin/development HEAD \
+  || { echo "Lock 1: branch is behind origin/development - rebase/merge it first."; exit 1; }
+# (b) No forbidden src/safelint/ changes. Three-dot `A...HEAD` = this branch's
+# OWN contribution (identical to the PR's "Files changed" set), so an independent
+# src/ change already on development is correctly NOT flagged. `|| true`
+# neutralises grep's exit-1-on-no-match (safe under `set -e` / `pipefail`); the
+# `[ -z ]` check decides pass/fail.
+leaked="$(git diff --name-only origin/development...HEAD -- src/safelint/ \
   | grep -v '^src/safelint/skill_files/' || true)"
 [ -z "$leaked" ] || { printf 'Lock 1 FAILED - unauthorised source change(s):\n%s\n' "$leaked"; exit 1; }
 ```
