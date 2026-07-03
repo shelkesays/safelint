@@ -23,9 +23,9 @@ widen the C rules, add a small C++-idiom set. Resist template-aware analysis.
 
 The C release was audited against its spec and against the Power of Ten paper
 on 2026-07-02. The audit found the C implementation behaviourally correct but
-caught repeatable process gaps, **closed in the 2.7.1 release, which is
-sequenced to land BEFORE this C++ work** (owner decision). **This spec is
-written to be executed only after 2.7.1 has shipped.** It therefore assumes -
+caught repeatable process gaps, **scheduled to be closed by the 2.7.1 release,
+which is sequenced to land BEFORE this C++ work** (owner decision). **This spec
+is written to be executed only after 2.7.1 has shipped.** It therefore assumes -
 and you must CONFIRM at the start (they are not yet present on the pre-2.7.1
 branch) - that 2.7.1's artifacts below exist before you begin C++. If any is
 missing, 2.7.1 has not fully landed: stop and raise it rather than proceeding.
