@@ -23,11 +23,14 @@ widen the C rules, add a small C++-idiom set. Resist template-aware analysis.
 
 The C release was audited against its spec and against the Power of Ten paper
 on 2026-07-02. The audit found the C implementation behaviourally correct but
-caught repeatable process gaps, which were **closed in the 2.7.1 release
-BEFORE this C++ work** (owner-sequenced ahead of C++). That work shipped these
-concrete artifacts, which now exist in the tree and are the baseline you build
-on (the remediation plan file itself is removed on completion, so this spec
-does not depend on it):
+caught repeatable process gaps, **closed in the 2.7.1 release, which is
+sequenced to land BEFORE this C++ work** (owner decision). **This spec is
+written to be executed only after 2.7.1 has shipped.** It therefore assumes -
+and you must CONFIRM at the start (they are not yet present on the pre-2.7.1
+branch) - that 2.7.1's artifacts below exist before you begin C++. If any is
+missing, 2.7.1 has not fully landed: stop and raise it rather than proceeding.
+Those artifacts are the baseline you build on (the remediation plan file itself
+is removed when 2.7.1 completes, so this spec does not depend on it):
 
 - the behavioural pin `tests/rules/test_c_power_of_ten_pin.py`,
 - the SAFE106 / SAFE310 config-override tests in `tests/rules/test_c_rules.py`
@@ -37,7 +40,10 @@ does not depend on it):
 - the C paper-fidelity notes in `docs/power-of-ten.md`,
 - and the eight-language enumeration state across the docs / skill files.
 
-So when you start C++, that C baseline is already fully closed and guarded.
+Once 2.7.1 has landed and those are confirmed present, that C baseline is fully
+closed and guarded, and the rest of this section tells you how to build on it.
+(Downstream references to these artifacts as "already existing" are relative to
+that post-2.7.1 starting point, not the current pre-2.7.1 branch.)
 This section tells you how to **build on** that baseline without regressing it
 and without repeating the misses. **Every item here is a ship-blocker for the
 C++ PR unless marked optional.**
