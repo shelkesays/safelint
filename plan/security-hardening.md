@@ -390,8 +390,9 @@ and the GitHub Actions / dependency surface.
   correctly implemented and tested (evidence below). No `eval` / `exec` /
   `subprocess` of user code / deserialisation / network / new file I/O anywhere;
   the only subprocess remains the four list-form `git` calls; the only writes
-  remain the sanctioned skill-installer (exclusive-create) and cache
-  (`mkstemp`) paths.
+  remain the sanctioned skill-installer and cache (`mkstemp`) paths (the
+  primary skill writes are exclusive-create; the `AGENTS.md` merge write is the
+  one remaining non-atomic, check-then-act site - tracked as H7 below).
 - **The C language addition introduced no new security surface** and two of its
   changes are net security-positive (see delta review). Confirmed against the
   earlier C SOC sign-off.
