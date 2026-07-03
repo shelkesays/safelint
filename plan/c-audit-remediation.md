@@ -62,9 +62,14 @@ written down here so no context loss can corrupt the work.
 
 Two hard invariants pin "no functionality regression":
 
-**Lock 1 - source-tree invariant.** This plan may only change: `docs/**`,
-`plan/**`, `tests/**`, `CHANGELOG.md`, `CONTRIBUTING.md`, `README.md`, and
-`src/safelint/skill_files/**` (bundled docs, not code). At the end:
+**Lock 1 - source-tree invariant.** The enforced invariant is **no behaviour
+change: nothing under `src/safelint/` may change except bundled docs under
+`src/safelint/skill_files/**`** (the check below verifies exactly that). The
+plan's other edits are docs / tests / plan files (`docs/**`, `plan/**`,
+`tests/**`, `CHANGELOG.md`, `CONTRIBUTING.md`, `README.md`) plus the one release
+edit the flow requires: the `project.version` bump to `2.7.1` in
+`pyproject.toml` (and the `uv.lock` update it triggers). Neither of those is
+under `src/safelint/`, so they do not affect the check. At the end:
 
 ```bash
 git fetch origin development -q
