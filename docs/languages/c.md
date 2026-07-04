@@ -75,6 +75,7 @@ C uses line-comment directives (`//` form): `// nosafe` (all rules on the line),
 - `(void)f()` (the explicit-discard cast) wraps the call in a `cast_expression`, so SAFE802 does not fire on it.
 - `argv` enters taint analysis via function-parameter seeding; `argv[1]` keeps the taint.
 - SAFE313 fires on `char **argv` (a two-level pointer) - intentional for the strict, opt-in rule.
+- SAFE313 is a syntactic declarator check: a pointer level hidden behind a `typedef` (`typedef int *intp; intp *pp;`) or a macro is not counted - the paper's no-hidden-dereference clause needs type resolution and is a documented gap.
 
 ## Configuration
 
