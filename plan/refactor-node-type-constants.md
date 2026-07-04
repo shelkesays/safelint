@@ -6,10 +6,10 @@ maintainability change - **no behaviour change**.
 **Status**: not started. **Scheduled after C and C++ ship** (so the language
 set is stable and the sweep is done once, not re-done per language addition).
 
-**Sequencing**: run this only when `plan/02-c.md` and `plan/03-cpp.md` are both
-complete and their spec files removed. Doing it earlier would mean re-touching
-the same tables for every subsequent language; doing it once at the end is the
-single-pass win.
+**Sequencing**: C has shipped (`plan/02-c.md` removed on completion); run this
+only once `plan/03-cpp.md` (C++) is also complete and its spec removed. Doing
+it earlier would mean re-touching the same tables for every subsequent
+language; doing it once at the end is the single-pass win.
 
 ---
 
