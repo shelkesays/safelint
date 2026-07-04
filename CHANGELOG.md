@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Post-release hardening of the v2.7.0 C support (no runtime behaviour change): documentation-fidelity corrections plus regression tests that backfill gaps found in the C post-release audit. Bundled skill-file docs are the only shipped delta.
+
+### Fixed
+
+- Recorded two Power of Ten paper-fidelity gaps in the C rules so they read as deliberate decisions: SAFE311 (`complex_macro`) does not detect mutually recursive macro definitions, and SAFE313 (`restricted_pointers`), a syntactic declarator check, does not see pointer levels hidden behind a `typedef` or macro. Both need analysis SafeLint does not do; documented in the Power of Ten page, the rules reference, and the C language page.
+- Corrected the stale rule-7 fidelity note to name C's literal `(void)` cast (recognised by SAFE802); Go's blank identifier is described as the memory-managed-language analogue.
+- Swept lingering "seven languages" enumerations to the eight-language state (CONTRIBUTING, the JSON-schema page, the README pre-commit example, the bundled skill README, and the "all-language core" labels).
+
+### Added
+
+- C regression tests backfilling the post-release audit gaps: a Power of Ten behavioural pin (`tests/rules/test_c_power_of_ten_pin.py`), an engine-level suite (`tests/core/test_engine_c.py`, covering both `.c` and `.h`), config-override tests for the SAFE106 `nonlocal_jump_calls_c` and SAFE310 `allocation_calls_c` list knobs, and a SAFE106 default-on / warning-severity contract lock.
+
 ## [2.7.0] - 2026-07-02
 
 **C is now a supported language alongside Python, JavaScript, TypeScript, Java, Rust, Go, and PHP.** `.c` and `.h` files are discovered, parsed via Tree-sitter (`tree-sitter-c`, shipped in the opt-in `[c]` extra), and run against **21 rules** - the 16 cross-language ports plus **5 new C-only rules**, the largest rule addition of any language. C is Holzmann's original "Power of Ten" target, so the new rules express clauses every other language adapts away, literally. safelint grows to **45 rules** and **8 registered languages**. Additive per the project's semver policy (a new language is MINOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.
