@@ -31,12 +31,32 @@ def _codes(src: str, tmp_path: Path, enable: list[str] | None = None) -> set[str
     return {v.code for v in engine.check_file(str(sample)).violations}
 
 
+def _codes_with_config(src: str, tmp_path: Path, rule_config: dict) -> set[str]:
+    """Like ``_codes``, but takes an explicit ``{rule_name: {..config..}}`` mapping so
+    tests can exercise list knobs (e.g. ``nonlocal_jump_calls_c``), not just ``enabled``."""
+    sample = tmp_path / "sample.c"
+    sample.write_text(src, encoding="utf-8")
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": rule_config}))
+    return {v.code for v in engine.check_file(str(sample)).violations}
+
+
 def test_c_opt_in_rules_are_silent_by_default(tmp_path: Path) -> None:
     """SAFE310-313 are opt-in: source that would trip all four reports none with no overrides."""
     src = "#define CAT(a, b) a##b\n#ifdef DEBUG\nint d;\n#endif\nint **pp;\nvoid f(void) {\n    void *p = malloc(8);\n    free(p);\n}\n"
     codes = _codes(src, tmp_path)  # no overrides -> built-in defaults
     opt_in = {DynamicAllocationRule.code, ComplexMacroRule.code, ConditionalCompilationRule.code, RestrictedPointersRule.code}
     assert codes.isdisjoint(opt_in)
+
+
+def test_safe106_defaults_enabled_at_warning_severity() -> None:
+    """SAFE106 is the only default-on C-only rule and ships at warning severity - a contract lock.
+
+    Visible-but-non-blocking at ``--fail-on=error`` is the maintainer decision (``goto err``
+    cleanup is idiomatic); re-tiering it must be a conscious, test-breaking act.
+    """
+    cfg = DEFAULTS["rules"]["nonlocal_jumps"]
+    assert cfg["enabled"] is True
+    assert cfg["severity"] == "warning"
 
 
 # --- SAFE106 nonlocal_jumps (enabled by default, severity=warning) -------------
@@ -63,6 +83,24 @@ def test_c_no_goto_is_clean_for_safe106(tmp_path: Path) -> None:
     assert "SAFE106" not in _codes("int f(int x) {\n    return x > 0 ? 1 : 0;\n}\n", tmp_path)
 
 
+def test_c_safe106_custom_jump_call_list_is_honoured(tmp_path: Path) -> None:
+    """A custom ``nonlocal_jump_calls_c`` entry is matched (SAFE106 is default-on)."""
+    cfg = {"nonlocal_jumps": {"nonlocal_jump_calls_c": ["my_longjmp_wrapper"]}}
+    assert "SAFE106" in _codes_with_config("void f(void *b) {\n    my_longjmp_wrapper(b, 1);\n}\n", tmp_path, cfg)
+
+
+def test_c_safe106_custom_list_replaces_defaults(tmp_path: Path) -> None:
+    """The custom list replaces the defaults: a default entry (``setjmp``) no longer fires under an override."""
+    cfg = {"nonlocal_jumps": {"nonlocal_jump_calls_c": ["my_longjmp_wrapper"]}}
+    assert "SAFE106" not in _codes_with_config("void f(void *b) {\n    setjmp(b);\n}\n", tmp_path, cfg)
+
+
+def test_c_safe106_goto_is_structural_not_list_driven(tmp_path: Path) -> None:
+    """``goto`` fires structurally regardless of ``nonlocal_jump_calls_c`` - the knob scopes only the call names."""
+    cfg = {"nonlocal_jumps": {"nonlocal_jump_calls_c": ["my_longjmp_wrapper"]}}
+    assert "SAFE106" in _codes_with_config("void f(int x) {\n    if (x) goto out;\nout:\n    return;\n}\n", tmp_path, cfg)
+
+
 # --- SAFE310 dynamic_allocation (opt-in) ---------------------------------------
 
 
@@ -79,6 +117,18 @@ def test_c_free_fires_safe310(tmp_path: Path) -> None:
 def test_c_no_allocation_is_clean_for_safe310(tmp_path: Path) -> None:
     """Stack-only code does not fire SAFE310."""
     assert "SAFE310" not in _codes("int f(void) {\n    int buf[16];\n    return buf[0];\n}\n", tmp_path, ["dynamic_allocation"])
+
+
+def test_c_safe310_custom_allocation_call_list_is_honoured(tmp_path: Path) -> None:
+    """A custom ``allocation_calls_c`` entry is matched (SAFE310 is opt-in, so enable it too)."""
+    cfg = {"dynamic_allocation": {"enabled": True, "allocation_calls_c": ["my_pool_alloc"]}}
+    assert "SAFE310" in _codes_with_config("void *f(int n) {\n    return my_pool_alloc(n);\n}\n", tmp_path, cfg)
+
+
+def test_c_safe310_custom_list_replaces_defaults(tmp_path: Path) -> None:
+    """The custom list replaces the defaults: ``malloc`` no longer fires under an override."""
+    cfg = {"dynamic_allocation": {"enabled": True, "allocation_calls_c": ["my_pool_alloc"]}}
+    assert "SAFE310" not in _codes_with_config("void *f(void) {\n    return malloc(8);\n}\n", tmp_path, cfg)
 
 
 # --- SAFE311 complex_macro (opt-in) --------------------------------------------
