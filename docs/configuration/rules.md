@@ -628,7 +628,7 @@ allocation_calls_c = ["malloc", "calloc", "realloc", "aligned_alloc", "free", "s
 
 **What it flags:** Preprocessor macros that are not simple, complete syntactic units. **C-only**, new in v2.7.0. Holzmann's rule 8 ("limit the preprocessor to header files and simple macros").
 
-Fires on function-like macros that use token pasting (`##`) or variadic `__VA_ARGS__`, and on object-like macros whose replacement text is not a balanced syntactic unit (heuristic: unbalanced `()` / `{}` / `[]`, ignoring brackets inside string and character literals). **Disabled by default.**
+Fires on function-like macros that use token pasting (`##`) or variadic `__VA_ARGS__`, and on object-like macros whose replacement text is not a balanced syntactic unit (heuristic: unbalanced `()` / `{}` / `[]`, ignoring brackets inside string and character literals). Mutually recursive macro definitions (the paper's third banned construct) are not detected; that needs macro-table analysis. **Disabled by default.**
 
 ```toml
 # pyproject.toml
@@ -662,7 +662,7 @@ enabled = true
 
 ### SAFE313: `restricted_pointers`
 
-**What it flags:** Declarators with more than one level of pointer indirection (`int **p`) and function-pointer declarators (`void (*fp)(int)`). **C-only**, new in v2.7.0. Holzmann's rule 9 ("limit pointer use to a single dereference, and do not use function pointers") expressed literally.
+**What it flags:** Declarators with more than one level of pointer indirection (`int **p`) and function-pointer declarators (`void (*fp)(int)`). **C-only**, new in v2.7.0. Holzmann's rule 9 ("limit pointer use to a single dereference, and do not use function pointers") expressed literally. The check is syntactic (declarator shape only): a pointer level hidden behind a `typedef` or a macro is not counted - the paper's no-hidden-dereference clause needs type resolution and is a documented gap.
 
 **Disabled by default** - it is deliberately strict (`char **argv` fires too). Opt in for the highest-assurance profiles; collapse multi-level pointers behind a struct or out-parameter, and replace function pointers with tagged dispatch.
 
