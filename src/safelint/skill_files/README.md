@@ -1,6 +1,6 @@
 # SafeLint AI-client skill
 
-A bundled skill / project-rule that lets fourteen AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp, Kiro) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/`, currently Python, JavaScript, TypeScript, Java, Rust, Go, and PHP (mirroring safelint's `src/safelint/languages/` package layout).
+A bundled skill / project-rule that lets fourteen AI clients (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp, Kiro) run `safelint` against the current project and present the violations in a reviewable format. The instructions are language-agnostic; per-language addendums sit alongside under `languages/`, currently Python, JavaScript, TypeScript, Java, Rust, Go, PHP, and C (mirroring safelint's `src/safelint/languages/` package layout).
 
 > **For the comprehensive user guide** (auto-detection logic, per-client setup, troubleshooting, adding a new client) see the [AI client integrations](https://shelkesays.github.io/safelint/ai-clients/) docs. The README you're reading is the in-wheel reference; it covers the install command surface and the layout of the bundled files. The full guide lives on the docs site.
 
