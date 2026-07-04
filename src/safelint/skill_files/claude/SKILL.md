@@ -1,6 +1,6 @@
 ---
 name: safelint
-description: Run safelint static analysis on the user's project and present Holzmann Power-of-Ten safety violations grouped by file. Supports any language registered with safelint (currently Python, JavaScript, and TypeScript including TSX / AssemblyScript; more languages can be added). Use this for "safelint check", "lint with safelint", "safety review", "Power-of-Ten review", or similar requests for safelint's specific rule set. For generic linting use the project's configured tools (ruff, eslint, etc.) instead.
+description: Run safelint static analysis on the user's project and present Holzmann Power-of-Ten safety violations grouped by file. Supports any language registered with safelint (Python, JavaScript, TypeScript including TSX / AssemblyScript, Java, Rust, Go, PHP, and C today; more can be added). Use this for "safelint check", "lint with safelint", "safety review", "Power-of-Ten review", or similar requests for safelint's specific rule set. For generic linting use the project's configured tools (ruff, eslint, etc.) instead.
 ---
 
 # safelint skill
