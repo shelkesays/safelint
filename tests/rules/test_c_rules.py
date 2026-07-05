@@ -23,21 +23,24 @@ from safelint.rules.c_rules import (
 )
 
 
-def _codes(src: str, tmp_path: Path, enable: list[str] | None = None) -> set[str]:
+def _codes(src: str, tmp_path: Path, enable: list[str] | None = None, config: dict | None = None) -> set[str]:
+    """Return the violation codes for *src*.
+
+    ``enable`` toggles rules on by name; ``config`` supplies a full
+    ``{rule_name: {..config..}}`` mapping for list knobs (e.g.
+    ``nonlocal_jump_calls_c``). The two compose, with ``config`` winning.
+    """
     sample = tmp_path / "sample.c"
     sample.write_text(src, encoding="utf-8")
-    overrides = {"rules": {r: {"enabled": True} for r in (enable or [])}}
-    engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+    rules = {r: {"enabled": True} for r in (enable or [])}
+    rules.update(config or {})
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": rules}))
     return {v.code for v in engine.check_file(str(sample)).violations}
 
 
 def _codes_with_config(src: str, tmp_path: Path, rule_config: dict) -> set[str]:
-    """Like ``_codes``, but takes an explicit ``{rule_name: {..config..}}`` mapping so
-    tests can exercise list knobs (e.g. ``nonlocal_jump_calls_c``), not just ``enabled``."""
-    sample = tmp_path / "sample.c"
-    sample.write_text(src, encoding="utf-8")
-    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": rule_config}))
-    return {v.code for v in engine.check_file(str(sample)).violations}
+    """Exercise per-rule list knobs by delegating to ``_codes``'s ``config`` parameter."""
+    return _codes(src, tmp_path, config=rule_config)
 
 
 def test_c_opt_in_rules_are_silent_by_default(tmp_path: Path) -> None:
