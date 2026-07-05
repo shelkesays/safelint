@@ -31,7 +31,7 @@ PHP supports **line-comment directives only** (`//`): `// nosafe`, `// nosafe: S
 
 ## Rules that fire on PHP
 
-**21 rules apply to PHP.** PHP is in scope for 13 cross-language rules (the all-language core), plus a set of rules shared with most other languages, plus the try/catch rules and SAFE301. 2 cross-language rules are deliberately skipped, see the next section. Like the other languages' optional rules, every dataflow rule and several state / suppression rules are disabled by default.
+**21 rules apply to PHP.** PHP is in scope for 13 cross-language rules (the all-language core), plus a set of rules shared with most other languages, plus the try/catch rules and SAFE301. 2 rules are deliberately skipped, see the next section. Like the other languages' optional rules, every dataflow rule and several state / suppression rules are disabled by default.
 
 ### Cross-language rules
 
