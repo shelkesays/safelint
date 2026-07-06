@@ -127,6 +127,20 @@ audited C behaviour must be byte-for-byte identical after this PR.
    opt-in, so for them the default-disabled smoke assertion (mirror
    `test_c_opt_in_rules_are_silent_by_default` in
    `tests/rules/test_c_rules.py`) is the required lock.
+5. **Per-language "enable EVERY rule" engine smoke test (standing owner task;
+   ships in the same PR as C++).** For EACH registered language (all nine once
+   C++ lands), a test that enables every rule applicable to that language
+   (flip `enabled: true` on the full `DEFAULTS["rules"]` set) and runs the
+   engine end-to-end on a small valid sample file, asserting it completes
+   without crashing (violations are fine; exceptions are not). Motivation
+   (recorded during the C build): several rules are opt-in
+   (`blanket_suppression`, `missing_assertions`, `dynamic_code_execution`,
+   `test_existence`, the dataflow trio, the C-only 310-313), so a port that
+   crashes only when enabled is invisible to the default-config suites. The
+   owner deliberately scheduled this AFTER C and C++ ship so it is built once
+   over the final language set - C++ is that moment; do not defer it again.
+   Suggested home: `tests/core/test_all_rules_smoke.py`, parametrised over
+   the language registry so the NEXT language addition gets its row for free.
 
 ### 0.4 Paper-fidelity notes land in the SAME PR as the behaviour
 
