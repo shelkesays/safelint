@@ -646,7 +646,7 @@ enabled = true
 
 **What it flags:** `#if` / `#ifdef` / `#ifndef` directives beyond the include-guard idiom. **C-only**, new in v2.7.0. Holzmann's rule 8 again: each conditional-compilation directive doubles the number of build configurations that must be tested (2^n versions from n flags).
 
-An `#ifndef X` + `#define X` pair (a header include guard) is exempt; every other `#if` / `#ifdef` / `#ifndef` fires. **Disabled by default.** Prefer runtime configuration over compile-time flags.
+An `#ifndef X` + `#define X` pair (a header include guard) is exempt; the matching `#define` must be the first substantive statement of the block, with comments (e.g. an SPDX / licence header) and `#pragma` lines (a belt-and-braces `#pragma once`) allowed in between. Every other `#if` / `#ifdef` / `#ifndef` fires. **Disabled by default.** Prefer runtime configuration over compile-time flags.
 
 ```toml
 # pyproject.toml

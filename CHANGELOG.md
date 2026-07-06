@@ -7,10 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-Post-release hardening of the v2.7.0 C support (no runtime behaviour change): documentation-fidelity corrections plus regression tests that backfill gaps found in the C post-release audit. Bundled skill-file docs are the only shipped delta.
+Post-release hardening of the v2.7.0 C support: one opt-in-rule bugfix (SAFE312 false positives on real-world include guards), documentation-fidelity corrections, and regression tests that backfill gaps found in the C post-release audit.
 
 ### Fixed
 
+- **SAFE312 (`conditional_compilation`) no longer false-positives on real-world include guards.** The exemption required `#define X` to be the node immediately after `#ifndef X`, so a licence / SPDX comment or a belt-and-braces `#pragma once` between the two - both widespread header idioms - made the guard fire spuriously. The first-substantive-statement check now skips `comment` and `preproc_call` nodes; an unrelated statement in that position still fires (the anti-disguise tightening is unchanged). Found by review on the 2.7.1 release PR.
 - Recorded two Power of Ten paper-fidelity gaps in the C rules so they read as deliberate decisions: SAFE311 (`complex_macro`) does not detect mutually recursive macro definitions, and SAFE313 (`restricted_pointers`), a syntactic declarator check, does not see pointer levels hidden behind a `typedef` or macro. Both need analysis SafeLint does not do; documented in the Power of Ten page, the rules reference, and the C language page.
 - Corrected the stale rule-7 fidelity note to name C's literal `(void)` cast (recognised by SAFE802); Go's blank identifier is described as the memory-managed-language analogue.
 - Swept lingering "seven languages" enumerations to the eight-language state (CONTRIBUTING, the JSON-schema page, the README pre-commit example, the bundled skill README, and the "all-language core" labels).

@@ -65,6 +65,7 @@ _CASES = [
     ("misordered brackets fire SAFE311", "#define BAD )(\n", "SAFE311", True),
     ("#ifdef fires SAFE312", "#ifdef DEBUG\nint d;\n#endif\n", "SAFE312", True),
     ("include guard exempt SAFE312", "#ifndef H_H\n#define H_H\nint x;\n#endif\n", "SAFE312", False),
+    ("include guard with licence comment exempt SAFE312", "#ifndef H_H\n/* (c) 2026 */\n#define H_H\nint x;\n#endif\n", "SAFE312", False),
     ("double pointer fires SAFE313", "void f(int **pp){ }", "SAFE313", True),
     ("single pointer clean SAFE313", "void f(int *p){ }", "SAFE313", False),
     ("argv->system taint fires SAFE801", "void f(char **argv){ system(argv[1]); }", "SAFE801", True),
