@@ -29,6 +29,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 1
+          # Least privilege: nothing in this job needs git credentials after
+          # checkout (gh uses its env token; the review reads the tree and
+          # posts via the API). Keeps GITHUB_TOKEN out of .git/config.
+          persist-credentials: false
 
       - name: Claude Code review
         uses: anthropics/claude-code-action@v1
