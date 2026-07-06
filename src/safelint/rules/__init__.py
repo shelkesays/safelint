@@ -12,6 +12,10 @@ from safelint.rules.c_rules import (
     RestrictedPointersRule,
 )
 from safelint.rules.complexity import ComplexityRule
+from safelint.rules.cpp_rules import (
+    DangerousCastsRule,
+    RawNewDeleteRule,
+)
 from safelint.rules.dataflow import NullDereferenceRule, ReturnValueIgnoredRule, TaintedSinkRule
 from safelint.rules.documentation import MissingAssertionsRule
 from safelint.rules.dynamic_code_execution import DynamicCodeExecutionRule
@@ -115,6 +119,11 @@ ALL_RULES: list[type[BaseRule]] = [
     ComplexMacroRule,
     ConditionalCompilationRule,
     RestrictedPointersRule,
+    # C++-only rules (modern-C++ idiom discipline, 3xx band). C++-only, so -
+    # like the C- / Rust- / Go-only rules - they are not listed in
+    # ``execution.order``. Both are opt-in (disabled by default).
+    RawNewDeleteRule,
+    DangerousCastsRule,
 ]
 
 RULE_BY_NAME: dict[str, type[BaseRule]] = {cls.name: cls for cls in ALL_RULES}
@@ -128,6 +137,7 @@ __all__ = [
     "ComplexMacroRule",
     "ComplexityRule",
     "ConditionalCompilationRule",
+    "DangerousCastsRule",
     "DangerousMemOpsRule",
     "DynamicAllocationRule",
     "DynamicCodeExecutionRule",
@@ -148,6 +158,7 @@ __all__ = [
     "NullDereferenceRule",
     "PanicCallsOutsideTestsRule",
     "PanicMacrosOutsideTestsRule",
+    "RawNewDeleteRule",
     "ResourceLifecycleRule",
     "RestrictedPointersRule",
     "ResultUnwrapOutsideTestsRule",

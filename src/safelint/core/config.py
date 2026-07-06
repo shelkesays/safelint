@@ -1683,6 +1683,16 @@ DEFAULTS: dict[str, Any] = {
         "complex_macro": {"enabled": False, "severity": "warning"},
         "conditional_compilation": {"enabled": False, "severity": "warning"},
         "restricted_pointers": {"enabled": False, "severity": "warning"},
+        # C++-only rules (modern-C++ idiom discipline, 3xx band). Both opt-in.
+        # SAFE315 flags ``new`` / ``delete`` structurally (no list). SAFE316's
+        # cast list is configurable via ``dangerous_casts_cpp``; ``static_cast``
+        # / ``dynamic_cast`` are omitted because the compiler type-checks them.
+        "raw_new_delete": {"enabled": False, "severity": "warning"},
+        "dangerous_casts": {
+            "enabled": False,
+            "severity": "warning",
+            "dangerous_casts_cpp": ["reinterpret_cast", "const_cast"],
+        },
     },
 }
 

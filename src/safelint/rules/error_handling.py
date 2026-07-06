@@ -384,15 +384,26 @@ def _cpp_stream_target_name(operand: tree_sitter.Node) -> str | None:
     return None
 
 
+def _cpp_chain_leftmost(expr: tree_sitter.Node) -> tree_sitter.Node | None:
+    r"""Descend a ``<<`` chain's left spine to its leftmost operand (bounded loop).
+
+    ``std::cerr << e.what() << "\\n"`` nests left, so the deepest left operand
+    is ``std::cerr``. Never recurses (SAFE105).
+    """
+    operand: tree_sitter.Node | None = expr
+    for _ in range(64):
+        if operand is None or operand.type != "binary_expression":
+            return operand
+        operand = operand.child_by_field_name("left")
+    return operand
+
+
 def _cpp_body_has_stream_log(body: tree_sitter.Node, function_types: frozenset[str]) -> bool:
-    r"""Return True if *body* contains a ``std::cerr << ...`` style stream-log expression.
+    """Return True if *body* contains a ``std::cerr << ...`` style stream-log expression.
 
     Scans every ``<<`` binary expression (pruning nested function / lambda
-    bodies) and resolves the leftmost operand of the insertion chain: for
-    ``std::cerr << e.what() << "\\n"`` the chain nests left, so the deepest
-    left operand is ``std::cerr``. If that operand names a known log stream,
-    the handler is treated as logging the caught error. The leftmost descent
-    is a bounded loop (never recursion - SAFE105).
+    bodies); if the leftmost operand of the insertion chain names a known log
+    stream, the handler is treated as logging the caught error.
     """
     for node in walk(body, skip_types=tuple(function_types)):
         if node.type != "binary_expression":
@@ -400,12 +411,8 @@ def _cpp_body_has_stream_log(body: tree_sitter.Node, function_types: frozenset[s
         operator = node.child_by_field_name("operator")
         if operator is None or node_text(operator) != "<<":
             continue
-        operand: tree_sitter.Node | None = node
-        for _ in range(64):
-            if operand is None or operand.type != "binary_expression":
-                break
-            operand = operand.child_by_field_name("left")
-        if operand is not None and _cpp_stream_target_name(operand) in _CPP_LOG_STREAMS:
+        leftmost = _cpp_chain_leftmost(node)
+        if leftmost is not None and _cpp_stream_target_name(leftmost) in _CPP_LOG_STREAMS:
             return True
     return False
 
