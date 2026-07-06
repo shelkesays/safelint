@@ -227,14 +227,25 @@ def _ifndef_guard_name(node: tree_sitter.Node) -> str | None:
 
 
 def _first_body_define_name(node: tree_sitter.Node) -> str | None:
-    """Return the macro name defined by the *first* body statement of *node*, or None.
+    """Return the macro name defined by the *first substantive* body statement, or None.
 
-    ``named_children`` is ``[condition-name, first-body, ...]`` so the opener is
-    index 1. Requiring the ``#define`` to be first - rather than merely present
-    somewhere in the block - stops an unrelated ``#define`` deeper in the body
-    from disguising a real conditional as an include guard.
+    Requiring the ``#define`` to be first - rather than merely present somewhere
+    in the block - stops an unrelated ``#define`` deeper in the body from
+    disguising a real conditional as an include guard. "First" skips inert
+    nodes that idiomatically sit between ``#ifndef X`` and ``#define X`` in real
+    headers: ``comment`` (SPDX / licence blocks, ``//`` lines) and
+    ``preproc_call`` (a belt-and-braces ``#pragma once``). The guard-name
+    ``identifier`` is skipped by node id (compare by ``.id``, not ``is`` -
+    tree-sitter hands out a fresh wrapper per access).
     """
-    opener = node.named_children[1] if len(node.named_children) > 1 else None
+    name = node.child_by_field_name("name")
+    name_id = name.id if name is not None else None
+    opener = None
+    for child in node.named_children:
+        if child.id == name_id or child.type in ("comment", "preproc_call"):
+            continue
+        opener = child
+        break
     if opener is None or opener.type != "preproc_def":
         return None
     defined = opener.child_by_field_name("name")

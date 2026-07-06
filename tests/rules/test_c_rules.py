@@ -206,6 +206,30 @@ def test_c_ifndef_with_unrelated_define_first_fires_safe312(tmp_path: Path) -> N
     assert "SAFE312" in _codes(src, tmp_path, ["conditional_compilation"])
 
 
+def test_c_include_guard_with_line_comment_is_clean_for_safe312(tmp_path: Path) -> None:
+    """A ``//`` comment (e.g. SPDX line) between ``#ifndef`` and ``#define`` keeps the exemption."""
+    src = "#ifndef HEADER_H\n// SPDX-License-Identifier: MIT\n#define HEADER_H\nint x;\n#endif\n"
+    assert "SAFE312" not in _codes(src, tmp_path, ["conditional_compilation"])
+
+
+def test_c_include_guard_with_block_comment_is_clean_for_safe312(tmp_path: Path) -> None:
+    """A licence block comment between ``#ifndef`` and ``#define`` keeps the exemption."""
+    src = "#ifndef HEADER_H\n/* Copyright (c) 2026\n * MIT licence\n */\n#define HEADER_H\nint x;\n#endif\n"
+    assert "SAFE312" not in _codes(src, tmp_path, ["conditional_compilation"])
+
+
+def test_c_include_guard_with_pragma_once_is_clean_for_safe312(tmp_path: Path) -> None:
+    """A belt-and-braces ``#pragma once`` between ``#ifndef`` and ``#define`` keeps the exemption."""
+    src = "#ifndef HEADER_H\n#pragma once\n#define HEADER_H\nint x;\n#endif\n"
+    assert "SAFE312" not in _codes(src, tmp_path, ["conditional_compilation"])
+
+
+def test_c_comment_then_unrelated_statement_still_fires_safe312(tmp_path: Path) -> None:
+    """Skipping inert nodes must not weaken the first-statement requirement."""
+    src = "#ifndef DEBUG\n// toggle\nint enabled;\n#define DEBUG 1\n#endif\n"
+    assert "SAFE312" in _codes(src, tmp_path, ["conditional_compilation"])
+
+
 # --- SAFE313 restricted_pointers (opt-in) --------------------------------------
 
 
