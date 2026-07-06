@@ -266,6 +266,10 @@ _CALLEE_BAREWORD_FIELD: dict[str, str] = {
     "field_expression": "field",
     "scoped_identifier": "name",
     "selector_expression": "field",
+    # C++ ``std::system`` / ``spdlog::error`` - the ``name`` field is the
+    # trailing identifier, so a namespace-qualified call resolves to its
+    # bareword just like a member call (``logger.error`` -> ``error``).
+    "qualified_identifier": "name",
 }
 
 
