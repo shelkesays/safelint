@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
 from safelint.languages.go import PARAMETER_DECLARATION as _GO_PARAMETER_DECLARATION
@@ -33,6 +34,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
     "c": _C_FUNCTION_TYPES,
+    "cpp": _CPP_FUNCTION_TYPES,
 }
 
 _PY_SPLAT_PARAM_TYPES = frozenset({"list_splat_pattern", "dictionary_splat_pattern"})
@@ -194,8 +196,8 @@ def _count_args(func_node: tree_sitter.Node, lang_name: str) -> tuple[int, str |
     ``self`` / ``cls``); JavaScript callers ignore it. Both languages
     expose the parameter list through ``func_node.child_by_field_name("parameters")``.
     """
-    if lang_name == "c":
-        # C nests parameters under the ``function_declarator`` (which may itself
+    if lang_name in ("c", "cpp"):
+        # C / C++ nest parameters under the ``function_declarator`` (which may itself
         # be wrapped in a ``pointer_declarator`` for a pointer-returning
         # function), and ``int f(void)`` is the spelling for *zero* parameters.
         # ``_count_c_args`` handles both; the generic ``parameters``-field path
@@ -280,7 +282,7 @@ class MaxArgumentsRule(BaseRule):
 
     name = "max_arguments"
     code = "SAFE103"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function with more arguments than max_args."""

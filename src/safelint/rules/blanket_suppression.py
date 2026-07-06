@@ -264,6 +264,8 @@ _COMMENT_DETECTORS_BY_LANG = {
     "python": _python_blanket,
     "go": _go_blanket,
     "c": _c_blanket,
+    # C++ shares C's clang-tidy ``// NOLINT`` blanket form.
+    "cpp": _c_blanket,
 }
 
 
@@ -272,7 +274,7 @@ class BlanketSuppressionRule(BaseRule):
 
     name = "blanket_suppression"
     code = "SAFE603"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every blanket foreign-analyser suppression in *filepath*."""

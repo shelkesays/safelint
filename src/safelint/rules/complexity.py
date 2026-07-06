@@ -6,6 +6,7 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
@@ -41,6 +42,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
     "c": _C_FUNCTION_TYPES,
+    "cpp": _CPP_FUNCTION_TYPES,
 }
 
 # Node types that add 1 to cyclomatic complexity. Both languages: every
@@ -160,6 +162,8 @@ _C_BRANCHING_TYPES = frozenset(
         "conditional_expression",
     }
 )
+# C++: the C set plus ``catch_clause`` (each ``catch`` is a branch).
+_CPP_BRANCHING_TYPES = _C_BRANCHING_TYPES | frozenset({"catch_clause"})
 _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset(
         {
@@ -180,6 +184,7 @@ _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "go": _GO_BRANCHING_TYPES,
     "php": _PHP_BRANCHING_TYPES,
     "c": _C_BRANCHING_TYPES,
+    "cpp": _CPP_BRANCHING_TYPES,
 }
 
 # JavaScript: ``binary_expression`` covers many operators (``+``, ``>``,
@@ -219,6 +224,7 @@ _BRANCHING_BINARY_OPS_BY_LANG: dict[str, frozenset[str]] = {
     "go": _GO_BRANCHING_BINARY_OPS,
     "php": _PHP_BRANCHING_BINARY_OPS,
     "c": _C_BRANCHING_BINARY_OPS,
+    "cpp": _C_BRANCHING_BINARY_OPS,
 }
 
 
@@ -227,7 +233,7 @@ class ComplexityRule(BaseRule):
 
     name = "complexity"
     code = "SAFE104"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions whose cyclomatic complexity exceeds the configured maximum."""

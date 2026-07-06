@@ -164,16 +164,19 @@ def _java_method_invocation_name(call_node: tree_sitter.Node) -> str | None:
 def function_name_node(func_node: tree_sitter.Node, lang_name: str) -> tree_sitter.Node | None:
     """Return the ``identifier`` node that names *func_node*, or None.
 
-    Most languages expose the name on the ``name`` field. C is the exception:
-    it nests the name under the ``declarator`` field -
+    Most languages expose the name on the ``name`` field. C and C++ are the
+    exception: they nest the name under the ``declarator`` field -
     ``function_definition.declarator`` is a ``function_declarator`` (optionally
     wrapped in a ``pointer_declarator`` for pointer-returning functions), whose
-    own ``declarator`` is the name ``identifier``. The unwrap descends the
-    ``declarator`` chain with a bounded loop (never recursion - SAFE105 polices
-    this codebase) and only returns once it has passed through the
-    ``function_declarator``, so a non-function declarator never yields a name.
+    own ``declarator`` is the name node. The unwrap descends the ``declarator``
+    chain with a bounded loop (never recursion - SAFE105 polices this codebase)
+    and only returns once it has passed through the ``function_declarator``, so a
+    non-function declarator never yields a name. C++ adds two name shapes on top
+    of C's bare ``identifier``: an in-class method names a ``field_identifier``
+    (``int m()``), and an out-of-line definition names a ``qualified_identifier``
+    (``void S::m()``) whose trailing ``name`` field is the method identifier.
     """
-    if lang_name != "c":
+    if lang_name not in ("c", "cpp"):
         return func_node.child_by_field_name("name")
     node = func_node.child_by_field_name("declarator")
     passed_function_declarator = False
@@ -181,8 +184,11 @@ def function_name_node(func_node: tree_sitter.Node, lang_name: str) -> tree_sitt
     # to a child), so a plain ``while`` walk terminates without a fixed cap - a
     # cap would silently drop legal-but-deep declarators and lose name attribution.
     while node is not None:
-        if node.type == "identifier":
+        if node.type in ("identifier", "field_identifier"):
             return node if passed_function_declarator else None
+        if node.type == "qualified_identifier":
+            # C++ ``S::m`` - the trailing ``name`` field is the method identifier.
+            return node.child_by_field_name("name") if passed_function_declarator else None
         if node.type == "function_declarator":
             passed_function_declarator = True
         node = node.child_by_field_name("declarator")
