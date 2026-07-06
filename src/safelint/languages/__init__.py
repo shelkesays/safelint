@@ -18,6 +18,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from safelint.languages import c as _c_mod
+from safelint.languages import cpp as _cpp_mod
 from safelint.languages import go as _go_mod
 from safelint.languages import java as _java_mod
 from safelint.languages import javascript as _javascript_mod
@@ -27,6 +28,7 @@ from safelint.languages import rust as _rust_mod
 from safelint.languages import typescript as _typescript_mod
 from safelint.languages._types import LanguageDefinition
 from safelint.languages.c import C
+from safelint.languages.cpp import CPP
 from safelint.languages.go import GO
 from safelint.languages.java import JAVA
 from safelint.languages.javascript import JAVASCRIPT
@@ -158,6 +160,20 @@ else:
         _UNAVAILABLE_EXTENSIONS[_ext] = _c_mod.GRAMMAR_INSTALL_HINT
         _UNAVAILABLE_EXTRA_NAMES[_ext] = _c_mod.EXTRA_NAME
 
+# C++ - only register if ``tree-sitter-cpp`` is installed (i.e. the ``[cpp]`` or
+# ``[all]`` extra was selected). C++ builds on C: it widens the five C-only
+# rules to ``("c", "cpp")``, gives SAFE201 its first non-Python home, and adds
+# SAFE315 / SAFE316. C++-only header extensions (``.hpp`` / ``.hxx`` / ``.hh``)
+# register here; plain ``.h`` stays with C (documented). Same shape as the
+# blocks above - keep them parallel so future drift is grep-able.
+if _cpp_mod._GRAMMAR_AVAILABLE:
+    for _ext in CPP.file_extensions:
+        _REGISTRY[_ext] = CPP
+else:
+    for _ext in CPP.file_extensions:
+        _UNAVAILABLE_EXTENSIONS[_ext] = _cpp_mod.GRAMMAR_INSTALL_HINT
+        _UNAVAILABLE_EXTRA_NAMES[_ext] = _cpp_mod.EXTRA_NAME
+
 
 def get_language_for_file(filepath: str) -> LanguageDefinition | None:
     """Return the LanguageDefinition for *filepath* based on its extension, or None.
@@ -220,6 +236,7 @@ def extra_name_for(extension: str) -> str | None:
 
 
 __all__ = [
+    "CPP",
     "GO",
     "JAVA",
     "JAVASCRIPT",

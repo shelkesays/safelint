@@ -4,13 +4,13 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "safelint"
-version = "2.7.1"
-description = "Engineering safety lint rules and pre-commit integration for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP, and C codebases"
+version = "2.8.0rc1"
+description = "Engineering safety lint rules and pre-commit integration for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP, C, and C++ codebases"
 readme = "README.md"
 requires-python = ">=3.11"
 license = "MIT"
 license-files = ["LICENSE"]
-keywords = ["lint", "pre-commit", "static-analysis", "safety", "python", "javascript", "typescript", "java", "spring-boot", "rust", "go", "php", "c"]
+keywords = ["lint", "pre-commit", "static-analysis", "safety", "python", "javascript", "typescript", "java", "spring-boot", "rust", "go", "php", "c", "cpp", "c++"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -53,11 +53,12 @@ Issues = "https://github.com/shelkesays/safelint/issues"
 #     pip install 'safelint[go]'            # adds .go
 #     pip install 'safelint[php]'           # adds .php
 #     pip install 'safelint[c]'             # adds .c, .h
+#     pip install 'safelint[cpp]'           # adds .cpp, .cxx, .cc, .hpp, .hxx, .hh
 #     pip install 'safelint[all]'           # everything currently supported
 #
 # Multiple extras compose: ``pip install 'safelint[python,javascript]'``
-# for a Python+JS monorepo, etc. As more languages land (C++ next),
-# each gets its own extra and is folded into ``[all]``.
+# for a Python+JS monorepo, etc. As more languages land, each gets
+# its own extra and is folded into ``[all]``.
 python = [
     "tree-sitter-python>=0.23.0",
 ]
@@ -123,6 +124,9 @@ php = [
 c = [
     "tree-sitter-c>=0.23.0",
 ]
+cpp = [
+    "tree-sitter-cpp>=0.23.0",
+]
 # Convenience: every supported-language grammar in one install. Pin against
 # this when you want safelint to lint anything you throw at it without
 # thinking about per-language extras.
@@ -135,6 +139,7 @@ all = [
     "tree-sitter-go>=0.23.0",
     "tree-sitter-php>=0.23.0",
     "tree-sitter-c>=0.23.0",
+    "tree-sitter-cpp>=0.23.0",
 ]
 dev = [
     "pre-commit>=4.5.1",
