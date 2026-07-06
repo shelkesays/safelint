@@ -42,7 +42,7 @@ number, not the priority rank.
 
 | Priority | Spec # | File | Item | Status | Depends on |
 |---|---|---|---|---|---|
-| 1 (next) | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) -> **2.8.0** | not started - **read its section 0 first** (binding audit-derived requirements) | C shipped in v2.7.0 + gaps closed in 2.7.1 (satisfied): the regression guards and closed C baseline are in place |
+| 1 (in progress) | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) -> **2.8.0** | **in progress** on `feature/cpp-language-support` (2.8.0rc1); foundation landed - **read its section 0 first** | C shipped in v2.7.0 + gaps closed in 2.7.1 (satisfied): the regression guards and closed C baseline are in place |
 
 Update the Status column (and the per-spec status header) as work lands; remove
 a spec file once its language ships (as was done for Go, PHP, and C).
