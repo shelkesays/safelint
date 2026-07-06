@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
@@ -50,6 +51,7 @@ _WHILE_STATEMENT_BY_LANG: dict[str, str | None] = {
     "go": None,
     "php": "while_statement",
     "c": "while_statement",
+    "cpp": "while_statement",
 }
 
 # Per-language: unconditional-``loop`` construct, or None if the
@@ -73,6 +75,7 @@ _INFINITE_LOOP_STATEMENT_BY_LANG: dict[str, str | None] = {
     # C: ``for (;;)`` headerless infinite loop (same node type as a bounded
     # ``for``; the :func:`_is_c_infinite_for` guard checks for an absent condition).
     "c": "for_statement",
+    "cpp": "for_statement",
 }
 
 # Per-language: ``break`` statement node type. Python / JS / TS / Java /
@@ -86,6 +89,7 @@ _BREAK_STATEMENT_BY_LANG: dict[str, str] = {
     "go": "break_statement",
     "php": "break_statement",
     "c": "break_statement",
+    "cpp": "break_statement",
 }
 
 # Per-language: literal-``true`` condition node type. Python / JS / TS
@@ -107,6 +111,8 @@ _TRUE_LITERAL_BY_LANG: dict[str, str] = {
     # C ``while (1)`` is a ``number_literal``; ``while (true)`` (stdbool) an
     # identifier. ``_is_literal_true`` special-cases C to handle both.
     "c": "number_literal",
+    # C++: unused directly (``_is_c_literal_true`` handles both ``1`` and ``true``).
+    "cpp": "number_literal",
 }
 
 # Per-language: the node type used by a labelled-break's argument.
@@ -122,6 +128,7 @@ _BREAK_LABEL_TYPE_BY_LANG: dict[str, str | None] = {
     "rust": "label",
     "go": "label_name",
     "c": None,  # C has no labelled break
+    "cpp": None,  # C++ has no labelled break either
 }
 
 # Per-language: node types that bound a ``break`` statement's scope -
@@ -179,6 +186,9 @@ _C_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
     "switch_statement",
     "function_definition",
 )
+# C++ adds ``lambda_expression`` to C's boundary set: a ``break`` inside a
+# lambda body exits that lambda, not an enclosing loop.
+_CPP_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (*_C_BREAK_SCOPE_BOUNDARIES, "lambda_expression")
 _BREAK_SCOPE_BOUNDARIES_BY_LANG: dict[str, tuple[str, ...]] = {
     "python": (FOR_STATEMENT, WHILE_STATEMENT, FUNCTION_DEF, ASYNC_FUNCTION_DEF),
     "javascript": _JS_BREAK_SCOPE_BOUNDARIES,
@@ -187,6 +197,7 @@ _BREAK_SCOPE_BOUNDARIES_BY_LANG: dict[str, tuple[str, ...]] = {
     "rust": _RUST_BREAK_SCOPE_BOUNDARIES,
     "go": _GO_BREAK_SCOPE_BOUNDARIES,
     "c": _C_BREAK_SCOPE_BOUNDARIES,
+    "cpp": _CPP_BREAK_SCOPE_BOUNDARIES,
 }
 
 
@@ -225,6 +236,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
     "c": _C_FUNCTION_TYPES,
+    "cpp": _CPP_FUNCTION_TYPES,
 }
 
 # PHP loop / switch constructs that a ``break N`` counts as one "level".
@@ -248,6 +260,7 @@ _INFINITE_LOOP_MESSAGE_BY_LANG: dict[str, str] = {
     "go": "`for {}` loop has no break - potential infinite loop",
     "php": "`for (;;)` loop has no break - potential infinite loop",
     "c": "`for (;;)` loop has no break - potential infinite loop",
+    "cpp": "`for (;;)` loop has no break - potential infinite loop",
 }
 
 
@@ -515,8 +528,8 @@ def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
         # dedicated depth-counting walk replaces both the direct-break and
         # labelled-break paths.
         return _php_has_exiting_break(while_node)
-    if lang_name == "c":
-        # C has no labelled break; a ``goto`` leaving the loop is the multi-level
+    if lang_name in ("c", "cpp"):
+        # C / C++ have no labelled break; a ``goto`` leaving the loop is the multi-level
         # escape. ``_c_has_goto_exit`` counts a ``goto`` as an exit only when its
         # target label is defined outside the loop body - a ``goto`` to an in-loop
         # label is intra-loop control flow, not an exit, so a ``while (1)`` that
@@ -553,7 +566,7 @@ def _is_literal_true(condition: tree_sitter.Node, lang_name: str) -> bool:
     so the check additionally inspects the token text. C is special-cased
     (``1`` or ``true``) via :func:`_is_c_literal_true`.
     """
-    if lang_name == "c":
+    if lang_name in ("c", "cpp"):
         return _is_c_literal_true(condition)
     expected = _TRUE_LITERAL_BY_LANG[lang_name]
     if condition.type != expected:
@@ -587,7 +600,7 @@ class UnboundedLoopRule(BaseRule):
 
     name = "unbounded_loops"
     code = "SAFE501"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     @staticmethod
     def _while_true_construct(lang_name: str) -> str:
@@ -596,6 +609,8 @@ class UnboundedLoopRule(BaseRule):
             return "while (true)"
         if lang_name == "rust":
             return "while true"
+        if lang_name == "cpp":
+            return "while (true)"
         if lang_name == "c":
             return "while (1)"
         return "while True"
@@ -613,8 +628,10 @@ class UnboundedLoopRule(BaseRule):
         # parentheses can nest (``while ((true))``, ``while ((((x)))) ``),
         # so unwrap until we reach the underlying expression - otherwise
         # ``is_literal_true`` would be False on the outer wrapper and the
-        # ``while (true)`` check would silently skip.
-        while condition.type == "parenthesized_expression":
+        # ``while (true)`` check would silently skip. C++ wraps the condition
+        # in a ``condition_clause`` instead (it can hold a declaration), whose
+        # inner expression is likewise the first named child - unwrap it too.
+        while condition.type in ("parenthesized_expression", "condition_clause"):
             if not condition.named_children:
                 break
             condition = condition.named_children[0]
@@ -656,7 +673,7 @@ class UnboundedLoopRule(BaseRule):
             return None
         if lang_name == "php" and not _is_php_infinite_for(node):
             return None
-        if lang_name == "c" and not _is_c_infinite_for(node):
+        if lang_name in ("c", "cpp") and not _is_c_infinite_for(node):
             return None
         if _has_exiting_break(node, lang_name):
             return None
