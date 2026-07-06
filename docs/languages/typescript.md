@@ -111,12 +111,13 @@ repos:
         # TS users add the matching extra so pre-commit's isolated environment
         # installs ``tree-sitter-typescript`` (and the bundled JS grammar).
         additional_dependencies: ['safelint[typescript]']
-        # The published hook's ``types_or`` already includes python,
-        # javascript, ts, and tsx. Optional: scope to a directory.
+        # The published hook's ``types_or`` already includes every
+        # registered language's tags (ts and tsx among them). Optional:
+        # scope to a directory.
         files: ^src/
 ```
 
-**AssemblyScript (`.as`) users, additional override required.** Pre-commit's `identify` library has no `as` filetype tag, so the default `types_or: [python, javascript, ts, tsx]` won't match `.as` files. Override `types_or` with a permissive tag that `.as` files *actually* carry (`text` or `file`) and use `files` to scope the match. `types_or: []` does **not** work, pre-commit treats an empty tag list as "no tag matches" rather than "filter disabled", so the hook never fires.
+**AssemblyScript (`.as`) users, additional override required.** Pre-commit's `identify` library has no `as` filetype tag, so the default `types_or` list (which carries only real `identify` tags: `python, javascript, ts, tsx, java, rust, go, php, c`) won't match `.as` files. Override `types_or` with a permissive tag that `.as` files *actually* carry (`text` or `file`) and use `files` to scope the match. `types_or: []` does **not** work, pre-commit treats an empty tag list as "no tag matches" rather than "filter disabled", so the hook never fires.
 
 ```yaml
       - id: safelint

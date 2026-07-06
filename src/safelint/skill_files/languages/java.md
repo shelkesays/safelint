@@ -295,7 +295,7 @@ public CompletableFuture<Void> runJob() {
 safelint runs alongside the standard Java tool chain; it doesn't replace any of them. Typical wiring:
 
 * **Maven / Gradle**: keep using SpotBugs / PMD / Checkstyle for style and general defect detection. safelint covers a different, narrower set (Holzmann safety rules + Spring framework-specific patterns).
-* **Pre-commit**: drop into `.pre-commit-config.yaml` as shown in the install section above. Pre-commit handles file routing automatically via `types_or: [java]`.
+* **Pre-commit**: drop into `.pre-commit-config.yaml` as shown in the install section above. Pre-commit handles file routing automatically (the published hook's `types_or` includes `java`).
 * **CI**: invoke `safelint check src/main/java src/test/java --fail-on warning` (or `--mode ci`) in your build pipeline. Exit code 0 / 1 / 2 maps cleanly to "passed" / "violations found" / "setup error - install hint emitted on stderr".
 * **IDE**: any JSON-output-consuming editor plugin (the safelint JSON schema is stable in v2.0.0+) can surface violations inline.
 
