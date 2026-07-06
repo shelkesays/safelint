@@ -397,7 +397,7 @@ class GlobalMutationRule(BaseRule):
 
     name = "global_mutation"
     code = "SAFE302"
-    language = ("python", "javascript", "typescript", "java", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "go", "php", "c", "cpp")
 
     _DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT: ClassVar[list[str]] = [
         "globalThis",  # universal - works in browsers, Node, web workers
@@ -495,17 +495,44 @@ class GlobalMutationRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every write to a module-level state binding inside a function."""
         lang_name = resolve_lang_name(filepath)
-        if lang_name == "python":
-            return self._python_check(filepath, tree)
-        if lang_name == "java":
-            return self._java_check(filepath, tree)
-        if lang_name == "go":
-            return self._go_check(filepath, tree)
-        if lang_name == "php":
-            return self._php_check(filepath, tree)
-        if lang_name == "c":
-            return self._c_check(filepath, tree)
+        # Dedicated per-language checkers (declaration-site detection); every
+        # other language routes through the JS-family assignment-site checker.
+        dedicated = {
+            "python": self._python_check,
+            "java": self._java_check,
+            "go": self._go_check,
+            "php": self._php_check,
+            "c": self._c_check,
+            "cpp": self._cpp_check,
+        }.get(lang_name)
+        if dedicated is not None:
+            return dedicated(filepath, tree)
         return self._javascript_check(filepath, tree, lang_name)
+
+    def _cpp_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag file-scope and namespace-scope mutable variable declarations (C++'s shared state).
+
+        Extends the C shape by descending into ``namespace_definition`` bodies
+        (including anonymous namespaces): a variable declared directly in a
+        namespace is still translation-unit-scoped shared mutable state.
+        Declarations inside a ``class_specifier`` / ``struct_specifier`` are
+        members, not file-scope state, so those scopes are not walked. The
+        per-declaration exemptions (``const``, ``extern`` forward references,
+        function prototypes) are reused from ``_c_declaration_violations``. A
+        worklist keeps the traversal iterative (SAFE105 polices recursion).
+        """
+        violations: list[Violation] = []
+        scopes: list[tree_sitter.Node] = [tree.root_node]
+        while len(scopes) > 0:
+            scope = scopes.pop()
+            for node in scope.named_children:
+                if node.type == "declaration":
+                    violations.extend(self._c_declaration_violations(filepath, node))
+                elif node.type == "namespace_definition":
+                    body = node.child_by_field_name("body")
+                    if body is not None:
+                        scopes.append(body)
+        return violations
 
     def _c_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every file-scope mutable variable declaration (C's shared-mutable-state shape).

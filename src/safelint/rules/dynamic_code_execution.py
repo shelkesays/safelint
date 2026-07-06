@@ -75,6 +75,7 @@ _DEFAULT_CALLS_JAVA = ["forName", "invoke", "eval", "defineClass", "loadClass"]
 _DEFAULT_CALLS_GO = ["Call", "CallSlice", "MethodByName", "Open", "Lookup"]
 _DEFAULT_CALLS_PHP = ["eval", "assert", "create_function", "call_user_func", "call_user_func_array"]
 _DEFAULT_CALLS_C = ["dlopen", "dlsym"]
+_DEFAULT_CALLS_CPP = ["dlopen", "dlsym"]
 
 _DEFAULTS_BY_LANG: dict[str, list[str]] = {
     "python": _DEFAULT_CALLS_PYTHON,
@@ -84,6 +85,7 @@ _DEFAULTS_BY_LANG: dict[str, list[str]] = {
     "go": _DEFAULT_CALLS_GO,
     "php": _DEFAULT_CALLS_PHP,
     "c": _DEFAULT_CALLS_C,
+    "cpp": _DEFAULT_CALLS_CPP,
 }
 
 #: Call-expression node types to inspect per language. Python ``call``;
@@ -99,6 +101,7 @@ _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "go": frozenset({"call_expression"}),
     "php": frozenset({"function_call_expression"}),
     "c": frozenset({"call_expression"}),
+    "cpp": frozenset({"call_expression"}),
 }
 
 
@@ -193,6 +196,7 @@ _MATCHERS: dict[str, Callable[[tree_sitter.Node, frozenset[str]], str | None]] =
     "go": _go_match,
     "php": _php_match,
     "c": _c_match,
+    "cpp": _c_match,
 }
 
 
@@ -201,7 +205,7 @@ class DynamicCodeExecutionRule(BaseRule):
 
     name = "dynamic_code_execution"
     code = "SAFE309"
-    language = ("python", "javascript", "typescript", "java", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "go", "php", "c", "cpp")
 
     _BASE_KEY: ClassVar[str] = "dynamic_exec_calls"
 

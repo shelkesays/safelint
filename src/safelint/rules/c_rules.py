@@ -19,16 +19,27 @@ directly, slotted by category into the existing 1xx-3xx bands:
   more than one pointer level (``int **p``) and function-pointer declarators.
   Disabled by default.
 
-All read their configurable lists from ``_c``-suffixed config keys.
+All five widen to ``("c", "cpp")``: the C node types are a subset of
+tree-sitter-cpp, so the structural checks carry over unchanged. C++ adds two
+behaviours: SAFE310 also flags ``new`` / ``delete`` expressions, and SAFE313
+naturally exempts smart pointers (``std::unique_ptr<T>`` is a class template,
+not a ``pointer_declarator``, so it never triggers the raw-pointer check).
+Configurable lists read ``_c`` / ``_cpp``-suffixed config keys per language.
 """
 
 from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
-from safelint.core._validators import _validated_string_list
-from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
+from safelint.languages._node_utils import call_name, node_text, resolve_lang_name, walk
 from safelint.rules.base import BaseRule
+
+
+def _lang_call_list(config: dict, base_key: str, lang_name: str, default: list[str]) -> frozenset[str]:
+    """Resolve and validate a per-language call list (``<base>_c`` / ``<base>_cpp``)."""
+    raw, key = resolve_lang_config_lookup(config, base_key, lang_name, default=default)
+    return frozenset(_validated_string_list(raw, key))
 
 
 if TYPE_CHECKING:
@@ -47,13 +58,13 @@ class NonlocalJumpsRule(BaseRule):
 
     name = "nonlocal_jumps"
     code = "SAFE106"
-    language = ("c",)
+    language = ("c", "cpp")
 
     _DEFAULT_JUMP_CALLS: ClassVar[list[str]] = ["setjmp", "longjmp", "sigsetjmp", "siglongjmp"]
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every ``goto_statement`` and every configured non-local-jump call."""
-        jump_calls = frozenset(_validated_string_list(self.config.get("nonlocal_jump_calls_c", self._DEFAULT_JUMP_CALLS), "nonlocal_jump_calls_c"))
+        jump_calls = _lang_call_list(self.config, "nonlocal_jump_calls", resolve_lang_name(filepath), self._DEFAULT_JUMP_CALLS)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type == "goto_statement":
@@ -85,15 +96,26 @@ class DynamicAllocationRule(BaseRule):
 
     name = "dynamic_allocation"
     code = "SAFE310"
-    language = ("c",)
+    language = ("c", "cpp")
 
     _DEFAULT_ALLOCATION_CALLS: ClassVar[list[str]] = ["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup"]
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Flag every configured heap-allocation / free call."""
-        allocation_calls = frozenset(_validated_string_list(self.config.get("allocation_calls_c", self._DEFAULT_ALLOCATION_CALLS), "allocation_calls_c"))
+        """Flag every configured heap-allocation / free call, plus C++ ``new`` / ``delete``."""
+        allocation_calls = _lang_call_list(self.config, "allocation_calls", resolve_lang_name(filepath), self._DEFAULT_ALLOCATION_CALLS)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
+            # C++ ``new`` / ``delete`` are dedicated expression nodes, not calls.
+            if node.type in ("new_expression", "delete_expression"):
+                keyword = "new" if node.type == "new_expression" else "delete"
+                violations.append(
+                    self._make_violation_for_node(
+                        filepath,
+                        node,
+                        f"`{keyword}` performs dynamic heap allocation - prefer static / stack allocation or a scoped owner after initialisation (Power of Ten rule 3)",
+                    )
+                )
+                continue
             if node.type != "call_expression":
                 continue
             name = call_name(node)
@@ -179,7 +201,7 @@ class ComplexMacroRule(BaseRule):
 
     name = "complex_macro"
     code = "SAFE311"
-    language = ("c",)
+    language = ("c", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag complex preprocessor macros (token paste, variadic, or non-balanced replacement)."""
@@ -263,7 +285,7 @@ class ConditionalCompilationRule(BaseRule):
 
     name = "conditional_compilation"
     code = "SAFE312"
-    language = ("c",)
+    language = ("c", "cpp")
 
     _MESSAGE: ClassVar[str] = "Conditional compilation directive - each `#if` / `#ifdef` doubles the build configurations to test (Power of Ten rule 8); prefer runtime configuration"
 
@@ -294,7 +316,7 @@ class RestrictedPointersRule(BaseRule):
 
     name = "restricted_pointers"
     code = "SAFE313"
-    language = ("c",)
+    language = ("c", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag declarators with more than one pointer level, and function-pointer declarators."""

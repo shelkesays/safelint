@@ -219,6 +219,7 @@ DEFAULTS: dict[str, Any] = {
             # resolves a symbol from it). Narrow by design; extend if a project
             # uses other loader shims.
             "dynamic_exec_calls_c": ["dlopen", "dlsym"],
+            "dynamic_exec_calls_cpp": ["dlopen", "dlsym"],
         },
         "side_effects_hidden": {
             "enabled": True,
@@ -397,6 +398,27 @@ DEFAULTS: dict[str, Any] = {
                 "send",
                 "system",
             ],
+            # C++ reuses the C I/O-primitive list (printf-family / stdio / POSIX
+            # byte I/O / sockets / system). ``std::cout`` / ``std::cerr`` stream
+            # I/O uses ``<<`` operators rather than named calls, so it is not
+            # call-name-matchable here; SAFE203 covers the ``cerr`` logging case.
+            "io_functions_cpp": [
+                "printf",
+                "fprintf",
+                "puts",
+                "putchar",
+                "fopen",
+                "fread",
+                "fwrite",
+                "fgets",
+                "scanf",
+                "getchar",
+                "read",
+                "write",
+                "recv",
+                "send",
+                "system",
+            ],
             "pure_prefixes": [
                 "calculate",
                 "compute",
@@ -530,6 +552,27 @@ DEFAULTS: dict[str, Any] = {
             # ``io_functions_c`` above (the C primitives are unambiguous
             # libc/POSIX functions).
             "io_functions_c": [
+                "printf",
+                "fprintf",
+                "puts",
+                "putchar",
+                "fopen",
+                "fread",
+                "fwrite",
+                "fgets",
+                "scanf",
+                "getchar",
+                "read",
+                "write",
+                "recv",
+                "send",
+                "system",
+            ],
+            # C++ reuses the C I/O-primitive list (printf-family / stdio / POSIX
+            # byte I/O / sockets / system). ``std::cout`` / ``std::cerr`` stream
+            # I/O uses ``<<`` operators rather than named calls, so it is not
+            # call-name-matchable here; SAFE203 covers the ``cerr`` logging case.
+            "io_functions_cpp": [
                 "printf",
                 "fprintf",
                 "puts",
@@ -1580,15 +1623,21 @@ DEFAULTS: dict[str, Any] = {
         "nonlocal_jumps": {
             "enabled": True,
             "severity": "warning",
-            # Call names treated as non-local jumps alongside ``goto``.
+            # Call names treated as non-local jumps alongside ``goto`` (``goto``
+            # itself is structural, not list-driven). C and C++ share the same
+            # setjmp family; each has its own key so a project can diverge them.
             "nonlocal_jump_calls_c": ["setjmp", "longjmp", "sigsetjmp", "siglongjmp"],
+            "nonlocal_jump_calls_cpp": ["setjmp", "longjmp", "sigsetjmp", "siglongjmp"],
         },
         "dynamic_allocation": {
             "enabled": False,
             "severity": "warning",
             # Heap allocation / free calls. ``malloc`` family plus ``strdup``;
-            # add project allocators (``xmalloc`` / arena helpers) as needed.
+            # add project allocators (``xmalloc`` / arena helpers) as needed. On
+            # C++, ``new`` / ``delete`` are flagged structurally (not via this
+            # list) alongside the configured calls.
             "allocation_calls_c": ["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup"],
+            "allocation_calls_cpp": ["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup"],
         },
         "complex_macro": {"enabled": False, "severity": "warning"},
         "conditional_compilation": {"enabled": False, "severity": "warning"},

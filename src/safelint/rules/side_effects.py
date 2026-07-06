@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
@@ -31,6 +32,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
     "c": _C_FUNCTION_TYPES,
+    "cpp": _CPP_FUNCTION_TYPES,
 }
 
 
@@ -152,7 +154,7 @@ class SideEffectsHiddenRule(BaseRule):
 
     name = "side_effects_hidden"
     code = "SAFE303"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
@@ -189,7 +191,7 @@ class SideEffectsRule(BaseRule):
 
     name = "side_effects"
     code = "SAFE304"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""

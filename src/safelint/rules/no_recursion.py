@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
@@ -64,6 +65,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
     "c": _C_FUNCTION_TYPES,
+    "cpp": _CPP_FUNCTION_TYPES,
 }
 
 #: The call-expression node type(s) per language. Most languages have a
@@ -84,6 +86,7 @@ _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "go": frozenset({"call_expression"}),
     "php": frozenset({"function_call_expression", "member_call_expression", "nullsafe_member_call_expression", "scoped_call_expression"}),
     "c": frozenset({"call_expression"}),
+    "cpp": frozenset({"call_expression"}),
 }
 
 #: Identifiers that name "the current object" per language. A call
@@ -94,6 +97,7 @@ _SELF_RECEIVERS: dict[str, frozenset[str]] = {
     "javascript": frozenset({"this"}),
     "typescript": frozenset({"this"}),
     "rust": frozenset({"self"}),
+    "cpp": frozenset({"this"}),
 }
 
 #: Member-access node shape per language: ``(node_type, object_field,
@@ -105,6 +109,8 @@ _MEMBER_ACCESS: dict[str, tuple[str, str, str]] = {
     "javascript": ("member_expression", "object", "property"),
     "typescript": ("member_expression", "object", "property"),
     "rust": ("field_expression", "value", "field"),
+    # C++ ``this->m()``: field_expression with ``argument`` = this, ``field`` = m.
+    "cpp": ("field_expression", "argument", "field"),
 }
 
 
@@ -288,7 +294,7 @@ class NoRecursionRule(BaseRule):
 
     name = "no_recursion"
     code = "SAFE105"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every function whose body directly calls itself."""

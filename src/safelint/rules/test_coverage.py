@@ -95,6 +95,7 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
         "go": [f"{stem}_test.go"],
         "php": [f"{stem}Test.php"],
         "c": [f"{stem}_test.c", f"test_{stem}.c"],
+        "cpp": [f"{stem}_test.cpp", f"test_{stem}.cpp"],
     }
     # Python (and any future language without an explicit override).
     return candidates_by_lang.get(lang_name, [f"test_{stem}.py"])
@@ -122,6 +123,7 @@ def _test_filename_for_message(src_path: Path, lang_name: str) -> str:
         "go": f"{stem}_test.go",
         "php": f"{stem}Test.php",
         "c": f"{stem}_test.c",
+        "cpp": f"{stem}_test.cpp",
     }
     return message_name_by_lang.get(lang_name, f"test_{stem}.py")
 
@@ -229,8 +231,8 @@ def _filename_matches_test_pattern(filepath: str, lang_name: str) -> bool:
     if lang_name == "php":
         # PHPUnit's ``<ClassName>Test.php`` (StudlyCaps suffix).
         return Path(filepath).stem.endswith("Test")
-    if lang_name == "c":
-        # Unity / Check / CMocka use both ``<stem>_test.c`` and ``test_<stem>.c``;
+    if lang_name in ("c", "cpp"):
+        # C: Unity / Check / CMocka; C++: GoogleTest / Catch2 - both use ``<stem>_test.c`` and ``test_<stem>.c``;
         # recognise either so a canonical C test is not treated as production code.
         stem = Path(filepath).stem
         return stem.endswith("_test") or stem.startswith("test_")
@@ -333,7 +335,7 @@ class TestExistenceRule(BaseRule):
 
     name = "test_existence"
     code = "SAFE701"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when no matching test file can be found.
@@ -379,7 +381,7 @@ class TestCouplingRule(BaseRule):
 
     name = "test_coupling"
     code = "SAFE702"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when the paired test file was not part of this commit."""
