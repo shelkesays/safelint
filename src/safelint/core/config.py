@@ -1184,6 +1184,35 @@ DEFAULTS: dict[str, Any] = {
                 "validate",
                 "escape",
             ],
+            # C++ reuses C's command-execution / unbounded-copy sink set
+            # (tree-sitter-cpp is a superset of tree-sitter-c, so the same
+            # libc / POSIX call names apply). ``std::system`` resolves to
+            # ``system`` via ``call_name``'s qualified-identifier handling.
+            "sinks_cpp": [
+                "system",
+                "popen",
+                "execl",
+                "execlp",
+                "execv",
+                "execvp",
+                "sprintf",
+                "strcpy",
+                "strcat",
+                "gets",
+                "memcpy",
+            ],
+            # C++ sources mirror C's return-value input readers.
+            "sources_cpp": [
+                "getenv",
+                "fgets",
+                "gets",
+            ],
+            # C++ sanitizers mirror C's narrow generic set.
+            "sanitizers_cpp": [
+                "sanitize",
+                "validate",
+                "escape",
+            ],
         },
         "return_value_ignored": {
             "enabled": False,
@@ -1369,6 +1398,18 @@ DEFAULTS: dict[str, Any] = {
             # cast wraps the call so it is no longer a bare expression-statement
             # call and does NOT fire.
             "flagged_calls_c": [
+                "fclose",
+                "fwrite",
+                "fread",
+                "remove",
+                "rename",
+                "fflush",
+                "setvbuf",
+                "snprintf",
+            ],
+            # C++ mirrors C's status-returning libc calls whose result is
+            # discarded when used as a bare statement.
+            "flagged_calls_cpp": [
                 "fclose",
                 "fwrite",
                 "fread",
