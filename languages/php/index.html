@@ -2502,7 +2502,7 @@
 <h2 id="suppression-directives">Suppression directives<a class="headerlink" href="#suppression-directives" title="Permanent link">#</a></h2>
 <p>PHP supports <strong>line-comment directives only</strong> (<code>//</code>): <code>// nosafe</code>, <code>// nosafe: SAFE501</code>, <code>// safelint: ignore: SAFE101</code>. The <code>#</code> shell-style and <code>/* */</code> block-comment forms are a <strong>documented non-feature</strong> for directives: a <code># nosafe</code> or <code>/* nosafe */</code> is parsed as ordinary text and does not suppress anything. Use the <code>//</code> form.</p>
 <h2 id="rules-that-fire-on-php">Rules that fire on PHP<a class="headerlink" href="#rules-that-fire-on-php" title="Permanent link">#</a></h2>
-<p><strong>21 rules apply to PHP.</strong> PHP is in scope for 13 cross-language rules (the all-seven-languages set), plus a set of rules shared with most other languages, plus the try/catch rules and SAFE301. 2 cross-language rules are deliberately skipped, see the next section. Like the other languages' optional rules, every dataflow rule and several state / suppression rules are disabled by default.</p>
+<p><strong>21 rules apply to PHP.</strong> PHP is in scope for 13 cross-language rules (the all-language core), plus a set of rules shared with most other languages, plus the try/catch rules and SAFE301. 2 rules are deliberately skipped, see the next section. Like the other languages' optional rules, every dataflow rule and several state / suppression rules are disabled by default.</p>
 <h3 id="cross-language-rules">Cross-language rules<a class="headerlink" href="#cross-language-rules" title="Permanent link">#</a></h3>
 <table>
 <thead>

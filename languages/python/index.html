@@ -2532,7 +2532,7 @@
 <a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="c1"># Optional: scope to a directory</span>
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span>
 </code></pre></div>
-<p>The published hook spec sets <code>types_or: [python, javascript, ts, tsx]</code> and no <code>files:</code> filter, add your own <code>files:</code> / <code>exclude:</code> keys to scope it. Mixed-language projects compose extras: <code>additional_dependencies: ['safelint[python,javascript]']</code> (or <code>[all]</code>).</p>
+<p>The published hook spec sets <code>types_or: [python, javascript, ts, tsx, java, rust, go, php, c]</code> and no <code>files:</code> filter, add your own <code>files:</code> / <code>exclude:</code> keys to scope it. Mixed-language projects compose extras: <code>additional_dependencies: ['safelint[python,javascript]']</code> (or <code>[all]</code>).</p>
 <h2 id="python-specific-config-keys">Python-specific config keys<a class="headerlink" href="#python-specific-config-keys" title="Permanent link">#</a></h2>
 <p>Most rule options work uniformly across languages, but a few are Python-only:</p>
 <ul>

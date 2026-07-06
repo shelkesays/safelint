@@ -2247,7 +2247,7 @@
 <td><code>src/safelint/_skill_install.py</code> (one <code>ClientSpec</code> append), <code>src/safelint/skill_files/&lt;client&gt;/</code>, <code>tests/test_skill_install.py</code>, <code>docs/ai-clients/</code>, <code>src/safelint/skill_files/README.md</code>, <code>CHANGELOG.md</code></td>
 </tr>
 <tr>
-<td>A new <strong>language</strong> safelint can lint (e.g. C, C++, PHP)</td>
+<td>A new <strong>language</strong> safelint can lint (e.g. C++, Kotlin, Ruby)</td>
 <td><a href="https://shelkesays.github.io/safelint/contributing/adding-a-language/">Adding a language</a>, full walkthrough</td>
 <td><code>src/safelint/languages/&lt;lang&gt;.py</code>, the Tree-sitter grammar dependency in <code>pyproject.toml</code>, per-rule audit, <code>tests/</code>, <code>docs/configuration/</code>, every bundled AI-client doc</td>
 </tr>
@@ -2281,7 +2281,7 @@
 <p>The security guards (symlink refusal at the secondary destination, <code>skill remove --path PATH</code> install-shape validation, etc.) live in <code>_skill_install.py</code> and apply to your client automatically, no per-client implementation needed.</p>
 <hr />
 <h2 id="adding-a-new-language">Adding a new language<a class="headerlink" href="#adding-a-new-language" title="Permanent link">#</a></h2>
-<p>Seven languages are registered today (Python, JavaScript, TypeScript, Java, Rust, Go, PHP). Adding a new one (C, C++, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in <a href="https://shelkesays.github.io/safelint/contributing/adding-a-language/">Adding a language</a> - note its "scattered enumerations" step (the docs that list every language's extension / grammar / <code>--language</code> value outside the headline tables), which is the easiest part to miss.</p>
+<p>Eight languages are registered today (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C). Adding a new one (C++, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in <a href="https://shelkesays.github.io/safelint/contributing/adding-a-language/">Adding a language</a> - note its "scattered enumerations" step (the docs that list every language's extension / grammar / <code>--language</code> value outside the headline tables), which is the easiest part to miss.</p>
 <hr />
 <h2 id="ground-rules">Ground rules<a class="headerlink" href="#ground-rules" title="Permanent link">#</a></h2>
 <ul>

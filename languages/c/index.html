@@ -2683,6 +2683,7 @@
 <li><code>(void)f()</code> (the explicit-discard cast) wraps the call in a <code>cast_expression</code>, so SAFE802 does not fire on it.</li>
 <li><code>argv</code> enters taint analysis via function-parameter seeding; <code>argv[1]</code> keeps the taint.</li>
 <li>SAFE313 fires on <code>char **argv</code> (a two-level pointer) - intentional for the strict, opt-in rule.</li>
+<li>SAFE313 is a syntactic declarator check: a pointer level hidden behind a <code>typedef</code> (<code>typedef int *intp; intp *pp;</code>) or a macro is not counted - the paper's no-hidden-dereference clause needs type resolution and is a documented gap.</li>
 </ul>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
 <p>Every C-specific config key is set in either form. <code>[tool.safelint.rules.&lt;name&gt;]</code> for <code>pyproject.toml</code>, <code>[rules.&lt;name&gt;]</code> for standalone <code>safelint.toml</code>.</p>
