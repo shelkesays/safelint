@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
+from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
@@ -31,6 +32,7 @@ _CATCH_CLAUSE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": frozenset({"catch_clause"}),
     "java": frozenset({"catch_clause"}),
     "php": frozenset({"catch_clause"}),
+    "cpp": frozenset({"catch_clause"}),
 }
 
 # Per-language: function-defining node types (used to skip nested
@@ -43,6 +45,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _JS_FUNCTION_TYPES,
     "java": _JAVA_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
+    "cpp": _CPP_FUNCTION_TYPES,
 }
 
 # Per-language: re-raise statement types. ``except: raise`` (Python),
@@ -54,6 +57,8 @@ _RERAISE_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "javascript": frozenset({"throw_statement"}),
     "typescript": frozenset({"throw_statement"}),
     "java": frozenset({"throw_statement"}),
+    # C++ ``throw;`` (bare rethrow) / ``throw e;`` both re-raise.
+    "cpp": frozenset({"throw_statement"}),
 }
 
 # Statement-only no-op nodes: their presence means "developer wrote something
@@ -83,6 +88,10 @@ _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # such as ``catch (\E $e) { /* todo */ }`` matches the empty-handler
     # intent.
     "php": frozenset({"empty_statement", "comment"}),
+    # C++: bare ``;`` is ``empty_statement``; tree-sitter-cpp emits ``//`` and
+    # ``/* */`` as a single ``comment`` node that is a *named* child of the
+    # catch body (like Java / PHP), so a comment-only body matches.
+    "cpp": frozenset({"empty_statement", "comment"}),
 }
 
 # Per-language: literal expression node types that count as "comment-like"
@@ -137,6 +146,11 @@ _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # ``_php_string_is_literal`` so interpolating double-quoted strings are
     # not treated as no-op markers.
     "php": frozenset({"integer", "float", "boolean", "null"}),
+    # C++: ``number_literal`` covers int / float; ``true`` / ``false`` are
+    # dedicated nodes; ``nullptr`` / ``null`` and ``char_literal`` round out
+    # the single-literal no-op markers. String literals are delegated to
+    # ``_cpp_string_is_literal``.
+    "cpp": frozenset({"number_literal", "true", "false", "null", "nullptr", "char_literal"}),
 }
 
 
@@ -174,7 +188,7 @@ def _is_noop_body(body_node: tree_sitter.Node | None, lang_name: str) -> bool:
     # Java and PHP both emit comments as named block children, so a
     # comment-only body has several no-op children; accept when *every*
     # statement is a no-op (covers the multi-comment case).
-    if lang_name in ("java", "php"):
+    if lang_name in ("java", "php", "cpp"):
         return all(_stmt_is_noop(child, lang_name) for child in children)
     if len(children) != 1:
         return False
@@ -219,6 +233,16 @@ def _java_string_is_literal(node: tree_sitter.Node) -> bool:
     return node.type == "string_literal" and not node.named_children and bool(node_text(node))
 
 
+def _cpp_string_is_literal(node: tree_sitter.Node) -> bool:
+    """Return True for a plain C++ string literal used as a no-op ``// TODO`` marker.
+
+    C++ has no string interpolation (pre-C++26), so any ``string_literal`` /
+    ``concatenated_string`` (adjacent literals) / ``raw_string_literal`` with
+    text is a plain literal.
+    """
+    return node.type in ("string_literal", "concatenated_string", "raw_string_literal") and bool(node_text(node))
+
+
 def _php_string_is_literal(node: tree_sitter.Node) -> bool:
     """Return True for a PHP plain string literal with no interpolation.
 
@@ -241,6 +265,7 @@ _STRING_LITERAL_PREDICATES: dict[str, Callable[[tree_sitter.Node], bool]] = {
     "typescript": _js_string_is_literal,
     "java": _java_string_is_literal,
     "php": _php_string_is_literal,
+    "cpp": _cpp_string_is_literal,
 }
 
 
@@ -298,6 +323,93 @@ def _java_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
     return node_text(name_node)
 
 
+def _cpp_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
+    """Return the C++ ``catch (const E& e)`` binding (``e``), or None for ``catch (...)`` / unnamed.
+
+    The parameter lives on the ``parameters`` field (a ``parameter_list``) as a
+    single ``parameter_declaration``. The binding name is the sole ``identifier``
+    inside that declaration's ``declarator`` subtree - the exception *type*
+    (``const std::exception``) sits on the separate ``type`` field, so no type
+    identifier leaks in. A ``reference_declarator`` (``E& e``) nests its name as
+    a plain child rather than on a ``declarator`` field, so a subtree walk (not a
+    field-chain unwrap) is used; the walk is iterative (SAFE105 polices
+    recursion). ``catch (const E&)`` (no binding) and ``catch (...)`` return None.
+    """
+    params = catch_node.child_by_field_name("parameters")
+    if params is None:
+        return None
+    decl = next((c for c in params.named_children if c.type == "parameter_declaration"), None)
+    if decl is None:
+        return None
+    declarator = decl.child_by_field_name("declarator")
+    if declarator is None:
+        return None
+    return next((node_text(node) for node in walk(declarator) if node.type == "identifier"), None)
+
+
+def _cpp_is_catch_all(catch_node: tree_sitter.Node) -> bool:
+    """Return True for a C++ ``catch (...)`` catch-all (the bare-except analogue).
+
+    The ellipsis handler catches every exception - including ones the code has
+    no way to inspect or re-raise meaningfully - the same way Python's bare
+    ``except:`` swallows ``SystemExit`` / ``KeyboardInterrupt``. It is
+    distinguished from a typed ``catch (const E& e)`` by the absence of a
+    ``parameter_declaration`` in its ``parameter_list`` (the ``...`` is an
+    anonymous token, not a named child).
+    """
+    params = catch_node.child_by_field_name("parameters")
+    if params is None:  # pragma: no cover - valid source always has a parameter list
+        return False
+    return not any(c.type == "parameter_declaration" for c in params.named_children)
+
+
+#: C++ standard error / log streams whose ``<<`` insertion counts as a logging
+#: call for SAFE203 (``std::cerr`` / ``std::clog`` / ``std::cout`` and their
+#: unqualified ``using``-imported forms). Stream insertion is a ``<<`` binary
+#: expression, not a call, so the generic ``call_name`` scan cannot see it.
+_CPP_LOG_STREAMS = frozenset({"cerr", "clog", "cout"})
+
+
+def _cpp_stream_target_name(operand: tree_sitter.Node) -> str | None:
+    """Return the stream name of a ``<<`` chain's leftmost operand, or None.
+
+    ``std::cerr`` parses as a ``qualified_identifier`` (trailing ``name`` field);
+    an unqualified ``cerr`` (via ``using std::cerr``) is a bare ``identifier``.
+    """
+    if operand.type == "identifier":
+        return node_text(operand)
+    if operand.type == "qualified_identifier":
+        name = operand.child_by_field_name("name")
+        return node_text(name) if name is not None and name.type == "identifier" else None
+    return None
+
+
+def _cpp_body_has_stream_log(body: tree_sitter.Node, function_types: frozenset[str]) -> bool:
+    r"""Return True if *body* contains a ``std::cerr << ...`` style stream-log expression.
+
+    Scans every ``<<`` binary expression (pruning nested function / lambda
+    bodies) and resolves the leftmost operand of the insertion chain: for
+    ``std::cerr << e.what() << "\\n"`` the chain nests left, so the deepest
+    left operand is ``std::cerr``. If that operand names a known log stream,
+    the handler is treated as logging the caught error. The leftmost descent
+    is a bounded loop (never recursion - SAFE105).
+    """
+    for node in walk(body, skip_types=tuple(function_types)):
+        if node.type != "binary_expression":
+            continue
+        operator = node.child_by_field_name("operator")
+        if operator is None or node_text(operator) != "<<":
+            continue
+        operand: tree_sitter.Node | None = node
+        for _ in range(64):
+            if operand is None or operand.type != "binary_expression":
+                break
+            operand = operand.child_by_field_name("left")
+        if operand is not None and _cpp_stream_target_name(operand) in _CPP_LOG_STREAMS:
+            return True
+    return False
+
+
 def _caught_binding_name(catch_node: tree_sitter.Node, lang_name: str) -> str | None:
     """Return the variable name bound by the catch clause, or None if there isn't one.
 
@@ -317,6 +429,7 @@ _CAUGHT_BINDING_EXTRACTORS: dict[str, Callable[[tree_sitter.Node], str | None]] 
     "typescript": _js_caught_binding_name,
     "php": _php_caught_binding_name,
     "java": _java_caught_binding_name,
+    "cpp": _cpp_caught_binding_name,
 }
 
 
@@ -429,19 +542,36 @@ def _bare_except_suggestion(except_node: tree_sitter.Node) -> Suggestion | None:
 
 
 class BareExceptRule(BaseRule):
-    """Reject bare ``except:`` clauses that silently catch SystemExit and KeyboardInterrupt.
+    """Reject catch-all handlers that silently swallow every exception.
 
-    Python-only: JavaScript ``try/catch`` always binds the caught error
-    (or uses the optional-binding form ``catch {}`` which has different
-    semantics - no risk of accidentally catching a process-level signal
-    the way Python's bare ``except:`` does).
+    Python ``except:`` catches ``SystemExit`` / ``KeyboardInterrupt`` and
+    C++ ``catch (...)`` catches every thrown value with no binding to
+    inspect or re-raise meaningfully - both hide the failure the same way.
+    JavaScript / Java ``try/catch`` always binds the caught error (or uses
+    JS's optional-binding ``catch {}``), so there is no equivalent
+    unspecified-type form to flag there.
     """
 
     name = "bare_except"
     code = "SAFE201"
+    language = ("python", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Flag every except handler with no exception type specified."""
+        """Flag every catch-all handler with no exception type specified."""
+        if resolve_lang_name(filepath) == "cpp":
+            return self._cpp_check(filepath, tree)
+        return self._python_check(filepath, tree)
+
+    def _cpp_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag every C++ ``catch (...)`` catch-all clause."""
+        return [
+            self._make_violation_for_node(filepath, clause, "Catch-all `catch (...)` - catch a specific exception type instead")
+            for clause in _iter_catch_clauses(tree, "cpp")
+            if _cpp_is_catch_all(clause)
+        ]
+
+    def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag every Python bare ``except:`` clause with no exception type specified."""
         violations: list[Violation] = []
         for clause in _iter_catch_clauses(tree, "python"):
             if _has_typed_exception(clause):
@@ -469,7 +599,7 @@ class EmptyExceptRule(BaseRule):
 
     name = "empty_except"
     code = "SAFE202"
-    language = ("python", "javascript", "typescript", "java", "php")
+    language = ("python", "javascript", "typescript", "java", "php", "cpp")
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every catch handler whose body is effectively empty."""
@@ -477,7 +607,7 @@ class EmptyExceptRule(BaseRule):
         # Match the violation message to the source language's terminology -
         # JavaScript / Java / PHP developers don't write ``except`` blocks.
         # Same message-selection pattern as ``LoggingOnErrorRule``.
-        block_word = "catch" if lang_name in ("javascript", "typescript", "java", "php") else "except"
+        block_word = "catch" if lang_name in ("javascript", "typescript", "java", "php", "cpp") else "except"
         message = f"Empty {block_word} block - add error handling or a logging call"
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if _is_noop_body(_catch_body(clause), lang_name)]
 
@@ -492,7 +622,7 @@ class LoggingOnErrorRule(BaseRule):
 
     name = "logging_on_error"
     code = "SAFE203"
-    language = ("python", "javascript", "typescript", "java", "php")
+    language = ("python", "javascript", "typescript", "java", "php", "cpp")
 
     # Union of method names treated as "logging" across registered
     # languages. Python stdlib ``logging`` exposes ``debug`` / ``info`` /
@@ -574,23 +704,32 @@ class LoggingOnErrorRule(BaseRule):
         reraise_types = _RERAISE_STATEMENT_TYPES_BY_LANG[lang_name]
         if len(stmts) != 1 or stmts[0].type not in reraise_types:
             return False
-        if lang_name == "python":
-            # Bare ``raise`` has no children.
-            return not stmts[0].named_children
+        if lang_name in ("python", "cpp"):
+            # Bare ``raise`` (Python) / ``throw;`` (C++) rethrows the active
+            # exception and has no children. A C++ ``throw e;`` with an operand
+            # falls through to the caught-binding check below.
+            if not stmts[0].named_children:
+                return True
+            if lang_name == "python":
+                return False
         return _throw_reraises_caught_binding(stmts[0], except_node, lang_name)
 
-    def _has_log_call(self, except_node: tree_sitter.Node, function_types: frozenset[str]) -> bool:
+    def _has_log_call(self, except_node: tree_sitter.Node, function_types: frozenset[str], lang_name: str) -> bool:
         """Return True when the handler body contains at least one logging call.
 
         Walks only the body block (skipping the exception-type spec) and
         prunes nested function bodies so a logging call inside an inner
         function definition - which the catch handler never actually
-        executes - does not count as logging the caught error.
+        executes - does not count as logging the caught error. For C++, a
+        ``std::cerr << ...`` stream insertion also counts (it is a ``<<``
+        binary expression, not a call, so ``call_name`` alone cannot see it).
         """
         body = _catch_body(except_node)
         if body is None:  # pragma: no cover
             return False
-        return any(call_name(node) in self._LOG_METHODS for node in walk(body, skip_types=tuple(function_types)) if node.type in CALL_TYPES)
+        if any(call_name(node) in self._LOG_METHODS for node in walk(body, skip_types=tuple(function_types)) if node.type in CALL_TYPES):
+            return True
+        return lang_name == "cpp" and _cpp_body_has_stream_log(body, function_types)
 
     def _is_unlogged(self, except_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str]) -> bool:
         """Return True when this catch clause swallows an error without logging."""
@@ -600,7 +739,7 @@ class LoggingOnErrorRule(BaseRule):
         # the same defensive case as elsewhere.
         if body_node is None or not body_node.named_children:  # pragma: no branch
             return False
-        return not self._only_reraises(except_node, lang_name) and not self._has_log_call(except_node, function_types)
+        return not self._only_reraises(except_node, lang_name) and not self._has_log_call(except_node, function_types, lang_name)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag catch blocks that handle an error without any logging call."""
@@ -615,7 +754,7 @@ class LoggingOnErrorRule(BaseRule):
         # immediately visible).
         message = (
             "Catch block missing logging call - errors must be logged before being swallowed"
-            if lang_name in ("javascript", "typescript", "java", "php")
+            if lang_name in ("javascript", "typescript", "java", "php", "cpp")
             else "Except block missing logging call - errors must be logged before being swallowed"
         )
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if self._is_unlogged(clause, lang_name, function_types)]
