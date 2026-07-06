@@ -171,9 +171,7 @@ def _generate_rules_index(repo_root: Path) -> str:
         severity = defaults.get("severity", "-")
         enabled = "yes" if defaults.get("enabled", False) else "no"
         anchor = _slugify_heading(code, name)
-        lines.append(
-            f"| [`{code}`](#{anchor}) | `{name}` | {severity} | {enabled} |"
-        )
+        lines.append(f"| [`{code}`](#{anchor}) | `{name}` | {severity} | {enabled} |")
     lines.append("")
     return "\n".join(lines)
 
