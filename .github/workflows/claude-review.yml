@@ -1,0 +1,76 @@
+name: Claude PR Review
+
+# Opt-in, owner-controlled review: this workflow runs ONLY when the
+# `claude-review` label is added to a PR. No label, no run, no tokens.
+# To re-review after pushing fixes, remove and re-add the label.
+# The API key bills the metered Anthropic API (separate from any Claude
+# subscription), which is why invocation is deliberately manual.
+on:
+  pull_request:
+    types: [labeled]
+
+# One review per PR at a time; a re-label while a review is running
+# cancels the stale run instead of paying for two.
+concurrency:
+  group: claude-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  claude-review:
+    if: github.event.label.name == 'claude-review' && !github.event.pull_request.draft
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: write # post inline review comments
+      id-token: write # required by claude-code-action
+    steps:
+      - name: Checkout code
+        # TODO(H9, plan/security-hardening.md): pin actions by commit SHA.
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - name: Claude Code review
+        uses: anthropics/claude-code-action@v1
+        with:
+          anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
+          prompt: |
+            REPO: ${{ github.repository }}
+            PR NUMBER: ${{ github.event.pull_request.number }}
+
+            You are reviewing a pull request for safelint, a Tree-sitter based
+            static analysis tool implementing Holzmann's Power of Ten rules
+            across multiple languages. Start from `gh pr diff`.
+
+            Review ONLY for these classes of issue, in priority order:
+            1. Logic / correctness bugs in the changed code.
+            2. Security holes (path traversal, symlink races, code execution,
+               injection; the threat model is in SECURITY.md).
+            3. Engineering problems: broken invariants, unbounded recursion or
+               iteration (the analysis modules must use iterative worklists),
+               missed edge cases, fragile design.
+            4. Hidden side effects: I/O, state mutation, or behaviour changes
+               not implied by the diff's stated purpose.
+            5. Cross-artifact parity for language/rule changes: a rule or
+               language change must stay consistent across the rule
+               implementation (src/safelint/rules/), rule registration
+               (rules/__init__.py, core/config.py DEFAULTS), the SAFE-code
+               tables in docs/configuration/rules.md, the per-language pages
+               in docs/languages/, the bundled client docs in
+               src/safelint/skill_files/, and count/enumeration lines in
+               README.md / SECURITY.md / CONTRIBUTING.md. For parity checks
+               you may read those files beyond the diff; stay targeted.
+
+            Do NOT comment on formatting, style, naming, import order, or
+            anything ruff, ty, or safelint's self-lint already enforce -
+            deterministic CI covers all of that.
+
+            Report at most 5 findings, highest severity first; skip nitpicks.
+            Post each finding with
+            mcp__github_inline_comment__create_inline_comment
+            (confirmed: true) on the exact line. If you find nothing
+            significant, post nothing.
+          claude_args: |
+            --model claude-sonnet-5
+            --max-turns 25
+            --allowedTools "mcp__github_inline_comment__create_inline_comment,Bash(gh pr diff:*),Bash(gh pr view:*)"
