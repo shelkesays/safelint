@@ -14,6 +14,7 @@ from safelint.analysis.dataflow_rust import RustTaintTracker
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.go import FUNC_LITERAL as _GO_FUNC_LITERAL
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
@@ -52,6 +53,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "go": _GO_FUNCTION_TYPES,
     "php": _PHP_FUNCTION_TYPES,
     "c": _C_FUNCTION_TYPES,
+    "cpp": _CPP_FUNCTION_TYPES,
 }
 
 
@@ -91,6 +93,46 @@ def _c_param_names(func_node: tree_sitter.Node) -> set[str]:
     names: set[str] = set()
     for child in params_node.named_children:
         ident = _c_param_identifier(child.child_by_field_name("declarator"))
+        if ident is not None:
+            names.add(node_text(ident))
+    return names
+
+
+def _cpp_param_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Unwrap a C++ parameter declarator to its name ``identifier``, or None (bounded loop).
+
+    Like :func:`_c_param_identifier`, but a ``reference_declarator``
+    (``const std::string& s``) nests its inner declarator as a plain named
+    child rather than on a ``declarator`` field, so that layer is unwrapped by
+    scanning the named children for the next declarator / identifier.
+    """
+    cur = node
+    for _ in range(16):
+        if cur is None or cur.type == "identifier":
+            return cur
+        nxt = cur.child_by_field_name("declarator")
+        if nxt is None and cur.type == "reference_declarator":
+            nxt = next((c for c in cur.named_children if c.type in ("identifier", "pointer_declarator", "array_declarator", "reference_declarator", "function_declarator")), None)
+        cur = nxt
+    return None
+
+
+def _cpp_param_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return all parameter names for a C++ ``function_definition``.
+
+    Mirrors :func:`_c_param_names` (tree-sitter-cpp is a superset of
+    tree-sitter-c) but routes each parameter declarator through
+    :func:`_cpp_param_identifier` so reference parameters (``T& x``) are
+    seeded into the tainted set. The exception / parameter *type* sits on the
+    separate ``type`` field, so no type identifier leaks in.
+    """
+    func_decl = _c_function_declarator(func_node.child_by_field_name("declarator"))
+    params_node = func_decl.child_by_field_name("parameters") if func_decl is not None else None
+    if params_node is None:
+        return set()
+    names: set[str] = set()
+    for child in params_node.named_children:
+        ident = _cpp_param_identifier(child.child_by_field_name("declarator"))
         if ident is not None:
             names.add(node_text(ident))
     return names
@@ -615,7 +657,7 @@ class TaintedSinkRule(BaseRule):
 
     name = "tainted_sink"
     code = "SAFE801"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     _DEFAULT_SINKS: ClassVar[list[str]] = [
         "eval",
@@ -900,18 +942,35 @@ class TaintedSinkRule(BaseRule):
         unbounded-copy sinks (``system`` / ``strcpy`` / ``sprintf`` / ...) are
         flagged when reached by a tainted argument.
         """
-        sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", "c", default=[])
+        return self._c_family_check(filepath, tree, "c", _c_param_names)
+
+    def _cpp_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Run C++ taint analysis, reusing the C tracker (the AST is a superset).
+
+        tree-sitter-cpp shares C's ``call_expression`` / ``assignment_expression``
+        shapes, so :class:`CTaintTracker` tracks taint identically; only the
+        parameter seeding differs (C++ reference parameters, seeded via
+        :func:`_cpp_param_names`). The seeding boundary stays
+        ``function_definition`` (as for C), so a nested ``lambda_expression`` is
+        analysed as part of its enclosing function's body rather than seeded and
+        walked a second time.
+        """
+        return self._c_family_check(filepath, tree, "cpp", _cpp_param_names)
+
+    def _c_family_check(self, filepath: str, tree: tree_sitter.Tree, lang_name: str, param_names: Callable[[tree_sitter.Node], set[str]]) -> list[Violation]:
+        """Shared C / C++ taint pass: seed each ``function_definition`` and track to sinks."""
+        sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", lang_name, default=[])
         sinks = frozenset(_validated_string_list(sinks_raw, sinks_key))
-        sanitizers_raw, sanitizers_key = resolve_lang_config_lookup(self.config, "sanitizers", "c", default=[])
+        sanitizers_raw, sanitizers_key = resolve_lang_config_lookup(self.config, "sanitizers", lang_name, default=[])
         sanitizers = frozenset(_validated_string_list(sanitizers_raw, sanitizers_key))
-        sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", "c", default=[])
+        sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", lang_name, default=[])
         sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type not in _C_FUNCTION_TYPES:
                 continue
-            tracker = CTaintTracker(_c_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = CTaintTracker(param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
             tracker.visit(node)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
@@ -941,6 +1000,7 @@ class TaintedSinkRule(BaseRule):
             "go": self._go_check,
             "php": self._php_check,
             "c": self._c_check,
+            "cpp": self._cpp_check,
         }
         return checks.get(lang_name, self._python_check)(filepath, tree)
 
@@ -957,7 +1017,7 @@ class ReturnValueIgnoredRule(BaseRule):
 
     name = "return_value_ignored"
     code = "SAFE802"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
