@@ -524,15 +524,25 @@ class GlobalMutationRule(BaseRule):
         violations: list[Violation] = []
         scopes: list[tree_sitter.Node] = [tree.root_node]
         while len(scopes) > 0:
-            scope = scopes.pop()
-            for node in scope.named_children:
-                if node.type == "declaration":
-                    violations.extend(self._c_declaration_violations(filepath, node))
-                elif node.type == "namespace_definition":
-                    body = node.child_by_field_name("body")
-                    if body is not None:
-                        scopes.append(body)
+            for node in scopes.pop().named_children:
+                node_violations, child_scopes = self._cpp_scope_node(filepath, node)
+                violations.extend(node_violations)
+                scopes.extend(child_scopes)
         return violations
+
+    def _cpp_scope_node(self, filepath: str, node: tree_sitter.Node) -> tuple[list[Violation], list[tree_sitter.Node]]:
+        """Classify one file / namespace-scope node into (violations, child scopes to walk).
+
+        A ``declaration`` yields its file-scope variable violations; a
+        ``namespace_definition`` yields its ``body`` (a ``declaration_list``) as a
+        further scope to descend into. Anything else contributes neither.
+        """
+        if node.type == "declaration":
+            return self._c_declaration_violations(filepath, node), []
+        if node.type == "namespace_definition":
+            body = node.child_by_field_name("body")
+            return [], [body] if body is not None else []
+        return [], []
 
     def _c_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every file-scope mutable variable declaration (C's shared-mutable-state shape).
