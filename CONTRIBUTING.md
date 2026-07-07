@@ -36,7 +36,7 @@ Most contributions to safelint fall into one of three categories. Each has its o
 |---|---|---|
 | A new **safety rule** (e.g. another Power-of-Ten check) | The "Adding a new rule" checklist below | `src/safelint/rules/`, `core/config.py`, `docs/configuration/rules.md`, every bundled AI-client doc |
 | A new **AI-client integration** (e.g. JetBrains AI Assistant, a brand-new IDE) | [Adding an AI client](https://shelkesays.github.io/safelint/contributing/adding-an-ai-client/), full walkthrough with a worked example | `src/safelint/_skill_install.py` (one `ClientSpec` append), `src/safelint/skill_files/<client>/`, `tests/test_skill_install.py`, `docs/ai-clients/`, `src/safelint/skill_files/README.md`, `CHANGELOG.md` |
-| A new **language** safelint can lint (e.g. C++, Kotlin, Ruby) | [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/), full walkthrough | `src/safelint/languages/<lang>.py`, the Tree-sitter grammar dependency in `pyproject.toml`, per-rule audit, `tests/`, `docs/configuration/`, every bundled AI-client doc |
+| A new **language** safelint can lint (e.g. Kotlin, Ruby, Swift) | [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/), full walkthrough | `src/safelint/languages/<lang>.py`, the Tree-sitter grammar dependency in `pyproject.toml`, per-rule audit, `tests/`, `docs/configuration/`, every bundled AI-client doc |
 
 The architecture for each path is open-ended: rules go into one tuple (`ALL_RULES`), AI clients go into one tuple (`_CLIENT_SPECS`), languages go into one registry (`safelint.languages._REGISTRY`). Drift-detection tests parametrise over those registries automatically, when you add a new rule, the bundled-doc-coverage tests fail until *every* registered AI client mentions the new rule. When you add a new AI client, the parametrised tests fail until *its* bundled doc mentions every existing rule + extension. The architecture pulls you toward consistency rather than relying on memory.
 
@@ -75,7 +75,7 @@ The security guards (symlink refusal at the secondary destination, `skill remove
 
 ## Adding a new language
 
-Eight languages are registered today (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C). Adding a new one (C++, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) - note its "scattered enumerations" step (the docs that list every language's extension / grammar / `--language` value outside the headline tables), which is the easiest part to miss.
+Nine languages are registered today (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, C++). Adding a new one (Kotlin, etc.) needs three things: a Tree-sitter grammar package for the language, a per-language module exposing node-type constants, and a per-rule audit to identify which rules port cleanly. The full walkthrough with a worked TypeScript example lives in [Adding a language](https://shelkesays.github.io/safelint/contributing/adding-a-language/) - note its "scattered enumerations" step (the docs that list every language's extension / grammar / `--language` value outside the headline tables), which is the easiest part to miss.
 
 ---
 

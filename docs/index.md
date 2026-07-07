@@ -21,23 +21,24 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 
 | Applies to | # | Rules |
 |---|---|---|
-| **All eight** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C) | 13 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
-| Python / JS / TS / Java / Rust / PHP / C (not Go) | 1 | `missing_assertions` |
-| Python / JS / TS / Java / Rust / PHP (not Go, not C) | 1 | `null_dereference` |
-| Python / JS / TS / Java / Go / PHP / C (not Rust) | 2 | `global_mutation`, `dynamic_code_execution` |
-| Python / JS / TS / Java / Go / PHP (not Rust, not C) | 1 | `resource_lifecycle` |
-| Python / JS / TS / Java / PHP | 2 | `empty_except`, `logging_on_error` |
+| **All nine** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, C++) | 13 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
+| Python / JS / TS / Java / Rust / PHP / C / C++ (not Go) | 1 | `missing_assertions` |
+| Python / JS / TS / Java / Rust / PHP (not Go, not C, not C++) | 1 | `null_dereference` |
+| Python / JS / TS / Java / Go / PHP / C / C++ (not Rust) | 2 | `global_mutation`, `dynamic_code_execution` |
+| Python / JS / TS / Java / Go / PHP (not Rust, not C, not C++) | 1 | `resource_lifecycle` |
+| Python / JS / TS / Java / PHP / C++ | 2 | `empty_except`, `logging_on_error` |
 | Python + PHP | 1 | `global_state` |
-| Python only | 1 | `bare_except` |
+| Python + C++ | 1 | `bare_except` (Python `except:` / C++ `catch (...)`) |
 | JavaScript family (JS / TS) | 1 | `wide_scope_declaration` (`var` → `let` / `const`) |
 | Java + Spring Boot only | 4 | `spring_*` (SAFE901-904) |
 | Rust only | 11 | `needless_mut`, `unchecked_arithmetic_on_input`, `panic_macros_outside_tests`, `lock_poisoning_ignored`, `silent_result_discard`, `unlogged_error_branch`, `result_unwrap_outside_tests`, `dangerous_mem_ops`, `interior_mutable_static`, `truncating_as_cast`, `undocumented_unsafe` |
 | Go only | 2 | `empty_error_check`, `panic_calls_outside_tests` |
-| C only | 5 | `nonlocal_jumps`, `dynamic_allocation`, `complex_macro`, `conditional_compilation`, `restricted_pointers` |
+| C family (C and C++) | 5 | `nonlocal_jumps`, `dynamic_allocation`, `complex_macro`, `conditional_compilation`, `restricted_pointers` |
+| C++ only | 2 | `raw_new_delete`, `dangerous_casts` |
 
 Rules are skipped per language where the semantics don't translate - e.g. Go has no try/catch, `global` keyword, `var` hoisting, production assertion idiom, or chained-nullable idiom; Rust's `Result` / `Option` / `Drop` model covers its skips with Rust-specific replacements; C skips try/catch rules, `global_state`, `wide_scope_declaration`, and (documented gaps) `resource_lifecycle` / `null_dereference`.
 
-**Planned future languages** (no timelines committed): C++. See the [language-coverage roadmap](configuration/rules.md#planned).
+See the [language-coverage roadmap](configuration/rules.md#planned) for future languages.
 
 ## Quick start
 

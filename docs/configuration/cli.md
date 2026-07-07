@@ -57,7 +57,7 @@ safelint check . --format=json       # machine-readable output for editors / CI
 
 | Flag | Default | What it does |
 |---|---|---|
-| `--all-files` | off | Scan every supported source file under the target (`.py`, `.pyw`, `.js`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.as`, `.java`, `.rs`, `.go`, `.php`, `.c`, `.h`). Default (without this flag) is to check only git-modified files. |
+| `--all-files` | off | Scan every supported source file under the target (`.py`, `.pyw`, `.js`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.as`, `.java`, `.rs`, `.go`, `.php`, `.c`, `.h`, `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`). Default (without this flag) is to check only git-modified files. |
 | `--fail-on` | from config | Override the minimum severity that blocks the run: `error` or `warning`. |
 | `--mode` | from config | `local` (only errors block) or `ci` (warnings block too). |
 | `--config` | auto-discovered | Path to a config file (`pyproject.toml` or `safelint.toml`) or a directory to use as the config search root. |
@@ -87,7 +87,7 @@ safelint --list-rules --language=java                      # flag-alias form (sa
 
 | Flag | Default | What it does |
 |---|---|---|
-| `--language <LANG>` | (no filter) | Restrict to one language: `python`, `javascript`, `typescript`, `java`, `rust`, `go`, `php`, `c`. Filters by the rule's `language` tuple, so cross-language rules show under any of their languages. |
+| `--language <LANG>` | (no filter) | Restrict to one language: `python`, `javascript`, `typescript`, `java`, `rust`, `go`, `php`, `c`, `cpp`. Filters by the rule's `language` tuple, so cross-language rules show under any of their languages. |
 | `--format <FMT>` | `text` | `text` (aligned table grouped by category band), `json` (versioned document with `code`, `name`, `severity`, `default_enabled`, `languages`, `category`, `description`), `markdown` (one table per category band), or `sarif` (SARIF 2.1.0 catalogue document with rules under `runs[0].tool.driver.rules[]`). |
 | `--enabled-only` | off | Drop rules that are off by default. Useful for "what fires out of the box?" views. |
 
