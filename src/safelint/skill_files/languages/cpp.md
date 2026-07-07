@@ -25,8 +25,8 @@ C++ ships its grammar (`tree-sitter-cpp`) as the opt-in `[cpp]` extra; the base 
 ## C++ shapes worth knowing
 
 - `function_definition` covers both free functions AND methods; `lambda_expression` is a separate function node. A method name is a `field_identifier` (in-class) or a `qualified_identifier` (`S::m` out-of-line); a free function's name nests under `declarator.declarator` as in C.
-- SAFE105 detects a `this->m()` self-call (a `field_expression` callee) in addition to a bare-name recursive call.
-- SAFE302 descends into `namespace_definition` bodies, so a namespace-scoped mutable global fires, not just a translation-unit-scope one.
+- SAFE105 detects a `this->m()` self-call (a `field_expression` callee) and a namespace-qualified `ns::f()` (a `qualified_identifier` callee) in addition to a bare-name recursive call.
+- SAFE302 descends into `namespace_definition` and `extern "C"` (`linkage_specification`) bodies, and into `class_specifier` / `struct_specifier` bodies to reach `static` data members - all translation-unit-scoped mutable state.
 - The named casts (`reinterpret_cast<T>(x)`) are **not** dedicated cast nodes: they parse as a `call_expression` whose `function` is a `template_function`. SAFE316 detects them by that template callee name.
 - `std::cerr << ...` stream logging is a `<<` binary expression, not a call, so SAFE203 recognises it via a dedicated leftmost-operand scan (`cerr` / `clog` / `cout`, qualified or unqualified) in addition to `call_name`-matched log calls (`spdlog::error`, `logger.error`).
 - Smart pointers (`std::unique_ptr<T>`) are class templates, not `pointer_declarator`s, so SAFE313 never fires on them.
@@ -36,15 +36,15 @@ C++ ships its grammar (`tree-sitter-cpp`) as the opt-in `[cpp]` extra; the base 
 | Code | Rule | C++-specific notes |
 |---|---|---|
 | SAFE101 | function_length | Source lines on `function_definition` / `lambda_expression`. Default cap 60. |
-| SAFE102 | nesting_depth | Counts `if` / `for` / `while` / `do` / `switch` / `try`. Default max 2. |
-| SAFE103 | max_arguments | Counts `parameter_declaration` nodes. `int f()` / `int f(void)` is zero args. Default cap 7. |
-| SAFE104 | complexity | Every `if` / `for` / `while` / `do` / `case` / `catch` / ternary adds one; `&&` / `\|\|` each add one. Default cap 10. |
-| SAFE105 | no_recursion | Flags a function calling its own name directly, including a method's `this->m()`. Enabled by default at warning severity. |
+| SAFE102 | nesting_depth | Counts `if` / `for` (classic and range-based `for (auto x : v)`) / `while` / `do` / `switch` / `try`. Default max 2. |
+| SAFE103 | max_arguments | Counts `parameter_declaration` nodes on both `function_definition` and `lambda_expression` (a lambda's params nest under `abstract_function_declarator`). `int f()` / `int f(void)` is zero args. Default cap 7. |
+| SAFE104 | complexity | Every `if` / `for` (classic and range-based) / `while` / `do` / `case` / `catch` / ternary adds one; `&&` / `\|\|` each add one. Default cap 10. |
+| SAFE105 | no_recursion | Flags a function calling its own name directly, including a method's `this->m()` and a namespace-qualified `ns::f()`. Enabled by default at warning severity. **Known limitation:** the check is name-based, so a call to a *different overload* of the same name (`log(int)` calling `log(const char*)`) is reported as recursion - distinguishing overloads needs type resolution safelint does not do. Annotate a genuine non-recursive overload call with `// nosafe: SAFE105`. |
 | SAFE106 | nonlocal_jumps | *C / C++.* Every `goto` and every `setjmp` / `longjmp` family call. **Enabled at warning severity**; annotate a sanctioned `goto err` with `// nosafe: SAFE106`. Configurable via `nonlocal_jump_calls_cpp`. |
 | SAFE201 | bare_except | C++'s first non-Python home. Flags the `catch (...)` catch-all (swallows every exception with no binding to inspect or re-raise). A typed `catch (const E& e)` is clean. |
 | SAFE202 | empty_except | An empty / comment-only / literal-only `catch` body. |
-| SAFE203 | logging_on_error | A `catch` that swallows without logging. `std::cerr << ...` stream insertion and `spdlog::error(...)`-style calls count as logging; a bare `throw;` / `throw e;` counts as a re-raise. |
-| SAFE302 | global_mutation | File-scope AND namespace-scope mutable `declaration`s. `const` / prototypes / `typedef` / `extern` exempt; `static` counts. |
+| SAFE203 | logging_on_error | A `catch` that swallows without logging. `std::cerr << ...` stream insertion, `spdlog::error(...)`-style calls, `perror(...)`, and `fprintf(stderr, ...)` all count as logging; a bare `throw;` / `throw e;` counts as a re-raise. |
+| SAFE302 | global_mutation | File-scope, namespace-scope, `extern "C"`-block, and `static` class/struct data members (all translation-unit-scoped). Non-static fields are per-instance and exempt; `const` / `constexpr` exempt; prototypes / `typedef` / `extern` forward refs exempt. |
 | SAFE303 | side_effects_hidden | A pure-named function containing a C-family I/O call (`io_functions_cpp`, mirrors C's list). `std::cout << ...` stream I/O is operator-based and not call-matchable - a documented non-catch. |
 | SAFE304 | side_effects | Any non-I/O-named function containing a C-family I/O call (same `io_functions_cpp`). |
 | SAFE309 | dynamic_code_execution | The dynamic-linker surface: default `dynamic_exec_calls_cpp` `dlopen` / `dlsym`. Disabled by default. |

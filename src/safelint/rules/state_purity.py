@@ -510,16 +510,18 @@ class GlobalMutationRule(BaseRule):
         return self._javascript_check(filepath, tree, lang_name)
 
     def _cpp_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Flag file-scope and namespace-scope mutable variable declarations (C++'s shared state).
+        """Flag file-, namespace-, and class-static translation-unit-scoped mutable state (C++).
 
-        Extends the C shape by descending into ``namespace_definition`` bodies
-        (including anonymous namespaces): a variable declared directly in a
-        namespace is still translation-unit-scoped shared mutable state.
-        Declarations inside a ``class_specifier`` / ``struct_specifier`` are
-        members, not file-scope state, so those scopes are not walked. The
-        per-declaration exemptions (``const``, ``extern`` forward references,
-        function prototypes) are reused from ``_c_declaration_violations``. A
-        worklist keeps the traversal iterative (SAFE105 polices recursion).
+        Extends the C shape by descending into ``namespace_definition`` and
+        ``extern "C"`` (``linkage_specification``) bodies - a variable declared
+        directly there is still translation-unit-scoped shared mutable state -
+        and into ``class_specifier`` / ``struct_specifier`` bodies to reach
+        ``static`` data members (a ``static`` member is one translation-unit
+        location, not per-instance state; non-static fields are per-instance and
+        do not fire). The per-declaration exemptions (``const`` / ``constexpr``,
+        ``extern`` forward references, function prototypes) are reused from
+        ``_c_declaration_violations``. A worklist keeps the traversal iterative
+        (SAFE105 polices recursion).
         """
         violations: list[Violation] = []
         scopes: list[tree_sitter.Node] = [tree.root_node]
@@ -530,19 +532,56 @@ class GlobalMutationRule(BaseRule):
                 scopes.extend(child_scopes)
         return violations
 
+    #: Scope-introducing node types whose body is walked for further declarations.
+    #: ``namespace_definition`` / ``linkage_specification`` (``extern "C"``)
+    #: expose a ``declaration_list``; ``class_specifier`` / ``struct_specifier``
+    #: expose a ``field_declaration_list`` whose ``static`` members are TU-scoped.
+    _CPP_SCOPE_BODY_TYPES: ClassVar[tuple[str, ...]] = ("namespace_definition", "linkage_specification", "class_specifier", "struct_specifier")
+
     def _cpp_scope_node(self, filepath: str, node: tree_sitter.Node) -> tuple[list[Violation], list[tree_sitter.Node]]:
-        """Classify one file / namespace-scope node into (violations, child scopes to walk).
+        """Classify one scope node into (violations, child scopes to walk).
 
         A ``declaration`` yields its file-scope variable violations; a
-        ``namespace_definition`` yields its ``body`` (a ``declaration_list``) as a
-        further scope to descend into. Anything else contributes neither.
+        ``field_declaration`` yields a violation only when it is a ``static``
+        (translation-unit-scoped) data member; the scope-introducing types in
+        :data:`_CPP_SCOPE_BODY_TYPES` yield their body as a further scope.
         """
         if node.type == "declaration":
             return self._c_declaration_violations(filepath, node), []
-        if node.type == "namespace_definition":
+        if node.type == "field_declaration":
+            return self._cpp_static_member_violations(filepath, node), []
+        if node.type in self._CPP_SCOPE_BODY_TYPES:
             body = node.child_by_field_name("body")
             return [], [body] if body is not None else []
         return [], []
+
+    def _cpp_static_member_violations(self, filepath: str, field_decl: tree_sitter.Node) -> list[Violation]:
+        """Return a violation for a ``static`` (non-``const``) data member, else none.
+
+        A ``static`` class / struct data member is one translation-unit-scoped
+        mutable location, so it is shared mutable state; a non-static field is
+        per-instance and does not fire. ``const`` / ``constexpr`` members are
+        immutable and exempt. The member name is a ``field_identifier`` (unlike a
+        file-scope ``declaration``'s bare ``identifier``), so it is located by a
+        subtree scan; the type sits on a separate ``type`` field, so no type
+        identifier leaks in.
+        """
+        is_static = any(c.type == "storage_class_specifier" and node_text(c) == "static" for c in field_decl.named_children)
+        if not is_static:
+            return []
+        is_immutable = any(c.type == "type_qualifier" and node_text(c) in ("const", "constexpr", "constinit") for c in field_decl.named_children)
+        if is_immutable:
+            return []
+        name = next((c for c in walk(field_decl) if c.type == "field_identifier"), None)
+        if name is None:  # pragma: no cover - defensive: a static data member always names a field
+            return []
+        return [
+            self._make_violation_for_node(
+                filepath,
+                name,
+                f'Static data member "{node_text(name)}" is translation-unit-shared mutable state - use `const` / `constexpr` if it never changes (Power of Ten rule 6)',
+            )
+        ]
 
     def _c_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every file-scope mutable variable declaration (C's shared-mutable-state shape).
@@ -574,7 +613,9 @@ class GlobalMutationRule(BaseRule):
         fires despite the ``const``, and in a mixed ``extern int a, b = 1;`` the
         forward reference ``a`` is exempt while the definition ``b`` fires.
         """
-        decl_const = any(child.type == "type_qualifier" and node_text(child) == "const" for child in decl.named_children)
+        # C++ ``constexpr`` / ``constinit`` are immutable compile-time bindings, exempt like
+        # ``const`` (a C23 ``constexpr`` is likewise immutable, so this is safe for C too).
+        decl_const = any(child.type == "type_qualifier" and node_text(child) in ("const", "constexpr", "constinit") for child in decl.named_children)
         decl_extern = any(child.type == "storage_class_specifier" and node_text(child) == "extern" for child in decl.named_children)
         out: list[Violation] = []
         for child in decl.named_children:
