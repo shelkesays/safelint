@@ -75,3 +75,11 @@ def test_cpp_source_with_sibling_test_is_clean_for_safe701(tmp_path: Path) -> No
     (tmp_path / "tests" / "widget_test.cpp").write_text("void t() { assert(1); }\n", encoding="utf-8")
     overrides = {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(tmp_path / "tests")]}}}
     assert "SAFE701" not in _codes("widget.cpp", "int widget() { return 1; }\n", tmp_path, overrides)
+
+
+def test_cpp_cc_source_with_cc_test_is_clean_for_safe701(tmp_path: Path) -> None:
+    """A ``.cc`` source paired with ``<stem>_test.cc`` clears SAFE701 (not just ``.cpp``)."""
+    (tmp_path / "tests").mkdir()
+    (tmp_path / "tests" / "widget_test.cc").write_text("void t() { assert(1); }\n", encoding="utf-8")
+    overrides = {"rules": {"test_existence": {"enabled": True, "test_dirs": [str(tmp_path / "tests")]}}}
+    assert "SAFE701" not in _codes("widget.cc", "int widget() { return 1; }\n", tmp_path, overrides)

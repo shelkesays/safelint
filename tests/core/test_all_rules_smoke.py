@@ -49,14 +49,23 @@ def _all_rules_enabled_engine() -> SafetyEngine:
 
 
 def test_every_registered_language_has_a_smoke_sample() -> None:
-    """Every registered file extension maps to a language with a smoke sample.
+    """Every registered language has a smoke sample here.
 
-    Guards against a new language being registered without a row here (which
-    would otherwise silently skip the all-rules dispatch for it).
+    Guards against a new language being registered without a row in ``_SAMPLES``
+    (which would otherwise silently skip the all-rules dispatch for it). The
+    check runs in both directions: every sample extension must be registered,
+    and every registered language must have a sample.
     """
+    from safelint.languages import get_language_for_file  # noqa: PLC0415
+
     sample_exts = {ext for ext, _ in _SAMPLES.values()}
     # Every sample extension must actually be registered/installed.
     assert sample_exts.issubset(supported_extensions())
+    # Every registered language (resolved from its extensions) must have a
+    # sample row - a new language addition without one fails here.
+    registered_langs = {get_language_for_file(f"x{ext}").name for ext in supported_extensions()}
+    missing = registered_langs - set(_SAMPLES)
+    assert not missing, f"registered languages without an all-rules smoke sample: {sorted(missing)}"
 
 
 @pytest.mark.parametrize(["lang_name", "spec"], list(_SAMPLES.items()))

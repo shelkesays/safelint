@@ -19,7 +19,7 @@ v2.0.0 ships every language grammar as an opt-in extra, the `[python]` extra ins
 
 ## Rules that fire on Python
 
-Python is in scope for every cross-language rule plus the two Python-only rules (SAFE201 `bare_except`, SAFE301 `global_state`) and SAFE302 `global_mutation`. Newly added in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE309 `dynamic_code_execution`, and SAFE603 `blanket_suppression` (both disabled by default). The 1 JavaScript-family-only rule (SAFE305 `wide_scope_declaration`) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
+Python is in scope for every cross-language rule plus SAFE201 `bare_except` (shared with C++), the Python-only SAFE301 `global_state`, and SAFE302 `global_mutation`. Newly added in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE309 `dynamic_code_execution`, and SAFE603 `blanket_suppression` (both disabled by default). The 1 JavaScript-family-only rule (SAFE305 `wide_scope_declaration`) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
 
 | Code | Rule | Notes for Python |
 |---|---|---|
@@ -28,7 +28,7 @@ Python is in scope for every cross-language rule plus the two Python-only rules 
 | [SAFE103](../configuration/rules.md#safe103-max_arguments) | `max_arguments` | Counts positional, keyword, `*args`, `**kwargs` separately. Excludes `self` / `cls`. Default cap 7. |
 | [SAFE104](../configuration/rules.md#safe104-complexity) | `complexity` | Cyclomatic complexity, every `if` / `elif` / `for` / `while` / `except` / `case` / ternary / `and` / `or` adds one. Default cap 10. |
 | [SAFE105](../configuration/rules.md#safe105-no_recursion) | `no_recursion` | Flags a function that calls itself directly, bare (`fact(n-1)`) or `self`/`cls`-qualified (`self.walk(...)`). `other.walk(...)` does not fire. Direct self-recursion only. Enabled by default at warning severity. |
-| [SAFE201](../configuration/rules.md#safe201-bare_except) | `bare_except` | **Python-only.** Fires on `except:` with no exception type, catches `KeyboardInterrupt` and `SystemExit`. |
+| [SAFE201](../configuration/rules.md#safe201-bare_except) | `bare_except` | Fires on `except:` with no exception type, catches `KeyboardInterrupt` and `SystemExit`. (Also registered for C++'s `catch (...)`.) |
 | [SAFE202](../configuration/rules.md#safe202-empty_except) | `empty_except` | Fires on `except: pass`, `except: ...`, `except: 0`, `except: "TODO"`. |
 | [SAFE203](../configuration/rules.md#safe203-logging_on_error) | `logging_on_error` | Requires a call to `logger.{debug,info,warning,error,exception,critical}` (or bare `raise`) in every except handler. |
 | [SAFE301](../configuration/rules.md#safe301-global_state) | `global_state` | **Python-only.** Fires on the `global` keyword. With `strict = true`, fires on every declaration; default is "declaration + write". |

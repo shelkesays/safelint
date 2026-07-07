@@ -17,7 +17,7 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 | **PHP** | `.php` | 21 rules apply, the widest coverage of any non-Python language (only `bare_except` and `wide_scope_declaration` are skipped). First non-Python home for `global_state` (PHP has a literal `global` keyword). Headline highlights: the `@`-operator error-suppression idiom, superglobal taint sources (`$_GET` / `$_POST` / `$_REQUEST`) feeding `tainted_sink`, and the `break N;` / `continue N;` multi-level loop forms. See [PHP](languages/php.md). New in v2.6.0. |
 | **C** | `.c`, `.h` | 21 rules apply: the 16 cross-language ports plus **5 new C-only rules** - Holzmann's original language gets clauses every other language adapts away, expressed literally: `nonlocal_jumps` (`goto` / `setjmp`, rule 1), `dynamic_allocation` (`malloc` family, rule 3), `complex_macro` + `conditional_compilation` (the preprocessor, rule 8), and `restricted_pointers` (rule 9). `nonlocal_jumps` is enabled (warning); the other four are opt-in. `.h` headers lint as C. See [C](languages/c.md). New in v2.7.0. |
 
-**Rule coverage** - 45 rules total, scoped per language:
+**Rule coverage** - 47 rules total, scoped per language:
 
 | Applies to | # | Rules |
 |---|---|---|
