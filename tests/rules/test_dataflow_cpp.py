@@ -75,6 +75,25 @@ def test_cpp_unnamed_parameter_is_skipped(tmp_path: Path) -> None:
     assert "SAFE801" not in _codes(src, tmp_path, enable=["tainted_sink"])
 
 
+def test_cpp_lambda_parameter_taint_flows_to_sink(tmp_path: Path) -> None:
+    """A lambda's own parameter is seeded as tainted and flows to a sink (SAFE801)."""
+    src = "void f() {\n    auto g = [](const char* in) { system(in); };\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, enable=["tainted_sink"])
+
+
+def test_cpp_lambda_capture_flow_reports_once(tmp_path: Path) -> None:
+    """A captured tainted variable used in a lambda sink reports exactly one SAFE801 (no duplicate)."""
+    src = "void f(char* p) {\n    auto g = [&] { system(p); };\n}\n"
+    sample = tmp_path / "sample.cpp"
+    sample.write_text(src, encoding="utf-8")
+    from safelint.core.config import DEFAULTS, deep_merge  # noqa: PLC0415
+    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
+
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}}))
+    safe801 = [v for v in engine.check_file(str(sample)).violations if v.code == "SAFE801"]
+    assert len(safe801) == 1
+
+
 def test_cpp_ignored_return_fires_safe802(tmp_path: Path) -> None:
     """A bare ``fclose(f);`` whose return is discarded fires SAFE802."""
     src = "void f() {\n    fclose(handle);\n}\n"

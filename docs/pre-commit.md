@@ -36,7 +36,7 @@ SafeLint now runs on every `git commit` and blocks the commit if it finds blocki
 
 ## What the `additional_dependencies` line does
 
-v2.0.0+ ships every language grammar as an opt-in PEP 621 extra (`[python]`, `[javascript]`, `[typescript]`, `[java]`, `[rust]`, `[go]`, `[php]`, `[c]`, `[all]`). Plain `pip install safelint` installs only the engine, no grammars. The same applies to the hook: pre-commit creates an isolated virtualenv per hook revision and installs only what you list in `additional_dependencies`.
+v2.0.0+ ships every language grammar as an opt-in PEP 621 extra (`[python]`, `[javascript]`, `[typescript]`, `[java]`, `[rust]`, `[go]`, `[php]`, `[c]`, `[cpp]`, `[all]`). Plain `pip install safelint` installs only the engine, no grammars. The same applies to the hook: pre-commit creates an isolated virtualenv per hook revision and installs only what you list in `additional_dependencies`.
 
 `safelint[python]` pulls `tree-sitter-python`. `safelint[javascript]` pulls `tree-sitter-javascript`. `safelint[typescript]` pulls both `tree-sitter-javascript` and `tree-sitter-typescript` (TypeScript projects almost always have `.js` files too: vite / webpack / jest configs, generated declaration shims). `safelint[java]` pulls `tree-sitter-java` and unlocks the optional Spring Boot framework preset configured via `[tool.safelint.java] framework = "spring-boot"`. `safelint[rust]` / `safelint[go]` / `safelint[php]` / `safelint[c]` / `safelint[cpp]` pull their matching grammars (`tree-sitter-rust`, `tree-sitter-go`, `tree-sitter-php`, `tree-sitter-c`, `tree-sitter-cpp`). `safelint[all]` is the kitchen-sink that pulls every supported grammar in one go.
 

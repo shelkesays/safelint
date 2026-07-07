@@ -262,7 +262,7 @@ The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint 
   - `safelint skill status` and `safelint check --check-skill-freshness` (drift detection between bundled and installed skills) arrived in **v1.9.0**.
   - JavaScript (Node) support and runtime presets landed in **v1.13.0**.
   - **v2.0.0rc1** ships language grammars as opt-in extras (`[python]` / `[javascript]` / `[typescript]` / `[all]`), adds TypeScript / TSX / AssemblyScript, adds the silent-failure exit-code-2 guard, and teaches `safelint skill install` to auto-detect project languages. The bundled skill files in this directory document the v2.0.0+ install story, so a 1.x-era `safelint` on `PATH` won't behave the way the skills describe, bump first.
-- A project with at least one source file in a language safelint supports (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, or C today; C++ planned).
+- A project with at least one source file in a language safelint supports (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, or C++ today).
 
 ## What the skill does
 

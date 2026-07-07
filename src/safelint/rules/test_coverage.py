@@ -95,7 +95,10 @@ def _candidate_test_filenames(src_path: Path, lang_name: str) -> list[str]:
         "go": [f"{stem}_test.go"],
         "php": [f"{stem}Test.php"],
         "c": [f"{stem}_test.c", f"test_{stem}.c"],
-        "cpp": [f"{stem}_test.cpp", f"test_{stem}.cpp"],
+        # C++ sources use several extensions (``.cpp`` / ``.cc`` / ``.cxx``); a
+        # ``foo.cc`` is conventionally paired with ``foo_test.cc``, so accept a
+        # matching test file under any of them (GoogleTest / Catch2 conventions).
+        "cpp": [f"{stem}_test.{ext}" for ext in ("cpp", "cc", "cxx")] + [f"test_{stem}.{ext}" for ext in ("cpp", "cc", "cxx")],
     }
     # Python (and any future language without an explicit override).
     return candidates_by_lang.get(lang_name, [f"test_{stem}.py"])

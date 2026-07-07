@@ -569,18 +569,19 @@ class GlobalMutationRule(BaseRule):
         is_static = any(c.type == "storage_class_specifier" and node_text(c) == "static" for c in field_decl.named_children)
         if not is_static:
             return []
-        is_immutable = any(c.type == "type_qualifier" and node_text(c) in ("const", "constexpr", "constinit") for c in field_decl.named_children)
+        is_immutable = any(c.type == "type_qualifier" and node_text(c) in ("const", "constexpr") for c in field_decl.named_children)
         if is_immutable:
             return []
-        name = next((c for c in walk(field_decl) if c.type == "field_identifier"), None)
-        if name is None:  # pragma: no cover - defensive: a static data member always names a field
-            return []
+        # One violation per declared name: ``static int a, b;`` declares two
+        # translation-unit-scoped members, so both ``a`` and ``b`` must fire.
+        names = [c for c in walk(field_decl) if c.type == "field_identifier"]
         return [
             self._make_violation_for_node(
                 filepath,
                 name,
                 f'Static data member "{node_text(name)}" is translation-unit-shared mutable state - use `const` / `constexpr` if it never changes (Power of Ten rule 6)',
             )
+            for name in names
         ]
 
     def _c_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
@@ -613,9 +614,11 @@ class GlobalMutationRule(BaseRule):
         fires despite the ``const``, and in a mixed ``extern int a, b = 1;`` the
         forward reference ``a`` is exempt while the definition ``b`` fires.
         """
-        # C++ ``constexpr`` / ``constinit`` are immutable compile-time bindings, exempt like
-        # ``const`` (a C23 ``constexpr`` is likewise immutable, so this is safe for C too).
-        decl_const = any(child.type == "type_qualifier" and node_text(child) in ("const", "constexpr", "constinit") for child in decl.named_children)
+        # C++ ``constexpr`` is an immutable compile-time binding, exempt like ``const``
+        # (a C23 ``constexpr`` is likewise immutable, so this is safe for C too).
+        # ``constinit`` is NOT exempt - it only fixes initialisation timing; the
+        # variable remains mutable shared state afterwards.
+        decl_const = any(child.type == "type_qualifier" and node_text(child) in ("const", "constexpr") for child in decl.named_children)
         decl_extern = any(child.type == "storage_class_specifier" and node_text(child) == "extern" for child in decl.named_children)
         out: list[Violation] = []
         for child in decl.named_children:
