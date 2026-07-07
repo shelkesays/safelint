@@ -71,6 +71,21 @@ def test_cpp_static_const_member_is_clean_for_safe302(tmp_path: Path) -> None:
     assert "SAFE302" not in _codes("struct S {\n    static const int K = 1;\n};\n", tmp_path)
 
 
+def test_cpp_static_constinit_member_fires_safe302(tmp_path: Path) -> None:
+    """``constinit`` only fixes init timing - the variable is still mutable, so SAFE302 fires."""
+    assert "SAFE302" in _codes("struct S {\n    static constinit int counter = 0;\n};\n", tmp_path)
+
+
+def test_cpp_multi_declarator_static_member_fires_once_per_name(tmp_path: Path) -> None:
+    """`static int a, b;` declares two shared members - both fire SAFE302."""
+    sample = tmp_path / "sample.cpp"
+    sample.write_text("struct S {\n    static int a, b;\n};\n", encoding="utf-8")
+    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
+
+    safe302 = [v for v in SafetyEngine(DEFAULTS).check_file(str(sample)).violations if v.code == "SAFE302"]
+    assert len(safe302) == 2
+
+
 def test_cpp_printf_in_pure_named_function_fires_safe304(tmp_path: Path) -> None:
     """A ``printf`` call inside a function fires SAFE304 (I/O in a would-be-pure function)."""
     assert "SAFE304" in _codes('void render() {\n    printf("x");\n}\n', tmp_path)

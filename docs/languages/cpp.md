@@ -1,6 +1,6 @@
 # C++
 
-C++ builds on C. `tree-sitter-cpp` is a superset of `tree-sitter-c`, so the C node types carry over and the five C-family rules (SAFE106 / SAFE310-313) apply to C++ unchanged. On top of that, C++ gains its `try` / `catch` / `throw` error-handling rules (SAFE201 / SAFE202 / SAFE203) and **two new C++-only idiom rules** (SAFE315 / SAFE316). New in v2.8.0.
+C++ builds on C. `tree-sitter-cpp` is a superset of `tree-sitter-c`, so the C node types carry over and the five C-family rules (SAFE106 / SAFE310-313) apply to C++. On top of that, C++ gains its `try` / `catch` / `throw` error-handling rules (SAFE201 / SAFE202 / SAFE203) and **two new C++-only idiom rules** (SAFE315 / SAFE316). New in v2.8.0.
 
 ## File extensions
 

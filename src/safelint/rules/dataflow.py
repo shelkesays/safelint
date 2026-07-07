@@ -117,18 +117,42 @@ def _cpp_param_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | N
     return None  # pragma: no cover - defensive: 16-deep declarator nesting does not occur
 
 
+def _dedupe_hits(hits: list[tuple[tree_sitter.Node, str, str]], seen: set[tuple[int, str, str]]) -> list[tuple[tree_sitter.Node, str, str]]:
+    """Return the *hits* not already recorded in *seen*, keyed by (call position, var, sink).
+
+    A C++ lambda body is analysed both by its own tracker and by its enclosing
+    function's tracker, so the same sink hit can surface twice; de-duplicating by
+    source position keeps a single violation. *seen* is mutated in place.
+    """
+    fresh: list[tuple[tree_sitter.Node, str, str]] = []
+    for call_node, var, sink in hits:
+        key = (call_node.start_byte, var, sink)
+        if key in seen:
+            continue
+        seen.add(key)
+        fresh.append((call_node, var, sink))
+    return fresh
+
+
 def _cpp_param_names(func_node: tree_sitter.Node) -> set[str]:
-    """Return all parameter names for a C++ ``function_definition``.
+    """Return all parameter names for a C++ ``function_definition`` or ``lambda_expression``.
 
     Mirrors :func:`_c_param_names` (tree-sitter-cpp is a superset of
     tree-sitter-c) but routes each parameter declarator through
     :func:`_cpp_param_identifier` so reference parameters (``T& x``) are
-    seeded into the tainted set. The exception / parameter *type* sits on the
-    separate ``type`` field, so no type identifier leaks in.
+    seeded into the tainted set. A ``lambda_expression`` nests its parameters
+    under an ``abstract_function_declarator`` (there is no ``declarator``
+    field), so a lambda input like ``in`` in ``[](char* in){...}`` is seeded
+    too. The exception / parameter *type* sits on the separate ``type`` field,
+    so no type identifier leaks in.
     """
-    func_decl = _c_function_declarator(func_node.child_by_field_name("declarator"))
-    params_node = func_decl.child_by_field_name("parameters") if func_decl is not None else None
-    if params_node is None:  # pragma: no cover - defensive: valid C++ functions always have a parameters list
+    if func_node.type == "lambda_expression":
+        afd = next((c for c in func_node.named_children if c.type == "abstract_function_declarator"), None)
+        params_node = afd.child_by_field_name("parameters") if afd is not None else None
+    else:
+        func_decl = _c_function_declarator(func_node.child_by_field_name("declarator"))
+        params_node = func_decl.child_by_field_name("parameters") if func_decl is not None else None
+    if params_node is None:
         return set()
     names: set[str] = set()
     for child in params_node.named_children:
@@ -942,7 +966,7 @@ class TaintedSinkRule(BaseRule):
         unbounded-copy sinks (``system`` / ``strcpy`` / ``sprintf`` / ...) are
         flagged when reached by a tainted argument.
         """
-        return self._c_family_check(filepath, tree, "c", _c_param_names)
+        return self._c_family_check(filepath, tree, "c", _c_param_names, _C_FUNCTION_TYPES)
 
     def _cpp_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run C++ taint analysis, reusing the C tracker (the AST is a superset).
@@ -950,15 +974,23 @@ class TaintedSinkRule(BaseRule):
         tree-sitter-cpp shares C's ``call_expression`` / ``assignment_expression``
         shapes, so :class:`CTaintTracker` tracks taint identically; only the
         parameter seeding differs (C++ reference parameters, seeded via
-        :func:`_cpp_param_names`). The seeding boundary stays
-        ``function_definition`` (as for C), so a nested ``lambda_expression`` is
-        analysed as part of its enclosing function's body rather than seeded and
-        walked a second time.
+        :func:`_cpp_param_names`). The seeding boundary is ``_CPP_FUNCTION_TYPES``
+        (``function_definition`` *and* ``lambda_expression``) so a lambda's own
+        parameters are seeded; the enclosing function's tracker still walks the
+        lambda body (catching captured-variable flows), and :func:`_c_family_check`
+        de-duplicates the overlapping hits by source position.
         """
-        return self._c_family_check(filepath, tree, "cpp", _cpp_param_names)
+        return self._c_family_check(filepath, tree, "cpp", _cpp_param_names, _CPP_FUNCTION_TYPES)
 
-    def _c_family_check(self, filepath: str, tree: tree_sitter.Tree, lang_name: str, param_names: Callable[[tree_sitter.Node], set[str]]) -> list[Violation]:
-        """Shared C / C++ taint pass: seed each ``function_definition`` and track to sinks."""
+    def _c_family_check(self, filepath: str, tree: tree_sitter.Tree, lang_name: str, param_names: Callable[[tree_sitter.Node], set[str]], function_types: frozenset[str]) -> list[Violation]:
+        """Shared C / C++ taint pass: seed each function / lambda and track to sinks.
+
+        For C++ the seeding boundary includes ``lambda_expression``, so a lambda
+        is analysed both by its own tracker (parameters seeded) and by its
+        enclosing function's tracker (which walks the lambda body for captured
+        flows). The two passes can report the same sink hit, so hits are
+        de-duplicated by ``(sink call position, tainted var, sink name)``.
+        """
         sinks_raw, sinks_key = resolve_lang_config_lookup(self.config, "sinks", lang_name, default=[])
         sinks = frozenset(_validated_string_list(sinks_raw, sinks_key))
         sanitizers_raw, sanitizers_key = resolve_lang_config_lookup(self.config, "sanitizers", lang_name, default=[])
@@ -967,12 +999,13 @@ class TaintedSinkRule(BaseRule):
         sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
         violations: list[Violation] = []
+        seen: set[tuple[int, str, str]] = set()
         for node in walk(tree.root_node):
-            if node.type not in _C_FUNCTION_TYPES:
+            if node.type not in function_types:
                 continue
             tracker = CTaintTracker(param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
             tracker.visit(node)
-            violations.extend(self._format_hits(filepath, tracker.sink_hits))
+            violations.extend(self._format_hits(filepath, _dedupe_hits(tracker.sink_hits, seen)))
         return violations
 
     def _format_hits(self, filepath: str, hits: list[tuple[tree_sitter.Node, str, str]]) -> list[Violation]:
