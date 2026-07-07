@@ -46,6 +46,31 @@ def test_cpp_const_global_is_clean_for_safe302(tmp_path: Path) -> None:
     assert "SAFE302" not in _codes("const int kMax = 10;\n", tmp_path)
 
 
+def test_cpp_constexpr_global_is_clean_for_safe302(tmp_path: Path) -> None:
+    """A ``constexpr`` file-scope constant is immutable - no SAFE302."""
+    assert "SAFE302" not in _codes("constexpr int kMax = 100;\n", tmp_path)
+
+
+def test_cpp_extern_c_block_global_fires_safe302(tmp_path: Path) -> None:
+    """A mutable global inside an ``extern \"C\"`` block is still shared state (SAFE302)."""
+    assert "SAFE302" in _codes('extern "C" {\n    int shared_counter = 0;\n}\n', tmp_path)
+
+
+def test_cpp_static_data_member_fires_safe302(tmp_path: Path) -> None:
+    """A ``static`` class data member is translation-unit-shared mutable state (SAFE302)."""
+    assert "SAFE302" in _codes("struct S {\n    static int counter;\n};\n", tmp_path)
+
+
+def test_cpp_non_static_field_is_clean_for_safe302(tmp_path: Path) -> None:
+    """A non-static field is per-instance state, not a global - no SAFE302."""
+    assert "SAFE302" not in _codes("struct S {\n    int instance_value;\n};\n", tmp_path)
+
+
+def test_cpp_static_const_member_is_clean_for_safe302(tmp_path: Path) -> None:
+    """A ``static const`` member is immutable - no SAFE302."""
+    assert "SAFE302" not in _codes("struct S {\n    static const int K = 1;\n};\n", tmp_path)
+
+
 def test_cpp_printf_in_pure_named_function_fires_safe304(tmp_path: Path) -> None:
     """A ``printf`` call inside a function fires SAFE304 (I/O in a would-be-pure function)."""
     assert "SAFE304" in _codes('void render() {\n    printf("x");\n}\n', tmp_path)

@@ -90,7 +90,7 @@ _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # targets are flat labels, not nesting.
     "c": frozenset({"if_statement", "for_statement", "while_statement", "do_statement", "switch_statement"}),
     # C++: the C set plus ``try_statement`` (a try block nests its body).
-    "cpp": frozenset({"if_statement", "for_statement", "while_statement", "do_statement", "switch_statement", "try_statement"}),
+    "cpp": frozenset({"if_statement", "for_statement", "for_range_loop", "while_statement", "do_statement", "switch_statement", "try_statement"}),
 }
 
 

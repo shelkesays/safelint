@@ -139,6 +139,12 @@ def _call_targets_self(call_node: tree_sitter.Node, func_name: str, lang: str) -
         return False
     if callee.type == "identifier":
         return node_text(callee) == func_name
+    if lang == "cpp" and callee.type == "qualified_identifier":
+        # C++ ``ns::f()`` / ``S::m()`` self-call - the trailing ``name`` is the
+        # bareword; a match against the enclosing function name is a self-call
+        # (the same name-based heuristic as the bare-identifier case).
+        name = callee.child_by_field_name("name")
+        return name is not None and node_text(name) == func_name
     return _matches_self_qualified(callee, func_name, lang)
 
 

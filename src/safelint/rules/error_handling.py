@@ -417,6 +417,40 @@ def _cpp_body_has_stream_log(body: tree_sitter.Node, function_types: frozenset[s
     return False
 
 
+#: C-family stderr writers that count as logging when their first argument is
+#: ``stderr`` (``perror`` always writes to stderr and needs no argument check).
+_CPP_STDERR_CALLS = frozenset({"fprintf", "fputs", "vfprintf", "fwrite"})
+
+
+def _cpp_call_first_arg_is_stderr(call_node: tree_sitter.Node) -> bool:
+    """Return True if *call_node*'s first argument is the ``stderr`` stream."""
+    args = call_node.child_by_field_name("arguments")
+    if args is None:  # pragma: no cover - defensive: a call_expression always has an argument list
+        return False
+    first = next((c for c in args.named_children), None)
+    return first is not None and node_text(first) == "stderr"
+
+
+def _cpp_body_has_stderr_log(body: tree_sitter.Node, function_types: frozenset[str]) -> bool:
+    """Return True if *body* logs via ``perror(...)`` or ``fprintf(stderr, ...)``-style output.
+
+    These are the idiomatic no-framework C / C++ error-logging calls; without
+    them a catch that logs only through stderr would be a SAFE203 false
+    positive. ``perror`` always writes to stderr; the ``fprintf`` family counts
+    only when its first argument is ``stderr`` (a ``fprintf(logfile, ...)`` is
+    not error logging). Nested function / lambda bodies are pruned.
+    """
+    for node in walk(body, skip_types=tuple(function_types)):
+        if node.type not in CALL_TYPES:
+            continue
+        name = call_name(node)
+        if name == "perror":
+            return True
+        if name in _CPP_STDERR_CALLS and _cpp_call_first_arg_is_stderr(node):
+            return True
+    return False
+
+
 def _caught_binding_name(catch_node: tree_sitter.Node, lang_name: str) -> str | None:
     """Return the variable name bound by the catch clause, or None if there isn't one.
 
@@ -735,7 +769,9 @@ class LoggingOnErrorRule(BaseRule):
             return False
         if any(call_name(node) in self._LOG_METHODS for node in walk(body, skip_types=tuple(function_types)) if node.type in CALL_TYPES):
             return True
-        return lang_name == "cpp" and _cpp_body_has_stream_log(body, function_types)
+        if lang_name != "cpp":
+            return False
+        return _cpp_body_has_stream_log(body, function_types) or _cpp_body_has_stderr_log(body, function_types)
 
     def _is_unlogged(self, except_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str]) -> bool:
         """Return True when this catch clause swallows an error without logging."""
