@@ -164,21 +164,48 @@ def _is_c_void_param(param: tree_sitter.Node) -> bool:
     return param.child_by_field_name("declarator") is None and any(c.type == "primitive_type" and node_text(c) == "void" for c in param.named_children)
 
 
-def _count_c_args(func_node: tree_sitter.Node) -> int:
-    """Count C parameters, unwrapping the declarator and treating a lone ``void`` as zero.
+def _count_cpp_lambda_args(lambda_node: tree_sitter.Node) -> int:
+    """Count the parameters of a C++ ``lambda_expression``.
 
-    Parameters nest under ``function_declarator.parameters``; the function's own
-    declarator may be wrapped in a ``pointer_declarator`` for a pointer-returning
-    function (``char *foo(...)``), so the declarator chain is unwrapped to the
-    ``function_declarator`` first (bounded loop). ``int f(void)`` is C's spelling
-    for *no* parameters and counts as zero.
+    A lambda nests its parameters under an ``abstract_function_declarator``
+    child (there is no ``declarator`` field, unlike a ``function_definition``),
+    so the C declarator-chain unwrap in :func:`_count_c_args` would miss them
+    and count every lambda as zero. A parameterless lambda (``[]{...}`` or
+    ``[](){...}``) has no parameter list and counts as zero.
+    """
+    afd = next((c for c in lambda_node.named_children if c.type == "abstract_function_declarator"), None)
+    params_node = afd.child_by_field_name("parameters") if afd is not None else None
+    if params_node is None:
+        return 0
+    return len([c for c in params_node.named_children if c.type in ("parameter_declaration", "variadic_parameter", "optional_parameter_declaration")])
+
+
+def _c_function_params_node(func_node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Unwrap the declarator chain to the ``function_declarator``'s parameter list, or None.
+
+    The function's own declarator may be wrapped in a ``pointer_declarator`` for a
+    pointer-returning function (``char *foo(...)``), so the chain is unwrapped to
+    the ``function_declarator`` first (bounded loop; never recurses).
     """
     decl = func_node.child_by_field_name("declarator")
     for _ in range(16):
         if decl is None or decl.type == "function_declarator":
             break
         decl = decl.child_by_field_name("declarator")
-    params_node = decl.child_by_field_name("parameters") if decl is not None and decl.type == "function_declarator" else None
+    return decl.child_by_field_name("parameters") if decl is not None and decl.type == "function_declarator" else None
+
+
+def _count_c_args(func_node: tree_sitter.Node) -> int:
+    """Count C / C++ parameters, treating a lone ``void`` as zero.
+
+    Parameters nest under ``function_declarator.parameters`` (resolved by
+    :func:`_c_function_params_node`). ``int f(void)`` is C's spelling for *no*
+    parameters and counts as zero. A C++ ``lambda_expression`` uses a different
+    shape and is delegated to :func:`_count_cpp_lambda_args`.
+    """
+    if func_node.type == "lambda_expression":
+        return _count_cpp_lambda_args(func_node)
+    params_node = _c_function_params_node(func_node)
     if params_node is None:  # pragma: no cover - defensive: a function_definition always has a parameter list
         return 0
     # ``variadic_parameter`` is the ``...`` ellipsis - a real parameter slot, so

@@ -163,7 +163,7 @@ _C_BRANCHING_TYPES = frozenset(
     }
 )
 # C++: the C set plus ``catch_clause`` (each ``catch`` is a branch).
-_CPP_BRANCHING_TYPES = _C_BRANCHING_TYPES | frozenset({"catch_clause"})
+_CPP_BRANCHING_TYPES = _C_BRANCHING_TYPES | frozenset({"catch_clause", "for_range_loop"})
 _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset(
         {

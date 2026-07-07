@@ -104,3 +104,21 @@ def test_cpp_throwing_fresh_exception_without_log_fires_safe203(tmp_path: Path) 
     """Throwing a *new* exception (not the caught binding) is not a re-raise - logging is still required."""
     src = 'void f() {\n    try { g(); } catch (const std::exception& e) { throw std::runtime_error("bad"); }\n}\n'
     assert "SAFE203" in _codes(src, tmp_path)
+
+
+def test_cpp_fprintf_stderr_logging_catch_is_clean_for_safe203(tmp_path: Path) -> None:
+    """A `fprintf(stderr, ...)` in the catch counts as logging - no SAFE203."""
+    src = 'void f() {\n    try { g(); } catch (const std::exception& e) { fprintf(stderr, "error: %s\\n", e.what()); }\n}\n'
+    assert "SAFE203" not in _codes(src, tmp_path)
+
+
+def test_cpp_perror_logging_catch_is_clean_for_safe203(tmp_path: Path) -> None:
+    """A `perror(...)` in the catch counts as logging (it always writes to stderr) - no SAFE203."""
+    src = 'void f() {\n    try { g(); } catch (const std::exception& e) { perror("operation failed"); }\n}\n'
+    assert "SAFE203" not in _codes(src, tmp_path)
+
+
+def test_cpp_fprintf_to_non_stderr_still_fires_safe203(tmp_path: Path) -> None:
+    """A `fprintf(logfile, ...)` to a non-stderr stream is not error logging - SAFE203 still fires."""
+    src = 'void f() {\n    try { g(); } catch (const std::exception& e) { fprintf(logfile, "%s", e.what()); }\n}\n'
+    assert "SAFE203" in _codes(src, tmp_path)

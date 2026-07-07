@@ -87,3 +87,30 @@ def test_cpp_out_of_line_method_recursion_fires_safe105(tmp_path: Path) -> None:
 def test_cpp_non_recursive_is_clean_for_safe105(tmp_path: Path) -> None:
     """A method that calls a different function is clean for SAFE105."""
     assert "SAFE105" not in _codes("struct S {\n    int m() { return helper(); }\n};\n", tmp_path)
+
+
+def test_cpp_namespace_qualified_self_call_fires_safe105(tmp_path: Path) -> None:
+    """A namespace-qualified self-call (`ns::f()` inside `f`) is detected as recursion."""
+    assert "SAFE105" in _codes("namespace ns {\n    void f() { ns::f(); }\n}\n", tmp_path)
+
+
+def test_cpp_nested_range_for_loops_fire_safe102(tmp_path: Path) -> None:
+    """Three nested range-based `for (auto x : v)` loops exceed the depth-2 cap (SAFE102)."""
+    src = "void f() {\n    for (auto a : v) {\n        for (auto b : v) {\n            for (auto c : v) { g(a, b, c); }\n        }\n    }\n}\n"
+    assert "SAFE102" in _codes(src, tmp_path)
+
+
+def test_cpp_many_range_for_loops_fire_safe104(tmp_path: Path) -> None:
+    """A function dominated by range-based for loops still trips the complexity cap (SAFE104)."""
+    loops = "".join(f"    for (auto x{i} : v) {{ g(x{i}); }}\n" for i in range(12))
+    assert "SAFE104" in _codes(f"void f() {{\n{loops}}}\n", tmp_path)
+
+
+def test_cpp_over_parameterised_lambda_fires_safe103(tmp_path: Path) -> None:
+    """A lambda with more than the default max args (7) fires SAFE103."""
+    assert "SAFE103" in _codes("auto f = [](int a, int b, int c, int d, int e, int g, int h, int i) { return 0; };\n", tmp_path)
+
+
+def test_cpp_small_lambda_is_clean_for_safe103(tmp_path: Path) -> None:
+    """A two-parameter comparator lambda does not fire SAFE103."""
+    assert "SAFE103" not in _codes("auto cmp = [](int a, int b) { return a < b; };\n", tmp_path)
