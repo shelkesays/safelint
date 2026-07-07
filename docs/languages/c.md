@@ -6,7 +6,7 @@ C is Holzmann's original "Power of Ten" target language. Several clauses that ev
 
 `.c` and `.h`.
 
-**`.h` ownership:** `.h` headers are linted as **C**. A C++ project that uses `.h` headers gets them linted as C - content sniffing is out of scope, so a header shared between C and C++ is treated as C. C++ (when it lands) keeps the C++-only header extensions (`.hpp`, `.hxx`, `.hh`). This is a documented limitation.
+**`.h` ownership:** `.h` headers are linted as **C**. A C++ project that uses `.h` headers gets them linted as C - content sniffing is out of scope, so a header shared between C and C++ is treated as C. [C++](cpp.md) keeps the C++-only header extensions (`.hpp`, `.hxx`, `.hh`). This is a documented limitation.
 
 ## Quick start
 

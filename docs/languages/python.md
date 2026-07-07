@@ -114,7 +114,7 @@ repos:
         files: ^src/
 ```
 
-The published hook spec sets `types_or: [python, javascript, ts, tsx, java, rust, go, php, c]` and no `files:` filter, add your own `files:` / `exclude:` keys to scope it. Mixed-language projects compose extras: `additional_dependencies: ['safelint[python,javascript]']` (or `[all]`).
+The published hook spec sets `types_or: [python, javascript, ts, tsx, java, rust, go, php, c, c++]` and no `files:` filter, add your own `files:` / `exclude:` keys to scope it. Mixed-language projects compose extras: `additional_dependencies: ['safelint[python,javascript]']` (or `[all]`).
 
 ## Python-specific config keys
 

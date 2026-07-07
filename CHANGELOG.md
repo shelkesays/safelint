@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+**C++ is now a supported language.** Building on the C support, `.cpp` / `.cxx` / `.cc` / `.hpp` / `.hxx` / `.hh` files are discovered, parsed via `tree-sitter-cpp`, and run against **26 rules**: the cross-language ports, the five C-family rules (SAFE106 / SAFE310-313) widened to C and C++, the three `try` / `catch` / `throw` error-handling rules, and **two new C++-only rules**. Plain `.h` headers stay with C (documented). The additive language work is what justifies this release as a MINOR bump (per the project's semver rules: scope expansion is MINOR, never MAJOR).
+
+### Added
+
+- **C++ language support** via the opt-in `[cpp]` extra (`pip install 'safelint[cpp]'`). `tree-sitter-cpp` is a superset of `tree-sitter-c`, so the C node types and the five C-family rules carry over unchanged.
+- **SAFE315 (`raw_new_delete`)** - flags every `new` / `delete` expression; prefer `std::make_unique` / `std::make_shared` and RAII. `make_unique` / `make_shared` never fire; a raw `new` inside a `unique_ptr<T>(new T)` argument still does. Overlaps the widened SAFE310 by design. C++-only, disabled by default.
+- **SAFE316 (`dangerous_casts`)** - flags `reinterpret_cast` / `const_cast`; `static_cast` / `dynamic_cast` stay clean. Configurable via `dangerous_casts_cpp`. C++-only, disabled by default.
+- **SAFE201 (`bare_except`)** gains its first non-Python home: the `catch (...)` catch-all. SAFE202 (`empty_except`) and SAFE203 (`logging_on_error`) also register for C++; SAFE203 recognises `std::cerr << ...` stream insertion and `spdlog::error`-style calls as logging, and a bare `throw;` / `throw e;` as a re-raise.
+- C++-specific behaviour on the widened rules: SAFE302 (`global_mutation`) descends into `namespace_definition` bodies; SAFE310 (`dynamic_allocation`) also flags `new` / `delete`; SAFE313 (`restricted_pointers`) exempts smart pointers; SAFE105 (`no_recursion`) detects `this->m()` self-calls; SAFE801 (`tainted_sink`) seeds reference parameters and reuses the C taint tracker.
+- Per-language `_cpp`-suffixed config defaults mirroring C (`nonlocal_jump_calls_cpp`, `allocation_calls_cpp`, `dynamic_exec_calls_cpp`, `io_functions_cpp`, `assertion_calls_cpp`, `sinks_cpp` / `sources_cpp` / `sanitizers_cpp`, `flagged_calls_cpp`, `dangerous_casts_cpp`).
+- A bundled `languages/cpp.md` skill addendum and a C++ language reference page; all fourteen client skill files, the CLI / SECURITY / TOML / contributing enumerations, and the pre-commit `types_or` list updated for C++.
+
 ## [2.7.1] - 2026-07-06
 
 Post-release hardening of the v2.7.0 C support: one opt-in-rule bugfix (SAFE312 false positives on real-world include guards), documentation-fidelity corrections, and regression tests that backfill gaps found in the C post-release audit.

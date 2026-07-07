@@ -6,7 +6,7 @@ The schema's *shape* has been **stable since v1.5.0**. Field additions are non-b
 
 The *set of possible rule codes* has expanded as new languages landed (Java + the `SAFE901-904` Spring rules in v2.1.0; Rust + `SAFE110`/`SAFE112`/`SAFE204-208`/`SAFE306`/`SAFE308`/`SAFE602` in v2.2.0), but each new code follows the same `Violation` shape the schema documents.
 
-**The JSON shape is language-agnostic.** All eight supported languages (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C) produce identical violation structures; only the `filepath` extension and the specific rule codes that fired differ. A consumer parsing safelint output doesn't need per-language logic to read the document; if you want to group violations by language, key off the `filepath` extension.
+**The JSON shape is language-agnostic.** All nine supported languages (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, C++) produce identical violation structures; only the `filepath` extension and the specific rule codes that fired differ. A consumer parsing safelint output doesn't need per-language logic to read the document; if you want to group violations by language, key off the `filepath` extension.
 
 > **About "advisory" suggestions:** the `suggestions[]` array carries optional fix candidates the rule offers, but **safelint never auto-applies them**, and consumers (editors, plugins, CI scripts) must not auto-apply them either. Display them as user-confirmable quick-fixes; the user always presses "accept" before any byte is written. This is a permanent design contract: safelint is a review tool, not a refactor tool, and a `--fix` flag will not ship. See the *"Suggestions are advisory only"* section near the end of this page for the full rationale.
 

@@ -24,30 +24,30 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 - **PHP** (`.php`), new in v2.6.0. 21 rules apply and only 2 are skipped (SAFE201 `bare_except` and SAFE305 `wide_scope_declaration`), the widest rule coverage of any non-Python language because PHP ports the largest share of the existing rule set. PHP is the **first non-Python home for SAFE301 (`global_state`)**: PHP has a literal `global` keyword, so the rule fires on `global $config;`-style declarations exactly as it does on Python. PHP also has try/catch (SAFE202 / SAFE203 apply), `eval` and dynamic-call surfaces (SAFE309), and resource lifecycles (SAFE401). Headline PHP highlights: the `@`-operator error-suppression idiom, superglobal taint sources (`$_GET` / `$_POST` / `$_REQUEST` / etc.) feeding SAFE801, and the `break N;` / `continue N;` multi-level loop forms. See [PHP](../languages/php.md) for the full language reference.
 
 - **C** (`.c`, `.h`), new in v2.7.0. Holzmann's original target language. 21 rules apply: the 16 cross-language ports plus **5 new C-only rules** (the "homecoming") that express clauses every other language adapts away - SAFE106 (`nonlocal_jumps`, `goto` / `setjmp`), SAFE310 (`dynamic_allocation`, the `malloc` family), SAFE311 (`complex_macro`) and SAFE312 (`conditional_compilation`) for the preprocessor, and SAFE313 (`restricted_pointers`). SAFE106 is the only one enabled by default (warning severity, because `goto err` cleanup is idiomatic); the other four are opt-in. `.h` headers are linted as C. 5 rules are skipped (SAFE201/202/203, SAFE301, SAFE305) plus SAFE401 and SAFE803 (documented gaps - C cleanup and nil analysis need flow analysis). See [C](../languages/c.md) for the full language reference.
+- **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), new in v2.8.0. Builds on C: the five C-family rules widen to C and C++, plus C++ gains its `try` / `catch` / `throw` rules (SAFE201 catch-all, SAFE202, SAFE203) and **two new C++-only rules** - SAFE315 (`raw_new_delete`) and SAFE316 (`dangerous_casts`). 26 rules apply. Plain `.h` headers are linted as C; use `.hpp` / `.hxx` / `.hh` for C++ headers. See [C++](../languages/cpp.md) for the full language reference.
 
 ### Planned
 
-Listed in the project's current working priority; no timelines committed. SafeLint's registry-driven architecture (see [Adding a language](../contributing/adding-a-language.md)) makes each new language incremental, community contributions are welcome.
-
-1. **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), same grammar family as C; preprocessor / templates / ADL make the rule design noticeably harder, and it depends on C shipping first.
+No languages are currently on the near-term roadmap. SafeLint's registry-driven architecture (see [Adding a language](../contributing/adding-a-language.md)) makes each new language incremental, community contributions are welcome.
 
 ### Rule scope (current languages)
 
 | Scope | Count | Codes |
 |---|---|---|
-| **Cross-language** (all eight: Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C) | 13 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE105 (`no_recursion`), SAFE303, SAFE304, SAFE501, SAFE603 (`blanket_suppression`), SAFE701, SAFE702, SAFE801, SAFE802 (apply to all eight). |
-| **Python / JS / TS / Java / Rust / PHP / C** (not Go) | 1 | SAFE601 (`missing_assertions`); Go has no production assertion idiom. C has the literal `assert` macro. |
-| **Python / JS / TS / Java / Rust / PHP** (not Go, not C) | 1 | SAFE803 (`null_dereference`); no chained-nullable idiom in Go, and C nil analysis needs flow analysis (documented gap). |
-| **Python / JS / TS / Java / Go / PHP / C** (not Rust) | 2 | SAFE302 (`global_mutation`), SAFE309 (`dynamic_code_execution`). Rust's analogues are SAFE307 + SAFE602 (mutable statics) and an opaque token-tree limitation for rule 8. C fires on file-scope mutable declarations (SAFE302) and `dlopen` / `dlsym` (SAFE309). |
-| **Python / JS / TS / Java / Go / PHP** (not Rust, not C) | 1 | SAFE401 (`resource_lifecycle`). Rust uses Drop; C cleanup (`goto err`, explicit `fclose` / `free`) needs flow analysis the rule does not do (documented gap - allocation discipline is C's SAFE310). |
-| **Python / JS / TS / Java / PHP** (not Rust, not Go) | 2 | SAFE202 (`empty_except`), SAFE203 (`logging_on_error`). Neither Rust nor Go has try/catch; Rust's analogues are SAFE206 / SAFE207, and Go's empty-`if err != nil` swallow is covered by SAFE209. |
-| **Python + PHP** | 1 | SAFE301 (`global_state`); both have a literal `global` keyword, JS / TS / Java / Rust / Go do not. |
-| **Python-only** | 1 | SAFE201 (`bare_except`); JS / TS / Java catches always bind the error, and Rust / Go / PHP have no bare-catch equivalent. |
+| **Cross-language** (all nine: Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, C++) | 13 | SAFE101, SAFE102, SAFE103, SAFE104, SAFE105 (`no_recursion`), SAFE303, SAFE304, SAFE501, SAFE603 (`blanket_suppression`), SAFE701, SAFE702, SAFE801, SAFE802 (apply to all nine). |
+| **Python / JS / TS / Java / Rust / PHP / C / C++** (not Go) | 1 | SAFE601 (`missing_assertions`); Go has no production assertion idiom. C / C++ have the literal `assert` macro. |
+| **Python / JS / TS / Java / Rust / PHP** (not Go, not C, not C++) | 1 | SAFE803 (`null_dereference`); no chained-nullable idiom in Go, and C / C++ nil analysis needs flow analysis (documented gap). |
+| **Python / JS / TS / Java / Go / PHP / C / C++** (not Rust) | 2 | SAFE302 (`global_mutation`), SAFE309 (`dynamic_code_execution`). Rust's analogues are SAFE307 + SAFE602 (mutable statics) and an opaque token-tree limitation for rule 8. C / C++ fire on file-scope (and, for C++, namespace-scope) mutable declarations (SAFE302) and `dlopen` / `dlsym` (SAFE309). |
+| **Python / JS / TS / Java / Go / PHP** (not Rust, not C, not C++) | 1 | SAFE401 (`resource_lifecycle`). Rust and C++ use Drop / RAII; C cleanup (`goto err`, explicit `fclose` / `free`) needs flow analysis the rule does not do (documented gap - allocation discipline is C's SAFE310, C++'s is SAFE310 / SAFE315). |
+| **Python / JS / TS / Java / PHP / C++** (not Rust, not Go, not C) | 2 | SAFE202 (`empty_except`), SAFE203 (`logging_on_error`). C++ gains `try` / `catch`; C has no try/catch. Neither Rust nor Go has try/catch; Rust's analogues are SAFE206 / SAFE207, and Go's empty-`if err != nil` swallow is covered by SAFE209. |
+| **Python + PHP** | 1 | SAFE301 (`global_state`); both have a literal `global` keyword, JS / TS / Java / Rust / Go / C / C++ do not. |
+| **Python + C++** | 1 | SAFE201 (`bare_except`); Python's bare `except:` and C++'s `catch (...)` catch-all. JS / TS / Java catches always bind the error, and Rust / Go / PHP / C have no bare-catch equivalent. |
 | **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`); Python / Java / Rust / Go / PHP have no `var` / `let` / `const` distinction. |
 | **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`); all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset. |
 | **Rust-only** | 11 | SAFE110 (`needless_mut`), SAFE112 (`unchecked_arithmetic_on_input`), SAFE204 (`panic_macros_outside_tests`), SAFE205 (`lock_poisoning_ignored`), SAFE206 (`silent_result_discard`, the Rust analogue of SAFE202), SAFE207 (`unlogged_error_branch`, the Rust analogue of SAFE203), SAFE208 (`result_unwrap_outside_tests`), SAFE306 (`dangerous_mem_ops`), SAFE307 (`interior_mutable_static`), SAFE308 (`truncating_as_cast`), SAFE602 (`undocumented_unsafe`); all default-disabled. |
 | **Go-only** | 2 | SAFE209 (`empty_error_check`, the Go analogue of SAFE206), SAFE211 (`panic_calls_outside_tests`, the Go analogue of SAFE204); both default-disabled. |
-| **C-only** | 5 | SAFE106 (`nonlocal_jumps`, `goto` / `setjmp`; **enabled at warning severity**), SAFE310 (`dynamic_allocation`), SAFE311 (`complex_macro`), SAFE312 (`conditional_compilation`), SAFE313 (`restricted_pointers`); the last four default-disabled. The Power-of-Ten clauses (rules 1, 3, 8, 9) every other language adapts away. |
+| **C-family** (C and C++) | 5 | SAFE106 (`nonlocal_jumps`, `goto` / `setjmp`; **enabled at warning severity**), SAFE310 (`dynamic_allocation`; on C++ also `new` / `delete`), SAFE311 (`complex_macro`), SAFE312 (`conditional_compilation`), SAFE313 (`restricted_pointers`; smart pointers exempt on C++); the last four default-disabled. The Power-of-Ten clauses (rules 1, 3, 8, 9) every other language adapts away. |
+| **C++-only** | 2 | SAFE315 (`raw_new_delete`), SAFE316 (`dangerous_casts`); both default-disabled. Modern-C++ ownership / type-safety idioms (3xx band). |
 
 The engine's per-language dispatch automatically skips rules whose `language` tuple doesn't include the active file's language. There's no manual configuration to do, drop a `.py` file in a JS / TS project (or vice versa) and the right rules fire on each.
 
@@ -676,6 +676,48 @@ enabled = true
 # safelint.toml
 [rules.restricted_pointers]
 enabled = true
+```
+
+## C++ idiom rules
+
+Two C++-only rules capture modern-C++ ownership / type-safety idioms that have no analogue in the other languages. Both are **disabled by default**. New in v2.8.0.
+
+### SAFE315: `raw_new_delete`
+
+**What it flags:** Every `new` and `delete` expression. **C++-only.** The modern-ownership rule: prefer `std::make_unique` / `std::make_shared` and RAII so a scoped owner releases memory automatically and cannot be forgotten on an early return or exception. `std::make_unique` / `std::make_shared` contain no `new` expression and never fire; a raw `new` inside a `std::unique_ptr<T>(new T)` argument still fires (prefer `make_unique`).
+
+It **overlaps the widened SAFE310** (`dynamic_allocation`) by design: SAFE310 is the Holzmann no-allocation-after-init posture (embedded / safety-critical), SAFE315 the ownership posture (leak safety). Enabling both double-reports a raw `new`, the same intentional overlap as SAFE205 / SAFE208.
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.raw_new_delete]
+enabled = true
+```
+
+```toml
+# safelint.toml
+[rules.raw_new_delete]
+enabled = true
+```
+
+### SAFE316: `dangerous_casts`
+
+**What it flags:** `reinterpret_cast` and `const_cast` expressions. **C++-only.** These defeat the type / const system: `reinterpret_cast` reinterprets a bit pattern with no checking, `const_cast` strips `const` (undefined behaviour if the underlying object is truly `const`). `static_cast` and `dynamic_cast` are compiler-checked and stay clean. The named casts parse as a `call_expression` whose callee is a `template_function`, so the rule matches on the template callee name.
+
+The flagged list is configurable via `dangerous_casts_cpp` - narrow it, or add `static_cast` if your profile forbids all named casts.
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.dangerous_casts]
+enabled = true
+dangerous_casts_cpp = ["reinterpret_cast", "const_cast"]
+```
+
+```toml
+# safelint.toml
+[rules.dangerous_casts]
+enabled = true
+dangerous_casts_cpp = ["reinterpret_cast", "const_cast"]
 ```
 
 ## Resource safety rules
