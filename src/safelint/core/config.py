@@ -793,6 +793,12 @@ DEFAULTS: dict[str, Any] = {
             "assertion_calls_c": [
                 "assert",
             ],
+            # C++ reuses C's ``assert`` macro (``<cassert>``). Add project /
+            # framework assertion macros (e.g. GoogleTest ``ASSERT_TRUE``,
+            # Catch2 ``REQUIRE``) via ``assertion_calls_cpp`` if needed.
+            "assertion_calls_cpp": [
+                "assert",
+            ],
         },
         "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
         "test_coupling": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},

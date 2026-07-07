@@ -336,13 +336,13 @@ def _cpp_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
     recursion). ``catch (const E&)`` (no binding) and ``catch (...)`` return None.
     """
     params = catch_node.child_by_field_name("parameters")
-    if params is None:
+    if params is None:  # pragma: no cover - defensive: a catch clause always has a parameter list
         return None
     decl = next((c for c in params.named_children if c.type == "parameter_declaration"), None)
-    if decl is None:
+    if decl is None:  # pragma: no cover - defensive: only reached for a ``throw e;`` inside a typed catch, which has a parameter_declaration
         return None
     declarator = decl.child_by_field_name("declarator")
-    if declarator is None:
+    if declarator is None:  # pragma: no cover - defensive: a re-raised binding comes from a named ``catch (E& e)``
         return None
     return next((node_text(node) for node in walk(declarator) if node.type == "identifier"), None)
 
@@ -381,7 +381,7 @@ def _cpp_stream_target_name(operand: tree_sitter.Node) -> str | None:
     if operand.type == "qualified_identifier":
         name = operand.child_by_field_name("name")
         return node_text(name) if name is not None and name.type == "identifier" else None
-    return None
+    return None  # pragma: no cover - defensive: a stream-insertion chain's leftmost operand is a stream name, not another shape
 
 
 def _cpp_chain_leftmost(expr: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -395,7 +395,7 @@ def _cpp_chain_leftmost(expr: tree_sitter.Node) -> tree_sitter.Node | None:
         if operand is None or operand.type != "binary_expression":
             return operand
         operand = operand.child_by_field_name("left")
-    return operand
+    return operand  # pragma: no cover - defensive: a ``<<`` chain deeper than 64 does not occur
 
 
 def _cpp_body_has_stream_log(body: tree_sitter.Node, function_types: frozenset[str]) -> bool:
@@ -711,14 +711,13 @@ class LoggingOnErrorRule(BaseRule):
         reraise_types = _RERAISE_STATEMENT_TYPES_BY_LANG[lang_name]
         if len(stmts) != 1 or stmts[0].type not in reraise_types:
             return False
-        if lang_name in ("python", "cpp"):
-            # Bare ``raise`` (Python) / ``throw;`` (C++) rethrows the active
-            # exception and has no children. A C++ ``throw e;`` with an operand
-            # falls through to the caught-binding check below.
-            if not stmts[0].named_children:
-                return True
-            if lang_name == "python":
-                return False
+        if lang_name == "python":
+            # Bare ``raise`` (no children) re-raises; ``raise Exception()`` does not.
+            return not stmts[0].named_children
+        if lang_name == "cpp" and not stmts[0].named_children:
+            # Bare ``throw;`` rethrows the active exception. A ``throw e;`` with
+            # an operand falls through to the caught-binding check below.
+            return True
         return _throw_reraises_caught_binding(stmts[0], except_node, lang_name)
 
     def _has_log_call(self, except_node: tree_sitter.Node, function_types: frozenset[str], lang_name: str) -> bool:

@@ -92,7 +92,7 @@ class DangerousCastsRule(BaseRule):
             if func is None or func.type != "template_function":
                 continue
             name_node = func.child_by_field_name("name")
-            if name_node is None:
+            if name_node is None:  # pragma: no cover - defensive: a template_function always has a name field
                 continue
             cast = node_text(name_node)
             if cast in flagged:

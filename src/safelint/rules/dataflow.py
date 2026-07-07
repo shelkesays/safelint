@@ -114,7 +114,7 @@ def _cpp_param_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | N
         if nxt is None and cur.type == "reference_declarator":
             nxt = next((c for c in cur.named_children if c.type in ("identifier", "pointer_declarator", "array_declarator", "reference_declarator", "function_declarator")), None)
         cur = nxt
-    return None
+    return None  # pragma: no cover - defensive: 16-deep declarator nesting does not occur
 
 
 def _cpp_param_names(func_node: tree_sitter.Node) -> set[str]:
@@ -128,7 +128,7 @@ def _cpp_param_names(func_node: tree_sitter.Node) -> set[str]:
     """
     func_decl = _c_function_declarator(func_node.child_by_field_name("declarator"))
     params_node = func_decl.child_by_field_name("parameters") if func_decl is not None else None
-    if params_node is None:
+    if params_node is None:  # pragma: no cover - defensive: valid C++ functions always have a parameters list
         return set()
     names: set[str] = set()
     for child in params_node.named_children:

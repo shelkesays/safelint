@@ -383,38 +383,45 @@ def test_base_rule_default_language_is_python_only() -> None:
 # each rule sits where it does.
 _ALL_SEVEN = ("python", "javascript", "typescript", "java", "rust", "go", "php")
 _ALL_EIGHT = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c")
+_ALL_NINE = (*_ALL_EIGHT, "cpp")
 
 _EXPECTED_LANGUAGES: dict[str, tuple[str, ...]] = {
     # Cross-language structural / dataflow rules ported to EVERY registered
-    # language (all eight, C included).
-    "FunctionLengthRule": _ALL_EIGHT,  # SAFE101
-    "NestingDepthRule": _ALL_EIGHT,  # SAFE102
-    "MaxArgumentsRule": _ALL_EIGHT,  # SAFE103
-    "ComplexityRule": _ALL_EIGHT,  # SAFE104
-    "NoRecursionRule": _ALL_EIGHT,  # SAFE105
-    "UnboundedLoopRule": _ALL_EIGHT,  # SAFE501
-    "BlanketSuppressionRule": _ALL_EIGHT,  # SAFE603
-    "TestExistenceRule": _ALL_EIGHT,  # SAFE701
-    "TestCouplingRule": _ALL_EIGHT,  # SAFE702
-    "SideEffectsHiddenRule": _ALL_EIGHT,  # SAFE303
-    "SideEffectsRule": _ALL_EIGHT,  # SAFE304
-    "TaintedSinkRule": _ALL_EIGHT,  # SAFE801
-    "ReturnValueIgnoredRule": _ALL_EIGHT,  # SAFE802
+    # language (all nine, C and C++ included).
+    "FunctionLengthRule": _ALL_NINE,  # SAFE101
+    "NestingDepthRule": _ALL_NINE,  # SAFE102
+    "MaxArgumentsRule": _ALL_NINE,  # SAFE103
+    "ComplexityRule": _ALL_NINE,  # SAFE104
+    "NoRecursionRule": _ALL_NINE,  # SAFE105
+    "UnboundedLoopRule": _ALL_NINE,  # SAFE501
+    "BlanketSuppressionRule": _ALL_NINE,  # SAFE603
+    "TestExistenceRule": _ALL_NINE,  # SAFE701
+    "TestCouplingRule": _ALL_NINE,  # SAFE702
+    "SideEffectsHiddenRule": _ALL_NINE,  # SAFE303
+    "SideEffectsRule": _ALL_NINE,  # SAFE304
+    "TaintedSinkRule": _ALL_NINE,  # SAFE801
+    "ReturnValueIgnoredRule": _ALL_NINE,  # SAFE802
     # Ported everywhere EXCEPT Rust (Rust covers these via RAII / SAFE602 /
-    # SAFE307, or its rule-8 analogue is the opaque macro system). C is included.
-    "GlobalMutationRule": ("python", "javascript", "typescript", "java", "go", "php", "c"),  # SAFE302
-    "DynamicCodeExecutionRule": ("python", "javascript", "typescript", "java", "go", "php", "c"),  # SAFE309
-    # SAFE401 resource_lifecycle is NOT ported to C (cleanup needs flow analysis;
-    # allocation discipline is the new SAFE310's job - documented gap).
+    # SAFE307, or its rule-8 analogue is the opaque macro system). C / C++ in.
+    "GlobalMutationRule": ("python", "javascript", "typescript", "java", "go", "php", "c", "cpp"),  # SAFE302
+    "DynamicCodeExecutionRule": ("python", "javascript", "typescript", "java", "go", "php", "c", "cpp"),  # SAFE309
+    # SAFE401 resource_lifecycle is NOT ported to C / C++ (cleanup needs flow
+    # analysis; C's allocation discipline is SAFE310's job, C++'s is RAII -
+    # same rationale as Rust - documented gap).
     "ResourceLifecycleRule": ("python", "javascript", "typescript", "java", "go", "php"),  # SAFE401
-    # Ported everywhere EXCEPT Go (no production assertion idiom). C is included
-    # (the ``assert`` macro). SAFE803 stays without C / Go (nil analysis needs types).
-    "MissingAssertionsRule": ("python", "javascript", "typescript", "java", "rust", "php", "c"),  # SAFE601
+    # Ported everywhere EXCEPT Go (no production assertion idiom). C / C++ are
+    # included (the ``assert`` macro). SAFE803 stays without C / C++ / Go (nil
+    # analysis needs types).
+    "MissingAssertionsRule": ("python", "javascript", "typescript", "java", "rust", "php", "c", "cpp"),  # SAFE601
     "NullDereferenceRule": ("python", "javascript", "typescript", "java", "rust", "php"),  # SAFE803
     # try/catch rules: the languages with try/catch (Rust / Go have neither;
-    # their analogues SAFE206/207 / SAFE209 are separate rule designs).
-    "EmptyExceptRule": ("python", "javascript", "typescript", "java", "php"),  # SAFE202
-    "LoggingOnErrorRule": ("python", "javascript", "typescript", "java", "php"),  # SAFE203
+    # their analogues SAFE206/207 / SAFE209 are separate rule designs). C++
+    # adds ``try`` / ``catch`` / ``throw``.
+    "EmptyExceptRule": ("python", "javascript", "typescript", "java", "php", "cpp"),  # SAFE202
+    "LoggingOnErrorRule": ("python", "javascript", "typescript", "java", "php", "cpp"),  # SAFE203
+    # SAFE201 bare_except: Python's bare ``except:`` and C++'s ``catch (...)``
+    # catch-all - its first non-Python home.
+    "BareExceptRule": ("python", "cpp"),  # SAFE201
     # The literal ``global`` keyword: Python and PHP only (PHP is SAFE301's
     # first non-Python registration).
     "GlobalStateRule": ("python", "php"),  # SAFE301
@@ -441,12 +448,17 @@ _EXPECTED_LANGUAGES: dict[str, tuple[str, ...]] = {
     # Go-only language-idiom rules.
     "EmptyErrorCheckRule": ("go",),  # SAFE209
     "PanicCallsOutsideTestsRule": ("go",),  # SAFE211
-    # C-only rules - the "Power of Ten homecoming" (1xx / 3xx bands).
-    "NonlocalJumpsRule": ("c",),  # SAFE106
-    "DynamicAllocationRule": ("c",),  # SAFE310
-    "ComplexMacroRule": ("c",),  # SAFE311
-    "ConditionalCompilationRule": ("c",),  # SAFE312
-    "RestrictedPointersRule": ("c",),  # SAFE313
+    # C-family rules - the "Power of Ten homecoming" (1xx / 3xx bands). All
+    # five widen to ``("c", "cpp")`` (tree-sitter-cpp is a superset of
+    # tree-sitter-c, so the structural checks carry over unchanged).
+    "NonlocalJumpsRule": ("c", "cpp"),  # SAFE106
+    "DynamicAllocationRule": ("c", "cpp"),  # SAFE310
+    "ComplexMacroRule": ("c", "cpp"),  # SAFE311
+    "ConditionalCompilationRule": ("c", "cpp"),  # SAFE312
+    "RestrictedPointersRule": ("c", "cpp"),  # SAFE313
+    # C++-only rules (modern-C++ idiom discipline, 3xx band).
+    "RawNewDeleteRule": ("cpp",),  # SAFE315
+    "DangerousCastsRule": ("cpp",),  # SAFE316
 }
 
 
