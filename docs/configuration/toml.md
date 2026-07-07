@@ -398,6 +398,8 @@ Later   - enable opt-in rules as needed:
           - C:          dynamic_allocation, complex_macro, conditional_compilation,
                         restricted_pointers (the rule 3 / 8 / 9 "homecoming";
                         nonlocal_jumps is already on at warning severity)
+          - C++:        the C-family rules above (widened) plus raw_new_delete
+                        and dangerous_casts (modern-ownership / cast safety)
           - test discipline: missing_assertions (set min_assertions = 2 for the
                         Holzmann density), test_existence, test_coupling
 ```
