@@ -63,7 +63,7 @@ def test_every_registered_language_has_a_smoke_sample() -> None:
     assert sample_exts.issubset(supported_extensions())
     # Every registered language (resolved from its extensions) must have a
     # sample row - a new language addition without one fails here.
-    registered_langs = {get_language_for_file(f"x{ext}").name for ext in supported_extensions()}
+    registered_langs = {ld.name for ext in supported_extensions() if (ld := get_language_for_file(f"x{ext}")) is not None}
     missing = registered_langs - set(_SAMPLES)
     assert not missing, f"registered languages without an all-rules smoke sample: {sorted(missing)}"
 
