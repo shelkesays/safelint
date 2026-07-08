@@ -210,7 +210,9 @@ def _count_c_args(func_node: tree_sitter.Node) -> int:
         return 0
     # ``variadic_parameter`` is the ``...`` ellipsis - a real parameter slot, so
     # ``int log(int a, ...)`` counts as 2 (omitting it leaves the count one short).
-    params = [c for c in params_node.named_children if c.type in ("parameter_declaration", "variadic_parameter")]
+    # ``optional_parameter_declaration`` is a C++ default-valued parameter
+    # (``int b = 5``) - still a real parameter slot, counted like the lambda path.
+    params = [c for c in params_node.named_children if c.type in ("parameter_declaration", "variadic_parameter", "optional_parameter_declaration")]
     if len(params) == 1 and _is_c_void_param(params[0]):
         return 0
     return len(params)
