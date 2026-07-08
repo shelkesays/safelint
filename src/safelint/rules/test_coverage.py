@@ -235,8 +235,11 @@ def _filename_matches_test_pattern(filepath: str, lang_name: str) -> bool:
         # PHPUnit's ``<ClassName>Test.php`` (StudlyCaps suffix).
         return Path(filepath).stem.endswith("Test")
     if lang_name in ("c", "cpp"):
-        # C: Unity / Check / CMocka; C++: GoogleTest / Catch2 - both use ``<stem>_test.c`` and ``test_<stem>.c``;
-        # recognise either so a canonical C test is not treated as production code.
+        # C (Unity / Check / CMocka) and C++ (GoogleTest / Catch2) share a
+        # ``<stem>_test`` / ``test_<stem>`` convention. The match is on the stem
+        # only, so it holds for any C / C++ extension (``.c`` / ``.cpp`` /
+        # ``.cc`` / ``.cxx`` / ``.hpp`` / ...); recognise either form so a
+        # canonical test is not treated as production code.
         stem = Path(filepath).stem
         return stem.endswith("_test") or stem.startswith("test_")
     return name.startswith("test_")
