@@ -65,22 +65,36 @@ def _c_declarator_identifier(node: tree_sitter.Node) -> tree_sitter.Node | None:
     return None
 
 
+#: Declarator wrapper node types whose inner declarator is a plain named child
+#: (no ``declarator`` field) - unwrapped by scanning ``named_children``.
+_CPP_PLAIN_CHILD_DECLARATORS = ("reference_declarator", "parenthesized_declarator")
+_CPP_INNER_DECLARATOR_TYPES = ("field_identifier", "pointer_declarator", "array_declarator", "reference_declarator", "function_declarator", "parenthesized_declarator")
+
+
 def _cpp_field_declarator_name(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
     """Return the ``field_identifier`` name of a C++ data-member declarator, or None.
 
     Unwraps a ``pointer_declarator`` / ``array_declarator`` (via the ``declarator``
     field - the array ``size`` sits on a separate field, so a member-access size
-    like ``arr[obj.n]`` is not reached) and a ``reference_declarator`` (whose
-    inner declarator is a plain named child). A bare ``field_identifier`` is
-    returned directly. Bounded loop; never recurses (SAFE105 polices this).
+    like ``arr[obj.n]`` is not reached) and a ``reference_declarator`` /
+    ``parenthesized_declarator`` (whose inner declarator is a plain named child).
+    A ``function_declarator`` is a data member *only* when it is a function
+    pointer (``int (*fp)(int)`` - the declarator is a ``parenthesized_declarator``);
+    a plain member-function declaration (``int m(int)`` - the declarator is the
+    ``field_identifier``) is not data and returns None. A bare ``field_identifier``
+    is returned directly. Bounded loop; never recurses (SAFE105 polices this).
     """
     cur: tree_sitter.Node | None = declarator
     for _ in range(16):
         if cur is None or cur.type == "field_identifier":
             return cur
+        if cur.type == "function_declarator":
+            inner = cur.child_by_field_name("declarator")
+            cur = inner if inner is not None and inner.type == "parenthesized_declarator" else None
+            continue
         nxt = cur.child_by_field_name("declarator")
-        if nxt is None and cur.type == "reference_declarator":
-            nxt = next((c for c in cur.named_children if c.type in ("field_identifier", "pointer_declarator", "array_declarator", "reference_declarator")), None)
+        if nxt is None and cur.type in _CPP_PLAIN_CHILD_DECLARATORS:
+            nxt = next((c for c in cur.named_children if c.type in _CPP_INNER_DECLARATOR_TYPES), None)
         cur = nxt
     return None
 
@@ -579,7 +593,7 @@ class GlobalMutationRule(BaseRule):
     #: The *initialiser* value (``= obj.field``) and an array *size* (``arr[N]``)
     #: are separate children / fields, so unwrapping via the ``declarator`` field
     #: never reaches a member-access ``field_identifier`` inside them.
-    _CPP_FIELD_DECLARATOR_TYPES: ClassVar[tuple[str, ...]] = ("field_identifier", "pointer_declarator", "array_declarator", "reference_declarator")
+    _CPP_FIELD_DECLARATOR_TYPES: ClassVar[tuple[str, ...]] = ("field_identifier", "pointer_declarator", "array_declarator", "reference_declarator", "function_declarator")
 
     def _cpp_static_member_violations(self, filepath: str, field_decl: tree_sitter.Node) -> list[Violation]:
         """Return one violation per ``static`` (non-``const``) data member, else none.
