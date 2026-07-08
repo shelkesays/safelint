@@ -450,6 +450,8 @@ def _cpp_body_has_stderr_log(body: tree_sitter.Node, function_types: frozenset[s
         if node.type not in CALL_TYPES:
             continue
         name = call_name(node)
+        if name is None:
+            continue
         if name == "perror":
             return True
         stream_arg = _CPP_STDERR_STREAM_ARG.get(name)

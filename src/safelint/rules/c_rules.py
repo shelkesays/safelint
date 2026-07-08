@@ -107,14 +107,12 @@ class DynamicAllocationRule(BaseRule):
         for node in walk(tree.root_node):
             # C++ ``new`` / ``delete`` are dedicated expression nodes, not calls.
             if node.type in ("new_expression", "delete_expression"):
-                keyword = "new" if node.type == "new_expression" else "delete"
-                violations.append(
-                    self._make_violation_for_node(
-                        filepath,
-                        node,
-                        f"`{keyword}` performs dynamic heap allocation - prefer static / stack allocation or a scoped owner after initialisation (Power of Ten rule 3)",
-                    )
+                message = (
+                    "`new` performs dynamic heap allocation - prefer static / stack allocation or a scoped owner after initialisation (Power of Ten rule 3)"
+                    if node.type == "new_expression"
+                    else "`delete` frees dynamically allocated heap memory - prefer static / stack allocation or a scoped owner (RAII) that releases automatically (Power of Ten rule 3)"
                 )
+                violations.append(self._make_violation_for_node(filepath, node, message))
                 continue
             if node.type != "call_expression":
                 continue
