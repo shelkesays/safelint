@@ -379,7 +379,7 @@ def test_grouped_by_category_handles_unknown_band_synthesizes_other_section() ->
     assert "ODD000" in out
 
 
-def test_cli_list_rules_zero_match_exits_two(capsys: pytest.CaptureFixture[str]) -> None:
+def test_cli_list_rules_zero_match_exits_two(monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]) -> None:
     """A filter combination matching zero rules exits 2 + writes a stderr error.
 
     The exit-2 contract guards against typos in CI scripts silently producing
@@ -390,12 +390,10 @@ def test_cli_list_rules_zero_match_exits_two(capsys: pytest.CaptureFixture[str])
     # produce for ``safelint list-rules --language rust`` against an empty
     # iterator.
     args = argparse.Namespace(language="rust", output_format="text", enabled_only=False)
-    original = rl.iter_rule_specs
-    rl.iter_rule_specs = list
-    try:
-        rc = cli._run_list_rules(args)
-    finally:
-        rl.iter_rule_specs = original
+    # Force an empty catalogue: ``list`` consumes the (spec, ...) iterator and
+    # yields nothing. ``monkeypatch`` restores the original after the test.
+    monkeypatch.setattr(rl, "iter_rule_specs", list)
+    rc = cli._run_list_rules(args)
     captured = capsys.readouterr()
     assert rc == 2
     assert "no rules matched" in captured.err
