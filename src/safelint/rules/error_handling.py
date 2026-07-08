@@ -417,28 +417,34 @@ def _cpp_body_has_stream_log(body: tree_sitter.Node, function_types: frozenset[s
     return False
 
 
-#: C-family stderr writers that count as logging when their first argument is
-#: ``stderr`` (``perror`` always writes to stderr and needs no argument check).
-_CPP_STDERR_CALLS = frozenset({"fprintf", "fputs", "vfprintf", "fwrite"})
+#: C-family stderr writers that count as logging, mapped to the 0-based argument
+#: position that carries the ``FILE*`` stream. The stream is NOT always the first
+#: argument: ``fprintf(stream, fmt, ...)`` / ``vfprintf(stream, fmt, ap)`` put it
+#: first, but ``fputs(s, stream)`` puts it second and
+#: ``fwrite(ptr, size, nmemb, stream)`` fourth. ``perror`` always writes to
+#: stderr and is handled separately (no argument check).
+_CPP_STDERR_STREAM_ARG: dict[str, int] = {"fprintf": 0, "vfprintf": 0, "fputs": 1, "fwrite": 3}
 
 
-def _cpp_call_first_arg_is_stderr(call_node: tree_sitter.Node) -> bool:
-    """Return True if *call_node*'s first argument is the ``stderr`` stream."""
+def _cpp_call_arg_is_stderr(call_node: tree_sitter.Node, position: int) -> bool:
+    """Return True if *call_node*'s argument at *position* (0-based) is the ``stderr`` stream."""
     args = call_node.child_by_field_name("arguments")
     if args is None:  # pragma: no cover - defensive: a call_expression always has an argument list
         return False
-    first = next((c for c in args.named_children), None)
-    return first is not None and node_text(first) == "stderr"
+    named = args.named_children
+    return position < len(named) and node_text(named[position]) == "stderr"
 
 
 def _cpp_body_has_stderr_log(body: tree_sitter.Node, function_types: frozenset[str]) -> bool:
-    """Return True if *body* logs via ``perror(...)`` or ``fprintf(stderr, ...)``-style output.
+    """Return True if *body* logs via ``perror(...)`` or a ``stderr`` stream write.
 
     These are the idiomatic no-framework C / C++ error-logging calls; without
     them a catch that logs only through stderr would be a SAFE203 false
-    positive. ``perror`` always writes to stderr; the ``fprintf`` family counts
-    only when its first argument is ``stderr`` (a ``fprintf(logfile, ...)`` is
-    not error logging). Nested function / lambda bodies are pruned.
+    positive. ``perror`` always writes to stderr; the ``fprintf`` / ``fputs`` /
+    ``fwrite`` / ``vfprintf`` family counts only when its stream argument (at the
+    per-function position in :data:`_CPP_STDERR_STREAM_ARG`) is ``stderr`` - a
+    ``fprintf(logfile, ...)`` is not error logging. Nested function / lambda
+    bodies are pruned.
     """
     for node in walk(body, skip_types=tuple(function_types)):
         if node.type not in CALL_TYPES:
@@ -446,7 +452,8 @@ def _cpp_body_has_stderr_log(body: tree_sitter.Node, function_types: frozenset[s
         name = call_name(node)
         if name == "perror":
             return True
-        if name in _CPP_STDERR_CALLS and _cpp_call_first_arg_is_stderr(node):
+        stream_arg = _CPP_STDERR_STREAM_ARG.get(name)
+        if stream_arg is not None and _cpp_call_arg_is_stderr(node, stream_arg):
             return True
     return False
 

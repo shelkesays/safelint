@@ -122,3 +122,21 @@ def test_cpp_fprintf_to_non_stderr_still_fires_safe203(tmp_path: Path) -> None:
     """A `fprintf(logfile, ...)` to a non-stderr stream is not error logging - SAFE203 still fires."""
     src = 'void f() {\n    try { g(); } catch (const std::exception& e) { fprintf(logfile, "%s", e.what()); }\n}\n'
     assert "SAFE203" in _codes(src, tmp_path)
+
+
+def test_cpp_fputs_to_stderr_logging_catch_is_clean_for_safe203(tmp_path: Path) -> None:
+    """`fputs(msg, stderr)` logs to stderr (stream is the *second* arg) - no SAFE203."""
+    src = "void f() {\n    try { g(); } catch (const std::exception& e) { fputs(e.what(), stderr); }\n}\n"
+    assert "SAFE203" not in _codes(src, tmp_path)
+
+
+def test_cpp_fwrite_to_stderr_logging_catch_is_clean_for_safe203(tmp_path: Path) -> None:
+    """`fwrite(..., stderr)` logs to stderr (stream is the *fourth* arg) - no SAFE203."""
+    src = "void f() {\n    try { g(); } catch (const std::exception& e) { fwrite(e.what(), 1, 4, stderr); }\n}\n"
+    assert "SAFE203" not in _codes(src, tmp_path)
+
+
+def test_cpp_fputs_to_non_stderr_still_fires_safe203(tmp_path: Path) -> None:
+    """`fputs(msg, logfile)` to a non-stderr stream is not error logging - SAFE203 still fires."""
+    src = "void f() {\n    try { g(); } catch (const std::exception& e) { fputs(e.what(), logfile); }\n}\n"
+    assert "SAFE203" in _codes(src, tmp_path)
