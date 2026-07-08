@@ -65,6 +65,26 @@ def _c_declarator_identifier(node: tree_sitter.Node) -> tree_sitter.Node | None:
     return None
 
 
+def _cpp_field_declarator_name(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the ``field_identifier`` name of a C++ data-member declarator, or None.
+
+    Unwraps a ``pointer_declarator`` / ``array_declarator`` (via the ``declarator``
+    field - the array ``size`` sits on a separate field, so a member-access size
+    like ``arr[obj.n]`` is not reached) and a ``reference_declarator`` (whose
+    inner declarator is a plain named child). A bare ``field_identifier`` is
+    returned directly. Bounded loop; never recurses (SAFE105 polices this).
+    """
+    cur: tree_sitter.Node | None = declarator
+    for _ in range(16):
+        if cur is None or cur.type == "field_identifier":
+            return cur
+        nxt = cur.child_by_field_name("declarator")
+        if nxt is None and cur.type == "reference_declarator":
+            nxt = next((c for c in cur.named_children if c.type in ("field_identifier", "pointer_declarator", "array_declarator", "reference_declarator")), None)
+        cur = nxt
+    return None
+
+
 def _c_is_function_prototype(function_declarator: tree_sitter.Node) -> bool:
     """Return True if a ``function_declarator`` is a real prototype, not a function-pointer variable.
 
@@ -555,16 +575,22 @@ class GlobalMutationRule(BaseRule):
             return [], [body] if body is not None else []
         return [], []
 
+    #: Declarator node types a ``field_declaration`` uses for its member name(s).
+    #: The *initialiser* value (``= obj.field``) and an array *size* (``arr[N]``)
+    #: are separate children / fields, so unwrapping via the ``declarator`` field
+    #: never reaches a member-access ``field_identifier`` inside them.
+    _CPP_FIELD_DECLARATOR_TYPES: ClassVar[tuple[str, ...]] = ("field_identifier", "pointer_declarator", "array_declarator", "reference_declarator")
+
     def _cpp_static_member_violations(self, filepath: str, field_decl: tree_sitter.Node) -> list[Violation]:
-        """Return a violation for a ``static`` (non-``const``) data member, else none.
+        """Return one violation per ``static`` (non-``const``) data member, else none.
 
         A ``static`` class / struct data member is one translation-unit-scoped
         mutable location, so it is shared mutable state; a non-static field is
         per-instance and does not fire. ``const`` / ``constexpr`` members are
-        immutable and exempt. The member name is a ``field_identifier`` (unlike a
-        file-scope ``declaration``'s bare ``identifier``), so it is located by a
-        subtree scan; the type sits on a separate ``type`` field, so no type
-        identifier leaks in.
+        immutable and exempt. A multi-declarator ``static int a, b;`` fires for
+        both names; only the declarator names are collected (not a
+        member-access ``field_identifier`` inside an initialiser like
+        ``static int a = obj.field;`` or an array size ``static int a[obj.n];``).
         """
         is_static = any(c.type == "storage_class_specifier" and node_text(c) == "static" for c in field_decl.named_children)
         if not is_static:
@@ -572,9 +598,7 @@ class GlobalMutationRule(BaseRule):
         is_immutable = any(c.type == "type_qualifier" and node_text(c) in ("const", "constexpr") for c in field_decl.named_children)
         if is_immutable:
             return []
-        # One violation per declared name: ``static int a, b;`` declares two
-        # translation-unit-scoped members, so both ``a`` and ``b`` must fire.
-        names = [c for c in walk(field_decl) if c.type == "field_identifier"]
+        names = [name for child in field_decl.named_children if child.type in self._CPP_FIELD_DECLARATOR_TYPES for name in (_cpp_field_declarator_name(child),) if name is not None]
         return [
             self._make_violation_for_node(
                 filepath,

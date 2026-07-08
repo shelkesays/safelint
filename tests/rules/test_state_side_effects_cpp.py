@@ -86,6 +86,20 @@ def test_cpp_multi_declarator_static_member_fires_once_per_name(tmp_path: Path) 
     assert len(safe302) == 2
 
 
+def test_cpp_static_member_initializer_member_access_is_not_flagged(tmp_path: Path) -> None:
+    """A member-access in a static member's initialiser / array size must not be reported as a member.
+
+    `static int a = obj.field;` declares only `a`; the initialiser's `field`
+    (and an array-size member like `arr[obj.n]`) must not produce a bogus SAFE302.
+    """
+    sample = tmp_path / "sample.cpp"
+    sample.write_text("struct S {\n    static int a = obj.field;\n    static int arr[obj.n];\n};\n", encoding="utf-8")
+    from safelint.core.engine import SafetyEngine  # noqa: PLC0415
+
+    flagged = {v.message.split('"')[1] for v in SafetyEngine(DEFAULTS).check_file(str(sample)).violations if v.code == "SAFE302"}
+    assert flagged == {"a", "arr"}
+
+
 def test_cpp_printf_in_pure_named_function_fires_safe304(tmp_path: Path) -> None:
     """A ``printf`` call inside a function fires SAFE304 (I/O in a would-be-pure function)."""
     assert "SAFE304" in _codes('void render() {\n    printf("x");\n}\n', tmp_path)
