@@ -2,8 +2,6 @@
 
 C++ builds on C. `tree-sitter-cpp` is a superset of `tree-sitter-c`, so the C node types carry over and the five C-family rules (SAFE106 / SAFE310-313) apply to C++. On top of that, C++ gains its `try` / `catch` / `throw` error-handling rules (SAFE201 / SAFE202 / SAFE203) and **two new C++-only idiom rules** (SAFE315 / SAFE316). New in v2.8.0.
 
-> **C++ support is opt-in.** The `tree-sitter-cpp` grammar ships as the optional `[cpp]` extra - the base install bundles no grammars. Install it with `pip install 'safelint[cpp]'` (or `uv add 'safelint[cpp]'`). If you run safelint through **pre-commit** or **CI**, make sure the hook / job installs the same extra - e.g. `additional_dependencies: ['safelint[cpp]']` in `.pre-commit-config.yaml`, or a `pip install 'safelint[cpp]'` / `uv sync --extra cpp` step in the workflow.
-
 ## File extensions
 
 `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`.
