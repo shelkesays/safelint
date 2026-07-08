@@ -260,7 +260,7 @@ SafeLint ships **47 rules** across the Holzmann safety categories. **16 are on b
 | [SAFE103](https://shelkesays.github.io/safelint/configuration/rules/#safe103-max_arguments) | `max_arguments` | error | Functions with more than 7 parameters |
 | [SAFE104](https://shelkesays.github.io/safelint/configuration/rules/#safe104-complexity) | `complexity` | error | Functions with high cyclomatic complexity |
 | [SAFE105](https://shelkesays.github.io/safelint/configuration/rules/#safe105-no_recursion) | `no_recursion` | warning | Functions that call themselves directly (Holzmann rule 1) |
-| [SAFE106](https://shelkesays.github.io/safelint/configuration/rules/#safe106-nonlocal_jumps) | `nonlocal_jumps` | warning | `goto` / `setjmp` / `longjmp` non-local jumps *(C-only; Holzmann rule 1)* |
+| [SAFE106](https://shelkesays.github.io/safelint/configuration/rules/#safe106-nonlocal_jumps) | `nonlocal_jumps` | warning | `goto` / `setjmp` / `longjmp` non-local jumps *(C / C++; Holzmann rule 1)* |
 | [SAFE201](https://shelkesays.github.io/safelint/configuration/rules/#safe201-bare_except) | `bare_except` | error | `except:` (Python) / `catch (...)` (C++) with no exception type *(Python and C++)* |
 | [SAFE202](https://shelkesays.github.io/safelint/configuration/rules/#safe202-empty_except) | `empty_except` | error | `except` / `catch` blocks that do nothing |
 | [SAFE203](https://shelkesays.github.io/safelint/configuration/rules/#safe203-logging_on_error) | `logging_on_error` | warning | Except / catch blocks that swallow errors silently |

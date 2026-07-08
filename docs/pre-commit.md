@@ -19,6 +19,8 @@ repos:
         # additional_dependencies: ['safelint[javascript]']         # JS-only repo
         # additional_dependencies: ['safelint[typescript]']         # TypeScript repo (bundles JS too)
         # additional_dependencies: ['safelint[java]']     # Java repo, RC pin until v2.1.0 GA (Spring Boot via [tool.safelint.java] framework = "spring-boot")
+        # additional_dependencies: ['safelint[c]']                  # C repo
+        # additional_dependencies: ['safelint[cpp]']                # C++ repo
         # additional_dependencies: ['safelint[python,javascript]']  # mixed monorepo
         # additional_dependencies: ['safelint[all]']      # every supported language, RC pin until v2.1.0 GA so [all] actually includes Java
 
@@ -44,7 +46,7 @@ You can compose extras: `['safelint[python,javascript]']` for a Python+JS monore
 
 ## One hook, every language
 
-The same `id: safelint` handles Python, JavaScript, TypeScript, Java, Rust, Go, PHP, and C. There is no per-language `safelint-python` / `safelint-javascript` / ... split. The published hook spec sets:
+The same `id: safelint` handles Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, and C++. There is no per-language `safelint-python` / `safelint-javascript` / ... split. The published hook spec sets:
 
 ```yaml
 types_or: [python, javascript, ts, tsx, java, rust, go, php, c, c++]
