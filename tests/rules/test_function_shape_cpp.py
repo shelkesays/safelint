@@ -114,3 +114,14 @@ def test_cpp_over_parameterised_lambda_fires_safe103(tmp_path: Path) -> None:
 def test_cpp_small_lambda_is_clean_for_safe103(tmp_path: Path) -> None:
     """A two-parameter comparator lambda does not fire SAFE103."""
     assert "SAFE103" not in _codes("auto cmp = [](int a, int b) { return a < b; };\n", tmp_path)
+
+
+def test_cpp_default_valued_parameters_count_toward_safe103(tmp_path: Path) -> None:
+    """C++ default-valued parameters (`int b = 5`) are counted; 8 of them (2 defaulted) trips SAFE103."""
+    src = "void f(int a, int b, int c, int d, int e, int g, int h = 1, int i = 2) {}\n"
+    assert "SAFE103" in _codes(src, tmp_path)
+
+
+def test_cpp_function_with_one_default_param_within_limit_is_clean(tmp_path: Path) -> None:
+    """A default-valued parameter is a real slot but two params stay within the max-7 cap."""
+    assert "SAFE103" not in _codes("void f(int a, int b = 5) {}\n", tmp_path)
