@@ -86,6 +86,16 @@ def test_cpp_multi_declarator_static_member_fires_once_per_name(tmp_path: Path) 
     assert len(safe302) == 2
 
 
+def test_cpp_static_function_pointer_member_fires_safe302(tmp_path: Path) -> None:
+    """A `static` function-pointer data member (`static int (*fp)(int);`) is mutable shared state (SAFE302)."""
+    assert "SAFE302" in _codes("struct S {\n    static int (*fp)(int);\n};\n", tmp_path)
+
+
+def test_cpp_static_member_function_declaration_is_not_flagged(tmp_path: Path) -> None:
+    """A `static` member *function* declaration is not data - it must not fire SAFE302."""
+    assert "SAFE302" not in _codes("struct S {\n    static void m(int x);\n};\n", tmp_path)
+
+
 def test_cpp_static_member_initializer_member_access_is_not_flagged(tmp_path: Path) -> None:
     """A member-access in a static member's initialiser / array size must not be reported as a member.
 
