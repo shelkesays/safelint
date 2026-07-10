@@ -19,7 +19,7 @@ If your project doesn't already have a Python toolchain, the same install comman
 
 ## Rules that fire on JavaScript
 
-JavaScript is in scope for every cross-language rule plus SAFE302 `global_mutation` and the JavaScript-family rule SAFE305 `wide_scope_declaration`. Newly added in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE309 `dynamic_code_execution`, and SAFE603 `blanket_suppression` (both disabled by default). The 2 Python-only rules (SAFE201, SAFE301) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
+JavaScript is in scope for every cross-language rule plus SAFE302 `global_mutation` and the JavaScript-family rule SAFE305 `wide_scope_declaration`. Newly added in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE309 `dynamic_code_execution`, and SAFE603 `blanket_suppression` (both disabled by default). The 2 rules outside the JS-family scope (SAFE201 `bare_except`, SAFE301 `global_state`) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
 
 | Code | Rule | Notes for JavaScript |
 |---|---|---|

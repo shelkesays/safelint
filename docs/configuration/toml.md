@@ -404,4 +404,4 @@ Later   - enable opt-in rules as needed:
                         Holzmann density), test_existence, test_coupling
 ```
 
-All of these are off by default; see the [Rules reference](rules.md) for each rule's config knobs. `no_recursion` (SAFE105) and the C-only `nonlocal_jumps` (SAFE106) are the rules that are **on by default** (at `warning` severity), so no opt-in step is needed for them.
+All of these are off by default; see the [Rules reference](rules.md) for each rule's config knobs. `no_recursion` (SAFE105) and the C-family `nonlocal_jumps` (SAFE106) are the rules that are **on by default** (at `warning` severity), so no opt-in step is needed for them.

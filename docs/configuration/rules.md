@@ -23,7 +23,7 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 - **Go** (`.go`), new in v2.5.0. 16 cross-language rules apply (the 13 all-language core plus SAFE302 / SAFE309 / SAFE401, which Go shares with Python / JS / TS / Java / PHP but Rust skips) and 2 Go-only rules cover Go-idiom patterns: SAFE209 (`empty_error_check`, the empty `if err != nil {}` swallow) and SAFE211 (`panic_calls_outside_tests`). 7 rules deliberately skipped for Go because their semantics don't translate cleanly (no try/catch, no `global` keyword, no `var` hoisting, no production assertion idiom, no chained-nullable idiom). Headline Go adaptations: the bare `for {}` infinite loop (SAFE501), the sibling `foo_test.go` convention (SAFE701 / SAFE702), the `_ = f()` explicit-discard exemption (SAFE802), and the `defer x.Close()` resource form (SAFE401). See [Go](../languages/go.md) for the full language reference.
 - **PHP** (`.php`), new in v2.6.0. 21 rules apply and only 2 are skipped (SAFE201 `bare_except` and SAFE305 `wide_scope_declaration`), the widest rule coverage of any non-Python language because PHP ports the largest share of the existing rule set. PHP is the **first non-Python home for SAFE301 (`global_state`)**: PHP has a literal `global` keyword, so the rule fires on `global $config;`-style declarations exactly as it does on Python. PHP also has try/catch (SAFE202 / SAFE203 apply), `eval` and dynamic-call surfaces (SAFE309), and resource lifecycles (SAFE401). Headline PHP highlights: the `@`-operator error-suppression idiom, superglobal taint sources (`$_GET` / `$_POST` / `$_REQUEST` / etc.) feeding SAFE801, and the `break N;` / `continue N;` multi-level loop forms. See [PHP](../languages/php.md) for the full language reference.
 
-- **C** (`.c`, `.h`), new in v2.7.0. Holzmann's original target language. 21 rules apply: the 16 cross-language ports plus **5 new C-only rules** (the "homecoming") that express clauses every other language adapts away - SAFE106 (`nonlocal_jumps`, `goto` / `setjmp`), SAFE310 (`dynamic_allocation`, the `malloc` family), SAFE311 (`complex_macro`) and SAFE312 (`conditional_compilation`) for the preprocessor, and SAFE313 (`restricted_pointers`). SAFE106 is the only one enabled by default (warning severity, because `goto err` cleanup is idiomatic); the other four are opt-in. `.h` headers are linted as C. 5 rules are skipped (SAFE201/202/203, SAFE301, SAFE305) plus SAFE401 and SAFE803 (documented gaps - C cleanup and nil analysis need flow analysis). See [C](../languages/c.md) for the full language reference.
+- **C** (`.c`, `.h`), new in v2.7.0. Holzmann's original target language. 21 rules apply: the 16 cross-language ports plus **5 new C-family rules** (the "homecoming", shared with C++) that express clauses every other language adapts away - SAFE106 (`nonlocal_jumps`, `goto` / `setjmp`), SAFE310 (`dynamic_allocation`, the `malloc` family), SAFE311 (`complex_macro`) and SAFE312 (`conditional_compilation`) for the preprocessor, and SAFE313 (`restricted_pointers`). SAFE106 is the only one enabled by default (warning severity, because `goto err` cleanup is idiomatic); the other four are opt-in. `.h` headers are linted as C. 5 rules are skipped (SAFE201/202/203, SAFE301, SAFE305) plus SAFE401 and SAFE803 (documented gaps - C cleanup and nil analysis need flow analysis). See [C](../languages/c.md) for the full language reference.
 - **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), new in v2.8.0. Builds on C: the five C-family rules widen to C and C++, plus C++ gains its `try` / `catch` / `throw` rules (SAFE201 catch-all, SAFE202, SAFE203) and **two new C++-only rules** - SAFE315 (`raw_new_delete`) and SAFE316 (`dangerous_casts`). 26 rules apply. Plain `.h` headers are linted as C; use `.hpp` / `.hxx` / `.hh` for C++ headers. See [C++](../languages/cpp.md) for the full language reference.
 
 ### Planned
@@ -195,7 +195,7 @@ severity = "warning"
 
 ### SAFE106: `nonlocal_jumps`
 
-**What it flags:** `goto` statements and `setjmp` / `longjmp` family calls. **C-only**, new in v2.7.0. This is Holzmann's rule 1 ("restrict all code to very simple control flow constructs") expressed literally - C is the only registered language with `goto`.
+**What it flags:** `goto` statements and `setjmp` / `longjmp` family calls. **C and C++**, new in v2.7.0 (widened to C++ in v2.8.0). This is Holzmann's rule 1 ("restrict all code to very simple control flow constructs") expressed literally - C and C++ are the registered languages with `goto` / `setjmp`.
 
 `goto` and the `setjmp` / `longjmp` non-local-jump pair bypass structured control flow, so worst-case control paths cannot be reasoned about by inspection. The rule fires on every `goto_statement` and every call to a configured non-local-jump function (`setjmp` / `longjmp` / `sigsetjmp` / `siglongjmp`).
 
@@ -225,7 +225,7 @@ These check that exceptions are handled clearly and not swallowed silently.
 
 ### SAFE201: `bare_except`
 
-**What it flags:** `except:` clauses with no exception type. **Python-only**, JavaScript `catch` clauses always bind the caught error (and don't have the `KeyboardInterrupt` / `SystemExit` hijack hazard), so there's no equivalent hazard to flag on JS files. SAFE202 + SAFE203 cover the related JS concerns.
+**What it flags:** `except:` clauses with no exception type. **Python and C++** - Python's `except:` and C++'s `catch (...)` catch-all (its first non-Python home). JavaScript `catch` clauses always bind the caught error (and don't have the `KeyboardInterrupt` / `SystemExit` hijack hazard), so there's no equivalent hazard to flag on JS files; SAFE202 + SAFE203 cover the related JS concerns.
 
 A bare `except:` catches everything including `KeyboardInterrupt` and `SystemExit`, which are signals, not bugs. Always specify the exception type you expect.
 
@@ -601,7 +601,7 @@ enabled = true
 
 ### SAFE310: `dynamic_allocation`
 
-**What it flags:** Calls to the heap-allocation / free family. **C-only**, new in v2.7.0. Holzmann's rule 3 ("do not use dynamic memory allocation after initialisation") expressed literally - C is the only registered language where manual heap management is the norm.
+**What it flags:** Calls to the heap-allocation / free family. **C and C++**, new in v2.7.0 (widened to C++ in v2.8.0). Holzmann's rule 3 ("do not use dynamic memory allocation after initialisation") expressed literally - on C++ it additionally flags `new` / `delete` expressions.
 
 Fires on every call to a configured allocator (`malloc` / `calloc` / `realloc` / `aligned_alloc` / `free` / `strdup`). **Disabled by default** - embedded and safety-critical projects opt in; most application C uses the heap freely. Pre-allocate fixed pools / arenas at init and hand out slots to satisfy the rule.
 
@@ -626,7 +626,7 @@ allocation_calls_c = ["malloc", "calloc", "realloc", "aligned_alloc", "free", "s
 
 ### SAFE311: `complex_macro`
 
-**What it flags:** Preprocessor macros that are not simple, complete syntactic units. **C-only**, new in v2.7.0. Holzmann's rule 8 ("limit the preprocessor to header files and simple macros").
+**What it flags:** Preprocessor macros that are not simple, complete syntactic units. **C and C++**, new in v2.7.0 (widened to C++ in v2.8.0). Holzmann's rule 8 ("limit the preprocessor to header files and simple macros").
 
 Fires on function-like macros that use token pasting (`##`) or variadic `__VA_ARGS__`, and on object-like macros whose replacement text is not a balanced syntactic unit (heuristic: unbalanced `()` / `{}` / `[]`, ignoring brackets inside string and character literals). Mutually recursive macro definitions (the paper's third banned construct) are not detected; that needs macro-table analysis. **Disabled by default.**
 
@@ -644,7 +644,7 @@ enabled = true
 
 ### SAFE312: `conditional_compilation`
 
-**What it flags:** `#if` / `#ifdef` / `#ifndef` directives beyond the include-guard idiom. **C-only**, new in v2.7.0. Holzmann's rule 8 again: each conditional-compilation directive doubles the number of build configurations that must be tested (2^n versions from n flags).
+**What it flags:** `#if` / `#ifdef` / `#ifndef` directives beyond the include-guard idiom. **C and C++**, new in v2.7.0 (widened to C++ in v2.8.0). Holzmann's rule 8 again: each conditional-compilation directive doubles the number of build configurations that must be tested (2^n versions from n flags).
 
 An `#ifndef X` + `#define X` pair (a header include guard) is exempt; the matching `#define` must be the first substantive statement of the block, with comments (e.g. an SPDX / licence header) and `#pragma` lines (a belt-and-braces `#pragma once`) allowed in between. Every other `#if` / `#ifdef` / `#ifndef` fires. **Disabled by default.** Prefer runtime configuration over compile-time flags.
 
@@ -662,7 +662,7 @@ enabled = true
 
 ### SAFE313: `restricted_pointers`
 
-**What it flags:** Declarators with more than one level of pointer indirection (`int **p`) and function-pointer declarators (`void (*fp)(int)`). **C-only**, new in v2.7.0. Holzmann's rule 9 ("limit pointer use to a single dereference, and do not use function pointers") expressed literally. The check is syntactic (declarator shape only): a pointer level hidden behind a `typedef` or a macro is not counted - the paper's no-hidden-dereference clause needs type resolution and is a documented gap.
+**What it flags:** Declarators with more than one level of pointer indirection (`int **p`) and function-pointer declarators (`void (*fp)(int)`). **C and C++**, new in v2.7.0 (widened to C++ in v2.8.0; smart pointers exempt on C++). Holzmann's rule 9 ("limit pointer use to a single dereference, and do not use function pointers") expressed literally. The check is syntactic (declarator shape only): a pointer level hidden behind a `typedef` or a macro is not counted - the paper's no-hidden-dereference clause needs type resolution and is a documented gap.
 
 **Disabled by default** - it is deliberately strict (`char **argv` fires too). Opt in for the highest-assurance profiles; collapse multi-level pointers behind a struct or out-parameter, and replace function pointers with tagged dispatch.
 
@@ -950,7 +950,7 @@ function transfer(amount, src, dst) {
 
 ### SAFE603: `blanket_suppression`
 
-**What it flags:** un-scoped suppressions of *other* analysers. Python, JavaScript, TypeScript, Java, Rust. Disabled by default.
+**What it flags:** un-scoped suppressions of *other* analysers. Cross-language (all nine registered languages). Disabled by default.
 
 Holzmann's rule 10 ("compile with all warnings enabled and heed every warning") has a modern failure mode: not disabling warnings at the compiler, but silencing an entire analyser from inside the source. SAFE603 flags the *blanket* forms while leaving *scoped* suppressions alone, because a scoped suppression is a deliberate, auditable decision about one rule.
 
@@ -960,6 +960,9 @@ Per language, the blanket forms that fire (and the scoped forms that stay clean)
 - **JavaScript / TypeScript** (comments): `eslint-disable` / `eslint-disable-line` / `eslint-disable-next-line` with no rule list, `@ts-nocheck`, `@ts-ignore`. `@ts-expect-error` is clean (it self-polices: it errors when the suppressed error no longer occurs). A rule-listed `eslint-disable no-console` is clean.
 - **Java** (annotations): `@SuppressWarnings("all")` and `@SuppressWarnings({..., "all"})`. Scoped (`@SuppressWarnings("unchecked")`) is clean.
 - **Rust** (attributes): `#[allow(clippy::all)]`, `#[allow(warnings)]`, and their inner `#![...]` forms. Scoped (`#[allow(dead_code)]`, `#[allow(clippy::too_many_arguments)]`) is clean.
+- **Go** (comments): bare `//nolint` (all linters) and bare `//lint:ignore` (recognised only with no space after `//`, golangci's requirement). Scoped (`//nolint:errcheck`, `//lint:ignore SA1000 reason`) is clean.
+- **PHP**: the `@` error-suppression operator (`@file_get_contents(...)`) - PHP's headline blanket-suppression hazard - plus blanket `@phpstan-ignore` / `@psalm-suppress all`-style directives. Scoped forms are clean.
+- **C / C++** (comments): clang-tidy's bare `// NOLINT` / `// NOLINTNEXTLINE`. Scoped `// NOLINT(bugprone-foo)` is clean.
 
 SAFE603 never flags safelint's own `# nosafe` / `# safelint: ignore` directives, those are policed by SAFE004 (unused suppression). Directive-looking text inside a string literal is not flagged either, the detectors scan comment / annotation / attribute nodes, not string contents.
 

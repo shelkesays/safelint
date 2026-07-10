@@ -21,7 +21,7 @@ If your project doesn't already have a Python toolchain, `pipx install 'safelint
 
 ## Rules that fire on TypeScript
 
-TypeScript is in scope for every cross-language rule plus SAFE302 `global_mutation` and SAFE305 `wide_scope_declaration` (which also fires on TS because `var` is still legal there). Newly added in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE309 `dynamic_code_execution`, and SAFE603 `blanket_suppression` (both disabled by default). The 2 Python-only rules (SAFE201, SAFE301) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
+TypeScript is in scope for every cross-language rule plus SAFE302 `global_mutation` and SAFE305 `wide_scope_declaration` (which also fires on TS because `var` is still legal there). Newly added in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE309 `dynamic_code_execution`, and SAFE603 `blanket_suppression` (both disabled by default). The 2 rules outside the JS-family scope (SAFE201 `bare_except`, SAFE301 `global_state`) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
 
 The behaviour is identical to JavaScript for almost everything, see [JavaScript notes](javascript.md) for the canonical per-rule guidance. The differences below are TypeScript-specific.
 
@@ -117,7 +117,7 @@ repos:
         files: ^src/
 ```
 
-**AssemblyScript (`.as`) users, additional override required.** Pre-commit's `identify` library has no `as` filetype tag, so the default `types_or` list (which carries only real `identify` tags: `python, javascript, ts, tsx, java, rust, go, php, c`) won't match `.as` files. Override `types_or` with a permissive tag that `.as` files *actually* carry (`text` or `file`) and use `files` to scope the match. `types_or: []` does **not** work, pre-commit treats an empty tag list as "no tag matches" rather than "filter disabled", so the hook never fires.
+**AssemblyScript (`.as`) users, additional override required.** Pre-commit's `identify` library has no `as` filetype tag, so the default `types_or` list (which carries only real `identify` tags: `python, javascript, ts, tsx, java, rust, go, php, c, c++`) won't match `.as` files. Override `types_or` with a permissive tag that `.as` files *actually* carry (`text` or `file`) and use `files` to scope the match. `types_or: []` does **not** work, pre-commit treats an empty tag list as "no tag matches" rather than "filter disabled", so the hook never fires.
 
 ```yaml
       - id: safelint
