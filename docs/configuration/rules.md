@@ -961,7 +961,7 @@ Per language, the blanket forms that fire (and the scoped forms that stay clean)
 - **Java** (annotations): `@SuppressWarnings("all")` and `@SuppressWarnings({..., "all"})`. Scoped (`@SuppressWarnings("unchecked")`) is clean.
 - **Rust** (attributes): `#[allow(clippy::all)]`, `#[allow(warnings)]`, and their inner `#![...]` forms. Scoped (`#[allow(dead_code)]`, `#[allow(clippy::too_many_arguments)]`) is clean.
 - **Go** (comments): bare `//nolint` (all linters) and bare `//lint:ignore` (recognised only with no space after `//`, golangci's requirement). Scoped (`//nolint:errcheck`, `//lint:ignore SA1000 reason`) is clean.
-- **PHP**: the `@` error-suppression operator (`@file_get_contents(...)`) - PHP's headline blanket-suppression hazard - plus blanket `@phpstan-ignore` / `@psalm-suppress all`-style directives. Scoped forms are clean.
+- **PHP**: the `@` error-suppression operator (`@file_get_contents(...)`) - PHP's headline blanket-suppression hazard - plus bare `phpcs:ignore` / `phpcs:disable`, `@phpstan-ignore-line` / `@phpstan-ignore-next-line`, and `@psalm-suppress all`. Scoped forms (`phpcs:ignore Squiz.Foo`, `@phpstan-ignore <id>`, `@psalm-suppress SomeIssue`) are clean.
 - **C / C++** (comments): clang-tidy's bare `// NOLINT` / `// NOLINTNEXTLINE`. Scoped `// NOLINT(bugprone-foo)` is clean.
 
 SAFE603 never flags safelint's own `# nosafe` / `# safelint: ignore` directives, those are policed by SAFE004 (unused suppression). Directive-looking text inside a string literal is not flagged either, the detectors scan comment / annotation / attribute nodes, not string contents.
