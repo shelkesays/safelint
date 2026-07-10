@@ -1,6 +1,6 @@
 # C
 
-C is Holzmann's original "Power of Ten" target language. Several clauses that every other language *adapts away* apply literally to C, so it brings the largest set of new language-specific rules of any addition: the **five C-only rules** (the "homecoming") express rules 1, 3, 8, and 9 directly. New in v2.7.0.
+C is Holzmann's original "Power of Ten" target language. Several clauses that every other language *adapts away* apply literally to C, so it brings the largest set of new language-specific rules of any addition: the **five C-family rules** (the "homecoming", shared with C++) express rules 1, 3, 8, and 9 directly. New in v2.7.0.
 
 ## File extensions
 
@@ -26,7 +26,7 @@ C uses line-comment directives (`//` form): `// nosafe` (all rules on the line),
 
 ## Rules that fire on C
 
-21 rules apply: the 16 cross-language rules plus the 5 new C-only rules.
+21 rules apply: the 16 cross-language rules plus the 5 new C-family rules (shared with C++).
 
 ### Cross-language rules
 
@@ -49,7 +49,7 @@ C uses line-comment directives (`//` form): `// nosafe` (all rules on the line),
 | [SAFE801](../configuration/rules.md#safe801-tainted_sink) | tainted_sink | `argv` / `getenv` / ... into `system` / `strcpy` / ... Disabled by default. |
 | [SAFE802](../configuration/rules.md#safe802-return_value_ignored) | return_value_ignored | Discarded `fclose` / `fwrite` / ...; `(void)f()` exempt. Disabled by default. |
 
-### C-only rules (the Power-of-Ten homecoming)
+### C-family rules (the Power-of-Ten homecoming)
 
 | Code | Rule | Holzmann rule | Default | Behaviour |
 |------|------|---------------|---------|-----------|

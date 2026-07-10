@@ -4,7 +4,7 @@ This guide is the cheat sheet for adding support for a new programming language 
 
 !!! note
 
-    Today Python, JavaScript, TypeScript (including TSX and AssemblyScript), Java, Rust, Go, PHP, and C are all registered. The supporting structure (parser hookup, file-discovery loop, suppression parser, optional-grammar extras) is fully language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants and gates the grammar import behind the matching `[project.optional-dependencies]` extra (see Step 1 + Step 6b), and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.
+    Today Python, JavaScript, TypeScript (including TSX and AssemblyScript), Java, Rust, Go, PHP, C, and C++ are all registered. The supporting structure (parser hookup, file-discovery loop, suppression parser, optional-grammar extras) is fully language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants and gates the grammar import behind the matching `[project.optional-dependencies]` extra (see Step 1 + Step 6b), and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.
 
 !!! warning "Bundled AI-client skills also need an update"
 

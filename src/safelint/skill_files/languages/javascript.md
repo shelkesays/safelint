@@ -67,7 +67,7 @@ result = eval(userInput);  // nosafe: SAFE801
 
 ## Rules ported to JavaScript
 
-JavaScript is in scope for the cross-language rules plus SAFE302 (`global_mutation`) and SAFE305 (`wide_scope_declaration`, JavaScript-family only). New in 2.4.0: SAFE105 (`no_recursion`, enabled by default), SAFE309 (`dynamic_code_execution`) and SAFE603 (`blanket_suppression`, both disabled by default). The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here remain Python-only (SAFE201, SAFE301) or Java + Spring Boot only (SAFE901-904), see *Rules that stay Python-only* below.
+JavaScript is in scope for the cross-language rules plus SAFE302 (`global_mutation`) and SAFE305 (`wide_scope_declaration`, JavaScript-family only). New in 2.4.0: SAFE105 (`no_recursion`, enabled by default), SAFE309 (`dynamic_code_execution`) and SAFE603 (`blanket_suppression`, both disabled by default). The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here are outside the JS-family scope (SAFE201, SAFE301) or Java + Spring Boot only (SAFE901-904), see *Rules not registered for JavaScript* below.
 
 | Code | Rule | JavaScript-specific notes |
 |---|---|---|
@@ -93,9 +93,9 @@ JavaScript is in scope for the cross-language rules plus SAFE302 (`global_mutati
 | SAFE802 | return_value_ignored | Bare calls (an `expression_statement` whose first child is a call) to a configured set of return-value-significant functions. JS default `flagged_calls_javascript`: Node fs / stream / process methods whose return value or returned promise carries success/failure info, `write`, `writeFile`, `writeFileSync`, `unlink`, `unlinkSync`, `rename`, `renameSync`, `mkdir`, `mkdirSync`, `rmdir`, `rmdirSync`, `rm`, `rmSync`, `send`, `sendall`, `exec`, `execSync`, `spawn`, `spawnSync`. **Common gotcha:** an unhandled rejected promise (e.g. `fs.writeFile(...)` returning a Promise that gets dropped) silently swallows errors, capturing the result with `await` or `.then()` resolves the violation. |
 | SAFE803 | null_dereference | Chained `.field` / `[idx]` access on a call returning `null` / `undefined`. **Optional chaining is the safe form**: `arr.find(...)?.name` is null-safe and is NOT flagged. JS default `nullable_methods_javascript`: Array (`find`, `pop`, `shift`), Map (`get`), DOM (`getElementById`, `querySelector`, `closest`), RegExp (`exec`, `match`). |
 
-### Rules that stay Python-only
+### Rules not registered for JavaScript
 
-The following rules don't apply to JavaScript and stay registered for Python only, they will not fire on `.js` / `.mjs` / `.cjs` files.
+The following rules don't apply to JavaScript (they are registered for other languages - SAFE201 for Python / C++, SAFE301 for Python / PHP); they will not fire on `.js` / `.mjs` / `.cjs` files.
 
 | Code | Rule | Why JS-only-skipped |
 |---|---|---|
