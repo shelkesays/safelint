@@ -205,18 +205,21 @@ severity = "warning"
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"warning"` | `"error"` or `"warning"` |
-| `nonlocal_jump_calls_c` | `["setjmp", "longjmp", "sigsetjmp", "siglongjmp"]` | Call names treated as non-local jumps alongside `goto` |
+| `nonlocal_jump_calls_c` | `["setjmp", "longjmp", "sigsetjmp", "siglongjmp"]` | Call names treated as non-local jumps alongside `goto` (C, `.c` / `.h`) |
+| `nonlocal_jump_calls_cpp` | `["setjmp", "longjmp", "sigsetjmp", "siglongjmp"]` | Same, for C++ (`.cpp` / `.cxx` / `.cc` / `.hpp` / `.hxx` / `.hh`) - resolved independently of the C key |
 
 ```toml
 # pyproject.toml
 [tool.safelint.rules.nonlocal_jumps]
 nonlocal_jump_calls_c = ["setjmp", "longjmp", "sigsetjmp", "siglongjmp"]
+nonlocal_jump_calls_cpp = ["setjmp", "longjmp", "sigsetjmp", "siglongjmp"]  # C++ uses its own key
 ```
 
 ```toml
 # safelint.toml
 [rules.nonlocal_jumps]
 nonlocal_jump_calls_c = ["setjmp", "longjmp", "sigsetjmp", "siglongjmp"]
+nonlocal_jump_calls_cpp = ["setjmp", "longjmp", "sigsetjmp", "siglongjmp"]  # C++ uses its own key
 ```
 
 ## Error handling rules
@@ -608,13 +611,15 @@ Fires on every call to a configured allocator (`malloc` / `calloc` / `realloc` /
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `false` | Turn rule on/off |
-| `allocation_calls_c` | `["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup"]` | Allocator call names |
+| `allocation_calls_c` | `["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup"]` | Allocator call names (C, `.c` / `.h`) |
+| `allocation_calls_cpp` | `["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup"]` | Allocator call names for C++ (`.cpp` / `.cxx` / ...) - resolved independently of the C key. C++ additionally flags `new` / `delete` expressions structurally (not configurable) |
 
 ```toml
 # pyproject.toml
 [tool.safelint.rules.dynamic_allocation]
 enabled = true
 allocation_calls_c = ["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup", "xmalloc"]
+allocation_calls_cpp = ["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup", "xmalloc"]  # C++ uses its own key; new / delete are always flagged
 ```
 
 ```toml
@@ -622,6 +627,7 @@ allocation_calls_c = ["malloc", "calloc", "realloc", "aligned_alloc", "free", "s
 [rules.dynamic_allocation]
 enabled = true
 allocation_calls_c = ["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup", "xmalloc"]
+allocation_calls_cpp = ["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup", "xmalloc"]  # C++ uses its own key; new / delete are always flagged
 ```
 
 ### SAFE311: `complex_macro`
