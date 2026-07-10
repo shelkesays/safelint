@@ -94,7 +94,7 @@ These rules are NOT registered for Java because the Python / JS-family semantics
 
 | Code | Rule | Why skipped for Java |
 |---|---|---|
-| SAFE201 | bare_except | Python-only construct. Java's `catch (Throwable t)` is the closest analogue but is already covered by SAFE202 (empty body check) and SAFE203 (missing logging). A bare-catch rule for Java would duplicate those checks without adding new coverage. |
+| SAFE201 | bare_except | A Python (`except:`) / C++ (`catch (...)`) catch-all construct; not applicable to Java. Java's `catch (Throwable t)` is the closest analogue but is already covered by SAFE202 (empty body check) and SAFE203 (missing logging). A bare-catch rule for Java would duplicate those checks without adding new coverage. |
 | SAFE301 | global_state | Python-only (`global` keyword). Java has no statement-level "this references module state" annotation. (Java shared-mutable-state is instead covered by SAFE302's non-final-static-field check, see the table above.) |
 | SAFE305 | wide_scope_declaration | JavaScript / TypeScript only (`var` hoisting). Java's `var` (Java 10+) is local-only and block-scoped - no hoisting hazard. |
 

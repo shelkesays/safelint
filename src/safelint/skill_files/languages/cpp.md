@@ -14,6 +14,18 @@ pip install 'safelint[all]'
 
 C++ ships its grammar (`tree-sitter-cpp`) as the opt-in `[cpp]` extra; the base install has no grammars.
 
+For pre-commit integration, the published hook routes the C++ extensions via the `c++` filetype tag in `types_or` (pre-commit's `identify` library uses **`c++`**, not `cpp`, for C++ files):
+
+```yaml
+- repo: https://github.com/shelkesays/safelint
+  rev: v2.8.0  # C++ support requires v2.8.0+
+  hooks:
+    - id: safelint
+      additional_dependencies: ['safelint[cpp]']
+```
+
+`--language cpp` filters `safelint list-rules` to the C++ rule set.
+
 ## File extensions
 
 `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`. **`.h` ownership:** a plain `.h` header is linted as **C**, not C++ (content sniffing is out of scope). A C++ project whose headers use `.h` gets them linted as C; use the C++-specific header extensions (`.hpp` / `.hxx` / `.hh`) for C++ header linting. This is a documented limitation shared with the C page.
