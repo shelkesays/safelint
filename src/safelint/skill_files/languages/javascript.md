@@ -67,7 +67,7 @@ result = eval(userInput);  // nosafe: SAFE801
 
 ## Rules ported to JavaScript
 
-JavaScript is in scope for the cross-language rules plus SAFE302 (`global_mutation`) and SAFE305 (`wide_scope_declaration`, JavaScript-family only). New in 2.4.0: SAFE105 (`no_recursion`, enabled by default), SAFE309 (`dynamic_code_execution`) and SAFE603 (`blanket_suppression`, both disabled by default). The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here are outside the JS-family scope (SAFE201, SAFE301) or Java + Spring Boot only (SAFE901-904), see *Rules not registered for JavaScript* below.
+JavaScript is in scope for the cross-language rules plus SAFE302 (`global_mutation`) and SAFE305 (`wide_scope_declaration`, JavaScript-family only). New in 2.4.0: SAFE105 (`no_recursion`, enabled by default), SAFE309 (`dynamic_code_execution`) and SAFE603 (`blanket_suppression`, both disabled by default). The table below names them and notes any JS-specific behaviour the agent should be aware of when explaining a violation. Rules not listed here are registered for other languages, not the JS family - notably SAFE201 / SAFE301 (detailed in *Rules not registered for JavaScript* below) and the Java + Spring Boot rules (SAFE901-904), plus each other language's own language-specific rules (Rust / Go / C / C++).
 
 | Code | Rule | JavaScript-specific notes |
 |---|---|---|
