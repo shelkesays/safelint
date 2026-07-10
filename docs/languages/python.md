@@ -19,7 +19,7 @@ v2.0.0 ships every language grammar as an opt-in extra, the `[python]` extra ins
 
 ## Rules that fire on Python
 
-Python is in scope for every cross-language rule plus SAFE201 `bare_except` (shared with C++), the Python-only SAFE301 `global_state`, and SAFE302 `global_mutation`. Newly added in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE309 `dynamic_code_execution`, and SAFE603 `blanket_suppression` (both disabled by default). The 1 JavaScript-family-only rule (SAFE305 `wide_scope_declaration`) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
+Python is in scope for every cross-language rule plus SAFE201 `bare_except` (shared with C++), SAFE301 `global_state` (shared with PHP), and SAFE302 `global_mutation`. Newly added in 2.4.0: SAFE105 `no_recursion` (enabled by default), SAFE309 `dynamic_code_execution`, and SAFE603 `blanket_suppression` (both disabled by default). The 1 JavaScript-family-only rule (SAFE305 `wide_scope_declaration`) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.
 
 | Code | Rule | Notes for Python |
 |---|---|---|

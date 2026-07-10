@@ -1,6 +1,6 @@
 ---
 name: safelint
-description: Run safelint static analysis on the user's project and present Holzmann Power-of-Ten safety violations grouped by file. Supports any language registered with safelint (Python, JavaScript, TypeScript including TSX / AssemblyScript, Java, Rust, Go, PHP, and C today; more can be added). Use this for "safelint check", "lint with safelint", "safety review", "Power-of-Ten review", or similar requests for safelint's specific rule set. For generic linting use the project's configured tools (ruff, eslint, etc.) instead.
+description: Run safelint static analysis on the user's project and present Holzmann Power-of-Ten safety violations grouped by file. Supports any language registered with safelint (Python, JavaScript, TypeScript including TSX / AssemblyScript, Java, Rust, Go, PHP, C, and C++ today; more can be added). Use this for "safelint check", "lint with safelint", "safety review", "Power-of-Ten review", or similar requests for safelint's specific rule set. For generic linting use the project's configured tools (ruff, eslint, etc.) instead.
 ---
 
 # safelint skill
@@ -55,7 +55,7 @@ Look at the project files in cwd to figure out which languages safelint can lint
 
 (More languages will land over time. To check the live list, run `python -c "from safelint.languages import supported_extensions; print(sorted(supported_extensions()))"`.)
 
-If the user's project has files matching one or more registered languages, proceed. If safelint doesn't yet support the language they're working in (e.g. they have only `.c` / `.cpp` files), tell them so plainly; don't run safelint just to report "0 files checked".
+If the user's project has files matching one or more registered languages, proceed. If safelint doesn't yet support the language they're working in (e.g. they have only `.rb` / `.swift` / `.kt` files), tell them so plainly; don't run safelint just to report "0 files checked".
 
 For deeper, language-specific guidance (install nuance, idiomatic fixes, language-specific rule notes), read the matching `languages/<lang>.md` file from the bundled skill directory. Locate it with `safelint skill path` (prints the on-disk root); the addendums sit at `<that path>/languages/<lang>.md`. Skip the read if the user's request doesn't need that depth (e.g. a simple "run safelint and show me the count").
 
