@@ -3,13 +3,14 @@
 **Type**: cross-language refactor (NOT a language addition). Pure
 maintainability change - **no behaviour change**.
 
-**Status**: not started. **Scheduled after C and C++ ship** (so the language
-set is stable and the sweep is done once, not re-done per language addition).
-
-**Sequencing**: C has shipped (`plan/02-c.md` removed on completion); run this
-only once `plan/03-cpp.md` (C++) is also complete and its spec removed. Doing
-it earlier would mean re-touching the same tables for every subsequent
-language; doing it once at the end is the single-pass win.
+**Status**: not started, but **now unblocked**: this was scheduled for after C
+and C++ ship (so the language set is stable and the sweep is done once, not
+re-done per language addition), and **C++ shipped in v2.8.0** (its spec,
+`plan/03-cpp.md`, removed on completion, as C's `plan/02-c.md` was in v2.7.0).
+This is the single-pass window - the recurring node-constant review comments
+during the C++ PR (e.g. on `max_arguments.py`) were deferred here on that
+basis. Doing it earlier would have meant re-touching the same tables for every
+language; doing it once now is the win.
 
 ---
 
