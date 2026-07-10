@@ -5,6 +5,8 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
 ## [2.8.0] - 2026-07-10
 
 **C++ is now a supported language.** Building on the C support, `.cpp` / `.cxx` / `.cc` / `.hpp` / `.hxx` / `.hh` files are discovered, parsed via `tree-sitter-cpp`, and run against **26 rules**: the cross-language ports, the five C-family rules (SAFE106 / SAFE310-313) widened to C and C++, the three `try` / `catch` / `throw` error-handling rules, and **two new C++-only rules**. Plain `.h` headers stay with C (documented). The additive language work is what justifies this release as a MINOR bump (per the project's semver rules: scope expansion is MINOR, never MAJOR).
