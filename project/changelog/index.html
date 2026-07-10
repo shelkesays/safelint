@@ -2060,7 +2060,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#280-2026-07-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8.0 - 2026-07-10
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.8.0 - 2026-07-10">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2083,12 +2094,12 @@
   <a href="#271-2026-07-06" class="md-nav__link">
     <span class="md-ellipsis">
       
-        [2.7.1] - 2026-07-06
+        2.7.1 - 2026-07-06
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[2.7.1] - 2026-07-06">
+    <nav class="md-nav" aria-label="2.7.1 - 2026-07-06">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -2122,12 +2133,12 @@
   <a href="#270-2026-07-02" class="md-nav__link">
     <span class="md-ellipsis">
       
-        [2.7.0] - 2026-07-02
+        2.7.0 - 2026-07-02
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[2.7.0] - 2026-07-02">
+    <nav class="md-nav" aria-label="2.7.0 - 2026-07-02">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3731,7 +3742,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#280-2026-07-10" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.8.0 - 2026-07-10
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.8.0 - 2026-07-10">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3754,12 +3776,12 @@
   <a href="#271-2026-07-06" class="md-nav__link">
     <span class="md-ellipsis">
       
-        [2.7.1] - 2026-07-06
+        2.7.1 - 2026-07-06
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[2.7.1] - 2026-07-06">
+    <nav class="md-nav" aria-label="2.7.1 - 2026-07-06">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3793,12 +3815,12 @@
   <a href="#270-2026-07-02" class="md-nav__link">
     <span class="md-ellipsis">
       
-        [2.7.0] - 2026-07-02
+        2.7.0 - 2026-07-02
       
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="[2.7.0] - 2026-07-02">
+    <nav class="md-nav" aria-label="2.7.0 - 2026-07-02">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -5296,7 +5318,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.6.1...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.8.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="280-2026-07-10"><a href="https://github.com/shelkesays/safelint/compare/v2.7.1...v2.8.0">2.8.0</a> - 2026-07-10<a class="headerlink" href="#280-2026-07-10" title="Permanent link">#</a></h2>
 <p><strong>C++ is now a supported language.</strong> Building on the C support, <code>.cpp</code> / <code>.cxx</code> / <code>.cc</code> / <code>.hpp</code> / <code>.hxx</code> / <code>.hh</code> files are discovered, parsed via <code>tree-sitter-cpp</code>, and run against <strong>26 rules</strong>: the cross-language ports, the five C-family rules (SAFE106 / SAFE310-313) widened to C and C++, the three <code>try</code> / <code>catch</code> / <code>throw</code> error-handling rules, and <strong>two new C++-only rules</strong>. Plain <code>.h</code> headers stay with C (documented). The additive language work is what justifies this release as a MINOR bump (per the project's semver rules: scope expansion is MINOR, never MAJOR).</p>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
@@ -5308,7 +5331,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li>Per-language <code>_cpp</code>-suffixed config defaults mirroring C (<code>nonlocal_jump_calls_cpp</code>, <code>allocation_calls_cpp</code>, <code>dynamic_exec_calls_cpp</code>, <code>io_functions_cpp</code>, <code>assertion_calls_cpp</code>, <code>sinks_cpp</code> / <code>sources_cpp</code> / <code>sanitizers_cpp</code>, <code>flagged_calls_cpp</code>, <code>dangerous_casts_cpp</code>).</li>
 <li>A bundled <code>languages/cpp.md</code> skill addendum and a C++ language reference page; all fourteen client skill files, the CLI / SECURITY / TOML / contributing enumerations, and the pre-commit <code>types_or</code> list updated for C++.</li>
 </ul>
-<h2 id="271-2026-07-06">[2.7.1] - 2026-07-06<a class="headerlink" href="#271-2026-07-06" title="Permanent link">#</a></h2>
+<h2 id="271-2026-07-06"><a href="https://github.com/shelkesays/safelint/compare/v2.7.0...v2.7.1">2.7.1</a> - 2026-07-06<a class="headerlink" href="#271-2026-07-06" title="Permanent link">#</a></h2>
 <p>Post-release hardening of the v2.7.0 C support: one opt-in-rule bugfix (SAFE312 false positives on real-world include guards), documentation-fidelity corrections, and regression tests that backfill gaps found in the C post-release audit.</p>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
 <ul>
@@ -5321,7 +5344,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <ul>
 <li>C regression tests backfilling the post-release audit gaps: a Power of Ten behavioural pin (<code>tests/rules/test_c_power_of_ten_pin.py</code>), an engine-level suite (<code>tests/core/test_engine_c.py</code>, covering both <code>.c</code> and <code>.h</code>), config-override tests for the SAFE106 <code>nonlocal_jump_calls_c</code> and SAFE310 <code>allocation_calls_c</code> list knobs, and a SAFE106 default-on / warning-severity contract lock.</li>
 </ul>
-<h2 id="270-2026-07-02">[2.7.0] - 2026-07-02<a class="headerlink" href="#270-2026-07-02" title="Permanent link">#</a></h2>
+<h2 id="270-2026-07-02"><a href="https://github.com/shelkesays/safelint/compare/v2.6.1...v2.7.0">2.7.0</a> - 2026-07-02<a class="headerlink" href="#270-2026-07-02" title="Permanent link">#</a></h2>
 <p><strong>C is now a supported language alongside Python, JavaScript, TypeScript, Java, Rust, Go, and PHP.</strong> <code>.c</code> and <code>.h</code> files are discovered, parsed via Tree-sitter (<code>tree-sitter-c</code>, shipped in the opt-in <code>[c]</code> extra), and run against <strong>21 rules</strong> - the 16 cross-language ports plus <strong>5 new C-only rules</strong>, the largest rule addition of any language. C is Holzmann's original "Power of Ten" target, so the new rules express clauses every other language adapts away, literally. safelint grows to <strong>45 rules</strong> and <strong>8 registered languages</strong>. Additive per the project's semver policy (a new language is MINOR); nothing renames, removes, or changes the meaning of any existing rule code, CLI flag, or config key.</p>
 <h3 id="added_2">Added<a class="headerlink" href="#added_2" title="Permanent link">#</a></h3>
 <ul>
