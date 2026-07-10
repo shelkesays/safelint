@@ -555,6 +555,8 @@
       
         
       
+        
+      
     
     
     
@@ -811,6 +813,34 @@
     
   
     C
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../languages/cpp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C++
   
 
     
@@ -3109,8 +3139,10 @@
 <a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>          - C:          dynamic_allocation, complex_macro, conditional_compilation,
 <a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>                        restricted_pointers (the rule 3 / 8 / 9 &quot;homecoming&quot;;
 <a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>                        nonlocal_jumps is already on at warning severity)
-<a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>          - test discipline: missing_assertions (set min_assertions = 2 for the
-<a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>                        Holzmann density), test_existence, test_coupling
+<a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>          - C++:        the C-family rules above (widened) plus raw_new_delete
+<a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>                        and dangerous_casts (modern-ownership / cast safety)
+<a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>          - test discipline: missing_assertions (set min_assertions = 2 for the
+<a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>                        Holzmann density), test_existence, test_coupling
 </code></pre></div>
 <p>All of these are off by default; see the <a href="../rules/">Rules reference</a> for each rule's config knobs. <code>no_recursion</code> (SAFE105) and the C-only <code>nonlocal_jumps</code> (SAFE106) are the rules that are <strong>on by default</strong> (at <code>warning</code> severity), so no opt-in step is needed for them.</p>
 

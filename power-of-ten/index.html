@@ -674,6 +674,8 @@
       
         
       
+        
+      
     
     
     
@@ -930,6 +932,34 @@
     
   
     C
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../languages/cpp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C++
   
 
     
@@ -2312,7 +2342,7 @@
 
 
 <h1 id="the-power-of-ten-adapted">The Power of Ten, adapted<a class="headerlink" href="#the-power-of-ten-adapted" title="Permanent link">#</a></h1>
-<p>SafeLint is an adaptation of Gerard Holzmann's <a href="https://spinroot.com/gerard/pdf/P10.pdf">"The Power of Ten - Rules for Developing Safety-Critical Code"</a> (NASA/JPL, 2006). The original ten rules target C for spacecraft flight software; SafeLint translates their <em>intent</em> to Python, JavaScript, TypeScript, Java, Rust, Go, PHP, and C. Some rules map almost directly (bounded function length, assertion density); others have no literal analogue in a garbage-collected or memory-safe language and are adapted, or deliberately left to the compiler. <strong>C is the exception: as Holzmann's original target language it gets the literal rules</strong> - clauses 1, 3, 8, and 9, adapted away for every other language, exist verbatim as the C-only rules SAFE106 / SAFE310 / SAFE311 / SAFE312 / SAFE313.</p>
+<p>SafeLint is an adaptation of Gerard Holzmann's <a href="https://spinroot.com/gerard/pdf/P10.pdf">"The Power of Ten - Rules for Developing Safety-Critical Code"</a> (NASA/JPL, 2006). The original ten rules target C for spacecraft flight software; SafeLint translates their <em>intent</em> to Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, and C++. Some rules map almost directly (bounded function length, assertion density); others have no literal analogue in a garbage-collected or memory-safe language and are adapted, or deliberately left to the compiler. <strong>C and C++ are the exception: as (near-)descendants of Holzmann's original target language they get the literal rules</strong> - clauses 1, 3, 8, and 9, adapted away for every other language, exist verbatim as the C-family rules SAFE106 / SAFE310 / SAFE311 / SAFE312 / SAFE313 (which apply to both C and C++). C++ additionally layers on its own ownership / cast-safety rules (SAFE315 <code>raw_new_delete</code>, SAFE316 <code>dangerous_casts</code>).</p>
 <p>This page maps each of the ten rules to the SafeLint rules that implement it, and records the rationale wherever a clause is adapted away. For the full per-rule configuration, see the <a href="../configuration/rules/">rules reference</a>; for what fires on each language, see the per-language pages under <strong>Languages</strong>.</p>
 <h2 id="coverage-map">Coverage map<a class="headerlink" href="#coverage-map" title="Permanent link">#</a></h2>
 <table>
@@ -2328,8 +2358,8 @@
 <tr>
 <td>1</td>
 <td>Simple control flow; no <code>goto</code>, <code>setjmp</code>, or <strong>recursion</strong></td>
-<td><a href="../configuration/rules/#safe102-nesting_depth">SAFE102</a> <code>nesting_depth</code>, <a href="../configuration/rules/#safe104-complexity">SAFE104</a> <code>complexity</code>, <a href="../configuration/rules/#safe105-no_recursion">SAFE105</a> <code>no_recursion</code>, <a href="../configuration/rules/#safe106-nonlocal_jumps">SAFE106</a> <code>nonlocal_jumps</code> (C)</td>
-<td>SAFE105 enforces the recursion ban in every language. <code>goto</code> / <code>setjmp</code> exist only in C, where <strong>SAFE106 flags them literally</strong> (enabled at warning severity).</td>
+<td><a href="../configuration/rules/#safe102-nesting_depth">SAFE102</a> <code>nesting_depth</code>, <a href="../configuration/rules/#safe104-complexity">SAFE104</a> <code>complexity</code>, <a href="../configuration/rules/#safe105-no_recursion">SAFE105</a> <code>no_recursion</code>, <a href="../configuration/rules/#safe106-nonlocal_jumps">SAFE106</a> <code>nonlocal_jumps</code> (C / C++)</td>
+<td>SAFE105 enforces the recursion ban in every language. <code>goto</code> / <code>setjmp</code> exist in C and C++, where <strong>SAFE106 flags them literally</strong> (enabled at warning severity).</td>
 </tr>
 <tr>
 <td>2</td>
@@ -2340,8 +2370,8 @@
 <tr>
 <td>3</td>
 <td>No dynamic memory allocation after initialisation</td>
-<td><a href="../configuration/rules/#safe310-dynamic_allocation">SAFE310</a> <code>dynamic_allocation</code> (C); <em>(adapted away elsewhere, see below)</em></td>
-<td><strong>C gets the literal rule</strong> (SAFE310 flags the <code>malloc</code> family); for the memory-managed languages the clause is adapted away (intent partly served by SAFE501 / SAFE401).</td>
+<td><a href="../configuration/rules/#safe310-dynamic_allocation">SAFE310</a> <code>dynamic_allocation</code> (C / C++); <em>(adapted away elsewhere, see below)</em></td>
+<td><strong>C and C++ get the literal rule</strong> (SAFE310 flags the <code>malloc</code> family, plus C++ <code>new</code> / <code>delete</code>); for the memory-managed languages the clause is adapted away (intent partly served by SAFE501 / SAFE401).</td>
 </tr>
 <tr>
 <td>4</td>
@@ -2370,14 +2400,14 @@
 <tr>
 <td>8</td>
 <td>Limit the preprocessor</td>
-<td><a href="../configuration/rules/#safe311-complex_macro">SAFE311</a> <code>complex_macro</code> (C), <a href="../configuration/rules/#safe312-conditional_compilation">SAFE312</a> <code>conditional_compilation</code> (C), <a href="../configuration/rules/#safe309-dynamic_code_execution">SAFE309</a> <code>dynamic_code_execution</code>, <a href="../configuration/rules/#safe801-tainted_sink">SAFE801</a> <code>tainted_sink</code>, <a href="../configuration/rules/#safe204-panic_macros_outside_tests">SAFE204</a> (Rust)</td>
-<td><strong>C has a real preprocessor</strong>, so SAFE311 (complex macros) and SAFE312 (conditional compilation) flag it literally. Elsewhere the analysability threat is dynamic code execution / reflection (SAFE309 / SAFE801). See below for Rust macros.</td>
+<td><a href="../configuration/rules/#safe311-complex_macro">SAFE311</a> <code>complex_macro</code> (C / C++), <a href="../configuration/rules/#safe312-conditional_compilation">SAFE312</a> <code>conditional_compilation</code> (C / C++), <a href="../configuration/rules/#safe309-dynamic_code_execution">SAFE309</a> <code>dynamic_code_execution</code>, <a href="../configuration/rules/#safe801-tainted_sink">SAFE801</a> <code>tainted_sink</code>, <a href="../configuration/rules/#safe204-panic_macros_outside_tests">SAFE204</a> (Rust)</td>
+<td><strong>C and C++ have a real preprocessor</strong>, so SAFE311 (complex macros) and SAFE312 (conditional compilation) flag it literally. Elsewhere the analysability threat is dynamic code execution / reflection (SAFE309 / SAFE801). See below for Rust macros.</td>
 </tr>
 <tr>
 <td>9</td>
 <td>Restrict pointer use</td>
-<td><a href="../configuration/rules/#safe313-restricted_pointers">SAFE313</a> <code>restricted_pointers</code> (C), <a href="../configuration/rules/#safe803-null_dereference">SAFE803</a> <code>null_dereference</code>, <a href="../configuration/rules/#safe306-dangerous_mem_ops">SAFE306</a> (Rust), <a href="../configuration/rules/#safe308-truncating_as_cast">SAFE308</a> (Rust), <a href="../configuration/rules/#safe602-undocumented_unsafe">SAFE602</a> (Rust)</td>
-<td><strong>C gets the literal rule</strong>: SAFE313 flags multi-level and function-pointer declarators. Null/Option dereference everywhere; raw-pointer / transmute hazards on Rust.</td>
+<td><a href="../configuration/rules/#safe313-restricted_pointers">SAFE313</a> <code>restricted_pointers</code> (C / C++), <a href="../configuration/rules/#safe803-null_dereference">SAFE803</a> <code>null_dereference</code>, <a href="../configuration/rules/#safe306-dangerous_mem_ops">SAFE306</a> (Rust), <a href="../configuration/rules/#safe308-truncating_as_cast">SAFE308</a> (Rust), <a href="../configuration/rules/#safe602-undocumented_unsafe">SAFE602</a> (Rust)</td>
+<td><strong>C and C++ get the literal rule</strong>: SAFE313 flags multi-level and function-pointer declarators (smart pointers are exempt on C++). Null/Option dereference everywhere; raw-pointer / transmute hazards on Rust.</td>
 </tr>
 <tr>
 <td>10</td>
@@ -2399,17 +2429,17 @@
 </ul>
 <h2 id="adapted-away-clauses">Adapted-away clauses<a class="headerlink" href="#adapted-away-clauses" title="Permanent link">#</a></h2>
 <h3 id="rule-3-no-dynamic-allocation-after-initialisation">Rule 3: no dynamic allocation after initialisation<a class="headerlink" href="#rule-3-no-dynamic-allocation-after-initialisation" title="Permanent link">#</a></h3>
-<p>The original rule forbids <code>malloc</code>/<code>free</code> after start-up so that memory behaviour is statically bounded and there is no allocator non-determinism or use-after-free. SafeLint implements it <strong>literally for C</strong> and adapts it away elsewhere:</p>
+<p>The original rule forbids <code>malloc</code>/<code>free</code> after start-up so that memory behaviour is statically bounded and there is no allocator non-determinism or use-after-free. SafeLint implements it <strong>literally for C and C++</strong> and adapts it away elsewhere:</p>
 <ul>
-<li><strong>C</strong> gets the literal rule: <a href="../configuration/rules/#safe310-dynamic_allocation">SAFE310</a> flags every <code>malloc</code> / <code>calloc</code> / <code>realloc</code> / <code>aligned_alloc</code> / <code>free</code> / <code>strdup</code> call. Disabled by default - embedded and safety-critical projects opt in; pre-allocate fixed pools / arenas at init to satisfy it.</li>
+<li><strong>C and C++</strong> get the literal rule: <a href="../configuration/rules/#safe310-dynamic_allocation">SAFE310</a> flags every <code>malloc</code> / <code>calloc</code> / <code>realloc</code> / <code>aligned_alloc</code> / <code>free</code> / <code>strdup</code> call (and, on C++, <code>new</code> / <code>delete</code>). Disabled by default - embedded and safety-critical projects opt in; pre-allocate fixed pools / arenas at init to satisfy it.</li>
 <li><strong>Python, JavaScript, TypeScript, Java</strong> are garbage-collected. Allocation-site analysis is not a meaningful safety gate in these languages: allocation is pervasive and implicit, and the failure modes the rule targets (fragmentation, allocator latency, leaks-by-forgotten-free) are managed by the runtime. The rule's underlying intent, <em>predictable memory and termination behaviour</em>, is partly served by <a href="../configuration/rules/#safe501-unbounded_loops">SAFE501</a> (bounded loops) and <a href="../configuration/rules/#safe401-resource_lifecycle">SAFE401</a> (deterministic resource cleanup).</li>
 <li><strong>Rust</strong> makes allocation explicit but idiomatic; <code>rustc</code> and <code>clippy</code> own the performance lane, and a blanket "no allocation in a loop" rule would be noisy. An allocation-in-loop rule is a <em>possible future addition</em>, deliberately not committed to here.</li>
 <li><strong>AssemblyScript</strong> (<code>.as</code>, parsed via the TypeScript grammar) genuinely has manual memory management and is the one place a rule-3 analysis would be meaningful; it is currently an un-analysed surface and is noted here as a known gap.</li>
 </ul>
 <h3 id="rule-8-limit-the-preprocessor">Rule 8: limit the preprocessor<a class="headerlink" href="#rule-8-limit-the-preprocessor" title="Permanent link">#</a></h3>
-<p>C's <code>#define</code> macros generate code the compiler (and any analyser) cannot see until expansion, which is why the original rule restricts them. SafeLint implements it <strong>literally for C</strong> and adapts it to runtime code generation / reflection elsewhere:</p>
+<p>C's <code>#define</code> macros generate code the compiler (and any analyser) cannot see until expansion, which is why the original rule restricts them. SafeLint implements it <strong>literally for C and C++</strong> and adapts it to runtime code generation / reflection elsewhere:</p>
 <ul>
-<li><strong>C</strong> gets the literal rule: <a href="../configuration/rules/#safe311-complex_macro">SAFE311</a> flags function-like macros using <code>##</code> / <code>__VA_ARGS__</code> and unbalanced object-like macros, and <a href="../configuration/rules/#safe312-conditional_compilation">SAFE312</a> flags every <code>#if</code> / <code>#ifdef</code> / <code>#ifndef</code> beyond an include guard (the paper's "2^n testable versions" caution). Both disabled by default.</li>
+<li><strong>C and C++</strong> get the literal rule: <a href="../configuration/rules/#safe311-complex_macro">SAFE311</a> flags function-like macros using <code>##</code> / <code>__VA_ARGS__</code> and unbalanced object-like macros, and <a href="../configuration/rules/#safe312-conditional_compilation">SAFE312</a> flags every <code>#if</code> / <code>#ifdef</code> / <code>#ifndef</code> beyond an include guard (the paper's "2^n testable versions" caution). Both disabled by default.</li>
 <li><strong>Python, JavaScript, TypeScript, Java</strong> are covered structurally by <a href="../configuration/rules/#safe309-dynamic_code_execution">SAFE309</a> (flag <code>eval</code> / <code>new Function</code> / <code>Class.forName</code> / <code>Method.invoke</code> wherever they appear) and dataflow-wise by <a href="../configuration/rules/#safe801-tainted_sink">SAFE801</a> (flag user input reaching those sinks). The two are complementary and may both fire on one line.</li>
 <li><strong>Go</strong> has no <code>eval</code>; its rule-8 surface is <strong>reflection and plugin loading</strong>. <a href="../configuration/rules/#safe309-dynamic_code_execution">SAFE309</a> flags <code>reflect</code> <code>Call</code> / <code>CallSlice</code> / <code>MethodByName</code> and <code>plugin</code> <code>Open</code> / <code>Lookup</code> structurally, and <a href="../configuration/rules/#safe801-tainted_sink">SAFE801</a> covers user input reaching the <code>os/exec</code> / <code>database/sql</code> / <code>plugin</code> sinks. Go has no C-style preprocessor or conditional-compilation directive (build constraints are file-level, not in-source <code>#ifdef</code>), so there is no cfg-density concern.</li>
 <li><strong>PHP</strong> has the <strong>largest dynamic-execution surface of any supported language</strong>: <code>eval</code>, the string form of <code>assert</code>, <code>create_function</code>, the <code>call_user_func</code> / <code>call_user_func_array</code> dispatchers, <em>and</em> variable <code>include</code> / <code>require</code> (loading a path computed at runtime). <a href="../configuration/rules/#safe309-dynamic_code_execution">SAFE309</a> flags the structural call sites and <a href="../configuration/rules/#safe801-tainted_sink">SAFE801</a> covers user input from the web superglobals (<code>$_GET</code> / <code>$_POST</code> / ...) reaching the <code>eval</code> / <code>exec</code> / <code>unserialize</code> / raw-SQL sinks and the dynamic <code>include</code> / <code>require</code>. The two are complementary and may both fire on one line.</li>

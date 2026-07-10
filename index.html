@@ -644,6 +644,8 @@
       
         
       
+        
+      
     
     
     
@@ -900,6 +902,34 @@
     
   
     C
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="languages/cpp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C++
   
 
     
@@ -2310,7 +2340,7 @@
 </tr>
 </tbody>
 </table>
-<p><strong>Rule coverage</strong> - 45 rules total, scoped per language:</p>
+<p><strong>Rule coverage</strong> - 47 rules total, scoped per language:</p>
 <table>
 <thead>
 <tr>
@@ -2321,32 +2351,32 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>All eight</strong> (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C)</td>
+<td><strong>All nine</strong> (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, C++)</td>
 <td>13</td>
 <td>the cross-language core: <code>function_length</code>, <code>nesting_depth</code>, <code>max_arguments</code>, <code>complexity</code>, <code>no_recursion</code>, <code>side_effects_hidden</code>, <code>side_effects</code>, <code>unbounded_loops</code>, <code>blanket_suppression</code>, <code>test_existence</code>, <code>test_coupling</code>, <code>tainted_sink</code>, <code>return_value_ignored</code></td>
 </tr>
 <tr>
-<td>Python / JS / TS / Java / Rust / PHP / C (not Go)</td>
+<td>Python / JS / TS / Java / Rust / PHP / C / C++ (not Go)</td>
 <td>1</td>
 <td><code>missing_assertions</code></td>
 </tr>
 <tr>
-<td>Python / JS / TS / Java / Rust / PHP (not Go, not C)</td>
+<td>Python / JS / TS / Java / Rust / PHP (not Go, not C, not C++)</td>
 <td>1</td>
 <td><code>null_dereference</code></td>
 </tr>
 <tr>
-<td>Python / JS / TS / Java / Go / PHP / C (not Rust)</td>
+<td>Python / JS / TS / Java / Go / PHP / C / C++ (not Rust)</td>
 <td>2</td>
 <td><code>global_mutation</code>, <code>dynamic_code_execution</code></td>
 </tr>
 <tr>
-<td>Python / JS / TS / Java / Go / PHP (not Rust, not C)</td>
+<td>Python / JS / TS / Java / Go / PHP (not Rust, not C, not C++)</td>
 <td>1</td>
 <td><code>resource_lifecycle</code></td>
 </tr>
 <tr>
-<td>Python / JS / TS / Java / PHP</td>
+<td>Python / JS / TS / Java / PHP / C++</td>
 <td>2</td>
 <td><code>empty_except</code>, <code>logging_on_error</code></td>
 </tr>
@@ -2356,9 +2386,9 @@
 <td><code>global_state</code></td>
 </tr>
 <tr>
-<td>Python only</td>
+<td>Python + C++</td>
 <td>1</td>
-<td><code>bare_except</code></td>
+<td><code>bare_except</code> (Python <code>except:</code> / C++ <code>catch (...)</code>)</td>
 </tr>
 <tr>
 <td>JavaScript family (JS / TS)</td>
@@ -2381,14 +2411,19 @@
 <td><code>empty_error_check</code>, <code>panic_calls_outside_tests</code></td>
 </tr>
 <tr>
-<td>C only</td>
+<td>C family (C and C++)</td>
 <td>5</td>
 <td><code>nonlocal_jumps</code>, <code>dynamic_allocation</code>, <code>complex_macro</code>, <code>conditional_compilation</code>, <code>restricted_pointers</code></td>
+</tr>
+<tr>
+<td>C++ only</td>
+<td>2</td>
+<td><code>raw_new_delete</code>, <code>dangerous_casts</code></td>
 </tr>
 </tbody>
 </table>
 <p>Rules are skipped per language where the semantics don't translate - e.g. Go has no try/catch, <code>global</code> keyword, <code>var</code> hoisting, production assertion idiom, or chained-nullable idiom; Rust's <code>Result</code> / <code>Option</code> / <code>Drop</code> model covers its skips with Rust-specific replacements; C skips try/catch rules, <code>global_state</code>, <code>wide_scope_declaration</code>, and (documented gaps) <code>resource_lifecycle</code> / <code>null_dereference</code>.</p>
-<p><strong>Planned future languages</strong> (no timelines committed): C++. See the <a href="configuration/rules/#planned">language-coverage roadmap</a>.</p>
+<p>See the <a href="configuration/rules/#planned">language-coverage roadmap</a> for future languages.</p>
 <h2 id="quick-start">Quick start<a class="headerlink" href="#quick-start" title="Permanent link">#</a></h2>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python]&#39;</span><span class="w">         </span><span class="c1"># adds .py, .pyw</span>
 <a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[javascript]&#39;</span><span class="w">     </span><span class="c1"># adds .js, .mjs, .cjs</span>

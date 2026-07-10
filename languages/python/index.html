@@ -557,6 +557,8 @@
       
         
       
+        
+      
     
     
     
@@ -951,6 +953,34 @@
     
   
     C
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cpp/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    C++
   
 
     
@@ -2360,7 +2390,7 @@
 </code></pre></div>
 <p>v2.0.0 ships every language grammar as an opt-in extra, the <code>[python]</code> extra installs <code>tree-sitter-python</code> alongside the engine. Plain <code>pip install safelint</code> installs only the engine and emits an install hint on first run.</p>
 <h2 id="rules-that-fire-on-python">Rules that fire on Python<a class="headerlink" href="#rules-that-fire-on-python" title="Permanent link">#</a></h2>
-<p>Python is in scope for every cross-language rule plus the two Python-only rules (SAFE201 <code>bare_except</code>, SAFE301 <code>global_state</code>) and SAFE302 <code>global_mutation</code>. Newly added in 2.4.0: SAFE105 <code>no_recursion</code> (enabled by default), SAFE309 <code>dynamic_code_execution</code>, and SAFE603 <code>blanket_suppression</code> (both disabled by default). The 1 JavaScript-family-only rule (SAFE305 <code>wide_scope_declaration</code>) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.</p>
+<p>Python is in scope for every cross-language rule plus SAFE201 <code>bare_except</code> (shared with C++), the Python-only SAFE301 <code>global_state</code>, and SAFE302 <code>global_mutation</code>. Newly added in 2.4.0: SAFE105 <code>no_recursion</code> (enabled by default), SAFE309 <code>dynamic_code_execution</code>, and SAFE603 <code>blanket_suppression</code> (both disabled by default). The 1 JavaScript-family-only rule (SAFE305 <code>wide_scope_declaration</code>) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.</p>
 <table>
 <thead>
 <tr>
@@ -2398,7 +2428,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe201-bare_except">SAFE201</a></td>
 <td><code>bare_except</code></td>
-<td><strong>Python-only.</strong> Fires on <code>except:</code> with no exception type, catches <code>KeyboardInterrupt</code> and <code>SystemExit</code>.</td>
+<td>Fires on <code>except:</code> with no exception type, catches <code>KeyboardInterrupt</code> and <code>SystemExit</code>. (Also registered for C++'s <code>catch (...)</code>.)</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe202-empty_except">SAFE202</a></td>
@@ -2532,7 +2562,7 @@
 <a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="c1"># Optional: scope to a directory</span>
 <a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span>
 </code></pre></div>
-<p>The published hook spec sets <code>types_or: [python, javascript, ts, tsx, java, rust, go, php, c]</code> and no <code>files:</code> filter, add your own <code>files:</code> / <code>exclude:</code> keys to scope it. Mixed-language projects compose extras: <code>additional_dependencies: ['safelint[python,javascript]']</code> (or <code>[all]</code>).</p>
+<p>The published hook spec sets <code>types_or: [python, javascript, ts, tsx, java, rust, go, php, c, c++]</code> and no <code>files:</code> filter, add your own <code>files:</code> / <code>exclude:</code> keys to scope it. Mixed-language projects compose extras: <code>additional_dependencies: ['safelint[python,javascript]']</code> (or <code>[all]</code>).</p>
 <h2 id="python-specific-config-keys">Python-specific config keys<a class="headerlink" href="#python-specific-config-keys" title="Permanent link">#</a></h2>
 <p>Most rule options work uniformly across languages, but a few are Python-only:</p>
 <ul>
