@@ -44,9 +44,9 @@ follows: a spec file is removed once its language ships.
 > `src/safelint/skill_files/languages/cpp.md` addendum, and the shipped code.
 
 No active language specs remain in this directory. When a new language is
-planned, add its spec file and a status row here, in working-priority order
-(and remove the spec once the language ships, as was done for Go, PHP, C, and
-C++).
+planned, add its spec file and (re)introduce a status table here listing it in
+working-priority order (and remove the spec once the language ships, as was done
+for Go, PHP, C, and C++).
 
 ## Deferred cross-language refactors (run AFTER the languages above)
 
