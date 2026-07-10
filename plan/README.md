@@ -1,18 +1,15 @@
-# Language-expansion plan: C++
+# Language-expansion plan
 
 **Audience**: the AI coding agent (or human contributor) implementing the next
 piece of work. Each item has its own self-contained spec in this directory.
 Implement **one spec at a time, in working-priority order**.
 
-**Next up: C++ (`plan/03-cpp.md`) as 2.8.0.** C shipped in v2.7.0, and its
-post-release audit gaps were closed in 2.7.1 (the behavioural pin, the
-SAFE106/310 config-override tests, the SAFE106 contract lock, the engine-level
-C suite, the paper-fidelity notes, and the eight-language enumeration sweep all
-landed), so the hard C-before-C++ ordering is satisfied and C++ now builds on a
-fully-closed, fully-guarded C baseline. `docs/configuration/rules.md` "Planned"
-lists C++ as the next planned language. The blockquotes below record the
-shipped-language history and the convention this plan directory follows: a spec
-file is removed once its language ships.
+**No language addition is currently planned.** C++ shipped in v2.8.0 (see the
+blockquote below); the remaining work in this directory is the deferred
+cross-language refactors listed further down. `docs/configuration/rules.md`
+"Planned" reflects the same empty near-term roadmap. The blockquotes below
+record the shipped-language history and the convention this plan directory
+follows: a spec file is removed once its language ships.
 
 > **Go (`.go`) shipped in v2.5.0** (6th registered language: 16 cross-language
 > rules + the Go-only SAFE209 `empty_error_check` / SAFE211
@@ -37,15 +34,19 @@ file is removed once its language ships.
 > [C language page](../docs/languages/c.md), the
 > `src/safelint/skill_files/languages/c.md` addendum, and the shipped code.
 
-Rows are in working-priority order; the **Spec #** column is the stable file
-number, not the priority rank.
+> **C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) shipped in v2.8.0** (9th
+> registered language: 26 rules = the cross-language ports + the five C-family
+> rules SAFE106 / SAFE310-313 widened to C and C++ + the try/catch rules
+> SAFE201-203 + two new C++-only rules SAFE315 `raw_new_delete` / SAFE316
+> `dangerous_casts`). Its spec, `plan/03-cpp.md`, was removed on completion -
+> the design decisions now live in the
+> [C++ language page](../docs/languages/cpp.md), the
+> `src/safelint/skill_files/languages/cpp.md` addendum, and the shipped code.
 
-| Priority | Spec # | File | Item | Status | Depends on |
-|---|---|---|---|---|---|
-| 1 (in release) | 3 | `plan/03-cpp.md` | C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) -> **2.8.0** | **in release**: all seven batches merged to `development` via PR #95 (feature -> development); now promoting `development -> main` on `release/2.8.0` (version bumped to the production **2.8.0**) via PR #96, full gate green. Remaining owner steps at merge: date the CHANGELOG `[2.8.0]`, tag `v2.8.0`, then remove this spec + add the shipped blockquote. | C shipped in v2.7.0 + gaps closed in 2.7.1 (satisfied): the regression guards and closed C baseline are in place |
-
-Update the Status column (and the per-spec status header) as work lands; remove
-a spec file once its language ships (as was done for Go, PHP, and C).
+No active language specs remain in this directory. When a new language is
+planned, add its spec file and a status row here, in working-priority order
+(and remove the spec once the language ships, as was done for Go, PHP, C, and
+C++).
 
 ## Deferred cross-language refactors (run AFTER the languages above)
 
