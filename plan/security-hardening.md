@@ -59,7 +59,7 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - [x] H4 - cache tmp write via `mkstemp` (`O_EXCL` + unguessable name) (done - PR #83)
 - [x] H5 - `_maybe_seed_secondary_for_opencode` dangling-symlink `touch()` guard (done - PR #83)
 - [x] H6 - prefer `pathlib.Path` over `os.path`/`os` where a safe equivalent exists (done - PR #84)
-- [ ] H7 - `_install_secondary` / `_remove_secondary` `AGENTS.md` merge write is still check-then-act (the H2 TOCTOU class, unhardened on this path) (open; from the 2026-07-02 re-scan)
+- [x] H7 - `_install_secondary` / `_remove_secondary` `AGENTS.md` merge write now goes through `_write_file_replace` (exclusive-create temp + `os.replace`, mode-preserving), so a symlink swapped into the check-then-write window is replaced as a directory entry rather than written through (done - security hardening PR)
 - [ ] H8 - `_remove_path` validates the resolved parent shape but deletes the unresolved path (ancestor-swap race) (open; residual, same class as H1)
 - [x] H9 - GitHub Actions SHA-pinned (all 13 `uses:` across the four workflows, incl. the OIDC-privileged `pypa/gh-action-pypi-publish` in `publish.yml`) + a `github-actions` Dependabot ecosystem to keep pins fresh (done - security hardening PR)
 

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import stat
 import sys
 from typing import TYPE_CHECKING
 
@@ -1030,6 +1031,55 @@ def test_write_empty_file_exclusive_is_noop_when_file_exists(tmp_path: Path) -> 
     target.write_text("existing content\n", encoding="utf-8")
     _skill_install._write_empty_file_exclusive(target)
     assert target.read_text(encoding="utf-8") == "existing content\n"
+
+
+def test_write_file_replace_overwrites_existing_content(tmp_path: Path) -> None:
+    """``_write_file_replace`` replaces the file's contents (the section-merge happy path)."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("old body\n", encoding="utf-8")
+    _skill_install._write_file_replace(target, "new merged body\n")
+    assert target.read_text(encoding="utf-8") == "new merged body\n"
+    assert not target.is_symlink()
+
+
+def test_write_file_replace_leaves_no_temp_behind(tmp_path: Path) -> None:
+    """The exclusive-create temp is renamed away on success - no ``.safelint-section-*`` residue."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("old\n", encoding="utf-8")
+    _skill_install._write_file_replace(target, "new\n")
+    leftovers = [p.name for p in tmp_path.iterdir() if p.name.startswith(".safelint-section-")]
+    assert leftovers == [], f"temp files left behind: {leftovers}"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows chmod bits differ from POSIX mode")
+def test_write_file_replace_preserves_mode(tmp_path: Path) -> None:
+    """The original file's permission bits survive the temp-plus-replace (not mkstemp's 0600)."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("old\n", encoding="utf-8")
+    target.chmod(0o644)
+    _skill_install._write_file_replace(target, "new\n")
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_write_file_replace_does_not_write_through_planted_symlink(tmp_path: Path) -> None:
+    """A symlink swapped in after the writability check is replaced, not written through (H7).
+
+    ``_secondary_target_writable_or_warn`` validates a regular file, then the
+    caller writes. If an attacker wins that window and plants a symlink at the
+    target, ``os.replace`` swaps the *directory entry* (the link) for our
+    regular temp file - the link's victim target is never written through.
+    """
+    victim = tmp_path / "victim.txt"
+    victim.write_text("VICTIM UNCHANGED\n", encoding="utf-8")
+    planted = tmp_path / "AGENTS.md"
+    planted.symlink_to(victim)
+
+    _skill_install._write_file_replace(planted, "safelint section\n")
+
+    assert victim.read_text(encoding="utf-8") == "VICTIM UNCHANGED\n", "must not write through the symlink"
+    assert not planted.is_symlink(), "os.replace swaps the link out for a regular file"
+    assert planted.read_text(encoding="utf-8") == "safelint section\n"
 
 
 def test_install_codex_without_opencode_does_not_create_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
