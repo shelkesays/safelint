@@ -1051,6 +1051,43 @@ def test_write_file_replace_leaves_no_temp_behind(tmp_path: Path) -> None:
     assert leftovers == [], f"temp files left behind: {leftovers}"
 
 
+class _WriteInjectedError(OSError):
+    """Sentinel raised by monkeypatches to exercise the cleanup-and-reraise paths."""
+
+
+def test_write_file_replace_closes_fd_and_cleans_up_when_fdopen_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If ``os.fdopen`` fails, the raw mkstemp fd is closed (no leak) and the temp is removed."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("old\n", encoding="utf-8")
+    closed: list[int] = []
+    real_close = _skill_install.os.close
+    monkeypatch.setattr(_skill_install.os, "close", lambda fd: (closed.append(fd), real_close(fd))[1])
+    monkeypatch.setattr(_skill_install.os, "fdopen", lambda *a, **k: (_ for _ in ()).throw(_WriteInjectedError))
+
+    with pytest.raises(_WriteInjectedError):
+        _skill_install._write_file_replace(target, "new\n")
+
+    assert closed, "the raw fd must be closed when fdopen fails, or it leaks"
+    assert list(tmp_path.glob(".safelint-section-*")) == [], "temp file must be cleaned up"
+    assert target.read_text(encoding="utf-8") == "old\n", "target left untouched on failure"
+
+
+def test_write_file_replace_cleans_up_when_replace_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If the final atomic rename fails, the orphan temp is removed and the error propagates."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("old\n", encoding="utf-8")
+
+    def boom_replace(self: Path, target_: Path) -> None:
+        raise _WriteInjectedError
+
+    monkeypatch.setattr(_skill_install.Path, "replace", boom_replace)
+
+    with pytest.raises(_WriteInjectedError):
+        _skill_install._write_file_replace(target, "new\n")
+
+    assert list(tmp_path.glob(".safelint-section-*")) == [], "temp cleaned up after a failed rename"
+
+
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows chmod bits differ from POSIX mode")
 def test_write_file_replace_preserves_mode(tmp_path: Path) -> None:
     """The original file's permission bits survive the temp-plus-replace (not mkstemp's 0600)."""
@@ -1059,6 +1096,26 @@ def test_write_file_replace_preserves_mode(tmp_path: Path) -> None:
     target.chmod(0o644)
     _skill_install._write_file_replace(target, "new\n")
     assert stat.S_IMODE(target.stat().st_mode) == 0o644
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_write_file_replace_does_not_abort_on_dangling_symlink(tmp_path: Path) -> None:
+    """A dangling symlink swapped into the window is replaced, not stat-followed into a crash.
+
+    Reading the mode with ``lstat`` (not ``stat``) means a dangling symlink at
+    the target no longer raises ``FileNotFoundError`` before the atomic replace;
+    ``os.replace`` then swaps the link out for our regular file, and the missing
+    link target is never created.
+    """
+    missing = tmp_path / "gone.txt"  # never created - the dangling target
+    planted = tmp_path / "AGENTS.md"
+    planted.symlink_to(missing)
+
+    _skill_install._write_file_replace(planted, "content\n")  # must not raise
+
+    assert not missing.exists(), "must not create the dangling link target"
+    assert not planted.is_symlink()
+    assert planted.read_text(encoding="utf-8") == "content\n"
 
 
 @pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
