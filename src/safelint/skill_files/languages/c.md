@@ -14,7 +14,7 @@ pip install 'safelint[all]'
 
 C ships its grammar (`tree-sitter-c`) as the opt-in `[c]` extra; the base install has no grammars.
 
-For pre-commit integration you normally only need to add the grammar extra via `additional_dependencies`; the published hook already scopes itself to `.c` / `.h` files (its `types_or` carries the `c` filetype tag, so no `types_or` line is needed unless you override it):
+For pre-commit integration you normally only need to add the grammar extra via `additional_dependencies`; the published hook's `types_or` already includes the `c` filetype tag (alongside every other supported language), so `.c` / `.h` files are picked up without a `types_or` line unless you have customised `types_or` yourself:
 
 ```yaml
 - repo: https://github.com/shelkesays/safelint
