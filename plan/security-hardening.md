@@ -61,7 +61,7 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - [x] H6 - prefer `pathlib.Path` over `os.path`/`os` where a safe equivalent exists (done - PR #84)
 - [ ] H7 - `_install_secondary` / `_remove_secondary` `AGENTS.md` merge write is still check-then-act (the H2 TOCTOU class, unhardened on this path) (open; from the 2026-07-02 re-scan)
 - [ ] H8 - `_remove_path` validates the resolved parent shape but deletes the unresolved path (ancestor-swap race) (open; residual, same class as H1)
-- [ ] H9 - GitHub Actions pinned to mutable refs; the OIDC-privileged `publish.yml` uses a moving branch ref (`pypa/gh-action-pypi-publish@release/v1`) (open; CI/CD supply-chain hardening)
+- [x] H9 - GitHub Actions SHA-pinned (all 13 `uses:` across the four workflows, incl. the OIDC-privileged `pypa/gh-action-pypi-publish` in `publish.yml`) + a `github-actions` Dependabot ecosystem to keep pins fresh (done - security hardening PR)
 
 ### H1 - `skill remove --path` validates the path tail lexically; a symlinked ancestor can escape
 
