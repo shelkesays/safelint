@@ -19,6 +19,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          # Least privilege: nothing after checkout does git operations, so keep
+          # GITHUB_TOKEN out of .git/config (matches claude-review.yml).
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:
@@ -55,6 +59,10 @@ jobs:
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          # Least privilege: nothing after checkout does git operations, so keep
+          # GITHUB_TOKEN out of .git/config (matches claude-review.yml).
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:

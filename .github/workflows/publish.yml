@@ -35,6 +35,11 @@ jobs:
 
     steps:
       - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
+        with:
+          # Least privilege: the build job only reads the tree, verifies the tag,
+          # and builds/uploads artifacts - no git ops - so keep GITHUB_TOKEN out
+          # of .git/config. The publish job omits checkout entirely.
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b  # v8.1.0
         with:

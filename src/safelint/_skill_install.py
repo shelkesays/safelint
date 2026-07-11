@@ -824,7 +824,13 @@ def _write_empty_file_exclusive(path: Path) -> None:
 
 
 def _unlink_quietly(path: Path) -> None:
-    """Remove *path*, ignoring the case where it has already gone (best-effort temp cleanup)."""
+    """Best-effort removal of *path*, suppressing any ``OSError``.
+
+    Used for temp cleanup: the path may already be gone (renamed away on the
+    success path), and even a permissions / I/O failure on cleanup must not mask
+    the real error being propagated by the caller. Suppressing the whole
+    ``OSError`` family (not just ``FileNotFoundError``) is deliberate.
+    """
     with contextlib.suppress(OSError):
         path.unlink()
 
@@ -858,8 +864,14 @@ def _write_file_replace(target: Path, text: str) -> None:
     does: there is no pathlib equivalent for an atomic exclusive temp create.
     The "write" in the name tells SAFE304 this is I/O by intent.
     """
-    info = target.lstat()  # lstat: never follow a symlink swapped in after the check
-    mode = stat.S_IMODE(info.st_mode) if stat.S_ISREG(info.st_mode) else None
+    # lstat (never follows a symlink swapped in after the check) reads the mode
+    # to preserve. A target that vanished in the race (removed between the
+    # caller's read and here) has no mode to carry over - leave it None and let
+    # os.replace create the file fresh, matching the old write_text behaviour.
+    mode = None
+    with contextlib.suppress(FileNotFoundError):
+        info = target.lstat()
+        mode = stat.S_IMODE(info.st_mode) if stat.S_ISREG(info.st_mode) else None
     fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=".safelint-section-", suffix=".tmp")
     tmp = Path(tmp_name)
     try:

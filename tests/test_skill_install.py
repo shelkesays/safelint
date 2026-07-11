@@ -1051,6 +1051,19 @@ def test_write_file_replace_leaves_no_temp_behind(tmp_path: Path) -> None:
     assert leftovers == [], f"temp files left behind: {leftovers}"
 
 
+def test_write_file_replace_creates_target_when_missing(tmp_path: Path) -> None:
+    """A target that vanished in the race window is recreated, not crashed on.
+
+    ``lstat`` raises ``FileNotFoundError`` when the file was removed between the
+    caller's read and the write; that is suppressed (no mode to preserve) and
+    ``os.replace`` creates the file fresh, matching the old ``write_text``.
+    """
+    target = tmp_path / "AGENTS.md"  # never created - simulates a vanished target
+    _skill_install._write_file_replace(target, "fresh\n")  # must not raise
+    assert target.read_text(encoding="utf-8") == "fresh\n"
+    assert not target.is_symlink()
+
+
 class _WriteInjectedError(OSError):
     """Sentinel raised by monkeypatches to exercise the cleanup-and-reraise paths."""
 
