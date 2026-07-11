@@ -14,7 +14,7 @@ pip install 'safelint[all]'
 
 C++ ships its grammar (`tree-sitter-cpp`) as the opt-in `[cpp]` extra; the base install has no grammars.
 
-For pre-commit integration, the published hook routes the C++ extensions via the `c++` filetype tag in `types_or` (pre-commit's `identify` library uses **`c++`**, not `cpp`, for C++ files):
+For pre-commit integration you normally only need to add the grammar extra via `additional_dependencies`; the published hook already scopes itself to the C++ extensions (its `types_or` carries the `c++` filetype tag). Only if you override `types_or` yourself, note that pre-commit's `identify` library uses **`c++`**, not `cpp`, for C++ files:
 
 ```yaml
 - repo: https://github.com/shelkesays/safelint
