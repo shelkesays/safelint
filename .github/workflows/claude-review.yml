@@ -25,7 +25,6 @@ jobs:
       id-token: write # required by claude-code-action
     steps:
       - name: Checkout code
-        # TODO(H9, plan/security-hardening.md): pin actions by commit SHA.
         uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
         with:
           fetch-depth: 1
