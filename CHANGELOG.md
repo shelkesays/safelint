@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.1] - 2026-07-12
+
 ### Security
 
 - **Skill-install and CI hardening (internal audit items H7-H9), all LOW / defence-in-depth.** None is exploitable in the default no-flag flow; they close residual TOCTOU and supply-chain gaps around the `safelint skill` command and the release pipeline. No change to lint behaviour or public API.
@@ -898,7 +900,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.8.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.8.1...HEAD
+[2.8.1]: https://github.com/shelkesays/safelint/compare/v2.8.0...v2.8.1
 [2.8.0]: https://github.com/shelkesays/safelint/compare/v2.7.1...v2.8.0
 [2.7.1]: https://github.com/shelkesays/safelint/compare/v2.7.0...v2.7.1
 [2.7.0]: https://github.com/shelkesays/safelint/compare/v2.6.1...v2.7.0
