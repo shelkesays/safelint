@@ -1780,39 +1780,47 @@ def _path_looks_like_safelint_install(path: Path) -> bool:
     return False
 
 
-def _resolved_install_shape_ok(path: Path) -> bool:
-    """Re-check the install shape after resolving *path*'s ancestor symlinks.
+def _resolved_removal_target(path: Path) -> Path | None:
+    """Resolve *path*'s ancestor symlinks once and return the removal target, or None.
 
     ``_path_looks_like_safelint_install`` matches the *lexical* tail, so a
-    symlinked ancestor that redirects the removal onto an unrelated real
-    tree (``~/x/.cursor/rules`` -> ``/victim/data``) would still pass it.
-    Resolving the parent and re-running the tail match closes that gap: a
-    symlink that lands on a non-install-shaped location fails here, while
-    genuinely unusual *real* parents - and symlinks that still resolve to
-    an install-shaped tail - keep working.
+    symlinked ancestor that redirects the removal onto an unrelated real tree
+    (``~/x/.cursor/rules`` -> ``/victim/data``) would still pass it. Resolving
+    the parent and re-running the tail match closes that gap: a symlink that
+    lands on a non-install-shaped location returns None, while genuinely unusual
+    *real* parents - and symlinks that still resolve to an install-shaped tail -
+    return the resolved target.
+
+    Returning the resolved target (rather than a bool) lets ``_remove_path`` use
+    the **same** resolved path for both the shape check and the actual removal.
+    That is the H8 hardening: the earlier flow validated a resolved path but then
+    removed the *unresolved* one, leaving a window in which a symlinked ancestor
+    swapped in after validation redirected the unlink onto a different tree. With
+    a single resolve, the validated path and the removed path are one object.
 
     Two deliberate choices:
 
-    - ``Path.resolve(strict=False)`` resolves ancestor symlinks without
-      raising on a *missing* path. It rewrites only the symlinked *prefix*;
-      an unusual-but-real parent, or a platform prefix symlink like macOS's
-      ``/var`` -> ``/private/var``, leaves the install-shaped tail intact
-      and still matches. It *can* raise ``RuntimeError`` on an infinite
-      symlink loop in an ancestor (and ``OSError`` on some platforms), so
-      resolution failure is caught and treated as a non-match - a looped
-      ``--path`` is refused cleanly rather than tracebacking out of
-      ``_remove_path``.
+    - ``Path.resolve(strict=False)`` resolves ancestor symlinks without raising
+      on a *missing* path. It rewrites only the symlinked *prefix*; an
+      unusual-but-real parent, or a platform prefix symlink like macOS's
+      ``/var`` -> ``/private/var``, leaves the install-shaped tail intact and
+      still matches. It *can* raise ``RuntimeError`` on an infinite symlink loop
+      in an ancestor (and ``OSError`` on some platforms), so resolution failure
+      is caught and treated as a non-match - a looped ``--path`` is refused
+      cleanly rather than tracebacking out of ``_remove_path``.
     - The leaf name is appended verbatim rather than resolved.
-      ``_remove_existing`` deliberately unlinks a leaf symlink as the link
-      itself (not its target), so following the leaf would mischaracterise
-      what actually gets removed.
+      ``_remove_existing`` deliberately unlinks a leaf symlink as the link itself
+      (not its target), so following the leaf would mischaracterise - and change
+      - what actually gets removed.
     """
     try:
         resolved = path.parent.resolve(strict=False) / path.name
     # A symlink loop in an ancestor raises; refuse the path rather than crash.
     except (OSError, RuntimeError):  # nosafe: SAFE203
-        return False
-    return _path_looks_like_safelint_install(resolved)
+        return None
+    if not _path_looks_like_safelint_install(resolved):
+        return None
+    return resolved
 
 
 def _print_remove_path_unrecognised(path: Path) -> None:
@@ -1833,24 +1841,27 @@ def _remove_path(path: Path, *, dry_run: bool) -> int:
     client's ``install_relpath`` (see
     :func:`_path_looks_like_safelint_install`), *and* that tail must
     still match after resolving ancestor symlinks (see
-    :func:`_resolved_install_shape_ok`). The first check prevents typos
+    :func:`_resolved_removal_target`). The first check prevents typos
     and shell-expansion accidents (e.g. ``--path ~/.config`` instead of
     ``--path ~/.cursor/rules/safelint.mdc``); the second prevents a
     symlinked ancestor from redirecting the removal onto an unrelated
-    real tree. Truly unusual install locations should be removed
-    manually with ``rm``.
+    real tree. The resolved target from that second check is what is
+    actually removed, so validation and removal cannot diverge under an
+    ancestor-symlink swap (H8). Truly unusual install locations should be
+    removed manually with ``rm``.
     """
     if not path.exists() and not path.is_symlink():
         _print_remove_path_missing(path)
         return 1
-    if not _path_looks_like_safelint_install(path) or not _resolved_install_shape_ok(path):
+    target = _resolved_removal_target(path) if _path_looks_like_safelint_install(path) else None
+    if target is None:
         _print_remove_path_unrecognised(path)
         return 1
     shape = "symlink" if path.is_symlink() else "copy"
     if dry_run:
         _print_remove_dry_run(None, path, None, shape=shape)
         return 0
-    _remove_existing(path)
+    _remove_existing(target)
     _cleanup_empty_install_parent(path, explicit_path_removal=True)
     _print_remove_success(None, path, None)
     return 0
