@@ -52,6 +52,7 @@ pip install 'safelint[rust]'           # adds .rs
 pip install 'safelint[go]'             # adds .go
 pip install 'safelint[php]'            # adds .php
 pip install 'safelint[c]'              # adds .c, .h
+pip install 'safelint[cpp]'            # adds .cpp, .cxx, .cc, .hpp, .hxx, .hh
 pip install 'safelint[all]'            # every supported language
 pip install 'safelint[python,rust]'    # multiple extras compose (e.g. PyO3 / maturin)
 # uv add 'safelint[typescript]' works the same way.

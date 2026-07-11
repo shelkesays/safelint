@@ -60,7 +60,7 @@ lints some files keeps the warning as context.)
 
 ## Rule count
 
-TypeScript is in scope for the cross-language rules plus SAFE302 (`global_mutation`) and SAFE305 `wide_scope_declaration` (JS-family-only, flags `var`, which is still legal but discouraged in TypeScript). New in 2.4.0: SAFE105 (`no_recursion`, enabled by default), SAFE309 (`dynamic_code_execution`) and SAFE603 (`blanket_suppression`, both disabled by default). The 2 rules registered only for other languages (SAFE201 for Python / C++, SAFE301 for Python / PHP) are skipped automatically.
+TypeScript is in scope for the cross-language rules plus SAFE302 (`global_mutation`) and SAFE305 `wide_scope_declaration` (JS-family-only, flags `var`, which is still legal but discouraged in TypeScript). New in 2.4.0: SAFE105 (`no_recursion`, enabled by default), SAFE309 (`dynamic_code_execution`) and SAFE603 (`blanket_suppression`, both disabled by default). SAFE201 (Python / C++) and SAFE301 (Python / PHP) are the two shared rules skipped for TypeScript; each other language's own language-specific rules (Java + Spring, Rust, Go, C-family, C++) are naturally skipped too.
 
 ## TypeScript-specific rule behaviour
 

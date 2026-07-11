@@ -1,6 +1,6 @@
 # C
 
-C is Holzmann's original "Power of Ten" target language. Several clauses that every other language *adapts away* apply literally to C, so it brings the largest set of new language-specific rules of any addition: the **five C-family rules** (the "homecoming", shared with C++) express rules 1, 3, 8, and 9 directly. New in v2.7.0.
+C is Holzmann's original "Power of Ten" target language. Several clauses that every other language *adapts away* apply literally to C, so it gains a dedicated set of new language-specific rules: the **five C-family rules** (the "homecoming", shared with C++) express rules 1, 3, 8, and 9 directly. New in v2.7.0.
 
 ## File extensions
 
