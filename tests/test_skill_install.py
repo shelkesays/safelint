@@ -3332,7 +3332,7 @@ def test_remove_path_refuses_symlinked_ancestor_redirect(tmp_path: Path, capsys:
     The lexical tail ``.cursor/rules/safelint.mdc`` matches Cursor's
     ``install_relpath``, so the shape guard alone would accept it - but
     ``rules`` is a symlink into an unrelated tree, so removing the leaf
-    would delete a victim file. ``_resolved_install_shape_ok`` re-checks
+    would delete a victim file. ``_resolved_removal_target`` re-checks
     the tail after resolving ancestors and rejects the redirect.
     """
     victim = tmp_path / "victim"
@@ -3375,11 +3375,11 @@ def test_remove_path_accepts_shape_preserving_symlinked_parent(tmp_path: Path) -
     assert not leaf.exists()
 
 
-def test_resolved_install_shape_ok_refuses_on_resolve_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_resolved_removal_target_refuses_on_resolve_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """If ``Path.resolve`` raises (e.g. a symlink loop -> ``RuntimeError``), the guard refuses, not crashes.
 
     ``_remove_path``'s existence check short-circuits most loop/missing paths
-    before this runs, but ``_resolved_install_shape_ok`` still catches a
+    before this runs, but ``_resolved_removal_target`` still catches a
     resolution failure defensively so no caller can traceback through it.
     """
 
@@ -3389,7 +3389,42 @@ def test_resolved_install_shape_ok_refuses_on_resolve_error(monkeypatch: pytest.
     monkeypatch.setattr(_skill_install.Path, "resolve", boom_resolve)
     # A canonical Cursor-shaped path (would pass the lexical check).
     p = tmp_path / ".cursor" / "rules" / "safelint.mdc"
-    assert _skill_install._resolved_install_shape_ok(p) is False
+    assert _skill_install._resolved_removal_target(p) is None
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_resolved_removal_target_returns_resolved_real_path_for_symlinked_parent(tmp_path: Path) -> None:
+    """The removal target has the ancestor symlink collapsed but the leaf name kept verbatim (H8).
+
+    ``_remove_path`` removes exactly this resolved path, so a symlinked ancestor
+    swapped in after validation cannot redirect the unlink - the validated path
+    and the removed path are the same object.
+    """
+    real = tmp_path / "dotfiles" / ".cursor" / "rules"
+    real.mkdir(parents=True)
+    (real / "safelint.mdc").write_text("rule\n", encoding="utf-8")
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".cursor").symlink_to(tmp_path / "dotfiles" / ".cursor", target_is_directory=True)
+    via_link = home / ".cursor" / "rules" / "safelint.mdc"
+
+    target = _skill_install._resolved_removal_target(via_link)
+
+    assert target == real.resolve() / "safelint.mdc", "ancestor symlink collapsed, leaf appended verbatim"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_resolved_removal_target_refuses_shape_breaking_redirect(tmp_path: Path) -> None:
+    """A symlinked ancestor that resolves to a non-install-shaped tail returns None (H1)."""
+    victim = tmp_path / "victim"
+    victim.mkdir()
+    (victim / "safelint.mdc").write_text("VICTIM\n", encoding="utf-8")
+    install = tmp_path / "fake" / ".cursor"
+    install.mkdir(parents=True)
+    (install / "rules").symlink_to(victim, target_is_directory=True)
+    attack_path = install / "rules" / "safelint.mdc"  # resolves to victim/safelint.mdc
+
+    assert _skill_install._resolved_removal_target(attack_path) is None
 
 
 def test_path_looks_like_safelint_install_recognises_every_registered_client() -> None:
