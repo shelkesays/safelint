@@ -55,7 +55,7 @@ Java is in scope for the cross-language rules plus SAFE302 `global_mutation` (ad
 The 3 rules **not registered for Java**:
 
 - [SAFE201 `bare_except`](../configuration/rules.md#safe201-bare_except), a Python (`except:`) / C++ (`catch (...)`) catch-all construct. Java's `catch (Throwable t)` is the closest analogue but is already covered by SAFE202 (empty body) and SAFE203 (missing logging).
-- [SAFE301 `global_state`](../configuration/rules.md#safe301-global_state), Python-only (`global` keyword). Java has no statement-level "this references module state" annotation.
+- [SAFE301 `global_state`](../configuration/rules.md#safe301-global_state), Python / PHP (`global` keyword). Java has no statement-level "this references module state" annotation.
 - [SAFE305 `wide_scope_declaration`](../configuration/rules.md#safe305-wide_scope_declaration), JavaScript / TypeScript only (`var` hoisting). Java's `var` (Java 10+) is local-only and block-scoped, no hoisting hazard.
 
 (SAFE302 `global_mutation` **was** in this list before 2.4.0; it is now registered for Java as a non-final-static-field check, see the table above.)

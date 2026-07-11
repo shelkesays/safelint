@@ -31,7 +31,7 @@ Python is in scope for every cross-language rule plus SAFE201 `bare_except` (sha
 | [SAFE201](../configuration/rules.md#safe201-bare_except) | `bare_except` | Fires on `except:` with no exception type, catches `KeyboardInterrupt` and `SystemExit`. (Also registered for C++'s `catch (...)`.) |
 | [SAFE202](../configuration/rules.md#safe202-empty_except) | `empty_except` | Fires on `except: pass`, `except: ...`, `except: 0`, `except: "TODO"`. |
 | [SAFE203](../configuration/rules.md#safe203-logging_on_error) | `logging_on_error` | Requires a call to `logger.{debug,info,warning,error,exception,critical}` (or bare `raise`) in every except handler. |
-| [SAFE301](../configuration/rules.md#safe301-global_state) | `global_state` | **Python-only.** Fires on the `global` keyword. With `strict = true`, fires on every declaration; default is "declaration + write". |
+| [SAFE301](../configuration/rules.md#safe301-global_state) | `global_state` | **Python and PHP.** Fires on the `global` keyword. With `strict = true`, fires on every declaration; default is "declaration + write". |
 | [SAFE302](../configuration/rules.md#safe302-global_mutation) | `global_mutation` | Function-body writes that follow a `global` declaration. Reading a global doesn't fire. |
 | [SAFE303](../configuration/rules.md#safe303-side_effects_hidden) | `side_effects_hidden` | Functions named with a pure-prefix (`calculate_`, `get_`, `is_`, …) that secretly call `open()` / `print()` / `input()`. |
 | [SAFE304](../configuration/rules.md#safe304-side_effects) | `side_effects` | Any function calling an I/O primitive whose name doesn't signal I/O (no `log_` / `write_` / `read_` / etc. infix). |
