@@ -842,26 +842,44 @@ def _write_file_replace(target: Path, text: str) -> None:
     check-then-write window (``_secondary_target_writable_or_warn`` validated a
     regular file earlier), the rename replaces the *link itself* with our
     regular file - it never writes *through* the link to the link's target
-    (audit finding H7, the H2 TOCTOU class on the merge path). The original
-    file's permission bits are carried onto the temp first so a shared file
-    keeps its mode instead of inheriting ``mkstemp``'s ``0600``. ``tempfile`` /
-    ``os`` are used here (not pathlib) for the same reason H4 does in
-    ``_cache.py``: there is no pathlib equivalent for an atomic exclusive temp
-    create. The "write" in the name tells SAFE304 this is I/O by intent.
+    (audit finding H7, the H2 TOCTOU class on the merge path).
+
+    Metadata is read with ``lstat`` so a symlink swapped into the window is not
+    followed (a plain ``stat`` would dereference it - inspecting the link's
+    target, or raising ``FileNotFoundError`` on a dangling link and aborting the
+    very write the hardening exists to make safe). The permission bits are
+    carried onto the temp *only* when *target* is still a regular file, so a
+    shared file keeps its mode while a swapped-in symlink neither aborts the
+    write nor donates a bogus mode (the temp keeps ``mkstemp``'s ``0600``). The
+    ``mkstemp`` / ``os.fdopen`` handling mirrors
+    ``_cache._atomic_write_json``: the raw fd never leaks even if ``os.fdopen``
+    fails before taking ownership of it, and the temp is always cleaned up.
+    ``tempfile`` / ``os`` are used here (not pathlib) for the same reason H4
+    does: there is no pathlib equivalent for an atomic exclusive temp create.
+    The "write" in the name tells SAFE304 this is I/O by intent.
     """
-    mode = stat.S_IMODE(target.stat().st_mode)
-    fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=".safelint-section-", suffix=".tmp")
-    tmp_path = Path(tmp)
+    info = target.lstat()  # lstat: never follow a symlink swapped in after the check
+    mode = stat.S_IMODE(info.st_mode) if stat.S_ISREG(info.st_mode) else None
+    fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=".safelint-section-", suffix=".tmp")
+    tmp = Path(tmp_name)
     try:
-        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+        handle = os.fdopen(fd, "w", encoding="utf-8")  # takes ownership of fd
+    # Cleanup-and-reraise: close the raw fd so it can't leak, drop the temp.
+    except OSError:  # nosafe: SAFE203
+        with contextlib.suppress(OSError):
+            os.close(fd)  # reached only when fdopen did NOT take ownership
+        _unlink_quietly(tmp)
+        raise
+    try:
+        with handle:
             handle.write(text)
-        tmp_path.chmod(mode)
-        tmp_path.replace(target)
-    finally:
-        # On success the temp was renamed away (unlink is a suppressed no-op);
-        # on any failure this removes the leftover temp. No except - the error
-        # propagates unchanged, so there is nothing to log/swallow (SAFE203).
-        _unlink_quietly(tmp_path)
+        if mode is not None:
+            tmp.chmod(mode)
+        tmp.replace(target)
+    # Cleanup-and-reraise: drop the orphan temp; the error propagates upward.
+    except OSError:  # nosafe: SAFE203
+        _unlink_quietly(tmp)
+        raise
 
 
 def _install_copy(source: Path, target: Path) -> None:
