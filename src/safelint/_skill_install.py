@@ -835,6 +835,25 @@ def _unlink_quietly(path: Path) -> None:
         path.unlink()
 
 
+def _apply_preserved_mode(fd: int, tmp: Path, mode: int | None) -> None:
+    """Set *mode* on the temp via ``os.fchmod`` on the still-open *fd* (no path re-resolution).
+
+    Setting the mode through the open descriptor avoids the TOCTOU a path-based
+    ``chmod`` after close would leave: a symlink swapped in for the (unguessable)
+    temp path between close and ``chmod`` could otherwise redirect the permission
+    change onto another file. ``os.fchmod`` is POSIX-only; on Windows (no
+    ``fchmod``, where POSIX mode bits are cosmetic) fall back to a path ``chmod``.
+    A ``None`` *mode* (non-regular target - nothing meaningful to preserve) is a
+    no-op.
+    """
+    if mode is None:
+        return
+    if hasattr(os, "fchmod"):
+        os.fchmod(fd, mode)
+    else:  # pragma: no cover - Windows-only fallback (no fchmod)
+        tmp.chmod(mode)
+
+
 def _write_file_replace(target: Path, text: str) -> None:
     """Atomically replace *target*'s contents with *text*, never following a symlink at *target*.
 
@@ -885,8 +904,7 @@ def _write_file_replace(target: Path, text: str) -> None:
     try:
         with handle:
             handle.write(text)
-        if mode is not None:
-            tmp.chmod(mode)
+            _apply_preserved_mode(handle.fileno(), tmp, mode)
         tmp.replace(target)
     # Cleanup-and-reraise: drop the orphan temp; the error propagates upward.
     except OSError:  # nosafe: SAFE203
