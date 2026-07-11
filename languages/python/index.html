@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP, C, and C++">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -2390,7 +2390,7 @@
 </code></pre></div>
 <p>v2.0.0 ships every language grammar as an opt-in extra, the <code>[python]</code> extra installs <code>tree-sitter-python</code> alongside the engine. Plain <code>pip install safelint</code> installs only the engine and emits an install hint on first run.</p>
 <h2 id="rules-that-fire-on-python">Rules that fire on Python<a class="headerlink" href="#rules-that-fire-on-python" title="Permanent link">#</a></h2>
-<p>Python is in scope for every cross-language rule plus SAFE201 <code>bare_except</code> (shared with C++), the Python-only SAFE301 <code>global_state</code>, and SAFE302 <code>global_mutation</code>. Newly added in 2.4.0: SAFE105 <code>no_recursion</code> (enabled by default), SAFE309 <code>dynamic_code_execution</code>, and SAFE603 <code>blanket_suppression</code> (both disabled by default). The 1 JavaScript-family-only rule (SAFE305 <code>wide_scope_declaration</code>) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.</p>
+<p>Python is in scope for every cross-language rule plus SAFE201 <code>bare_except</code> (shared with C++), SAFE301 <code>global_state</code> (shared with PHP), and SAFE302 <code>global_mutation</code>. Newly added in 2.4.0: SAFE105 <code>no_recursion</code> (enabled by default), SAFE309 <code>dynamic_code_execution</code>, and SAFE603 <code>blanket_suppression</code> (both disabled by default). The 1 JavaScript-family-only rule (SAFE305 <code>wide_scope_declaration</code>) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.</p>
 <table>
 <thead>
 <tr>

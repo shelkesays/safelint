@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP, C, and C++">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -2285,7 +2285,7 @@
 
 <h1 id="safelint">SafeLint<a class="headerlink" href="#safelint" title="Permanent link">#</a></h1>
 <blockquote>
-<p>Holzmann "Power of Ten" safety lint rules for modern <strong>Python, JavaScript, TypeScript, Java</strong> (with <strong>Spring Boot</strong> framework preset), <strong>Rust</strong>, <strong>Go</strong>, <strong>PHP</strong>, and <strong>C</strong>, adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint, SpotBugs, Checkstyle, clippy, go vet) doesn't reach.</p>
+<p>Holzmann "Power of Ten" safety lint rules for modern <strong>Python, JavaScript, TypeScript, Java</strong> (with <strong>Spring Boot</strong> framework preset), <strong>Rust</strong>, <strong>Go</strong>, <strong>PHP</strong>, <strong>C</strong>, and <strong>C++</strong>, adapted from C/C++ aerospace conventions to bound function length, nesting depth, cyclomatic complexity, error-handling discipline, hidden side effects, dataflow taint, and other classes of bugs that a typical linter (ruff, pylint, mypy, ESLint, SpotBugs, Checkstyle, clippy, go vet) doesn't reach.</p>
 </blockquote>
 <p>SafeLint complements your existing linters. Where ruff handles style and pylint catches general defects, SafeLint enforces a focused set of <em>safety</em> rules: the kind you'd want in code that has to be reviewable, testable, and predictably-terminating. See <a href="power-of-ten/">The Power of Ten, adapted</a> for how each of Holzmann's ten rules maps onto SafeLint's checks across the supported languages. It's a CLI, a <a href="pre-commit/">pre-commit hook</a>, a JSON / SARIF emitter for editor and CI consumers, and an <a href="ai-clients/">AI-client skill</a> that fourteen agents (Claude Code, Cursor, GitHub Copilot, Gemini, Windsurf, codex, Continue.dev, Cline, aider, Trae, Antigravity, Zed, Warp, Kiro) speak.</p>
 <h2 id="currently-supported-languages">Currently supported languages<a class="headerlink" href="#currently-supported-languages" title="Permanent link">#</a></h2>
@@ -2336,7 +2336,12 @@
 <tr>
 <td><strong>C</strong></td>
 <td><code>.c</code>, <code>.h</code></td>
-<td>21 rules apply: the 16 cross-language ports plus <strong>5 new C-only rules</strong> - Holzmann's original language gets clauses every other language adapts away, expressed literally: <code>nonlocal_jumps</code> (<code>goto</code> / <code>setjmp</code>, rule 1), <code>dynamic_allocation</code> (<code>malloc</code> family, rule 3), <code>complex_macro</code> + <code>conditional_compilation</code> (the preprocessor, rule 8), and <code>restricted_pointers</code> (rule 9). <code>nonlocal_jumps</code> is enabled (warning); the other four are opt-in. <code>.h</code> headers lint as C. See <a href="languages/c/">C</a>. New in v2.7.0.</td>
+<td>21 rules apply: the 16 cross-language ports plus <strong>5 new C-family rules</strong> (shared with C++) - Holzmann's original language gets clauses every other language adapts away, expressed literally: <code>nonlocal_jumps</code> (<code>goto</code> / <code>setjmp</code>, rule 1), <code>dynamic_allocation</code> (<code>malloc</code> family, rule 3), <code>complex_macro</code> + <code>conditional_compilation</code> (the preprocessor, rule 8), and <code>restricted_pointers</code> (rule 9). <code>nonlocal_jumps</code> is enabled (warning); the other four are opt-in. <code>.h</code> headers lint as C. See <a href="languages/c/">C</a>. New in v2.7.0.</td>
+</tr>
+<tr>
+<td><strong>C++</strong></td>
+<td><code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code></td>
+<td>26 rules apply: the cross-language ports, the five C-family rules widened to C and C++, the three <code>try</code> / <code>catch</code> / <code>throw</code> rules (<code>bare_except</code> via <code>catch (...)</code>, <code>empty_except</code>, <code>logging_on_error</code>), plus <strong>2 new C++-only rules</strong>: <code>raw_new_delete</code> and <code>dangerous_casts</code>. Plain <code>.h</code> lints as C; use <code>.hpp</code> / <code>.hxx</code> / <code>.hh</code> for C++ headers. See <a href="languages/cpp/">C++</a>. New in v2.8.0.</td>
 </tr>
 </tbody>
 </table>

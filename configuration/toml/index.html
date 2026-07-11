@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP, C, and C++">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -3144,7 +3144,7 @@
 <a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>          - test discipline: missing_assertions (set min_assertions = 2 for the
 <a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>                        Holzmann density), test_existence, test_coupling
 </code></pre></div>
-<p>All of these are off by default; see the <a href="../rules/">Rules reference</a> for each rule's config knobs. <code>no_recursion</code> (SAFE105) and the C-only <code>nonlocal_jumps</code> (SAFE106) are the rules that are <strong>on by default</strong> (at <code>warning</code> severity), so no opt-in step is needed for them.</p>
+<p>All of the opt-in rules listed above are off by default; see the <a href="../rules/">Rules reference</a> for each rule's config knobs. <code>no_recursion</code> (SAFE105) and the C-family <code>nonlocal_jumps</code> (SAFE106) are the rules that are <strong>on by default</strong> (at <code>warning</code> severity), so no opt-in step is needed for them.</p>
 
 
 

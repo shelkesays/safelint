@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP, C, and C++">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -2577,7 +2577,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe603-blanket_suppression">SAFE603</a></td>
 <td><code>blanket_suppression</code></td>
-<td>Flags blanket golangci / staticcheck directives (Holzmann rule 10): bare <code>//nolint</code> (all linters) and bare <code>//lint:ignore</code> (no checks). Scoped forms (<code>//nolint:errcheck</code>, <code>//lint:ignore SA1000 reason</code>) are clean. The directives are recognised only with no space after <code>//</code> (golangci's requirement), so a prose <code>// nolint here</code> comment is not flagged. Disabled by default.</td>
+<td>Flags blanket golangci-lint / Staticcheck directives (Holzmann rule 10): golangci-lint's bare <code>//nolint</code> (all linters) and Staticcheck's bare <code>//lint:ignore</code> (no checks). Scoped forms (<code>//nolint:errcheck</code>, <code>//lint:ignore SA1000 reason</code>) are clean. Both are machine-readable directives recognised only with no space after <code>//</code>, so a prose <code>// nolint here</code> comment is not flagged. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe701-test_existence">SAFE701</a></td>

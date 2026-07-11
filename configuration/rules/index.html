@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP, C, and C++">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -3868,7 +3868,7 @@
 <p><strong>PHP</strong> (<code>.php</code>), new in v2.6.0. 21 rules apply and only 2 are skipped (SAFE201 <code>bare_except</code> and SAFE305 <code>wide_scope_declaration</code>), the widest rule coverage of any non-Python language because PHP ports the largest share of the existing rule set. PHP is the <strong>first non-Python home for SAFE301 (<code>global_state</code>)</strong>: PHP has a literal <code>global</code> keyword, so the rule fires on <code>global $config;</code>-style declarations exactly as it does on Python. PHP also has try/catch (SAFE202 / SAFE203 apply), <code>eval</code> and dynamic-call surfaces (SAFE309), and resource lifecycles (SAFE401). Headline PHP highlights: the <code>@</code>-operator error-suppression idiom, superglobal taint sources (<code>$_GET</code> / <code>$_POST</code> / <code>$_REQUEST</code> / etc.) feeding SAFE801, and the <code>break N;</code> / <code>continue N;</code> multi-level loop forms. See <a href="../../languages/php/">PHP</a> for the full language reference.</p>
 </li>
 <li>
-<p><strong>C</strong> (<code>.c</code>, <code>.h</code>), new in v2.7.0. Holzmann's original target language. 21 rules apply: the 16 cross-language ports plus <strong>5 new C-only rules</strong> (the "homecoming") that express clauses every other language adapts away - SAFE106 (<code>nonlocal_jumps</code>, <code>goto</code> / <code>setjmp</code>), SAFE310 (<code>dynamic_allocation</code>, the <code>malloc</code> family), SAFE311 (<code>complex_macro</code>) and SAFE312 (<code>conditional_compilation</code>) for the preprocessor, and SAFE313 (<code>restricted_pointers</code>). SAFE106 is the only one enabled by default (warning severity, because <code>goto err</code> cleanup is idiomatic); the other four are opt-in. <code>.h</code> headers are linted as C. 5 rules are skipped (SAFE201/202/203, SAFE301, SAFE305) plus SAFE401 and SAFE803 (documented gaps - C cleanup and nil analysis need flow analysis). See <a href="../../languages/c/">C</a> for the full language reference.</p>
+<p><strong>C</strong> (<code>.c</code>, <code>.h</code>), new in v2.7.0. Holzmann's original target language. 21 rules apply: the 16 cross-language ports plus <strong>5 new C-family rules</strong> (the "homecoming", shared with C++) that express clauses every other language adapts away - SAFE106 (<code>nonlocal_jumps</code>, <code>goto</code> / <code>setjmp</code>), SAFE310 (<code>dynamic_allocation</code>, the <code>malloc</code> family), SAFE311 (<code>complex_macro</code>) and SAFE312 (<code>conditional_compilation</code>) for the preprocessor, and SAFE313 (<code>restricted_pointers</code>). SAFE106 is the only one enabled by default (warning severity, because <code>goto err</code> cleanup is idiomatic); the other four are opt-in. <code>.h</code> headers are linted as C. 7 rules are skipped: SAFE201/202/203, SAFE301 and SAFE305 (semantics don't translate) plus SAFE401 and SAFE803 (documented gaps - C cleanup and nil analysis need flow analysis). See <a href="../../languages/c/">C</a> for the full language reference.</p>
 </li>
 <li><strong>C++</strong> (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>), new in v2.8.0. Builds on C: the five C-family rules widen to C and C++, plus C++ gains its <code>try</code> / <code>catch</code> / <code>throw</code> rules (SAFE201 catch-all, SAFE202, SAFE203) and <strong>two new C++-only rules</strong> - SAFE315 (<code>raw_new_delete</code>) and SAFE316 (<code>dangerous_casts</code>). 26 rules apply. Plain <code>.h</code> headers are linted as C; use <code>.hpp</code> / <code>.hxx</code> / <code>.hh</code> for C++ headers. See <a href="../../languages/cpp/">C++</a> for the full language reference.</li>
 </ul>
@@ -4448,7 +4448,7 @@
 <a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
 </code></pre></div>
 <h3 id="safe106-nonlocal_jumps">SAFE106: <code>nonlocal_jumps</code><a class="headerlink" href="#safe106-nonlocal_jumps" title="Permanent link">#</a></h3>
-<p><strong>What it flags:</strong> <code>goto</code> statements and <code>setjmp</code> / <code>longjmp</code> family calls. <strong>C-only</strong>, new in v2.7.0. This is Holzmann's rule 1 ("restrict all code to very simple control flow constructs") expressed literally - C is the only registered language with <code>goto</code>.</p>
+<p><strong>What it flags:</strong> <code>goto</code> statements and <code>setjmp</code> / <code>longjmp</code> family calls. <strong>C and C++</strong>, new in v2.7.0 (widened to C++ in v2.8.0). This is Holzmann's rule 1 ("restrict all code to very simple control flow constructs") expressed literally - C and C++ are the registered languages with <code>goto</code> / <code>setjmp</code>.</p>
 <p><code>goto</code> and the <code>setjmp</code> / <code>longjmp</code> non-local-jump pair bypass structured control flow, so worst-case control paths cannot be reasoned about by inspection. The rule fires on every <code>goto_statement</code> and every call to a configured non-local-jump function (<code>setjmp</code> / <code>longjmp</code> / <code>sigsetjmp</code> / <code>siglongjmp</code>).</p>
 <p><strong>Enabled by default at <code>warning</code> severity.</strong> The paper bans <code>goto</code> outright, but the <code>goto err</code> cleanup chain is pervasive, idiomatic C; shipping it as a non-blocking warning surfaces every jump without breaking <code>--fail-on=error</code> builds. Annotate a sanctioned cleanup with <code>// nosafe: SAFE106</code>.</p>
 <table>
@@ -4473,22 +4473,29 @@
 <tr>
 <td><code>nonlocal_jump_calls_c</code></td>
 <td><code>["setjmp", "longjmp", "sigsetjmp", "siglongjmp"]</code></td>
-<td>Call names treated as non-local jumps alongside <code>goto</code></td>
+<td>Call names treated as non-local jumps alongside <code>goto</code> (C, <code>.c</code> / <code>.h</code>)</td>
+</tr>
+<tr>
+<td><code>nonlocal_jump_calls_cpp</code></td>
+<td><code>["setjmp", "longjmp", "sigsetjmp", "siglongjmp"]</code></td>
+<td>Same, for C++ (<code>.cpp</code> / <code>.cxx</code> / <code>.cc</code> / <code>.hpp</code> / <code>.hxx</code> / <code>.hh</code>) - resolved independently of the C key</td>
 </tr>
 </tbody>
 </table>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a><span class="c1"># pyproject.toml</span>
 <a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a><span class="k">[tool.safelint.rules.nonlocal_jumps]</span>
 <a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a><span class="n">nonlocal_jump_calls_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;setjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;longjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sigsetjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;siglongjmp&quot;</span><span class="p">]</span>
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a><span class="n">nonlocal_jump_calls_cpp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;setjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;longjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sigsetjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;siglongjmp&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># C++ uses its own key</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-8-1" name="__codelineno-8-1" href="#__codelineno-8-1"></a><span class="c1"># safelint.toml</span>
 <a id="__codelineno-8-2" name="__codelineno-8-2" href="#__codelineno-8-2"></a><span class="k">[rules.nonlocal_jumps]</span>
 <a id="__codelineno-8-3" name="__codelineno-8-3" href="#__codelineno-8-3"></a><span class="n">nonlocal_jump_calls_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;setjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;longjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sigsetjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;siglongjmp&quot;</span><span class="p">]</span>
+<a id="__codelineno-8-4" name="__codelineno-8-4" href="#__codelineno-8-4"></a><span class="n">nonlocal_jump_calls_cpp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;setjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;longjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sigsetjmp&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;siglongjmp&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># C++ uses its own key</span>
 </code></pre></div>
 <h2 id="error-handling-rules">Error handling rules<a class="headerlink" href="#error-handling-rules" title="Permanent link">#</a></h2>
 <p>These check that exceptions are handled clearly and not swallowed silently.</p>
 <h3 id="safe201-bare_except">SAFE201: <code>bare_except</code><a class="headerlink" href="#safe201-bare_except" title="Permanent link">#</a></h3>
-<p><strong>What it flags:</strong> <code>except:</code> clauses with no exception type. <strong>Python-only</strong>, JavaScript <code>catch</code> clauses always bind the caught error (and don't have the <code>KeyboardInterrupt</code> / <code>SystemExit</code> hijack hazard), so there's no equivalent hazard to flag on JS files. SAFE202 + SAFE203 cover the related JS concerns.</p>
+<p><strong>What it flags:</strong> <code>except:</code> clauses with no exception type. <strong>Python and C++</strong> - Python's <code>except:</code> and C++'s <code>catch (...)</code> catch-all (its first non-Python home). JavaScript <code>catch</code> clauses always bind the caught error (and don't have the <code>KeyboardInterrupt</code> / <code>SystemExit</code> hijack hazard), so there's no equivalent hazard to flag on JS files; SAFE202 + SAFE203 cover the related JS concerns.</p>
 <p>A bare <code>except:</code> catches everything including <code>KeyboardInterrupt</code> and <code>SystemExit</code>, which are signals, not bugs. Always specify the exception type you expect.</p>
 <table>
 <thead>
@@ -4944,7 +4951,7 @@
 <a id="__codelineno-34-3" name="__codelineno-34-3" href="#__codelineno-34-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
 <h3 id="safe310-dynamic_allocation">SAFE310: <code>dynamic_allocation</code><a class="headerlink" href="#safe310-dynamic_allocation" title="Permanent link">#</a></h3>
-<p><strong>What it flags:</strong> Calls to the heap-allocation / free family. <strong>C-only</strong>, new in v2.7.0. Holzmann's rule 3 ("do not use dynamic memory allocation after initialisation") expressed literally - C is the only registered language where manual heap management is the norm.</p>
+<p><strong>What it flags:</strong> Calls to the heap-allocation / free family. <strong>C and C++</strong>, new in v2.7.0 (widened to C++ in v2.8.0). Holzmann's rule 3 ("do not use dynamic memory allocation after initialisation") expressed literally - on C++ it additionally flags <code>new</code> / <code>delete</code> expressions.</p>
 <p>Fires on every call to a configured allocator (<code>malloc</code> / <code>calloc</code> / <code>realloc</code> / <code>aligned_alloc</code> / <code>free</code> / <code>strdup</code>). <strong>Disabled by default</strong> - embedded and safety-critical projects opt in; most application C uses the heap freely. Pre-allocate fixed pools / arenas at init and hand out slots to satisfy the rule.</p>
 <table>
 <thead>
@@ -4963,7 +4970,12 @@
 <tr>
 <td><code>allocation_calls_c</code></td>
 <td><code>["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup"]</code></td>
-<td>Allocator call names</td>
+<td>Allocator call names (C, <code>.c</code> / <code>.h</code>)</td>
+</tr>
+<tr>
+<td><code>allocation_calls_cpp</code></td>
+<td><code>["malloc", "calloc", "realloc", "aligned_alloc", "free", "strdup"]</code></td>
+<td>Allocator call names for C++ (<code>.cpp</code> / <code>.cxx</code> / ...) - resolved independently of the C key. C++ additionally flags <code>new</code> / <code>delete</code> expressions structurally (not configurable)</td>
 </tr>
 </tbody>
 </table>
@@ -4971,14 +4983,16 @@
 <a id="__codelineno-35-2" name="__codelineno-35-2" href="#__codelineno-35-2"></a><span class="k">[tool.safelint.rules.dynamic_allocation]</span>
 <a id="__codelineno-35-3" name="__codelineno-35-3" href="#__codelineno-35-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-35-4" name="__codelineno-35-4" href="#__codelineno-35-4"></a><span class="n">allocation_calls_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;malloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;calloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;realloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;aligned_alloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;free&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strdup&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;xmalloc&quot;</span><span class="p">]</span>
+<a id="__codelineno-35-5" name="__codelineno-35-5" href="#__codelineno-35-5"></a><span class="n">allocation_calls_cpp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;malloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;calloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;realloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;aligned_alloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;free&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strdup&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;xmalloc&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># C++ uses its own key; new / delete are always flagged</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-36-1" name="__codelineno-36-1" href="#__codelineno-36-1"></a><span class="c1"># safelint.toml</span>
 <a id="__codelineno-36-2" name="__codelineno-36-2" href="#__codelineno-36-2"></a><span class="k">[rules.dynamic_allocation]</span>
 <a id="__codelineno-36-3" name="__codelineno-36-3" href="#__codelineno-36-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-36-4" name="__codelineno-36-4" href="#__codelineno-36-4"></a><span class="n">allocation_calls_c</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;malloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;calloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;realloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;aligned_alloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;free&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strdup&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;xmalloc&quot;</span><span class="p">]</span>
+<a id="__codelineno-36-5" name="__codelineno-36-5" href="#__codelineno-36-5"></a><span class="n">allocation_calls_cpp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;malloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;calloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;realloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;aligned_alloc&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;free&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strdup&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;xmalloc&quot;</span><span class="p">]</span><span class="w">  </span><span class="c1"># C++ uses its own key; new / delete are always flagged</span>
 </code></pre></div>
 <h3 id="safe311-complex_macro">SAFE311: <code>complex_macro</code><a class="headerlink" href="#safe311-complex_macro" title="Permanent link">#</a></h3>
-<p><strong>What it flags:</strong> Preprocessor macros that are not simple, complete syntactic units. <strong>C-only</strong>, new in v2.7.0. Holzmann's rule 8 ("limit the preprocessor to header files and simple macros").</p>
+<p><strong>What it flags:</strong> Preprocessor macros that are not simple, complete syntactic units. <strong>C and C++</strong>, new in v2.7.0 (widened to C++ in v2.8.0). Holzmann's rule 8 ("limit the preprocessor to header files and simple macros").</p>
 <p>Fires on function-like macros that use token pasting (<code>##</code>) or variadic <code>__VA_ARGS__</code>, and on object-like macros whose replacement text is not a balanced syntactic unit (heuristic: unbalanced <code>()</code> / <code>{}</code> / <code>[]</code>, ignoring brackets inside string and character literals). Mutually recursive macro definitions (the paper's third banned construct) are not detected; that needs macro-table analysis. <strong>Disabled by default.</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-37-1" name="__codelineno-37-1" href="#__codelineno-37-1"></a><span class="c1"># pyproject.toml</span>
 <a id="__codelineno-37-2" name="__codelineno-37-2" href="#__codelineno-37-2"></a><span class="k">[tool.safelint.rules.complex_macro]</span>
@@ -4989,7 +5003,7 @@
 <a id="__codelineno-38-3" name="__codelineno-38-3" href="#__codelineno-38-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
 <h3 id="safe312-conditional_compilation">SAFE312: <code>conditional_compilation</code><a class="headerlink" href="#safe312-conditional_compilation" title="Permanent link">#</a></h3>
-<p><strong>What it flags:</strong> <code>#if</code> / <code>#ifdef</code> / <code>#ifndef</code> directives beyond the include-guard idiom. <strong>C-only</strong>, new in v2.7.0. Holzmann's rule 8 again: each conditional-compilation directive doubles the number of build configurations that must be tested (2^n versions from n flags).</p>
+<p><strong>What it flags:</strong> <code>#if</code> / <code>#ifdef</code> / <code>#ifndef</code> directives beyond the include-guard idiom. <strong>C and C++</strong>, new in v2.7.0 (widened to C++ in v2.8.0). Holzmann's rule 8 again: each conditional-compilation directive doubles the number of build configurations that must be tested (2^n versions from n flags).</p>
 <p>An <code>#ifndef X</code> + <code>#define X</code> pair (a header include guard) is exempt; the matching <code>#define</code> must be the first substantive statement of the block, with comments (e.g. an SPDX / licence header) and <code>#pragma</code> lines (a belt-and-braces <code>#pragma once</code>) allowed in between. Every other <code>#if</code> / <code>#ifdef</code> / <code>#ifndef</code> fires. <strong>Disabled by default.</strong> Prefer runtime configuration over compile-time flags.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-39-1" name="__codelineno-39-1" href="#__codelineno-39-1"></a><span class="c1"># pyproject.toml</span>
 <a id="__codelineno-39-2" name="__codelineno-39-2" href="#__codelineno-39-2"></a><span class="k">[tool.safelint.rules.conditional_compilation]</span>
@@ -5000,7 +5014,7 @@
 <a id="__codelineno-40-3" name="__codelineno-40-3" href="#__codelineno-40-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
 <h3 id="safe313-restricted_pointers">SAFE313: <code>restricted_pointers</code><a class="headerlink" href="#safe313-restricted_pointers" title="Permanent link">#</a></h3>
-<p><strong>What it flags:</strong> Declarators with more than one level of pointer indirection (<code>int **p</code>) and function-pointer declarators (<code>void (*fp)(int)</code>). <strong>C-only</strong>, new in v2.7.0. Holzmann's rule 9 ("limit pointer use to a single dereference, and do not use function pointers") expressed literally. The check is syntactic (declarator shape only): a pointer level hidden behind a <code>typedef</code> or a macro is not counted - the paper's no-hidden-dereference clause needs type resolution and is a documented gap.</p>
+<p><strong>What it flags:</strong> Declarators with more than one level of pointer indirection (<code>int **p</code>) and function-pointer declarators (<code>void (*fp)(int)</code>). <strong>C and C++</strong>, new in v2.7.0 (widened to C++ in v2.8.0; smart pointers exempt on C++). Holzmann's rule 9 ("limit pointer use to a single dereference, and do not use function pointers") expressed literally. The check is syntactic (declarator shape only): a pointer level hidden behind a <code>typedef</code> or a macro is not counted - the paper's no-hidden-dereference clause needs type resolution and is a documented gap.</p>
 <p><strong>Disabled by default</strong> - it is deliberately strict (<code>char **argv</code> fires too). Opt in for the highest-assurance profiles; collapse multi-level pointers behind a struct or out-parameter, and replace function pointers with tagged dispatch.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-41-1" name="__codelineno-41-1" href="#__codelineno-41-1"></a><span class="c1"># pyproject.toml</span>
 <a id="__codelineno-41-2" name="__codelineno-41-2" href="#__codelineno-41-2"></a><span class="k">[tool.safelint.rules.restricted_pointers]</span>
@@ -5270,7 +5284,7 @@
 <a id="__codelineno-65-6" name="__codelineno-65-6" href="#__codelineno-65-6"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="safe603-blanket_suppression">SAFE603: <code>blanket_suppression</code><a class="headerlink" href="#safe603-blanket_suppression" title="Permanent link">#</a></h3>
-<p><strong>What it flags:</strong> un-scoped suppressions of <em>other</em> analysers. Python, JavaScript, TypeScript, Java, Rust. Disabled by default.</p>
+<p><strong>What it flags:</strong> un-scoped suppressions of <em>other</em> analysers. Cross-language (all nine registered languages). Disabled by default.</p>
 <p>Holzmann's rule 10 ("compile with all warnings enabled and heed every warning") has a modern failure mode: not disabling warnings at the compiler, but silencing an entire analyser from inside the source. SAFE603 flags the <em>blanket</em> forms while leaving <em>scoped</em> suppressions alone, because a scoped suppression is a deliberate, auditable decision about one rule.</p>
 <p>Per language, the blanket forms that fire (and the scoped forms that stay clean):</p>
 <ul>
@@ -5278,6 +5292,9 @@
 <li><strong>JavaScript / TypeScript</strong> (comments): <code>eslint-disable</code> / <code>eslint-disable-line</code> / <code>eslint-disable-next-line</code> with no rule list, <code>@ts-nocheck</code>, <code>@ts-ignore</code>. <code>@ts-expect-error</code> is clean (it self-polices: it errors when the suppressed error no longer occurs). A rule-listed <code>eslint-disable no-console</code> is clean.</li>
 <li><strong>Java</strong> (annotations): <code>@SuppressWarnings("all")</code> and <code>@SuppressWarnings({..., "all"})</code>. Scoped (<code>@SuppressWarnings("unchecked")</code>) is clean.</li>
 <li><strong>Rust</strong> (attributes): <code>#[allow(clippy::all)]</code>, <code>#[allow(warnings)]</code>, and their inner <code>#![...]</code> forms. Scoped (<code>#[allow(dead_code)]</code>, <code>#[allow(clippy::too_many_arguments)]</code>) is clean.</li>
+<li><strong>Go</strong> (comments): golangci-lint's bare <code>//nolint</code> (all linters) and Staticcheck's bare <code>//lint:ignore</code> (no check list). Both are machine-readable directives recognised only in the tight form with no space after <code>//</code> (<code>//nolint</code>, not <code>// nolint</code>), so a prose <code>// nolint here</code> comment is left alone. Scoped (<code>//nolint:errcheck</code>, <code>//lint:ignore SA1000 reason</code>) is clean.</li>
+<li><strong>PHP</strong>: the <code>@</code> error-suppression operator (<code>@file_get_contents(...)</code>) - PHP's headline blanket-suppression hazard - plus bare <code>phpcs:ignore</code> / <code>phpcs:disable</code>, <code>@phpstan-ignore-line</code> / <code>@phpstan-ignore-next-line</code>, and <code>@psalm-suppress all</code>. Scoped forms (<code>phpcs:ignore Squiz.Foo</code>, <code>@phpstan-ignore &lt;id&gt;</code>, <code>@psalm-suppress SomeIssue</code>) are clean.</li>
+<li><strong>C / C++</strong> (comments): clang-tidy's bare <code>// NOLINT</code> / <code>// NOLINTNEXTLINE</code>. Scoped <code>// NOLINT(bugprone-foo)</code> is clean.</li>
 </ul>
 <p>SAFE603 never flags safelint's own <code># nosafe</code> / <code># safelint: ignore</code> directives, those are policed by SAFE004 (unused suppression). Directive-looking text inside a string literal is not flagged either, the detectors scan comment / annotation / attribute nodes, not string contents.</p>
 <table>

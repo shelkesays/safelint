@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP, C, and C++">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -926,10 +926,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#c-only-rules-the-power-of-ten-homecoming" class="md-nav__link">
+  <a href="#c-family-rules-the-power-of-ten-homecoming" class="md-nav__link">
     <span class="md-ellipsis">
       
-        C-only rules (the Power-of-Ten homecoming)
+        C-family rules (the Power-of-Ten homecoming)
       
     </span>
   </a>
@@ -2389,10 +2389,10 @@
 </li>
         
           <li class="md-nav__item">
-  <a href="#c-only-rules-the-power-of-ten-homecoming" class="md-nav__link">
+  <a href="#c-family-rules-the-power-of-ten-homecoming" class="md-nav__link">
     <span class="md-ellipsis">
       
-        C-only rules (the Power-of-Ten homecoming)
+        C-family rules (the Power-of-Ten homecoming)
       
     </span>
   </a>
@@ -2513,7 +2513,7 @@
 
 
 <h1 id="c">C<a class="headerlink" href="#c" title="Permanent link">#</a></h1>
-<p>C is Holzmann's original "Power of Ten" target language. Several clauses that every other language <em>adapts away</em> apply literally to C, so it brings the largest set of new language-specific rules of any addition: the <strong>five C-only rules</strong> (the "homecoming") express rules 1, 3, 8, and 9 directly. New in v2.7.0.</p>
+<p>C is Holzmann's original "Power of Ten" target language. Several clauses that every other language <em>adapts away</em> apply literally to C, so it brings the largest set of new language-specific rules of any addition: the <strong>five C-family rules</strong> (the "homecoming", shared with C++) express rules 1, 3, 8, and 9 directly. New in v2.7.0.</p>
 <h2 id="file-extensions">File extensions<a class="headerlink" href="#file-extensions" title="Permanent link">#</a></h2>
 <p><code>.c</code> and <code>.h</code>.</p>
 <p><strong><code>.h</code> ownership:</strong> <code>.h</code> headers are linted as <strong>C</strong>. A C++ project that uses <code>.h</code> headers gets them linted as C - content sniffing is out of scope, so a header shared between C and C++ is treated as C. <a href="../cpp/">C++</a> keeps the C++-only header extensions (<code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>). This is a documented limitation.</p>
@@ -2528,7 +2528,7 @@
 <h2 id="suppression-directives">Suppression directives<a class="headerlink" href="#suppression-directives" title="Permanent link">#</a></h2>
 <p>C uses line-comment directives (<code>//</code> form): <code>// nosafe</code> (all rules on the line), <code>// nosafe: SAFE106</code> (a specific rule), and the file-scope <code>// safelint: ignore</code>. Block-comment (<code>/* */</code>) directives parse but are not recognised, matching every other language's line-directive-only convention.</p>
 <h2 id="rules-that-fire-on-c">Rules that fire on C<a class="headerlink" href="#rules-that-fire-on-c" title="Permanent link">#</a></h2>
-<p>21 rules apply: the 16 cross-language rules plus the 5 new C-only rules.</p>
+<p>21 rules apply: the 16 cross-language rules plus the 5 new C-family rules (shared with C++).</p>
 <h3 id="cross-language-rules">Cross-language rules<a class="headerlink" href="#cross-language-rules" title="Permanent link">#</a></h3>
 <table>
 <thead>
@@ -2621,7 +2621,7 @@
 </tr>
 </tbody>
 </table>
-<h3 id="c-only-rules-the-power-of-ten-homecoming">C-only rules (the Power-of-Ten homecoming)<a class="headerlink" href="#c-only-rules-the-power-of-ten-homecoming" title="Permanent link">#</a></h3>
+<h3 id="c-family-rules-the-power-of-ten-homecoming">C-family rules (the Power-of-Ten homecoming)<a class="headerlink" href="#c-family-rules-the-power-of-ten-homecoming" title="Permanent link">#</a></h3>
 <table>
 <thead>
 <tr>

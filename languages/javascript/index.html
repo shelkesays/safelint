@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP, C, and C++">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -2412,7 +2412,7 @@
 </code></pre></div>
 <p>If your project doesn't already have a Python toolchain, the same install command works through <code>pipx install 'safelint[javascript]'</code> (isolates the install) or by adding <code>'safelint[javascript]'</code> as a dev dependency through any pip-compatible manager. v2.0.0 ships every language grammar as an opt-in extra; the <code>[javascript]</code> extra installs <code>tree-sitter-javascript</code> alongside the engine.</p>
 <h2 id="rules-that-fire-on-javascript">Rules that fire on JavaScript<a class="headerlink" href="#rules-that-fire-on-javascript" title="Permanent link">#</a></h2>
-<p>JavaScript is in scope for every cross-language rule plus SAFE302 <code>global_mutation</code> and the JavaScript-family rule SAFE305 <code>wide_scope_declaration</code>. Newly added in 2.4.0: SAFE105 <code>no_recursion</code> (enabled by default), SAFE309 <code>dynamic_code_execution</code>, and SAFE603 <code>blanket_suppression</code> (both disabled by default). The 2 Python-only rules (SAFE201, SAFE301) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.</p>
+<p>JavaScript is in scope for every cross-language rule plus SAFE302 <code>global_mutation</code> and the JavaScript-family rule SAFE305 <code>wide_scope_declaration</code>. Newly added in 2.4.0: SAFE105 <code>no_recursion</code> (enabled by default), SAFE309 <code>dynamic_code_execution</code>, and SAFE603 <code>blanket_suppression</code> (both disabled by default). The 2 rules outside the JS-family scope (SAFE201 <code>bare_except</code>, SAFE301 <code>global_state</code>) and the 4 Java + Spring Boot only rules (SAFE901-904) are skipped automatically by the engine's per-language dispatch.</p>
 <table>
 <thead>
 <tr>

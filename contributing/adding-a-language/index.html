@@ -6,7 +6,7 @@
       <meta charset="utf-8">
       <meta name="viewport" content="width=device-width,initial-scale=1">
       
-        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, and Java (with Spring Boot framework preset)">
+        <meta name="description" content="Holzmann Power-of-Ten safety lint rules for modern Python, JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP, C, and C++">
       
       
         <meta name="author" content="Rahul Shelke">
@@ -2548,7 +2548,7 @@
 <p>This guide is the cheat sheet for adding support for a new programming language (TypeScript, Go, Rust, etc.) to SafeLint. The architecture was prepared with multi-language in mind; the moving parts you need to understand and the steps you need to follow are below.</p>
 <div class="admonition note">
 <p class="admonition-title">Note</p>
-<p>Today Python, JavaScript, TypeScript (including TSX and AssemblyScript), Java, Rust, Go, PHP, and C are all registered. The supporting structure (parser hookup, file-discovery loop, suppression parser, optional-grammar extras) is fully language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants and gates the grammar import behind the matching <code>[project.optional-dependencies]</code> extra (see Step 1 + Step 6b), and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.</p>
+<p>Today Python, JavaScript, TypeScript (including TSX and AssemblyScript), Java, Rust, Go, PHP, C, and C++ are all registered. The supporting structure (parser hookup, file-discovery loop, suppression parser, optional-grammar extras) is fully language-agnostic. To add a new language you need three pieces: (a) a Tree-sitter grammar package for that language, (b) a per-language module that exports the grammar's node-type names as constants and gates the grammar import behind the matching <code>[project.optional-dependencies]</code> extra (see Step 1 + Step 6b), and (c) a rule-by-rule audit to identify which existing rules port cleanly and which are Python-specific.</p>
 </div>
 <div class="admonition warning">
 <p class="admonition-title">Bundled AI-client skills also need an update</p>
