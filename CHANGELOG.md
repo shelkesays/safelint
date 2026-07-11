@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Skill-install and CI hardening (internal audit items H7-H9), all LOW / defence-in-depth.** None is exploitable in the default no-flag flow; they close residual TOCTOU and supply-chain gaps around the `safelint skill` command and the release pipeline. No change to lint behaviour or public API.
+  - Secondary-file (`AGENTS.md`) section writes are now atomic and symlink-safe: the merged text is written to an exclusive-create temp in the same directory and `os.replace`d over the target, so a symlink swapped into the check-then-write window is replaced as a directory entry rather than written through. The original file's permission bits are preserved.
+  - `safelint skill remove --path` now resolves its target a single time and removes that same validated path, so a symlinked ancestor swapped in after the shape check can no longer redirect the removal onto a different tree; a terminal-symlink install is still unlinked as the link itself.
+  - Every third-party GitHub Action is pinned to a full commit SHA (most importantly the OIDC-privileged `pypa/gh-action-pypi-publish` in the publish workflow), with a Dependabot `github-actions` ecosystem added to keep the pins current.
+
 ## [2.8.0] - 2026-07-10
 
 **C++ is now a supported language.** Building on the C support, `.cpp` / `.cxx` / `.cc` / `.hpp` / `.hxx` / `.hh` files are discovered, parsed via `tree-sitter-cpp`, and run against **26 rules**: the cross-language ports, the five C-family rules (SAFE106 / SAFE310-313) widened to C and C++, the three `try` / `catch` / `throw` error-handling rules, and **two new C++-only rules**. Plain `.h` headers stay with C (documented). The additive language work is what justifies this release as a MINOR bump (per the project's semver rules: scope expansion is MINOR, never MAJOR).
