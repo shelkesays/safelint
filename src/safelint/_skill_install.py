@@ -41,9 +41,12 @@ import contextlib
 from dataclasses import dataclass
 import hashlib
 from importlib import resources
+import os
 from pathlib import Path
 import shutil
+import stat
 import sys
+import tempfile
 from typing import TYPE_CHECKING
 
 
@@ -820,6 +823,47 @@ def _write_empty_file_exclusive(path: Path) -> None:
         pass
 
 
+def _unlink_quietly(path: Path) -> None:
+    """Remove *path*, ignoring the case where it has already gone (best-effort temp cleanup)."""
+    with contextlib.suppress(OSError):
+        path.unlink()
+
+
+def _write_file_replace(target: Path, text: str) -> None:
+    """Atomically replace *target*'s contents with *text*, never following a symlink at *target*.
+
+    Used for the section-merge writes into a shared file like ``AGENTS.md``,
+    which are read-modify-write and so cannot use the plain exclusive-create
+    helpers (the target legitimately pre-exists). *text* is written to an
+    exclusive-create temp in the *same directory* (``tempfile.mkstemp`` =
+    ``O_CREAT | O_EXCL`` [+ ``O_NOFOLLOW`` where the platform provides it],
+    under an unguessable name) and ``os.replace``d over *target*. ``os.replace``
+    swaps directory entries: if a symlink is planted at *target* in the
+    check-then-write window (``_secondary_target_writable_or_warn`` validated a
+    regular file earlier), the rename replaces the *link itself* with our
+    regular file - it never writes *through* the link to the link's target
+    (audit finding H7, the H2 TOCTOU class on the merge path). The original
+    file's permission bits are carried onto the temp first so a shared file
+    keeps its mode instead of inheriting ``mkstemp``'s ``0600``. ``tempfile`` /
+    ``os`` are used here (not pathlib) for the same reason H4 does in
+    ``_cache.py``: there is no pathlib equivalent for an atomic exclusive temp
+    create. The "write" in the name tells SAFE304 this is I/O by intent.
+    """
+    mode = stat.S_IMODE(target.stat().st_mode)
+    fd, tmp = tempfile.mkstemp(dir=target.parent, prefix=".safelint-section-", suffix=".tmp")
+    tmp_path = Path(tmp)
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            handle.write(text)
+        tmp_path.chmod(mode)
+        tmp_path.replace(target)
+    finally:
+        # On success the temp was renamed away (unlink is a suppressed no-op);
+        # on any failure this removes the leftover temp. No except - the error
+        # propagates unchanged, so there is nothing to log/swallow (SAFE203).
+        _unlink_quietly(tmp_path)
+
+
 def _install_copy(source: Path, target: Path) -> None:
     """Copy *source* to *target* as a single fresh file.
 
@@ -1052,6 +1096,12 @@ def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
 
     Both refusals use :func:`_secondary_target_writable_or_warn`, which
     funnels the checks through one place.
+
+    - **The write is atomic and symlink-safe.** The symlink check above is
+      check-then-act; the merged text is written via
+      :func:`_write_file_replace` (exclusive-create temp + ``os.replace``), so
+      a symlink swapped in *after* the check is replaced as a directory entry
+      rather than written through (audit finding H7).
     """
     target = _secondary_target_writable_or_warn(spec, project=project)
     if target is None:
@@ -1061,7 +1111,7 @@ def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
     new_text = _replace_or_append_section(existing, spec, bundled)
     if new_text == existing:
         return False
-    target.write_text(new_text, encoding="utf-8")
+    _write_file_replace(target, new_text)
     return True
 
 
@@ -1082,9 +1132,11 @@ def _remove_secondary(spec: ClientSpec, *, project: bool) -> bool:
     if stripped.strip() == "":
         # We owned the entire file (only safelint content was there).
         # Remove it rather than leaving an empty AGENTS.md behind.
+        # unlink() removes the directory entry itself - a symlink swapped in
+        # after the check is unlinked as the link, never followed.
         target.unlink()
         return True
-    target.write_text(stripped, encoding="utf-8")
+    _write_file_replace(target, stripped)
     return True
 
 
