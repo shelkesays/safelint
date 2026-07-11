@@ -2607,7 +2607,7 @@
 <p>The 3 rules <strong>not registered for Java</strong>:</p>
 <ul>
 <li><a href="../../configuration/rules/#safe201-bare_except">SAFE201 <code>bare_except</code></a>, a Python (<code>except:</code>) / C++ (<code>catch (...)</code>) catch-all construct. Java's <code>catch (Throwable t)</code> is the closest analogue but is already covered by SAFE202 (empty body) and SAFE203 (missing logging).</li>
-<li><a href="../../configuration/rules/#safe301-global_state">SAFE301 <code>global_state</code></a>, Python-only (<code>global</code> keyword). Java has no statement-level "this references module state" annotation.</li>
+<li><a href="../../configuration/rules/#safe301-global_state">SAFE301 <code>global_state</code></a>, Python / PHP (<code>global</code> keyword). Java has no statement-level "this references module state" annotation.</li>
 <li><a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305 <code>wide_scope_declaration</code></a>, JavaScript / TypeScript only (<code>var</code> hoisting). Java's <code>var</code> (Java 10+) is local-only and block-scoped, no hoisting hazard.</li>
 </ul>
 <p>(SAFE302 <code>global_mutation</code> <strong>was</strong> in this list before 2.4.0; it is now registered for Java as a non-final-static-field check, see the table above.)</p>
