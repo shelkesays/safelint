@@ -25,8 +25,7 @@ jobs:
       id-token: write # required by claude-code-action
     steps:
       - name: Checkout code
-        # TODO(H9, plan/security-hardening.md): pin actions by commit SHA.
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5  # v4.3.1
         with:
           fetch-depth: 1
           # Least privilege: nothing in this job needs git credentials after
@@ -35,7 +34,7 @@ jobs:
           persist-credentials: false
 
       - name: Claude Code review
-        uses: anthropics/claude-code-action@v1
+        uses: anthropics/claude-code-action@e90deca47693f9457b72f2b53c17d7c445a87342  # v1.0.171
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |

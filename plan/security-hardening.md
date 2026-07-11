@@ -59,9 +59,9 @@ no-flag flow. Remediation checklist (detailed write-ups follow):
 - [x] H4 - cache tmp write via `mkstemp` (`O_EXCL` + unguessable name) (done - PR #83)
 - [x] H5 - `_maybe_seed_secondary_for_opencode` dangling-symlink `touch()` guard (done - PR #83)
 - [x] H6 - prefer `pathlib.Path` over `os.path`/`os` where a safe equivalent exists (done - PR #84)
-- [ ] H7 - `_install_secondary` / `_remove_secondary` `AGENTS.md` merge write is still check-then-act (the H2 TOCTOU class, unhardened on this path) (open; from the 2026-07-02 re-scan)
-- [ ] H8 - `_remove_path` validates the resolved parent shape but deletes the unresolved path (ancestor-swap race) (open; residual, same class as H1)
-- [ ] H9 - GitHub Actions pinned to mutable refs; the OIDC-privileged `publish.yml` uses a moving branch ref (`pypa/gh-action-pypi-publish@release/v1`) (open; CI/CD supply-chain hardening)
+- [x] H7 - `_install_secondary` / `_remove_secondary` `AGENTS.md` merge write now goes through `_write_file_replace` (exclusive-create temp + `os.replace`, mode-preserving), so a symlink swapped into the check-then-write window is replaced as a directory entry rather than written through (done - security hardening PR)
+- [x] H8 - `_remove_path` now resolves once (`_resolved_removal_target`) and removes that **same** validated resolved path instead of the unresolved one, so an ancestor-symlink swap after validation cannot redirect the unlink; leaf appended verbatim keeps the H1 unlink-as-link behaviour (done - security hardening PR; dir_fd rejected, see H8 write-up)
+- [x] H9 - GitHub Actions SHA-pinned (all 13 `uses:` across the four workflows, incl. the OIDC-privileged `pypa/gh-action-pypi-publish` in `publish.yml`) + a `github-actions` Dependabot ecosystem to keep pins fresh (done - security hardening PR)
 
 ### H1 - `skill remove --path` validates the path tail lexically; a symlinked ancestor can escape
 
@@ -456,6 +456,26 @@ and the GitHub Actions / dependency surface.
   dir_fd=...)`) so the validated parent and the acted-on parent are the same
   object. Weigh against H1's deliberate "delete the unresolved leaf so terminal
   symlinks are unlinked as links" behaviour - any fix must preserve that.
+- **Fixed (security hardening PR): resolve-once, not `dir_fd`.**
+  `_resolved_install_shape_ok` (bool) became `_resolved_removal_target(path) ->
+  Path | None`: it resolves `path.parent.resolve(strict=False) / path.name`
+  once, validates that resolved tail's shape, and returns the resolved target.
+  `_remove_path` removes **that** target, so the validated path and the removed
+  path are one object - a symlinked ancestor swapped in after validation no
+  longer redirects the unlink through the original symlink. The leaf name is
+  still appended verbatim, so a terminal-symlink install is unlinked as the link
+  (H1 preserved); `test_remove_path_accepts_shape_preserving_symlinked_parent`
+  and `test_remove_path_refuses_symlinked_ancestor_redirect` both still pass,
+  plus new `_resolved_removal_target` unit tests. The **`dir_fd` variant was
+  evaluated and rejected**: a bare `os.open(...)` directory fd trips safelint's
+  own SAFE304 (`open` I/O primitive in a non-I/O-named function) and SAFE401
+  (raw fd whose `os.close()` isn't recognised as `with`-managed cleanup), which
+  would need new inline `# nosafe` suppressions - against the project's
+  "safelint must pass itself" invariant and its prefer-rewriting-over-annotating
+  stance. Resolve-once closes the finding's swap-after-validation attack within
+  those constraints; the residual generic path race (swapping a *resolved real*
+  ancestor in the microsecond before `unlink`) is the same one every path-based
+  remover carries and is acceptable for this opt-in `--path` escape hatch.
 
 ### H9 - GitHub Actions pinned to mutable refs (CI/CD supply-chain hardening)
 

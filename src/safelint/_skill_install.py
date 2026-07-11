@@ -41,9 +41,12 @@ import contextlib
 from dataclasses import dataclass
 import hashlib
 from importlib import resources
+import os
 from pathlib import Path
 import shutil
+import stat
 import sys
+import tempfile
 from typing import TYPE_CHECKING
 
 
@@ -820,6 +823,95 @@ def _write_empty_file_exclusive(path: Path) -> None:
         pass
 
 
+def _unlink_quietly(path: Path) -> None:
+    """Best-effort removal of *path*, suppressing any ``OSError``.
+
+    Used for temp cleanup: the path may already be gone (renamed away on the
+    success path), and even a permissions / I/O failure on cleanup must not mask
+    the real error being propagated by the caller. Suppressing the whole
+    ``OSError`` family (not just ``FileNotFoundError``) is deliberate.
+    """
+    with contextlib.suppress(OSError):
+        path.unlink()
+
+
+def _apply_preserved_mode(fd: int, tmp: Path, mode: int | None) -> None:
+    """Set *mode* on the temp via ``os.fchmod`` on the still-open *fd* (no path re-resolution).
+
+    Setting the mode through the open descriptor avoids the TOCTOU a path-based
+    ``chmod`` after close would leave: a symlink swapped in for the (unguessable)
+    temp path between close and ``chmod`` could otherwise redirect the permission
+    change onto another file. ``os.fchmod`` is POSIX-only; on Windows (no
+    ``fchmod``, where POSIX mode bits are cosmetic) fall back to a path ``chmod``.
+    A ``None`` *mode* (non-regular target - nothing meaningful to preserve) is a
+    no-op.
+    """
+    if mode is None:
+        return
+    if hasattr(os, "fchmod"):
+        os.fchmod(fd, mode)
+    else:  # pragma: no cover - Windows-only fallback (no fchmod)
+        tmp.chmod(mode)
+
+
+def _write_file_replace(target: Path, text: str) -> None:
+    """Atomically replace *target*'s contents with *text*, never following a symlink at *target*.
+
+    Used for the section-merge writes into a shared file like ``AGENTS.md``,
+    which are read-modify-write and so cannot use the plain exclusive-create
+    helpers (the target legitimately pre-exists). *text* is written to an
+    exclusive-create temp in the *same directory* (``tempfile.mkstemp`` =
+    ``O_CREAT | O_EXCL`` [+ ``O_NOFOLLOW`` where the platform provides it],
+    under an unguessable name) and ``os.replace``d over *target*. ``os.replace``
+    swaps directory entries: if a symlink is planted at *target* in the
+    check-then-write window (``_secondary_target_writable_or_warn`` validated a
+    regular file earlier), the rename replaces the *link itself* with our
+    regular file - it never writes *through* the link to the link's target
+    (audit finding H7, the H2 TOCTOU class on the merge path).
+
+    Metadata is read with ``lstat`` so a symlink swapped into the window is not
+    followed (a plain ``stat`` would dereference it - inspecting the link's
+    target, or raising ``FileNotFoundError`` on a dangling link and aborting the
+    very write the hardening exists to make safe). The permission bits are
+    carried onto the temp *only* when *target* is still a regular file, so a
+    shared file keeps its mode while a swapped-in symlink neither aborts the
+    write nor donates a bogus mode (the temp keeps ``mkstemp``'s ``0600``). The
+    ``mkstemp`` / ``os.fdopen`` handling mirrors
+    ``_cache._atomic_write_json``: the raw fd never leaks even if ``os.fdopen``
+    fails before taking ownership of it, and the temp is always cleaned up.
+    ``tempfile`` / ``os`` are used here (not pathlib) for the same reason H4
+    does: there is no pathlib equivalent for an atomic exclusive temp create.
+    The "write" in the name tells SAFE304 this is I/O by intent.
+    """
+    # lstat (never follows a symlink swapped in after the check) reads the mode
+    # to preserve. A target that vanished in the race (removed between the
+    # caller's read and here) has no mode to carry over - leave it None and let
+    # os.replace create the file fresh, matching the old write_text behaviour.
+    mode = None
+    with contextlib.suppress(FileNotFoundError):
+        info = target.lstat()
+        mode = stat.S_IMODE(info.st_mode) if stat.S_ISREG(info.st_mode) else None
+    fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=".safelint-section-", suffix=".tmp")
+    tmp = Path(tmp_name)
+    try:
+        handle = os.fdopen(fd, "w", encoding="utf-8")  # takes ownership of fd
+    # Cleanup-and-reraise: close the raw fd so it can't leak, drop the temp.
+    except OSError:  # nosafe: SAFE203
+        with contextlib.suppress(OSError):
+            os.close(fd)  # reached only when fdopen did NOT take ownership
+        _unlink_quietly(tmp)
+        raise
+    try:
+        with handle:
+            handle.write(text)
+            _apply_preserved_mode(handle.fileno(), tmp, mode)
+        tmp.replace(target)
+    # Cleanup-and-reraise: drop the orphan temp; the error propagates upward.
+    except OSError:  # nosafe: SAFE203
+        _unlink_quietly(tmp)
+        raise
+
+
 def _install_copy(source: Path, target: Path) -> None:
     """Copy *source* to *target* as a single fresh file.
 
@@ -1052,6 +1144,12 @@ def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
 
     Both refusals use :func:`_secondary_target_writable_or_warn`, which
     funnels the checks through one place.
+
+    - **The write is atomic and symlink-safe.** The symlink check above is
+      check-then-act; the merged text is written via
+      :func:`_write_file_replace` (exclusive-create temp + ``os.replace``), so
+      a symlink swapped in *after* the check is replaced as a directory entry
+      rather than written through (audit finding H7).
     """
     target = _secondary_target_writable_or_warn(spec, project=project)
     if target is None:
@@ -1061,7 +1159,7 @@ def _install_secondary(spec: ClientSpec, *, project: bool) -> bool:
     new_text = _replace_or_append_section(existing, spec, bundled)
     if new_text == existing:
         return False
-    target.write_text(new_text, encoding="utf-8")
+    _write_file_replace(target, new_text)
     return True
 
 
@@ -1082,9 +1180,11 @@ def _remove_secondary(spec: ClientSpec, *, project: bool) -> bool:
     if stripped.strip() == "":
         # We owned the entire file (only safelint content was there).
         # Remove it rather than leaving an empty AGENTS.md behind.
+        # unlink() removes the directory entry itself - a symlink swapped in
+        # after the check is unlinked as the link, never followed.
         target.unlink()
         return True
-    target.write_text(stripped, encoding="utf-8")
+    _write_file_replace(target, stripped)
     return True
 
 
@@ -1728,39 +1828,47 @@ def _path_looks_like_safelint_install(path: Path) -> bool:
     return False
 
 
-def _resolved_install_shape_ok(path: Path) -> bool:
-    """Re-check the install shape after resolving *path*'s ancestor symlinks.
+def _resolved_removal_target(path: Path) -> Path | None:
+    """Resolve *path*'s ancestor symlinks once and return the removal target, or None.
 
     ``_path_looks_like_safelint_install`` matches the *lexical* tail, so a
-    symlinked ancestor that redirects the removal onto an unrelated real
-    tree (``~/x/.cursor/rules`` -> ``/victim/data``) would still pass it.
-    Resolving the parent and re-running the tail match closes that gap: a
-    symlink that lands on a non-install-shaped location fails here, while
-    genuinely unusual *real* parents - and symlinks that still resolve to
-    an install-shaped tail - keep working.
+    symlinked ancestor that redirects the removal onto an unrelated real tree
+    (``~/x/.cursor/rules`` -> ``/victim/data``) would still pass it. Resolving
+    the parent and re-running the tail match closes that gap: a symlink that
+    lands on a non-install-shaped location returns None, while genuinely unusual
+    *real* parents - and symlinks that still resolve to an install-shaped tail -
+    return the resolved target.
+
+    Returning the resolved target (rather than a bool) lets ``_remove_path`` use
+    the **same** resolved path for both the shape check and the actual removal.
+    That is the H8 hardening: the earlier flow validated a resolved path but then
+    removed the *unresolved* one, leaving a window in which a symlinked ancestor
+    swapped in after validation redirected the unlink onto a different tree. With
+    a single resolve, the validated path and the removed path are one object.
 
     Two deliberate choices:
 
-    - ``Path.resolve(strict=False)`` resolves ancestor symlinks without
-      raising on a *missing* path. It rewrites only the symlinked *prefix*;
-      an unusual-but-real parent, or a platform prefix symlink like macOS's
-      ``/var`` -> ``/private/var``, leaves the install-shaped tail intact
-      and still matches. It *can* raise ``RuntimeError`` on an infinite
-      symlink loop in an ancestor (and ``OSError`` on some platforms), so
-      resolution failure is caught and treated as a non-match - a looped
-      ``--path`` is refused cleanly rather than tracebacking out of
-      ``_remove_path``.
+    - ``Path.resolve(strict=False)`` resolves ancestor symlinks without raising
+      on a *missing* path. It rewrites only the symlinked *prefix*; an
+      unusual-but-real parent, or a platform prefix symlink like macOS's
+      ``/var`` -> ``/private/var``, leaves the install-shaped tail intact and
+      still matches. It *can* raise ``RuntimeError`` on an infinite symlink loop
+      in an ancestor (and ``OSError`` on some platforms), so resolution failure
+      is caught and treated as a non-match - a looped ``--path`` is refused
+      cleanly rather than tracebacking out of ``_remove_path``.
     - The leaf name is appended verbatim rather than resolved.
-      ``_remove_existing`` deliberately unlinks a leaf symlink as the link
-      itself (not its target), so following the leaf would mischaracterise
-      what actually gets removed.
+      ``_remove_existing`` deliberately unlinks a leaf symlink as the link itself
+      (not its target), so following the leaf would mischaracterise - and change
+      - what actually gets removed.
     """
     try:
         resolved = path.parent.resolve(strict=False) / path.name
     # A symlink loop in an ancestor raises; refuse the path rather than crash.
     except (OSError, RuntimeError):  # nosafe: SAFE203
-        return False
-    return _path_looks_like_safelint_install(resolved)
+        return None
+    if not _path_looks_like_safelint_install(resolved):
+        return None
+    return resolved
 
 
 def _print_remove_path_unrecognised(path: Path) -> None:
@@ -1781,24 +1889,27 @@ def _remove_path(path: Path, *, dry_run: bool) -> int:
     client's ``install_relpath`` (see
     :func:`_path_looks_like_safelint_install`), *and* that tail must
     still match after resolving ancestor symlinks (see
-    :func:`_resolved_install_shape_ok`). The first check prevents typos
+    :func:`_resolved_removal_target`). The first check prevents typos
     and shell-expansion accidents (e.g. ``--path ~/.config`` instead of
     ``--path ~/.cursor/rules/safelint.mdc``); the second prevents a
     symlinked ancestor from redirecting the removal onto an unrelated
-    real tree. Truly unusual install locations should be removed
-    manually with ``rm``.
+    real tree. The resolved target from that second check is what is
+    actually removed, so validation and removal cannot diverge under an
+    ancestor-symlink swap (H8). Truly unusual install locations should be
+    removed manually with ``rm``.
     """
     if not path.exists() and not path.is_symlink():
         _print_remove_path_missing(path)
         return 1
-    if not _path_looks_like_safelint_install(path) or not _resolved_install_shape_ok(path):
+    target = _resolved_removal_target(path) if _path_looks_like_safelint_install(path) else None
+    if target is None:
         _print_remove_path_unrecognised(path)
         return 1
     shape = "symlink" if path.is_symlink() else "copy"
     if dry_run:
         _print_remove_dry_run(None, path, None, shape=shape)
         return 0
-    _remove_existing(path)
+    _remove_existing(target)
     _cleanup_empty_install_parent(path, explicit_path_removal=True)
     _print_remove_success(None, path, None)
     return 0

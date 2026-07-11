@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import stat
 import sys
 from typing import TYPE_CHECKING
 
@@ -1030,6 +1031,125 @@ def test_write_empty_file_exclusive_is_noop_when_file_exists(tmp_path: Path) -> 
     target.write_text("existing content\n", encoding="utf-8")
     _skill_install._write_empty_file_exclusive(target)
     assert target.read_text(encoding="utf-8") == "existing content\n"
+
+
+def test_write_file_replace_overwrites_existing_content(tmp_path: Path) -> None:
+    """``_write_file_replace`` replaces the file's contents (the section-merge happy path)."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("old body\n", encoding="utf-8")
+    _skill_install._write_file_replace(target, "new merged body\n")
+    assert target.read_text(encoding="utf-8") == "new merged body\n"
+    assert not target.is_symlink()
+
+
+def test_write_file_replace_leaves_no_temp_behind(tmp_path: Path) -> None:
+    """The exclusive-create temp is renamed away on success - no ``.safelint-section-*`` residue."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("old\n", encoding="utf-8")
+    _skill_install._write_file_replace(target, "new\n")
+    leftovers = [p.name for p in tmp_path.iterdir() if p.name.startswith(".safelint-section-")]
+    assert leftovers == [], f"temp files left behind: {leftovers}"
+
+
+def test_write_file_replace_creates_target_when_missing(tmp_path: Path) -> None:
+    """A target that vanished in the race window is recreated, not crashed on.
+
+    ``lstat`` raises ``FileNotFoundError`` when the file was removed between the
+    caller's read and the write; that is suppressed (no mode to preserve) and
+    ``os.replace`` creates the file fresh, matching the old ``write_text``.
+    """
+    target = tmp_path / "AGENTS.md"  # never created - simulates a vanished target
+    _skill_install._write_file_replace(target, "fresh\n")  # must not raise
+    assert target.read_text(encoding="utf-8") == "fresh\n"
+    assert not target.is_symlink()
+
+
+class _WriteInjectedError(OSError):
+    """Sentinel raised by monkeypatches to exercise the cleanup-and-reraise paths."""
+
+
+def test_write_file_replace_closes_fd_and_cleans_up_when_fdopen_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If ``os.fdopen`` fails, the raw mkstemp fd is closed (no leak) and the temp is removed."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("old\n", encoding="utf-8")
+    closed: list[int] = []
+    real_close = _skill_install.os.close
+    monkeypatch.setattr(_skill_install.os, "close", lambda fd: (closed.append(fd), real_close(fd))[1])
+    monkeypatch.setattr(_skill_install.os, "fdopen", lambda *a, **k: (_ for _ in ()).throw(_WriteInjectedError))
+
+    with pytest.raises(_WriteInjectedError):
+        _skill_install._write_file_replace(target, "new\n")
+
+    assert closed, "the raw fd must be closed when fdopen fails, or it leaks"
+    assert list(tmp_path.glob(".safelint-section-*")) == [], "temp file must be cleaned up"
+    assert target.read_text(encoding="utf-8") == "old\n", "target left untouched on failure"
+
+
+def test_write_file_replace_cleans_up_when_replace_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """If the final atomic rename fails, the orphan temp is removed and the error propagates."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("old\n", encoding="utf-8")
+
+    def boom_replace(self: Path, target_: Path) -> None:
+        raise _WriteInjectedError
+
+    monkeypatch.setattr(_skill_install.Path, "replace", boom_replace)
+
+    with pytest.raises(_WriteInjectedError):
+        _skill_install._write_file_replace(target, "new\n")
+
+    assert list(tmp_path.glob(".safelint-section-*")) == [], "temp cleaned up after a failed rename"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows chmod bits differ from POSIX mode")
+def test_write_file_replace_preserves_mode(tmp_path: Path) -> None:
+    """The original file's permission bits survive the temp-plus-replace (not mkstemp's 0600)."""
+    target = tmp_path / "AGENTS.md"
+    target.write_text("old\n", encoding="utf-8")
+    target.chmod(0o644)
+    _skill_install._write_file_replace(target, "new\n")
+    assert stat.S_IMODE(target.stat().st_mode) == 0o644
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_write_file_replace_does_not_abort_on_dangling_symlink(tmp_path: Path) -> None:
+    """A dangling symlink swapped into the window is replaced, not stat-followed into a crash.
+
+    Reading the mode with ``lstat`` (not ``stat``) means a dangling symlink at
+    the target no longer raises ``FileNotFoundError`` before the atomic replace;
+    ``os.replace`` then swaps the link out for our regular file, and the missing
+    link target is never created.
+    """
+    missing = tmp_path / "gone.txt"  # never created - the dangling target
+    planted = tmp_path / "AGENTS.md"
+    planted.symlink_to(missing)
+
+    _skill_install._write_file_replace(planted, "content\n")  # must not raise
+
+    assert not missing.exists(), "must not create the dangling link target"
+    assert not planted.is_symlink()
+    assert planted.read_text(encoding="utf-8") == "content\n"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_write_file_replace_does_not_write_through_planted_symlink(tmp_path: Path) -> None:
+    """A symlink swapped in after the writability check is replaced, not written through (H7).
+
+    ``_secondary_target_writable_or_warn`` validates a regular file, then the
+    caller writes. If an attacker wins that window and plants a symlink at the
+    target, ``os.replace`` swaps the *directory entry* (the link) for our
+    regular temp file - the link's victim target is never written through.
+    """
+    victim = tmp_path / "victim.txt"
+    victim.write_text("VICTIM UNCHANGED\n", encoding="utf-8")
+    planted = tmp_path / "AGENTS.md"
+    planted.symlink_to(victim)
+
+    _skill_install._write_file_replace(planted, "safelint section\n")
+
+    assert victim.read_text(encoding="utf-8") == "VICTIM UNCHANGED\n", "must not write through the symlink"
+    assert not planted.is_symlink(), "os.replace swaps the link out for a regular file"
+    assert planted.read_text(encoding="utf-8") == "safelint section\n"
 
 
 def test_install_codex_without_opencode_does_not_create_agents_md(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -3282,7 +3402,7 @@ def test_remove_path_refuses_symlinked_ancestor_redirect(tmp_path: Path, capsys:
     The lexical tail ``.cursor/rules/safelint.mdc`` matches Cursor's
     ``install_relpath``, so the shape guard alone would accept it - but
     ``rules`` is a symlink into an unrelated tree, so removing the leaf
-    would delete a victim file. ``_resolved_install_shape_ok`` re-checks
+    would delete a victim file. ``_resolved_removal_target`` re-checks
     the tail after resolving ancestors and rejects the redirect.
     """
     victim = tmp_path / "victim"
@@ -3325,11 +3445,11 @@ def test_remove_path_accepts_shape_preserving_symlinked_parent(tmp_path: Path) -
     assert not leaf.exists()
 
 
-def test_resolved_install_shape_ok_refuses_on_resolve_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+def test_resolved_removal_target_refuses_on_resolve_error(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     """If ``Path.resolve`` raises (e.g. a symlink loop -> ``RuntimeError``), the guard refuses, not crashes.
 
     ``_remove_path``'s existence check short-circuits most loop/missing paths
-    before this runs, but ``_resolved_install_shape_ok`` still catches a
+    before this runs, but ``_resolved_removal_target`` still catches a
     resolution failure defensively so no caller can traceback through it.
     """
 
@@ -3339,7 +3459,42 @@ def test_resolved_install_shape_ok_refuses_on_resolve_error(monkeypatch: pytest.
     monkeypatch.setattr(_skill_install.Path, "resolve", boom_resolve)
     # A canonical Cursor-shaped path (would pass the lexical check).
     p = tmp_path / ".cursor" / "rules" / "safelint.mdc"
-    assert _skill_install._resolved_install_shape_ok(p) is False
+    assert _skill_install._resolved_removal_target(p) is None
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_resolved_removal_target_returns_resolved_real_path_for_symlinked_parent(tmp_path: Path) -> None:
+    """The removal target has the ancestor symlink collapsed but the leaf name kept verbatim (H8).
+
+    ``_remove_path`` removes exactly this resolved path, so a symlinked ancestor
+    swapped in after validation cannot redirect the unlink - the validated path
+    and the removed path are the same object.
+    """
+    real = tmp_path / "dotfiles" / ".cursor" / "rules"
+    real.mkdir(parents=True)
+    (real / "safelint.mdc").write_text("rule\n", encoding="utf-8")
+    home = tmp_path / "home"
+    home.mkdir()
+    (home / ".cursor").symlink_to(tmp_path / "dotfiles" / ".cursor", target_is_directory=True)
+    via_link = home / ".cursor" / "rules" / "safelint.mdc"
+
+    target = _skill_install._resolved_removal_target(via_link)
+
+    assert target == real.resolve() / "safelint.mdc", "ancestor symlink collapsed, leaf appended verbatim"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="Windows symlinks need elevated permissions in CI")
+def test_resolved_removal_target_refuses_shape_breaking_redirect(tmp_path: Path) -> None:
+    """A symlinked ancestor that resolves to a non-install-shaped tail returns None (H1)."""
+    victim = tmp_path / "victim"
+    victim.mkdir()
+    (victim / "safelint.mdc").write_text("VICTIM\n", encoding="utf-8")
+    install = tmp_path / "fake" / ".cursor"
+    install.mkdir(parents=True)
+    (install / "rules").symlink_to(victim, target_is_directory=True)
+    attack_path = install / "rules" / "safelint.mdc"  # resolves to victim/safelint.mdc
+
+    assert _skill_install._resolved_removal_target(attack_path) is None
 
 
 def test_path_looks_like_safelint_install_recognises_every_registered_client() -> None:
