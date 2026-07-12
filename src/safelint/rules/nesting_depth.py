@@ -5,12 +5,51 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
+from safelint.languages.c import DO_STATEMENT as _C_DO_STATEMENT
+from safelint.languages.c import FOR_STATEMENT as _C_FOR_STATEMENT
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.c import IF_STATEMENT as _C_IF_STATEMENT
+from safelint.languages.c import SWITCH_STATEMENT as _C_SWITCH_STATEMENT
+from safelint.languages.c import WHILE_STATEMENT as _C_WHILE_STATEMENT
+from safelint.languages.cpp import DO_STATEMENT as _CPP_DO_STATEMENT
+from safelint.languages.cpp import FOR_STATEMENT as _CPP_FOR_STATEMENT
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
+from safelint.languages.cpp import IF_STATEMENT as _CPP_IF_STATEMENT
+from safelint.languages.cpp import SWITCH_STATEMENT as _CPP_SWITCH_STATEMENT
+from safelint.languages.cpp import TRY_STATEMENT as _CPP_TRY_STATEMENT
+from safelint.languages.cpp import WHILE_STATEMENT as _CPP_WHILE_STATEMENT
+from safelint.languages.go import EXPRESSION_SWITCH_STATEMENT as _GO_EXPRESSION_SWITCH_STATEMENT
+from safelint.languages.go import FOR_STATEMENT as _GO_FOR_STATEMENT
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
+from safelint.languages.go import IF_STATEMENT as _GO_IF_STATEMENT
+from safelint.languages.go import SELECT_STATEMENT as _GO_SELECT_STATEMENT
+from safelint.languages.go import TYPE_SWITCH_STATEMENT as _GO_TYPE_SWITCH_STATEMENT
+from safelint.languages.java import DO_STATEMENT as _JAVA_DO_STATEMENT
+from safelint.languages.java import ENHANCED_FOR_STATEMENT as _JAVA_ENHANCED_FOR_STATEMENT
+from safelint.languages.java import FOR_STATEMENT as _JAVA_FOR_STATEMENT
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
+from safelint.languages.java import IF_STATEMENT as _JAVA_IF_STATEMENT
+from safelint.languages.java import SWITCH_EXPRESSION as _JAVA_SWITCH_EXPRESSION
+from safelint.languages.java import TRY_STATEMENT as _JAVA_TRY_STATEMENT
+from safelint.languages.java import TRY_WITH_RESOURCES_STATEMENT as _JAVA_TRY_WITH_RESOURCES_STATEMENT
+from safelint.languages.java import WHILE_STATEMENT as _JAVA_WHILE_STATEMENT
+from safelint.languages.javascript import DO_STATEMENT as _JS_DO_STATEMENT
+from safelint.languages.javascript import FOR_IN_STATEMENT as _JS_FOR_IN_STATEMENT
+from safelint.languages.javascript import FOR_STATEMENT as _JS_FOR_STATEMENT
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.javascript import IF_STATEMENT as _JS_IF_STATEMENT
+from safelint.languages.javascript import SWITCH_STATEMENT as _JS_SWITCH_STATEMENT
+from safelint.languages.javascript import TRY_STATEMENT as _JS_TRY_STATEMENT
+from safelint.languages.javascript import WHILE_STATEMENT as _JS_WHILE_STATEMENT
+from safelint.languages.php import DO_STATEMENT as _PHP_DO_STATEMENT
+from safelint.languages.php import FOR_STATEMENT as _PHP_FOR_STATEMENT
+from safelint.languages.php import FOREACH_STATEMENT as _PHP_FOREACH_STATEMENT
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
+from safelint.languages.php import IF_STATEMENT as _PHP_IF_STATEMENT
+from safelint.languages.php import MATCH_EXPRESSION as _PHP_MATCH_EXPRESSION
+from safelint.languages.php import SWITCH_STATEMENT as _PHP_SWITCH_STATEMENT
+from safelint.languages.php import TRY_STATEMENT as _PHP_TRY_STATEMENT
+from safelint.languages.php import WHILE_STATEMENT as _PHP_WHILE_STATEMENT
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     FOR_STATEMENT,
@@ -21,7 +60,21 @@ from safelint.languages.python import (
     WHILE_STATEMENT,
     WITH_STATEMENT,
 )
+from safelint.languages.rust import FOR_EXPRESSION as _RUST_FOR_EXPRESSION
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
+from safelint.languages.rust import IF_EXPRESSION as _RUST_IF_EXPRESSION
+from safelint.languages.rust import IF_LET_EXPRESSION as _RUST_IF_LET_EXPRESSION
+from safelint.languages.rust import LOOP_EXPRESSION as _RUST_LOOP_EXPRESSION
+from safelint.languages.rust import MATCH_EXPRESSION as _RUST_MATCH_EXPRESSION
+from safelint.languages.rust import WHILE_EXPRESSION as _RUST_WHILE_EXPRESSION
+from safelint.languages.rust import WHILE_LET_EXPRESSION as _RUST_WHILE_LET_EXPRESSION
+from safelint.languages.typescript import DO_STATEMENT as _TS_DO_STATEMENT
+from safelint.languages.typescript import FOR_IN_STATEMENT as _TS_FOR_IN_STATEMENT
+from safelint.languages.typescript import FOR_STATEMENT as _TS_FOR_STATEMENT
+from safelint.languages.typescript import IF_STATEMENT as _TS_IF_STATEMENT
+from safelint.languages.typescript import SWITCH_STATEMENT as _TS_SWITCH_STATEMENT
+from safelint.languages.typescript import TRY_STATEMENT as _TS_TRY_STATEMENT
+from safelint.languages.typescript import WHILE_STATEMENT as _TS_WHILE_STATEMENT
 from safelint.rules.base import BaseRule
 
 
@@ -80,17 +133,28 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # ``switch`` / ``match`` is the single step.
 _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({IF_STATEMENT, FOR_STATEMENT, WHILE_STATEMENT, WITH_STATEMENT, TRY_STATEMENT, MATCH_STATEMENT}),
-    "javascript": frozenset({"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"}),
-    "typescript": frozenset({"if_statement", "for_statement", "for_in_statement", "while_statement", "do_statement", "switch_statement", "try_statement"}),
-    "java": frozenset({"if_statement", "for_statement", "enhanced_for_statement", "while_statement", "do_statement", "try_statement", "try_with_resources_statement", "switch_expression"}),
-    "rust": frozenset({"if_expression", "if_let_expression", "for_expression", "while_expression", "while_let_expression", "loop_expression", "match_expression"}),
-    "go": frozenset({"if_statement", "for_statement", "expression_switch_statement", "type_switch_statement", "select_statement"}),
-    "php": frozenset({"if_statement", "while_statement", "do_statement", "for_statement", "foreach_statement", "switch_statement", "try_statement", "match_expression"}),
+    "javascript": frozenset({_JS_IF_STATEMENT, _JS_FOR_STATEMENT, _JS_FOR_IN_STATEMENT, _JS_WHILE_STATEMENT, _JS_DO_STATEMENT, _JS_SWITCH_STATEMENT, _JS_TRY_STATEMENT}),
+    "typescript": frozenset({_TS_IF_STATEMENT, _TS_FOR_STATEMENT, _TS_FOR_IN_STATEMENT, _TS_WHILE_STATEMENT, _TS_DO_STATEMENT, _TS_SWITCH_STATEMENT, _TS_TRY_STATEMENT}),
+    "java": frozenset(
+        {
+            _JAVA_IF_STATEMENT,
+            _JAVA_FOR_STATEMENT,
+            _JAVA_ENHANCED_FOR_STATEMENT,
+            _JAVA_WHILE_STATEMENT,
+            _JAVA_DO_STATEMENT,
+            _JAVA_TRY_STATEMENT,
+            _JAVA_TRY_WITH_RESOURCES_STATEMENT,
+            _JAVA_SWITCH_EXPRESSION,
+        }
+    ),
+    "rust": frozenset({_RUST_IF_EXPRESSION, _RUST_IF_LET_EXPRESSION, _RUST_FOR_EXPRESSION, _RUST_WHILE_EXPRESSION, _RUST_WHILE_LET_EXPRESSION, _RUST_LOOP_EXPRESSION, _RUST_MATCH_EXPRESSION}),
+    "go": frozenset({_GO_IF_STATEMENT, _GO_FOR_STATEMENT, _GO_EXPRESSION_SWITCH_STATEMENT, _GO_TYPE_SWITCH_STATEMENT, _GO_SELECT_STATEMENT}),
+    "php": frozenset({_PHP_IF_STATEMENT, _PHP_WHILE_STATEMENT, _PHP_DO_STATEMENT, _PHP_FOR_STATEMENT, _PHP_FOREACH_STATEMENT, _PHP_SWITCH_STATEMENT, _PHP_TRY_STATEMENT, _PHP_MATCH_EXPRESSION}),
     # C: the four loop forms, ``if``, and ``switch``. No try/catch; ``goto``
     # targets are flat labels, not nesting.
-    "c": frozenset({"if_statement", "for_statement", "while_statement", "do_statement", "switch_statement"}),
+    "c": frozenset({_C_IF_STATEMENT, _C_FOR_STATEMENT, _C_WHILE_STATEMENT, _C_DO_STATEMENT, _C_SWITCH_STATEMENT}),
     # C++: the C set plus ``try_statement`` (a try block nests its body).
-    "cpp": frozenset({"if_statement", "for_statement", "for_range_loop", "while_statement", "do_statement", "switch_statement", "try_statement"}),
+    "cpp": frozenset({_CPP_IF_STATEMENT, _CPP_FOR_STATEMENT, "for_range_loop", _CPP_WHILE_STATEMENT, _CPP_DO_STATEMENT, _CPP_SWITCH_STATEMENT, _CPP_TRY_STATEMENT}),
 }
 
 

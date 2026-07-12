@@ -25,6 +25,15 @@ from typing import TYPE_CHECKING, ClassVar
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import call_name, node_text, resolve_lang_name, walk
+from safelint.languages.c import CALL_EXPRESSION as _C_CALL_EXPRESSION
+from safelint.languages.cpp import CALL_EXPRESSION as _CPP_CALL_EXPRESSION
+from safelint.languages.go import CALL_EXPRESSION as _GO_CALL_EXPRESSION
+from safelint.languages.java import METHOD_INVOCATION as _JAVA_METHOD_INVOCATION
+from safelint.languages.javascript import CALL_EXPRESSION as _JS_CALL_EXPRESSION
+from safelint.languages.javascript import NEW_EXPRESSION as _JS_NEW_EXPRESSION
+from safelint.languages.php import FUNCTION_CALL_EXPRESSION as _PHP_FUNCTION_CALL_EXPRESSION
+from safelint.languages.typescript import CALL_EXPRESSION as _TS_CALL_EXPRESSION
+from safelint.languages.typescript import NEW_EXPRESSION as _TS_NEW_EXPRESSION
 from safelint.rules.base import BaseRule
 
 
@@ -95,13 +104,13 @@ _DEFAULTS_BY_LANG: dict[str, list[str]] = {
 #: functions).
 _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({"call"}),
-    "javascript": frozenset({"call_expression", "new_expression"}),
-    "typescript": frozenset({"call_expression", "new_expression"}),
-    "java": frozenset({"method_invocation"}),
-    "go": frozenset({"call_expression"}),
-    "php": frozenset({"function_call_expression"}),
-    "c": frozenset({"call_expression"}),
-    "cpp": frozenset({"call_expression"}),
+    "javascript": frozenset({_JS_CALL_EXPRESSION, _JS_NEW_EXPRESSION}),
+    "typescript": frozenset({_TS_CALL_EXPRESSION, _TS_NEW_EXPRESSION}),
+    "java": frozenset({_JAVA_METHOD_INVOCATION}),
+    "go": frozenset({_GO_CALL_EXPRESSION}),
+    "php": frozenset({_PHP_FUNCTION_CALL_EXPRESSION}),
+    "c": frozenset({_C_CALL_EXPRESSION}),
+    "cpp": frozenset({_CPP_CALL_EXPRESSION}),
 }
 
 
