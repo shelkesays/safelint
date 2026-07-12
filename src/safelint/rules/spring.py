@@ -34,6 +34,23 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import call_name, node_text, resolve_lang_name, walk
+from safelint.languages.java import (
+    ANNOTATION,
+    CLASS_DECLARATION,
+    FIELD_ACCESS,
+    FIELD_DECLARATION,
+    FORMAL_PARAMETER,
+    IDENTIFIER,
+    MARKER_ANNOTATION,
+    METHOD_DECLARATION,
+    METHOD_INVOCATION,
+    MODIFIERS,
+    SCOPED_IDENTIFIER,
+    SCOPED_TYPE_IDENTIFIER,
+    THROWS,
+    TYPE_IDENTIFIER,
+    VARIABLE_DECLARATOR,
+)
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.rules.base import BaseRule
 
@@ -71,7 +88,7 @@ def _iter_annotation_names(modifiers_node: tree_sitter.Node | None) -> Iterator[
     if modifiers_node is None:
         return
     for child in modifiers_node.named_children:
-        if child.type not in ("marker_annotation", "annotation"):
+        if child.type not in (MARKER_ANNOTATION, ANNOTATION):
             continue
         ident = _annotation_simple_name(child)
         if ident is not None:  # pragma: no cover - defensive: well-formed annotations always resolve to an identifier
@@ -86,7 +103,7 @@ def _last_identifier_descendant(node: tree_sitter.Node) -> tree_sitter.Node | No
     """
     last_id = None
     for descendant in walk(node):
-        if descendant.type == "identifier":
+        if descendant.type == IDENTIFIER:
             last_id = descendant
     return last_id
 
@@ -103,9 +120,9 @@ def _annotation_simple_name(annotation_node: tree_sitter.Node) -> str | None:
     if not annotation_node.named_children:  # pragma: no cover - defensive: well-formed annotations always carry a name
         return None
     name_node = annotation_node.named_children[0]
-    if name_node.type == "identifier":
+    if name_node.type == IDENTIFIER:
         return node_text(name_node)
-    if name_node.type != "scoped_identifier":  # pragma: no cover - only identifier / scoped_identifier shapes exist in tree-sitter-java
+    if name_node.type != SCOPED_IDENTIFIER:  # pragma: no cover - only identifier / scoped_identifier shapes exist in tree-sitter-java
         return None
     last_id = _last_identifier_descendant(name_node)
     return node_text(last_id) if last_id is not None else None  # pragma: no cover - defensive: scoped_identifier always has trailing identifier
@@ -129,7 +146,7 @@ def _modifiers_of(node: tree_sitter.Node) -> tree_sitter.Node | None:
     field). When absent, the declaration has no annotations and no
     keyword modifiers (``public`` / ``static`` / etc.).
     """
-    return next((c for c in node.named_children if c.type == "modifiers"), None)
+    return next((c for c in node.named_children if c.type == MODIFIERS), None)
 
 
 def _enclosing_class(node: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -143,7 +160,7 @@ def _enclosing_class(node: tree_sitter.Node) -> tree_sitter.Node | None:
     """
     cur = node.parent
     while cur is not None:
-        if cur.type == "class_declaration":
+        if cur.type == CLASS_DECLARATION:
             return cur
         cur = cur.parent
     return None
@@ -187,7 +204,7 @@ class SpringFieldInjectionRule(BaseRule):
             return []
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "field_declaration":
+            if node.type != FIELD_DECLARATION:
                 continue
             if not _has_annotation(_modifiers_of(node), "Autowired"):
                 continue
@@ -212,11 +229,11 @@ def _first_field_variable_name(field_node: tree_sitter.Node) -> str | None:
     SAFE901) fall back to a ``"<field>"`` placeholder so the
     violation message stays informative.
     """
-    decl = next((c for c in field_node.named_children if c.type == "variable_declarator"), None)
+    decl = next((c for c in field_node.named_children if c.type == VARIABLE_DECLARATOR), None)
     if decl is None:  # pragma: no cover - defensive: valid Java field_declaration always has at least one variable_declarator
         return None
     name_node = decl.child_by_field_name("name")
-    if name_node is None or name_node.type != "identifier":  # pragma: no cover - defensive: valid declarator always has an identifier name
+    if name_node is None or name_node.type != IDENTIFIER:  # pragma: no cover - defensive: valid declarator always has an identifier name
         return None
     return node_text(name_node)
 
@@ -314,7 +331,7 @@ class SpringMissingTransactionalRule(BaseRule):
             return []
         violations: list[Violation] = []
         for method in walk(tree.root_node):
-            if method.type != "method_declaration":
+            if method.type != METHOD_DECLARATION:
                 continue
             enclosing = _enclosing_class(method)
             if enclosing is None:
@@ -363,11 +380,11 @@ def _is_repository_receiver(call_node: tree_sitter.Node) -> bool:
     obj = call_node.child_by_field_name("object")
     if obj is None:
         return False
-    if obj.type == "identifier":
+    if obj.type == IDENTIFIER:
         return _name_matches_repo_pattern(node_text(obj))
-    if obj.type == "field_access":
+    if obj.type == FIELD_ACCESS:
         field_node = obj.child_by_field_name("field")
-        if field_node is None or field_node.type != "identifier":
+        if field_node is None or field_node.type != IDENTIFIER:
             return False
         return _name_matches_repo_pattern(node_text(field_node))
     return False
@@ -396,7 +413,7 @@ def _count_repository_writes(method_node: tree_sitter.Node) -> int:
     for node in walk(method_node, skip_types=tuple(_JAVA_FUNCTION_TYPES)):
         if node is method_node:
             continue
-        if node.type != "method_invocation":
+        if node.type != METHOD_INVOCATION:
             continue
         if call_name(node) not in _SPRING_REPO_WRITE_METHODS:
             continue
@@ -409,7 +426,7 @@ def _count_repository_writes(method_node: tree_sitter.Node) -> int:
 def _method_name(method_node: tree_sitter.Node) -> str | None:
     """Return the simple method name from a ``method_declaration``."""
     name_node = method_node.child_by_field_name("name")
-    return node_text(name_node) if name_node is not None and name_node.type == "identifier" else None
+    return node_text(name_node) if name_node is not None and name_node.type == IDENTIFIER else None
 
 
 # ---------------------------------------------------------------------------
@@ -495,7 +512,7 @@ class SpringUnvalidatedInputRule(BaseRule):
         method_name = _method_name(method) or "<method>"
         violations: list[Violation] = []
         for param in params_node.named_children:
-            if param.type != "formal_parameter":  # pragma: no cover - defensive: receiver_parameter / spread_parameter rarely appear in controllers
+            if param.type != FORMAL_PARAMETER:  # pragma: no cover - defensive: receiver_parameter / spread_parameter rarely appear in controllers
                 continue
             v = self._check_param(filepath, param, method_name)
             if v is not None:
@@ -535,7 +552,7 @@ def _is_async_method(method: tree_sitter.Node) -> bool:
 
 def _is_controller_method(node: tree_sitter.Node) -> bool:
     """Return True if *node* is a ``method_declaration`` inside a Spring controller class."""
-    if node.type != "method_declaration":
+    if node.type != METHOD_DECLARATION:
         return False
     enclosing = _enclosing_class(node)
     if enclosing is None:  # pragma: no cover - defensive: orphan methods at program root don't exist in valid Java
@@ -554,7 +571,7 @@ def _validatable_binding_on(modifiers_node: tree_sitter.Node | None) -> str | No
 def _formal_param_name(param_node: tree_sitter.Node) -> str | None:
     """Return the bound variable name from a ``formal_parameter`` node."""
     name_node = param_node.child_by_field_name("name")
-    return node_text(name_node) if name_node is not None and name_node.type == "identifier" else None
+    return node_text(name_node) if name_node is not None and name_node.type == IDENTIFIER else None
 
 
 # ---------------------------------------------------------------------------
@@ -607,11 +624,11 @@ class SpringAsyncCheckedExceptionRule(BaseRule):
             return []
         violations: list[Violation] = []
         for method in walk(tree.root_node):
-            if method.type != "method_declaration":
+            if method.type != METHOD_DECLARATION:
                 continue
             if not _is_async_method(method):
                 continue
-            throws_node = next((c for c in method.named_children if c.type == "throws"), None)
+            throws_node = next((c for c in method.named_children if c.type == THROWS), None)
             if throws_node is None:
                 continue
             throws_types = _throws_type_names(throws_node)
@@ -636,15 +653,15 @@ def _throws_type_simple_name(child: tree_sitter.Node) -> str | None:
     ``scoped_type_identifier`` (qualified ``java.io.IOException``);
     returns the trailing simple name in the qualified case.
     """
-    if child.type == "type_identifier":
+    if child.type == TYPE_IDENTIFIER:
         return node_text(child)
-    if child.type != "scoped_type_identifier":  # pragma: no cover - throws types are always type_identifier or scoped_type_identifier
+    if child.type != SCOPED_TYPE_IDENTIFIER:  # pragma: no cover - throws types are always type_identifier or scoped_type_identifier
         return None
     # Walk for the last ``type_identifier`` descendant - the simple name
     # at the end of the qualified chain.
     last_id = None
     for descendant in walk(child):
-        if descendant.type == "type_identifier":
+        if descendant.type == TYPE_IDENTIFIER:
             last_id = descendant
     return node_text(last_id) if last_id else None
 
