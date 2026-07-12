@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Internal refactor: the rules now import Tree-sitter node-type / operator constants from the `languages/<lang>.py` modules instead of hardcoding raw string literals.** Each language module is the single source of truth for its node types, and every language's rule logic references its own module. **No behaviour change** - every rule's resolved node-type set is byte-identical to before (verified by a deterministic table snapshot), and no rule, code, config key, CLI flag, or output format is affected. Purely additive at the module level (new constants only; none removed or renamed), so any downstream importer of `safelint.languages.*` stays compatible.
+
 ## [2.8.1] - 2026-07-12
 
 ### Security
