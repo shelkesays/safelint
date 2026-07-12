@@ -12,11 +12,50 @@ from typing import TYPE_CHECKING, ClassVar
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup  # ``_validated_string_list`` re-exported for backwards-compat
 from safelint.languages._node_utils import call_name, resolve_lang_name, walk
 from safelint.languages._node_utils import node_text as _node_text
+from safelint.languages.c import ASSIGNMENT_EXPRESSION as _C_ASSIGNMENT_EXPRESSION
+from safelint.languages.c import CAST_EXPRESSION as _C_CAST_EXPRESSION
+from safelint.languages.c import PARENTHESIZED_EXPRESSION as _C_PARENTHESIZED_EXPRESSION
+from safelint.languages.go import ASSIGNMENT_STATEMENT as _GO_ASSIGNMENT_STATEMENT
+from safelint.languages.go import BLANK_IDENTIFIER as _GO_BLANK_IDENTIFIER
+from safelint.languages.go import CALL_EXPRESSION as _GO_CALL_EXPRESSION
+from safelint.languages.go import COMMUNICATION_CASE as _GO_COMMUNICATION_CASE
+from safelint.languages.go import DEFAULT_CASE as _GO_DEFAULT_CASE
+from safelint.languages.go import DEFER_STATEMENT as _GO_DEFER_STATEMENT
+from safelint.languages.go import EXPRESSION_CASE as _GO_EXPRESSION_CASE
+from safelint.languages.go import EXPRESSION_LIST as _GO_EXPRESSION_LIST
+from safelint.languages.go import EXPRESSION_SWITCH_STATEMENT as _GO_EXPRESSION_SWITCH_STATEMENT
+from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
+from safelint.languages.go import FOR_STATEMENT as _GO_FOR_STATEMENT
+from safelint.languages.go import FUNC_LITERAL as _GO_FUNC_LITERAL
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
+from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
+from safelint.languages.go import IF_STATEMENT as _GO_IF_STATEMENT
+from safelint.languages.go import RETURN_STATEMENT as _GO_RETURN_STATEMENT
+from safelint.languages.go import SELECT_STATEMENT as _GO_SELECT_STATEMENT
+from safelint.languages.go import SELECTOR_EXPRESSION as _GO_SELECTOR_EXPRESSION
+from safelint.languages.go import SHORT_VAR_DECLARATION as _GO_SHORT_VAR_DECLARATION
+from safelint.languages.go import TYPE_CASE as _GO_TYPE_CASE
+from safelint.languages.go import TYPE_SWITCH_STATEMENT as _GO_TYPE_SWITCH_STATEMENT
+from safelint.languages.go import VAR_SPEC as _GO_VAR_SPEC
+from safelint.languages.java import ARGUMENT_LIST as _JAVA_ARGUMENT_LIST
+from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
+from safelint.languages.java import FINALLY_CLAUSE as _JAVA_FINALLY_CLAUSE
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
+from safelint.languages.java import METHOD_INVOCATION as _JAVA_METHOD_INVOCATION
+from safelint.languages.java import OBJECT_CREATION_EXPRESSION as _JAVA_OBJECT_CREATION_EXPRESSION
+from safelint.languages.java import RESOURCE_SPECIFICATION as _JAVA_RESOURCE_SPECIFICATION
+from safelint.languages.java import TRY_STATEMENT as _JAVA_TRY_STATEMENT
+from safelint.languages.java import TRY_WITH_RESOURCES_STATEMENT as _JAVA_TRY_WITH_RESOURCES_STATEMENT
+from safelint.languages.java import VARIABLE_DECLARATOR as _JAVA_VARIABLE_DECLARATOR
+from safelint.languages.javascript import CALL_EXPRESSION as _JS_CALL_EXPRESSION
+from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.javascript import NEW_EXPRESSION as _JS_NEW_EXPRESSION
+from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
+from safelint.languages.php import FUNCTION_CALL_EXPRESSION as _PHP_FUNCTION_CALL_EXPRESSION
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
-from safelint.languages.python import CALL, WITH_ITEM
+from safelint.languages.python import AS_PATTERN, CALL, EXTRA_NAME, FINALLY_CLAUSE, IDENTIFIER, TRY_STATEMENT, WITH_ITEM
+from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.rules.base import BaseRule
 
 
@@ -44,7 +83,7 @@ def _with_item_call(item: tree_sitter.Node) -> tree_sitter.Node | None:
     # a defensive guard against malformed AST.
     if value is None:  # pragma: no cover
         return None
-    if value.type == "as_pattern" and value.named_children:
+    if value.type == AS_PATTERN and value.named_children:
         value = value.named_children[0]
     return value if value.type == CALL else None
 
@@ -103,13 +142,13 @@ def _is_inside_try_finally(node: tree_sitter.Node, function_types: frozenset[str
             # default; PHP passes its own set (both share the
             # ``try_statement`` / ``finally_clause`` shape).
             return False
-        # ``prev.type != "finally_clause"`` skips a try_statement whose
+        # ``prev.type != FINALLY_CLAUSE`` skips a try_statement whose
         # finally we just came out of - that finally is the *parent* of
         # the call, not a subsequent cleanup hook for it. Without this
         # check, ``try { ... } finally { fs.createReadStream(p); }``
         # would be silently accepted as "guarded" even though no
         # finally runs after the stream opens.
-        if _try_statement_has_finally(cur) and prev.type != "finally_clause":
+        if _try_statement_has_finally(cur) and prev.type != FINALLY_CLAUSE:
             return True
         prev = cur
         cur = cur.parent
@@ -118,9 +157,9 @@ def _is_inside_try_finally(node: tree_sitter.Node, function_types: frozenset[str
 
 def _try_statement_has_finally(node: tree_sitter.Node) -> bool:
     """Return True if *node* is a ``try_statement`` with a ``finally_clause`` child."""
-    if node.type != "try_statement":
+    if node.type != TRY_STATEMENT:
         return False
-    return any(child.type == "finally_clause" for child in node.named_children)
+    return any(child.type == FINALLY_CLAUSE for child in node.named_children)
 
 
 def _java_acquired_variable_name(call_node: tree_sitter.Node) -> str | None:
@@ -162,7 +201,7 @@ def _java_acquired_variable_name(call_node: tree_sitter.Node) -> str | None:
         direct = _direct_assigned_name(cur)
         if direct is not None:
             return direct
-        if cur.type == "argument_list" and cur.parent is not None and cur.parent.type == "object_creation_expression":
+        if cur.type == _JAVA_ARGUMENT_LIST and cur.parent is not None and cur.parent.type == _JAVA_OBJECT_CREATION_EXPRESSION:
             node = cur.parent
             continue
         return None
@@ -178,7 +217,7 @@ def _skip_wrapper_parents(node: tree_sitter.Node | None) -> tree_sitter.Node | N
     """
     cur = node
     while cur is not None:
-        if cur.type not in ("parenthesized_expression", "cast_expression"):
+        if cur.type not in (_C_PARENTHESIZED_EXPRESSION, _C_CAST_EXPRESSION):
             return cur
         cur = cur.parent
     return None  # node was None, or the wrapper chain ran off the tree root
@@ -192,14 +231,14 @@ def _direct_assigned_name(node: tree_sitter.Node) -> str | None:
     (after passthrough unwrap) of an acquirer call - we just need to
     pick off the two terminal cases.
     """
-    if node.type == "variable_declarator":
+    if node.type == _JAVA_VARIABLE_DECLARATOR:
         name_node = node.child_by_field_name("name")
-        if name_node is not None and name_node.type == "identifier":
+        if name_node is not None and name_node.type == IDENTIFIER:
             return _node_text(name_node)
         return None  # pragma: no cover - defensive: declarator name is always an identifier in valid Java
-    if node.type == "assignment_expression":
+    if node.type == _C_ASSIGNMENT_EXPRESSION:
         left = node.child_by_field_name("left")
-        if left is not None and left.type == "identifier":
+        if left is not None and left.type == IDENTIFIER:
             return _node_text(left)
     return None
 
@@ -237,10 +276,10 @@ def _finally_closes_variable(finally_clause: tree_sitter.Node, var_name: str) ->
     refactor to the modern try-with-resources form.
     """
     for descendant in walk(finally_clause, skip_types=_JAVA_FUNCTION_TYPES):
-        if descendant.type != "method_invocation":
+        if descendant.type != _JAVA_METHOD_INVOCATION:
             continue
         obj = descendant.child_by_field_name("object")
-        if obj is None or obj.type != "identifier" or _node_text(obj) != var_name:
+        if obj is None or obj.type != IDENTIFIER or _node_text(obj) != var_name:
             continue
         name_node = descendant.child_by_field_name("name")
         if name_node is not None and _node_text(name_node) == "close":
@@ -277,7 +316,7 @@ def _is_inside_java_resource_guard(node: tree_sitter.Node) -> bool:
     inside a lambda doesn't borrow the enclosing method's
     try-with-resources for safety.
 
-    The ``prev.type != "finally_clause"`` guard mirrors the JS logic:
+    The ``prev.type != _JAVA_FINALLY_CLAUSE`` guard mirrors the JS logic:
     a resource acquired inside the finally block of a try-statement
     isn't covered by *that* try's cleanup. tree-sitter-java doesn't
     use ``finally_clause`` as a child of try_with_resources_statement
@@ -307,17 +346,17 @@ def _java_ancestor_is_guard(cur: tree_sitter.Node, prev: tree_sitter.Node, var_n
       JLS guarantees ``close()``. A call reached via the ``block`` child is
       inside the body and is NOT auto-closed.
     * ``try_statement`` (manual try/finally) whose finally clause contains a
-      ``<var_name>.close()`` invocation. The ``prev.type != "finally_clause"``
+      ``<var_name>.close()`` invocation. The ``prev.type != _JAVA_FINALLY_CLAUSE``
       guard skips a try whose finally we just walked out of - that finally
       doesn't run AFTER the acquirer if the acquirer lives inside it.
       ``var_name is None`` (bare-expression acquirers) always returns False
       from this branch because there's no handle to close.
     """
-    if cur.type == "try_with_resources_statement" and prev.type == "resource_specification":
+    if cur.type == _JAVA_TRY_WITH_RESOURCES_STATEMENT and prev.type == _JAVA_RESOURCE_SPECIFICATION:
         return True
-    if cur.type != "try_statement" or prev.type == "finally_clause" or var_name is None:
+    if cur.type != _JAVA_TRY_STATEMENT or prev.type == _JAVA_FINALLY_CLAUSE or var_name is None:
         return False
-    finally_clause = next((c for c in cur.named_children if c.type == "finally_clause"), None)
+    finally_clause = next((c for c in cur.named_children if c.type == _JAVA_FINALLY_CLAUSE), None)
     return finally_clause is not None and _finally_closes_variable(finally_clause, var_name)
 
 
@@ -347,7 +386,7 @@ def _go_acquired_variable_names(call_node: tree_sitter.Node) -> frozenset[str]:
     never be deferred-closed, so it is always a leak.
     """
     rhs_list = call_node.parent
-    if rhs_list is None or rhs_list.type != "expression_list":
+    if rhs_list is None or rhs_list.type != _GO_EXPRESSION_LIST:
         return frozenset()
     container = rhs_list.parent
     if container is None:  # pragma: no cover - defensive: expression_list always has a parent
@@ -358,7 +397,7 @@ def _go_acquired_variable_names(call_node: tree_sitter.Node) -> frozenset[str]:
     positional = _go_positional_name(call_node, left_idents, rhs_list.named_children)
     if positional is not None:
         return positional
-    return frozenset(t for t in (_node_text(n) for n in left_idents) if t != "_")
+    return frozenset(t for t in (_node_text(n) for n in left_idents) if t != _GO_BLANK_IDENTIFIER)
 
 
 def _go_positional_name(call_node: tree_sitter.Node, left_idents: list[tree_sitter.Node], right_exprs: list[tree_sitter.Node]) -> frozenset[str] | None:
@@ -376,7 +415,7 @@ def _go_positional_name(call_node: tree_sitter.Node, left_idents: list[tree_sitt
     if idx is None:  # pragma: no cover - defensive: call_node is one of rhs_list's children
         return frozenset()
     name = _node_text(left_idents[idx])
-    return frozenset({name}) if name != "_" else frozenset()
+    return frozenset({name}) if name != _GO_BLANK_IDENTIFIER else frozenset()
 
 
 def _go_left_idents(container: tree_sitter.Node) -> list[tree_sitter.Node] | None:
@@ -387,11 +426,11 @@ def _go_left_idents(container: tree_sitter.Node) -> list[tree_sitter.Node] | Non
     (e.g. a ``return`` statement) so a returned acquirer is treated as
     having no local handle.
     """
-    if container.type in ("short_var_declaration", "assignment_statement"):
+    if container.type in (_GO_SHORT_VAR_DECLARATION, _GO_ASSIGNMENT_STATEMENT):
         left = container.child_by_field_name("left")
-        return [c for c in left.named_children if c.type == "identifier"] if left is not None else []
-    if container.type == "var_spec":
-        return [c for c in container.named_children if c.type == "identifier"]
+        return [c for c in left.named_children if c.type == _GO_IDENTIFIER] if left is not None else []
+    if container.type == _GO_VAR_SPEC:
+        return [c for c in container.named_children if c.type == _GO_IDENTIFIER]
     return None
 
 
@@ -406,10 +445,10 @@ def _go_is_returned(call_node: tree_sitter.Node) -> bool:
     parent = call_node.parent
     if parent is None:  # pragma: no cover - defensive: a call always has a parent
         return False
-    if parent.type == "return_statement":  # pragma: no cover - Go wraps return values in an expression_list
+    if parent.type == _GO_RETURN_STATEMENT:  # pragma: no cover - Go wraps return values in an expression_list
         return True
     grandparent = parent.parent
-    return parent.type == "expression_list" and grandparent is not None and grandparent.type == "return_statement"
+    return parent.type == _GO_EXPRESSION_LIST and grandparent is not None and grandparent.type == _GO_RETURN_STATEMENT
 
 
 def _go_enclosing_function(node: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -427,16 +466,16 @@ def _go_enclosing_function(node: tree_sitter.Node) -> tree_sitter.Node | None:
 # conditional and does not reliably close a resource acquired unconditionally.
 _GO_NESTING_TYPES: frozenset[str] = frozenset(
     {
-        "if_statement",
-        "for_statement",
-        "expression_switch_statement",
-        "type_switch_statement",
-        "select_statement",
-        "communication_case",
-        "expression_case",
-        "type_case",
-        "default_case",
-        "func_literal",
+        _GO_IF_STATEMENT,
+        _GO_FOR_STATEMENT,
+        _GO_EXPRESSION_SWITCH_STATEMENT,
+        _GO_TYPE_SWITCH_STATEMENT,
+        _GO_SELECT_STATEMENT,
+        _GO_COMMUNICATION_CASE,
+        _GO_EXPRESSION_CASE,
+        _GO_TYPE_CASE,
+        _GO_DEFAULT_CASE,
+        _GO_FUNC_LITERAL,
     }
 )
 
@@ -458,7 +497,7 @@ def _go_defer_closes(func_node: tree_sitter.Node, var_names: frozenset[str], acq
       path from the unconditional acquisition.
     """
     for node in walk(func_node, skip_types=tuple(_GO_FUNCTION_TYPES)):
-        if node.type != "defer_statement" or not _go_defer_targets(node, var_names):
+        if node.type != _GO_DEFER_STATEMENT or not _go_defer_targets(node, var_names):
             continue
         if node.start_byte > acquirer.start_byte and _go_defer_is_unconditional(node, func_node):
             return True
@@ -484,15 +523,15 @@ def _go_defer_is_unconditional(defer_node: tree_sitter.Node, func_node: tree_sit
 
 def _go_defer_targets(defer_node: tree_sitter.Node, var_names: frozenset[str]) -> bool:
     """Return True if *defer_node* is a ``defer <var>.Close()`` for a name in *var_names*."""
-    call = next((c for c in defer_node.named_children if c.type == "call_expression"), None)
+    call = next((c for c in defer_node.named_children if c.type == _GO_CALL_EXPRESSION), None)
     if call is None:
         return False
     fn = call.child_by_field_name("function")
-    if fn is None or fn.type != "selector_expression":
+    if fn is None or fn.type != _GO_SELECTOR_EXPRESSION:
         return False
     operand = fn.child_by_field_name("operand")
     field = fn.child_by_field_name("field")
-    if operand is None or field is None or operand.type != "identifier":
+    if operand is None or field is None or operand.type != _GO_IDENTIFIER:
         return False
     return _node_text(field) == "Close" and _node_text(operand) in var_names
 
@@ -517,7 +556,7 @@ class ResourceLifecycleRule(BaseRule):
 
     name = "resource_lifecycle"
     code = "SAFE401"
-    language = ("python", "javascript", "typescript", "java", "go", "php")
+    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME)
 
     _DEFAULT_TRACKED_PHP: ClassVar[list[str]] = [
         # PHP resource acquirers are global functions; ``call_name`` resolves
@@ -604,11 +643,11 @@ class ResourceLifecycleRule(BaseRule):
         leaks. Bare-expression acquirers (no assignment) always fire - there
         is no handle to defer-close.
         """
-        raw_tracked, error_key = resolve_lang_config_lookup(self.config, "tracked_functions", "go", default=self._DEFAULT_TRACKED_GO)
+        raw_tracked, error_key = resolve_lang_config_lookup(self.config, "tracked_functions", _GO_EXTRA_NAME, default=self._DEFAULT_TRACKED_GO)
         tracked = frozenset(_validated_string_list(raw_tracked, error_key))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "call_expression":
+            if node.type != _GO_CALL_EXPRESSION:
                 continue
             name = call_name(node)
             if not name or name not in tracked:
@@ -667,7 +706,7 @@ class ResourceLifecycleRule(BaseRule):
         tracked: frozenset[str] = frozenset(base_tracked + extra_tracked)
         # cleanup_patterns has the same string-vs-list footgun as
         # tracked_functions - ``cleanup_patterns = "close"`` would coerce
-        # to ``frozenset("close")`` = ``{'c','l','o','s','e'}`` and the
+        # to ``frozenset("close")`` = ``{_C_EXTRA_NAME,'l','o','s','e'}`` and the
         # diagnostic text would render as ``c / e / l / o / s``. Validate
         # it the same way for consistency.
         cleanup_list = _validated_string_list(self.config.get("cleanup_patterns", ["close"]), "cleanup_patterns")
@@ -719,7 +758,7 @@ class ResourceLifecycleRule(BaseRule):
         tracked: frozenset[str] = frozenset(tracked_js)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type not in ("call_expression", "new_expression"):
+            if node.type not in (_JS_CALL_EXPRESSION, _JS_NEW_EXPRESSION):
                 continue
             name = call_name(node)
             if not name or name not in tracked:
@@ -731,7 +770,7 @@ class ResourceLifecycleRule(BaseRule):
             # message. Reporting ``Worker()`` for ``new Worker(...)``
             # would be misleading - the user grep'ing for ``Worker(``
             # in the source wouldn't find the offending site.
-            invocation = f"new {name}()" if node.type == "new_expression" else f"{name}()"
+            invocation = f"new {name}()" if node.type == _JS_NEW_EXPRESSION else f"{name}()"
             violations.append(
                 self._make_violation_for_node(
                     filepath,
@@ -752,13 +791,13 @@ class ResourceLifecycleRule(BaseRule):
         raw_tracked, error_key = resolve_lang_config_lookup(
             self.config,
             "tracked_functions",
-            "java",
+            _JAVA_EXTRA_NAME,
             default=self._DEFAULT_TRACKED_JAVA,
         )
         tracked = frozenset(_validated_string_list(raw_tracked, error_key))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type not in ("method_invocation", "object_creation_expression"):
+            if node.type not in (_JAVA_METHOD_INVOCATION, _JAVA_OBJECT_CREATION_EXPRESSION):
                 continue
             name = call_name(node)
             if not name or name not in tracked:
@@ -768,7 +807,7 @@ class ResourceLifecycleRule(BaseRule):
             # Use ``new Foo()`` only for constructor invocations to match
             # the source surface the user can grep for. ``Files.newBufferedReader``
             # via ``method_invocation`` renders as ``newBufferedReader()``.
-            invocation = f"new {name}()" if node.type == "object_creation_expression" else f"{name}()"
+            invocation = f"new {name}()" if node.type == _JAVA_OBJECT_CREATION_EXPRESSION else f"{name}()"
             message = (
                 f'"{invocation}" not wrapped in try-with-resources or try/finally; '
                 f"declare it as ``try (var resource = {invocation}) {{ ... }}`` "
@@ -790,11 +829,11 @@ class ResourceLifecycleRule(BaseRule):
         the specific handle - it catches the common "opened a handle, no
         cleanup scope at all" leak.
         """
-        raw_tracked, error_key = resolve_lang_config_lookup(self.config, "tracked_functions", "php", default=self._DEFAULT_TRACKED_PHP)
+        raw_tracked, error_key = resolve_lang_config_lookup(self.config, "tracked_functions", _PHP_EXTRA_NAME, default=self._DEFAULT_TRACKED_PHP)
         tracked = frozenset(_validated_string_list(raw_tracked, error_key))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "function_call_expression":
+            if node.type != _PHP_FUNCTION_CALL_EXPRESSION:
                 continue
             name = call_name(node)
             if not name or name not in tracked:

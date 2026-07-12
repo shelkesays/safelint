@@ -6,18 +6,73 @@ from typing import TYPE_CHECKING, ClassVar
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.c import ARRAY_DECLARATOR as _C_ARRAY_DECLARATOR
+from safelint.languages.c import DECLARATION as _C_DECLARATION
+from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
+from safelint.languages.c import FIELD_IDENTIFIER as _C_FIELD_IDENTIFIER
+from safelint.languages.c import FUNCTION_DECLARATOR as _C_FUNCTION_DECLARATOR
+from safelint.languages.c import IDENTIFIER as _C_IDENTIFIER
+from safelint.languages.c import INIT_DECLARATOR as _C_INIT_DECLARATOR
+from safelint.languages.c import PARENTHESIZED_DECLARATOR as _C_PARENTHESIZED_DECLARATOR
+from safelint.languages.c import POINTER_DECLARATOR as _C_POINTER_DECLARATOR
+from safelint.languages.c import STORAGE_CLASS_SPECIFIER as _C_STORAGE_CLASS_SPECIFIER
+from safelint.languages.c import TYPE_QUALIFIER as _C_TYPE_QUALIFIER
+from safelint.languages.cpp import ARRAY_DECLARATOR as _CPP_ARRAY_DECLARATOR
+from safelint.languages.cpp import CLASS_SPECIFIER as _CPP_CLASS_SPECIFIER
+from safelint.languages.cpp import DECLARATION as _CPP_DECLARATION
+from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
+from safelint.languages.cpp import FIELD_DECLARATION as _CPP_FIELD_DECLARATION
+from safelint.languages.cpp import FUNCTION_DECLARATOR as _CPP_FUNCTION_DECLARATOR
+from safelint.languages.cpp import NAMESPACE_DEFINITION as _CPP_NAMESPACE_DEFINITION
+from safelint.languages.cpp import PARENTHESIZED_DECLARATOR as _CPP_PARENTHESIZED_DECLARATOR
+from safelint.languages.cpp import POINTER_DECLARATOR as _CPP_POINTER_DECLARATOR
+from safelint.languages.cpp import REFERENCE_DECLARATOR as _CPP_REFERENCE_DECLARATOR
+from safelint.languages.cpp import STORAGE_CLASS_SPECIFIER as _CPP_STORAGE_CLASS_SPECIFIER
+from safelint.languages.cpp import STRUCT_SPECIFIER as _CPP_STRUCT_SPECIFIER
+from safelint.languages.cpp import TYPE_QUALIFIER as _CPP_TYPE_QUALIFIER
+from safelint.languages.go import BLANK_IDENTIFIER as _GO_BLANK_IDENTIFIER
+from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
+from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
+from safelint.languages.go import VAR_DECLARATION as _GO_VAR_DECLARATION
+from safelint.languages.go import VAR_SPEC as _GO_VAR_SPEC
+from safelint.languages.go import VAR_SPEC_LIST as _GO_VAR_SPEC_LIST
+from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
+from safelint.languages.java import FIELD_DECLARATION as _JAVA_FIELD_DECLARATION
+from safelint.languages.java import MODIFIERS as _JAVA_MODIFIERS
+from safelint.languages.java import VARIABLE_DECLARATOR as _JAVA_VARIABLE_DECLARATOR
+from safelint.languages.javascript import AS_EXPRESSION as _JS_AS_EXPRESSION
+from safelint.languages.javascript import ASSIGNMENT_EXPRESSION as _JS_ASSIGNMENT_EXPRESSION
+from safelint.languages.javascript import AUGMENTED_ASSIGNMENT_EXPRESSION as _JS_AUGMENTED_ASSIGNMENT_EXPRESSION
+from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.javascript import IDENTIFIER as _JS_IDENTIFIER
+from safelint.languages.javascript import MEMBER_EXPRESSION as _JS_MEMBER_EXPRESSION
+from safelint.languages.javascript import NON_NULL_EXPRESSION as _JS_NON_NULL_EXPRESSION
+from safelint.languages.javascript import SATISFIES_EXPRESSION as _JS_SATISFIES_EXPRESSION
+from safelint.languages.javascript import SUBSCRIPT_EXPRESSION as _JS_SUBSCRIPT_EXPRESSION
+from safelint.languages.javascript import TYPE_ASSERTION as _JS_TYPE_ASSERTION
+from safelint.languages.javascript import UPDATE_EXPRESSION as _JS_UPDATE_EXPRESSION
 from safelint.languages.javascript import VARIABLE_DECLARATION as _JS_VARIABLE_DECLARATION
+from safelint.languages.php import ASSIGNMENT_EXPRESSION as _PHP_ASSIGNMENT_EXPRESSION
+from safelint.languages.php import AUGMENTED_ASSIGNMENT_EXPRESSION as _PHP_AUGMENTED_ASSIGNMENT_EXPRESSION
+from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
+from safelint.languages.php import GLOBAL_DECLARATION as _PHP_GLOBAL_DECLARATION
+from safelint.languages.php import PARENTHESIZED_EXPRESSION as _PHP_PARENTHESIZED_EXPRESSION
+from safelint.languages.php import SUBSCRIPT_EXPRESSION as _PHP_SUBSCRIPT_EXPRESSION
+from safelint.languages.php import UPDATE_EXPRESSION as _PHP_UPDATE_EXPRESSION
+from safelint.languages.php import VARIABLE_NAME as _PHP_VARIABLE_NAME
 from safelint.languages.python import (
     ASSIGNMENT,
     ASYNC_FUNCTION_DEF,
     AUGMENTED_ASSIGNMENT,
     CLASS_DEF,
+    EXTRA_NAME,
     FUNCTION_DEF,
     GLOBAL_STATEMENT,
     IDENTIFIER,
 )
+from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.rules.base import BaseRule
 
 
@@ -48,18 +103,18 @@ def _c_declarator_identifier(node: tree_sitter.Node) -> tree_sitter.Node | None:
     ``identifier``. Non-declarator children (``primitive_type``,
     ``type_qualifier``, ``storage_class_specifier``) return None.
     """
-    if node.type not in ("init_declarator", "pointer_declarator", "array_declarator", "function_declarator", "parenthesized_declarator", "identifier"):
+    if node.type not in (_C_INIT_DECLARATOR, _C_POINTER_DECLARATOR, _C_ARRAY_DECLARATOR, _C_FUNCTION_DECLARATOR, _C_PARENTHESIZED_DECLARATOR, _C_IDENTIFIER):
         return None
     cur: tree_sitter.Node | None = node
     for _ in range(16):  # bounded unwrap; never recurse
         if cur is None:
             return None
-        if cur.type == "identifier":
+        if cur.type == _C_IDENTIFIER:
             return cur
         nxt = cur.child_by_field_name("declarator")
         # ``parenthesized_declarator`` (``(*fp)``) wraps its inner declarator as
         # a plain named child rather than on a ``declarator`` field.
-        if nxt is None and cur.type == "parenthesized_declarator" and cur.named_children:
+        if nxt is None and cur.type == _C_PARENTHESIZED_DECLARATOR and cur.named_children:
             nxt = cur.named_children[0]
         cur = nxt
     return None
@@ -67,8 +122,8 @@ def _c_declarator_identifier(node: tree_sitter.Node) -> tree_sitter.Node | None:
 
 #: Declarator wrapper node types whose inner declarator is a plain named child
 #: (no ``declarator`` field) - unwrapped by scanning ``named_children``.
-_CPP_PLAIN_CHILD_DECLARATORS = ("reference_declarator", "parenthesized_declarator")
-_CPP_INNER_DECLARATOR_TYPES = ("field_identifier", "pointer_declarator", "array_declarator", "reference_declarator", "function_declarator", "parenthesized_declarator")
+_CPP_PLAIN_CHILD_DECLARATORS = (_CPP_REFERENCE_DECLARATOR, _CPP_PARENTHESIZED_DECLARATOR)
+_CPP_INNER_DECLARATOR_TYPES = (_C_FIELD_IDENTIFIER, _CPP_POINTER_DECLARATOR, _CPP_ARRAY_DECLARATOR, _CPP_REFERENCE_DECLARATOR, _CPP_FUNCTION_DECLARATOR, _CPP_PARENTHESIZED_DECLARATOR)
 
 
 def _cpp_field_declarator_name(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -86,11 +141,11 @@ def _cpp_field_declarator_name(declarator: tree_sitter.Node) -> tree_sitter.Node
     """
     cur: tree_sitter.Node | None = declarator
     for _ in range(16):
-        if cur is None or cur.type == "field_identifier":
+        if cur is None or cur.type == _C_FIELD_IDENTIFIER:
             return cur
-        if cur.type == "function_declarator":
+        if cur.type == _CPP_FUNCTION_DECLARATOR:
             inner = cur.child_by_field_name("declarator")
-            cur = inner if inner is not None and inner.type == "parenthesized_declarator" else None
+            cur = inner if inner is not None and inner.type == _CPP_PARENTHESIZED_DECLARATOR else None
             continue
         nxt = cur.child_by_field_name("declarator")
         if nxt is None and cur.type in _CPP_PLAIN_CHILD_DECLARATORS:
@@ -108,7 +163,7 @@ def _c_is_function_prototype(function_declarator: tree_sitter.Node) -> bool:
     exempted from SAFE302.
     """
     inner = function_declarator.child_by_field_name("declarator")
-    return inner is None or inner.type != "parenthesized_declarator"
+    return inner is None or inner.type != _C_PARENTHESIZED_DECLARATOR
 
 
 def _c_inner_function_declarator(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -126,9 +181,9 @@ def _c_inner_function_declarator(declarator: tree_sitter.Node) -> tree_sitter.No
     for _ in range(16):
         if cur is None:
             return None
-        if cur.type == "function_declarator":
+        if cur.type == _C_FUNCTION_DECLARATOR:
             return cur
-        if cur.type not in ("init_declarator", "pointer_declarator"):
+        if cur.type not in (_C_INIT_DECLARATOR, _C_POINTER_DECLARATOR):
             return None
         cur = cur.child_by_field_name("declarator")
     return None
@@ -136,7 +191,7 @@ def _c_inner_function_declarator(declarator: tree_sitter.Node) -> tree_sitter.No
 
 def _c_unwrap_init(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
     """Return the underlying declarator, unwrapping a single ``init_declarator`` (``int *p = 0`` -> ``*p``)."""
-    if declarator.type == "init_declarator":
+    if declarator.type == _C_INIT_DECLARATOR:
         return declarator.child_by_field_name("declarator")
     return declarator
 
@@ -152,9 +207,9 @@ def _c_is_mutable_pointer(declarator: tree_sitter.Node) -> bool:
     ``pointer_declarator`` and is genuinely immutable.
     """
     inner = _c_unwrap_init(declarator)
-    if inner is None or inner.type != "pointer_declarator":
+    if inner is None or inner.type != _C_POINTER_DECLARATOR:
         return False
-    return not any(c.type == "type_qualifier" and node_text(c) == "const" for c in inner.named_children)
+    return not any(c.type == _C_TYPE_QUALIFIER and node_text(c) == "const" for c in inner.named_children)
 
 
 def _iter_python_functions(tree: tree_sitter.Tree) -> Iterator[tree_sitter.Node]:
@@ -231,13 +286,13 @@ def _iter_php_global_statements(func_node: tree_sitter.Node) -> Iterator[tree_si
     closure belongs to that closure's scope, not the outer function's.
     """
     for child in walk(func_node, skip_types=_PHP_NESTED_SCOPE_TYPES):
-        if child.type == "global_declaration":
+        if child.type == _PHP_GLOBAL_DECLARATION:
             yield child
 
 
 def _php_global_identifiers(global_stmt: tree_sitter.Node) -> list[tree_sitter.Node]:
     """Return the ``variable_name`` nodes named in a PHP ``global`` statement."""
-    return [c for c in global_stmt.named_children if c.type == "variable_name"]
+    return [c for c in global_stmt.named_children if c.type == _PHP_VARIABLE_NAME]
 
 
 def _php_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -248,9 +303,9 @@ def _php_assignment_target(node: tree_sitter.Node) -> tree_sitter.Node | None:
     field. Catching the increment / decrement forms means a write to a
     declared global via ``$counter++`` is flagged like ``$counter = ...``.
     """
-    if node.type in ("assignment_expression", "augmented_assignment_expression"):
+    if node.type in (_PHP_ASSIGNMENT_EXPRESSION, _PHP_AUGMENTED_ASSIGNMENT_EXPRESSION):
         return node.child_by_field_name("left")
-    if node.type == "update_expression":
+    if node.type == _PHP_UPDATE_EXPRESSION:
         return node.child_by_field_name("argument")
     return None
 
@@ -264,10 +319,10 @@ def _php_subscript_root(target: tree_sitter.Node) -> str | None:
     """
     cur: tree_sitter.Node | None = target
     while cur is not None:
-        if cur.type != "subscript_expression":
+        if cur.type != _PHP_SUBSCRIPT_EXPRESSION:
             break
         cur = cur.named_children[0] if cur.named_children else None
-    if cur is None or cur.type != "variable_name":
+    if cur is None or cur.type != _PHP_VARIABLE_NAME:
         return None
     return node_text(cur)
 
@@ -279,11 +334,11 @@ def _php_subscript_root(target: tree_sitter.Node) -> str | None:
 #: assertion / `satisfies` clause / parens are all the same shape.
 _PASSTHROUGH_WRAPPER_TYPES = frozenset(
     {
-        "type_assertion",  # TS: ``<Foo>x`` (angle-bracket cast, equivalent to ``as``)
-        "parenthesized_expression",
-        "as_expression",  # TS: ``x as Foo``
-        "satisfies_expression",  # TS: ``x satisfies Foo``
-        "non_null_expression",  # TS: ``x!``
+        _JS_TYPE_ASSERTION,  # TS: ``<Foo>x`` (angle-bracket cast, equivalent to ``as``)
+        _PHP_PARENTHESIZED_EXPRESSION,
+        _JS_AS_EXPRESSION,  # TS: ``x as Foo``
+        _JS_SATISFIES_EXPRESSION,  # TS: ``x satisfies Foo``
+        _JS_NON_NULL_EXPRESSION,  # TS: ``x!``
     }
 )
 
@@ -320,7 +375,7 @@ def _unwrap_passthrough_wrappers(node: tree_sitter.Node | None) -> tree_sitter.N
         named = cur.named_children
         if not named:
             return None
-        cur = named[1] if cur.type == "type_assertion" and len(named) >= 2 else named[0]
+        cur = named[1] if cur.type == _JS_TYPE_ASSERTION and len(named) >= 2 else named[0]
     return cur
 
 
@@ -347,10 +402,10 @@ def _javascript_global_namespace_root(target: tree_sitter.Node) -> str | None:
     """
     cur = _unwrap_passthrough_wrappers(target)
     while cur is not None:
-        if cur.type not in ("member_expression", "subscript_expression"):
+        if cur.type not in (_JS_MEMBER_EXPRESSION, _JS_SUBSCRIPT_EXPRESSION):
             break
         cur = _unwrap_passthrough_wrappers(cur.child_by_field_name("object"))
-    if cur is None or cur.type != "identifier":
+    if cur is None or cur.type != _JS_IDENTIFIER:
         return None
     return node_text(cur)
 
@@ -367,7 +422,7 @@ class GlobalStateRule(BaseRule):
 
     name = "global_state"
     code = "SAFE301"
-    language = ("python", "php")
+    language = (EXTRA_NAME, _PHP_EXTRA_NAME)
 
     def _violations_for_func(self, filepath: str, func: tree_sitter.Node) -> list[Violation]:
         """Return one violation per ``global`` statement inside *func* (Python)."""
@@ -431,7 +486,7 @@ class GlobalMutationRule(BaseRule):
 
     name = "global_mutation"
     code = "SAFE302"
-    language = ("python", "javascript", "typescript", "java", "go", "php", "c", "cpp")
+    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
 
     _DEFAULT_GLOBAL_NAMESPACES_JAVASCRIPT: ClassVar[list[str]] = [
         "globalThis",  # universal - works in browsers, Node, web workers
@@ -499,19 +554,19 @@ class GlobalMutationRule(BaseRule):
         for node in walk(func, skip_types=tuple(_JS_FUNCTION_TYPES)):
             if node is func:
                 continue
-            if node.type not in ("assignment_expression", "augmented_assignment_expression", "update_expression"):
+            if node.type not in (_JS_ASSIGNMENT_EXPRESSION, _JS_AUGMENTED_ASSIGNMENT_EXPRESSION, _JS_UPDATE_EXPRESSION):
                 continue
             # ``assignment_expression`` / ``augmented_assignment_expression`` use
             # the ``left`` field for the LHS; ``update_expression`` (``x++`` /
             # ``--y``) uses ``argument`` for the operand.
-            target = node.child_by_field_name("argument") if node.type == "update_expression" else node.child_by_field_name("left")
+            target = node.child_by_field_name("argument") if node.type == _JS_UPDATE_EXPRESSION else node.child_by_field_name("left")
             # Unwrap a paren-wrapped target so ``(globalThis.x) = 1``
             # and ``((process).exitCode)++`` are recognised - without
             # this the LHS-type filter would reject the
             # ``parenthesized_expression`` wrapper and skip the write
             # entirely.
             target = _unwrap_passthrough_wrappers(target)
-            if target is None or target.type not in ("member_expression", "subscript_expression"):
+            if target is None or target.type not in (_JS_MEMBER_EXPRESSION, _JS_SUBSCRIPT_EXPRESSION):
                 continue
             root = _javascript_global_namespace_root(target)
             if root is None or root not in namespaces:
@@ -570,7 +625,7 @@ class GlobalMutationRule(BaseRule):
     #: ``namespace_definition`` / ``linkage_specification`` (``extern "C"``)
     #: expose a ``declaration_list``; ``class_specifier`` / ``struct_specifier``
     #: expose a ``field_declaration_list`` whose ``static`` members are TU-scoped.
-    _CPP_SCOPE_BODY_TYPES: ClassVar[tuple[str, ...]] = ("namespace_definition", "linkage_specification", "class_specifier", "struct_specifier")
+    _CPP_SCOPE_BODY_TYPES: ClassVar[tuple[str, ...]] = (_CPP_NAMESPACE_DEFINITION, "linkage_specification", _CPP_CLASS_SPECIFIER, _CPP_STRUCT_SPECIFIER)
 
     def _cpp_scope_node(self, filepath: str, node: tree_sitter.Node) -> tuple[list[Violation], list[tree_sitter.Node]]:
         """Classify one scope node into (violations, child scopes to walk).
@@ -580,9 +635,9 @@ class GlobalMutationRule(BaseRule):
         (translation-unit-scoped) data member; the scope-introducing types in
         :data:`_CPP_SCOPE_BODY_TYPES` yield their body as a further scope.
         """
-        if node.type == "declaration":
+        if node.type == _CPP_DECLARATION:
             return self._c_declaration_violations(filepath, node), []
-        if node.type == "field_declaration":
+        if node.type == _CPP_FIELD_DECLARATION:
             return self._cpp_static_member_violations(filepath, node), []
         if node.type in self._CPP_SCOPE_BODY_TYPES:
             body = node.child_by_field_name("body")
@@ -593,7 +648,7 @@ class GlobalMutationRule(BaseRule):
     #: The *initialiser* value (``= obj.field``) and an array *size* (``arr[N]``)
     #: are separate children / fields, so unwrapping via the ``declarator`` field
     #: never reaches a member-access ``field_identifier`` inside them.
-    _CPP_FIELD_DECLARATOR_TYPES: ClassVar[tuple[str, ...]] = ("field_identifier", "pointer_declarator", "array_declarator", "reference_declarator", "function_declarator")
+    _CPP_FIELD_DECLARATOR_TYPES: ClassVar[tuple[str, ...]] = (_C_FIELD_IDENTIFIER, _CPP_POINTER_DECLARATOR, _CPP_ARRAY_DECLARATOR, _CPP_REFERENCE_DECLARATOR, _CPP_FUNCTION_DECLARATOR)
 
     def _cpp_static_member_violations(self, filepath: str, field_decl: tree_sitter.Node) -> list[Violation]:
         """Return one violation per ``static`` (non-``const``) data member, else none.
@@ -606,10 +661,10 @@ class GlobalMutationRule(BaseRule):
         member-access ``field_identifier`` inside an initialiser like
         ``static int a = obj.field;`` or an array size ``static int a[obj.n];``).
         """
-        is_static = any(c.type == "storage_class_specifier" and node_text(c) == "static" for c in field_decl.named_children)
+        is_static = any(c.type == _CPP_STORAGE_CLASS_SPECIFIER and node_text(c) == "static" for c in field_decl.named_children)
         if not is_static:
             return []
-        is_immutable = any(c.type == "type_qualifier" and node_text(c) in ("const", "constexpr") for c in field_decl.named_children)
+        is_immutable = any(c.type == _CPP_TYPE_QUALIFIER and node_text(c) in ("const", "constexpr") for c in field_decl.named_children)
         if is_immutable:
             return []
         names = [name for child in field_decl.named_children if child.type in self._CPP_FIELD_DECLARATOR_TYPES for name in (_cpp_field_declarator_name(child),) if name is not None]
@@ -640,7 +695,7 @@ class GlobalMutationRule(BaseRule):
         """
         violations: list[Violation] = []
         for node in tree.root_node.named_children:
-            if node.type == "declaration":
+            if node.type == _C_DECLARATION:
                 violations.extend(self._c_declaration_violations(filepath, node))
         return violations
 
@@ -656,8 +711,8 @@ class GlobalMutationRule(BaseRule):
         # (a C23 ``constexpr`` is likewise immutable, so this is safe for C too).
         # ``constinit`` is NOT exempt - it only fixes initialisation timing; the
         # variable remains mutable shared state afterwards.
-        decl_const = any(child.type == "type_qualifier" and node_text(child) in ("const", "constexpr") for child in decl.named_children)
-        decl_extern = any(child.type == "storage_class_specifier" and node_text(child) == "extern" for child in decl.named_children)
+        decl_const = any(child.type == _C_TYPE_QUALIFIER and node_text(child) in ("const", "constexpr") for child in decl.named_children)
+        decl_extern = any(child.type == _C_STORAGE_CLASS_SPECIFIER and node_text(child) == "extern" for child in decl.named_children)
         out: list[Violation] = []
         for child in decl.named_children:
             ident = _c_declarator_identifier(child)
@@ -688,7 +743,7 @@ class GlobalMutationRule(BaseRule):
         fn = _c_inner_function_declarator(declarator)
         if fn is not None and _c_is_function_prototype(fn):
             return True
-        if decl_extern and declarator.type != "init_declarator":
+        if decl_extern and declarator.type != _C_INIT_DECLARATOR:
             return True
         if not decl_const:
             return False
@@ -708,7 +763,7 @@ class GlobalMutationRule(BaseRule):
         """
         violations: list[Violation] = []
         for node in tree.root_node.named_children:
-            if node.type == "var_declaration":
+            if node.type == _GO_VAR_DECLARATION:
                 violations.extend(self._go_var_violations(filepath, node))
         return violations
 
@@ -725,9 +780,9 @@ class GlobalMutationRule(BaseRule):
         """
         out: list[Violation] = []
         for child in var_decl.named_children:
-            if child.type == "var_spec":
+            if child.type == _GO_VAR_SPEC:
                 out.extend(self._go_spec_violations(filepath, child))
-            elif child.type == "var_spec_list":
+            elif child.type == _GO_VAR_SPEC_LIST:
                 out.extend(self._go_spec_list_violations(filepath, child))
         return out
 
@@ -735,7 +790,7 @@ class GlobalMutationRule(BaseRule):
         """Return violations for every ``var_spec`` inside a grouped ``var ( ... )`` block."""
         out: list[Violation] = []
         for spec in spec_list.named_children:
-            if spec.type == "var_spec":
+            if spec.type == _GO_VAR_SPEC:
                 out.extend(self._go_spec_violations(filepath, spec))
         return out
 
@@ -756,7 +811,7 @@ class GlobalMutationRule(BaseRule):
                 f'Package-level var "{node_text(ident)}" is shared mutable state - scope it to its consumer, or use `const` if it never changes (Power of Ten rule 6)',
             )
             for ident in spec.named_children
-            if ident.type == "identifier" and node_text(ident) != "_"
+            if ident.type == _GO_IDENTIFIER and node_text(ident) != _GO_BLANK_IDENTIFIER
         ]
 
     def _java_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
@@ -774,7 +829,7 @@ class GlobalMutationRule(BaseRule):
         """
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "field_declaration":
+            if node.type != _JAVA_FIELD_DECLARATION:
                 continue
             modifiers = self._java_modifier_set(node)
             if "static" not in modifiers or "final" in modifiers:
@@ -792,7 +847,7 @@ class GlobalMutationRule(BaseRule):
         """
         out: list[Violation] = []
         for child in field_node.named_children:
-            if child.type != "variable_declarator":
+            if child.type != _JAVA_VARIABLE_DECLARATOR:
                 continue
             name = child.child_by_field_name("name")
             field_name = node_text(name) if name is not None else "<field>"
@@ -815,7 +870,7 @@ class GlobalMutationRule(BaseRule):
         keyword tokens.
         """
         for child in field_node.named_children:
-            if child.type == "modifiers":
+            if child.type == _JAVA_MODIFIERS:
                 return {node_text(kw) for kw in child.children if not kw.is_named}
         return set()
 
@@ -837,7 +892,7 @@ class GlobalMutationRule(BaseRule):
         results: list[tuple[tree_sitter.Node, str]] = []
         for node in walk(func_node, skip_types=_PHP_NESTED_SCOPE_TYPES):
             target = _php_assignment_target(node)
-            if target is not None and target.type == "variable_name" and node_text(target) in global_names:
+            if target is not None and target.type == _PHP_VARIABLE_NAME and node_text(target) in global_names:
                 results.append((node, node_text(target)))
         return results
 
@@ -881,7 +936,7 @@ class GlobalMutationRule(BaseRule):
         out: list[Violation] = []
         for node in walk(tree.root_node):
             target = _php_assignment_target(node)
-            if target is None or target.type != "subscript_expression":
+            if target is None or target.type != _PHP_SUBSCRIPT_EXPRESSION:
                 continue
             if _php_subscript_root(target) != "$GLOBALS":
                 continue
@@ -949,14 +1004,14 @@ class WideScopeDeclarationRule(BaseRule):
     ``let`` / ``const`` distinction, so Python users get nothing from
     this rule. ``var`` is still legal in TypeScript and carries the
     same function-scoped-and-hoisted hazard there, so the rule
-    registers ``language = ("javascript", "typescript")`` and the
+    registers ``language = (_JS_EXTRA_NAME, _TS_EXTRA_NAME)`` and the
     engine's per-language dispatch correctly skips it on ``.py`` /
     ``.pyw`` files.
     """
 
     name = "wide_scope_declaration"
     code = "SAFE305"
-    language = ("javascript", "typescript")
+    language = (_JS_EXTRA_NAME, _TS_EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every ``var`` declaration in the file."""

@@ -32,29 +32,47 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
 from safelint.languages.c import CALL_EXPRESSION as _C_CALL_EXPRESSION
+from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.cpp import CALL_EXPRESSION as _CPP_CALL_EXPRESSION
+from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
 from safelint.languages.cpp import FIELD_EXPRESSION as _CPP_FIELD_EXPRESSION
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
+from safelint.languages.cpp import QUALIFIED_IDENTIFIER as _CPP_QUALIFIED_IDENTIFIER
 from safelint.languages.go import CALL_EXPRESSION as _GO_CALL_EXPRESSION
+from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
+from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
+from safelint.languages.go import METHOD_DECLARATION as _GO_METHOD_DECLARATION
+from safelint.languages.go import PARAMETER_DECLARATION as _GO_PARAMETER_DECLARATION
+from safelint.languages.go import SELECTOR_EXPRESSION as _GO_SELECTOR_EXPRESSION
+from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.java import METHOD_INVOCATION as _JAVA_METHOD_INVOCATION
+from safelint.languages.java import THIS as _JAVA_THIS
 from safelint.languages.javascript import CALL_EXPRESSION as _JS_CALL_EXPRESSION
+from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.javascript import MEMBER_EXPRESSION as _JS_MEMBER_EXPRESSION
 from safelint.languages.javascript import OBJECT as _JS_OBJECT
+from safelint.languages.php import ARGUMENT as _PHP_ARGUMENT
+from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
 from safelint.languages.php import FUNCTION_CALL_EXPRESSION as _PHP_FUNCTION_CALL_EXPRESSION
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.php import MEMBER_CALL_EXPRESSION as _PHP_MEMBER_CALL_EXPRESSION
+from safelint.languages.php import NAME as _PHP_NAME
 from safelint.languages.php import NULLSAFE_MEMBER_CALL_EXPRESSION as _PHP_NULLSAFE_MEMBER_CALL_EXPRESSION
+from safelint.languages.php import RELATIVE_SCOPE as _PHP_RELATIVE_SCOPE
 from safelint.languages.php import SCOPED_CALL_EXPRESSION as _PHP_SCOPED_CALL_EXPRESSION
-from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
+from safelint.languages.python import ASYNC_FUNCTION_DEF, ATTRIBUTE, CALL, EXTRA_NAME, FUNCTION_DEF, IDENTIFIER
 from safelint.languages.rust import CALL_EXPRESSION as _RUST_CALL_EXPRESSION
+from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
 from safelint.languages.rust import FIELD_EXPRESSION as _RUST_FIELD_EXPRESSION
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.languages.typescript import CALL_EXPRESSION as _TS_CALL_EXPRESSION
+from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.languages.typescript import MEMBER_EXPRESSION as _TS_MEMBER_EXPRESSION
+from safelint.languages.typescript import OBJECT as _TS_OBJECT
 from safelint.rules.base import BaseRule, Suggestion
 
 
@@ -94,7 +112,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 #: an instance is not a self-recursive *function* call in the sense rule 1
 #: cares about.
 _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({"call"}),
+    "python": frozenset({CALL}),
     "javascript": frozenset({_JS_CALL_EXPRESSION}),
     "typescript": frozenset({_TS_CALL_EXPRESSION}),
     "rust": frozenset({_RUST_CALL_EXPRESSION}),
@@ -110,10 +128,10 @@ _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 #: ``other.foo()`` is not, even though it shares the bareword name.
 _SELF_RECEIVERS: dict[str, frozenset[str]] = {
     "python": frozenset({"self", "cls"}),
-    "javascript": frozenset({"this"}),
-    "typescript": frozenset({"this"}),
+    "javascript": frozenset({_JAVA_THIS}),
+    "typescript": frozenset({_JAVA_THIS}),
     "rust": frozenset({"self"}),
-    "cpp": frozenset({"this"}),
+    "cpp": frozenset({_JAVA_THIS}),
 }
 
 #: Member-access node shape per language: ``(node_type, object_field,
@@ -121,12 +139,12 @@ _SELF_RECEIVERS: dict[str, frozenset[str]] = {
 #: because its ``method_invocation`` carries the receiver and method name
 #: as fields on the call node itself, not via a nested member-access node.
 _MEMBER_ACCESS: dict[str, tuple[str, str, str]] = {
-    "python": ("attribute", "object", "attribute"),
+    "python": (ATTRIBUTE, _JS_OBJECT, ATTRIBUTE),
     "javascript": (_JS_MEMBER_EXPRESSION, _JS_OBJECT, "property"),
-    "typescript": (_TS_MEMBER_EXPRESSION, "object", "property"),
+    "typescript": (_TS_MEMBER_EXPRESSION, _TS_OBJECT, "property"),
     "rust": (_RUST_FIELD_EXPRESSION, "value", "field"),
     # C++ ``this->m()``: field_expression with ``argument`` = this, ``field`` = m.
-    "cpp": (_CPP_FIELD_EXPRESSION, "argument", "field"),
+    "cpp": (_CPP_FIELD_EXPRESSION, _PHP_ARGUMENT, "field"),
 }
 
 
@@ -153,9 +171,9 @@ def _call_targets_self(call_node: tree_sitter.Node, func_name: str, lang: str) -
     callee = call_node.child_by_field_name("function")
     if callee is None:
         return False
-    if callee.type == "identifier":
+    if callee.type == IDENTIFIER:
         return node_text(callee) == func_name
-    if lang == "cpp" and callee.type == "qualified_identifier":
+    if lang == _CPP_EXTRA_NAME and callee.type == _CPP_QUALIFIED_IDENTIFIER:
         # C++ ``ns::f()`` / ``S::m()`` self-call - the trailing ``name`` is the
         # bareword; a match against the enclosing function name is a self-call
         # (the same name-based heuristic as the bare-identifier case).
@@ -175,7 +193,7 @@ def _java_call_targets_self(call_node: tree_sitter.Node, func_name: str) -> bool
     if name is None or node_text(name) != func_name:
         return False
     obj = call_node.child_by_field_name("object")
-    return obj is None or obj.type == "this"
+    return obj is None or obj.type == _JAVA_THIS
 
 
 def _go_receiver_name(func: tree_sitter.Node) -> str | None:
@@ -188,15 +206,15 @@ def _go_receiver_name(func: tree_sitter.Node) -> str | None:
     receiver (``func (*Svc) Walk()`` - the receiver can't be referenced,
     so a receiver-qualified self-call is impossible).
     """
-    if func.type != "method_declaration":
+    if func.type != _GO_METHOD_DECLARATION:
         return None
     receiver = func.child_by_field_name("receiver")
     if receiver is None:  # pragma: no cover - defensive: method_declaration always has a receiver
         return None
     for decl in receiver.named_children:
-        if decl.type != "parameter_declaration":  # pragma: no cover - defensive: receiver list holds only a parameter_declaration
+        if decl.type != _GO_PARAMETER_DECLARATION:  # pragma: no cover - defensive: receiver list holds only a parameter_declaration
             continue
-        ident = next((child for child in decl.named_children if child.type == "identifier"), None)
+        ident = next((child for child in decl.named_children if child.type == _GO_IDENTIFIER), None)
         if ident is not None:
             return node_text(ident)
     return None
@@ -218,9 +236,9 @@ def _go_call_targets_self(call_node: tree_sitter.Node, func_name: str, receiver_
     callee = call_node.child_by_field_name("function")
     if callee is None:  # pragma: no cover - defensive: call_expression always has a function field
         return False
-    if callee.type == "identifier":
+    if callee.type == _GO_IDENTIFIER:
         return not is_method and node_text(callee) == func_name
-    if callee.type == "selector_expression":
+    if callee.type == _GO_SELECTOR_EXPRESSION:
         if receiver_name is None:
             return False
         operand = callee.child_by_field_name("operand")
@@ -245,11 +263,11 @@ def _php_call_targets_self(call_node: tree_sitter.Node, func_name: str, *, is_me
     to the enclosing method, so a method recurses only through
     ``$this->`` / ``self::`` / ``static::``.
     """
-    if call_node.type == "function_call_expression":
+    if call_node.type == _PHP_FUNCTION_CALL_EXPRESSION:
         if is_method:
             return False
         callee = call_node.child_by_field_name("function")
-        return callee is not None and callee.type == "name" and node_text(callee) == func_name
+        return callee is not None and callee.type == _PHP_NAME and node_text(callee) == func_name
     return _php_qualified_self_call(call_node, func_name)
 
 
@@ -258,14 +276,14 @@ def _php_qualified_self_call(call_node: tree_sitter.Node, func_name: str) -> boo
     name = call_node.child_by_field_name("name")
     if name is None or node_text(name) != func_name:
         return False
-    if call_node.type in ("member_call_expression", "nullsafe_member_call_expression"):
+    if call_node.type in (_PHP_MEMBER_CALL_EXPRESSION, _PHP_NULLSAFE_MEMBER_CALL_EXPRESSION):
         # ``$this->foo()`` and ``$this?->foo()`` both recurse - ``$this`` is
         # never null, so the nullsafe form still calls (and recurses into) foo.
         obj = call_node.child_by_field_name("object")
         return obj is not None and node_text(obj) == "$this"
     # scoped_call_expression: ``self::`` / ``static::`` recursion only.
     scope = call_node.child_by_field_name("scope")
-    return scope is not None and scope.type == "relative_scope" and node_text(scope) in ("self", "static")
+    return scope is not None and scope.type == _PHP_RELATIVE_SCOPE and node_text(scope) in ("self", "static")
 
 
 def _targets_self(call_node: tree_sitter.Node, func_name: str, lang: str, receiver_name: str | None, *, is_method: bool) -> bool:
@@ -289,7 +307,7 @@ def _call_is_bare(call_node: tree_sitter.Node, lang: str) -> bool:
     if lang == "java":
         return call_node.child_by_field_name("object") is None
     callee = call_node.child_by_field_name("function")
-    return callee is not None and callee.type == "identifier"
+    return callee is not None and callee.type == IDENTIFIER
 
 
 def _directly_nested_function_names(func: tree_sitter.Node, func_types: frozenset[str]) -> set[str]:
@@ -316,7 +334,7 @@ class NoRecursionRule(BaseRule):
 
     name = "no_recursion"
     code = "SAFE105"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
+    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every function whose body directly calls itself."""
@@ -355,8 +373,8 @@ class NoRecursionRule(BaseRule):
         # ``is_method`` flag suppresses bare-call self-recursion for methods
         # (a bare ``foo()`` denotes a package-level / global function, not the
         # method). Only Go carries a user-named receiver to resolve.
-        is_method = func.type == "method_declaration" and lang in ("go", "php")
-        receiver_name = _go_receiver_name(func) if (is_method and lang == "go") else None
+        is_method = func.type == _GO_METHOD_DECLARATION and lang in (_GO_EXTRA_NAME, _PHP_EXTRA_NAME)
+        receiver_name = _go_receiver_name(func) if (is_method and lang == _GO_EXTRA_NAME) else None
         shadowed = func_name in _directly_nested_function_names(func, func_types)
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(func_types)):
