@@ -17,6 +17,7 @@ from safelint.languages.c import CONDITION_CLAUSE as _C_CONDITION_CLAUSE
 from safelint.languages.c import DO_STATEMENT as _C_DO_STATEMENT
 from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
 from safelint.languages.c import FOR_STATEMENT as _C_FOR_STATEMENT
+from safelint.languages.c import FUNCTION_DEFINITION as _C_FUNCTION_DEFINITION
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.c import GOTO_STATEMENT as _C_GOTO_STATEMENT
 from safelint.languages.c import IDENTIFIER as _C_IDENTIFIER
@@ -42,26 +43,33 @@ from safelint.languages.go import LABEL_NAME as _GO_LABEL_NAME
 from safelint.languages.go import SELECT_STATEMENT as _GO_SELECT_STATEMENT
 from safelint.languages.go import TYPE_SWITCH_STATEMENT as _GO_TYPE_SWITCH_STATEMENT
 from safelint.languages.java import BREAK_STATEMENT as _JAVA_BREAK_STATEMENT
+from safelint.languages.java import DO_STATEMENT as _JAVA_DO_STATEMENT
 from safelint.languages.java import ENHANCED_FOR_STATEMENT as _JAVA_ENHANCED_FOR_STATEMENT
 from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
+from safelint.languages.java import FOR_STATEMENT as _JAVA_FOR_STATEMENT
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.java import IDENTIFIER as _JAVA_IDENTIFIER
 from safelint.languages.java import SWITCH_EXPRESSION as _JAVA_SWITCH_EXPRESSION
 from safelint.languages.java import TRUE as _JAVA_TRUE
 from safelint.languages.java import WHILE_STATEMENT as _JAVA_WHILE_STATEMENT
 from safelint.languages.javascript import BREAK_STATEMENT as _JS_BREAK_STATEMENT
+from safelint.languages.javascript import DO_STATEMENT as _JS_DO_STATEMENT
 from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
 from safelint.languages.javascript import FOR_IN_STATEMENT as _JS_FOR_IN_STATEMENT
+from safelint.languages.javascript import FOR_STATEMENT as _JS_FOR_STATEMENT
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.javascript import SWITCH_STATEMENT as _JS_SWITCH_STATEMENT
 from safelint.languages.javascript import TRUE as _JS_TRUE
 from safelint.languages.javascript import WHILE_STATEMENT as _JS_WHILE_STATEMENT
 from safelint.languages.php import BOOLEAN as _PHP_BOOLEAN
 from safelint.languages.php import BREAK_STATEMENT as _PHP_BREAK_STATEMENT
+from safelint.languages.php import DO_STATEMENT as _PHP_DO_STATEMENT
 from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
 from safelint.languages.php import FOR_STATEMENT as _PHP_FOR_STATEMENT
 from safelint.languages.php import FOREACH_STATEMENT as _PHP_FOREACH_STATEMENT
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.php import INTEGER as _PHP_INTEGER
+from safelint.languages.php import SWITCH_STATEMENT as _PHP_SWITCH_STATEMENT
 from safelint.languages.php import WHILE_STATEMENT as _PHP_WHILE_STATEMENT
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
@@ -196,19 +204,19 @@ _BREAK_LABEL_TYPE_BY_LANG: dict[str, str | None] = {
 # a nested loop or function definition (those breaks belong to the
 # inner construct, not the outer ``while`` we're checking).
 _JS_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
-    FOR_STATEMENT,
+    _JS_FOR_STATEMENT,
     _JS_FOR_IN_STATEMENT,  # also covers ``for...of``
-    WHILE_STATEMENT,
-    _C_DO_STATEMENT,
+    _JS_WHILE_STATEMENT,
+    _JS_DO_STATEMENT,
     # Switch arms also stop ``break`` propagation.
-    _C_SWITCH_STATEMENT,
+    _JS_SWITCH_STATEMENT,
     *sorted(_JS_FUNCTION_TYPES),
 )
 _JAVA_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
-    FOR_STATEMENT,
+    _JAVA_FOR_STATEMENT,
     _JAVA_ENHANCED_FOR_STATEMENT,
-    WHILE_STATEMENT,
-    _C_DO_STATEMENT,
+    _JAVA_WHILE_STATEMENT,
+    _JAVA_DO_STATEMENT,
     # Switch arms stop ``break`` propagation (Java's classic colon-form
     # switch uses ``break`` to exit a case; the modern arrow-form
     # ``case X -> stmt`` does not).
@@ -230,7 +238,7 @@ _RUST_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
 # (not the enclosing loop) - so the two switch forms and ``select`` are
 # boundaries too, the same way Java's ``switch_expression`` is.
 _GO_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
-    FOR_STATEMENT,
+    _GO_FOR_STATEMENT,
     _GO_EXPRESSION_SWITCH_STATEMENT,
     _GO_TYPE_SWITCH_STATEMENT,
     _GO_SELECT_STATEMENT,
@@ -240,11 +248,11 @@ _GO_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
 # loop. ``function_definition`` bounds the scope too. C has no labelled break -
 # ``goto`` is the multi-level escape, handled separately as a loop exit.
 _C_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
-    FOR_STATEMENT,
-    WHILE_STATEMENT,
+    _C_FOR_STATEMENT,
+    _C_WHILE_STATEMENT,
     _C_DO_STATEMENT,
     _C_SWITCH_STATEMENT,
-    FUNCTION_DEF,
+    _C_FUNCTION_DEFINITION,
 )
 # C++ adds ``lambda_expression`` to C's boundary set: a ``break`` inside a
 # lambda body exits that lambda, not an enclosing loop.
@@ -304,11 +312,11 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # is excluded - it has no ``break`` statement.
 _PHP_LOOP_SWITCH_TYPES: frozenset[str] = frozenset(
     {
-        FOR_STATEMENT,
+        _PHP_FOR_STATEMENT,
         _PHP_FOREACH_STATEMENT,
-        WHILE_STATEMENT,
-        _C_DO_STATEMENT,
-        _C_SWITCH_STATEMENT,
+        _PHP_WHILE_STATEMENT,
+        _PHP_DO_STATEMENT,
+        _PHP_SWITCH_STATEMENT,
     }
 )
 

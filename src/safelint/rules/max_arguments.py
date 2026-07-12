@@ -32,20 +32,33 @@ from safelint.languages.javascript import ARRAY_PATTERN as _JS_ARRAY_PATTERN
 from safelint.languages.javascript import ASSIGNMENT_PATTERN as _JS_ASSIGNMENT_PATTERN
 from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.javascript import IDENTIFIER as _JS_IDENTIFIER
 from safelint.languages.javascript import OBJECT_PATTERN as _JS_OBJECT_PATTERN
-from safelint.languages.javascript import OPTIONAL_PARAMETER as _JS_OPTIONAL_PARAMETER
-from safelint.languages.javascript import REQUIRED_PARAMETER as _JS_REQUIRED_PARAMETER
-from safelint.languages.javascript import REST_PARAMETER as _JS_REST_PARAMETER
 from safelint.languages.javascript import REST_PATTERN as _JS_REST_PATTERN
 from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.php import PROPERTY_PROMOTION_PARAMETER as _PHP_PROPERTY_PROMOTION_PARAMETER
 from safelint.languages.php import SIMPLE_PARAMETER as _PHP_SIMPLE_PARAMETER
-from safelint.languages.python import ASYNC_FUNCTION_DEF, DICTIONARY_SPLAT_PATTERN, EXTRA_NAME, FUNCTION_DEF, IDENTIFIER, LIST_SPLAT_PATTERN
+from safelint.languages.php import VARIADIC_PARAMETER as _PHP_VARIADIC_PARAMETER
+from safelint.languages.python import (
+    ASYNC_FUNCTION_DEF,
+    DEFAULT_PARAMETER,
+    DICTIONARY_SPLAT_PATTERN,
+    EXTRA_NAME,
+    FUNCTION_DEF,
+    IDENTIFIER,
+    LIST_SPLAT_PATTERN,
+    TYPED_DEFAULT_PARAMETER,
+    TYPED_PARAMETER,
+)
 from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
+from safelint.languages.rust import IDENTIFIER as _RUST_IDENTIFIER
 from safelint.languages.rust import PARAMETER as _RUST_PARAMETER
 from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
+from safelint.languages.typescript import OPTIONAL_PARAMETER as _TS_OPTIONAL_PARAMETER
+from safelint.languages.typescript import REQUIRED_PARAMETER as _TS_REQUIRED_PARAMETER
+from safelint.languages.typescript import REST_PARAMETER as _TS_REST_PARAMETER
 from safelint.rules.base import BaseRule
 
 
@@ -72,9 +85,9 @@ _PY_SPLAT_PARAM_TYPES = frozenset({LIST_SPLAT_PATTERN, DICTIONARY_SPLAT_PATTERN}
 _PY_COUNTED_PARAM_TYPES = frozenset(
     {
         IDENTIFIER,
-        "typed_parameter",
-        "default_parameter",
-        "typed_default_parameter",
+        TYPED_PARAMETER,
+        DEFAULT_PARAMETER,
+        TYPED_DEFAULT_PARAMETER,
     }
     | _PY_SPLAT_PARAM_TYPES
 )
@@ -86,7 +99,7 @@ _PY_COUNTED_PARAM_TYPES = frozenset(
 # the whole *point* of using a config object, so the count stays low).
 _JS_COUNTED_PARAM_TYPES = frozenset(
     {
-        IDENTIFIER,
+        _JS_IDENTIFIER,
         _JS_ASSIGNMENT_PATTERN,
         _JS_REST_PATTERN,
         _JS_OBJECT_PATTERN,
@@ -104,9 +117,9 @@ _JS_COUNTED_PARAM_TYPES = frozenset(
 # additional handling.
 _TS_COUNTED_PARAM_TYPES = frozenset(
     {
-        _JS_REQUIRED_PARAMETER,
-        _JS_OPTIONAL_PARAMETER,
-        _JS_REST_PARAMETER,
+        _TS_REQUIRED_PARAMETER,
+        _TS_OPTIONAL_PARAMETER,
+        _TS_REST_PARAMETER,
     }
 )
 
@@ -138,7 +151,7 @@ _JAVA_COUNTED_PARAM_TYPES = frozenset(
 _RUST_COUNTED_PARAM_TYPES = frozenset(
     {
         _RUST_PARAMETER,
-        IDENTIFIER,
+        _RUST_IDENTIFIER,
     }
 )
 
@@ -152,7 +165,7 @@ _RUST_COUNTED_PARAM_TYPES = frozenset(
 _PHP_COUNTED_PARAM_TYPES = frozenset(
     {
         _PHP_SIMPLE_PARAMETER,
-        _C_VARIADIC_PARAMETER,
+        _PHP_VARIADIC_PARAMETER,
         _PHP_PROPERTY_PROMOTION_PARAMETER,
     }
 )

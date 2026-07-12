@@ -116,6 +116,8 @@ FIELD_DECLARATION = "field_declaration"  # class/struct member declaration (SAFE
 PARAMETER_LIST = "parameter_list"
 PARAMETER_DECLARATION = "parameter_declaration"
 OPTIONAL_PARAMETER_DECLARATION = "optional_parameter_declaration"
+FOR_RANGE_LOOP = "for_range_loop"
+LINKAGE_SPECIFICATION = "linkage_specification"
 
 # Declarators (SAFE313 restricted pointers).
 POINTER_DECLARATOR = "pointer_declarator"
@@ -163,3 +165,15 @@ IDENTIFIER = "identifier"
 # Misc.
 TRANSLATION_UNIT = "translation_unit"  # the root node
 COMMENT = "comment"
+# added for node-constant refactor
+EMPTY_STATEMENT = "empty_statement"
+NUMBER_LITERAL = "number_literal"
+TRUE = "true"
+FALSE = "false"
+NULL = "null"
+CHAR_LITERAL = "char_literal"
+# added for node-constant refactor
+THIS = "this"
+ARGUMENT = "argument"
+# added for node-constant refactor
+FIELD_IDENTIFIER = "field_identifier"

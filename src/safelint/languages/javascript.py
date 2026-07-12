@@ -198,3 +198,11 @@ PAIR = "pair"  # ``key: value`` entry inside an object literal
 # When present, the chained access is null-safe by construction - null_dereference
 # (SAFE803) should NOT fire.
 OPTIONAL_CHAIN = "optional_chain"
+# added for node-constant refactor
+AMP_AMP = "&&"
+PIPE_PIPE = "||"
+QQ = "??"
+# added for node-constant refactor
+EMPTY_STATEMENT = "empty_statement"
+# added for node-constant refactor
+THIS = "this"

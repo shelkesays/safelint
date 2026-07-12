@@ -74,11 +74,15 @@ from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     ATTRIBUTE,
     CALL,
+    DEFAULT_PARAMETER,
     DICTIONARY_SPLAT_PATTERN,
     EXPRESSION_STATEMENT,
     FUNCTION_DEF,
+    IDENTIFIER,
     LIST_SPLAT_PATTERN,
     SUBSCRIPT,
+    TYPED_DEFAULT_PARAMETER,
+    TYPED_PARAMETER,
 )
 from safelint.languages.rust import CALL_EXPRESSION as _RUST_CALL_EXPRESSION
 from safelint.languages.rust import CAPTURED_PATTERN as _RUST_CAPTURED_PATTERN
@@ -98,6 +102,9 @@ from safelint.languages.rust import STRUCT_PATTERN as _RUST_STRUCT_PATTERN
 from safelint.languages.rust import TRY_EXPRESSION as _RUST_TRY_EXPRESSION
 from safelint.languages.rust import TUPLE_PATTERN as _RUST_TUPLE_PATTERN
 from safelint.languages.rust import TUPLE_STRUCT_PATTERN as _RUST_TUPLE_STRUCT_PATTERN
+from safelint.languages.typescript import OPTIONAL_PARAMETER as _TS_OPTIONAL_PARAMETER
+from safelint.languages.typescript import REQUIRED_PARAMETER as _TS_REQUIRED_PARAMETER
+from safelint.languages.typescript import REST_PARAMETER as _TS_REST_PARAMETER
 from safelint.rules.base import BaseRule
 
 
@@ -353,10 +360,10 @@ def _peel_java_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | 
 # safelint.rules.max_arguments to avoid drift.
 _PY_PARAM_TYPES = frozenset(
     {
-        "identifier",
-        "typed_parameter",
-        "default_parameter",
-        "typed_default_parameter",
+        IDENTIFIER,
+        TYPED_PARAMETER,
+        DEFAULT_PARAMETER,
+        TYPED_DEFAULT_PARAMETER,
         LIST_SPLAT_PATTERN,
         DICTIONARY_SPLAT_PATTERN,
     }
@@ -389,12 +396,12 @@ _JS_PARAM_TYPES = frozenset(
         _JS_REST_PARAMETER,
     }
 )
-_TS_PARAM_WRAPPER_TYPES = frozenset({_JS_REQUIRED_PARAMETER, _JS_OPTIONAL_PARAMETER, _JS_REST_PARAMETER})
+_TS_PARAM_WRAPPER_TYPES = frozenset({_TS_REQUIRED_PARAMETER, _TS_OPTIONAL_PARAMETER, _TS_REST_PARAMETER})
 
 
 def _python_param_node_name(child: tree_sitter.Node) -> str:
     """Return the bare identifier name carried by a Python parameter node, or ``""``."""
-    if child.type == "identifier":
+    if child.type == IDENTIFIER:
         return node_text(child)
     if child.type in (LIST_SPLAT_PATTERN, DICTIONARY_SPLAT_PATTERN):
         # Splat parameters always have an identifier child in valid Python;
@@ -756,7 +763,7 @@ class TaintedSinkRule(BaseRule):
         "popen",
         "Popen",
         "run",
-        "call",
+        CALL,
         "check_output",
         "execute",
     ]
@@ -1119,7 +1126,7 @@ class ReturnValueIgnoredRule(BaseRule):
 
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
-        "call",
+        CALL,
         "check_output",
         "write",
         "send",
