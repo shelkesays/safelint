@@ -13,7 +13,6 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.c import BREAK_STATEMENT as _C_BREAK_STATEMENT
-from safelint.languages.c import CONDITION_CLAUSE as _C_CONDITION_CLAUSE
 from safelint.languages.c import DO_STATEMENT as _C_DO_STATEMENT
 from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
 from safelint.languages.c import FOR_STATEMENT as _C_FOR_STATEMENT
@@ -28,10 +27,12 @@ from safelint.languages.c import SWITCH_STATEMENT as _C_SWITCH_STATEMENT
 from safelint.languages.c import TRUE as _C_TRUE
 from safelint.languages.c import WHILE_STATEMENT as _C_WHILE_STATEMENT
 from safelint.languages.cpp import BREAK_STATEMENT as _CPP_BREAK_STATEMENT
+from safelint.languages.cpp import CONDITION_CLAUSE as _CPP_CONDITION_CLAUSE
 from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
 from safelint.languages.cpp import FOR_STATEMENT as _CPP_FOR_STATEMENT
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.cpp import LAMBDA_EXPRESSION as _CPP_LAMBDA_EXPRESSION
+from safelint.languages.cpp import NUMBER_LITERAL as _CPP_NUMBER_LITERAL
 from safelint.languages.cpp import WHILE_STATEMENT as _CPP_WHILE_STATEMENT
 from safelint.languages.go import BREAK_STATEMENT as _GO_BREAK_STATEMENT
 from safelint.languages.go import COMMENT as _GO_COMMENT
@@ -181,7 +182,7 @@ _TRUE_LITERAL_BY_LANG: dict[str, str] = {
     # identifier. ``_is_literal_true`` special-cases C to handle both.
     "c": _C_NUMBER_LITERAL,
     # C++: unused directly (``_is_c_literal_true`` handles both ``1`` and ``true``).
-    "cpp": _C_NUMBER_LITERAL,
+    "cpp": _CPP_NUMBER_LITERAL,
 }
 
 # Per-language: the node type used by a labelled-break's argument.
@@ -700,7 +701,7 @@ class UnboundedLoopRule(BaseRule):
         # ``while (true)`` check would silently skip. C++ wraps the condition
         # in a ``condition_clause`` instead (it can hold a declaration), whose
         # inner expression is likewise the first named child - unwrap it too.
-        while condition.type in (_C_PARENTHESIZED_EXPRESSION, _C_CONDITION_CLAUSE):
+        while condition.type in (_C_PARENTHESIZED_EXPRESSION, _CPP_CONDITION_CLAUSE):
             if not condition.named_children:
                 break
             condition = condition.named_children[0]
