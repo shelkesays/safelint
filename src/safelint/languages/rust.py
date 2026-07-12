@@ -176,6 +176,7 @@ RANGE_EXPRESSION = "range_expression"  # ``a..b``
 TUPLE_EXPRESSION = "tuple_expression"
 ARRAY_EXPRESSION = "array_expression"
 STRUCT_EXPRESSION = "struct_expression"  # ``Point { x, y }``
+AWAIT_EXPRESSION = "await_expression"  # ``fut.await``
 CLOSURE_PARAMETERS = "closure_parameters"  # ``|x, y|`` in ``|x, y| body``
 
 # Parameters.
@@ -190,6 +191,32 @@ TYPE_IDENTIFIER = "type_identifier"
 FIELD_IDENTIFIER = "field_identifier"
 SCOPED_IDENTIFIER = "scoped_identifier"  # ``std::fs::read``
 SCOPED_TYPE_IDENTIFIER = "scoped_type_identifier"
+SHORTHAND_FIELD_IDENTIFIER = "shorthand_field_identifier"  # ``Point { x }``
+
+# Patterns.
+MUT_PATTERN = "mut_pattern"  # ``mut x`` binding
+REF_PATTERN = "ref_pattern"  # ``ref x`` binding
+TUPLE_PATTERN = "tuple_pattern"  # ``(a, b)``
+TUPLE_STRUCT_PATTERN = "tuple_struct_pattern"  # ``Some(x)`` / ``Point(x, y)``
+STRUCT_PATTERN = "struct_pattern"  # ``Point { x, y }``
+CAPTURED_PATTERN = "captured_pattern"  # ``name @ sub_pattern``
+FIELD_PATTERN = "field_pattern"  # ``field: pattern`` inside a struct pattern
+
+# Operator tokens (the ``operator`` field of a ``binary_expression``).
+PLUS = "+"
+MINUS = "-"
+STAR = "*"
+
+# Comments.
+LINE_COMMENT = "line_comment"  # ``// ...``
+BLOCK_COMMENT = "block_comment"  # ``/* ... */``
+
+# Misc node types.
+GENERIC_FUNCTION = "generic_function"  # ``foo::<T>()`` turbofish call
+LET_CONDITION = "let_condition"  # the ``let`` condition in ``if let Some(x) = opt``
+MUTABLE_SPECIFIER = "mutable_specifier"  # the ``mut`` token in ``let mut`` / ``&mut``
+TYPE_CAST_EXPRESSION = "type_cast_expression"  # ``x as u32``
+UNIT_EXPRESSION = "unit_expression"  # ``()``
 
 # Types.
 PRIMITIVE_TYPE = "primitive_type"  # ``i32`` / ``u64`` / ``f64`` / ``bool`` etc.

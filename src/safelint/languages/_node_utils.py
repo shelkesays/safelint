@@ -8,6 +8,71 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.languages.cpp import (
+    FUNCTION_DECLARATOR as _CPP_FUNCTION_DECLARATOR,
+)
+from safelint.languages.cpp import (
+    IDENTIFIER as _CPP_IDENTIFIER,
+)
+from safelint.languages.cpp import (
+    QUALIFIED_IDENTIFIER as _CPP_QUALIFIED_IDENTIFIER,
+)
+from safelint.languages.go import SELECTOR_EXPRESSION as _GO_SELECTOR_EXPRESSION
+from safelint.languages.java import (
+    GENERIC_TYPE as _JAVA_GENERIC_TYPE,
+)
+from safelint.languages.java import (
+    IDENTIFIER as _JAVA_IDENTIFIER,
+)
+from safelint.languages.java import (
+    METHOD_INVOCATION as _JAVA_METHOD_INVOCATION,
+)
+from safelint.languages.java import (
+    OBJECT_CREATION_EXPRESSION as _JAVA_OBJECT_CREATION_EXPRESSION,
+)
+from safelint.languages.java import (
+    SCOPED_TYPE_IDENTIFIER as _JAVA_SCOPED_TYPE_IDENTIFIER,
+)
+from safelint.languages.java import (
+    TYPE_IDENTIFIER as _JAVA_TYPE_IDENTIFIER,
+)
+from safelint.languages.javascript import (
+    CALL_EXPRESSION as _JS_CALL_EXPRESSION,
+)
+from safelint.languages.javascript import (
+    IDENTIFIER as _JS_IDENTIFIER,
+)
+from safelint.languages.javascript import (
+    MEMBER_EXPRESSION as _JS_MEMBER_EXPRESSION,
+)
+from safelint.languages.javascript import (
+    NEW_EXPRESSION as _JS_NEW_EXPRESSION,
+)
+from safelint.languages.php import (
+    FUNCTION_CALL_EXPRESSION as _PHP_FUNCTION_CALL_EXPRESSION,
+)
+from safelint.languages.php import (
+    MEMBER_CALL_EXPRESSION as _PHP_MEMBER_CALL_EXPRESSION,
+)
+from safelint.languages.php import (
+    NAME as _PHP_NAME,
+)
+from safelint.languages.php import (
+    NULLSAFE_MEMBER_CALL_EXPRESSION as _PHP_NULLSAFE_MEMBER_CALL_EXPRESSION,
+)
+from safelint.languages.php import (
+    QUALIFIED_NAME as _PHP_QUALIFIED_NAME,
+)
+from safelint.languages.php import (
+    SCOPED_CALL_EXPRESSION as _PHP_SCOPED_CALL_EXPRESSION,
+)
+from safelint.languages.rust import (
+    FIELD_EXPRESSION as _RUST_FIELD_EXPRESSION,
+)
+from safelint.languages.rust import (
+    SCOPED_IDENTIFIER as _RUST_SCOPED_IDENTIFIER,
+)
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Iterable, Iterator
@@ -125,14 +190,14 @@ def node_text(node: tree_sitter.Node) -> str:
 CALL_TYPES: frozenset[str] = frozenset(
     {
         "call",
-        "call_expression",
-        "new_expression",
-        "method_invocation",
-        "object_creation_expression",
-        "function_call_expression",
-        "member_call_expression",
-        "nullsafe_member_call_expression",
-        "scoped_call_expression",
+        _JS_CALL_EXPRESSION,
+        _JS_NEW_EXPRESSION,
+        _JAVA_METHOD_INVOCATION,
+        _JAVA_OBJECT_CREATION_EXPRESSION,
+        _PHP_FUNCTION_CALL_EXPRESSION,
+        _PHP_MEMBER_CALL_EXPRESSION,
+        _PHP_NULLSAFE_MEMBER_CALL_EXPRESSION,
+        _PHP_SCOPED_CALL_EXPRESSION,
     }
 )
 
@@ -158,7 +223,7 @@ def resolve_lang_name(filepath: str) -> str:
 def _java_method_invocation_name(call_node: tree_sitter.Node) -> str | None:
     """Return the bare method name from a Java ``method_invocation`` node."""
     name_node = call_node.child_by_field_name("name")
-    return node_text(name_node) if name_node and name_node.type == "identifier" else None
+    return node_text(name_node) if name_node and name_node.type == _JAVA_IDENTIFIER else None
 
 
 def function_name_node(func_node: tree_sitter.Node, lang_name: str) -> tree_sitter.Node | None:
@@ -184,12 +249,12 @@ def function_name_node(func_node: tree_sitter.Node, lang_name: str) -> tree_sitt
     # to a child), so a plain ``while`` walk terminates without a fixed cap - a
     # cap would silently drop legal-but-deep declarators and lose name attribution.
     while node is not None:
-        if node.type in ("identifier", "field_identifier"):
+        if node.type in (_CPP_IDENTIFIER, "field_identifier"):
             return node if passed_function_declarator else None
-        if node.type == "qualified_identifier":
+        if node.type == _CPP_QUALIFIED_IDENTIFIER:
             # C++ ``S::m`` - the trailing ``name`` field is the method identifier.
             return node.child_by_field_name("name") if passed_function_declarator else None
-        if node.type == "function_declarator":
+        if node.type == _CPP_FUNCTION_DECLARATOR:
             passed_function_declarator = True
         node = node.child_by_field_name("declarator")
     return None
@@ -199,7 +264,7 @@ def _last_type_identifier(type_node: tree_sitter.Node) -> tree_sitter.Node | Non
     """Return the last ``type_identifier`` named child of *type_node*, or None."""
     last_id = None
     for child in type_node.named_children:
-        if child.type == "type_identifier":
+        if child.type == _JAVA_TYPE_IDENTIFIER:
             last_id = child
     return last_id
 
@@ -230,13 +295,13 @@ def _java_type_name(type_node: tree_sitter.Node) -> str | None:
     # name (``List<Map<String, Foo>>`` -> ``List``; ``MyResource<Foo>`` ->
     # ``MyResource``). The base is the first named child; the loop guards the
     # (non-Java) case of a generic whose base is itself generic.
-    while type_node.type == "generic_type":
+    while type_node.type == _JAVA_GENERIC_TYPE:
         if not type_node.named_children:  # pragma: no cover - defensive: generic_type always wraps a type
             return None
         type_node = type_node.named_children[0]
-    if type_node.type == "type_identifier":
+    if type_node.type == _JAVA_TYPE_IDENTIFIER:
         return node_text(type_node)
-    if type_node.type != "scoped_type_identifier":  # pragma: no cover - array creation etc. falls through
+    if type_node.type != _JAVA_SCOPED_TYPE_IDENTIFIER:  # pragma: no cover - array creation etc. falls through
         return None
     last_id = _last_type_identifier(type_node)
     return node_text(last_id) if last_id is not None else None  # pragma: no cover - defensive: scoped_type_identifier always has trailing identifier
@@ -262,14 +327,14 @@ def _java_type_name(type_node: tree_sitter.Node) -> str | None:
 #   every package that exposes it).
 _CALLEE_BAREWORD_FIELD: dict[str, str] = {
     "attribute": "attribute",
-    "member_expression": "property",
-    "field_expression": "field",
-    "scoped_identifier": "name",
-    "selector_expression": "field",
+    _JS_MEMBER_EXPRESSION: "property",
+    _RUST_FIELD_EXPRESSION: "field",
+    _RUST_SCOPED_IDENTIFIER: "name",
+    _GO_SELECTOR_EXPRESSION: "field",
     # C++ ``std::system`` / ``spdlog::error`` - the ``name`` field is the
     # trailing identifier, so a namespace-qualified call resolves to its
     # bareword just like a member call (``logger.error`` -> ``error``).
-    "qualified_identifier": "name",
+    _CPP_QUALIFIED_IDENTIFIER: "name",
 }
 
 
@@ -286,7 +351,7 @@ def _python_js_call_name(call_node: tree_sitter.Node) -> str | None:
     func_node = call_node.child_by_field_name("function") or call_node.child_by_field_name("constructor")
     if func_node is None:
         return None
-    if func_node.type == "identifier":
+    if func_node.type == _JS_IDENTIFIER:
         return node_text(func_node)
     field = _CALLEE_BAREWORD_FIELD.get(func_node.type)
     if field is None:
@@ -305,13 +370,13 @@ def _php_trailing_name(callee: tree_sitter.Node) -> str | None:
     the bareword keeps the ``*_php`` sink / I/O config lists short (users
     list ``system``, not every namespace that re-exports it).
     """
-    if callee.type == "name":
+    if callee.type == _PHP_NAME:
         return node_text(callee)
-    if callee.type != "qualified_name":  # pragma: no cover - defensive: only name/qualified_name reach here
+    if callee.type != _PHP_QUALIFIED_NAME:  # pragma: no cover - defensive: only name/qualified_name reach here
         return None
     trailing = None
     for child in callee.named_children:
-        if child.type == "name":
+        if child.type == _PHP_NAME:
             trailing = child
     return node_text(trailing) if trailing is not None else None
 
@@ -331,7 +396,7 @@ def _php_call_name(call_node: tree_sitter.Node) -> str | None:
     PHP rules resolve sinks via function / member / scoped calls rather than
     ``new``.
     """
-    if call_node.type == "function_call_expression":
+    if call_node.type == _PHP_FUNCTION_CALL_EXPRESSION:
         func = call_node.child_by_field_name("function")
         return _php_trailing_name(func) if func is not None else None
     # member / nullsafe-member / scoped calls: method bareword on ``name``.
@@ -344,12 +409,12 @@ def _php_call_name(call_node: tree_sitter.Node) -> str | None:
 # one-line append, and ``call_name`` stays small (no growing chain of
 # ``if`` branches that would trip the function-return-count guard).
 _CALL_NAME_DISPATCH: dict[str, Callable[[tree_sitter.Node], str | None]] = {
-    "method_invocation": _java_method_invocation_name,
-    "object_creation_expression": _java_object_creation_name,
-    "function_call_expression": _php_call_name,
-    "member_call_expression": _php_call_name,
-    "nullsafe_member_call_expression": _php_call_name,
-    "scoped_call_expression": _php_call_name,
+    _JAVA_METHOD_INVOCATION: _java_method_invocation_name,
+    _JAVA_OBJECT_CREATION_EXPRESSION: _java_object_creation_name,
+    _PHP_FUNCTION_CALL_EXPRESSION: _php_call_name,
+    _PHP_MEMBER_CALL_EXPRESSION: _php_call_name,
+    _PHP_NULLSAFE_MEMBER_CALL_EXPRESSION: _php_call_name,
+    _PHP_SCOPED_CALL_EXPRESSION: _php_call_name,
 }
 
 

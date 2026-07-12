@@ -129,6 +129,7 @@ EXPRESSION_STATEMENT = "expression_statement"
 
 # Expressions.
 CALL_EXPRESSION = "call_expression"
+NEW_EXPRESSION = "new_expression"
 MEMBER_EXPRESSION = "member_expression"
 SUBSCRIPT_EXPRESSION = "subscript_expression"
 ASSIGNMENT_EXPRESSION = "assignment_expression"
@@ -136,7 +137,18 @@ BINARY_EXPRESSION = "binary_expression"
 UNARY_EXPRESSION = "unary_expression"
 UPDATE_EXPRESSION = "update_expression"
 AWAIT_EXPRESSION = "await_expression"
+YIELD_EXPRESSION = "yield_expression"
 TERNARY_EXPRESSION = "ternary_expression"
+SEQUENCE_EXPRESSION = "sequence_expression"  # ``(a, b, c)`` comma operator
+PARENTHESIZED_EXPRESSION = "parenthesized_expression"  # ``(expr)``
+
+# TypeScript-only expression wrappers. The shared JS/TS grammar surface means
+# rules that walk ``.ts`` / ``.tsx`` trees see these; they don't appear in plain
+# ``.js`` sources but the constants live here so the family shares one vocabulary.
+TYPE_ASSERTION = "type_assertion"  # ``<T>expr``
+AS_EXPRESSION = "as_expression"  # ``expr as T``
+SATISFIES_EXPRESSION = "satisfies_expression"  # ``expr satisfies T``
+NON_NULL_EXPRESSION = "non_null_expression"  # ``expr!``
 
 # Identifiers / literals.
 IDENTIFIER = "identifier"
@@ -165,8 +177,13 @@ VARIABLE_DECLARATION = "variable_declaration"  # ``var`` wrapper
 ARRAY_PATTERN = "array_pattern"  # ``[a, b] = ...``
 OBJECT_PATTERN = "object_pattern"  # ``{a, b} = ...``
 REST_PATTERN = "rest_pattern"  # ``...rest`` in destructuring
+ASSIGNMENT_PATTERN = "assignment_pattern"  # ``{a = 1}`` / ``[a = 1]`` default in destructuring
 SHORTHAND_PROPERTY_IDENTIFIER_PATTERN = "shorthand_property_identifier_pattern"  # ``{foo}`` short form
 PAIR_PATTERN = "pair_pattern"  # ``{key: alias}`` in object destructuring
+# TypeScript typed-parameter wrappers around a binding pattern in ``formal_parameters``.
+REQUIRED_PARAMETER = "required_parameter"  # ``x: number``
+OPTIONAL_PARAMETER = "optional_parameter"  # ``x?: number``
+REST_PARAMETER = "rest_parameter"  # ``...args: number[]``
 
 # Composite expressions that propagate taint between operands.
 TEMPLATE_SUBSTITUTION = "template_substitution"  # ``${expr}`` inside a template_string
@@ -175,6 +192,7 @@ SPREAD_ELEMENT = "spread_element"  # ``foo(...args)`` in call positions
 # Container literals.
 ARRAY = "array"
 OBJECT = "object"
+PAIR = "pair"  # ``key: value`` entry inside an object literal
 
 # Field name on a member_expression marking optional chaining (``foo?.bar``).
 # When present, the chained access is null-safe by construction - null_dereference

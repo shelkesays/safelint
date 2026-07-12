@@ -28,6 +28,40 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.languages.javascript import (
+    ARRAY,
+    ARRAY_PATTERN,
+    AS_EXPRESSION,
+    ASSIGNMENT_EXPRESSION,
+    ASSIGNMENT_PATTERN,
+    AUGMENTED_ASSIGNMENT_EXPRESSION,
+    AWAIT_EXPRESSION,
+    BINARY_EXPRESSION,
+    CALL_EXPRESSION,
+    IDENTIFIER,
+    MEMBER_EXPRESSION,
+    NEW_EXPRESSION,
+    NON_NULL_EXPRESSION,
+    OBJECT,
+    OBJECT_PATTERN,
+    PAIR,
+    PAIR_PATTERN,
+    PARENTHESIZED_EXPRESSION,
+    REST_PATTERN,
+    SATISFIES_EXPRESSION,
+    SEQUENCE_EXPRESSION,
+    SHORTHAND_PROPERTY_IDENTIFIER_PATTERN,
+    SPREAD_ELEMENT,
+    SUBSCRIPT_EXPRESSION,
+    TEMPLATE_STRING,
+    TEMPLATE_SUBSTITUTION,
+    TERNARY_EXPRESSION,
+    TYPE_ASSERTION,
+    UNARY_EXPRESSION,
+    UPDATE_EXPRESSION,
+    VARIABLE_DECLARATOR,
+    YIELD_EXPRESSION,
+)
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 
 
@@ -58,38 +92,38 @@ if TYPE_CHECKING:
 #     must propagate through it the same as through ``as_expression``)
 _SPREADING_TYPES = frozenset(
     {
-        "binary_expression",
-        "unary_expression",
-        "ternary_expression",
-        "update_expression",
-        "sequence_expression",
-        "parenthesized_expression",
-        "await_expression",
-        "yield_expression",
+        BINARY_EXPRESSION,
+        UNARY_EXPRESSION,
+        TERNARY_EXPRESSION,
+        UPDATE_EXPRESSION,
+        SEQUENCE_EXPRESSION,
+        PARENTHESIZED_EXPRESSION,
+        AWAIT_EXPRESSION,
+        YIELD_EXPRESSION,
         # TypeScript-only pass-through wrappers:
-        "as_expression",
-        "satisfies_expression",
-        "non_null_expression",
-        "type_assertion",
+        AS_EXPRESSION,
+        SATISFIES_EXPRESSION,
+        NON_NULL_EXPRESSION,
+        TYPE_ASSERTION,
     }
 )
 
 # Container / aggregate literals that carry taint when any element is tainted.
-_CONTAINER_TYPES = frozenset({"array", "object", "pair", "spread_element"})
+_CONTAINER_TYPES = frozenset({ARRAY, OBJECT, PAIR, SPREAD_ELEMENT})
 
 # Member access shapes (``foo.bar`` / ``foo[idx]``) - taint flows from the
 # receiver. ``optional_chain`` (``foo?.bar``) doesn't change the propagation
 # direction, only the null-safety semantics - handled by SAFE803, not here.
-_MEMBER_TYPES = frozenset({"member_expression", "subscript_expression"})
+_MEMBER_TYPES = frozenset({MEMBER_EXPRESSION, SUBSCRIPT_EXPRESSION})
 
 #: Destructuring-pattern node types that bind through a *specific* field.
 #: ``pair_pattern`` carries the bound alias on ``value`` (``{key: alias}``);
 #: ``assignment_pattern`` carries the binding on ``left`` (``[a = 1]`` -
 #: ``right`` is the default value, not a binding).
-_PATTERN_BINDING_FIELD = {"pair_pattern": "value", "assignment_pattern": "left"}
+_PATTERN_BINDING_FIELD = {PAIR_PATTERN: "value", ASSIGNMENT_PATTERN: "left"}
 
 #: Destructuring-pattern node types whose every named child is a binding.
-_PATTERN_CONTAINER_TYPES = frozenset({"array_pattern", "object_pattern", "rest_pattern"})
+_PATTERN_CONTAINER_TYPES = frozenset({ARRAY_PATTERN, OBJECT_PATTERN, REST_PATTERN})
 
 
 def _destructure_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
@@ -148,13 +182,13 @@ class JsTaintTracker:
 
     def _visit_node(self, node: tree_sitter.Node) -> None:
         """Dispatch *node* to the right per-shape handler."""
-        if node.type == "assignment_expression":
+        if node.type == ASSIGNMENT_EXPRESSION:
             self._visit_assignment(node)
-        elif node.type == "augmented_assignment_expression":
+        elif node.type == AUGMENTED_ASSIGNMENT_EXPRESSION:
             self._visit_aug_assignment(node)
-        elif node.type == "variable_declarator":
+        elif node.type == VARIABLE_DECLARATOR:
             self._visit_var_declarator(node)
-        elif node.type in ("call_expression", "new_expression"):
+        elif node.type in (CALL_EXPRESSION, NEW_EXPRESSION):
             # Treat ``new Foo(tainted)`` the same as ``Foo(tainted)`` for
             # taint tracking - the default JS sinks list includes ``Function``,
             # which is canonically invoked via ``new Function(code)``.
@@ -188,7 +222,7 @@ class JsTaintTracker:
         stack = [target]
         while len(stack) > 0:
             current = stack.pop()
-            if current.type in ("identifier", "shorthand_property_identifier_pattern"):
+            if current.type in (IDENTIFIER, SHORTHAND_PROPERTY_IDENTIFIER_PATTERN):
                 yield current
             else:
                 stack.extend(reversed(_destructure_children(current)))
@@ -242,12 +276,12 @@ class JsTaintTracker:
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
-        arg_name = node_text(arg_node) if arg_node.type == "identifier" else "<expr>"
+        arg_name = node_text(arg_node) if arg_node.type == IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))  # pragma: no branch
 
     def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool) -> None:
         """Add or remove *target* from the tainted set if it carries a bare name."""
-        if target.type not in ("identifier", "shorthand_property_identifier_pattern"):
+        if target.type not in (IDENTIFIER, SHORTHAND_PROPERTY_IDENTIFIER_PATTERN):
             return
         name = node_text(target)
         if is_tainted:
@@ -274,11 +308,11 @@ class JsTaintTracker:
     def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if *node* is a leaf that itself carries taint."""
         node_type = node.type
-        if node_type == "identifier":
+        if node_type == IDENTIFIER:
             return node_text(node) in self.tainted
-        if node_type in ("call_expression", "new_expression"):
+        if node_type in (CALL_EXPRESSION, NEW_EXPRESSION):
             return self._call_tainted(node)
-        if node_type == "template_string":
+        if node_type == TEMPLATE_STRING:
             return self._template_tainted(node)
         return False
 
@@ -319,7 +353,7 @@ class JsTaintTracker:
     def _template_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if any ``${expr}`` substitution in a template string is tainted."""
         for child in walk(node):
-            if child.type != "template_substitution":
+            if child.type != TEMPLATE_SUBSTITUTION:
                 continue
             if any(self._is_tainted(inner) for inner in child.named_children):
                 return True
