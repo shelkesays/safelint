@@ -39,6 +39,26 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.languages.php import (
+    ARGUMENT,
+    ASSIGNMENT_EXPRESSION,
+    AUGMENTED_ASSIGNMENT_EXPRESSION,
+    BINARY_EXPRESSION,
+    ENCAPSED_STRING,
+    FUNCTION_CALL_EXPRESSION,
+    INCLUDE_EXPRESSION,
+    INCLUDE_ONCE_EXPRESSION,
+    MEMBER_ACCESS_EXPRESSION,
+    MEMBER_CALL_EXPRESSION,
+    NULLSAFE_MEMBER_ACCESS_EXPRESSION,
+    NULLSAFE_MEMBER_CALL_EXPRESSION,
+    PARENTHESIZED_EXPRESSION,
+    REQUIRE_EXPRESSION,
+    REQUIRE_ONCE_EXPRESSION,
+    SCOPED_CALL_EXPRESSION,
+    SUBSCRIPT_EXPRESSION,
+    VARIABLE_NAME,
+)
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 
 
@@ -49,20 +69,20 @@ if TYPE_CHECKING:
 # PHP call node types whose result may carry taint / be a sink.
 _PHP_CALL_TYPES = frozenset(
     {
-        "function_call_expression",
-        "member_call_expression",
-        "nullsafe_member_call_expression",
-        "scoped_call_expression",
+        FUNCTION_CALL_EXPRESSION,
+        MEMBER_CALL_EXPRESSION,
+        NULLSAFE_MEMBER_CALL_EXPRESSION,
+        SCOPED_CALL_EXPRESSION,
     }
 )
 
 # ``include`` / ``require`` family - a tainted path argument is a sink.
 _PHP_INCLUDE_TYPES = frozenset(
     {
-        "include_expression",
-        "include_once_expression",
-        "require_expression",
-        "require_once_expression",
+        INCLUDE_EXPRESSION,
+        INCLUDE_ONCE_EXPRESSION,
+        REQUIRE_EXPRESSION,
+        REQUIRE_ONCE_EXPRESSION,
     }
 )
 
@@ -72,10 +92,10 @@ _PHP_INCLUDE_TYPES = frozenset(
 # is a pure pass-through; ``encapsed_string`` carries interpolated variables.
 _SPREADING_TYPES = frozenset(
     {
-        "binary_expression",
+        BINARY_EXPRESSION,
         "unary_op_expression",
-        "parenthesized_expression",
-        "encapsed_string",
+        PARENTHESIZED_EXPRESSION,
+        ENCAPSED_STRING,
     }
 )
 
@@ -123,7 +143,7 @@ class PhpTaintTracker:
     def _visit_node(self, node: tree_sitter.Node) -> None:
         """Dispatch *node* to the right per-shape handler."""
         node_type = node.type
-        if node_type in ("assignment_expression", "augmented_assignment_expression"):
+        if node_type in (ASSIGNMENT_EXPRESSION, AUGMENTED_ASSIGNMENT_EXPRESSION):
             self._visit_assignment(node)
         elif node_type in _PHP_CALL_TYPES:
             self._visit_call(node)
@@ -146,7 +166,7 @@ class PhpTaintTracker:
         target = self._assignment_target_name(left)
         if target is None:
             return
-        keep_existing = node.type == "augmented_assignment_expression"
+        keep_existing = node.type == AUGMENTED_ASSIGNMENT_EXPRESSION
         self._update_name(target, is_tainted=self._is_tainted(right), keep_existing=keep_existing)
 
     @staticmethod
@@ -157,11 +177,11 @@ class PhpTaintTracker:
         tainted element taints the array for the conservative model); other
         shapes (property writes etc.) are not tracked.
         """
-        if left.type == "variable_name":
+        if left.type == VARIABLE_NAME:
             return node_text(left)
-        if left.type == "subscript_expression":
+        if left.type == SUBSCRIPT_EXPRESSION:
             base = left.named_children[0] if left.named_children else None
-            if base is not None and base.type == "variable_name":
+            if base is not None and base.type == VARIABLE_NAME:
                 return node_text(base)
         return None
 
@@ -193,9 +213,9 @@ class PhpTaintTracker:
     def _arg_display_name(arg_node: tree_sitter.Node) -> str:
         """Return the variable name of an argument for the message, or ``"<expr>"``."""
         target = arg_node
-        if arg_node.type == "argument" and arg_node.named_children:
+        if arg_node.type == ARGUMENT and arg_node.named_children:
             target = arg_node.named_children[0]
-        return node_text(target) if target.type == "variable_name" else "<expr>"
+        return node_text(target) if target.type == VARIABLE_NAME else "<expr>"
 
     def _update_name(self, name: str, *, is_tainted: bool, keep_existing: bool = False) -> None:
         """Add or remove *name* from the tainted set.
@@ -227,9 +247,9 @@ class PhpTaintTracker:
     def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if *node* is a leaf that itself carries taint."""
         node_type = node.type
-        if node_type == "variable_name":
+        if node_type == VARIABLE_NAME:
             return node_text(node) in self.tainted
-        if node_type == "subscript_expression":
+        if node_type == SUBSCRIPT_EXPRESSION:
             return self._subscript_is_source(node)
         if node_type in _PHP_CALL_TYPES:
             return self._call_tainted(node)
@@ -243,7 +263,7 @@ class PhpTaintTracker:
         direct superglobal-read source shape.
         """
         base = node.named_children[0] if node.named_children else None
-        return base is not None and base.type == "variable_name" and node_text(base) in self.sources
+        return base is not None and base.type == VARIABLE_NAME and node_text(base) in self.sources
 
     @staticmethod
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
@@ -256,13 +276,13 @@ class PhpTaintTracker:
         propagate every named child. Everything else is a taint dead-end.
         """
         node_type = node.type
-        if node_type in ("member_access_expression", "nullsafe_member_access_expression"):
+        if node_type in (MEMBER_ACCESS_EXPRESSION, NULLSAFE_MEMBER_ACCESS_EXPRESSION):
             obj = node.child_by_field_name("object")
             return [obj] if obj is not None else []
-        if node_type == "subscript_expression":
+        if node_type == SUBSCRIPT_EXPRESSION:
             base = node.named_children[0] if node.named_children else None
             return [base] if base is not None else []
-        if node_type in ("argument", "array_element_initializer") or node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
+        if node_type in (ARGUMENT, "array_element_initializer") or node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
             return list(node.named_children)
         return []
 

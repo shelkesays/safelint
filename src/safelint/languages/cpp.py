@@ -122,6 +122,7 @@ FUNCTION_DECLARATOR = "function_declarator"
 PARENTHESIZED_DECLARATOR = "parenthesized_declarator"
 ARRAY_DECLARATOR = "array_declarator"
 REFERENCE_DECLARATOR = "reference_declarator"  # ``int& r`` / ``int&& r`` - not a pointer level
+ABSTRACT_FUNCTION_DECLARATOR = "abstract_function_declarator"  # lambda ``[](int x){}`` parameter-list wrapper
 
 # Aggregates / scopes.
 CLASS_SPECIFIER = "class_specifier"  # SAFE302: non-const static data members
