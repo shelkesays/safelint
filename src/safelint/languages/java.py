@@ -244,3 +244,12 @@ SCOPED_IDENTIFIER = "scoped_identifier"  # ``com.example.Foo``
 # Composite expressions that propagate taint between operands.
 STRING_CONCATENATION = BINARY_EXPRESSION  # Java uses ``+`` for string concat; binary_expression covers it
 ARGUMENT_LIST = "argument_list"
+
+# Node-type constants added for the rules node-constant refactor
+# (per-language literal -> imported-constant sweep).
+AMP_AMP = "&&"
+PIPE_PIPE = "||"
+EMPTY_STATEMENT = "empty_statement"
+THIS = "this"
+ARRAY_INITIALIZER = "array_initializer"
+EQ = "="

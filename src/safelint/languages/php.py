@@ -215,3 +215,20 @@ PROGRAM = "program"  # the root node
 PHP_TAG = "php_tag"  # the ``<?php`` open tag
 TEXT = "text"  # raw HTML segment outside ``<?php ... ?>`` - rules never match these
 COMMENT = "comment"  # single type for ``//``, ``#``, and ``/* */``
+
+# Node-type constants added for the rules node-constant refactor
+# (per-language literal -> imported-constant sweep).
+ELSE_IF_CLAUSE = "else_if_clause"
+CASE_STATEMENT = "case_statement"
+AMP_AMP = "&&"
+PIPE_PIPE = "||"
+QQ = "??"
+AND_KW = "and"
+OR_KW = "or"
+EMPTY_STATEMENT = "empty_statement"
+FLOAT = "float"
+NULL = "null"
+UPDATE_EXPRESSION = "update_expression"
+UNARY_OP_EXPRESSION = "unary_op_expression"
+ARRAY_CREATION_EXPRESSION = "array_creation_expression"
+ARRAY_ELEMENT_INITIALIZER = "array_element_initializer"

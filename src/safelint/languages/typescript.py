@@ -68,6 +68,22 @@ except ImportError:  # nosafe: SAFE203
 #: the CLI to compose multi-language install commands.
 EXTRA_NAME = "typescript"
 
+# Node-type constants added for the rules node-constant refactor
+# (per-language literal -> imported-constant sweep).
+AMP_AMP = "&&"
+PIPE_PIPE = "||"
+QQ = "??"
+STATEMENT_IDENTIFIER = "statement_identifier"
+EMPTY_STATEMENT = "empty_statement"
+REQUIRED_PARAMETER = "required_parameter"
+OPTIONAL_PARAMETER = "optional_parameter"
+REST_PARAMETER = "rest_parameter"
+NEW_EXPRESSION = "new_expression"
+AS_EXPRESSION = "as_expression"
+SATISFIES_EXPRESSION = "satisfies_expression"
+NON_NULL_EXPRESSION = "non_null_expression"
+TYPE_ASSERTION = "type_assertion"
+
 #: Install hint surfaced by the CLI when a user has ``.ts`` / ``.tsx`` / ``.as``
 #: files but ``tree-sitter-typescript`` isn't installed.
 GRAMMAR_INSTALL_HINT = f"pip install 'safelint[{EXTRA_NAME}]'"

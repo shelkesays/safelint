@@ -157,3 +157,19 @@ IDENTIFIER = "identifier"
 # Misc.
 TRANSLATION_UNIT = "translation_unit"  # the root node
 COMMENT = "comment"  # single type for ``//`` and ``/* */``
+
+# Node-type constants added for the rules node-constant refactor
+# (per-language literal -> imported-constant sweep).
+AMP_AMP = "&&"
+PIPE_PIPE = "||"
+NUMBER_LITERAL = "number_literal"
+TRUE = "true"
+VARIADIC_PARAMETER = "variadic_parameter"
+PREPROC_CALL = "preproc_call"
+UNARY_EXPRESSION = "unary_expression"
+PARENTHESIZED_EXPRESSION = "parenthesized_expression"
+POINTER_EXPRESSION = "pointer_expression"
+COMMA_EXPRESSION = "comma_expression"
+SUBSCRIPT_EXPRESSION = "subscript_expression"
+EQ = "="
+FIELD_IDENTIFIER = "field_identifier"

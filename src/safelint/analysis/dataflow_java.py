@@ -41,6 +41,25 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.languages.java import (
+    ARRAY_ACCESS,
+    ARRAY_CREATION_EXPRESSION,
+    ARRAY_INITIALIZER,
+    ASSIGNMENT_EXPRESSION,
+    BINARY_EXPRESSION,
+    CAST_EXPRESSION,
+    ENHANCED_FOR_STATEMENT,
+    FIELD_ACCESS,
+    IDENTIFIER,
+    INSTANCEOF_EXPRESSION,
+    METHOD_INVOCATION,
+    OBJECT_CREATION_EXPRESSION,
+    PARENTHESIZED_EXPRESSION,
+    TERNARY_EXPRESSION,
+    UNARY_EXPRESSION,
+    UPDATE_EXPRESSION,
+    VARIABLE_DECLARATOR,
+)
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 
 
@@ -71,13 +90,13 @@ if TYPE_CHECKING:
 # single operand.
 _SPREADING_TYPES = frozenset(
     {
-        "binary_expression",
-        "unary_expression",
-        "ternary_expression",
-        "update_expression",
-        "parenthesized_expression",
-        "cast_expression",
-        "instanceof_expression",  # pattern variables introduced by ``x instanceof Foo f`` are unhandled today; the expression itself is boolean
+        BINARY_EXPRESSION,
+        UNARY_EXPRESSION,
+        TERNARY_EXPRESSION,
+        UPDATE_EXPRESSION,
+        PARENTHESIZED_EXPRESSION,
+        CAST_EXPRESSION,
+        INSTANCEOF_EXPRESSION,  # pattern variables introduced by ``x instanceof Foo f`` are unhandled today; the expression itself is boolean
     }
 )
 
@@ -87,21 +106,21 @@ _SPREADING_TYPES = frozenset(
 # invocations, handled by the call-tainted path.
 _CONTAINER_TYPES = frozenset(
     {
-        "array_creation_expression",
-        "array_initializer",
+        ARRAY_CREATION_EXPRESSION,
+        ARRAY_INITIALIZER,
     }
 )
 
 # Member access shapes - taint flows from the receiver. Java splits
 # what JS calls ``member_expression`` / ``subscript_expression`` into
 # ``field_access`` (``obj.foo``) and ``array_access`` (``arr[i]``).
-_MEMBER_TYPES = frozenset({"field_access", "array_access"})
+_MEMBER_TYPES = frozenset({FIELD_ACCESS, ARRAY_ACCESS})
 
 # Call shapes - Java's two flavours. Both feed the sink check and
 # taint propagation; ``call_name`` already normalises both
 # (returning ``"foo"`` for both ``foo(...)`` / ``obj.foo(...)`` and
 # ``new Foo(...)``).
-_CALL_TYPES = frozenset({"method_invocation", "object_creation_expression"})
+_CALL_TYPES = frozenset({METHOD_INVOCATION, OBJECT_CREATION_EXPRESSION})
 
 
 def _is_compound_assignment(node: tree_sitter.Node) -> bool:
@@ -161,11 +180,11 @@ class JavaTaintTracker:
 
     def _visit_node(self, node: tree_sitter.Node) -> None:
         """Dispatch *node* to the right per-shape handler."""
-        if node.type == "assignment_expression":
+        if node.type == ASSIGNMENT_EXPRESSION:
             self._visit_assignment(node)
-        elif node.type == "variable_declarator":
+        elif node.type == VARIABLE_DECLARATOR:
             self._visit_var_declarator(node)
-        elif node.type == "enhanced_for_statement":
+        elif node.type == ENHANCED_FOR_STATEMENT:
             self._visit_enhanced_for(node)
         elif node.type in _CALL_TYPES:
             # Treat ``new Foo(tainted)`` the same as ``Foo(tainted)`` for
@@ -204,7 +223,7 @@ class JavaTaintTracker:
         chain: list[tree_sitter.Node] = []
         cur: tree_sitter.Node | None = node
         while cur is not None:
-            if cur.type != "assignment_expression":
+            if cur.type != ASSIGNMENT_EXPRESSION:
                 break
             chain.append(cur)
             cur = cur.child_by_field_name("right")
@@ -213,7 +232,7 @@ class JavaTaintTracker:
             right = assign.child_by_field_name("right")
             if left is None or right is None:  # pragma: no cover - defensive: valid assignments have both sides
                 continue
-            if left.type != "identifier":
+            if left.type != IDENTIFIER:
                 continue
             rhs_tainted = self._assignment_chain_tainted(right)
             if _is_compound_assignment(assign) and self._name_is_tainted(left):
@@ -223,7 +242,7 @@ class JavaTaintTracker:
     def _assignment_chain_tainted(self, node: tree_sitter.Node) -> bool:
         """Return the innermost-RHS taint state for a (possibly chained) assignment RHS."""
         cur = node
-        while cur.type == "assignment_expression":
+        while cur.type == ASSIGNMENT_EXPRESSION:
             inner = cur.child_by_field_name("right")
             if inner is None:  # pragma: no cover - defensive: valid assignment always has right
                 return False
@@ -232,7 +251,7 @@ class JavaTaintTracker:
 
     def _name_is_tainted(self, name_node: tree_sitter.Node) -> bool:
         """Return True if *name_node* is an identifier that's currently tainted."""
-        return name_node.type == "identifier" and node_text(name_node) in self.tainted
+        return name_node.type == IDENTIFIER and node_text(name_node) in self.tainted
 
     def _visit_enhanced_for(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``for (T x : tainted_iterable) { ... }``.
@@ -253,7 +272,7 @@ class JavaTaintTracker:
         value_node = node.child_by_field_name("value")
         if name_node is None or value_node is None:  # pragma: no cover - defensive: enhanced_for always has both
             return
-        if name_node.type != "identifier":  # pragma: no cover - defensive: name field is always identifier in valid Java
+        if name_node.type != IDENTIFIER:  # pragma: no cover - defensive: name field is always identifier in valid Java
             return
         self._update_name(name_node, is_tainted=self._is_tainted(value_node))
 
@@ -277,7 +296,7 @@ class JavaTaintTracker:
             # No initialiser: ``int x;`` - the binding starts untainted,
             # nothing to record.
             return
-        if name.type != "identifier":  # pragma: no cover - defensive: variable_declarator name is always an identifier in valid Java
+        if name.type != IDENTIFIER:  # pragma: no cover - defensive: variable_declarator name is always an identifier in valid Java
             return
         is_tainted = self._is_tainted(value)
         self._update_name(name, is_tainted=is_tainted)
@@ -298,7 +317,7 @@ class JavaTaintTracker:
         if name not in self.sinks:
             return
         self._record_tainted_arg_hits(node, name)
-        if node.type == "method_invocation":
+        if node.type == METHOD_INVOCATION:
             obj = node.child_by_field_name("object")
             if obj is not None and self._is_tainted(obj):
                 self._record_sink_hit(node, obj, name)
@@ -314,7 +333,7 @@ class JavaTaintTracker:
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
-        arg_name = node_text(arg_node) if arg_node.type == "identifier" else "<expr>"
+        arg_name = node_text(arg_node) if arg_node.type == IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
 
     def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool) -> None:
@@ -344,7 +363,7 @@ class JavaTaintTracker:
     def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if *node* is a leaf that itself carries taint."""
         node_type = node.type
-        if node_type == "identifier":
+        if node_type == IDENTIFIER:
             return node_text(node) in self.tainted
         if node_type in _CALL_TYPES:
             return self._call_tainted(node)
@@ -360,7 +379,7 @@ class JavaTaintTracker:
         """
         node_type = node.type
         if node_type in _MEMBER_TYPES:
-            obj = node.child_by_field_name("object" if node_type == "field_access" else "array")
+            obj = node.child_by_field_name("object" if node_type == FIELD_ACCESS else "array")
             return [obj] if obj is not None else []
         if node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
             return list(node.named_children)
@@ -395,7 +414,7 @@ class JavaTaintTracker:
         args_node = node.child_by_field_name("arguments")
         if args_node and any(self._is_tainted(arg) for arg in args_node.named_children):
             return True
-        if node.type == "method_invocation":
+        if node.type == METHOD_INVOCATION:
             obj = node.child_by_field_name("object")
             if obj is not None and self._is_tainted(obj):
                 return True
