@@ -5,10 +5,27 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
+from safelint.languages.cpp import CATCH_CLAUSE as _CPP_CATCH_CLAUSE
+from safelint.languages.cpp import COMMENT as _CPP_COMMENT
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
+from safelint.languages.cpp import THROW_STATEMENT as _CPP_THROW_STATEMENT
+from safelint.languages.java import BLOCK_COMMENT as _JAVA_BLOCK_COMMENT
+from safelint.languages.java import CATCH_CLAUSE as _JAVA_CATCH_CLAUSE
+from safelint.languages.java import EMPTY_STATEMENT as _JAVA_EMPTY_STATEMENT
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
+from safelint.languages.java import LINE_COMMENT as _JAVA_LINE_COMMENT
+from safelint.languages.java import THROW_STATEMENT as _JAVA_THROW_STATEMENT
+from safelint.languages.javascript import CATCH_CLAUSE as _JS_CATCH_CLAUSE
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.javascript import THROW_STATEMENT as _JS_THROW_STATEMENT
+from safelint.languages.php import BOOLEAN as _PHP_BOOLEAN
+from safelint.languages.php import CATCH_CLAUSE as _PHP_CATCH_CLAUSE
+from safelint.languages.php import COMMENT as _PHP_COMMENT
+from safelint.languages.php import EMPTY_STATEMENT as _PHP_EMPTY_STATEMENT
+from safelint.languages.php import FLOAT as _PHP_FLOAT
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
+from safelint.languages.php import INTEGER as _PHP_INTEGER
+from safelint.languages.php import NULL as _PHP_NULL
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     ATTRIBUTE,
@@ -18,6 +35,9 @@ from safelint.languages.python import (
     RAISE_STATEMENT,
     TUPLE,
 )
+from safelint.languages.typescript import CATCH_CLAUSE as _TS_CATCH_CLAUSE
+from safelint.languages.typescript import EMPTY_STATEMENT as _TS_EMPTY_STATEMENT
+from safelint.languages.typescript import THROW_STATEMENT as _TS_THROW_STATEMENT
 from safelint.rules.base import BaseRule, Suggestion, TextEdit
 
 
@@ -28,11 +48,11 @@ from safelint.rules.base import BaseRule, Suggestion, TextEdit
 # typed-binding requirement that the language enforces upstream).
 _CATCH_CLAUSE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({EXCEPT_CLAUSE}),
-    "javascript": frozenset({"catch_clause"}),
-    "typescript": frozenset({"catch_clause"}),
-    "java": frozenset({"catch_clause"}),
-    "php": frozenset({"catch_clause"}),
-    "cpp": frozenset({"catch_clause"}),
+    "javascript": frozenset({_JS_CATCH_CLAUSE}),
+    "typescript": frozenset({_TS_CATCH_CLAUSE}),
+    "java": frozenset({_JAVA_CATCH_CLAUSE}),
+    "php": frozenset({_PHP_CATCH_CLAUSE}),
+    "cpp": frozenset({_CPP_CATCH_CLAUSE}),
 }
 
 # Per-language: function-defining node types (used to skip nested
@@ -54,11 +74,11 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # rule treats as legitimate handling.
 _RERAISE_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({RAISE_STATEMENT}),
-    "javascript": frozenset({"throw_statement"}),
-    "typescript": frozenset({"throw_statement"}),
-    "java": frozenset({"throw_statement"}),
+    "javascript": frozenset({_JS_THROW_STATEMENT}),
+    "typescript": frozenset({_TS_THROW_STATEMENT}),
+    "java": frozenset({_JAVA_THROW_STATEMENT}),
     # C++ ``throw;`` (bare rethrow) / ``throw e;`` both re-raise.
-    "cpp": frozenset({"throw_statement"}),
+    "cpp": frozenset({_CPP_THROW_STATEMENT}),
 }
 
 # Statement-only no-op nodes: their presence means "developer wrote something
@@ -75,23 +95,23 @@ _RERAISE_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({"pass_statement", "continue_statement"}),
     "javascript": frozenset({"empty_statement"}),
-    "typescript": frozenset({"empty_statement"}),
+    "typescript": frozenset({_TS_EMPTY_STATEMENT}),
     # Java accepts bare semicolons (``catch (Exception e) { ; }``) as
     # empty statements, same as JS. ``line_comment`` / ``block_comment``
     # cover comment-only bodies (tree-sitter-java emits comments as
     # named block children, unlike JS where they're extras).
-    "java": frozenset({"empty_statement", "line_comment", "block_comment"}),
+    "java": frozenset({_JAVA_EMPTY_STATEMENT, _JAVA_LINE_COMMENT, _JAVA_BLOCK_COMMENT}),
     # PHP: bare ``;`` is ``empty_statement``; tree-sitter-php emits both
     # ``//`` / ``#`` line comments and ``/* */`` block comments as a single
     # ``comment`` node that is a *named* child of the body block (like Java,
     # unlike JS where comments are extras), so a comment-only catch body
     # such as ``catch (\E $e) { /* todo */ }`` matches the empty-handler
     # intent.
-    "php": frozenset({"empty_statement", "comment"}),
+    "php": frozenset({_PHP_EMPTY_STATEMENT, _PHP_COMMENT}),
     # C++: bare ``;`` is ``empty_statement``; tree-sitter-cpp emits ``//`` and
     # ``/* */`` as a single ``comment`` node that is a *named* child of the
     # catch body (like Java / PHP), so a comment-only body matches.
-    "cpp": frozenset({"empty_statement", "comment"}),
+    "cpp": frozenset({"empty_statement", _CPP_COMMENT}),
 }
 
 # Per-language: literal expression node types that count as "comment-like"
@@ -145,7 +165,7 @@ _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # literals (``'TODO'`` / ``"TODO"``) are delegated to
     # ``_php_string_is_literal`` so interpolating double-quoted strings are
     # not treated as no-op markers.
-    "php": frozenset({"integer", "float", "boolean", "null"}),
+    "php": frozenset({_PHP_INTEGER, _PHP_FLOAT, _PHP_BOOLEAN, _PHP_NULL}),
     # C++: ``number_literal`` covers int / float; ``true`` / ``false`` are
     # dedicated nodes; ``nullptr`` / ``null`` and ``char_literal`` round out
     # the single-literal no-op markers. String literals are delegated to
