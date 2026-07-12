@@ -83,6 +83,8 @@ AS_EXPRESSION = "as_expression"
 SATISFIES_EXPRESSION = "satisfies_expression"
 NON_NULL_EXPRESSION = "non_null_expression"
 TYPE_ASSERTION = "type_assertion"
+# added for node-constant refactor
+THIS = "this"
 
 #: Install hint surfaced by the CLI when a user has ``.ts`` / ``.tsx`` / ``.as``
 #: files but ``tree-sitter-typescript`` isn't installed.

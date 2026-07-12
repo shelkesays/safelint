@@ -154,6 +154,7 @@ LABEL = "label"  # ``'outer:`` block label
 # Statements / declarations.
 LET_DECLARATION = "let_declaration"
 STATIC_ITEM = "static_item"  # ``static FOO: T = ...`` (module / impl scope)
+ATTRIBUTE = "attribute"
 CONST_ITEM = "const_item"  # ``const FOO: T = ...``
 EXPRESSION_STATEMENT = "expression_statement"
 USE_DECLARATION = "use_declaration"
@@ -244,3 +245,6 @@ ENUM_VARIANT = "enum_variant"
 FIELD_DECLARATION = "field_declaration"
 DECLARATION_LIST = "declaration_list"  # body of ``impl`` / ``trait`` / ``mod``
 SOURCE_FILE = "source_file"  # the root node
+# added for node-constant refactor
+AMP_AMP = "&&"
+PIPE_PIPE = "||"

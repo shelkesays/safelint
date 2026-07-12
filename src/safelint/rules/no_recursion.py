@@ -39,6 +39,7 @@ from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
 from safelint.languages.cpp import FIELD_EXPRESSION as _CPP_FIELD_EXPRESSION
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.cpp import QUALIFIED_IDENTIFIER as _CPP_QUALIFIED_IDENTIFIER
+from safelint.languages.cpp import THIS as _CPP_THIS
 from safelint.languages.go import CALL_EXPRESSION as _GO_CALL_EXPRESSION
 from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
@@ -54,8 +55,7 @@ from safelint.languages.javascript import CALL_EXPRESSION as _JS_CALL_EXPRESSION
 from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.javascript import MEMBER_EXPRESSION as _JS_MEMBER_EXPRESSION
-from safelint.languages.javascript import OBJECT as _JS_OBJECT
-from safelint.languages.php import ARGUMENT as _PHP_ARGUMENT
+from safelint.languages.javascript import THIS as _JS_THIS
 from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
 from safelint.languages.php import FUNCTION_CALL_EXPRESSION as _PHP_FUNCTION_CALL_EXPRESSION
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
@@ -72,7 +72,7 @@ from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.languages.typescript import CALL_EXPRESSION as _TS_CALL_EXPRESSION
 from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.languages.typescript import MEMBER_EXPRESSION as _TS_MEMBER_EXPRESSION
-from safelint.languages.typescript import OBJECT as _TS_OBJECT
+from safelint.languages.typescript import THIS as _TS_THIS
 from safelint.rules.base import BaseRule, Suggestion
 
 
@@ -128,10 +128,10 @@ _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 #: ``other.foo()`` is not, even though it shares the bareword name.
 _SELF_RECEIVERS: dict[str, frozenset[str]] = {
     "python": frozenset({"self", "cls"}),
-    "javascript": frozenset({_JAVA_THIS}),
-    "typescript": frozenset({_JAVA_THIS}),
+    "javascript": frozenset({_JS_THIS}),
+    "typescript": frozenset({_TS_THIS}),
     "rust": frozenset({"self"}),
-    "cpp": frozenset({_JAVA_THIS}),
+    "cpp": frozenset({_CPP_THIS}),
 }
 
 #: Member-access node shape per language: ``(node_type, object_field,
@@ -139,12 +139,12 @@ _SELF_RECEIVERS: dict[str, frozenset[str]] = {
 #: because its ``method_invocation`` carries the receiver and method name
 #: as fields on the call node itself, not via a nested member-access node.
 _MEMBER_ACCESS: dict[str, tuple[str, str, str]] = {
-    "python": (ATTRIBUTE, _JS_OBJECT, ATTRIBUTE),
-    "javascript": (_JS_MEMBER_EXPRESSION, _JS_OBJECT, "property"),
-    "typescript": (_TS_MEMBER_EXPRESSION, _TS_OBJECT, "property"),
+    "python": (ATTRIBUTE, "object", "attribute"),
+    "javascript": (_JS_MEMBER_EXPRESSION, "object", "property"),
+    "typescript": (_TS_MEMBER_EXPRESSION, "object", "property"),
     "rust": (_RUST_FIELD_EXPRESSION, "value", "field"),
     # C++ ``this->m()``: field_expression with ``argument`` = this, ``field`` = m.
-    "cpp": (_CPP_FIELD_EXPRESSION, _PHP_ARGUMENT, "field"),
+    "cpp": (_CPP_FIELD_EXPRESSION, "argument", "field"),
 }
 
 

@@ -30,6 +30,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text
+from safelint.languages.rust import ATTRIBUTE as _RUST_ATTRIBUTE
+from safelint.languages.rust import IDENTIFIER as _RUST_IDENTIFIER
+from safelint.languages.rust import SCOPED_IDENTIFIER as _RUST_SCOPED_IDENTIFIER
 
 
 if TYPE_CHECKING:
@@ -73,7 +76,7 @@ def attribute_item_is_test_marker(attr_item: tree_sitter.Node) -> bool:
     Convenience wrapper: extracts the inner ``attribute`` child and
     delegates to :func:`attribute_is_test_marker`.
     """
-    attribute = next((c for c in attr_item.named_children if c.type == "attribute"), None)
+    attribute = next((c for c in attr_item.named_children if c.type == _RUST_ATTRIBUTE), None)
     if attribute is None:  # pragma: no cover - defensive: every attribute_item wraps an attribute
         return False
     return attribute_is_test_marker(attribute)
@@ -82,10 +85,10 @@ def attribute_item_is_test_marker(attr_item: tree_sitter.Node) -> bool:
 def _first_child_marks_test(children: list[tree_sitter.Node]) -> bool:
     """Dispatch the test-marker check on an attribute's first named child."""
     first = children[0]
-    if first.type == "scoped_identifier":
+    if first.type == _RUST_SCOPED_IDENTIFIER:
         trailing = first.child_by_field_name("name")
         return trailing is not None and node_text(trailing) in RUST_TEST_ATTRIBUTE_NAMES
-    if first.type != "identifier":  # pragma: no cover - defensive: rare attribute shapes (token_tree-first etc.)
+    if first.type != _RUST_IDENTIFIER:  # pragma: no cover - defensive: rare attribute shapes (token_tree-first etc.)
         return False
     first_name = node_text(first)
     if first_name in RUST_TEST_ATTRIBUTE_NAMES:
@@ -103,6 +106,6 @@ def _cfg_token_tree_mentions_test(children: list[tree_sitter.Node]) -> bool:
     for child in children:
         if child.type != "token_tree":  # pragma: no cover - ``#[cfg = "value"]`` shape isn't a test marker
             continue
-        if any(inner.type == "identifier" and node_text(inner) == "test" for inner in child.named_children):
+        if any(inner.type == _RUST_IDENTIFIER and node_text(inner) == "test" for inner in child.named_children):
             return True
     return False

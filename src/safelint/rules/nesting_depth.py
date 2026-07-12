@@ -14,6 +14,7 @@ from safelint.languages.c import SWITCH_STATEMENT as _C_SWITCH_STATEMENT
 from safelint.languages.c import WHILE_STATEMENT as _C_WHILE_STATEMENT
 from safelint.languages.cpp import DO_STATEMENT as _CPP_DO_STATEMENT
 from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
+from safelint.languages.cpp import FOR_RANGE_LOOP as _CPP_FOR_RANGE_LOOP
 from safelint.languages.cpp import FOR_STATEMENT as _CPP_FOR_STATEMENT
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.cpp import IF_STATEMENT as _CPP_IF_STATEMENT
@@ -163,7 +164,7 @@ _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # targets are flat labels, not nesting.
     "c": frozenset({_C_IF_STATEMENT, _C_FOR_STATEMENT, _C_WHILE_STATEMENT, _C_DO_STATEMENT, _C_SWITCH_STATEMENT}),
     # C++: the C set plus ``try_statement`` (a try block nests its body).
-    "cpp": frozenset({_CPP_IF_STATEMENT, _CPP_FOR_STATEMENT, "for_range_loop", _CPP_WHILE_STATEMENT, _CPP_DO_STATEMENT, _CPP_SWITCH_STATEMENT, _CPP_TRY_STATEMENT}),
+    "cpp": frozenset({_CPP_IF_STATEMENT, _CPP_FOR_STATEMENT, _CPP_FOR_RANGE_LOOP, _CPP_WHILE_STATEMENT, _CPP_DO_STATEMENT, _CPP_SWITCH_STATEMENT, _CPP_TRY_STATEMENT}),
 }
 
 
