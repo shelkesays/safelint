@@ -6,12 +6,14 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
 from safelint.languages.c import DO_STATEMENT as _C_DO_STATEMENT
+from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
 from safelint.languages.c import FOR_STATEMENT as _C_FOR_STATEMENT
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.c import IF_STATEMENT as _C_IF_STATEMENT
 from safelint.languages.c import SWITCH_STATEMENT as _C_SWITCH_STATEMENT
 from safelint.languages.c import WHILE_STATEMENT as _C_WHILE_STATEMENT
 from safelint.languages.cpp import DO_STATEMENT as _CPP_DO_STATEMENT
+from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
 from safelint.languages.cpp import FOR_STATEMENT as _CPP_FOR_STATEMENT
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.cpp import IF_STATEMENT as _CPP_IF_STATEMENT
@@ -19,6 +21,7 @@ from safelint.languages.cpp import SWITCH_STATEMENT as _CPP_SWITCH_STATEMENT
 from safelint.languages.cpp import TRY_STATEMENT as _CPP_TRY_STATEMENT
 from safelint.languages.cpp import WHILE_STATEMENT as _CPP_WHILE_STATEMENT
 from safelint.languages.go import EXPRESSION_SWITCH_STATEMENT as _GO_EXPRESSION_SWITCH_STATEMENT
+from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
 from safelint.languages.go import FOR_STATEMENT as _GO_FOR_STATEMENT
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.go import IF_STATEMENT as _GO_IF_STATEMENT
@@ -26,6 +29,7 @@ from safelint.languages.go import SELECT_STATEMENT as _GO_SELECT_STATEMENT
 from safelint.languages.go import TYPE_SWITCH_STATEMENT as _GO_TYPE_SWITCH_STATEMENT
 from safelint.languages.java import DO_STATEMENT as _JAVA_DO_STATEMENT
 from safelint.languages.java import ENHANCED_FOR_STATEMENT as _JAVA_ENHANCED_FOR_STATEMENT
+from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
 from safelint.languages.java import FOR_STATEMENT as _JAVA_FOR_STATEMENT
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.java import IF_STATEMENT as _JAVA_IF_STATEMENT
@@ -34,6 +38,7 @@ from safelint.languages.java import TRY_STATEMENT as _JAVA_TRY_STATEMENT
 from safelint.languages.java import TRY_WITH_RESOURCES_STATEMENT as _JAVA_TRY_WITH_RESOURCES_STATEMENT
 from safelint.languages.java import WHILE_STATEMENT as _JAVA_WHILE_STATEMENT
 from safelint.languages.javascript import DO_STATEMENT as _JS_DO_STATEMENT
+from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
 from safelint.languages.javascript import FOR_IN_STATEMENT as _JS_FOR_IN_STATEMENT
 from safelint.languages.javascript import FOR_STATEMENT as _JS_FOR_STATEMENT
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
@@ -42,6 +47,7 @@ from safelint.languages.javascript import SWITCH_STATEMENT as _JS_SWITCH_STATEME
 from safelint.languages.javascript import TRY_STATEMENT as _JS_TRY_STATEMENT
 from safelint.languages.javascript import WHILE_STATEMENT as _JS_WHILE_STATEMENT
 from safelint.languages.php import DO_STATEMENT as _PHP_DO_STATEMENT
+from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
 from safelint.languages.php import FOR_STATEMENT as _PHP_FOR_STATEMENT
 from safelint.languages.php import FOREACH_STATEMENT as _PHP_FOREACH_STATEMENT
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
@@ -52,6 +58,7 @@ from safelint.languages.php import TRY_STATEMENT as _PHP_TRY_STATEMENT
 from safelint.languages.php import WHILE_STATEMENT as _PHP_WHILE_STATEMENT
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
+    EXTRA_NAME,
     FOR_STATEMENT,
     FUNCTION_DEF,
     IF_STATEMENT,
@@ -60,6 +67,7 @@ from safelint.languages.python import (
     WHILE_STATEMENT,
     WITH_STATEMENT,
 )
+from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
 from safelint.languages.rust import FOR_EXPRESSION as _RUST_FOR_EXPRESSION
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 from safelint.languages.rust import IF_EXPRESSION as _RUST_IF_EXPRESSION
@@ -69,6 +77,7 @@ from safelint.languages.rust import MATCH_EXPRESSION as _RUST_MATCH_EXPRESSION
 from safelint.languages.rust import WHILE_EXPRESSION as _RUST_WHILE_EXPRESSION
 from safelint.languages.rust import WHILE_LET_EXPRESSION as _RUST_WHILE_LET_EXPRESSION
 from safelint.languages.typescript import DO_STATEMENT as _TS_DO_STATEMENT
+from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.languages.typescript import FOR_IN_STATEMENT as _TS_FOR_IN_STATEMENT
 from safelint.languages.typescript import FOR_STATEMENT as _TS_FOR_STATEMENT
 from safelint.languages.typescript import IF_STATEMENT as _TS_IF_STATEMENT
@@ -163,7 +172,7 @@ class NestingDepthRule(BaseRule):
 
     name = "nesting_depth"
     code = "SAFE102"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
+    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function whose maximum control-flow nesting depth exceeds max_depth."""

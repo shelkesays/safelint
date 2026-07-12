@@ -115,6 +115,7 @@ INIT_DECLARATOR = "init_declarator"
 FIELD_DECLARATION = "field_declaration"  # class/struct member declaration (SAFE302 static members)
 PARAMETER_LIST = "parameter_list"
 PARAMETER_DECLARATION = "parameter_declaration"
+OPTIONAL_PARAMETER_DECLARATION = "optional_parameter_declaration"
 
 # Declarators (SAFE313 restricted pointers).
 POINTER_DECLARATOR = "pointer_declarator"

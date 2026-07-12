@@ -13,48 +13,78 @@ from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.c import BREAK_STATEMENT as _C_BREAK_STATEMENT
+from safelint.languages.c import CONDITION_CLAUSE as _C_CONDITION_CLAUSE
+from safelint.languages.c import DO_STATEMENT as _C_DO_STATEMENT
+from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
 from safelint.languages.c import FOR_STATEMENT as _C_FOR_STATEMENT
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.c import GOTO_STATEMENT as _C_GOTO_STATEMENT
+from safelint.languages.c import IDENTIFIER as _C_IDENTIFIER
+from safelint.languages.c import LABELED_STATEMENT as _C_LABELED_STATEMENT
 from safelint.languages.c import NUMBER_LITERAL as _C_NUMBER_LITERAL
+from safelint.languages.c import PARENTHESIZED_EXPRESSION as _C_PARENTHESIZED_EXPRESSION
+from safelint.languages.c import SWITCH_STATEMENT as _C_SWITCH_STATEMENT
+from safelint.languages.c import TRUE as _C_TRUE
 from safelint.languages.c import WHILE_STATEMENT as _C_WHILE_STATEMENT
 from safelint.languages.cpp import BREAK_STATEMENT as _CPP_BREAK_STATEMENT
+from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
 from safelint.languages.cpp import FOR_STATEMENT as _CPP_FOR_STATEMENT
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
+from safelint.languages.cpp import LAMBDA_EXPRESSION as _CPP_LAMBDA_EXPRESSION
 from safelint.languages.cpp import WHILE_STATEMENT as _CPP_WHILE_STATEMENT
 from safelint.languages.go import BREAK_STATEMENT as _GO_BREAK_STATEMENT
+from safelint.languages.go import COMMENT as _GO_COMMENT
+from safelint.languages.go import EXPRESSION_SWITCH_STATEMENT as _GO_EXPRESSION_SWITCH_STATEMENT
+from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
 from safelint.languages.go import FOR_STATEMENT as _GO_FOR_STATEMENT
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.go import LABEL_NAME as _GO_LABEL_NAME
+from safelint.languages.go import SELECT_STATEMENT as _GO_SELECT_STATEMENT
+from safelint.languages.go import TYPE_SWITCH_STATEMENT as _GO_TYPE_SWITCH_STATEMENT
 from safelint.languages.java import BREAK_STATEMENT as _JAVA_BREAK_STATEMENT
+from safelint.languages.java import ENHANCED_FOR_STATEMENT as _JAVA_ENHANCED_FOR_STATEMENT
+from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.java import IDENTIFIER as _JAVA_IDENTIFIER
+from safelint.languages.java import SWITCH_EXPRESSION as _JAVA_SWITCH_EXPRESSION
 from safelint.languages.java import TRUE as _JAVA_TRUE
 from safelint.languages.java import WHILE_STATEMENT as _JAVA_WHILE_STATEMENT
 from safelint.languages.javascript import BREAK_STATEMENT as _JS_BREAK_STATEMENT
+from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
+from safelint.languages.javascript import FOR_IN_STATEMENT as _JS_FOR_IN_STATEMENT
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.javascript import TRUE as _JS_TRUE
 from safelint.languages.javascript import WHILE_STATEMENT as _JS_WHILE_STATEMENT
 from safelint.languages.php import BOOLEAN as _PHP_BOOLEAN
 from safelint.languages.php import BREAK_STATEMENT as _PHP_BREAK_STATEMENT
+from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
 from safelint.languages.php import FOR_STATEMENT as _PHP_FOR_STATEMENT
+from safelint.languages.php import FOREACH_STATEMENT as _PHP_FOREACH_STATEMENT
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
+from safelint.languages.php import INTEGER as _PHP_INTEGER
 from safelint.languages.php import WHILE_STATEMENT as _PHP_WHILE_STATEMENT
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     BREAK_STATEMENT,
     COMPARISON_OPERATOR,
+    EXTRA_NAME,
     FOR_STATEMENT,
     FUNCTION_DEF,
+    IDENTIFIER,
     TRUE,
     WHILE_STATEMENT,
 )
 from safelint.languages.rust import BOOLEAN_LITERAL as _RUST_BOOLEAN_LITERAL
 from safelint.languages.rust import BREAK_EXPRESSION as _RUST_BREAK_EXPRESSION
+from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
+from safelint.languages.rust import FOR_EXPRESSION as _RUST_FOR_EXPRESSION
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
+from safelint.languages.rust import IDENTIFIER as _RUST_IDENTIFIER
 from safelint.languages.rust import LABEL as _RUST_LABEL
 from safelint.languages.rust import LOOP_EXPRESSION as _RUST_LOOP_EXPRESSION
 from safelint.languages.rust import WHILE_EXPRESSION as _RUST_WHILE_EXPRESSION
 from safelint.languages.typescript import BREAK_STATEMENT as _TS_BREAK_STATEMENT
+from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.languages.typescript import STATEMENT_IDENTIFIER as _TS_STATEMENT_IDENTIFIER
 from safelint.languages.typescript import TRUE as _TS_TRUE
 from safelint.languages.typescript import WHILE_STATEMENT as _TS_WHILE_STATEMENT
@@ -142,7 +172,7 @@ _TRUE_LITERAL_BY_LANG: dict[str, str] = {
     # identifier. ``_is_literal_true`` special-cases C to handle both.
     "c": _C_NUMBER_LITERAL,
     # C++: unused directly (``_is_c_literal_true`` handles both ``1`` and ``true``).
-    "cpp": "number_literal",
+    "cpp": _C_NUMBER_LITERAL,
 }
 
 # Per-language: the node type used by a labelled-break's argument.
@@ -152,7 +182,7 @@ _TRUE_LITERAL_BY_LANG: dict[str, str] = {
 # node (``break outer``). Python has no labelled break.
 _BREAK_LABEL_TYPE_BY_LANG: dict[str, str | None] = {
     "python": None,
-    "javascript": "statement_identifier",
+    "javascript": _TS_STATEMENT_IDENTIFIER,
     "typescript": _TS_STATEMENT_IDENTIFIER,
     "java": _JAVA_IDENTIFIER,
     "rust": _RUST_LABEL,
@@ -166,23 +196,23 @@ _BREAK_LABEL_TYPE_BY_LANG: dict[str, str | None] = {
 # a nested loop or function definition (those breaks belong to the
 # inner construct, not the outer ``while`` we're checking).
 _JS_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
-    "for_statement",
-    "for_in_statement",  # also covers ``for...of``
-    "while_statement",
-    "do_statement",
+    FOR_STATEMENT,
+    _JS_FOR_IN_STATEMENT,  # also covers ``for...of``
+    WHILE_STATEMENT,
+    _C_DO_STATEMENT,
     # Switch arms also stop ``break`` propagation.
-    "switch_statement",
+    _C_SWITCH_STATEMENT,
     *sorted(_JS_FUNCTION_TYPES),
 )
 _JAVA_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
-    "for_statement",
-    "enhanced_for_statement",
-    "while_statement",
-    "do_statement",
+    FOR_STATEMENT,
+    _JAVA_ENHANCED_FOR_STATEMENT,
+    WHILE_STATEMENT,
+    _C_DO_STATEMENT,
     # Switch arms stop ``break`` propagation (Java's classic colon-form
     # switch uses ``break`` to exit a case; the modern arrow-form
     # ``case X -> stmt`` does not).
-    "switch_expression",
+    _JAVA_SWITCH_EXPRESSION,
     *sorted(_JAVA_FUNCTION_TYPES),
 )
 # Rust: any nested loop type stops a bare ``break`` from referring to
@@ -190,9 +220,9 @@ _JAVA_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
 # inside a match arm legally targets the enclosing loop (there is no
 # ``break`` exit from a match).
 _RUST_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
-    "for_expression",
-    "while_expression",
-    "loop_expression",
+    _RUST_FOR_EXPRESSION,
+    _RUST_WHILE_EXPRESSION,
+    _RUST_LOOP_EXPRESSION,
     *sorted(_RUST_FUNCTION_TYPES),
 )
 # Go: a nested ``for`` stops a bare ``break`` from referring to the outer
@@ -200,25 +230,25 @@ _RUST_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
 # (not the enclosing loop) - so the two switch forms and ``select`` are
 # boundaries too, the same way Java's ``switch_expression`` is.
 _GO_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
-    "for_statement",
-    "expression_switch_statement",
-    "type_switch_statement",
-    "select_statement",
+    FOR_STATEMENT,
+    _GO_EXPRESSION_SWITCH_STATEMENT,
+    _GO_TYPE_SWITCH_STATEMENT,
+    _GO_SELECT_STATEMENT,
     *sorted(_GO_FUNCTION_TYPES),
 )
 # C: a nested loop or ``switch`` stops a bare ``break`` from exiting the outer
 # loop. ``function_definition`` bounds the scope too. C has no labelled break -
 # ``goto`` is the multi-level escape, handled separately as a loop exit.
 _C_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
-    "for_statement",
-    "while_statement",
-    "do_statement",
-    "switch_statement",
-    "function_definition",
+    FOR_STATEMENT,
+    WHILE_STATEMENT,
+    _C_DO_STATEMENT,
+    _C_SWITCH_STATEMENT,
+    FUNCTION_DEF,
 )
 # C++ adds ``lambda_expression`` to C's boundary set: a ``break`` inside a
 # lambda body exits that lambda, not an enclosing loop.
-_CPP_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (*_C_BREAK_SCOPE_BOUNDARIES, "lambda_expression")
+_CPP_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (*_C_BREAK_SCOPE_BOUNDARIES, _CPP_LAMBDA_EXPRESSION)
 _BREAK_SCOPE_BOUNDARIES_BY_LANG: dict[str, tuple[str, ...]] = {
     "python": (FOR_STATEMENT, WHILE_STATEMENT, FUNCTION_DEF, ASYNC_FUNCTION_DEF),
     "javascript": _JS_BREAK_SCOPE_BOUNDARIES,
@@ -274,11 +304,11 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # is excluded - it has no ``break`` statement.
 _PHP_LOOP_SWITCH_TYPES: frozenset[str] = frozenset(
     {
-        "for_statement",
-        "foreach_statement",
-        "while_statement",
-        "do_statement",
-        "switch_statement",
+        FOR_STATEMENT,
+        _PHP_FOREACH_STATEMENT,
+        WHILE_STATEMENT,
+        _C_DO_STATEMENT,
+        _C_SWITCH_STATEMENT,
     }
 )
 
@@ -307,7 +337,7 @@ def _is_php_infinite_for(node: tree_sitter.Node) -> bool:
 def _php_break_level(break_node: tree_sitter.Node) -> int:
     """Return the numeric level of a PHP ``break`` (``break 2;`` -> 2, bare ``break;`` -> 1)."""
     for child in break_node.named_children:
-        if child.type == "integer":
+        if child.type == _PHP_INTEGER:
             text = node_text(child)
             return int(text) if text.isdigit() else 1
     return 1
@@ -330,7 +360,7 @@ def _php_has_exiting_break(loop_node: tree_sitter.Node) -> bool:
         node, depth = stack.pop()
         if node is not loop_node and node.type in funcs:
             continue
-        if node.type == "break_statement" and _php_break_level(node) >= depth + 1:
+        if node.type == _PHP_BREAK_STATEMENT and _php_break_level(node) >= depth + 1:
             return True
         child_depth = depth + 1 if (node is not loop_node and node.type in _PHP_LOOP_SWITCH_TYPES) else depth
         stack.extend((child, child_depth) for child in node.named_children)
@@ -351,7 +381,7 @@ def _c_labels_defined_in(loop_node: tree_sitter.Node, skip: tuple[str, ...]) -> 
     """Return the set of label names defined within *loop_node* (skipping nested functions)."""
     names: set[str] = set()
     for child in walk(loop_node, skip_types=skip):
-        if child.type != "labeled_statement":
+        if child.type != _C_LABELED_STATEMENT:
             continue
         label = child.child_by_field_name("label")
         if label is not None:
@@ -371,7 +401,7 @@ def _c_has_goto_exit(loop_node: tree_sitter.Node) -> bool:
     skip = tuple(_C_FUNCTION_TYPES)
     inner_labels = _c_labels_defined_in(loop_node, skip)
     for child in walk(loop_node, skip_types=skip):
-        if child.type != "goto_statement":
+        if child.type != _C_GOTO_STATEMENT:
             continue
         target = child.child_by_field_name("label")
         if target is not None and node_text(target) not in inner_labels:
@@ -393,7 +423,7 @@ def _is_go_infinite_for(node: tree_sitter.Node) -> bool:
     # ``child is body`` is always False even for the same node.
     body = node.child_by_field_name("body")
     body_id = body.id if body is not None else None
-    return all(child.id == body_id or child.type == "comment" for child in node.named_children)
+    return all(child.id == body_id or child.type == _GO_COMMENT for child in node.named_children)
 
 
 def _rust_label_name(label_node: tree_sitter.Node) -> str | None:
@@ -404,7 +434,7 @@ def _rust_label_name(label_node: tree_sitter.Node) -> str | None:
     ``'outer`` (with the leading apostrophe); reaching into the
     identifier returns the bare name (``outer``) for comparison.
     """
-    ident = next((c for c in label_node.named_children if c.type == "identifier"), None)
+    ident = next((c for c in label_node.named_children if c.type == _RUST_IDENTIFIER), None)
     return node_text(ident) if ident is not None else None
 
 
@@ -413,9 +443,9 @@ def _rust_label_name(label_node: tree_sitter.Node) -> str | None:
 # *target* of the break, not a name for the break itself.)
 _RUST_LABELABLE_NODE_TYPES: frozenset[str] = frozenset(
     {
-        "loop_expression",
-        "while_expression",
-        "for_expression",
+        _RUST_LOOP_EXPRESSION,
+        _RUST_WHILE_EXPRESSION,
+        _RUST_FOR_EXPRESSION,
     }
 )
 
@@ -439,7 +469,7 @@ def _node_label_name(node: tree_sitter.Node, lang_name: str) -> str | None:
     """
     if lang_name == "rust":
         return _rust_node_label_name(node)
-    if node.type != "labeled_statement":
+    if node.type != _C_LABELED_STATEMENT:
         return None
     return _labeled_statement_name(node, lang_name)
 
@@ -453,7 +483,7 @@ def _rust_node_label_name(node: tree_sitter.Node) -> str | None:
     """
     if node.type not in _RUST_LABELABLE_NODE_TYPES:
         return None
-    label = next((c for c in node.named_children if c.type == "label"), None)
+    label = next((c for c in node.named_children if c.type == _RUST_LABEL), None)
     return None if label is None else _rust_label_name(label)
 
 
@@ -465,10 +495,10 @@ def _labeled_statement_name(node: tree_sitter.Node, lang_name: str) -> str | Non
     ``label`` field (a ``statement_identifier``).
     """
     if lang_name == "java":
-        ident = next((c for c in node.named_children if c.type == "identifier"), None)
+        ident = next((c for c in node.named_children if c.type == IDENTIFIER), None)
         return node_text(ident) if ident is not None else None
     if lang_name == "go":
-        label_name = next((c for c in node.named_children if c.type == "label_name"), None)
+        label_name = next((c for c in node.named_children if c.type == _GO_LABEL_NAME), None)
         return node_text(label_name) if label_name is not None else None
     label = node.child_by_field_name("label")
     return node_text(label) if label is not None else None
@@ -558,7 +588,7 @@ def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
         # dedicated depth-counting walk replaces both the direct-break and
         # labelled-break paths.
         return _php_has_exiting_break(while_node)
-    if lang_name in ("c", "cpp"):
+    if lang_name in (_C_EXTRA_NAME, _CPP_EXTRA_NAME):
         # C / C++ have no labelled break; a ``goto`` leaving the loop is the multi-level
         # escape. ``_c_has_goto_exit`` counts a ``goto`` as an exit only when its
         # target label is defined outside the loop body - a ``goto`` to an in-loop
@@ -567,7 +597,7 @@ def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
         return _has_direct_break(while_node, lang_name) or _c_has_goto_exit(while_node)
     if _has_direct_break(while_node, lang_name):
         return True
-    if lang_name not in ("javascript", "typescript", "java", "rust", "go"):
+    if lang_name not in (_JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME):
         return False
     return _has_outward_labelled_break(while_node, lang_name)
 
@@ -582,9 +612,9 @@ def _is_c_literal_true(condition: tree_sitter.Node) -> bool:
     canonical infinite idiom.
     """
     text = node_text(condition)
-    if condition.type == "number_literal":
+    if condition.type == _C_NUMBER_LITERAL:
         return text == "1"
-    return condition.type in ("identifier", "true") and text == "true"
+    return condition.type in (_C_IDENTIFIER, _C_TRUE) and text == _C_TRUE
 
 
 def _is_literal_true(condition: tree_sitter.Node, lang_name: str) -> bool:
@@ -596,20 +626,20 @@ def _is_literal_true(condition: tree_sitter.Node, lang_name: str) -> bool:
     so the check additionally inspects the token text. C is special-cased
     (``1`` or ``true``) via :func:`_is_c_literal_true`.
     """
-    if lang_name in ("c", "cpp"):
+    if lang_name in (_C_EXTRA_NAME, _CPP_EXTRA_NAME):
         return _is_c_literal_true(condition)
     expected = _TRUE_LITERAL_BY_LANG[lang_name]
     if condition.type != expected:
         return False
     # Rust and PHP collapse both boolean literals into one node type, so the
     # token text must be inspected; the others emit a dedicated ``true`` node.
-    if lang_name not in ("rust", "php"):
+    if lang_name not in (_RUST_EXTRA_NAME, _PHP_EXTRA_NAME):
         return True
     text = node_text(condition)
     # PHP boolean literals are case-insensitive (``true`` / ``TRUE`` / ``True``
     # all denote the same value), so ``while (TRUE)`` must still fire SAFE501.
     # Rust's ``true`` is case-sensitive, so it keeps the exact comparison.
-    return text.lower() == "true" if lang_name == "php" else text == "true"
+    return text.lower() == TRUE if lang_name == _PHP_EXTRA_NAME else text == TRUE
 
 
 class UnboundedLoopRule(BaseRule):
@@ -630,12 +660,12 @@ class UnboundedLoopRule(BaseRule):
 
     name = "unbounded_loops"
     code = "SAFE501"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
+    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
 
     @staticmethod
     def _while_true_construct(lang_name: str) -> str:
         """Return the source-language spelling of ``while true`` for messages."""
-        if lang_name in ("javascript", "typescript", "java"):
+        if lang_name in (_JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME):
             return "while (true)"
         if lang_name == "rust":
             return "while true"
@@ -661,7 +691,7 @@ class UnboundedLoopRule(BaseRule):
         # ``while (true)`` check would silently skip. C++ wraps the condition
         # in a ``condition_clause`` instead (it can hold a declaration), whose
         # inner expression is likewise the first named child - unwrap it too.
-        while condition.type in ("parenthesized_expression", "condition_clause"):
+        while condition.type in (_C_PARENTHESIZED_EXPRESSION, _C_CONDITION_CLAUSE):
             if not condition.named_children:
                 break
             condition = condition.named_children[0]
@@ -699,11 +729,11 @@ class UnboundedLoopRule(BaseRule):
         the headerless infinite form (see :func:`_is_go_infinite_for`) is
         considered; bounded ``for`` loops return ``None`` immediately.
         """
-        if lang_name == "go" and not _is_go_infinite_for(node):
+        if lang_name == _GO_EXTRA_NAME and not _is_go_infinite_for(node):
             return None
-        if lang_name == "php" and not _is_php_infinite_for(node):
+        if lang_name == _PHP_EXTRA_NAME and not _is_php_infinite_for(node):
             return None
-        if lang_name in ("c", "cpp") and not _is_c_infinite_for(node):
+        if lang_name in (_C_EXTRA_NAME, _CPP_EXTRA_NAME) and not _is_c_infinite_for(node):
             return None
         if _has_exiting_break(node, lang_name):
             return None

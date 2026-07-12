@@ -41,6 +41,7 @@ from typing import TYPE_CHECKING
 from safelint.languages._node_utils import call_name, node_text, walk
 from safelint.languages.php import (
     ARGUMENT,
+    ARRAY_CREATION_EXPRESSION,
     ASSIGNMENT_EXPRESSION,
     AUGMENTED_ASSIGNMENT_EXPRESSION,
     BINARY_EXPRESSION,
@@ -57,6 +58,7 @@ from safelint.languages.php import (
     REQUIRE_ONCE_EXPRESSION,
     SCOPED_CALL_EXPRESSION,
     SUBSCRIPT_EXPRESSION,
+    UNARY_OP_EXPRESSION,
     VARIABLE_NAME,
 )
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
@@ -93,14 +95,14 @@ _PHP_INCLUDE_TYPES = frozenset(
 _SPREADING_TYPES = frozenset(
     {
         BINARY_EXPRESSION,
-        "unary_op_expression",
+        UNARY_OP_EXPRESSION,
         PARENTHESIZED_EXPRESSION,
         ENCAPSED_STRING,
     }
 )
 
 # Array literals carry taint when any element is tainted.
-_CONTAINER_TYPES = frozenset({"array_creation_expression"})
+_CONTAINER_TYPES = frozenset({ARRAY_CREATION_EXPRESSION})
 
 
 class PhpTaintTracker:
