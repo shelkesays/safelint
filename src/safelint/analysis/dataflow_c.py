@@ -29,6 +29,22 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.languages.c import (
+    ASSIGNMENT_EXPRESSION,
+    BINARY_EXPRESSION,
+    CALL_EXPRESSION,
+    CAST_EXPRESSION,
+    COMMA_EXPRESSION,
+    CONDITIONAL_EXPRESSION,
+    FIELD_EXPRESSION,
+    IDENTIFIER,
+    INIT_DECLARATOR,
+    PARENTHESIZED_EXPRESSION,
+    POINTER_EXPRESSION,
+    SUBSCRIPT_EXPRESSION,
+    TYPE_DESCRIPTOR,
+    UNARY_EXPRESSION,
+)
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 
 
@@ -39,12 +55,12 @@ if TYPE_CHECKING:
 # Expressions whose taint state is the OR of their named children.
 _SPREADING_TYPES = frozenset(
     {
-        "binary_expression",
-        "unary_expression",
-        "parenthesized_expression",
-        "pointer_expression",  # ``*p`` / ``&p``
-        "comma_expression",
-        "conditional_expression",  # ``cond ? tainted : clean`` - either branch taints
+        BINARY_EXPRESSION,
+        UNARY_EXPRESSION,
+        PARENTHESIZED_EXPRESSION,
+        POINTER_EXPRESSION,  # ``*p`` / ``&p``
+        COMMA_EXPRESSION,
+        CONDITIONAL_EXPRESSION,  # ``cond ? tainted : clean`` - either branch taints
     }
 )
 
@@ -76,7 +92,7 @@ def _declarator_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | 
     for _ in range(16):
         if cur is None:  # pragma: no cover - defensive: declarator chains always bottom out in an identifier
             return None
-        if cur.type == "identifier":
+        if cur.type == IDENTIFIER:
             return cur
         cur = cur.child_by_field_name("declarator")
     return None  # pragma: no cover - defensive: 16-deep declarator nesting does not occur
@@ -116,11 +132,11 @@ class CTaintTracker:
     def _visit_node(self, node: tree_sitter.Node) -> None:
         """Dispatch *node* to the right per-shape handler."""
         node_type = node.type
-        if node_type == "init_declarator":
+        if node_type == INIT_DECLARATOR:
             self._visit_init_declarator(node)
-        elif node_type == "assignment_expression":
+        elif node_type == ASSIGNMENT_EXPRESSION:
             self._visit_assignment(node)
-        elif node_type == "call_expression":
+        elif node_type == CALL_EXPRESSION:
             self._visit_call(node)
 
     def _visit_init_declarator(self, node: tree_sitter.Node) -> None:
@@ -136,7 +152,7 @@ class CTaintTracker:
         """Propagate taint through ``x = value`` / ``x += value`` (compound keeps prior taint)."""
         left = node.child_by_field_name("left")
         right = node.child_by_field_name("right")
-        if left is None or right is None or left.type != "identifier":
+        if left is None or right is None or left.type != IDENTIFIER:
             return
         operator = node.child_by_field_name("operator")
         keep_existing = operator is not None and node_text(operator) != "="
@@ -156,7 +172,7 @@ class CTaintTracker:
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
-        arg_name = node_text(arg_node) if arg_node.type == "identifier" else "<expr>"
+        arg_name = node_text(arg_node) if arg_node.type == IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
 
     def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool, keep_existing: bool = False) -> None:
@@ -165,7 +181,7 @@ class CTaintTracker:
         No ``_`` blank-identifier skip: unlike Go / Python, C has no blank
         identifier, so a variable legitimately named ``_`` is tracked normally.
         """
-        if target.type != "identifier":  # pragma: no cover - callers pre-filter to identifier nodes
+        if target.type != IDENTIFIER:  # pragma: no cover - callers pre-filter to identifier nodes
             return
         name = node_text(target)
         if is_tainted:
@@ -193,9 +209,9 @@ class CTaintTracker:
     def _taint_step(self, node: tree_sitter.Node) -> tuple[bool, list[tree_sitter.Node]]:
         """Reduce one worklist node to ``(is_tainted_here, children_to_examine)``."""
         node_type = node.type
-        if node_type == "identifier":
+        if node_type == IDENTIFIER:
             return node_text(node) in self.tainted, []
-        if node_type == "call_expression":
+        if node_type == CALL_EXPRESSION:
             return self._classify_call(node)
         return False, self._taint_propagating_children(node)
 
@@ -223,16 +239,16 @@ class CTaintTracker:
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
         """Return the child nodes through which taint can flow into *node*."""
         node_type = node.type
-        if node_type == "subscript_expression":
+        if node_type == SUBSCRIPT_EXPRESSION:
             argument = node.child_by_field_name("argument")
             return [argument] if argument is not None else []
-        if node_type == "field_expression":
+        if node_type == FIELD_EXPRESSION:
             argument = node.child_by_field_name("argument")
             return [argument] if argument is not None else []
-        if node_type == "cast_expression":
+        if node_type == CAST_EXPRESSION:
             # ``(T)expr`` - propagate the operand, never the type_descriptor.
-            return [c for c in node.named_children if c.type != "type_descriptor"]
-        if node_type == "assignment_expression":
+            return [c for c in node.named_children if c.type != TYPE_DESCRIPTOR]
+        if node_type == ASSIGNMENT_EXPRESSION:
             # An inline ``(x = rhs)`` carries its RHS's value into the sink.
             return _assignment_propagating_children(node)
         if node_type in _SPREADING_TYPES:

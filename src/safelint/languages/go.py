@@ -191,3 +191,12 @@ SOURCE_FILE = "source_file"  # the root node
 PACKAGE_CLAUSE = "package_clause"
 IMPORT_DECLARATION = "import_declaration"
 COMMENT = "comment"  # single type for both ``//`` and ``/* */``
+
+# Node-type constants added for the rules node-constant refactor
+# (per-language literal -> imported-constant sweep).
+AMP_AMP = "&&"
+PIPE_PIPE = "||"
+VAR_SPEC_LIST = "var_spec_list"
+BANG_EQ = "!="
+EQ_EQ = "=="
+EQ = "="
