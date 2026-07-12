@@ -9,6 +9,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages.cpp import (
+    FIELD_IDENTIFIER as _CPP_FIELD_IDENTIFIER,
+)
+from safelint.languages.cpp import (
     FUNCTION_DECLARATOR as _CPP_FUNCTION_DECLARATOR,
 )
 from safelint.languages.cpp import (
@@ -66,6 +69,7 @@ from safelint.languages.php import (
 from safelint.languages.php import (
     SCOPED_CALL_EXPRESSION as _PHP_SCOPED_CALL_EXPRESSION,
 )
+from safelint.languages.python import ATTRIBUTE, CALL
 from safelint.languages.rust import (
     FIELD_EXPRESSION as _RUST_FIELD_EXPRESSION,
 )
@@ -189,7 +193,7 @@ def node_text(node: tree_sitter.Node) -> str:
 #:   ``object_creation_expression`` (already listed).
 CALL_TYPES: frozenset[str] = frozenset(
     {
-        "call",
+        CALL,
         _JS_CALL_EXPRESSION,
         _JS_NEW_EXPRESSION,
         _JAVA_METHOD_INVOCATION,
@@ -249,7 +253,7 @@ def function_name_node(func_node: tree_sitter.Node, lang_name: str) -> tree_sitt
     # to a child), so a plain ``while`` walk terminates without a fixed cap - a
     # cap would silently drop legal-but-deep declarators and lose name attribution.
     while node is not None:
-        if node.type in (_CPP_IDENTIFIER, "field_identifier"):
+        if node.type in (_CPP_IDENTIFIER, _CPP_FIELD_IDENTIFIER):
             return node if passed_function_declarator else None
         if node.type == _CPP_QUALIFIED_IDENTIFIER:
             # C++ ``S::m`` - the trailing ``name`` field is the method identifier.
@@ -326,7 +330,7 @@ def _java_type_name(type_node: tree_sitter.Node) -> str | None:
 #   the ``*_go`` sink / I/O lists short (users list ``Println``, not
 #   every package that exposes it).
 _CALLEE_BAREWORD_FIELD: dict[str, str] = {
-    "attribute": "attribute",
+    ATTRIBUTE: "attribute",
     _JS_MEMBER_EXPRESSION: "property",
     _RUST_FIELD_EXPRESSION: "field",
     _RUST_SCOPED_IDENTIFIER: "name",

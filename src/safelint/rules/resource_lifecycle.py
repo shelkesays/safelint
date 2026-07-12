@@ -12,9 +12,6 @@ from typing import TYPE_CHECKING, ClassVar
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup  # ``_validated_string_list`` re-exported for backwards-compat
 from safelint.languages._node_utils import call_name, resolve_lang_name, walk
 from safelint.languages._node_utils import node_text as _node_text
-from safelint.languages.c import ASSIGNMENT_EXPRESSION as _C_ASSIGNMENT_EXPRESSION
-from safelint.languages.c import CAST_EXPRESSION as _C_CAST_EXPRESSION
-from safelint.languages.c import PARENTHESIZED_EXPRESSION as _C_PARENTHESIZED_EXPRESSION
 from safelint.languages.go import ASSIGNMENT_STATEMENT as _GO_ASSIGNMENT_STATEMENT
 from safelint.languages.go import BLANK_IDENTIFIER as _GO_BLANK_IDENTIFIER
 from safelint.languages.go import CALL_EXPRESSION as _GO_CALL_EXPRESSION
@@ -38,11 +35,14 @@ from safelint.languages.go import TYPE_CASE as _GO_TYPE_CASE
 from safelint.languages.go import TYPE_SWITCH_STATEMENT as _GO_TYPE_SWITCH_STATEMENT
 from safelint.languages.go import VAR_SPEC as _GO_VAR_SPEC
 from safelint.languages.java import ARGUMENT_LIST as _JAVA_ARGUMENT_LIST
+from safelint.languages.java import ASSIGNMENT_EXPRESSION as _JAVA_ASSIGNMENT_EXPRESSION
+from safelint.languages.java import CAST_EXPRESSION as _JAVA_CAST_EXPRESSION
 from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
 from safelint.languages.java import FINALLY_CLAUSE as _JAVA_FINALLY_CLAUSE
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.java import METHOD_INVOCATION as _JAVA_METHOD_INVOCATION
 from safelint.languages.java import OBJECT_CREATION_EXPRESSION as _JAVA_OBJECT_CREATION_EXPRESSION
+from safelint.languages.java import PARENTHESIZED_EXPRESSION as _JAVA_PARENTHESIZED_EXPRESSION
 from safelint.languages.java import RESOURCE_SPECIFICATION as _JAVA_RESOURCE_SPECIFICATION
 from safelint.languages.java import TRY_STATEMENT as _JAVA_TRY_STATEMENT
 from safelint.languages.java import TRY_WITH_RESOURCES_STATEMENT as _JAVA_TRY_WITH_RESOURCES_STATEMENT
@@ -217,7 +217,7 @@ def _skip_wrapper_parents(node: tree_sitter.Node | None) -> tree_sitter.Node | N
     """
     cur = node
     while cur is not None:
-        if cur.type not in (_C_PARENTHESIZED_EXPRESSION, _C_CAST_EXPRESSION):
+        if cur.type not in (_JAVA_PARENTHESIZED_EXPRESSION, _JAVA_CAST_EXPRESSION):
             return cur
         cur = cur.parent
     return None  # node was None, or the wrapper chain ran off the tree root
@@ -236,7 +236,7 @@ def _direct_assigned_name(node: tree_sitter.Node) -> str | None:
         if name_node is not None and name_node.type == IDENTIFIER:
             return _node_text(name_node)
         return None  # pragma: no cover - defensive: declarator name is always an identifier in valid Java
-    if node.type == _C_ASSIGNMENT_EXPRESSION:
+    if node.type == _JAVA_ASSIGNMENT_EXPRESSION:
         left = node.child_by_field_name("left")
         if left is not None and left.type == IDENTIFIER:
             return _node_text(left)
