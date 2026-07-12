@@ -31,14 +31,30 @@ from dataclasses import replace
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
+from safelint.languages.c import CALL_EXPRESSION as _C_CALL_EXPRESSION
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.cpp import CALL_EXPRESSION as _CPP_CALL_EXPRESSION
+from safelint.languages.cpp import FIELD_EXPRESSION as _CPP_FIELD_EXPRESSION
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
+from safelint.languages.go import CALL_EXPRESSION as _GO_CALL_EXPRESSION
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
+from safelint.languages.java import METHOD_INVOCATION as _JAVA_METHOD_INVOCATION
+from safelint.languages.javascript import CALL_EXPRESSION as _JS_CALL_EXPRESSION
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.javascript import MEMBER_EXPRESSION as _JS_MEMBER_EXPRESSION
+from safelint.languages.javascript import OBJECT as _JS_OBJECT
+from safelint.languages.php import FUNCTION_CALL_EXPRESSION as _PHP_FUNCTION_CALL_EXPRESSION
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
+from safelint.languages.php import MEMBER_CALL_EXPRESSION as _PHP_MEMBER_CALL_EXPRESSION
+from safelint.languages.php import NULLSAFE_MEMBER_CALL_EXPRESSION as _PHP_NULLSAFE_MEMBER_CALL_EXPRESSION
+from safelint.languages.php import SCOPED_CALL_EXPRESSION as _PHP_SCOPED_CALL_EXPRESSION
 from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
+from safelint.languages.rust import CALL_EXPRESSION as _RUST_CALL_EXPRESSION
+from safelint.languages.rust import FIELD_EXPRESSION as _RUST_FIELD_EXPRESSION
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
+from safelint.languages.typescript import CALL_EXPRESSION as _TS_CALL_EXPRESSION
+from safelint.languages.typescript import MEMBER_EXPRESSION as _TS_MEMBER_EXPRESSION
 from safelint.rules.base import BaseRule, Suggestion
 
 
@@ -79,14 +95,14 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 #: cares about.
 _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({"call"}),
-    "javascript": frozenset({"call_expression"}),
-    "typescript": frozenset({"call_expression"}),
-    "rust": frozenset({"call_expression"}),
-    "java": frozenset({"method_invocation"}),
-    "go": frozenset({"call_expression"}),
-    "php": frozenset({"function_call_expression", "member_call_expression", "nullsafe_member_call_expression", "scoped_call_expression"}),
-    "c": frozenset({"call_expression"}),
-    "cpp": frozenset({"call_expression"}),
+    "javascript": frozenset({_JS_CALL_EXPRESSION}),
+    "typescript": frozenset({_TS_CALL_EXPRESSION}),
+    "rust": frozenset({_RUST_CALL_EXPRESSION}),
+    "java": frozenset({_JAVA_METHOD_INVOCATION}),
+    "go": frozenset({_GO_CALL_EXPRESSION}),
+    "php": frozenset({_PHP_FUNCTION_CALL_EXPRESSION, _PHP_MEMBER_CALL_EXPRESSION, _PHP_NULLSAFE_MEMBER_CALL_EXPRESSION, _PHP_SCOPED_CALL_EXPRESSION}),
+    "c": frozenset({_C_CALL_EXPRESSION}),
+    "cpp": frozenset({_CPP_CALL_EXPRESSION}),
 }
 
 #: Identifiers that name "the current object" per language. A call
@@ -106,11 +122,11 @@ _SELF_RECEIVERS: dict[str, frozenset[str]] = {
 #: as fields on the call node itself, not via a nested member-access node.
 _MEMBER_ACCESS: dict[str, tuple[str, str, str]] = {
     "python": ("attribute", "object", "attribute"),
-    "javascript": ("member_expression", "object", "property"),
-    "typescript": ("member_expression", "object", "property"),
-    "rust": ("field_expression", "value", "field"),
+    "javascript": (_JS_MEMBER_EXPRESSION, _JS_OBJECT, "property"),
+    "typescript": (_TS_MEMBER_EXPRESSION, "object", "property"),
+    "rust": (_RUST_FIELD_EXPRESSION, "value", "field"),
     # C++ ``this->m()``: field_expression with ``argument`` = this, ``field`` = m.
-    "cpp": ("field_expression", "argument", "field"),
+    "cpp": (_CPP_FIELD_EXPRESSION, "argument", "field"),
 }
 
 

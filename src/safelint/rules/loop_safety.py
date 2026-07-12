@@ -12,12 +12,33 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.c import BREAK_STATEMENT as _C_BREAK_STATEMENT
+from safelint.languages.c import FOR_STATEMENT as _C_FOR_STATEMENT
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.c import NUMBER_LITERAL as _C_NUMBER_LITERAL
+from safelint.languages.c import WHILE_STATEMENT as _C_WHILE_STATEMENT
+from safelint.languages.cpp import BREAK_STATEMENT as _CPP_BREAK_STATEMENT
+from safelint.languages.cpp import FOR_STATEMENT as _CPP_FOR_STATEMENT
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
+from safelint.languages.cpp import WHILE_STATEMENT as _CPP_WHILE_STATEMENT
+from safelint.languages.go import BREAK_STATEMENT as _GO_BREAK_STATEMENT
+from safelint.languages.go import FOR_STATEMENT as _GO_FOR_STATEMENT
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
+from safelint.languages.go import LABEL_NAME as _GO_LABEL_NAME
+from safelint.languages.java import BREAK_STATEMENT as _JAVA_BREAK_STATEMENT
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
+from safelint.languages.java import IDENTIFIER as _JAVA_IDENTIFIER
+from safelint.languages.java import TRUE as _JAVA_TRUE
+from safelint.languages.java import WHILE_STATEMENT as _JAVA_WHILE_STATEMENT
+from safelint.languages.javascript import BREAK_STATEMENT as _JS_BREAK_STATEMENT
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.javascript import TRUE as _JS_TRUE
+from safelint.languages.javascript import WHILE_STATEMENT as _JS_WHILE_STATEMENT
+from safelint.languages.php import BOOLEAN as _PHP_BOOLEAN
+from safelint.languages.php import BREAK_STATEMENT as _PHP_BREAK_STATEMENT
+from safelint.languages.php import FOR_STATEMENT as _PHP_FOR_STATEMENT
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
+from safelint.languages.php import WHILE_STATEMENT as _PHP_WHILE_STATEMENT
 from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     BREAK_STATEMENT,
@@ -27,7 +48,16 @@ from safelint.languages.python import (
     TRUE,
     WHILE_STATEMENT,
 )
+from safelint.languages.rust import BOOLEAN_LITERAL as _RUST_BOOLEAN_LITERAL
+from safelint.languages.rust import BREAK_EXPRESSION as _RUST_BREAK_EXPRESSION
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
+from safelint.languages.rust import LABEL as _RUST_LABEL
+from safelint.languages.rust import LOOP_EXPRESSION as _RUST_LOOP_EXPRESSION
+from safelint.languages.rust import WHILE_EXPRESSION as _RUST_WHILE_EXPRESSION
+from safelint.languages.typescript import BREAK_STATEMENT as _TS_BREAK_STATEMENT
+from safelint.languages.typescript import STATEMENT_IDENTIFIER as _TS_STATEMENT_IDENTIFIER
+from safelint.languages.typescript import TRUE as _TS_TRUE
+from safelint.languages.typescript import WHILE_STATEMENT as _TS_WHILE_STATEMENT
 from safelint.rules.base import BaseRule
 
 
@@ -44,14 +74,14 @@ if TYPE_CHECKING:
 # handled through the unconditional-loop path below, not here.
 _WHILE_STATEMENT_BY_LANG: dict[str, str | None] = {
     "python": WHILE_STATEMENT,
-    "javascript": "while_statement",
-    "typescript": "while_statement",
-    "java": "while_statement",
-    "rust": "while_expression",
+    "javascript": _JS_WHILE_STATEMENT,
+    "typescript": _TS_WHILE_STATEMENT,
+    "java": _JAVA_WHILE_STATEMENT,
+    "rust": _RUST_WHILE_EXPRESSION,
     "go": None,
-    "php": "while_statement",
-    "c": "while_statement",
-    "cpp": "while_statement",
+    "php": _PHP_WHILE_STATEMENT,
+    "c": _C_WHILE_STATEMENT,
+    "cpp": _CPP_WHILE_STATEMENT,
 }
 
 # Per-language: unconditional-``loop`` construct, or None if the
@@ -66,30 +96,30 @@ _INFINITE_LOOP_STATEMENT_BY_LANG: dict[str, str | None] = {
     "javascript": None,
     "typescript": None,
     "java": None,
-    "rust": "loop_expression",
-    "go": "for_statement",
+    "rust": _RUST_LOOP_EXPRESSION,
+    "go": _GO_FOR_STATEMENT,
     # PHP ``for (;;)`` is the headerless infinite loop. Same node type as a
     # bounded ``for``, so ``_check_loop_node`` guards on
     # :func:`_is_php_infinite_for` (absence of the ``condition`` field).
-    "php": "for_statement",
+    "php": _PHP_FOR_STATEMENT,
     # C: ``for (;;)`` headerless infinite loop (same node type as a bounded
     # ``for``; the :func:`_is_c_infinite_for` guard checks for an absent condition).
-    "c": "for_statement",
-    "cpp": "for_statement",
+    "c": _C_FOR_STATEMENT,
+    "cpp": _CPP_FOR_STATEMENT,
 }
 
 # Per-language: ``break`` statement node type. Python / JS / TS / Java /
 # Go share ``break_statement``; Rust uses ``break_expression``.
 _BREAK_STATEMENT_BY_LANG: dict[str, str] = {
     "python": BREAK_STATEMENT,
-    "javascript": "break_statement",
-    "typescript": "break_statement",
-    "java": "break_statement",
-    "rust": "break_expression",
-    "go": "break_statement",
-    "php": "break_statement",
-    "c": "break_statement",
-    "cpp": "break_statement",
+    "javascript": _JS_BREAK_STATEMENT,
+    "typescript": _TS_BREAK_STATEMENT,
+    "java": _JAVA_BREAK_STATEMENT,
+    "rust": _RUST_BREAK_EXPRESSION,
+    "go": _GO_BREAK_STATEMENT,
+    "php": _PHP_BREAK_STATEMENT,
+    "c": _C_BREAK_STATEMENT,
+    "cpp": _CPP_BREAK_STATEMENT,
 }
 
 # Per-language: literal-``true`` condition node type. Python / JS / TS
@@ -100,17 +130,17 @@ _BREAK_STATEMENT_BY_LANG: dict[str, str] = {
 # :func:`_is_literal_true`.
 _TRUE_LITERAL_BY_LANG: dict[str, str] = {
     "python": TRUE,
-    "javascript": "true",
-    "typescript": "true",
-    "java": "true",
-    "rust": "boolean_literal",
+    "javascript": _JS_TRUE,
+    "typescript": _TS_TRUE,
+    "java": _JAVA_TRUE,
+    "rust": _RUST_BOOLEAN_LITERAL,
     # PHP emits a single ``boolean`` node for both ``true`` and ``false``
     # (like Rust's ``boolean_literal``), so ``_is_literal_true`` inspects
     # the token text in addition to the node type.
-    "php": "boolean",
+    "php": _PHP_BOOLEAN,
     # C ``while (1)`` is a ``number_literal``; ``while (true)`` (stdbool) an
     # identifier. ``_is_literal_true`` special-cases C to handle both.
-    "c": "number_literal",
+    "c": _C_NUMBER_LITERAL,
     # C++: unused directly (``_is_c_literal_true`` handles both ``1`` and ``true``).
     "cpp": "number_literal",
 }
@@ -123,10 +153,10 @@ _TRUE_LITERAL_BY_LANG: dict[str, str] = {
 _BREAK_LABEL_TYPE_BY_LANG: dict[str, str | None] = {
     "python": None,
     "javascript": "statement_identifier",
-    "typescript": "statement_identifier",
-    "java": "identifier",
-    "rust": "label",
-    "go": "label_name",
+    "typescript": _TS_STATEMENT_IDENTIFIER,
+    "java": _JAVA_IDENTIFIER,
+    "rust": _RUST_LABEL,
+    "go": _GO_LABEL_NAME,
     "c": None,  # C has no labelled break
     "cpp": None,  # C++ has no labelled break either
 }
