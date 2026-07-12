@@ -24,6 +24,21 @@ import re
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
+from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
+from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
+from safelint.languages.java import ANNOTATION as _JAVA_ANNOTATION
+from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
+from safelint.languages.java import STRING_LITERAL as _JAVA_STRING_LITERAL
+from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
+from safelint.languages.php import COMMENT as _PHP_COMMENT
+from safelint.languages.php import ERROR_SUPPRESSION_EXPRESSION as _PHP_ERROR_SUPPRESSION_EXPRESSION
+from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
+from safelint.languages.python import COMMENT, EXTRA_NAME
+from safelint.languages.rust import ATTRIBUTE_ITEM as _RUST_ATTRIBUTE_ITEM
+from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
+from safelint.languages.rust import INNER_ATTRIBUTE_ITEM as _RUST_INNER_ATTRIBUTE_ITEM
+from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.rules.base import BaseRule
 
 
@@ -274,7 +289,7 @@ class BlanketSuppressionRule(BaseRule):
 
     name = "blanket_suppression"
     code = "SAFE603"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
+    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every blanket foreign-analyser suppression in *filepath*."""
@@ -304,10 +319,10 @@ class BlanketSuppressionRule(BaseRule):
 
     def _php_node_violation(self, filepath: str, node: tree_sitter.Node) -> Violation | None:
         """Return a SAFE603 violation for a PHP comment directive or ``@`` operator, else None."""
-        if node.type == "comment":
+        if node.type == _PHP_COMMENT:
             label = _php_blanket(node_text(node))
             return self._violation(filepath, node, label) if label is not None else None
-        if node.type == "error_suppression_expression":
+        if node.type == _PHP_ERROR_SUPPRESSION_EXPRESSION:
             return self._make_violation_for_node(
                 filepath,
                 node,
@@ -320,7 +335,7 @@ class BlanketSuppressionRule(BaseRule):
         detector = _COMMENT_DETECTORS_BY_LANG.get(lang, _javascript_blanket)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "comment":
+            if node.type != COMMENT:
                 continue
             label = detector(node_text(node))
             if label is not None:
@@ -331,7 +346,7 @@ class BlanketSuppressionRule(BaseRule):
         """Scan Rust attribute nodes for ``allow(clippy::all)`` / ``allow(warnings)``."""
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type not in ("attribute_item", "inner_attribute_item"):
+            if node.type not in (_RUST_ATTRIBUTE_ITEM, _RUST_INNER_ATTRIBUTE_ITEM):
                 continue
             label = _rust_blanket(node_text(node))
             if label is not None:
@@ -342,7 +357,7 @@ class BlanketSuppressionRule(BaseRule):
         """Scan Java annotations for ``@SuppressWarnings("all")``."""
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "annotation":
+            if node.type != _JAVA_ANNOTATION:
                 continue
             if self._java_suppress_all(node):
                 violations.append(self._violation(filepath, node, '@SuppressWarnings("all")'))
@@ -354,7 +369,7 @@ class BlanketSuppressionRule(BaseRule):
         name = annotation_node.child_by_field_name("name")
         if name is None or node_text(name) != "SuppressWarnings":
             return False
-        return any(child.type == "string_literal" and node_text(child).strip("\"'") == "all" for child in walk(annotation_node))
+        return any(child.type == _JAVA_STRING_LITERAL and node_text(child).strip("\"'") == "all" for child in walk(annotation_node))
 
     def _violation(self, filepath: str, node: tree_sitter.Node, label: str) -> Violation:
         """Build the SAFE603 violation for *node* describing the blanket directive *label*."""

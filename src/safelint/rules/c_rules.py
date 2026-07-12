@@ -46,6 +46,8 @@ from safelint.languages.c import (
     PREPROC_IF,
     PREPROC_IFDEF,
 )
+from safelint.languages.cpp import DELETE_EXPRESSION as _CPP_DELETE_EXPRESSION
+from safelint.languages.cpp import NEW_EXPRESSION as _CPP_NEW_EXPRESSION
 from safelint.rules.base import BaseRule
 
 
@@ -119,10 +121,10 @@ class DynamicAllocationRule(BaseRule):
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             # C++ ``new`` / ``delete`` are dedicated expression nodes, not calls.
-            if node.type in ("new_expression", "delete_expression"):
+            if node.type in (_CPP_NEW_EXPRESSION, _CPP_DELETE_EXPRESSION):
                 message = (
                     "`new` performs dynamic heap allocation - prefer static / stack allocation or a scoped owner after initialisation (Power of Ten rule 3)"
-                    if node.type == "new_expression"
+                    if node.type == _CPP_NEW_EXPRESSION
                     else "`delete` frees dynamically allocated heap memory - prefer static / stack allocation or a scoped owner (RAII) that releases automatically (Power of Ten rule 3)"
                 )
                 violations.append(self._make_violation_for_node(filepath, node, message))

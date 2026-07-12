@@ -74,8 +74,10 @@ from safelint.languages.python import (
     ASYNC_FUNCTION_DEF,
     ATTRIBUTE,
     CALL,
+    DICTIONARY_SPLAT_PATTERN,
     EXPRESSION_STATEMENT,
     FUNCTION_DEF,
+    LIST_SPLAT_PATTERN,
     SUBSCRIPT,
 )
 from safelint.languages.rust import CALL_EXPRESSION as _RUST_CALL_EXPRESSION
@@ -355,8 +357,8 @@ _PY_PARAM_TYPES = frozenset(
         "typed_parameter",
         "default_parameter",
         "typed_default_parameter",
-        "list_splat_pattern",
-        "dictionary_splat_pattern",
+        LIST_SPLAT_PATTERN,
+        DICTIONARY_SPLAT_PATTERN,
     }
 )
 
@@ -394,7 +396,7 @@ def _python_param_node_name(child: tree_sitter.Node) -> str:
     """Return the bare identifier name carried by a Python parameter node, or ``""``."""
     if child.type == "identifier":
         return node_text(child)
-    if child.type in ("list_splat_pattern", "dictionary_splat_pattern"):
+    if child.type in (LIST_SPLAT_PATTERN, DICTIONARY_SPLAT_PATTERN):
         # Splat parameters always have an identifier child in valid Python;
         # the empty-children branch is defensive against malformed AST.
         inner = child.named_children[0] if child.named_children else None  # pragma: no branch

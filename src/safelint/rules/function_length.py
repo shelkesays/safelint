@@ -6,14 +6,47 @@ from typing import TYPE_CHECKING
 
 from safelint.languages import get_language_for_file
 from safelint.languages._node_utils import end_lineno, function_name_node, lineno, node_text, resolve_lang_name, walk
+from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
+from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
+from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
+from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
+from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
-from safelint.languages.python import ASYNC_FUNCTION_DEF, FUNCTION_DEF
+from safelint.languages.python import (
+    ASSERT_STATEMENT,
+    ASSIGNMENT,
+    ASYNC_FUNCTION_DEF,
+    AUGMENTED_ASSIGNMENT,
+    BREAK_STATEMENT,
+    CLASS_DEF,
+    CONTINUE_STATEMENT,
+    DELETE_STATEMENT,
+    EXPRESSION_STATEMENT,
+    EXTRA_NAME,
+    FOR_STATEMENT,
+    FUNCTION_DEF,
+    GLOBAL_STATEMENT,
+    IF_STATEMENT,
+    IMPORT_FROM_STATEMENT,
+    IMPORT_STATEMENT,
+    MATCH_STATEMENT,
+    NONLOCAL_STATEMENT,
+    PASS_STATEMENT,
+    RAISE_STATEMENT,
+    RETURN_STATEMENT,
+    TRY_STATEMENT,
+    WHILE_STATEMENT,
+    WITH_STATEMENT,
+)
+from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
 from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
+from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.rules.base import BaseRule
 
 
@@ -62,27 +95,27 @@ _STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # function's complexity-proxy count, which matches the rule's intent.
     "python": frozenset(
         {
-            "expression_statement",
-            "assignment",
-            "augmented_assignment",
-            "if_statement",
-            "for_statement",
-            "while_statement",
-            "with_statement",
-            "try_statement",
-            "match_statement",
-            "return_statement",
-            "raise_statement",
-            "import_statement",
-            "import_from_statement",
-            "global_statement",
-            "nonlocal_statement",
-            "assert_statement",
-            "delete_statement",
-            "pass_statement",
-            "break_statement",
-            "continue_statement",
-            "class_definition",
+            EXPRESSION_STATEMENT,
+            ASSIGNMENT,
+            AUGMENTED_ASSIGNMENT,
+            IF_STATEMENT,
+            FOR_STATEMENT,
+            WHILE_STATEMENT,
+            WITH_STATEMENT,
+            TRY_STATEMENT,
+            MATCH_STATEMENT,
+            RETURN_STATEMENT,
+            RAISE_STATEMENT,
+            IMPORT_STATEMENT,
+            IMPORT_FROM_STATEMENT,
+            GLOBAL_STATEMENT,
+            NONLOCAL_STATEMENT,
+            ASSERT_STATEMENT,
+            DELETE_STATEMENT,
+            PASS_STATEMENT,
+            BREAK_STATEMENT,
+            CONTINUE_STATEMENT,
+            CLASS_DEF,
         }
     ),
 }
@@ -127,7 +160,7 @@ class FunctionLengthRule(BaseRule):
 
     name = "function_length"
     code = "SAFE101"
-    language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
+    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function or async function exceeding the configured size."""
