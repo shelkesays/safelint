@@ -10,7 +10,6 @@ from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
 from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
 from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
-from safelint.languages.go import BLANK_IDENTIFIER as _GO_BLANK_IDENTIFIER
 from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
 from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
@@ -184,7 +183,7 @@ class SideEffectsHiddenRule(BaseRule):
                 continue
             func_name = _func_display_name(node, lang_name)
             name_lower = func_name.lower()
-            if not any(name_lower.startswith(p) or name_lower == p.rstrip(_GO_BLANK_IDENTIFIER) for p in pure_prefixes):
+            if not any(name_lower.startswith(p) or name_lower == p.rstrip("_") for p in pure_prefixes):
                 continue
             io_call = _first_io_call(node, io_funcs, function_types)
             if io_call:
