@@ -58,6 +58,7 @@ from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
 from safelint.languages.javascript import FOR_IN_STATEMENT as _JS_FOR_IN_STATEMENT
 from safelint.languages.javascript import FOR_STATEMENT as _JS_FOR_STATEMENT
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
+from safelint.languages.javascript import STATEMENT_IDENTIFIER as _JS_STATEMENT_IDENTIFIER
 from safelint.languages.javascript import SWITCH_STATEMENT as _JS_SWITCH_STATEMENT
 from safelint.languages.javascript import TRUE as _JS_TRUE
 from safelint.languages.javascript import WHILE_STATEMENT as _JS_WHILE_STATEMENT
@@ -190,7 +191,7 @@ _TRUE_LITERAL_BY_LANG: dict[str, str] = {
 # node (``break outer``). Python has no labelled break.
 _BREAK_LABEL_TYPE_BY_LANG: dict[str, str | None] = {
     "python": None,
-    "javascript": _TS_STATEMENT_IDENTIFIER,
+    "javascript": _JS_STATEMENT_IDENTIFIER,
     "typescript": _TS_STATEMENT_IDENTIFIER,
     "java": _JAVA_IDENTIFIER,
     "rust": _RUST_LABEL,
