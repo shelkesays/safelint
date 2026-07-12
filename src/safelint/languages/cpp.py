@@ -117,6 +117,7 @@ PARAMETER_LIST = "parameter_list"
 PARAMETER_DECLARATION = "parameter_declaration"
 OPTIONAL_PARAMETER_DECLARATION = "optional_parameter_declaration"
 FOR_RANGE_LOOP = "for_range_loop"
+CONDITION_CLAUSE = "condition_clause"
 LINKAGE_SPECIFICATION = "linkage_specification"
 
 # Declarators (SAFE313 restricted pointers).
