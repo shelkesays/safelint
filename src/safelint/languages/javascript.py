@@ -204,5 +204,6 @@ PIPE_PIPE = "||"
 QQ = "??"
 # added for node-constant refactor
 EMPTY_STATEMENT = "empty_statement"
+STATEMENT_IDENTIFIER = "statement_identifier"
 # added for node-constant refactor
 THIS = "this"

@@ -9,6 +9,7 @@ from safelint.languages.cpp import BINARY_EXPRESSION as _CPP_BINARY_EXPRESSION
 from safelint.languages.cpp import CATCH_CLAUSE as _CPP_CATCH_CLAUSE
 from safelint.languages.cpp import CHAR_LITERAL as _CPP_CHAR_LITERAL
 from safelint.languages.cpp import COMMENT as _CPP_COMMENT
+from safelint.languages.cpp import CONCATENATED_STRING as _CPP_CONCATENATED_STRING
 from safelint.languages.cpp import EMPTY_STATEMENT as _CPP_EMPTY_STATEMENT
 from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
 from safelint.languages.cpp import FALSE as _CPP_FALSE
@@ -18,9 +19,10 @@ from safelint.languages.cpp import NULL as _CPP_NULL
 from safelint.languages.cpp import NUMBER_LITERAL as _CPP_NUMBER_LITERAL
 from safelint.languages.cpp import PARAMETER_DECLARATION as _CPP_PARAMETER_DECLARATION
 from safelint.languages.cpp import QUALIFIED_IDENTIFIER as _CPP_QUALIFIED_IDENTIFIER
+from safelint.languages.cpp import RAW_STRING_LITERAL as _CPP_RAW_STRING_LITERAL
+from safelint.languages.cpp import STRING_LITERAL as _CPP_STRING_LITERAL
 from safelint.languages.cpp import THROW_STATEMENT as _CPP_THROW_STATEMENT
 from safelint.languages.cpp import TRUE as _CPP_TRUE
-from safelint.languages.go import RAW_STRING_LITERAL as _GO_RAW_STRING_LITERAL
 from safelint.languages.java import BINARY_INTEGER_LITERAL as _JAVA_BINARY_INTEGER_LITERAL
 from safelint.languages.java import BLOCK_COMMENT as _JAVA_BLOCK_COMMENT
 from safelint.languages.java import CATCH_CLAUSE as _JAVA_CATCH_CLAUSE
@@ -48,6 +50,7 @@ from safelint.languages.javascript import FALSE as _JS_FALSE
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.javascript import NULL as _JS_NULL
 from safelint.languages.javascript import NUMBER as _JS_NUMBER
+from safelint.languages.javascript import STRING as _JS_STRING
 from safelint.languages.javascript import TEMPLATE_STRING as _JS_TEMPLATE_STRING
 from safelint.languages.javascript import TEMPLATE_SUBSTITUTION as _JS_TEMPLATE_SUBSTITUTION
 from safelint.languages.javascript import THROW_STATEMENT as _JS_THROW_STATEMENT
@@ -293,7 +296,7 @@ def _python_string_is_literal(node: tree_sitter.Node) -> bool:
 
 def _js_string_is_literal(node: tree_sitter.Node) -> bool:
     """Return True for a JS / TS ``string`` or ``template_string`` with no interpolation."""
-    if node.type not in (STRING, _JS_TEMPLATE_STRING):
+    if node.type not in (_JS_STRING, _JS_TEMPLATE_STRING):
         return False
     return all(child.type != _JS_TEMPLATE_SUBSTITUTION for child in node.named_children) and bool(node_text(node))
 
@@ -316,7 +319,7 @@ def _cpp_string_is_literal(node: tree_sitter.Node) -> bool:
     ``concatenated_string`` (adjacent literals) / ``raw_string_literal`` with
     text is a plain literal.
     """
-    return node.type in (_JAVA_STRING_LITERAL, CONCATENATED_STRING, _GO_RAW_STRING_LITERAL) and bool(node_text(node))
+    return node.type in (_CPP_STRING_LITERAL, _CPP_CONCATENATED_STRING, _CPP_RAW_STRING_LITERAL) and bool(node_text(node))
 
 
 def _php_string_is_literal(node: tree_sitter.Node) -> bool:

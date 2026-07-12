@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING
 
 from safelint.languages import JAVASCRIPT, TSX, TYPESCRIPT
 from safelint.languages._node_utils import resolve_lang_name, walk
-from safelint.languages.python import ATTRIBUTE
+from safelint.languages.rust import ATTRIBUTE as _RUST_ATTRIBUTE
 from safelint.rules._rust_test_attribute import attribute_is_test_marker
 from safelint.rules.base import BaseRule
 
@@ -294,7 +294,7 @@ def _rust_has_test_marker(tree: tree_sitter.Tree) -> bool:
     :func:`safelint.rules._rust_test_attribute.attribute_is_test_marker`
     so SAFE701 / SAFE702 / SAFE204 / SAFE208 share one definition.
     """
-    return any(node.type == ATTRIBUTE and attribute_is_test_marker(node) for node in walk(tree.root_node))
+    return any(node.type == _RUST_ATTRIBUTE and attribute_is_test_marker(node) for node in walk(tree.root_node))
 
 
 def _paired_test_in_changed_under_test_dirs(src: Path, changed: set[str], test_dirs: list[str], lang_name: str) -> bool:

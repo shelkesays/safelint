@@ -9,7 +9,6 @@ from safelint.languages._node_utils import node_text, resolve_lang_name, walk
 from safelint.languages.c import ARRAY_DECLARATOR as _C_ARRAY_DECLARATOR
 from safelint.languages.c import DECLARATION as _C_DECLARATION
 from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
-from safelint.languages.c import FIELD_IDENTIFIER as _C_FIELD_IDENTIFIER
 from safelint.languages.c import FUNCTION_DECLARATOR as _C_FUNCTION_DECLARATOR
 from safelint.languages.c import IDENTIFIER as _C_IDENTIFIER
 from safelint.languages.c import INIT_DECLARATOR as _C_INIT_DECLARATOR
@@ -143,7 +142,7 @@ def _cpp_field_declarator_name(declarator: tree_sitter.Node) -> tree_sitter.Node
     """
     cur: tree_sitter.Node | None = declarator
     for _ in range(16):
-        if cur is None or cur.type == _C_FIELD_IDENTIFIER:
+        if cur is None or cur.type == _CPP_FIELD_IDENTIFIER:
             return cur
         if cur.type == _CPP_FUNCTION_DECLARATOR:
             inner = cur.child_by_field_name("declarator")
