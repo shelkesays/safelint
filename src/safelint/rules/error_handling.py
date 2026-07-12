@@ -5,16 +5,21 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
-from safelint.languages.c import NUMBER_LITERAL as _C_NUMBER_LITERAL
 from safelint.languages.cpp import BINARY_EXPRESSION as _CPP_BINARY_EXPRESSION
 from safelint.languages.cpp import CATCH_CLAUSE as _CPP_CATCH_CLAUSE
+from safelint.languages.cpp import CHAR_LITERAL as _CPP_CHAR_LITERAL
 from safelint.languages.cpp import COMMENT as _CPP_COMMENT
+from safelint.languages.cpp import EMPTY_STATEMENT as _CPP_EMPTY_STATEMENT
 from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
+from safelint.languages.cpp import FALSE as _CPP_FALSE
 from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
 from safelint.languages.cpp import IDENTIFIER as _CPP_IDENTIFIER
+from safelint.languages.cpp import NULL as _CPP_NULL
+from safelint.languages.cpp import NUMBER_LITERAL as _CPP_NUMBER_LITERAL
 from safelint.languages.cpp import PARAMETER_DECLARATION as _CPP_PARAMETER_DECLARATION
 from safelint.languages.cpp import QUALIFIED_IDENTIFIER as _CPP_QUALIFIED_IDENTIFIER
 from safelint.languages.cpp import THROW_STATEMENT as _CPP_THROW_STATEMENT
+from safelint.languages.cpp import TRUE as _CPP_TRUE
 from safelint.languages.go import RAW_STRING_LITERAL as _GO_RAW_STRING_LITERAL
 from safelint.languages.java import BINARY_INTEGER_LITERAL as _JAVA_BINARY_INTEGER_LITERAL
 from safelint.languages.java import BLOCK_COMMENT as _JAVA_BLOCK_COMMENT
@@ -25,6 +30,7 @@ from safelint.languages.java import DECIMAL_FLOATING_POINT_LITERAL as _JAVA_DECI
 from safelint.languages.java import DECIMAL_INTEGER_LITERAL as _JAVA_DECIMAL_INTEGER_LITERAL
 from safelint.languages.java import EMPTY_STATEMENT as _JAVA_EMPTY_STATEMENT
 from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
+from safelint.languages.java import FALSE as _JAVA_FALSE
 from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
 from safelint.languages.java import HEX_FLOATING_POINT_LITERAL as _JAVA_HEX_FLOATING_POINT_LITERAL
 from safelint.languages.java import HEX_INTEGER_LITERAL as _JAVA_HEX_INTEGER_LITERAL
@@ -34,14 +40,18 @@ from safelint.languages.java import NULL_LITERAL as _JAVA_NULL_LITERAL
 from safelint.languages.java import OCTAL_INTEGER_LITERAL as _JAVA_OCTAL_INTEGER_LITERAL
 from safelint.languages.java import STRING_LITERAL as _JAVA_STRING_LITERAL
 from safelint.languages.java import THROW_STATEMENT as _JAVA_THROW_STATEMENT
+from safelint.languages.java import TRUE as _JAVA_TRUE
 from safelint.languages.javascript import CATCH_CLAUSE as _JS_CATCH_CLAUSE
+from safelint.languages.javascript import EMPTY_STATEMENT as _JS_EMPTY_STATEMENT
 from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
+from safelint.languages.javascript import FALSE as _JS_FALSE
 from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.javascript import NULL as _JS_NULL
 from safelint.languages.javascript import NUMBER as _JS_NUMBER
 from safelint.languages.javascript import TEMPLATE_STRING as _JS_TEMPLATE_STRING
 from safelint.languages.javascript import TEMPLATE_SUBSTITUTION as _JS_TEMPLATE_SUBSTITUTION
 from safelint.languages.javascript import THROW_STATEMENT as _JS_THROW_STATEMENT
+from safelint.languages.javascript import TRUE as _JS_TRUE
 from safelint.languages.javascript import UNDEFINED as _JS_UNDEFINED
 from safelint.languages.php import BOOLEAN as _PHP_BOOLEAN
 from safelint.languages.php import CATCH_CLAUSE as _PHP_CATCH_CLAUSE
@@ -80,7 +90,6 @@ from safelint.languages.python import (
     TRUE,
     TUPLE,
 )
-from safelint.languages.rust import CHAR_LITERAL as _RUST_CHAR_LITERAL
 from safelint.languages.typescript import CATCH_CLAUSE as _TS_CATCH_CLAUSE
 from safelint.languages.typescript import EMPTY_STATEMENT as _TS_EMPTY_STATEMENT
 from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
@@ -141,7 +150,7 @@ _RERAISE_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # empty-handler intent the way ``catch (Throwable t) {}`` already does.
 _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset({PASS_STATEMENT, CONTINUE_STATEMENT}),
-    "javascript": frozenset({_JAVA_EMPTY_STATEMENT}),
+    "javascript": frozenset({_JS_EMPTY_STATEMENT}),
     "typescript": frozenset({_TS_EMPTY_STATEMENT}),
     # Java accepts bare semicolons (``catch (Exception e) { ; }``) as
     # empty statements, same as JS. ``line_comment`` / ``block_comment``
@@ -158,7 +167,7 @@ _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # C++: bare ``;`` is ``empty_statement``; tree-sitter-cpp emits ``//`` and
     # ``/* */`` as a single ``comment`` node that is a *named* child of the
     # catch body (like Java / PHP), so a comment-only body matches.
-    "cpp": frozenset({_JAVA_EMPTY_STATEMENT, _CPP_COMMENT}),
+    "cpp": frozenset({_CPP_EMPTY_STATEMENT, _CPP_COMMENT}),
 }
 
 # Per-language: literal expression node types that count as "comment-like"
@@ -172,8 +181,8 @@ _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 _JS_LITERAL_EXPR_TYPES = frozenset(
     {
         _JS_NUMBER,
-        TRUE,
-        FALSE,
+        _JS_TRUE,
+        _JS_FALSE,
         _JS_NULL,
         _JS_UNDEFINED,
     }
@@ -186,8 +195,8 @@ _JAVA_LITERAL_EXPR_TYPES = frozenset(
         _JAVA_BINARY_INTEGER_LITERAL,
         _JAVA_DECIMAL_FLOATING_POINT_LITERAL,
         _JAVA_HEX_FLOATING_POINT_LITERAL,
-        TRUE,
-        FALSE,
+        _JAVA_TRUE,
+        _JAVA_FALSE,
         _JAVA_NULL_LITERAL,
         _JAVA_CHARACTER_LITERAL,
     }
@@ -217,7 +226,7 @@ _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # dedicated nodes; ``nullptr`` / ``null`` and ``char_literal`` round out
     # the single-literal no-op markers. String literals are delegated to
     # ``_cpp_string_is_literal``.
-    "cpp": frozenset({_C_NUMBER_LITERAL, TRUE, FALSE, _JS_NULL, "nullptr", _RUST_CHAR_LITERAL}),
+    "cpp": frozenset({_CPP_NUMBER_LITERAL, _CPP_TRUE, _CPP_FALSE, _CPP_NULL, "nullptr", _CPP_CHAR_LITERAL}),
 }
 
 

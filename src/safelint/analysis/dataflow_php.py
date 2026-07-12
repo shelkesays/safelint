@@ -42,6 +42,7 @@ from safelint.languages._node_utils import call_name, node_text, walk
 from safelint.languages.php import (
     ARGUMENT,
     ARRAY_CREATION_EXPRESSION,
+    ARRAY_ELEMENT_INITIALIZER,
     ASSIGNMENT_EXPRESSION,
     AUGMENTED_ASSIGNMENT_EXPRESSION,
     BINARY_EXPRESSION,
@@ -284,7 +285,7 @@ class PhpTaintTracker:
         if node_type == SUBSCRIPT_EXPRESSION:
             base = node.named_children[0] if node.named_children else None
             return [base] if base is not None else []
-        if node_type in (ARGUMENT, "array_element_initializer") or node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
+        if node_type in (ARGUMENT, ARRAY_ELEMENT_INITIALIZER) or node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
             return list(node.named_children)
         return []
 

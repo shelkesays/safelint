@@ -706,7 +706,7 @@ class ResourceLifecycleRule(BaseRule):
         tracked: frozenset[str] = frozenset(base_tracked + extra_tracked)
         # cleanup_patterns has the same string-vs-list footgun as
         # tracked_functions - ``cleanup_patterns = "close"`` would coerce
-        # to ``frozenset("close")`` = ``{_C_EXTRA_NAME,'l','o','s','e'}`` and the
+        # to ``frozenset("close")`` = ``{'c','l','o','s','e'}`` and the
         # diagnostic text would render as ``c / e / l / o / s``. Validate
         # it the same way for consistency.
         cleanup_list = _validated_string_list(self.config.get("cleanup_patterns", ["close"]), "cleanup_patterns")

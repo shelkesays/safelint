@@ -22,7 +22,9 @@ from safelint.languages.cpp import CLASS_SPECIFIER as _CPP_CLASS_SPECIFIER
 from safelint.languages.cpp import DECLARATION as _CPP_DECLARATION
 from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
 from safelint.languages.cpp import FIELD_DECLARATION as _CPP_FIELD_DECLARATION
+from safelint.languages.cpp import FIELD_IDENTIFIER as _CPP_FIELD_IDENTIFIER
 from safelint.languages.cpp import FUNCTION_DECLARATOR as _CPP_FUNCTION_DECLARATOR
+from safelint.languages.cpp import LINKAGE_SPECIFICATION as _CPP_LINKAGE_SPECIFICATION
 from safelint.languages.cpp import NAMESPACE_DEFINITION as _CPP_NAMESPACE_DEFINITION
 from safelint.languages.cpp import PARENTHESIZED_DECLARATOR as _CPP_PARENTHESIZED_DECLARATOR
 from safelint.languages.cpp import POINTER_DECLARATOR as _CPP_POINTER_DECLARATOR
@@ -48,6 +50,7 @@ from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
 from safelint.languages.javascript import IDENTIFIER as _JS_IDENTIFIER
 from safelint.languages.javascript import MEMBER_EXPRESSION as _JS_MEMBER_EXPRESSION
 from safelint.languages.javascript import NON_NULL_EXPRESSION as _JS_NON_NULL_EXPRESSION
+from safelint.languages.javascript import PARENTHESIZED_EXPRESSION as _JS_PARENTHESIZED_EXPRESSION
 from safelint.languages.javascript import SATISFIES_EXPRESSION as _JS_SATISFIES_EXPRESSION
 from safelint.languages.javascript import SUBSCRIPT_EXPRESSION as _JS_SUBSCRIPT_EXPRESSION
 from safelint.languages.javascript import TYPE_ASSERTION as _JS_TYPE_ASSERTION
@@ -58,7 +61,6 @@ from safelint.languages.php import AUGMENTED_ASSIGNMENT_EXPRESSION as _PHP_AUGME
 from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
 from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
 from safelint.languages.php import GLOBAL_DECLARATION as _PHP_GLOBAL_DECLARATION
-from safelint.languages.php import PARENTHESIZED_EXPRESSION as _PHP_PARENTHESIZED_EXPRESSION
 from safelint.languages.php import SUBSCRIPT_EXPRESSION as _PHP_SUBSCRIPT_EXPRESSION
 from safelint.languages.php import UPDATE_EXPRESSION as _PHP_UPDATE_EXPRESSION
 from safelint.languages.php import VARIABLE_NAME as _PHP_VARIABLE_NAME
@@ -123,7 +125,7 @@ def _c_declarator_identifier(node: tree_sitter.Node) -> tree_sitter.Node | None:
 #: Declarator wrapper node types whose inner declarator is a plain named child
 #: (no ``declarator`` field) - unwrapped by scanning ``named_children``.
 _CPP_PLAIN_CHILD_DECLARATORS = (_CPP_REFERENCE_DECLARATOR, _CPP_PARENTHESIZED_DECLARATOR)
-_CPP_INNER_DECLARATOR_TYPES = (_C_FIELD_IDENTIFIER, _CPP_POINTER_DECLARATOR, _CPP_ARRAY_DECLARATOR, _CPP_REFERENCE_DECLARATOR, _CPP_FUNCTION_DECLARATOR, _CPP_PARENTHESIZED_DECLARATOR)
+_CPP_INNER_DECLARATOR_TYPES = (_CPP_FIELD_IDENTIFIER, _CPP_POINTER_DECLARATOR, _CPP_ARRAY_DECLARATOR, _CPP_REFERENCE_DECLARATOR, _CPP_FUNCTION_DECLARATOR, _CPP_PARENTHESIZED_DECLARATOR)
 
 
 def _cpp_field_declarator_name(declarator: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -335,7 +337,7 @@ def _php_subscript_root(target: tree_sitter.Node) -> str | None:
 _PASSTHROUGH_WRAPPER_TYPES = frozenset(
     {
         _JS_TYPE_ASSERTION,  # TS: ``<Foo>x`` (angle-bracket cast, equivalent to ``as``)
-        _PHP_PARENTHESIZED_EXPRESSION,
+        _JS_PARENTHESIZED_EXPRESSION,
         _JS_AS_EXPRESSION,  # TS: ``x as Foo``
         _JS_SATISFIES_EXPRESSION,  # TS: ``x satisfies Foo``
         _JS_NON_NULL_EXPRESSION,  # TS: ``x!``
@@ -625,7 +627,7 @@ class GlobalMutationRule(BaseRule):
     #: ``namespace_definition`` / ``linkage_specification`` (``extern "C"``)
     #: expose a ``declaration_list``; ``class_specifier`` / ``struct_specifier``
     #: expose a ``field_declaration_list`` whose ``static`` members are TU-scoped.
-    _CPP_SCOPE_BODY_TYPES: ClassVar[tuple[str, ...]] = (_CPP_NAMESPACE_DEFINITION, "linkage_specification", _CPP_CLASS_SPECIFIER, _CPP_STRUCT_SPECIFIER)
+    _CPP_SCOPE_BODY_TYPES: ClassVar[tuple[str, ...]] = (_CPP_NAMESPACE_DEFINITION, _CPP_LINKAGE_SPECIFICATION, _CPP_CLASS_SPECIFIER, _CPP_STRUCT_SPECIFIER)
 
     def _cpp_scope_node(self, filepath: str, node: tree_sitter.Node) -> tuple[list[Violation], list[tree_sitter.Node]]:
         """Classify one scope node into (violations, child scopes to walk).
@@ -648,7 +650,7 @@ class GlobalMutationRule(BaseRule):
     #: The *initialiser* value (``= obj.field``) and an array *size* (``arr[N]``)
     #: are separate children / fields, so unwrapping via the ``declarator`` field
     #: never reaches a member-access ``field_identifier`` inside them.
-    _CPP_FIELD_DECLARATOR_TYPES: ClassVar[tuple[str, ...]] = (_C_FIELD_IDENTIFIER, _CPP_POINTER_DECLARATOR, _CPP_ARRAY_DECLARATOR, _CPP_REFERENCE_DECLARATOR, _CPP_FUNCTION_DECLARATOR)
+    _CPP_FIELD_DECLARATOR_TYPES: ClassVar[tuple[str, ...]] = (_CPP_FIELD_IDENTIFIER, _CPP_POINTER_DECLARATOR, _CPP_ARRAY_DECLARATOR, _CPP_REFERENCE_DECLARATOR, _CPP_FUNCTION_DECLARATOR)
 
     def _cpp_static_member_violations(self, filepath: str, field_decl: tree_sitter.Node) -> list[Violation]:
         """Return one violation per ``static`` (non-``const``) data member, else none.
