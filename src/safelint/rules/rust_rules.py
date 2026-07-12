@@ -63,6 +63,47 @@ from typing import TYPE_CHECKING, ClassVar
 
 from safelint.core._validators import _validated_string_list
 from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.languages.rust import ASSIGNMENT_EXPRESSION as _RUST_ASSIGNMENT_EXPRESSION
+from safelint.languages.rust import ATTRIBUTE_ITEM as _RUST_ATTRIBUTE_ITEM
+from safelint.languages.rust import BINARY_EXPRESSION as _RUST_BINARY_EXPRESSION
+from safelint.languages.rust import BLOCK as _RUST_BLOCK
+from safelint.languages.rust import BLOCK_COMMENT as _RUST_BLOCK_COMMENT
+from safelint.languages.rust import BOOLEAN_LITERAL as _RUST_BOOLEAN_LITERAL
+from safelint.languages.rust import CALL_EXPRESSION as _RUST_CALL_EXPRESSION
+from safelint.languages.rust import CHAR_LITERAL as _RUST_CHAR_LITERAL
+from safelint.languages.rust import CLOSURE_EXPRESSION as _RUST_CLOSURE_EXPRESSION
+from safelint.languages.rust import COMPOUND_ASSIGNMENT_EXPR as _RUST_COMPOUND_ASSIGNMENT_EXPR
+from safelint.languages.rust import EXPRESSION_STATEMENT as _RUST_EXPRESSION_STATEMENT
+from safelint.languages.rust import FIELD_EXPRESSION as _RUST_FIELD_EXPRESSION
+from safelint.languages.rust import FLOAT_LITERAL as _RUST_FLOAT_LITERAL
+from safelint.languages.rust import FUNCTION_ITEM as _RUST_FUNCTION_ITEM
+from safelint.languages.rust import GENERIC_FUNCTION as _RUST_GENERIC_FUNCTION
+from safelint.languages.rust import IDENTIFIER as _RUST_IDENTIFIER
+from safelint.languages.rust import IF_EXPRESSION as _RUST_IF_EXPRESSION
+from safelint.languages.rust import INDEX_EXPRESSION as _RUST_INDEX_EXPRESSION
+from safelint.languages.rust import INTEGER_LITERAL as _RUST_INTEGER_LITERAL
+from safelint.languages.rust import LET_CONDITION as _RUST_LET_CONDITION
+from safelint.languages.rust import LET_DECLARATION as _RUST_LET_DECLARATION
+from safelint.languages.rust import LINE_COMMENT as _RUST_LINE_COMMENT
+from safelint.languages.rust import MACRO_INVOCATION as _RUST_MACRO_INVOCATION
+from safelint.languages.rust import MATCH_ARM as _RUST_MATCH_ARM
+from safelint.languages.rust import MATCH_PATTERN as _RUST_MATCH_PATTERN
+from safelint.languages.rust import MINUS as _RUST_MINUS
+from safelint.languages.rust import MOD_ITEM as _RUST_MOD_ITEM
+from safelint.languages.rust import MUTABLE_SPECIFIER as _RUST_MUTABLE_SPECIFIER
+from safelint.languages.rust import PARAMETER as _RUST_PARAMETER
+from safelint.languages.rust import PLUS as _RUST_PLUS
+from safelint.languages.rust import PRIMITIVE_TYPE as _RUST_PRIMITIVE_TYPE
+from safelint.languages.rust import REFERENCE_EXPRESSION as _RUST_REFERENCE_EXPRESSION
+from safelint.languages.rust import RETURN_EXPRESSION as _RUST_RETURN_EXPRESSION
+from safelint.languages.rust import SCOPED_IDENTIFIER as _RUST_SCOPED_IDENTIFIER
+from safelint.languages.rust import STAR as _RUST_STAR
+from safelint.languages.rust import STATIC_ITEM as _RUST_STATIC_ITEM
+from safelint.languages.rust import STRING_LITERAL as _RUST_STRING_LITERAL
+from safelint.languages.rust import TUPLE_STRUCT_PATTERN as _RUST_TUPLE_STRUCT_PATTERN
+from safelint.languages.rust import TYPE_CAST_EXPRESSION as _RUST_TYPE_CAST_EXPRESSION
+from safelint.languages.rust import UNIT_EXPRESSION as _RUST_UNIT_EXPRESSION
+from safelint.languages.rust import UNSAFE_BLOCK as _RUST_UNSAFE_BLOCK
 from safelint.rules._rust_test_attribute import attribute_item_is_test_marker
 from safelint.rules.base import BaseRule
 
@@ -217,7 +258,7 @@ _RUST_INTEGER_PRIMITIVE_TYPES: frozenset[str] = frozenset(
 #: function parameters. ``/`` and ``%`` are NOT included because
 #: division by zero is its own (well-defined) panic, not the silent
 #: overflow that SAFE112 cares about.
-_RUST_ARITHMETIC_OPERATORS: frozenset[str] = frozenset({"+", "-", "*"})
+_RUST_ARITHMETIC_OPERATORS: frozenset[str] = frozenset({_RUST_PLUS, _RUST_MINUS, _RUST_STAR})
 
 #: Standard-library interior-mutability wrapper types that SAFE307 flags
 #: when they appear in a ``static`` declaration's type. Each lets a
@@ -268,9 +309,9 @@ def _rust_macro_name(macro_node: tree_sitter.Node | None) -> str | None:
     """
     if macro_node is None:  # pragma: no cover - defensive: every macro_invocation has a macro field
         return None
-    if macro_node.type == "identifier":
+    if macro_node.type == _RUST_IDENTIFIER:
         return node_text(macro_node)
-    if macro_node.type == "scoped_identifier":
+    if macro_node.type == _RUST_SCOPED_IDENTIFIER:
         name = macro_node.child_by_field_name("name")
         return node_text(name) if name is not None else None
     return None  # pragma: no cover - defensive: macro field is always identifier or scoped_identifier
@@ -288,7 +329,7 @@ def _node_has_test_marker_attribute(node: tree_sitter.Node) -> bool:
     """
     cursor = node.prev_named_sibling
     while cursor is not None:
-        if cursor.type != "attribute_item":
+        if cursor.type != _RUST_ATTRIBUTE_ITEM:
             break
         if attribute_item_is_test_marker(cursor):
             return True
@@ -308,7 +349,7 @@ def _is_in_test_context(node: tree_sitter.Node) -> bool:
     """
     cursor: tree_sitter.Node | None = node.parent
     while cursor is not None:
-        if cursor.type in ("function_item", "mod_item") and _node_has_test_marker_attribute(cursor):
+        if cursor.type in (_RUST_FUNCTION_ITEM, _RUST_MOD_ITEM) and _node_has_test_marker_attribute(cursor):
             return True
         cursor = cursor.parent
     return False
@@ -336,11 +377,11 @@ def _unwrap_to_scoped_identifier(func: tree_sitter.Node | None) -> tree_sitter.N
     """
     if func is None:  # pragma: no cover - defensive: every call_expression has a function field
         return None
-    if func.type == "generic_function":
+    if func.type == _RUST_GENERIC_FUNCTION:
         func = func.child_by_field_name("function")
         if func is None:  # pragma: no cover - defensive: every generic_function has an inner function field
             return None
-    return func if func.type == "scoped_identifier" else None
+    return func if func.type == _RUST_SCOPED_IDENTIFIER else None
 
 
 # ---------------------------------------------------------------------------
@@ -374,7 +415,7 @@ class PanicMacrosOutsideTestsRule(BaseRule):
         macros = frozenset(self.config.get("panic_macros_rust", sorted(_PANIC_MACRO_NAMES)))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "macro_invocation":
+            if node.type != _RUST_MACRO_INVOCATION:
                 continue
             macro_field = node.child_by_field_name("macro")
             if macro_field is None:  # pragma: no cover - defensive: every macro_invocation has a macro field
@@ -402,7 +443,7 @@ class PanicMacrosOutsideTestsRule(BaseRule):
 def _is_lock_method_call(call_node: tree_sitter.Node) -> str | None:
     """If *call_node* is ``<receiver>.lock()`` / ``.read()`` / ``.write()`` etc., return the method name."""
     func = call_node.child_by_field_name("function")
-    if func is None or func.type != "field_expression":
+    if func is None or func.type != _RUST_FIELD_EXPRESSION:
         return None  # pragma: no cover - guarded by caller (SAFE205 only reaches here for field_expression calls)
     field = func.child_by_field_name("field")
     if field is None:  # pragma: no cover - defensive: every field_expression has a field child
@@ -437,7 +478,7 @@ class LockPoisoningIgnoredRule(BaseRule):
         """Flag ``.unwrap()`` / ``.expect()`` on a lock-acquisition call."""
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "call_expression":
+            if node.type != _RUST_CALL_EXPRESSION:
                 continue
             unwrap_method = self._unwrap_method_or_none(node)
             if unwrap_method is None:
@@ -461,7 +502,7 @@ class LockPoisoningIgnoredRule(BaseRule):
     def _unwrap_method_or_none(call_node: tree_sitter.Node) -> str | None:
         """If *call_node* is ``<x>.unwrap()`` / ``<x>.expect(...)``, return the method name."""
         func = call_node.child_by_field_name("function")
-        if func is None or func.type != "field_expression":
+        if func is None or func.type != _RUST_FIELD_EXPRESSION:
             return None  # pragma: no cover - SAFE205 walks every call_expression; most aren't field_expression calls
         field = func.child_by_field_name("field")
         if field is None:  # pragma: no cover - defensive: every field_expression has a field child
@@ -476,7 +517,7 @@ class LockPoisoningIgnoredRule(BaseRule):
         if func is None:  # pragma: no cover - guarded by caller
             return None
         receiver = func.child_by_field_name("value")
-        if receiver is None or receiver.type != "call_expression":
+        if receiver is None or receiver.type != _RUST_CALL_EXPRESSION:
             return None  # pragma: no cover - the .unwrap-on-non-call case is rare and not the SAFE205 hazard shape
         return receiver
 
@@ -524,7 +565,7 @@ class DangerousMemOpsRule(BaseRule):
         dangerous = frozenset(self.config.get("dangerous_mem_ops_rust", sorted(self._DEFAULT_DANGEROUS_OPS)))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "call_expression":
+            if node.type != _RUST_CALL_EXPRESSION:
                 continue
             op_name = self._resolved_mem_op_name(node, dangerous)
             if op_name is None:
@@ -610,7 +651,7 @@ class UndocumentedUnsafeRule(BaseRule):
         """Flag unsafe blocks lacking a preceding ``// SAFETY:`` comment."""
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "unsafe_block":
+            if node.type != _RUST_UNSAFE_BLOCK:
                 continue
             if self._has_safety_comment(node):
                 continue
@@ -636,11 +677,11 @@ class UndocumentedUnsafeRule(BaseRule):
         """
         anchor = unsafe_block
         parent = unsafe_block.parent
-        if parent is not None and parent.type == "expression_statement":
+        if parent is not None and parent.type == _RUST_EXPRESSION_STATEMENT:
             anchor = parent
         prev = anchor.prev_sibling
         while prev is not None:
-            if prev.type not in ("line_comment", "block_comment"):
+            if prev.type not in (_RUST_LINE_COMMENT, _RUST_BLOCK_COMMENT):
                 break
             if _SAFETY_COMMENT_PREFIX in node_text(prev).lower():
                 return True
@@ -662,10 +703,10 @@ def _is_err_pattern(pattern: tree_sitter.Node | None) -> bool:
     SAFE206 cares about empty body, SAFE207 cares about absence of
     log call, neither cares about the binding form.
     """
-    if pattern is None or pattern.type != "tuple_struct_pattern":
+    if pattern is None or pattern.type != _RUST_TUPLE_STRUCT_PATTERN:
         return False
     children = pattern.named_children
-    if not children or children[0].type != "identifier":  # pragma: no cover - defensive: tuple_struct_pattern always has a leading identifier
+    if not children or children[0].type != _RUST_IDENTIFIER:  # pragma: no cover - defensive: tuple_struct_pattern always has a leading identifier
         return False
     return node_text(children[0]) == "Err"
 
@@ -679,7 +720,7 @@ def _match_arm_pattern_and_body(arm: tree_sitter.Node) -> tuple[tree_sitter.Node
     ``Err(_) => expr,``).
     """
     children = arm.named_children
-    if len(children) < 2 or children[0].type != "match_pattern":  # pragma: no cover - defensive: every match_arm has match_pattern + body
+    if len(children) < 2 or children[0].type != _RUST_MATCH_PATTERN:  # pragma: no cover - defensive: every match_arm has match_pattern + body
         return None, None
     pattern_inner = next((c for c in children[0].named_children), None)
     return pattern_inner, children[1]
@@ -693,24 +734,24 @@ def _if_let_err_pattern_and_body(if_expr: tree_sitter.Node) -> tuple[tree_sitter
     pattern as its first named child and the matched value second.
     The ``block`` body is the next named child of ``if_expression``.
     """
-    condition = next((c for c in if_expr.named_children if c.type == "let_condition"), None)
+    condition = next((c for c in if_expr.named_children if c.type == _RUST_LET_CONDITION), None)
     if condition is None:
         return None, None  # plain ``if cond { ... }`` without ``let`` - not an if-let
     pattern = next((c for c in condition.named_children), None)
     if not _is_err_pattern(pattern):
         return None, None
-    block = next((c for c in if_expr.named_children if c.type == "block"), None)
+    block = next((c for c in if_expr.named_children if c.type == _RUST_BLOCK), None)
     return pattern, block
 
 
 _NOOP_LEAF_TYPES: frozenset[str] = frozenset(
     {
-        "integer_literal",
-        "float_literal",
-        "string_literal",
-        "char_literal",
-        "boolean_literal",
-        "unit_expression",
+        _RUST_INTEGER_LITERAL,
+        _RUST_FLOAT_LITERAL,
+        _RUST_STRING_LITERAL,
+        _RUST_CHAR_LITERAL,
+        _RUST_BOOLEAN_LITERAL,
+        _RUST_UNIT_EXPRESSION,
     }
 )
 
@@ -730,7 +771,7 @@ def _body_is_noop(body: tree_sitter.Node | None) -> bool:
         return False
     if body.type in _NOOP_LEAF_TYPES:
         return True
-    if body.type != "block":
+    if body.type != _RUST_BLOCK:
         return False
     return _block_is_noop(body)
 
@@ -745,20 +786,20 @@ def _block_is_noop(block: tree_sitter.Node) -> bool:
     only = named[0]
     if only.type in _NOOP_LEAF_TYPES:
         return True
-    if only.type != "expression_statement":  # pragma: no cover - rare: noop-leaf single-stmt blocks parse as direct leaf (tail form) or expression_statement (semicolon-terminated)
+    if only.type != _RUST_EXPRESSION_STATEMENT:  # pragma: no cover - rare: noop-leaf single-stmt blocks parse as direct leaf (tail form) or expression_statement (semicolon-terminated)
         return False
     inner = next((c for c in only.named_children), None)
     return inner is not None and inner.type in _NOOP_LEAF_TYPES
 
 
-_RUST_FUNCTION_TYPES_FOR_SKIP: tuple[str, ...] = ("function_item", "closure_expression")
+_RUST_FUNCTION_TYPES_FOR_SKIP: tuple[str, ...] = (_RUST_FUNCTION_ITEM, _RUST_CLOSURE_EXPRESSION)
 
 
 def _node_resolves_to_log_call(node: tree_sitter.Node) -> bool:
     """Return True if *node* is a macro or call resolving to a log-call name."""
-    if node.type == "macro_invocation":
+    if node.type == _RUST_MACRO_INVOCATION:
         return _rust_macro_name(node.child_by_field_name("macro")) in _LOG_CALL_NAMES
-    if node.type == "call_expression":
+    if node.type == _RUST_CALL_EXPRESSION:
         return call_name(node) in _LOG_CALL_NAMES
     return False
 
@@ -776,7 +817,7 @@ def _body_has_log_call(body: tree_sitter.Node | None) -> bool:
 
 def _node_is_panic_like_macro(node: tree_sitter.Node) -> bool:
     """Return True if *node* is a panic-like macro invocation."""
-    if node.type != "macro_invocation":
+    if node.type != _RUST_MACRO_INVOCATION:
         return False
     return _rust_macro_name(node.child_by_field_name("macro")) in _PANIC_LIKE_MACROS
 
@@ -801,33 +842,33 @@ def _body_propagates_or_panics(body: tree_sitter.Node | None) -> bool:
     if body is None:  # pragma: no cover - defensive: caller guards body presence
         return False
     for node in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP):
-        if node.type == "return_expression" or _node_is_panic_like_macro(node):
+        if node.type == _RUST_RETURN_EXPRESSION or _node_is_panic_like_macro(node):
             return True
     return _body_tail_is_err_constructor(body)
 
 
 def _body_tail_is_err_constructor(body: tree_sitter.Node) -> bool:
     """Return True if *body*'s tail expression is ``Err(...)`` (re-raise pattern)."""
-    if body.type == "call_expression" and _is_err_constructor_call(body):
+    if body.type == _RUST_CALL_EXPRESSION and _is_err_constructor_call(body):
         return True
-    if body.type != "block":
+    if body.type != _RUST_BLOCK:
         return False
     named = body.named_children
     if not named:  # pragma: no cover - defensive: callers reach this only for non-empty bodies
         return False
     tail = named[-1]
-    if tail.type == "call_expression":
+    if tail.type == _RUST_CALL_EXPRESSION:
         return _is_err_constructor_call(tail)  # pragma: no cover - tail-form ``Err(...)`` in a block is rare (typically a bare expression at the arm level)
-    if tail.type == "expression_statement":
+    if tail.type == _RUST_EXPRESSION_STATEMENT:
         inner = next((c for c in tail.named_children), None)
-        return inner is not None and inner.type == "call_expression" and _is_err_constructor_call(inner)
+        return inner is not None and inner.type == _RUST_CALL_EXPRESSION and _is_err_constructor_call(inner)
     return False  # pragma: no cover - non-call tail (let_declaration etc.) - body isn't a re-raise
 
 
 def _is_err_constructor_call(call_node: tree_sitter.Node) -> bool:
     """Return True if *call_node* is ``Err(...)`` (the bare constructor)."""
     func = call_node.child_by_field_name("function")
-    if func is None or func.type != "identifier":
+    if func is None or func.type != _RUST_IDENTIFIER:
         return False  # pragma: no cover - rare: ``Err`` used via method or scoped path isn't matched
     return node_text(func) == "Err"
 
@@ -868,7 +909,7 @@ class SilentResultDiscardRule(BaseRule):
 
     def _check_node(self, filepath: str, node: tree_sitter.Node) -> Violation | None:
         """Dispatch *node* to the right shape check; return a violation or None."""
-        if node.type == "match_arm":
+        if node.type == _RUST_MATCH_ARM:
             pattern, body = _match_arm_pattern_and_body(node)
             if _is_err_pattern(pattern) and _body_is_noop(body):
                 return self._make_violation_for_node(
@@ -877,7 +918,7 @@ class SilentResultDiscardRule(BaseRule):
                     'Empty "Err" arm silently discards the error - log the failure or return / propagate it',
                 )
             return None
-        if node.type == "if_expression":
+        if node.type == _RUST_IF_EXPRESSION:
             _, body = _if_let_err_pattern_and_body(node)
             if body is not None and _body_is_noop(body):
                 return self._make_violation_for_node(
@@ -931,7 +972,7 @@ class UnloggedErrorBranchRule(BaseRule):
 
     def _check_node(self, filepath: str, node: tree_sitter.Node) -> Violation | None:
         """Dispatch *node* and return a violation if the Err-branch body is silent."""
-        if node.type == "match_arm":
+        if node.type == _RUST_MATCH_ARM:
             pattern, body = _match_arm_pattern_and_body(node)
             if not _is_err_pattern(pattern):
                 return None
@@ -942,7 +983,7 @@ class UnloggedErrorBranchRule(BaseRule):
                     '"Err" arm handles the error but does not log it - add a log::error! / tracing::error! call or propagate the error',
                 )
             return None
-        if node.type == "if_expression":
+        if node.type == _RUST_IF_EXPRESSION:
             _, body = _if_let_err_pattern_and_body(node)
             if body is None:
                 return None
@@ -999,7 +1040,7 @@ class ResultUnwrapOutsideTestsRule(BaseRule):
         """Flag unwrap-family method calls outside test code."""
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "call_expression":
+            if node.type != _RUST_CALL_EXPRESSION:
                 continue
             method = self._unwrap_method_name(node)
             if method is None:
@@ -1019,7 +1060,7 @@ class ResultUnwrapOutsideTestsRule(BaseRule):
     def _unwrap_method_name(call_node: tree_sitter.Node) -> str | None:
         """Return the method name if *call_node* is ``<x>.<unwrap-method>()``, else None."""
         func = call_node.child_by_field_name("function")
-        if func is None or func.type != "field_expression":
+        if func is None or func.type != _RUST_FIELD_EXPRESSION:
             return None
         field = func.child_by_field_name("field")
         if field is None:  # pragma: no cover - defensive: every field_expression has a field child
@@ -1066,7 +1107,7 @@ class TruncatingAsCastRule(BaseRule):
         targets = frozenset(self.config.get("truncating_cast_targets_rust", sorted(_TRUNCATING_CAST_TARGETS)))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != "type_cast_expression":
+            if node.type != _RUST_TYPE_CAST_EXPRESSION:
                 continue
             target_name = self._cast_target_primitive(node)
             if target_name is None or target_name not in targets:
@@ -1095,7 +1136,7 @@ class TruncatingAsCastRule(BaseRule):
         if len(named) < 2:  # pragma: no cover - defensive: type_cast_expression has source + type
             return None
         target = named[-1]
-        return node_text(target) if target.type == "primitive_type" else None
+        return node_text(target) if target.type == _RUST_PRIMITIVE_TYPE else None
 
 
 # ---------------------------------------------------------------------------
@@ -1112,10 +1153,10 @@ def _let_mut_binding_name(let_decl: tree_sitter.Node) -> str | None:
     ``let (mut a, mut b) = ...``), so the rule sticks to the
     common single-binding form to minimise complexity.
     """
-    if not any(c.type == "mutable_specifier" for c in let_decl.named_children):
+    if not any(c.type == _RUST_MUTABLE_SPECIFIER for c in let_decl.named_children):
         return None
     for child in let_decl.named_children:
-        if child.type == "identifier":
+        if child.type == _RUST_IDENTIFIER:
             return node_text(child)
     return None  # pragma: no cover - defensive: ``let mut`` without an identifier binding is non-trivial destructure (caller skips it)
 
@@ -1150,15 +1191,15 @@ def _name_needs_mut_usage(name: str, body: tree_sitter.Node) -> bool:
 
 def _node_is_mut_use_of(name: str, node: tree_sitter.Node) -> bool:
     """Return True if *node* is a usage of *name* that requires the binding to be ``mut``."""
-    if node.type == "assignment_expression":
+    if node.type == _RUST_ASSIGNMENT_EXPRESSION:
         return _assignment_left_is(name, node)
-    if node.type == "compound_assignment_expr":
+    if node.type == _RUST_COMPOUND_ASSIGNMENT_EXPR:
         return _assignment_left_is(name, node)
-    if node.type == "reference_expression":
+    if node.type == _RUST_REFERENCE_EXPRESSION:
         return _is_mut_reference_of(name, node)
-    if node.type == "field_expression":
+    if node.type == _RUST_FIELD_EXPRESSION:
         return _field_expression_value_is(name, node)
-    if node.type == "index_expression":
+    if node.type == _RUST_INDEX_EXPRESSION:
         return _first_named_child_is(name, node)  # pragma: no cover - rare: index_expression as a mut-needing usage isn't reached by the current tests
     return False
 
@@ -1166,27 +1207,27 @@ def _node_is_mut_use_of(name: str, node: tree_sitter.Node) -> bool:
 def _assignment_left_is(name: str, node: tree_sitter.Node) -> bool:
     """Return True if *node*'s ``left`` field is identifier *name*."""
     left = node.child_by_field_name("left")
-    return left is not None and left.type == "identifier" and node_text(left) == name
+    return left is not None and left.type == _RUST_IDENTIFIER and node_text(left) == name
 
 
 def _is_mut_reference_of(name: str, node: tree_sitter.Node) -> bool:
     """Return True if *node* is ``&mut <name>``."""
-    if not any(c.type == "mutable_specifier" for c in node.named_children):
+    if not any(c.type == _RUST_MUTABLE_SPECIFIER for c in node.named_children):
         return False  # pragma: no cover - bare ``&x`` references aren't mut-needing usages
-    inner = next((c for c in node.named_children if c.type == "identifier"), None)
+    inner = next((c for c in node.named_children if c.type == _RUST_IDENTIFIER), None)
     return inner is not None and node_text(inner) == name
 
 
 def _field_expression_value_is(name: str, node: tree_sitter.Node) -> bool:
     """Return True if *node*'s ``value`` (receiver) is identifier *name*."""
     value = node.child_by_field_name("value")
-    return value is not None and value.type == "identifier" and node_text(value) == name
+    return value is not None and value.type == _RUST_IDENTIFIER and node_text(value) == name
 
 
 def _first_named_child_is(name: str, node: tree_sitter.Node) -> bool:
     """Return True if *node*'s first named child is identifier *name*."""
     children = node.named_children
-    return bool(children) and children[0].type == "identifier" and node_text(children[0]) == name  # pragma: no cover - helper for the rarely-hit index_expression branch
+    return bool(children) and children[0].type == _RUST_IDENTIFIER and node_text(children[0]) == name  # pragma: no cover - helper for the rarely-hit index_expression branch
 
 
 class NeedlessMutRule(BaseRule):
@@ -1238,7 +1279,7 @@ class NeedlessMutRule(BaseRule):
         """Return needless-mut violations for every ``let mut`` in *body*."""
         out: list[Violation] = []
         for let_decl in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP):
-            if let_decl.type != "let_declaration":
+            if let_decl.type != _RUST_LET_DECLARATION:
                 continue
             name = _let_mut_binding_name(let_decl)
             if name is None or _name_needs_mut_usage(name, body):
@@ -1273,15 +1314,15 @@ def _integer_param_names(func_node: tree_sitter.Node) -> set[str]:
         return set()
     names: set[str] = set()
     for child in params_node.named_children:
-        if child.type != "parameter":
+        if child.type != _RUST_PARAMETER:
             continue  # pragma: no cover - self_parameter / variadic skipped
         type_node = child.child_by_field_name("type")
-        if type_node is None or type_node.type != "primitive_type":
+        if type_node is None or type_node.type != _RUST_PRIMITIVE_TYPE:
             continue
         if node_text(type_node) not in _RUST_INTEGER_PRIMITIVE_TYPES:
             continue
         pattern = child.child_by_field_name("pattern")
-        if pattern is None or pattern.type != "identifier":
+        if pattern is None or pattern.type != _RUST_IDENTIFIER:
             continue
         names.add(node_text(pattern))
     return names
@@ -1327,7 +1368,7 @@ class UncheckedArithmeticOnInputRule(BaseRule):
         """Flag unchecked arithmetic on integer-typed parameters."""
         violations: list[Violation] = []
         for func_node in walk(tree.root_node):
-            if func_node.type != "function_item":
+            if func_node.type != _RUST_FUNCTION_ITEM:
                 continue
             int_params = _integer_param_names(func_node)
             if not int_params:
@@ -1342,7 +1383,7 @@ class UncheckedArithmeticOnInputRule(BaseRule):
         """Return violations for every unchecked arithmetic op on *int_params* in *body*."""
         out: list[Violation] = []
         for node in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP):
-            if node.type != "binary_expression":
+            if node.type != _RUST_BINARY_EXPRESSION:
                 continue
             op = self._operator_text(node)
             if op not in _RUST_ARITHMETIC_OPERATORS:
@@ -1371,7 +1412,7 @@ class UncheckedArithmeticOnInputRule(BaseRule):
         """Return the first operand whose text is in *int_params*, or None."""
         for field in ("left", "right"):
             operand = binary.child_by_field_name(field)
-            if operand is None or operand.type != "identifier":
+            if operand is None or operand.type != _RUST_IDENTIFIER:
                 continue  # operand is a literal / method call / nested binary - not a param identifier
             text = node_text(operand)
             if text in int_params:
@@ -1381,7 +1422,7 @@ class UncheckedArithmeticOnInputRule(BaseRule):
 
 def _op_method_suffix(op: str | None) -> str:
     """Map an arithmetic operator to its checked_*/wrapping_*/saturating_* method suffix."""
-    return {"+": "add", "-": "sub", "*": "mul"}.get(op or "", "op")
+    return {_RUST_PLUS: "add", _RUST_MINUS: "sub", _RUST_STAR: "mul"}.get(op or "", "op")
 
 
 # ---------------------------------------------------------------------------
@@ -1396,7 +1437,7 @@ def _static_item_is_mutable_specifier(static_node: tree_sitter.Node) -> bool:
     already audit-gated by SAFE602 (reads / writes require ``unsafe``), so
     SAFE307 skips them to avoid double-reporting.
     """
-    return any(child.type == "mutable_specifier" for child in static_node.named_children)
+    return any(child.type == _RUST_MUTABLE_SPECIFIER for child in static_node.named_children)
 
 
 def _type_text_has_interior_mutable(type_text: str, names: frozenset[str]) -> bool:
@@ -1453,13 +1494,13 @@ class InteriorMutableStaticRule(BaseRule):
 
     def _violation_for(self, filepath: str, node: tree_sitter.Node, names: frozenset[str]) -> Violation | None:
         """Return a SAFE307 violation for *node* if it is an interior-mutable static, else None."""
-        if node.type == "macro_invocation" and _rust_macro_name(node.child_by_field_name("macro")) == "lazy_static":
+        if node.type == _RUST_MACRO_INVOCATION and _rust_macro_name(node.child_by_field_name("macro")) == "lazy_static":
             return self._make_violation_for_node(
                 filepath,
                 node,
                 "lazy_static! declares lazily-initialised global mutable state - prefer passing state explicitly or scoping it to the consumer (Power of Ten rule 6)",
             )
-        if node.type != "static_item" or _static_item_is_mutable_specifier(node):
+        if node.type != _RUST_STATIC_ITEM or _static_item_is_mutable_specifier(node):
             return None
         type_node = node.child_by_field_name("type")
         if type_node is None or not _type_text_has_interior_mutable(node_text(type_node), names):
