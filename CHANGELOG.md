@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.3] - 2026-07-13
+
 ### Changed
 
 - **Internal refactor: the rules now reach Tree-sitter node-type / operator constants through module-access (`from safelint.languages import cpp as _cpp` → `_cpp.IF_STATEMENT`) instead of ~1,350 per-constant aliased imports (`from safelint.languages.cpp import IF_STATEMENT as _CPP_IF_STATEMENT`).** One module import per language per file replaces dozens of per-name imports, and the language is explicit at every call site. Follows the v2.8.2 constant sweep. **No behaviour change** - every rule's resolved node-type set is byte-identical (verified by a collections-only table snapshot showing zero real changes and the full suite passing unchanged), and the `languages/<lang>.py` modules are untouched, so any downstream importer of `safelint.languages.*` stays compatible.
