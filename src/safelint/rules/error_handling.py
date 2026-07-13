@@ -4,99 +4,13 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.languages import cpp as _cpp
+from safelint.languages import java as _java
+from safelint.languages import javascript as _js
+from safelint.languages import php as _php
+from safelint.languages import python as _py
+from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
-from safelint.languages.cpp import BINARY_EXPRESSION as _CPP_BINARY_EXPRESSION
-from safelint.languages.cpp import CATCH_CLAUSE as _CPP_CATCH_CLAUSE
-from safelint.languages.cpp import CHAR_LITERAL as _CPP_CHAR_LITERAL
-from safelint.languages.cpp import COMMENT as _CPP_COMMENT
-from safelint.languages.cpp import CONCATENATED_STRING as _CPP_CONCATENATED_STRING
-from safelint.languages.cpp import EMPTY_STATEMENT as _CPP_EMPTY_STATEMENT
-from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
-from safelint.languages.cpp import FALSE as _CPP_FALSE
-from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
-from safelint.languages.cpp import IDENTIFIER as _CPP_IDENTIFIER
-from safelint.languages.cpp import NULL as _CPP_NULL
-from safelint.languages.cpp import NUMBER_LITERAL as _CPP_NUMBER_LITERAL
-from safelint.languages.cpp import PARAMETER_DECLARATION as _CPP_PARAMETER_DECLARATION
-from safelint.languages.cpp import QUALIFIED_IDENTIFIER as _CPP_QUALIFIED_IDENTIFIER
-from safelint.languages.cpp import RAW_STRING_LITERAL as _CPP_RAW_STRING_LITERAL
-from safelint.languages.cpp import STRING_LITERAL as _CPP_STRING_LITERAL
-from safelint.languages.cpp import THROW_STATEMENT as _CPP_THROW_STATEMENT
-from safelint.languages.cpp import TRUE as _CPP_TRUE
-from safelint.languages.java import BINARY_INTEGER_LITERAL as _JAVA_BINARY_INTEGER_LITERAL
-from safelint.languages.java import BLOCK_COMMENT as _JAVA_BLOCK_COMMENT
-from safelint.languages.java import CATCH_CLAUSE as _JAVA_CATCH_CLAUSE
-from safelint.languages.java import CATCH_FORMAL_PARAMETER as _JAVA_CATCH_FORMAL_PARAMETER
-from safelint.languages.java import CHARACTER_LITERAL as _JAVA_CHARACTER_LITERAL
-from safelint.languages.java import DECIMAL_FLOATING_POINT_LITERAL as _JAVA_DECIMAL_FLOATING_POINT_LITERAL
-from safelint.languages.java import DECIMAL_INTEGER_LITERAL as _JAVA_DECIMAL_INTEGER_LITERAL
-from safelint.languages.java import EMPTY_STATEMENT as _JAVA_EMPTY_STATEMENT
-from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
-from safelint.languages.java import FALSE as _JAVA_FALSE
-from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
-from safelint.languages.java import HEX_FLOATING_POINT_LITERAL as _JAVA_HEX_FLOATING_POINT_LITERAL
-from safelint.languages.java import HEX_INTEGER_LITERAL as _JAVA_HEX_INTEGER_LITERAL
-from safelint.languages.java import IDENTIFIER as _JAVA_IDENTIFIER
-from safelint.languages.java import LINE_COMMENT as _JAVA_LINE_COMMENT
-from safelint.languages.java import NULL_LITERAL as _JAVA_NULL_LITERAL
-from safelint.languages.java import OCTAL_INTEGER_LITERAL as _JAVA_OCTAL_INTEGER_LITERAL
-from safelint.languages.java import STRING_LITERAL as _JAVA_STRING_LITERAL
-from safelint.languages.java import THROW_STATEMENT as _JAVA_THROW_STATEMENT
-from safelint.languages.java import TRUE as _JAVA_TRUE
-from safelint.languages.javascript import CATCH_CLAUSE as _JS_CATCH_CLAUSE
-from safelint.languages.javascript import EMPTY_STATEMENT as _JS_EMPTY_STATEMENT
-from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
-from safelint.languages.javascript import FALSE as _JS_FALSE
-from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
-from safelint.languages.javascript import NULL as _JS_NULL
-from safelint.languages.javascript import NUMBER as _JS_NUMBER
-from safelint.languages.javascript import STRING as _JS_STRING
-from safelint.languages.javascript import TEMPLATE_STRING as _JS_TEMPLATE_STRING
-from safelint.languages.javascript import TEMPLATE_SUBSTITUTION as _JS_TEMPLATE_SUBSTITUTION
-from safelint.languages.javascript import THROW_STATEMENT as _JS_THROW_STATEMENT
-from safelint.languages.javascript import TRUE as _JS_TRUE
-from safelint.languages.javascript import UNDEFINED as _JS_UNDEFINED
-from safelint.languages.php import BOOLEAN as _PHP_BOOLEAN
-from safelint.languages.php import CATCH_CLAUSE as _PHP_CATCH_CLAUSE
-from safelint.languages.php import COMMENT as _PHP_COMMENT
-from safelint.languages.php import EMPTY_STATEMENT as _PHP_EMPTY_STATEMENT
-from safelint.languages.php import ENCAPSED_STRING as _PHP_ENCAPSED_STRING
-from safelint.languages.php import EXPRESSION_STATEMENT as _PHP_EXPRESSION_STATEMENT
-from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
-from safelint.languages.php import FLOAT as _PHP_FLOAT
-from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
-from safelint.languages.php import INTEGER as _PHP_INTEGER
-from safelint.languages.php import NULL as _PHP_NULL
-from safelint.languages.php import STRING as _PHP_STRING
-from safelint.languages.php import STRING_CONTENT as _PHP_STRING_CONTENT
-from safelint.languages.php import THROW_EXPRESSION as _PHP_THROW_EXPRESSION
-from safelint.languages.php import VARIABLE_NAME as _PHP_VARIABLE_NAME
-from safelint.languages.python import (
-    AS_PATTERN,
-    ASYNC_FUNCTION_DEF,
-    ATTRIBUTE,
-    CONCATENATED_STRING,
-    CONTINUE_STATEMENT,
-    EXCEPT_CLAUSE,
-    EXPRESSION_STATEMENT,
-    EXTRA_NAME,
-    FALSE,
-    FLOAT,
-    FUNCTION_DEF,
-    IDENTIFIER,
-    INTEGER,
-    INTERPOLATION,
-    NONE,
-    PASS_STATEMENT,
-    RAISE_STATEMENT,
-    STRING,
-    TRUE,
-    TUPLE,
-)
-from safelint.languages.typescript import CATCH_CLAUSE as _TS_CATCH_CLAUSE
-from safelint.languages.typescript import EMPTY_STATEMENT as _TS_EMPTY_STATEMENT
-from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
-from safelint.languages.typescript import THROW_STATEMENT as _TS_THROW_STATEMENT
 from safelint.rules.base import BaseRule, Suggestion, TextEdit
 
 
@@ -106,12 +20,12 @@ from safelint.rules.base import BaseRule, Suggestion, TextEdit
 # Java: ``catch_clause`` (same node name; same shape as JS apart from the
 # typed-binding requirement that the language enforces upstream).
 _CATCH_CLAUSE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({EXCEPT_CLAUSE}),
-    "javascript": frozenset({_JS_CATCH_CLAUSE}),
-    "typescript": frozenset({_TS_CATCH_CLAUSE}),
-    "java": frozenset({_JAVA_CATCH_CLAUSE}),
-    "php": frozenset({_PHP_CATCH_CLAUSE}),
-    "cpp": frozenset({_CPP_CATCH_CLAUSE}),
+    "python": frozenset({_py.EXCEPT_CLAUSE}),
+    "javascript": frozenset({_js.CATCH_CLAUSE}),
+    "typescript": frozenset({_ts.CATCH_CLAUSE}),
+    "java": frozenset({_java.CATCH_CLAUSE}),
+    "php": frozenset({_php.CATCH_CLAUSE}),
+    "cpp": frozenset({_cpp.CATCH_CLAUSE}),
 }
 
 # Per-language: function-defining node types (used to skip nested
@@ -119,12 +33,12 @@ _CATCH_CLAUSE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # a nested ``def`` / ``function`` doesn't count as logging the caught
 # error of the enclosing handler).
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
-    "javascript": _JS_FUNCTION_TYPES,
-    "typescript": _JS_FUNCTION_TYPES,
-    "java": _JAVA_FUNCTION_TYPES,
-    "php": _PHP_FUNCTION_TYPES,
-    "cpp": _CPP_FUNCTION_TYPES,
+    "python": frozenset({_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF}),
+    "javascript": _js.FUNCTION_TYPES,
+    "typescript": _js.FUNCTION_TYPES,
+    "java": _java.FUNCTION_TYPES,
+    "php": _php.FUNCTION_TYPES,
+    "cpp": _cpp.FUNCTION_TYPES,
 }
 
 # Per-language: re-raise statement types. ``except: raise`` (Python),
@@ -132,12 +46,12 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # (Java) all pass the error up the stack, which the logging-on-error
 # rule treats as legitimate handling.
 _RERAISE_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({RAISE_STATEMENT}),
-    "javascript": frozenset({_JS_THROW_STATEMENT}),
-    "typescript": frozenset({_TS_THROW_STATEMENT}),
-    "java": frozenset({_JAVA_THROW_STATEMENT}),
+    "python": frozenset({_py.RAISE_STATEMENT}),
+    "javascript": frozenset({_js.THROW_STATEMENT}),
+    "typescript": frozenset({_ts.THROW_STATEMENT}),
+    "java": frozenset({_java.THROW_STATEMENT}),
     # C++ ``throw;`` (bare rethrow) / ``throw e;`` both re-raise.
-    "cpp": frozenset({_CPP_THROW_STATEMENT}),
+    "cpp": frozenset({_cpp.THROW_STATEMENT}),
 }
 
 # Statement-only no-op nodes: their presence means "developer wrote something
@@ -152,25 +66,25 @@ _RERAISE_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # no-op statements lets ``catch (Throwable t) { /* todo */ }`` match the
 # empty-handler intent the way ``catch (Throwable t) {}`` already does.
 _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({PASS_STATEMENT, CONTINUE_STATEMENT}),
-    "javascript": frozenset({_JS_EMPTY_STATEMENT}),
-    "typescript": frozenset({_TS_EMPTY_STATEMENT}),
+    "python": frozenset({_py.PASS_STATEMENT, _py.CONTINUE_STATEMENT}),
+    "javascript": frozenset({_js.EMPTY_STATEMENT}),
+    "typescript": frozenset({_ts.EMPTY_STATEMENT}),
     # Java accepts bare semicolons (``catch (Exception e) { ; }``) as
     # empty statements, same as JS. ``line_comment`` / ``block_comment``
     # cover comment-only bodies (tree-sitter-java emits comments as
     # named block children, unlike JS where they're extras).
-    "java": frozenset({_JAVA_EMPTY_STATEMENT, _JAVA_LINE_COMMENT, _JAVA_BLOCK_COMMENT}),
+    "java": frozenset({_java.EMPTY_STATEMENT, _java.LINE_COMMENT, _java.BLOCK_COMMENT}),
     # PHP: bare ``;`` is ``empty_statement``; tree-sitter-php emits both
     # ``//`` / ``#`` line comments and ``/* */`` block comments as a single
     # ``comment`` node that is a *named* child of the body block (like Java,
     # unlike JS where comments are extras), so a comment-only catch body
     # such as ``catch (\E $e) { /* todo */ }`` matches the empty-handler
     # intent.
-    "php": frozenset({_PHP_EMPTY_STATEMENT, _PHP_COMMENT}),
+    "php": frozenset({_php.EMPTY_STATEMENT, _php.COMMENT}),
     # C++: bare ``;`` is ``empty_statement``; tree-sitter-cpp emits ``//`` and
     # ``/* */`` as a single ``comment`` node that is a *named* child of the
     # catch body (like Java / PHP), so a comment-only body matches.
-    "cpp": frozenset({_CPP_EMPTY_STATEMENT, _CPP_COMMENT}),
+    "cpp": frozenset({_cpp.EMPTY_STATEMENT, _cpp.COMMENT}),
 }
 
 # Per-language: literal expression node types that count as "comment-like"
@@ -183,36 +97,36 @@ _NOOP_STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # the same interpolation hazard as JS template strings).
 _JS_LITERAL_EXPR_TYPES = frozenset(
     {
-        _JS_NUMBER,
-        _JS_TRUE,
-        _JS_FALSE,
-        _JS_NULL,
-        _JS_UNDEFINED,
+        _js.NUMBER,
+        _js.TRUE,
+        _js.FALSE,
+        _js.NULL,
+        _js.UNDEFINED,
     }
 )
 _JAVA_LITERAL_EXPR_TYPES = frozenset(
     {
-        _JAVA_DECIMAL_INTEGER_LITERAL,
-        _JAVA_HEX_INTEGER_LITERAL,
-        _JAVA_OCTAL_INTEGER_LITERAL,
-        _JAVA_BINARY_INTEGER_LITERAL,
-        _JAVA_DECIMAL_FLOATING_POINT_LITERAL,
-        _JAVA_HEX_FLOATING_POINT_LITERAL,
-        _JAVA_TRUE,
-        _JAVA_FALSE,
-        _JAVA_NULL_LITERAL,
-        _JAVA_CHARACTER_LITERAL,
+        _java.DECIMAL_INTEGER_LITERAL,
+        _java.HEX_INTEGER_LITERAL,
+        _java.OCTAL_INTEGER_LITERAL,
+        _java.BINARY_INTEGER_LITERAL,
+        _java.DECIMAL_FLOATING_POINT_LITERAL,
+        _java.HEX_FLOATING_POINT_LITERAL,
+        _java.TRUE,
+        _java.FALSE,
+        _java.NULL_LITERAL,
+        _java.CHARACTER_LITERAL,
     }
 )
 _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset(
         {
-            INTEGER,
-            FLOAT,
-            CONCATENATED_STRING,
-            TRUE,
-            FALSE,
-            NONE,
+            _py.INTEGER,
+            _py.FLOAT,
+            _py.CONCATENATED_STRING,
+            _py.TRUE,
+            _py.FALSE,
+            _py.NONE,
             "ellipsis",
         }
     ),
@@ -224,12 +138,12 @@ _LITERAL_EXPR_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # literals (``'TODO'`` / ``"TODO"``) are delegated to
     # ``_php_string_is_literal`` so interpolating double-quoted strings are
     # not treated as no-op markers.
-    "php": frozenset({_PHP_INTEGER, _PHP_FLOAT, _PHP_BOOLEAN, _PHP_NULL}),
+    "php": frozenset({_php.INTEGER, _php.FLOAT, _php.BOOLEAN, _php.NULL}),
     # C++: ``number_literal`` covers int / float; ``true`` / ``false`` are
     # dedicated nodes; ``nullptr`` / ``null`` and ``char_literal`` round out
     # the single-literal no-op markers. String literals are delegated to
     # ``_cpp_string_is_literal``.
-    "cpp": frozenset({_CPP_NUMBER_LITERAL, _CPP_TRUE, _CPP_FALSE, _CPP_NULL, "nullptr", _CPP_CHAR_LITERAL}),
+    "cpp": frozenset({_cpp.NUMBER_LITERAL, _cpp.TRUE, _cpp.FALSE, _cpp.NULL, "nullptr", _cpp.CHAR_LITERAL}),
 }
 
 
@@ -267,7 +181,7 @@ def _is_noop_body(body_node: tree_sitter.Node | None, lang_name: str) -> bool:
     # Java and PHP both emit comments as named block children, so a
     # comment-only body has several no-op children; accept when *every*
     # statement is a no-op (covers the multi-comment case).
-    if lang_name in (_JAVA_EXTRA_NAME, _PHP_EXTRA_NAME, _CPP_EXTRA_NAME):
+    if lang_name in (_java.EXTRA_NAME, _php.EXTRA_NAME, _cpp.EXTRA_NAME):
         return all(_stmt_is_noop(child, lang_name) for child in children)
     if len(children) != 1:
         return False
@@ -278,7 +192,7 @@ def _stmt_is_noop(stmt: tree_sitter.Node, lang_name: str) -> bool:
     """Return True if *stmt* is a no-op statement under the active language's grammar."""
     if stmt.type in _NOOP_STATEMENT_TYPES_BY_LANG[lang_name]:
         return True
-    if stmt.type != EXPRESSION_STATEMENT:
+    if stmt.type != _py.EXPRESSION_STATEMENT:
         return False
     # expression_statement may wrap a single inner expression. Reach into it.
     inner = stmt.named_children[0] if stmt.named_children else None
@@ -291,14 +205,14 @@ def _stmt_is_noop(stmt: tree_sitter.Node, lang_name: str) -> bool:
 
 def _python_string_is_literal(node: tree_sitter.Node) -> bool:
     """Return True for a Python ``string`` node with no interpolation."""
-    return node.type == STRING and all(child.type != INTERPOLATION for child in node.named_children) and bool(node_text(node))
+    return node.type == _py.STRING and all(child.type != _py.INTERPOLATION for child in node.named_children) and bool(node_text(node))
 
 
 def _js_string_is_literal(node: tree_sitter.Node) -> bool:
     """Return True for a JS / TS ``string`` or ``template_string`` with no interpolation."""
-    if node.type not in (_JS_STRING, _JS_TEMPLATE_STRING):
+    if node.type not in (_js.STRING, _js.TEMPLATE_STRING):
         return False
-    return all(child.type != _JS_TEMPLATE_SUBSTITUTION for child in node.named_children) and bool(node_text(node))
+    return all(child.type != _js.TEMPLATE_SUBSTITUTION for child in node.named_children) and bool(node_text(node))
 
 
 def _java_string_is_literal(node: tree_sitter.Node) -> bool:
@@ -309,7 +223,7 @@ def _java_string_is_literal(node: tree_sitter.Node) -> bool:
     have only string-content children (anonymous tokens, not named),
     so a ``string_literal`` with no named children is a plain literal.
     """
-    return node.type == _JAVA_STRING_LITERAL and not node.named_children and bool(node_text(node))
+    return node.type == _java.STRING_LITERAL and not node.named_children and bool(node_text(node))
 
 
 def _cpp_string_is_literal(node: tree_sitter.Node) -> bool:
@@ -319,7 +233,7 @@ def _cpp_string_is_literal(node: tree_sitter.Node) -> bool:
     ``concatenated_string`` (adjacent literals) / ``raw_string_literal`` with
     text is a plain literal.
     """
-    return node.type in (_CPP_STRING_LITERAL, _CPP_CONCATENATED_STRING, _CPP_RAW_STRING_LITERAL) and bool(node_text(node))
+    return node.type in (_cpp.STRING_LITERAL, _cpp.CONCATENATED_STRING, _cpp.RAW_STRING_LITERAL) and bool(node_text(node))
 
 
 def _php_string_is_literal(node: tree_sitter.Node) -> bool:
@@ -331,11 +245,11 @@ def _php_string_is_literal(node: tree_sitter.Node) -> bool:
     named children are ``string_content`` counts as a no-op marker, while
     ``"$err"`` (with a ``variable_name`` child) does not.
     """
-    if node.type == _PHP_STRING:
+    if node.type == _php.STRING:
         return bool(node_text(node))
-    if node.type != _PHP_ENCAPSED_STRING:
+    if node.type != _php.ENCAPSED_STRING:
         return False
-    return all(child.type == _PHP_STRING_CONTENT for child in node.named_children) and bool(node_text(node))
+    return all(child.type == _php.STRING_CONTENT for child in node.named_children) and bool(node_text(node))
 
 
 _STRING_LITERAL_PREDICATES: dict[str, Callable[[tree_sitter.Node], bool]] = {
@@ -372,13 +286,13 @@ if TYPE_CHECKING:
 
 def _java_catch_formal_parameter(catch_node: tree_sitter.Node) -> tree_sitter.Node | None:
     """Return the ``catch_formal_parameter`` child of a Java ``catch_clause``, or None."""
-    return next((c for c in catch_node.named_children if c.type == _JAVA_CATCH_FORMAL_PARAMETER), None)
+    return next((c for c in catch_node.named_children if c.type == _java.CATCH_FORMAL_PARAMETER), None)
 
 
 def _js_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
     """Return the JS / TS ``catch (e)`` binding, or None for ``catch {}`` (optional-binding)."""
     param_node = catch_node.child_by_field_name("parameter")
-    if param_node is None or param_node.type != IDENTIFIER:
+    if param_node is None or param_node.type != _py.IDENTIFIER:
         return None
     return node_text(param_node)
 
@@ -386,7 +300,7 @@ def _js_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
 def _php_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
     r"""Return the PHP ``catch (\Type $e)`` binding (``$e``), or None for the non-capturing form."""
     name_node = catch_node.child_by_field_name("name")
-    if name_node is None or name_node.type != _PHP_VARIABLE_NAME:
+    if name_node is None or name_node.type != _php.VARIABLE_NAME:
         return None
     return node_text(name_node)
 
@@ -397,7 +311,7 @@ def _java_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
     if formal is None:
         return None
     name_node = formal.child_by_field_name("name")
-    if name_node is None or name_node.type != _JAVA_IDENTIFIER:
+    if name_node is None or name_node.type != _java.IDENTIFIER:
         return None
     return node_text(name_node)
 
@@ -417,13 +331,13 @@ def _cpp_caught_binding_name(catch_node: tree_sitter.Node) -> str | None:
     params = catch_node.child_by_field_name("parameters")
     if params is None:  # pragma: no cover - defensive: a catch clause always has a parameter list
         return None
-    decl = next((c for c in params.named_children if c.type == _CPP_PARAMETER_DECLARATION), None)
+    decl = next((c for c in params.named_children if c.type == _cpp.PARAMETER_DECLARATION), None)
     if decl is None:  # pragma: no cover - defensive: only reached for a ``throw e;`` inside a typed catch, which has a parameter_declaration
         return None
     declarator = decl.child_by_field_name("declarator")
     if declarator is None:  # pragma: no cover - defensive: a re-raised binding comes from a named ``catch (E& e)``
         return None
-    return next((node_text(node) for node in walk(declarator) if node.type == _CPP_IDENTIFIER), None)
+    return next((node_text(node) for node in walk(declarator) if node.type == _cpp.IDENTIFIER), None)
 
 
 def _cpp_is_catch_all(catch_node: tree_sitter.Node) -> bool:
@@ -439,7 +353,7 @@ def _cpp_is_catch_all(catch_node: tree_sitter.Node) -> bool:
     params = catch_node.child_by_field_name("parameters")
     if params is None:  # pragma: no cover - valid source always has a parameter list
         return False
-    return not any(c.type == _CPP_PARAMETER_DECLARATION for c in params.named_children)
+    return not any(c.type == _cpp.PARAMETER_DECLARATION for c in params.named_children)
 
 
 #: C++ standard error / log streams whose ``<<`` insertion counts as a logging
@@ -455,11 +369,11 @@ def _cpp_stream_target_name(operand: tree_sitter.Node) -> str | None:
     ``std::cerr`` parses as a ``qualified_identifier`` (trailing ``name`` field);
     an unqualified ``cerr`` (via ``using std::cerr``) is a bare ``identifier``.
     """
-    if operand.type == _CPP_IDENTIFIER:
+    if operand.type == _cpp.IDENTIFIER:
         return node_text(operand)
-    if operand.type == _CPP_QUALIFIED_IDENTIFIER:
+    if operand.type == _cpp.QUALIFIED_IDENTIFIER:
         name = operand.child_by_field_name("name")
-        return node_text(name) if name is not None and name.type == _CPP_IDENTIFIER else None
+        return node_text(name) if name is not None and name.type == _cpp.IDENTIFIER else None
     return None  # pragma: no cover - defensive: a stream-insertion chain's leftmost operand is a stream name, not another shape
 
 
@@ -471,7 +385,7 @@ def _cpp_chain_leftmost(expr: tree_sitter.Node) -> tree_sitter.Node | None:
     """
     operand: tree_sitter.Node | None = expr
     for _ in range(64):
-        if operand is None or operand.type != _CPP_BINARY_EXPRESSION:
+        if operand is None or operand.type != _cpp.BINARY_EXPRESSION:
             return operand
         operand = operand.child_by_field_name("left")
     return operand  # pragma: no cover - defensive: a ``<<`` chain deeper than 64 does not occur
@@ -485,7 +399,7 @@ def _cpp_body_has_stream_log(body: tree_sitter.Node, function_types: frozenset[s
     stream, the handler is treated as logging the caught error.
     """
     for node in walk(body, skip_types=tuple(function_types)):
-        if node.type != _CPP_BINARY_EXPRESSION:
+        if node.type != _cpp.BINARY_EXPRESSION:
             continue
         operator = node.child_by_field_name("operator")
         if operator is None or node_text(operator) != "<<":
@@ -575,17 +489,17 @@ def _php_only_reraises(catch_node: tree_sitter.Node, stmts: list[tree_sitter.Nod
     named body nodes, so ``catch (Exception $e) { /* why */ throw $e; }``
     would otherwise reach here with two statements and be misread as a swallow.
     """
-    real = [s for s in stmts if s.type != _PHP_COMMENT]
-    if len(real) != 1 or real[0].type != _PHP_EXPRESSION_STATEMENT:
+    real = [s for s in stmts if s.type != _php.COMMENT]
+    if len(real) != 1 or real[0].type != _php.EXPRESSION_STATEMENT:
         return False
     stmts = real
     inner = stmts[0].named_children
-    if len(inner) != 1 or inner[0].type != _PHP_THROW_EXPRESSION:
+    if len(inner) != 1 or inner[0].type != _php.THROW_EXPRESSION:
         return False
     operand = inner[0].named_children
-    if len(operand) != 1 or operand[0].type != _PHP_VARIABLE_NAME:
+    if len(operand) != 1 or operand[0].type != _php.VARIABLE_NAME:
         return False
-    bound = _caught_binding_name(catch_node, _PHP_EXTRA_NAME)
+    bound = _caught_binding_name(catch_node, _php.EXTRA_NAME)
     return bound is not None and node_text(operand[0]) == bound
 
 
@@ -598,7 +512,7 @@ def _throw_reraises_caught_binding(throw_stmt: tree_sitter.Node, catch_node: tre
     error and the rule still requires logging.
     """
     children = throw_stmt.named_children
-    if len(children) != 1 or children[0].type != IDENTIFIER:
+    if len(children) != 1 or children[0].type != _py.IDENTIFIER:
         return False
     param_text = _caught_binding_name(catch_node, lang_name)
     return param_text is not None and node_text(children[0]) == param_text
@@ -643,7 +557,7 @@ def _has_typed_exception(except_node: tree_sitter.Node) -> bool:
     grammar.
     """
     # ``except ValueError as e:`` puts the type inside an ``as_pattern`` named child.
-    return any(c.type in (IDENTIFIER, ATTRIBUTE, TUPLE, AS_PATTERN) for c in except_node.named_children)
+    return any(c.type in (_py.IDENTIFIER, _py.ATTRIBUTE, _py.TUPLE, _py.AS_PATTERN) for c in except_node.named_children)
 
 
 def _bare_except_suggestion(except_node: tree_sitter.Node) -> Suggestion | None:
@@ -683,7 +597,7 @@ class BareExceptRule(BaseRule):
 
     name = "bare_except"
     code = "SAFE201"
-    language = (EXTRA_NAME, _CPP_EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every catch-all handler with no exception type specified."""
@@ -695,14 +609,14 @@ class BareExceptRule(BaseRule):
         """Flag every C++ ``catch (...)`` catch-all clause."""
         return [
             self._make_violation_for_node(filepath, clause, "Catch-all `catch (...)` - catch a specific exception type instead")
-            for clause in _iter_catch_clauses(tree, _CPP_EXTRA_NAME)
+            for clause in _iter_catch_clauses(tree, _cpp.EXTRA_NAME)
             if _cpp_is_catch_all(clause)
         ]
 
     def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every Python bare ``except:`` clause with no exception type specified."""
         violations: list[Violation] = []
-        for clause in _iter_catch_clauses(tree, EXTRA_NAME):
+        for clause in _iter_catch_clauses(tree, _py.EXTRA_NAME):
             if _has_typed_exception(clause):
                 continue
             base = self._make_violation_for_node(filepath, clause, "Bare except clause - specify the exception type(s)")
@@ -728,7 +642,7 @@ class EmptyExceptRule(BaseRule):
 
     name = "empty_except"
     code = "SAFE202"
-    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _PHP_EXTRA_NAME, _CPP_EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _php.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every catch handler whose body is effectively empty."""
@@ -736,7 +650,7 @@ class EmptyExceptRule(BaseRule):
         # Match the violation message to the source language's terminology -
         # JavaScript / Java / PHP developers don't write ``except`` blocks.
         # Same message-selection pattern as ``LoggingOnErrorRule``.
-        block_word = "catch" if lang_name in (_JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _PHP_EXTRA_NAME, _CPP_EXTRA_NAME) else "except"
+        block_word = "catch" if lang_name in (_js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _php.EXTRA_NAME, _cpp.EXTRA_NAME) else "except"
         message = f"Empty {block_word} block - add error handling or a logging call"
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if _is_noop_body(_catch_body(clause), lang_name)]
 
@@ -751,7 +665,7 @@ class LoggingOnErrorRule(BaseRule):
 
     name = "logging_on_error"
     code = "SAFE203"
-    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _PHP_EXTRA_NAME, _CPP_EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _php.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     # Union of method names treated as "logging" across registered
     # languages. Python stdlib ``logging`` exposes ``debug`` / ``info`` /
@@ -836,7 +750,7 @@ class LoggingOnErrorRule(BaseRule):
         if lang_name == "python":
             # Bare ``raise`` (no children) re-raises; ``raise Exception()`` does not.
             return not stmts[0].named_children
-        if lang_name == _CPP_EXTRA_NAME and not stmts[0].named_children:
+        if lang_name == _cpp.EXTRA_NAME and not stmts[0].named_children:
             # Bare ``throw;`` rethrows the active exception. A ``throw e;`` with
             # an operand falls through to the caught-binding check below.
             return True
@@ -884,7 +798,7 @@ class LoggingOnErrorRule(BaseRule):
         # immediately visible).
         message = (
             "Catch block missing logging call - errors must be logged before being swallowed"
-            if lang_name in (_JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _PHP_EXTRA_NAME, _CPP_EXTRA_NAME)
+            if lang_name in (_js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _php.EXTRA_NAME, _cpp.EXTRA_NAME)
             else "Except block missing logging call - errors must be logged before being swallowed"
         )
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if self._is_unlogged(clause, lang_name, function_types)]

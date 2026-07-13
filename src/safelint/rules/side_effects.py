@@ -5,27 +5,16 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
+from safelint.languages import c as _c
+from safelint.languages import cpp as _cpp
+from safelint.languages import go as _go
+from safelint.languages import java as _java
+from safelint.languages import javascript as _js
+from safelint.languages import php as _php
+from safelint.languages import python as _py
+from safelint.languages import rust as _rust
+from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
-from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
-from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
-from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
-from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
-from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
-from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
-from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
-from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
-from safelint.languages.java import VARIABLE_DECLARATOR as _JAVA_VARIABLE_DECLARATOR
-from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
-from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
-from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
-from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
-from safelint.languages.python import ASYNC_FUNCTION_DEF, EXTRA_NAME, FUNCTION_DEF
-from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
-from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
-from safelint.languages.rust import IDENTIFIER as _RUST_IDENTIFIER
-from safelint.languages.rust import MACRO_INVOCATION as _RUST_MACRO_INVOCATION
-from safelint.languages.rust import SCOPED_IDENTIFIER as _RUST_SCOPED_IDENTIFIER
-from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.rules.base import BaseRule
 
 
@@ -36,15 +25,15 @@ if TYPE_CHECKING:
 
 
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
-    "javascript": _JS_FUNCTION_TYPES,
-    "typescript": _JS_FUNCTION_TYPES,
-    "java": _JAVA_FUNCTION_TYPES,
-    "rust": _RUST_FUNCTION_TYPES,
-    "go": _GO_FUNCTION_TYPES,
-    "php": _PHP_FUNCTION_TYPES,
-    "c": _C_FUNCTION_TYPES,
-    "cpp": _CPP_FUNCTION_TYPES,
+    "python": frozenset({_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF}),
+    "javascript": _js.FUNCTION_TYPES,
+    "typescript": _js.FUNCTION_TYPES,
+    "java": _java.FUNCTION_TYPES,
+    "rust": _rust.FUNCTION_TYPES,
+    "go": _go.FUNCTION_TYPES,
+    "php": _php.FUNCTION_TYPES,
+    "c": _c.FUNCTION_TYPES,
+    "cpp": _cpp.FUNCTION_TYPES,
 }
 
 
@@ -64,7 +53,7 @@ def _io_funcs_for_lang(rule_config: dict, lang_name: str, fallback: list[str]) -
     coerced to a set of single characters and effectively disable
     detection - fail loud instead.
     """
-    py_default = fallback if lang_name == EXTRA_NAME else []
+    py_default = fallback if lang_name == _py.EXTRA_NAME else []
     raw, error_key = resolve_lang_config_lookup(rule_config, "io_functions", lang_name, default=py_default)
     return frozenset(_validated_string_list(raw, error_key))
 
@@ -96,7 +85,7 @@ def _io_call_name(node: tree_sitter.Node) -> str | None:
     """
     if node.type in CALL_TYPES:
         return call_name(node)
-    if node.type == _RUST_MACRO_INVOCATION:
+    if node.type == _rust.MACRO_INVOCATION:
         return _rust_macro_name_text(node)
     return None
 
@@ -111,7 +100,7 @@ def _resolved_io_call_name(io_call: tree_sitter.Node) -> str:
     ``println!`` is clearly distinguished from a hypothetical ``println``
     function in messages.
     """
-    if io_call.type == _RUST_MACRO_INVOCATION:
+    if io_call.type == _rust.MACRO_INVOCATION:
         name = _rust_macro_name_text(io_call)
         return f"{name}!" if name else "<unknown>"
     return call_name(io_call) or "<unknown>"
@@ -126,9 +115,9 @@ def _rust_macro_name_text(macro_invocation: tree_sitter.Node) -> str | None:
     macro_field = macro_invocation.child_by_field_name("macro")
     if macro_field is None:
         return None
-    if macro_field.type == _RUST_IDENTIFIER:
+    if macro_field.type == _rust.IDENTIFIER:
         return node_text(macro_field)
-    if macro_field.type == _RUST_SCOPED_IDENTIFIER:
+    if macro_field.type == _rust.SCOPED_IDENTIFIER:
         name_node = macro_field.child_by_field_name("name")
         return node_text(name_node) if name_node is not None else None
     return None  # pragma: no cover - defensive: macro field is always identifier or scoped_identifier
@@ -154,7 +143,7 @@ def _func_display_name(func_node: tree_sitter.Node, lang_name: str) -> str:
     if name_node is not None:
         return node_text(name_node)
     parent = func_node.parent
-    if parent is not None and parent.type == _JAVA_VARIABLE_DECLARATOR:
+    if parent is not None and parent.type == _java.VARIABLE_DECLARATOR:
         binding = parent.child_by_field_name("name")
         if binding is not None:
             return node_text(binding)
@@ -166,7 +155,7 @@ class SideEffectsHiddenRule(BaseRule):
 
     name = "side_effects_hidden"
     code = "SAFE303"
-    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _rust.EXTRA_NAME, _go.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag pure-named functions that contain I/O calls."""
@@ -203,7 +192,7 @@ class SideEffectsRule(BaseRule):
 
     name = "side_effects"
     code = "SAFE304"
-    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _rust.EXTRA_NAME, _go.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions that hide side effects behind a non-I/O name."""

@@ -4,98 +4,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.languages import c as _c
+from safelint.languages import cpp as _cpp
+from safelint.languages import go as _go
+from safelint.languages import java as _java
+from safelint.languages import javascript as _js
+from safelint.languages import php as _php
+from safelint.languages import python as _py
+from safelint.languages import rust as _rust
+from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
-from safelint.languages.c import AMP_AMP as _C_AMP_AMP
-from safelint.languages.c import BINARY_EXPRESSION as _C_BINARY_EXPRESSION
-from safelint.languages.c import CASE_STATEMENT as _C_CASE_STATEMENT
-from safelint.languages.c import CONDITIONAL_EXPRESSION as _C_CONDITIONAL_EXPRESSION
-from safelint.languages.c import DO_STATEMENT as _C_DO_STATEMENT
-from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
-from safelint.languages.c import FOR_STATEMENT as _C_FOR_STATEMENT
-from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
-from safelint.languages.c import IF_STATEMENT as _C_IF_STATEMENT
-from safelint.languages.c import PIPE_PIPE as _C_PIPE_PIPE
-from safelint.languages.c import WHILE_STATEMENT as _C_WHILE_STATEMENT
-from safelint.languages.cpp import CATCH_CLAUSE as _CPP_CATCH_CLAUSE
-from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
-from safelint.languages.cpp import FOR_RANGE_LOOP as _CPP_FOR_RANGE_LOOP
-from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
-from safelint.languages.go import AMP_AMP as _GO_AMP_AMP
-from safelint.languages.go import COMMUNICATION_CASE as _GO_COMMUNICATION_CASE
-from safelint.languages.go import EXPRESSION_CASE as _GO_EXPRESSION_CASE
-from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
-from safelint.languages.go import FOR_STATEMENT as _GO_FOR_STATEMENT
-from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
-from safelint.languages.go import IF_STATEMENT as _GO_IF_STATEMENT
-from safelint.languages.go import PIPE_PIPE as _GO_PIPE_PIPE
-from safelint.languages.go import TYPE_CASE as _GO_TYPE_CASE
-from safelint.languages.java import AMP_AMP as _JAVA_AMP_AMP
-from safelint.languages.java import CATCH_CLAUSE as _JAVA_CATCH_CLAUSE
-from safelint.languages.java import DO_STATEMENT as _JAVA_DO_STATEMENT
-from safelint.languages.java import ENHANCED_FOR_STATEMENT as _JAVA_ENHANCED_FOR_STATEMENT
-from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
-from safelint.languages.java import FOR_STATEMENT as _JAVA_FOR_STATEMENT
-from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
-from safelint.languages.java import IF_STATEMENT as _JAVA_IF_STATEMENT
-from safelint.languages.java import PIPE_PIPE as _JAVA_PIPE_PIPE
-from safelint.languages.java import SWITCH_BLOCK_STATEMENT_GROUP as _JAVA_SWITCH_BLOCK_STATEMENT_GROUP
-from safelint.languages.java import SWITCH_RULE as _JAVA_SWITCH_RULE
-from safelint.languages.java import TERNARY_EXPRESSION as _JAVA_TERNARY_EXPRESSION
-from safelint.languages.java import WHILE_STATEMENT as _JAVA_WHILE_STATEMENT
-from safelint.languages.javascript import AMP_AMP as _JS_AMP_AMP
-from safelint.languages.javascript import CATCH_CLAUSE as _JS_CATCH_CLAUSE
-from safelint.languages.javascript import DO_STATEMENT as _JS_DO_STATEMENT
-from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
-from safelint.languages.javascript import FOR_IN_STATEMENT as _JS_FOR_IN_STATEMENT
-from safelint.languages.javascript import FOR_STATEMENT as _JS_FOR_STATEMENT
-from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
-from safelint.languages.javascript import IF_STATEMENT as _JS_IF_STATEMENT
-from safelint.languages.javascript import PIPE_PIPE as _JS_PIPE_PIPE
-from safelint.languages.javascript import QQ as _JS_QQ
-from safelint.languages.javascript import SWITCH_CASE as _JS_SWITCH_CASE
-from safelint.languages.javascript import TERNARY_EXPRESSION as _JS_TERNARY_EXPRESSION
-from safelint.languages.javascript import WHILE_STATEMENT as _JS_WHILE_STATEMENT
-from safelint.languages.php import AMP_AMP as _PHP_AMP_AMP
-from safelint.languages.php import AND_KW as _PHP_AND_KW
-from safelint.languages.php import CASE_STATEMENT as _PHP_CASE_STATEMENT
-from safelint.languages.php import CATCH_CLAUSE as _PHP_CATCH_CLAUSE
-from safelint.languages.php import CONDITIONAL_EXPRESSION as _PHP_CONDITIONAL_EXPRESSION
-from safelint.languages.php import DO_STATEMENT as _PHP_DO_STATEMENT
-from safelint.languages.php import ELSE_IF_CLAUSE as _PHP_ELSE_IF_CLAUSE
-from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
-from safelint.languages.php import FOR_STATEMENT as _PHP_FOR_STATEMENT
-from safelint.languages.php import FOREACH_STATEMENT as _PHP_FOREACH_STATEMENT
-from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
-from safelint.languages.php import IF_STATEMENT as _PHP_IF_STATEMENT
-from safelint.languages.php import MATCH_CONDITIONAL_EXPRESSION as _PHP_MATCH_CONDITIONAL_EXPRESSION
-from safelint.languages.php import OR_KW as _PHP_OR_KW
-from safelint.languages.php import PIPE_PIPE as _PHP_PIPE_PIPE
-from safelint.languages.php import QQ as _PHP_QQ
-from safelint.languages.php import WHILE_STATEMENT as _PHP_WHILE_STATEMENT
-from safelint.languages.python import (
-    ASYNC_FUNCTION_DEF,
-    BOOLEAN_OPERATOR,
-    CONDITIONAL_EXPRESSION,
-    ELIF_CLAUSE,
-    EXCEPT_CLAUSE,
-    EXTRA_NAME,
-    FOR_STATEMENT,
-    FUNCTION_DEF,
-    IF_CLAUSE,
-    IF_STATEMENT,
-    WHILE_STATEMENT,
-)
-from safelint.languages.rust import AMP_AMP as _RUST_AMP_AMP
-from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
-from safelint.languages.rust import FOR_EXPRESSION as _RUST_FOR_EXPRESSION
-from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
-from safelint.languages.rust import IF_EXPRESSION as _RUST_IF_EXPRESSION
-from safelint.languages.rust import LOOP_EXPRESSION as _RUST_LOOP_EXPRESSION
-from safelint.languages.rust import MATCH_ARM as _RUST_MATCH_ARM
-from safelint.languages.rust import PIPE_PIPE as _RUST_PIPE_PIPE
-from safelint.languages.rust import TRY_EXPRESSION as _RUST_TRY_EXPRESSION
-from safelint.languages.rust import WHILE_EXPRESSION as _RUST_WHILE_EXPRESSION
-from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.rules.base import BaseRule
 
 
@@ -106,15 +24,15 @@ if TYPE_CHECKING:
 
 
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
-    "javascript": _JS_FUNCTION_TYPES,
-    "typescript": _JS_FUNCTION_TYPES,
-    "java": _JAVA_FUNCTION_TYPES,
-    "rust": _RUST_FUNCTION_TYPES,
-    "go": _GO_FUNCTION_TYPES,
-    "php": _PHP_FUNCTION_TYPES,
-    "c": _C_FUNCTION_TYPES,
-    "cpp": _CPP_FUNCTION_TYPES,
+    "python": frozenset({_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF}),
+    "javascript": _js.FUNCTION_TYPES,
+    "typescript": _js.FUNCTION_TYPES,
+    "java": _java.FUNCTION_TYPES,
+    "rust": _rust.FUNCTION_TYPES,
+    "go": _go.FUNCTION_TYPES,
+    "php": _php.FUNCTION_TYPES,
+    "c": _c.FUNCTION_TYPES,
+    "cpp": _cpp.FUNCTION_TYPES,
 }
 
 # Node types that add 1 to cyclomatic complexity. Both languages: every
@@ -134,27 +52,27 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # (same operator-filter pattern as JS); Java does not have ``??``.
 _JS_BRANCHING_TYPES = frozenset(
     {
-        _JS_IF_STATEMENT,
-        _JS_FOR_STATEMENT,
-        _JS_FOR_IN_STATEMENT,  # also covers ``for...of`` in tree-sitter-javascript
-        _JS_WHILE_STATEMENT,
-        _JS_DO_STATEMENT,
-        _JS_SWITCH_CASE,
-        _JS_CATCH_CLAUSE,
-        _JS_TERNARY_EXPRESSION,
+        _js.IF_STATEMENT,
+        _js.FOR_STATEMENT,
+        _js.FOR_IN_STATEMENT,  # also covers ``for...of`` in tree-sitter-javascript
+        _js.WHILE_STATEMENT,
+        _js.DO_STATEMENT,
+        _js.SWITCH_CASE,
+        _js.CATCH_CLAUSE,
+        _js.TERNARY_EXPRESSION,
     }
 )
 _JAVA_BRANCHING_TYPES = frozenset(
     {
-        _JAVA_IF_STATEMENT,
-        _JAVA_FOR_STATEMENT,
-        _JAVA_ENHANCED_FOR_STATEMENT,
-        _JAVA_WHILE_STATEMENT,
-        _JAVA_DO_STATEMENT,
-        _JAVA_SWITCH_BLOCK_STATEMENT_GROUP,  # colon-form ``case X: stmt;``
-        _JAVA_SWITCH_RULE,  # arrow-form ``case X -> stmt;`` (Java 14+)
-        _JAVA_CATCH_CLAUSE,
-        _JAVA_TERNARY_EXPRESSION,
+        _java.IF_STATEMENT,
+        _java.FOR_STATEMENT,
+        _java.ENHANCED_FOR_STATEMENT,
+        _java.WHILE_STATEMENT,
+        _java.DO_STATEMENT,
+        _java.SWITCH_BLOCK_STATEMENT_GROUP,  # colon-form ``case X: stmt;``
+        _java.SWITCH_RULE,  # arrow-form ``case X -> stmt;`` (Java 14+)
+        _java.CATCH_CLAUSE,
+        _java.TERNARY_EXPRESSION,
     }
 )
 # Rust: ``if`` / ``for`` / ``while`` / ``loop`` are control-flow
@@ -169,12 +87,12 @@ _JAVA_BRANCHING_TYPES = frozenset(
 # ternary; ``if`` is itself an expression and is already counted.
 _RUST_BRANCHING_TYPES = frozenset(
     {
-        _RUST_IF_EXPRESSION,
-        _RUST_FOR_EXPRESSION,
-        _RUST_WHILE_EXPRESSION,
-        _RUST_LOOP_EXPRESSION,
-        _RUST_MATCH_ARM,
-        _RUST_TRY_EXPRESSION,
+        _rust.IF_EXPRESSION,
+        _rust.FOR_EXPRESSION,
+        _rust.WHILE_EXPRESSION,
+        _rust.LOOP_EXPRESSION,
+        _rust.MATCH_ARM,
+        _rust.TRY_EXPRESSION,
     }
 )
 # Go: ``if`` / ``for`` (the only loop keyword - all four forms parse as
@@ -187,11 +105,11 @@ _RUST_BRANCHING_TYPES = frozenset(
 # below); Go has no ternary and no ``??``.
 _GO_BRANCHING_TYPES = frozenset(
     {
-        _GO_IF_STATEMENT,
-        _GO_FOR_STATEMENT,
-        _GO_EXPRESSION_CASE,
-        _GO_TYPE_CASE,
-        _GO_COMMUNICATION_CASE,
+        _go.IF_STATEMENT,
+        _go.FOR_STATEMENT,
+        _go.EXPRESSION_CASE,
+        _go.TYPE_CASE,
+        _go.COMMUNICATION_CASE,
     }
 )
 # PHP: ``if_statement`` plus ``else_if_clause`` (PHP's ``elseif`` is a
@@ -206,16 +124,16 @@ _GO_BRANCHING_TYPES = frozenset(
 # ``binary_expression`` (operator filter below).
 _PHP_BRANCHING_TYPES = frozenset(
     {
-        _PHP_IF_STATEMENT,
-        _PHP_ELSE_IF_CLAUSE,
-        _PHP_WHILE_STATEMENT,
-        _PHP_DO_STATEMENT,
-        _PHP_FOR_STATEMENT,
-        _PHP_FOREACH_STATEMENT,
-        _PHP_CASE_STATEMENT,
-        _PHP_MATCH_CONDITIONAL_EXPRESSION,
-        _PHP_CATCH_CLAUSE,
-        _PHP_CONDITIONAL_EXPRESSION,
+        _php.IF_STATEMENT,
+        _php.ELSE_IF_CLAUSE,
+        _php.WHILE_STATEMENT,
+        _php.DO_STATEMENT,
+        _php.FOR_STATEMENT,
+        _php.FOREACH_STATEMENT,
+        _php.CASE_STATEMENT,
+        _php.MATCH_CONDITIONAL_EXPRESSION,
+        _php.CATCH_CLAUSE,
+        _php.CONDITIONAL_EXPRESSION,
     }
 )
 # C: ``if_statement``; the four loop forms (``while`` / ``do`` / ``for``);
@@ -226,27 +144,27 @@ _PHP_BRANCHING_TYPES = frozenset(
 # filter below). C has no try/catch, so no catch-arm node.
 _C_BRANCHING_TYPES = frozenset(
     {
-        _C_IF_STATEMENT,
-        _C_WHILE_STATEMENT,
-        _C_DO_STATEMENT,
-        _C_FOR_STATEMENT,
-        _C_CASE_STATEMENT,
-        _C_CONDITIONAL_EXPRESSION,
+        _c.IF_STATEMENT,
+        _c.WHILE_STATEMENT,
+        _c.DO_STATEMENT,
+        _c.FOR_STATEMENT,
+        _c.CASE_STATEMENT,
+        _c.CONDITIONAL_EXPRESSION,
     }
 )
 # C++: the C set plus ``catch_clause`` (each ``catch`` is a branch).
-_CPP_BRANCHING_TYPES = _C_BRANCHING_TYPES | frozenset({_CPP_CATCH_CLAUSE, _CPP_FOR_RANGE_LOOP})
+_CPP_BRANCHING_TYPES = _C_BRANCHING_TYPES | frozenset({_cpp.CATCH_CLAUSE, _cpp.FOR_RANGE_LOOP})
 _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "python": frozenset(
         {
-            IF_STATEMENT,
-            ELIF_CLAUSE,
-            FOR_STATEMENT,
-            WHILE_STATEMENT,
-            EXCEPT_CLAUSE,
-            CONDITIONAL_EXPRESSION,
-            IF_CLAUSE,
-            BOOLEAN_OPERATOR,
+            _py.IF_STATEMENT,
+            _py.ELIF_CLAUSE,
+            _py.FOR_STATEMENT,
+            _py.WHILE_STATEMENT,
+            _py.EXCEPT_CLAUSE,
+            _py.CONDITIONAL_EXPRESSION,
+            _py.IF_CLAUSE,
+            _py.BOOLEAN_OPERATOR,
         }
     ),
     "javascript": _JS_BRANCHING_TYPES,
@@ -262,27 +180,27 @@ _BRANCHING_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # JavaScript: ``binary_expression`` covers many operators (``+``, ``>``,
 # etc.) that are NOT branches. Only short-circuiting / null-coalescing
 # operators add complexity.
-_JS_BRANCHING_BINARY_OPS = frozenset({_JS_AMP_AMP, _JS_PIPE_PIPE, _JS_QQ})
+_JS_BRANCHING_BINARY_OPS = frozenset({_js.AMP_AMP, _js.PIPE_PIPE, _js.QQ})
 
 # Java: same idea, no ``??`` (Java uses ``Optional`` / ``Objects.requireNonNullElse``
 # for the null-coalescing role; both call expressions, not operators).
-_JAVA_BRANCHING_BINARY_OPS = frozenset({_JAVA_AMP_AMP, _JAVA_PIPE_PIPE})
+_JAVA_BRANCHING_BINARY_OPS = frozenset({_java.AMP_AMP, _java.PIPE_PIPE})
 
 # Rust: ``&&`` / ``||`` short-circuit just like JS / Java. Rust has no
 # ``??`` operator (the ``?`` operator is ``try_expression``, not a
 # binary operator, and is already counted via the branching-types set).
-_RUST_BRANCHING_BINARY_OPS = frozenset({_RUST_AMP_AMP, _RUST_PIPE_PIPE})
+_RUST_BRANCHING_BINARY_OPS = frozenset({_rust.AMP_AMP, _rust.PIPE_PIPE})
 
 # Go: ``&&`` / ``||`` short-circuit like the others; no ``??``.
-_GO_BRANCHING_BINARY_OPS = frozenset({_GO_AMP_AMP, _GO_PIPE_PIPE})
+_GO_BRANCHING_BINARY_OPS = frozenset({_go.AMP_AMP, _go.PIPE_PIPE})
 
 # PHP: ``&&`` / ``||`` / ``??`` plus the lower-precedence keyword
 # operators ``and`` / ``or`` (``xor`` excluded - it does not
 # short-circuit, so it adds no decision path).
-_PHP_BRANCHING_BINARY_OPS = frozenset({_PHP_AMP_AMP, _PHP_PIPE_PIPE, _PHP_QQ, _PHP_AND_KW, _PHP_OR_KW})
+_PHP_BRANCHING_BINARY_OPS = frozenset({_php.AMP_AMP, _php.PIPE_PIPE, _php.QQ, _php.AND_KW, _php.OR_KW})
 
 # C: ``&&`` / ``||`` short-circuit; no ``??``.
-_C_BRANCHING_BINARY_OPS = frozenset({_C_AMP_AMP, _C_PIPE_PIPE})
+_C_BRANCHING_BINARY_OPS = frozenset({_c.AMP_AMP, _c.PIPE_PIPE})
 
 # Per-language allow-list for ``binary_expression`` operators that add
 # one to cyclomatic complexity. Languages absent from this map (e.g.
@@ -305,7 +223,7 @@ class ComplexityRule(BaseRule):
 
     name = "complexity"
     code = "SAFE104"
-    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _rust.EXTRA_NAME, _go.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions whose cyclomatic complexity exceeds the configured maximum."""
@@ -365,7 +283,7 @@ def _is_branch_node(node: tree_sitter.Node, lang_name: str, branching_types: fro
     # ``binary_expression`` is the same node type in every supported grammar, so
     # this generic (all-language) check is language-neutral; the constant is
     # sourced from the c module arbitrarily, not because the check is C-specific.
-    if node.type != _C_BINARY_EXPRESSION:
+    if node.type != _c.BINARY_EXPRESSION:
         return False
     branching_ops = _BRANCHING_BINARY_OPS_BY_LANG.get(lang_name)
     if branching_ops is None:

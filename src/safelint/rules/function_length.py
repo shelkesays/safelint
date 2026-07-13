@@ -4,49 +4,17 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.languages import c as _c
+from safelint.languages import cpp as _cpp
 from safelint.languages import get_language_for_file
+from safelint.languages import go as _go
+from safelint.languages import java as _java
+from safelint.languages import javascript as _js
+from safelint.languages import php as _php
+from safelint.languages import python as _py
+from safelint.languages import rust as _rust
+from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import end_lineno, function_name_node, lineno, node_text, resolve_lang_name, walk
-from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
-from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
-from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
-from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
-from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
-from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
-from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
-from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
-from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
-from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
-from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
-from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
-from safelint.languages.python import (
-    ASSERT_STATEMENT,
-    ASSIGNMENT,
-    ASYNC_FUNCTION_DEF,
-    AUGMENTED_ASSIGNMENT,
-    BREAK_STATEMENT,
-    CLASS_DEF,
-    CONTINUE_STATEMENT,
-    DELETE_STATEMENT,
-    EXPRESSION_STATEMENT,
-    EXTRA_NAME,
-    FOR_STATEMENT,
-    FUNCTION_DEF,
-    GLOBAL_STATEMENT,
-    IF_STATEMENT,
-    IMPORT_FROM_STATEMENT,
-    IMPORT_STATEMENT,
-    MATCH_STATEMENT,
-    NONLOCAL_STATEMENT,
-    PASS_STATEMENT,
-    RAISE_STATEMENT,
-    RETURN_STATEMENT,
-    TRY_STATEMENT,
-    WHILE_STATEMENT,
-    WITH_STATEMENT,
-)
-from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
-from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
-from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.rules.base import BaseRule
 
 
@@ -60,15 +28,15 @@ if TYPE_CHECKING:
 # Adding a language widens both tables (or, for stmt-mode, adds an
 # entry - see _STATEMENT_TYPES_BY_LANG).
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
-    "javascript": _JS_FUNCTION_TYPES,
-    "typescript": _JS_FUNCTION_TYPES,
-    "java": _JAVA_FUNCTION_TYPES,
-    "rust": _RUST_FUNCTION_TYPES,
-    "go": _GO_FUNCTION_TYPES,
-    "php": _PHP_FUNCTION_TYPES,
-    "c": _C_FUNCTION_TYPES,
-    "cpp": _CPP_FUNCTION_TYPES,
+    "python": frozenset({_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF}),
+    "javascript": _js.FUNCTION_TYPES,
+    "typescript": _js.FUNCTION_TYPES,
+    "java": _java.FUNCTION_TYPES,
+    "rust": _rust.FUNCTION_TYPES,
+    "go": _go.FUNCTION_TYPES,
+    "php": _php.FUNCTION_TYPES,
+    "c": _c.FUNCTION_TYPES,
+    "cpp": _cpp.FUNCTION_TYPES,
 }
 
 # ``count_mode = "statements"`` is language-aware: each language has a
@@ -95,27 +63,27 @@ _STATEMENT_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     # function's complexity-proxy count, which matches the rule's intent.
     "python": frozenset(
         {
-            EXPRESSION_STATEMENT,
-            ASSIGNMENT,
-            AUGMENTED_ASSIGNMENT,
-            IF_STATEMENT,
-            FOR_STATEMENT,
-            WHILE_STATEMENT,
-            WITH_STATEMENT,
-            TRY_STATEMENT,
-            MATCH_STATEMENT,
-            RETURN_STATEMENT,
-            RAISE_STATEMENT,
-            IMPORT_STATEMENT,
-            IMPORT_FROM_STATEMENT,
-            GLOBAL_STATEMENT,
-            NONLOCAL_STATEMENT,
-            ASSERT_STATEMENT,
-            DELETE_STATEMENT,
-            PASS_STATEMENT,
-            BREAK_STATEMENT,
-            CONTINUE_STATEMENT,
-            CLASS_DEF,
+            _py.EXPRESSION_STATEMENT,
+            _py.ASSIGNMENT,
+            _py.AUGMENTED_ASSIGNMENT,
+            _py.IF_STATEMENT,
+            _py.FOR_STATEMENT,
+            _py.WHILE_STATEMENT,
+            _py.WITH_STATEMENT,
+            _py.TRY_STATEMENT,
+            _py.MATCH_STATEMENT,
+            _py.RETURN_STATEMENT,
+            _py.RAISE_STATEMENT,
+            _py.IMPORT_STATEMENT,
+            _py.IMPORT_FROM_STATEMENT,
+            _py.GLOBAL_STATEMENT,
+            _py.NONLOCAL_STATEMENT,
+            _py.ASSERT_STATEMENT,
+            _py.DELETE_STATEMENT,
+            _py.PASS_STATEMENT,
+            _py.BREAK_STATEMENT,
+            _py.CONTINUE_STATEMENT,
+            _py.CLASS_DEF,
         }
     ),
 }
@@ -160,7 +128,7 @@ class FunctionLengthRule(BaseRule):
 
     name = "function_length"
     code = "SAFE101"
-    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _rust.EXTRA_NAME, _go.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function or async function exceeding the configured size."""

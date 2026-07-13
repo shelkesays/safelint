@@ -5,25 +5,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
+from safelint.languages import c as _c
+from safelint.languages import cpp as _cpp
+from safelint.languages import java as _java
+from safelint.languages import javascript as _js
+from safelint.languages import php as _php
+from safelint.languages import python as _py
+from safelint.languages import rust as _rust
+from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
-from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
-from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
-from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
-from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
-from safelint.languages.java import ASSERT_STATEMENT as _JAVA_ASSERT_STATEMENT
-from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
-from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
-from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
-from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
-from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
-from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
-from safelint.languages.python import ASSERT_STATEMENT, ASYNC_FUNCTION_DEF, EXTRA_NAME, FUNCTION_DEF
-from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
-from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
-from safelint.languages.rust import IDENTIFIER as _RUST_IDENTIFIER
-from safelint.languages.rust import MACRO_INVOCATION as _RUST_MACRO_INVOCATION
-from safelint.languages.rust import SCOPED_IDENTIFIER as _RUST_SCOPED_IDENTIFIER
-from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
 from safelint.rules.base import BaseRule
 
 
@@ -34,14 +24,14 @@ if TYPE_CHECKING:
 
 
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
-    "javascript": _JS_FUNCTION_TYPES,
-    "typescript": _JS_FUNCTION_TYPES,
-    "java": _JAVA_FUNCTION_TYPES,
-    "rust": _RUST_FUNCTION_TYPES,
-    "php": _PHP_FUNCTION_TYPES,
-    "c": _C_FUNCTION_TYPES,
-    "cpp": _CPP_FUNCTION_TYPES,
+    "python": frozenset({_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF}),
+    "javascript": _js.FUNCTION_TYPES,
+    "typescript": _js.FUNCTION_TYPES,
+    "java": _java.FUNCTION_TYPES,
+    "rust": _rust.FUNCTION_TYPES,
+    "php": _php.FUNCTION_TYPES,
+    "c": _c.FUNCTION_TYPES,
+    "cpp": _cpp.FUNCTION_TYPES,
 }
 
 
@@ -55,7 +45,7 @@ def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozens
     """
     count = 0
     for c in walk(func_node, skip_types=tuple(function_types)):
-        if c is func_node or c.type != ASSERT_STATEMENT:
+        if c is func_node or c.type != _py.ASSERT_STATEMENT:
             continue
         count += 1
         if count >= minimum:
@@ -85,7 +75,7 @@ def _java_assertion_count(func_node: tree_sitter.Node, function_types: frozenset
     for c in walk(func_node, skip_types=tuple(function_types)):
         if c is func_node:
             continue
-        is_assert = c.type == _JAVA_ASSERT_STATEMENT or (c.type in CALL_TYPES and call_name(c) in assertion_calls)
+        is_assert = c.type == _java.ASSERT_STATEMENT or (c.type in CALL_TYPES and call_name(c) in assertion_calls)
         if not is_assert:
             continue
         count += 1
@@ -109,9 +99,9 @@ def _rust_macro_name(macro_node: tree_sitter.Node) -> str | None:
     scoped_identifier with no trailing name etc.); the caller's filter
     naturally skips those.
     """
-    if macro_node.type == _RUST_IDENTIFIER:
+    if macro_node.type == _rust.IDENTIFIER:
         return node_text(macro_node)
-    if macro_node.type == _RUST_SCOPED_IDENTIFIER:
+    if macro_node.type == _rust.SCOPED_IDENTIFIER:
         name = macro_node.child_by_field_name("name")
         return node_text(name) if name is not None else None
     return None
@@ -131,7 +121,7 @@ def _rust_assertion_count(func_node: tree_sitter.Node, function_types: frozenset
     """
     count = 0
     for c in walk(func_node, skip_types=tuple(function_types)):
-        if c is func_node or c.type != _RUST_MACRO_INVOCATION:
+        if c is func_node or c.type != _rust.MACRO_INVOCATION:
             continue
         macro = c.child_by_field_name("macro")
         if macro is None:
@@ -188,7 +178,7 @@ class MissingAssertionsRule(BaseRule):
 
     name = "missing_assertions"
     code = "SAFE601"
-    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _rust.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     def _assertion_count(self, func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str], minimum: int) -> int:
         """Dispatch to the language-appropriate assertion counter (early-exits at *minimum*).
@@ -207,7 +197,7 @@ class MissingAssertionsRule(BaseRule):
             # inside ``_java_assertion_count``) AND configured JUnit / AssertJ
             # method-call names. TypeScript inherits the JS list by default
             # via the TS→JS fallback; Java has its own dedicated set.
-            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _JAVA_EXTRA_NAME, default=[])
+            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _java.EXTRA_NAME, default=[])
             assertion_calls = frozenset(_validated_string_list(raw, error_key))
             return _java_assertion_count(func_node, function_types, assertion_calls, minimum)
         if lang_name == "rust":
@@ -215,7 +205,7 @@ class MissingAssertionsRule(BaseRule):
             # ``debug_assert!`` etc.), NOT function calls. The rule walks
             # ``macro_invocation`` nodes and matches the bareword macro
             # name (stripped of any ``std::`` / ``core::`` qualifier).
-            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _RUST_EXTRA_NAME, default=[])
+            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _rust.EXTRA_NAME, default=[])
             assertion_calls = frozenset(_validated_string_list(raw, error_key))
             return _rust_assertion_count(func_node, function_types, assertion_calls, minimum)
         if lang_name == "php":
@@ -223,7 +213,7 @@ class MissingAssertionsRule(BaseRule):
             # PHPUnit assertions are method calls (``assertSame`` /
             # ``assertEquals`` / ``expectException`` / ...). The generic
             # call-based counter handles both forms via ``assertion_calls_php``.
-            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _PHP_EXTRA_NAME, default=[])
+            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _php.EXTRA_NAME, default=[])
             assertion_calls = frozenset(_validated_string_list(raw, error_key))
             return _javascript_assertion_count(func_node, function_types, assertion_calls, minimum)
         # JS-family (JS / TS): TypeScript inherits the JS list by default
