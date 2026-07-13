@@ -1,8 +1,9 @@
 # Refactor: rule node-type constants to module-access instead of aliased imports
 
 **Type**: cross-language refactor (NOT a language addition). Pure maintainability
-change - **no behaviour change**. Follow-up to
-[[refactor-node-type-constants]] (which shipped in v2.8.2).
+change - **no behaviour change**. Follow-up to the node-type-constant refactor
+that shipped in **v2.8.2** (see that version's `CHANGELOG.md` entry) - the sweep
+that converted the raw node-type literals in `rules/` to imported constants.
 
 **Status**: not started. **Run only after v2.8.2 has shipped** - it re-touches
 the exact files that refactor just changed, so doing it on a stable released
