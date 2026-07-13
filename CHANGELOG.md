@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.2] - 2026-07-13
+
 ### Changed
 
 - **Internal refactor: the rules now import Tree-sitter node-type / operator constants from the `languages/<lang>.py` modules instead of hardcoding raw string literals.** Each language module is the single source of truth for its node types, and every language's rule logic references its own module. **No behaviour change** - every rule's resolved node-type set is byte-identical to before (verified by a deterministic table snapshot), and no rule, code, config key, CLI flag, or output format is affected. Purely additive at the module level (new constants only; none removed or renamed), so any downstream importer of `safelint.languages.*` stays compatible.
@@ -904,7 +906,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.8.1...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.8.2...HEAD
+[2.8.2]: https://github.com/shelkesays/safelint/compare/v2.8.1...v2.8.2
 [2.8.1]: https://github.com/shelkesays/safelint/compare/v2.8.0...v2.8.1
 [2.8.0]: https://github.com/shelkesays/safelint/compare/v2.7.1...v2.8.0
 [2.7.1]: https://github.com/shelkesays/safelint/compare/v2.7.0...v2.7.1
