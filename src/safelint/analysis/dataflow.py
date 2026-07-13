@@ -18,31 +18,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.languages import python as _py
 from safelint.languages._node_utils import call_name, node_text, walk
-from safelint.languages.python import (
-    ANNOTATED_ASSIGNMENT,
-    ASSIGNMENT,
-    ASYNC_FUNCTION_DEF,
-    AUGMENTED_ASSIGNMENT,
-    BINARY_OPERATOR,
-    BOOLEAN_OPERATOR,
-    CALL,
-    COMPARISON_OPERATOR,
-    CONCATENATED_STRING,
-    CONDITIONAL_EXPRESSION,
-    FUNCTION_DEF,
-    IDENTIFIER,
-    INTERPOLATION,
-    LIST,
-    LIST_PATTERN,
-    LIST_SPLAT_PATTERN,
-    PATTERN_LIST,
-    SET,
-    STRING,
-    TUPLE,
-    TUPLE_PATTERN,
-    UNARY_OPERATOR,
-)
 
 
 if TYPE_CHECKING:
@@ -53,15 +30,15 @@ if TYPE_CHECKING:
 
 _SPREADING_TYPES = frozenset(
     {
-        BINARY_OPERATOR,
-        BOOLEAN_OPERATOR,
-        UNARY_OPERATOR,
-        COMPARISON_OPERATOR,
-        CONDITIONAL_EXPRESSION,
+        _py.BINARY_OPERATOR,
+        _py.BOOLEAN_OPERATOR,
+        _py.UNARY_OPERATOR,
+        _py.COMPARISON_OPERATOR,
+        _py.CONDITIONAL_EXPRESSION,
     }
 )
 
-_CONTAINER_TYPES = frozenset({LIST, TUPLE, SET})
+_CONTAINER_TYPES = frozenset({_py.LIST, _py.TUPLE, _py.SET})
 
 # Splat operators in call argument lists - ``foo(*args, **kwargs)``.
 # Tree-sitter parses these as single-child wrapper nodes whose only
@@ -69,7 +46,7 @@ _CONTAINER_TYPES = frozenset({LIST, TUPLE, SET})
 _SPLAT_TYPES = frozenset({"list_splat", "dictionary_splat"})
 
 # Destructure shapes recognised on the LHS of an assignment.
-_PATTERN_TYPES = frozenset({PATTERN_LIST, TUPLE_PATTERN, LIST_PATTERN, LIST_SPLAT_PATTERN})
+_PATTERN_TYPES = frozenset({_py.PATTERN_LIST, _py.TUPLE_PATTERN, _py.LIST_PATTERN, _py.LIST_SPLAT_PATTERN})
 
 
 class TaintTracker:
@@ -131,14 +108,14 @@ class TaintTracker:
         be treated as part of the outer function's flow, leaking taint between
         scopes that don't actually share variables.
         """
-        for node in walk(root, skip_types=(FUNCTION_DEF, ASYNC_FUNCTION_DEF)):
-            if node.type == ASSIGNMENT:
+        for node in walk(root, skip_types=(_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF)):
+            if node.type == _py.ASSIGNMENT:
                 self._visit_assignment(node)
-            elif node.type == AUGMENTED_ASSIGNMENT:
+            elif node.type == _py.AUGMENTED_ASSIGNMENT:
                 self._visit_aug_assignment(node)
-            elif node.type == ANNOTATED_ASSIGNMENT:
+            elif node.type == _py.ANNOTATED_ASSIGNMENT:
                 self._visit_ann_assignment(node)
-            elif node.type == CALL:
+            elif node.type == _py.CALL:
                 self._visit_call(node)
 
     def _iter_target_identifiers(self, target: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
@@ -155,7 +132,7 @@ class TaintTracker:
         stack = [target]
         while len(stack) > 0:
             current = stack.pop()
-            if current.type == IDENTIFIER:
+            if current.type == _py.IDENTIFIER:
                 yield current
             elif current.type in _PATTERN_TYPES:
                 stack.extend(reversed(current.named_children))
@@ -173,7 +150,7 @@ class TaintTracker:
         # Bounded by the depth of nested ``assignment`` nodes in the parse
         # tree - finite by source structure, not by runtime data.
         while cursor is not None:
-            if cursor.type != ASSIGNMENT:
+            if cursor.type != _py.ASSIGNMENT:
                 break
             left = cursor.child_by_field_name("left")
             if left is not None:
@@ -216,12 +193,12 @@ class TaintTracker:
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
-        arg_name = node_text(arg_node) if arg_node.type == IDENTIFIER else "<expr>"
+        arg_name = node_text(arg_node) if arg_node.type == _py.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
 
     def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool) -> None:
         """Add or remove *target* from the tainted set if it is a bare identifier."""
-        if target.type != IDENTIFIER:
+        if target.type != _py.IDENTIFIER:
             return
         name = node_text(target)
         if is_tainted:
@@ -249,11 +226,11 @@ class TaintTracker:
     def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if *node* is a leaf that itself carries taint."""
         node_type = node.type
-        if node_type == IDENTIFIER:
+        if node_type == _py.IDENTIFIER:
             return node_text(node) in self.tainted
-        if node_type == CALL:
+        if node_type == _py.CALL:
             return self._call_tainted(node)
-        if node_type == STRING:
+        if node_type == _py.STRING:
             return self._fstring_tainted(node)
         return False
 
@@ -268,7 +245,7 @@ class TaintTracker:
         if node.type == "keyword_argument":
             value = node.child_by_field_name("value")
             return [value] if value is not None else []
-        if node.type in _SPLAT_TYPES or node.type == CONCATENATED_STRING or node.type in _CONTAINER_TYPES or node.type in _SPREADING_TYPES:
+        if node.type in _SPLAT_TYPES or node.type == _py.CONCATENATED_STRING or node.type in _CONTAINER_TYPES or node.type in _SPREADING_TYPES:
             return list(node.named_children)
         return []
 
@@ -294,4 +271,4 @@ class TaintTracker:
 
     def _fstring_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if any interpolated expression in an f-string is tainted."""
-        return any(self._is_tainted(inner) for child in walk(node) if child.type == INTERPOLATION for inner in child.named_children)
+        return any(self._is_tainted(inner) for child in walk(node) if child.type == _py.INTERPOLATION for inner in child.named_children)

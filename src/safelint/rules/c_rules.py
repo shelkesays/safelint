@@ -32,22 +32,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
+from safelint.languages import c as _c
+from safelint.languages import cpp as _cpp
 from safelint.languages._node_utils import call_name, node_text, resolve_lang_name, walk
-from safelint.languages.c import (
-    CALL_EXPRESSION,
-    COMMENT,
-    FUNCTION_DECLARATOR,
-    GOTO_STATEMENT,
-    PARENTHESIZED_DECLARATOR,
-    POINTER_DECLARATOR,
-    PREPROC_CALL,
-    PREPROC_DEF,
-    PREPROC_FUNCTION_DEF,
-    PREPROC_IF,
-    PREPROC_IFDEF,
-)
-from safelint.languages.cpp import DELETE_EXPRESSION as _CPP_DELETE_EXPRESSION
-from safelint.languages.cpp import NEW_EXPRESSION as _CPP_NEW_EXPRESSION
 from safelint.rules.base import BaseRule
 
 
@@ -82,7 +69,7 @@ class NonlocalJumpsRule(BaseRule):
         jump_calls = _lang_call_list(self.config, "nonlocal_jump_calls", resolve_lang_name(filepath), self._DEFAULT_JUMP_CALLS)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type == GOTO_STATEMENT:
+            if node.type == _c.GOTO_STATEMENT:
                 violations.append(
                     self._make_violation_for_node(
                         filepath,
@@ -90,7 +77,7 @@ class NonlocalJumpsRule(BaseRule):
                         "`goto` is a non-local jump - restrict control flow to structured constructs (Power of Ten rule 1); annotate a sanctioned `goto err` cleanup with `// nosafe: SAFE106`",
                     )
                 )
-            elif node.type == CALL_EXPRESSION and call_name(node) in jump_calls:
+            elif node.type == _c.CALL_EXPRESSION and call_name(node) in jump_calls:
                 violations.append(
                     self._make_violation_for_node(
                         filepath,
@@ -121,15 +108,15 @@ class DynamicAllocationRule(BaseRule):
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             # C++ ``new`` / ``delete`` are dedicated expression nodes, not calls.
-            if node.type in (_CPP_NEW_EXPRESSION, _CPP_DELETE_EXPRESSION):
+            if node.type in (_cpp.NEW_EXPRESSION, _cpp.DELETE_EXPRESSION):
                 message = (
                     "`new` performs dynamic heap allocation - prefer static / stack allocation or a scoped owner after initialisation (Power of Ten rule 3)"
-                    if node.type == _CPP_NEW_EXPRESSION
+                    if node.type == _cpp.NEW_EXPRESSION
                     else "`delete` frees dynamically allocated heap memory - prefer static / stack allocation or a scoped owner (RAII) that releases automatically (Power of Ten rule 3)"
                 )
                 violations.append(self._make_violation_for_node(filepath, node, message))
                 continue
-            if node.type != CALL_EXPRESSION:
+            if node.type != _c.CALL_EXPRESSION:
                 continue
             name = call_name(node)
             if name is not None and name in allocation_calls:
@@ -228,14 +215,14 @@ class ComplexMacroRule(BaseRule):
     @staticmethod
     def _macro_violation_reason(node: tree_sitter.Node) -> str | None:
         """Return a reason string if *node* is a complex macro, else None."""
-        if node.type == PREPROC_FUNCTION_DEF:
+        if node.type == _c.PREPROC_FUNCTION_DEF:
             text = _macro_replacement_text(node)
             if "##" in text:
                 return "Function-like macro uses token pasting (`##`) - macros must be simple, complete syntactic units (Power of Ten rule 8)"
             if "__VA_ARGS__" in text:
                 return "Variadic macro (`__VA_ARGS__`) - macros must be simple, complete syntactic units (Power of Ten rule 8)"
             return None
-        if node.type == PREPROC_DEF and _is_unbalanced(_macro_replacement_text(node)):
+        if node.type == _c.PREPROC_DEF and _is_unbalanced(_macro_replacement_text(node)):
             return "Object-like macro replacement is not a complete syntactic unit (unbalanced brackets) - macros must be simple (Power of Ten rule 8)"
         return None
 
@@ -252,7 +239,7 @@ def _ifndef_guard_name(node: tree_sitter.Node) -> str | None:
     the ``#ifndef`` form is the include-guard candidate. The directive keyword is
     the node's first child token.
     """
-    if node.type != PREPROC_IFDEF:
+    if node.type != _c.PREPROC_IFDEF:
         return None
     first = node.children[0] if node.children else None
     if first is None or node_text(first) != "#ifndef":
@@ -277,11 +264,11 @@ def _first_body_define_name(node: tree_sitter.Node) -> str | None:
     name_id = name.id if name is not None else None
     opener = None
     for child in node.named_children:
-        if child.id == name_id or child.type in (COMMENT, PREPROC_CALL):
+        if child.id == name_id or child.type in (_c.COMMENT, _c.PREPROC_CALL):
             continue
         opener = child
         break
-    if opener is None or opener.type != PREPROC_DEF:
+    if opener is None or opener.type != _c.PREPROC_DEF:
         return None
     defined = opener.child_by_field_name("name")
     return node_text(defined) if defined is not None else None
@@ -304,7 +291,7 @@ class ConditionalCompilationRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every conditional-compilation directive that is not an include guard."""
-        return [self._make_violation_for_node(filepath, node, self._MESSAGE) for node in walk(tree.root_node) if node.type in (PREPROC_IF, PREPROC_IFDEF) and not _is_include_guard(node)]
+        return [self._make_violation_for_node(filepath, node, self._MESSAGE) for node in walk(tree.root_node) if node.type in (_c.PREPROC_IF, _c.PREPROC_IFDEF) and not _is_include_guard(node)]
 
 
 # ---------------------------------------------------------------------------
@@ -317,7 +304,7 @@ def _pointer_depth(declarator: tree_sitter.Node | None) -> int:
     depth = 0
     cur = declarator
     for _ in range(32):
-        if cur is None or cur.type != POINTER_DECLARATOR:
+        if cur is None or cur.type != _c.POINTER_DECLARATOR:
             return depth
         depth += 1
         cur = cur.child_by_field_name("declarator")
@@ -350,13 +337,13 @@ class RestrictedPointersRule(BaseRule):
         ``pointer_declarator`` (its parent is not itself a ``pointer_declarator``)
         with depth > 1, so each ``**`` chain is reported once.
         """
-        if node.type == FUNCTION_DECLARATOR:
+        if node.type == _c.FUNCTION_DECLARATOR:
             inner = node.child_by_field_name("declarator")
-            if inner is not None and inner.type == PARENTHESIZED_DECLARATOR:
+            if inner is not None and inner.type == _c.PARENTHESIZED_DECLARATOR:
                 return "Function-pointer declarator - rule 9 restricts pointer use to a single level of dereferencing (Power of Ten rule 9)"
             return None
-        if node.type == POINTER_DECLARATOR:
+        if node.type == _c.POINTER_DECLARATOR:
             parent = node.parent
-            if (parent is None or parent.type != POINTER_DECLARATOR) and _pointer_depth(node) > 1:
+            if (parent is None or parent.type != _c.POINTER_DECLARATOR) and _pointer_depth(node) > 1:
                 return "Declarator has more than one level of pointer indirection - rule 9 restricts pointers to a single dereference (Power of Ten rule 9)"
         return None

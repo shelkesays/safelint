@@ -35,22 +35,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.languages import go as _go
 from safelint.languages._node_utils import call_name, node_text, walk
-from safelint.languages.go import (
-    ASSIGNMENT_STATEMENT,
-    BINARY_EXPRESSION,
-    CALL_EXPRESSION,
-    COMPOSITE_LITERAL,
-    EXPRESSION_LIST,
-    IDENTIFIER,
-    INDEX_EXPRESSION,
-    PARENTHESIZED_EXPRESSION,
-    SELECTOR_EXPRESSION,
-    SHORT_VAR_DECLARATION,
-    UNARY_EXPRESSION,
-    VAR_SPEC,
-)
-from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
 
 
 if TYPE_CHECKING:
@@ -64,15 +50,15 @@ if TYPE_CHECKING:
 # ``parenthesized_expression`` is a pure pass-through.
 _SPREADING_TYPES = frozenset(
     {
-        BINARY_EXPRESSION,
-        UNARY_EXPRESSION,
-        PARENTHESIZED_EXPRESSION,
+        _go.BINARY_EXPRESSION,
+        _go.UNARY_EXPRESSION,
+        _go.PARENTHESIZED_EXPRESSION,
     }
 )
 
 # Composite literals (``T{...}`` / ``[]T{...}`` / ``map[K]V{...}``) carry
 # taint when any element is tainted.
-_CONTAINER_TYPES = frozenset({COMPOSITE_LITERAL})
+_CONTAINER_TYPES = frozenset({_go.COMPOSITE_LITERAL})
 
 
 def _is_compound_assignment(node: tree_sitter.Node) -> bool:
@@ -121,17 +107,17 @@ class GoTaintTracker:
         analysed separately by the caller for each function found, with
         their own parameter set.
         """
-        for node in walk(root, skip_types=tuple(_GO_FUNCTION_TYPES)):
+        for node in walk(root, skip_types=tuple(_go.FUNCTION_TYPES)):
             self._visit_node(node)
 
     def _visit_node(self, node: tree_sitter.Node) -> None:
         """Dispatch *node* to the right per-shape handler."""
         node_type = node.type
-        if node_type in (SHORT_VAR_DECLARATION, ASSIGNMENT_STATEMENT):
+        if node_type in (_go.SHORT_VAR_DECLARATION, _go.ASSIGNMENT_STATEMENT):
             self._visit_assignment(node)
-        elif node_type == VAR_SPEC:
+        elif node_type == _go.VAR_SPEC:
             self._visit_var_spec(node)
-        elif node_type == CALL_EXPRESSION:
+        elif node_type == _go.CALL_EXPRESSION:
             self._visit_call(node)
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
@@ -149,14 +135,14 @@ class GoTaintTracker:
         right = node.child_by_field_name("right")
         if left is None or right is None:  # pragma: no cover - defensive: both sides always present
             return
-        name_nodes = [c for c in left.named_children if c.type == IDENTIFIER]
-        keep_existing = node.type == ASSIGNMENT_STATEMENT and _is_compound_assignment(node)
+        name_nodes = [c for c in left.named_children if c.type == _go.IDENTIFIER]
+        keep_existing = node.type == _go.ASSIGNMENT_STATEMENT and _is_compound_assignment(node)
         self._propagate(name_nodes, list(right.named_children), keep_existing=keep_existing)
 
     def _visit_var_spec(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``var x = value`` (identifiers + trailing expression_list)."""
-        name_nodes = [c for c in node.named_children if c.type == IDENTIFIER]
-        rhs_list = next((c for c in node.named_children if c.type == EXPRESSION_LIST), None)
+        name_nodes = [c for c in node.named_children if c.type == _go.IDENTIFIER]
+        rhs_list = next((c for c in node.named_children if c.type == _go.EXPRESSION_LIST), None)
         rhs = list(rhs_list.named_children) if rhs_list is not None else []
         self._propagate(name_nodes, rhs)
 
@@ -191,7 +177,7 @@ class GoTaintTracker:
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
-        arg_name = node_text(arg_node) if arg_node.type == IDENTIFIER else "<expr>"
+        arg_name = node_text(arg_node) if arg_node.type == _go.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
 
     def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool, keep_existing: bool = False) -> None:
@@ -200,7 +186,7 @@ class GoTaintTracker:
         With *keep_existing* (a compound read-modify-write assignment) a clean
         RHS leaves the name's prior taint untouched rather than clearing it.
         """
-        if target.type != IDENTIFIER:  # pragma: no cover - defensive: callers pre-filter to identifier nodes
+        if target.type != _go.IDENTIFIER:  # pragma: no cover - defensive: callers pre-filter to identifier nodes
             return
         name = node_text(target)
         if name == "_":
@@ -227,9 +213,9 @@ class GoTaintTracker:
     def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if *node* is a leaf that itself carries taint."""
         node_type = node.type
-        if node_type == IDENTIFIER:
+        if node_type == _go.IDENTIFIER:
             return node_text(node) in self.tainted
-        if node_type == CALL_EXPRESSION:
+        if node_type == _go.CALL_EXPRESSION:
             return self._call_tainted(node)
         return False
 
@@ -244,10 +230,10 @@ class GoTaintTracker:
         Everything else is a taint dead-end.
         """
         node_type = node.type
-        if node_type == SELECTOR_EXPRESSION:
+        if node_type == _go.SELECTOR_EXPRESSION:
             operand = node.child_by_field_name("operand")
             return [operand] if operand is not None else []
-        if node_type == INDEX_EXPRESSION or node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
+        if node_type == _go.INDEX_EXPRESSION or node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
             return list(node.named_children)
         return []
 
@@ -273,7 +259,7 @@ class GoTaintTracker:
         if args_node is not None:
             candidates.extend(args_node.named_children)
         function = node.child_by_field_name("function")
-        if function is not None and function.type == SELECTOR_EXPRESSION:
+        if function is not None and function.type == _go.SELECTOR_EXPRESSION:
             receiver = function.child_by_field_name("operand")
             if receiver is not None:
                 candidates.append(receiver)

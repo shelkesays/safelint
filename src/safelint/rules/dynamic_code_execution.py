@@ -24,25 +24,15 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
+from safelint.languages import c as _c
+from safelint.languages import cpp as _cpp
+from safelint.languages import go as _go
+from safelint.languages import java as _java
+from safelint.languages import javascript as _js
+from safelint.languages import php as _php
+from safelint.languages import python as _py
+from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import call_name, node_text, resolve_lang_name, walk
-from safelint.languages.c import CALL_EXPRESSION as _C_CALL_EXPRESSION
-from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
-from safelint.languages.cpp import CALL_EXPRESSION as _CPP_CALL_EXPRESSION
-from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
-from safelint.languages.go import CALL_EXPRESSION as _GO_CALL_EXPRESSION
-from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
-from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
-from safelint.languages.java import METHOD_INVOCATION as _JAVA_METHOD_INVOCATION
-from safelint.languages.javascript import CALL_EXPRESSION as _JS_CALL_EXPRESSION
-from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
-from safelint.languages.javascript import IDENTIFIER as _JS_IDENTIFIER
-from safelint.languages.javascript import NEW_EXPRESSION as _JS_NEW_EXPRESSION
-from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
-from safelint.languages.php import FUNCTION_CALL_EXPRESSION as _PHP_FUNCTION_CALL_EXPRESSION
-from safelint.languages.python import ATTRIBUTE, CALL, EXTRA_NAME, IDENTIFIER
-from safelint.languages.typescript import CALL_EXPRESSION as _TS_CALL_EXPRESSION
-from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
-from safelint.languages.typescript import NEW_EXPRESSION as _TS_NEW_EXPRESSION
 from safelint.rules.base import BaseRule
 
 
@@ -112,14 +102,14 @@ _DEFAULTS_BY_LANG: dict[str, list[str]] = {
 #: ``function_call_expression`` (the dynamic-exec builtins are all global
 #: functions).
 _CALL_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({CALL}),
-    "javascript": frozenset({_JS_CALL_EXPRESSION, _JS_NEW_EXPRESSION}),
-    "typescript": frozenset({_TS_CALL_EXPRESSION, _TS_NEW_EXPRESSION}),
-    "java": frozenset({_JAVA_METHOD_INVOCATION}),
-    "go": frozenset({_GO_CALL_EXPRESSION}),
-    "php": frozenset({_PHP_FUNCTION_CALL_EXPRESSION}),
-    "c": frozenset({_C_CALL_EXPRESSION}),
-    "cpp": frozenset({_CPP_CALL_EXPRESSION}),
+    "python": frozenset({_py.CALL}),
+    "javascript": frozenset({_js.CALL_EXPRESSION, _js.NEW_EXPRESSION}),
+    "typescript": frozenset({_ts.CALL_EXPRESSION, _ts.NEW_EXPRESSION}),
+    "java": frozenset({_java.METHOD_INVOCATION}),
+    "go": frozenset({_go.CALL_EXPRESSION}),
+    "php": frozenset({_php.FUNCTION_CALL_EXPRESSION}),
+    "c": frozenset({_c.CALL_EXPRESSION}),
+    "cpp": frozenset({_cpp.CALL_EXPRESSION}),
 }
 
 
@@ -132,13 +122,13 @@ def _python_match(call_node: tree_sitter.Node, names: frozenset[str]) -> str | N
     func = call_node.child_by_field_name("function")
     if func is None:
         return None
-    if func.type == IDENTIFIER:
+    if func.type == _py.IDENTIFIER:
         name = node_text(func)
         return name if name in names else None
-    if func.type == ATTRIBUTE:
+    if func.type == _py.ATTRIBUTE:
         obj = func.child_by_field_name("object")
         attr = func.child_by_field_name("attribute")
-        if obj is not None and attr is not None and obj.type == IDENTIFIER and node_text(obj) == "builtins":
+        if obj is not None and attr is not None and obj.type == _py.IDENTIFIER and node_text(obj) == "builtins":
             name = node_text(attr)
             return name if name in names else None
     return None
@@ -151,7 +141,7 @@ def _javascript_match(call_node: tree_sitter.Node, names: frozenset[str]) -> str
     as ``obj.eval()`` is not flagged.
     """
     callee = call_node.child_by_field_name("function") or call_node.child_by_field_name("constructor")
-    if callee is None or callee.type != _JS_IDENTIFIER:
+    if callee is None or callee.type != _js.IDENTIFIER:
         return None
     name = node_text(callee)
     return name if name in names else None
@@ -223,7 +213,7 @@ class DynamicCodeExecutionRule(BaseRule):
 
     name = "dynamic_code_execution"
     code = "SAFE309"
-    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _go.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     _BASE_KEY: ClassVar[str] = "dynamic_exec_calls"
 

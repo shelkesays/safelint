@@ -25,13 +25,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
+from safelint.languages import cpp as _cpp
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
-from safelint.languages.cpp import (
-    CALL_EXPRESSION,
-    DELETE_EXPRESSION,
-    NEW_EXPRESSION,
-    TEMPLATE_FUNCTION,
-)
 from safelint.rules.base import BaseRule
 
 
@@ -52,7 +47,7 @@ class RawNewDeleteRule(BaseRule):
         """Flag every ``new`` / ``delete`` expression in *tree*."""
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type == NEW_EXPRESSION:
+            if node.type == _cpp.NEW_EXPRESSION:
                 violations.append(
                     self._make_violation_for_node(
                         filepath,
@@ -60,7 +55,7 @@ class RawNewDeleteRule(BaseRule):
                         "`new` takes raw ownership of heap memory - prefer `std::make_unique` / `std::make_shared` so a scoped owner releases it (RAII)",
                     )
                 )
-            elif node.type == DELETE_EXPRESSION:
+            elif node.type == _cpp.DELETE_EXPRESSION:
                 violations.append(
                     self._make_violation_for_node(
                         filepath,
@@ -92,10 +87,10 @@ class DangerousCastsRule(BaseRule):
         flagged = frozenset(_validated_string_list(raw, error_key))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != CALL_EXPRESSION:
+            if node.type != _cpp.CALL_EXPRESSION:
                 continue
             func = node.child_by_field_name("function")
-            if func is None or func.type != TEMPLATE_FUNCTION:
+            if func is None or func.type != _cpp.TEMPLATE_FUNCTION:
                 continue
             name_node = func.child_by_field_name("name")
             if name_node is None:  # pragma: no cover - defensive: a template_function always has a name field
