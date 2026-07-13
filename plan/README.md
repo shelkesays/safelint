@@ -55,8 +55,9 @@ the language set is stable, so they don't have to be redone per language.
 
 | File | What | Run when |
 |---|---|---|
-| `plan/refactor-node-type-constants.md` | Convert the per-language node-type / operator tables in `src/safelint/rules/` from raw Tree-sitter string literals to imported `src/safelint/languages/<lang>.py` constants, for **all** languages at once (pure refactor, no behaviour change). Deferred out of the PHP PR because it is cross-language, not PHP-specific. | After C **and** C++ ship. |
-| `plan/security-hardening.md` | Defence-in-depth fixes from the 2026-06-25 internal security audit: `test_dirs` containment, `skill install/remove` symlink/TOCTOU hardening, cache `mkstemp`. **No HIGH/MEDIUM findings; none introduced by recent work** - all LOW / hardening, none default-flow-exploitable. | Low urgency; next maintenance pass. |
+| ~~`plan/refactor-node-type-constants.md`~~ **(SHIPPED v2.8.2)** | Convert the per-language node-type / operator tables in `src/safelint/rules/` from raw Tree-sitter string literals to imported `src/safelint/languages/<lang>.py` constants, for **all** languages at once (pure refactor, no behaviour change). Done via PR #107; the spec can be removed on the next cleanup. | Done. |
+| `plan/refactor-module-access-constants.md` | Follow-up to the above: switch the rules from ~700 per-constant aliased imports (`... import IF_STATEMENT as _CPP_IF_STATEMENT`) to **module-access** (`from safelint.languages import cpp as _cpp`; `_cpp.IF_STATEMENT`). ~1,767 use sites; the language modules stay unchanged. Pure refactor, no behaviour change. Gives the `Namespace.CONSTANT` ergonomics without a wrapper class and deletes the alias soup. | After v2.8.2 ships. |
+| `plan/security-hardening.md` | Defence-in-depth fixes from the 2026-06-25 internal security audit: `test_dirs` containment, `skill install/remove` symlink/TOCTOU hardening, cache `mkstemp`. **No HIGH/MEDIUM findings; none introduced by recent work** - all LOW / hardening, none default-flow-exploitable. **H1-H9 all shipped (v2.7.x / v2.8.1); this backlog is now empty.** | Done. |
 
 ## How to use these specs
 
