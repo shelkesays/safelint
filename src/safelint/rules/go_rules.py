@@ -25,16 +25,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, ClassVar
 
 from safelint.core._validators import _validated_string_list
+from safelint.languages import go as _go
 from safelint.languages._node_utils import call_name, node_text, walk
-from safelint.languages.go import (
-    BINARY_EXPRESSION,
-    BLOCK,
-    CALL_EXPRESSION,
-    IDENTIFIER,
-    IF_STATEMENT,
-    NIL,
-    STATEMENT_LIST,
-)
 from safelint.rules.base import BaseRule
 
 
@@ -59,7 +51,7 @@ def _nil_error_operator(condition: tree_sitter.Node, error_names: frozenset[str]
     pick the error-handling branch: ``!=`` puts it in the ``consequence``,
     ``==`` puts it in the ``else`` (``alternative``).
     """
-    if condition.type != BINARY_EXPRESSION:
+    if condition.type != _go.BINARY_EXPRESSION:
         return None
     operator = condition.child_by_field_name("operator")
     if operator is None:  # pragma: no cover - defensive: binary_expression always has an operator
@@ -78,7 +70,7 @@ def _nil_error_operator(condition: tree_sitter.Node, error_names: frozenset[str]
 
 def _is_err_nil_pair(err_side: tree_sitter.Node, nil_side: tree_sitter.Node, error_names: frozenset[str]) -> bool:
     """Return True if *err_side* is a configured error name and *nil_side* is ``nil``."""
-    return err_side.type == IDENTIFIER and node_text(err_side) in error_names and nil_side.type == NIL
+    return err_side.type == _go.IDENTIFIER and node_text(err_side) in error_names and nil_side.type == _go.NIL
 
 
 def _block_is_empty(block: tree_sitter.Node | None) -> bool:
@@ -92,7 +84,7 @@ def _block_is_empty(block: tree_sitter.Node | None) -> bool:
     """
     if block is None:  # pragma: no cover - defensive: if_statement always has a consequence block
         return True
-    return not any(child.type == STATEMENT_LIST for child in block.named_children)
+    return not any(child.type == _go.STATEMENT_LIST for child in block.named_children)
 
 
 class EmptyErrorCheckRule(BaseRule):
@@ -117,7 +109,7 @@ class EmptyErrorCheckRule(BaseRule):
         error_names = frozenset(_validated_string_list(self.config.get("error_names_go", self._DEFAULT_ERROR_NAMES), "error_names_go"))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != IF_STATEMENT:
+            if node.type != _go.IF_STATEMENT:
                 continue
             error_block = self._error_branch(node, error_names)
             if error_block is not None and _block_is_empty(error_block):
@@ -148,7 +140,7 @@ class EmptyErrorCheckRule(BaseRule):
         if operator == "!=":
             return if_node.child_by_field_name("consequence")
         alternative = if_node.child_by_field_name("alternative")
-        return alternative if alternative is not None and alternative.type == BLOCK else None
+        return alternative if alternative is not None and alternative.type == _go.BLOCK else None
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +176,7 @@ class PanicCallsOutsideTestsRule(BaseRule):
         panic_calls = frozenset(_validated_string_list(self.config.get("panic_calls_go", self._DEFAULT_PANIC_CALLS), "panic_calls_go"))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != CALL_EXPRESSION:
+            if node.type != _go.CALL_EXPRESSION:
                 continue
             name = call_name(node)
             if name is None or name not in panic_calls:

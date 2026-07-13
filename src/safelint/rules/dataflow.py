@@ -12,99 +12,16 @@ from safelint.analysis.dataflow_javascript import JsTaintTracker
 from safelint.analysis.dataflow_php import PhpTaintTracker
 from safelint.analysis.dataflow_rust import RustTaintTracker
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
+from safelint.languages import c as _c
+from safelint.languages import cpp as _cpp
+from safelint.languages import go as _go
+from safelint.languages import java as _java
+from safelint.languages import javascript as _js
+from safelint.languages import php as _php
+from safelint.languages import python as _py
+from safelint.languages import rust as _rust
+from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
-from safelint.languages.c import FUNCTION_DECLARATOR as _C_FUNCTION_DECLARATOR
-from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
-from safelint.languages.c import IDENTIFIER as _C_IDENTIFIER
-from safelint.languages.cpp import ABSTRACT_FUNCTION_DECLARATOR as _CPP_ABSTRACT_FUNCTION_DECLARATOR
-from safelint.languages.cpp import ARRAY_DECLARATOR as _CPP_ARRAY_DECLARATOR
-from safelint.languages.cpp import FUNCTION_DECLARATOR as _CPP_FUNCTION_DECLARATOR
-from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
-from safelint.languages.cpp import IDENTIFIER as _CPP_IDENTIFIER
-from safelint.languages.cpp import LAMBDA_EXPRESSION as _CPP_LAMBDA_EXPRESSION
-from safelint.languages.cpp import POINTER_DECLARATOR as _CPP_POINTER_DECLARATOR
-from safelint.languages.cpp import REFERENCE_DECLARATOR as _CPP_REFERENCE_DECLARATOR
-from safelint.languages.go import FUNC_LITERAL as _GO_FUNC_LITERAL
-from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
-from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
-from safelint.languages.go import PARAMETER_DECLARATION as _GO_PARAMETER_DECLARATION
-from safelint.languages.go import VARIADIC_PARAMETER_DECLARATION as _GO_VARIADIC_PARAMETER_DECLARATION
-from safelint.languages.java import ARRAY_ACCESS as _JAVA_ARRAY_ACCESS
-from safelint.languages.java import CAST_EXPRESSION as _JAVA_CAST_EXPRESSION
-from safelint.languages.java import FIELD_ACCESS as _JAVA_FIELD_ACCESS
-from safelint.languages.java import FORMAL_PARAMETER as _JAVA_FORMAL_PARAMETER
-from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
-from safelint.languages.java import IDENTIFIER as _JAVA_IDENTIFIER
-from safelint.languages.java import LAMBDA_EXPRESSION as _JAVA_LAMBDA_EXPRESSION
-from safelint.languages.java import METHOD_INVOCATION as _JAVA_METHOD_INVOCATION
-from safelint.languages.java import PARENTHESIZED_EXPRESSION as _JAVA_PARENTHESIZED_EXPRESSION
-from safelint.languages.java import SPREAD_PARAMETER as _JAVA_SPREAD_PARAMETER
-from safelint.languages.java import VARIABLE_DECLARATOR as _JAVA_VARIABLE_DECLARATOR
-from safelint.languages.javascript import ARRAY_PATTERN as _JS_ARRAY_PATTERN
-from safelint.languages.javascript import AS_EXPRESSION as _JS_AS_EXPRESSION
-from safelint.languages.javascript import ASSIGNMENT_PATTERN as _JS_ASSIGNMENT_PATTERN
-from safelint.languages.javascript import CALL_EXPRESSION as _JS_CALL_EXPRESSION
-from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
-from safelint.languages.javascript import IDENTIFIER as _JS_IDENTIFIER
-from safelint.languages.javascript import MEMBER_EXPRESSION as _JS_MEMBER_EXPRESSION
-from safelint.languages.javascript import NON_NULL_EXPRESSION as _JS_NON_NULL_EXPRESSION
-from safelint.languages.javascript import OBJECT_PATTERN as _JS_OBJECT_PATTERN
-from safelint.languages.javascript import OPTIONAL_CHAIN as _JS_OPTIONAL_CHAIN
-from safelint.languages.javascript import OPTIONAL_PARAMETER as _JS_OPTIONAL_PARAMETER
-from safelint.languages.javascript import PAIR_PATTERN as _JS_PAIR_PATTERN
-from safelint.languages.javascript import PARENTHESIZED_EXPRESSION as _JS_PARENTHESIZED_EXPRESSION
-from safelint.languages.javascript import REQUIRED_PARAMETER as _JS_REQUIRED_PARAMETER
-from safelint.languages.javascript import REST_PARAMETER as _JS_REST_PARAMETER
-from safelint.languages.javascript import REST_PATTERN as _JS_REST_PATTERN
-from safelint.languages.javascript import SATISFIES_EXPRESSION as _JS_SATISFIES_EXPRESSION
-from safelint.languages.javascript import SHORTHAND_PROPERTY_IDENTIFIER_PATTERN as _JS_SHORTHAND_PROPERTY_IDENTIFIER_PATTERN
-from safelint.languages.javascript import SUBSCRIPT_EXPRESSION as _JS_SUBSCRIPT_EXPRESSION
-from safelint.languages.javascript import TYPE_ASSERTION as _JS_TYPE_ASSERTION
-from safelint.languages.php import FUNCTION_CALL_EXPRESSION as _PHP_FUNCTION_CALL_EXPRESSION
-from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
-from safelint.languages.php import MEMBER_ACCESS_EXPRESSION as _PHP_MEMBER_ACCESS_EXPRESSION
-from safelint.languages.php import MEMBER_CALL_EXPRESSION as _PHP_MEMBER_CALL_EXPRESSION
-from safelint.languages.php import NULLSAFE_MEMBER_CALL_EXPRESSION as _PHP_NULLSAFE_MEMBER_CALL_EXPRESSION
-from safelint.languages.php import PROPERTY_PROMOTION_PARAMETER as _PHP_PROPERTY_PROMOTION_PARAMETER
-from safelint.languages.php import SCOPED_CALL_EXPRESSION as _PHP_SCOPED_CALL_EXPRESSION
-from safelint.languages.php import SIMPLE_PARAMETER as _PHP_SIMPLE_PARAMETER
-from safelint.languages.php import VARIABLE_NAME as _PHP_VARIABLE_NAME
-from safelint.languages.php import VARIADIC_PARAMETER as _PHP_VARIADIC_PARAMETER
-from safelint.languages.python import (
-    ASYNC_FUNCTION_DEF,
-    ATTRIBUTE,
-    CALL,
-    DEFAULT_PARAMETER,
-    DICTIONARY_SPLAT_PATTERN,
-    EXPRESSION_STATEMENT,
-    FUNCTION_DEF,
-    IDENTIFIER,
-    LIST_SPLAT_PATTERN,
-    SUBSCRIPT,
-    TYPED_DEFAULT_PARAMETER,
-    TYPED_PARAMETER,
-)
-from safelint.languages.rust import CALL_EXPRESSION as _RUST_CALL_EXPRESSION
-from safelint.languages.rust import CAPTURED_PATTERN as _RUST_CAPTURED_PATTERN
-from safelint.languages.rust import CLOSURE_EXPRESSION as _RUST_CLOSURE
-from safelint.languages.rust import FIELD_EXPRESSION as _RUST_FIELD_EXPRESSION
-from safelint.languages.rust import FIELD_PATTERN as _RUST_FIELD_PATTERN
-from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
-from safelint.languages.rust import IDENTIFIER as _RUST_IDENTIFIER
-from safelint.languages.rust import MUT_PATTERN as _RUST_MUT_PATTERN
-from safelint.languages.rust import PARAMETER as _RUST_PARAMETER
-from safelint.languages.rust import PARENTHESIZED_EXPRESSION as _RUST_PARENTHESIZED_EXPRESSION
-from safelint.languages.rust import REF_PATTERN as _RUST_REF_PATTERN
-from safelint.languages.rust import REFERENCE_EXPRESSION as _RUST_REFERENCE_EXPRESSION
-from safelint.languages.rust import SELF_PARAMETER as _RUST_SELF_PARAMETER
-from safelint.languages.rust import SHORTHAND_FIELD_IDENTIFIER as _RUST_SHORTHAND_FIELD_IDENTIFIER
-from safelint.languages.rust import STRUCT_PATTERN as _RUST_STRUCT_PATTERN
-from safelint.languages.rust import TRY_EXPRESSION as _RUST_TRY_EXPRESSION
-from safelint.languages.rust import TUPLE_PATTERN as _RUST_TUPLE_PATTERN
-from safelint.languages.rust import TUPLE_STRUCT_PATTERN as _RUST_TUPLE_STRUCT_PATTERN
-from safelint.languages.typescript import OPTIONAL_PARAMETER as _TS_OPTIONAL_PARAMETER
-from safelint.languages.typescript import REQUIRED_PARAMETER as _TS_REQUIRED_PARAMETER
-from safelint.languages.typescript import REST_PARAMETER as _TS_REST_PARAMETER
 from safelint.rules.base import BaseRule
 
 
@@ -117,15 +34,15 @@ if TYPE_CHECKING:
 
 
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
-    "javascript": _JS_FUNCTION_TYPES,
-    "typescript": _JS_FUNCTION_TYPES,
-    "java": _JAVA_FUNCTION_TYPES,
-    "rust": _RUST_FUNCTION_TYPES,
-    "go": _GO_FUNCTION_TYPES,
-    "php": _PHP_FUNCTION_TYPES,
-    "c": _C_FUNCTION_TYPES,
-    "cpp": _CPP_FUNCTION_TYPES,
+    "python": frozenset({_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF}),
+    "javascript": _js.FUNCTION_TYPES,
+    "typescript": _js.FUNCTION_TYPES,
+    "java": _java.FUNCTION_TYPES,
+    "rust": _rust.FUNCTION_TYPES,
+    "go": _go.FUNCTION_TYPES,
+    "php": _php.FUNCTION_TYPES,
+    "c": _c.FUNCTION_TYPES,
+    "cpp": _cpp.FUNCTION_TYPES,
 }
 
 
@@ -133,7 +50,7 @@ def _c_function_declarator(node: tree_sitter.Node | None) -> tree_sitter.Node | 
     """Unwrap pointer / array declarators to the ``function_declarator``, or None (bounded loop)."""
     cur = node
     for _ in range(16):
-        if cur is None or cur.type == _C_FUNCTION_DECLARATOR:
+        if cur is None or cur.type == _c.FUNCTION_DECLARATOR:
             return cur
         cur = cur.child_by_field_name("declarator")
     return None
@@ -143,7 +60,7 @@ def _c_param_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | Non
     """Unwrap a parameter's declarator to its name ``identifier``, or None (bounded loop)."""
     cur = node
     for _ in range(16):
-        if cur is None or cur.type == _C_IDENTIFIER:
+        if cur is None or cur.type == _c.IDENTIFIER:
             return cur
         cur = cur.child_by_field_name("declarator")
     return None
@@ -180,11 +97,11 @@ def _cpp_param_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | N
     """
     cur = node
     for _ in range(16):
-        if cur is None or cur.type == _CPP_IDENTIFIER:
+        if cur is None or cur.type == _cpp.IDENTIFIER:
             return cur
         nxt = cur.child_by_field_name("declarator")
-        if nxt is None and cur.type == _CPP_REFERENCE_DECLARATOR:
-            nxt = next((c for c in cur.named_children if c.type in (_CPP_IDENTIFIER, _CPP_POINTER_DECLARATOR, _CPP_ARRAY_DECLARATOR, _CPP_REFERENCE_DECLARATOR, _CPP_FUNCTION_DECLARATOR)), None)
+        if nxt is None and cur.type == _cpp.REFERENCE_DECLARATOR:
+            nxt = next((c for c in cur.named_children if c.type in (_cpp.IDENTIFIER, _cpp.POINTER_DECLARATOR, _cpp.ARRAY_DECLARATOR, _cpp.REFERENCE_DECLARATOR, _cpp.FUNCTION_DECLARATOR)), None)
         cur = nxt
     return None  # pragma: no cover - defensive: 16-deep declarator nesting does not occur
 
@@ -218,8 +135,8 @@ def _cpp_param_names(func_node: tree_sitter.Node) -> set[str]:
     too. The exception / parameter *type* sits on the separate ``type`` field,
     so no type identifier leaks in.
     """
-    if func_node.type == _CPP_LAMBDA_EXPRESSION:
-        afd = next((c for c in func_node.named_children if c.type == _CPP_ABSTRACT_FUNCTION_DECLARATOR), None)
+    if func_node.type == _cpp.LAMBDA_EXPRESSION:
+        afd = next((c for c in func_node.named_children if c.type == _cpp.ABSTRACT_FUNCTION_DECLARATOR), None)
         params_node = afd.child_by_field_name("parameters") if afd is not None else None
     else:
         func_decl = _c_function_declarator(func_node.child_by_field_name("declarator"))
@@ -249,9 +166,9 @@ def _php_param_names(func_node: tree_sitter.Node) -> set[str]:
         return set()
     names: set[str] = set()
     for child in params_node.named_children:
-        if child.type not in (_PHP_SIMPLE_PARAMETER, _PHP_VARIADIC_PARAMETER, _PHP_PROPERTY_PROMOTION_PARAMETER):
+        if child.type not in (_php.SIMPLE_PARAMETER, _php.VARIADIC_PARAMETER, _php.PROPERTY_PROMOTION_PARAMETER):
             continue
-        var = next((c for c in child.named_children if c.type == _PHP_VARIABLE_NAME), None)
+        var = next((c for c in child.named_children if c.type == _php.VARIABLE_NAME), None)
         if var is not None:
             names.add(node_text(var))
     return names
@@ -278,22 +195,22 @@ def _peel_js_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | No
     while node is not None:
         if node.type not in _JS_PASSTHROUGH_WRAPPER_TYPES or not node.named_children:
             break
-        node = node.named_children[1] if node.type == _JS_TYPE_ASSERTION and len(node.named_children) >= 2 else node.named_children[0]
+        node = node.named_children[1] if node.type == _js.TYPE_ASSERTION and len(node.named_children) >= 2 else node.named_children[0]
     return node
 
 
 _JS_PASSTHROUGH_WRAPPER_TYPES = frozenset(
     {
-        _JS_PARENTHESIZED_EXPRESSION,
-        _JS_AS_EXPRESSION,
-        _JS_SATISFIES_EXPRESSION,
-        _JS_NON_NULL_EXPRESSION,
+        _js.PARENTHESIZED_EXPRESSION,
+        _js.AS_EXPRESSION,
+        _js.SATISFIES_EXPRESSION,
+        _js.NON_NULL_EXPRESSION,
         # ``<Foo>x`` - older TS angle-bracket cast syntax, equivalent
         # to ``as`` but discouraged in TSX (collides with JSX). Plain
         # TS files still use it; SAFE803 must peel it the same as the
         # ``as`` cast or ``(call as Foo)!.bar`` would only be partly
         # handled.
-        _JS_TYPE_ASSERTION,
+        _js.TYPE_ASSERTION,
     }
 )
 
@@ -304,17 +221,17 @@ _JS_PASSTHROUGH_WRAPPER_TYPES = frozenset(
 # Without these, ``((Foo) map.get(k)).bar`` would slip past the check.
 _JAVA_PASSTHROUGH_WRAPPER_TYPES = frozenset(
     {
-        _JAVA_PARENTHESIZED_EXPRESSION,
-        _JAVA_CAST_EXPRESSION,
+        _java.PARENTHESIZED_EXPRESSION,
+        _java.CAST_EXPRESSION,
     }
 )
 
 
 _RUST_PASSTHROUGH_WRAPPER_TYPES = frozenset(
     {
-        _RUST_PARENTHESIZED_EXPRESSION,
-        _RUST_REFERENCE_EXPRESSION,  # ``&x`` / ``&mut x``
-        _RUST_TRY_EXPRESSION,  # ``foo()?`` propagates Ok inside the Result
+        _rust.PARENTHESIZED_EXPRESSION,
+        _rust.REFERENCE_EXPRESSION,  # ``&x`` / ``&mut x``
+        _rust.TRY_EXPRESSION,  # ``foo()?`` propagates Ok inside the Result
     }
 )
 
@@ -344,7 +261,7 @@ def _peel_java_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | 
     while node is not None:
         if node.type not in _JAVA_PASSTHROUGH_WRAPPER_TYPES:
             break
-        if node.type == _JAVA_CAST_EXPRESSION:
+        if node.type == _java.CAST_EXPRESSION:
             inner = node.child_by_field_name("value")
         elif node.named_children:
             inner = node.named_children[0]
@@ -360,12 +277,12 @@ def _peel_java_passthrough(node: tree_sitter.Node | None) -> tree_sitter.Node | 
 # safelint.rules.max_arguments to avoid drift.
 _PY_PARAM_TYPES = frozenset(
     {
-        IDENTIFIER,
-        TYPED_PARAMETER,
-        DEFAULT_PARAMETER,
-        TYPED_DEFAULT_PARAMETER,
-        LIST_SPLAT_PATTERN,
-        DICTIONARY_SPLAT_PATTERN,
+        _py.IDENTIFIER,
+        _py.TYPED_PARAMETER,
+        _py.DEFAULT_PARAMETER,
+        _py.TYPED_DEFAULT_PARAMETER,
+        _py.LIST_SPLAT_PATTERN,
+        _py.DICTIONARY_SPLAT_PATTERN,
     }
 )
 
@@ -385,25 +302,25 @@ _PY_PARAM_TYPES = frozenset(
 _JS_PARAM_TYPES = frozenset(
     {
         # JavaScript shapes
-        _JS_IDENTIFIER,
-        _JS_ASSIGNMENT_PATTERN,
-        _JS_REST_PATTERN,
-        _JS_OBJECT_PATTERN,
-        _JS_ARRAY_PATTERN,
+        _js.IDENTIFIER,
+        _js.ASSIGNMENT_PATTERN,
+        _js.REST_PATTERN,
+        _js.OBJECT_PATTERN,
+        _js.ARRAY_PATTERN,
         # TypeScript wrapper shapes
-        _JS_REQUIRED_PARAMETER,
-        _JS_OPTIONAL_PARAMETER,
-        _JS_REST_PARAMETER,
+        _js.REQUIRED_PARAMETER,
+        _js.OPTIONAL_PARAMETER,
+        _js.REST_PARAMETER,
     }
 )
-_TS_PARAM_WRAPPER_TYPES = frozenset({_TS_REQUIRED_PARAMETER, _TS_OPTIONAL_PARAMETER, _TS_REST_PARAMETER})
+_TS_PARAM_WRAPPER_TYPES = frozenset({_ts.REQUIRED_PARAMETER, _ts.OPTIONAL_PARAMETER, _ts.REST_PARAMETER})
 
 
 def _python_param_node_name(child: tree_sitter.Node) -> str:
     """Return the bare identifier name carried by a Python parameter node, or ``""``."""
-    if child.type == IDENTIFIER:
+    if child.type == _py.IDENTIFIER:
         return node_text(child)
-    if child.type in (LIST_SPLAT_PATTERN, DICTIONARY_SPLAT_PATTERN):
+    if child.type in (_py.LIST_SPLAT_PATTERN, _py.DICTIONARY_SPLAT_PATTERN):
         # Splat parameters always have an identifier child in valid Python;
         # the empty-children branch is defensive against malformed AST.
         inner = child.named_children[0] if child.named_children else None  # pragma: no branch
@@ -446,8 +363,8 @@ def _javascript_param_names(func_node: tree_sitter.Node) -> set[str]:
     return names
 
 
-_JS_NAME_LEAF_TYPES = frozenset({_JS_IDENTIFIER, _JS_SHORTHAND_PROPERTY_IDENTIFIER_PATTERN})
-_JS_DESTRUCTURE_CONTAINER_TYPES = frozenset({_JS_ARRAY_PATTERN, _JS_OBJECT_PATTERN, _JS_REST_PATTERN})
+_JS_NAME_LEAF_TYPES = frozenset({_js.IDENTIFIER, _js.SHORTHAND_PROPERTY_IDENTIFIER_PATTERN})
+_JS_DESTRUCTURE_CONTAINER_TYPES = frozenset({_js.ARRAY_PATTERN, _js.OBJECT_PATTERN, _js.REST_PATTERN})
 
 
 def _javascript_collect_names(node: tree_sitter.Node) -> set[str]:
@@ -473,9 +390,9 @@ def _javascript_collect_names(node: tree_sitter.Node) -> set[str]:
         return {node_text(node)}
     if node.type in _JS_DESTRUCTURE_CONTAINER_TYPES:
         return _collect_from_container_pattern(node)
-    if node.type == _JS_ASSIGNMENT_PATTERN:
+    if node.type == _js.ASSIGNMENT_PATTERN:
         return _collect_from_assignment_pattern(node)
-    if node.type == _JS_PAIR_PATTERN:
+    if node.type == _js.PAIR_PATTERN:
         return _collect_from_pair_pattern(node)
     return set()
 
@@ -503,7 +420,7 @@ def _collect_from_pair_pattern(node: tree_sitter.Node) -> set[str]:
 def _java_formal_param_name(child: tree_sitter.Node) -> str | None:
     """Return the bound name for a Java ``formal_parameter`` (``Type name``), or None."""
     name_node = child.child_by_field_name("name")
-    if name_node is None or name_node.type != _JAVA_IDENTIFIER:
+    if name_node is None or name_node.type != _java.IDENTIFIER:
         return None
     return node_text(name_node)
 
@@ -515,11 +432,11 @@ def _java_spread_param_name(child: tree_sitter.Node) -> str | None:
     binding name on the ``name`` field; the variadic ellipsis is
     anonymous.
     """
-    decl = next((c for c in child.named_children if c.type == _JAVA_VARIABLE_DECLARATOR), None)
+    decl = next((c for c in child.named_children if c.type == _java.VARIABLE_DECLARATOR), None)
     if decl is None:  # pragma: no cover - defensive: valid Java field/local always has a declarator
         return None
     name_node = decl.child_by_field_name("name")
-    if name_node is None or name_node.type != _JAVA_IDENTIFIER:  # pragma: no cover - defensive: declarator name is always an identifier
+    if name_node is None or name_node.type != _java.IDENTIFIER:  # pragma: no cover - defensive: declarator name is always an identifier
         return None
     return node_text(name_node)
 
@@ -551,17 +468,17 @@ def _rust_param_names(func_node: tree_sitter.Node) -> set[str]:
 
 def _rust_single_param_names(child: tree_sitter.Node) -> set[str]:
     """Return the bound names contributed by a single Rust param-list entry."""
-    if child.type == _RUST_SELF_PARAMETER:
+    if child.type == _rust.SELF_PARAMETER:
         return set()
-    if child.type == _RUST_IDENTIFIER:
+    if child.type == _rust.IDENTIFIER:
         return {node_text(child)}
-    if child.type == _RUST_PARAMETER:
+    if child.type == _rust.PARAMETER:
         pattern = child.child_by_field_name("pattern")
         return _rust_collect_pattern_names(pattern) if pattern is not None else set()
     return set()
 
 
-_RUST_RECURSIVE_PATTERN_TYPES = frozenset({_RUST_MUT_PATTERN, _RUST_REF_PATTERN, _RUST_TUPLE_PATTERN, _RUST_TUPLE_STRUCT_PATTERN, _RUST_STRUCT_PATTERN, _RUST_CAPTURED_PATTERN})
+_RUST_RECURSIVE_PATTERN_TYPES = frozenset({_rust.MUT_PATTERN, _rust.REF_PATTERN, _rust.TUPLE_PATTERN, _rust.TUPLE_STRUCT_PATTERN, _rust.STRUCT_PATTERN, _rust.CAPTURED_PATTERN})
 
 
 def _rust_collect_pattern_names(node: tree_sitter.Node) -> set[str]:
@@ -577,11 +494,11 @@ def _rust_collect_pattern_names(node: tree_sitter.Node) -> set[str]:
     stack = [node]
     while len(stack) > 0:
         current = stack.pop()
-        if current.type in (_RUST_IDENTIFIER, _RUST_SHORTHAND_FIELD_IDENTIFIER):
+        if current.type in (_rust.IDENTIFIER, _rust.SHORTHAND_FIELD_IDENTIFIER):
             names.add(node_text(current))
         elif current.type in _RUST_RECURSIVE_PATTERN_TYPES:
             stack.extend(current.named_children)
-        elif current.type == _RUST_FIELD_PATTERN:
+        elif current.type == _rust.FIELD_PATTERN:
             names.update(_rust_field_pattern_names(current))
     return names
 
@@ -591,7 +508,7 @@ def _rust_field_pattern_names(node: tree_sitter.Node) -> set[str]:
     inner = node.child_by_field_name("pattern")
     if inner is not None:
         return _rust_collect_pattern_names(inner)
-    shorthand = next((c for c in node.named_children if c.type == _RUST_SHORTHAND_FIELD_IDENTIFIER), None)
+    shorthand = next((c for c in node.named_children if c.type == _rust.SHORTHAND_FIELD_IDENTIFIER), None)
     return {node_text(shorthand)} if shorthand is not None else set()
 
 
@@ -613,7 +530,7 @@ def _java_lambda_enclosing_tainted(lambda_node: tree_sitter.Node, cache: dict[in
     """
     cur = lambda_node.parent
     while cur is not None:
-        if cur.type in _JAVA_FUNCTION_TYPES:
+        if cur.type in _java.FUNCTION_TYPES:
             return cache.get(cur.id, set())
         cur = cur.parent
     return set()  # pragma: no cover - defensive: a lambda in valid Java always has an enclosing function
@@ -640,7 +557,7 @@ def _rust_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[
     """
     cur = closure_node.parent
     while cur is not None:
-        if cur.type in _RUST_FUNCTION_TYPES:
+        if cur.type in _rust.FUNCTION_TYPES:
             return cache.get(cur.id, set())
         cur = cur.parent
     return set()  # pragma: no cover - defensive: a closure in valid Rust always has an enclosing function
@@ -661,9 +578,9 @@ def _go_param_names(func_node: tree_sitter.Node) -> set[str]:
         return set()
     names: set[str] = set()
     for child in params_node.named_children:
-        if child.type not in (_GO_PARAMETER_DECLARATION, _GO_VARIADIC_PARAMETER_DECLARATION):
+        if child.type not in (_go.PARAMETER_DECLARATION, _go.VARIADIC_PARAMETER_DECLARATION):
             continue
-        names.update(node_text(g) for g in child.named_children if g.type == _GO_IDENTIFIER)
+        names.update(node_text(g) for g in child.named_children if g.type == _go.IDENTIFIER)
     return names
 
 
@@ -680,7 +597,7 @@ def _go_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[in
     """
     cur = closure_node.parent
     while cur is not None:
-        if cur.type in _GO_FUNCTION_TYPES:
+        if cur.type in _go.FUNCTION_TYPES:
             return cache.get(cur.id, set())
         cur = cur.parent
     return set()  # pragma: no cover - defensive: a closure in valid Go always has an enclosing function
@@ -725,17 +642,17 @@ def _java_param_names(func_node: tree_sitter.Node) -> set[str]:
     # Untyped single-arg lambda: ``params_node`` IS the bare
     # ``identifier`` (no wrapping container). Seed the one bound
     # name directly before falling through to the container path.
-    if params_node.type == _JAVA_IDENTIFIER:
+    if params_node.type == _java.IDENTIFIER:
         return {node_text(params_node)}
     extractors: dict[str, Callable[[tree_sitter.Node], str | None]] = {
-        _JAVA_FORMAL_PARAMETER: _java_formal_param_name,
-        _JAVA_SPREAD_PARAMETER: _java_spread_param_name,
+        _java.FORMAL_PARAMETER: _java_formal_param_name,
+        _java.SPREAD_PARAMETER: _java_spread_param_name,
         # ``inferred_parameters`` body (lambda ``(a, b) -> ...``) lists
         # the parameter identifiers directly as named children. ``node_text``
         # returns ``""`` (falsy) for malformed AST; the ``if name is not None``
         # guard below still admits the empty string, which is harmless for
         # the tainted set lookup.
-        _JAVA_IDENTIFIER: node_text,
+        _java.IDENTIFIER: node_text,
     }
     names: set[str] = set()
     for child in params_node.named_children:
@@ -763,7 +680,7 @@ class TaintedSinkRule(BaseRule):
         "popen",
         "Popen",
         "run",
-        CALL,
+        _py.CALL,
         "check_output",
         "execute",
     ]
@@ -806,7 +723,7 @@ class TaintedSinkRule(BaseRule):
         assume = self._resolve_assume_taint_preserving()
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type not in (FUNCTION_DEF, ASYNC_FUNCTION_DEF):
+            if node.type not in (_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF):
                 continue
             params = _python_param_names(node)
             tracker = TaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
@@ -831,7 +748,7 @@ class TaintedSinkRule(BaseRule):
         assume = self._resolve_assume_taint_preserving()
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type not in _JS_FUNCTION_TYPES:
+            if node.type not in _js.FUNCTION_TYPES:
                 continue
             params = _javascript_param_names(node)
             tracker = JsTaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
@@ -882,7 +799,7 @@ class TaintedSinkRule(BaseRule):
         # ``id(wrapper)`` differs across wrapper accesses).
         tainted_cache: dict[int, set[str]] = {}
         for node in walk(tree.root_node):
-            if node.type not in _JAVA_FUNCTION_TYPES or node.type == _JAVA_LAMBDA_EXPRESSION:
+            if node.type not in _java.FUNCTION_TYPES or node.type == _java.LAMBDA_EXPRESSION:
                 continue
             tracker = JavaTaintTracker(_java_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
             tracker.visit(node)
@@ -890,7 +807,7 @@ class TaintedSinkRule(BaseRule):
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         # Pass 2: lambdas, seeded with enclosing function's final tainted.
         for node in walk(tree.root_node):
-            if node.type != _JAVA_LAMBDA_EXPRESSION:
+            if node.type != _java.LAMBDA_EXPRESSION:
                 continue
             seed = _java_param_names(node) | _java_lambda_enclosing_tainted(node, tainted_cache)
             tracker = JavaTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume)
@@ -930,7 +847,7 @@ class TaintedSinkRule(BaseRule):
         # ``id(wrapper)`` is not).
         tainted_cache: dict[int, set[str]] = {}
         for node in walk(tree.root_node):
-            if node.type != _RUST_CLOSURE and node.type in _RUST_FUNCTION_TYPES:
+            if node.type != _rust.CLOSURE_EXPRESSION and node.type in _rust.FUNCTION_TYPES:
                 tracker = RustTaintTracker(_rust_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
                 tracker.visit(node)
                 tainted_cache[node.id] = set(tracker.tainted)
@@ -940,7 +857,7 @@ class TaintedSinkRule(BaseRule):
         # Preorder walk processes outer closures before inner ones, so
         # nested closures inherit transitively via the cache.
         for node in walk(tree.root_node):
-            if node.type != _RUST_CLOSURE:
+            if node.type != _rust.CLOSURE_EXPRESSION:
                 continue
             seed = _rust_param_names(node) | _rust_closure_enclosing_tainted(node, tainted_cache)
             tracker = RustTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume)
@@ -976,7 +893,7 @@ class TaintedSinkRule(BaseRule):
         tainted_cache: dict[int, set[str]] = {}
         # Pass 1: named functions and methods (not closures).
         for node in walk(tree.root_node):
-            if node.type not in _GO_FUNCTION_TYPES or node.type == _GO_FUNC_LITERAL:
+            if node.type not in _go.FUNCTION_TYPES or node.type == _go.FUNC_LITERAL:
                 continue
             tracker = GoTaintTracker(_go_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
             tracker.visit(node)
@@ -984,7 +901,7 @@ class TaintedSinkRule(BaseRule):
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         # Pass 2: closures, seeded with the enclosing scope's tainted set.
         for node in walk(tree.root_node):
-            if node.type != _GO_FUNC_LITERAL:
+            if node.type != _go.FUNC_LITERAL:
                 continue
             seed = _go_param_names(node) | _go_closure_enclosing_tainted(node, tainted_cache)
             tracker = GoTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume)
@@ -1021,7 +938,7 @@ class TaintedSinkRule(BaseRule):
         top.visit(tree.root_node)
         violations.extend(self._format_hits(filepath, top.sink_hits))
         for node in walk(tree.root_node):
-            if node.type not in _PHP_FUNCTION_TYPES:
+            if node.type not in _php.FUNCTION_TYPES:
                 continue
             tracker = PhpTaintTracker(_php_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
             tracker.visit(node)
@@ -1038,7 +955,7 @@ class TaintedSinkRule(BaseRule):
         unbounded-copy sinks (``system`` / ``strcpy`` / ``sprintf`` / ...) are
         flagged when reached by a tainted argument.
         """
-        return self._c_family_check(filepath, tree, "c", _c_param_names, _C_FUNCTION_TYPES)
+        return self._c_family_check(filepath, tree, "c", _c_param_names, _c.FUNCTION_TYPES)
 
     def _cpp_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run C++ taint analysis, reusing the C tracker (the AST is a superset).
@@ -1052,7 +969,7 @@ class TaintedSinkRule(BaseRule):
         lambda body (catching captured-variable flows), and :func:`_c_family_check`
         de-duplicates the overlapping hits by source position.
         """
-        return self._c_family_check(filepath, tree, "cpp", _cpp_param_names, _CPP_FUNCTION_TYPES)
+        return self._c_family_check(filepath, tree, "cpp", _cpp_param_names, _cpp.FUNCTION_TYPES)
 
     def _c_family_check(self, filepath: str, tree: tree_sitter.Tree, lang_name: str, param_names: Callable[[tree_sitter.Node], set[str]], function_types: frozenset[str]) -> list[Violation]:
         """Shared C / C++ taint pass: seed each function / lambda and track to sinks.
@@ -1126,7 +1043,7 @@ class ReturnValueIgnoredRule(BaseRule):
 
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
-        CALL,
+        _py.CALL,
         "check_output",
         "write",
         "send",
@@ -1155,7 +1072,7 @@ class ReturnValueIgnoredRule(BaseRule):
             flagged = frozenset(_validated_string_list(raw, error_key))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type != EXPRESSION_STATEMENT:
+            if node.type != _py.EXPRESSION_STATEMENT:
                 continue
             named = node.named_children
             if not named or named[0].type not in CALL_TYPES:
@@ -1232,12 +1149,12 @@ class NullDereferenceRule(BaseRule):
 
     def _python_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
         """Return the method name if *node* is an unsafe Python dereference, else None."""
-        if node.type not in (ATTRIBUTE, SUBSCRIPT):
+        if node.type not in (_py.ATTRIBUTE, _py.SUBSCRIPT):
             return None
         # attribute → field "object", subscript → field "value"
-        field_name = "object" if node.type == ATTRIBUTE else "value"
+        field_name = "object" if node.type == _py.ATTRIBUTE else "value"
         obj = node.child_by_field_name(field_name)
-        if obj is None or obj.type != CALL:
+        if obj is None or obj.type != _py.CALL:
             return None
         name = call_name(obj)
         return name if name and name in nullable else None
@@ -1250,9 +1167,9 @@ class NullDereferenceRule(BaseRule):
         # ``method_invocation`` exposes the receiver of a chained call
         # as ``object`` (``foo.bar()`` - ``bar`` is the ``name`` field;
         # ``foo`` is the ``object`` field).
-        _JAVA_FIELD_ACCESS: "object",
-        _JAVA_ARRAY_ACCESS: "array",
-        _JAVA_METHOD_INVOCATION: "object",
+        _java.FIELD_ACCESS: "object",
+        _java.ARRAY_ACCESS: "array",
+        _java.METHOD_INVOCATION: "object",
     }
 
     def _java_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
@@ -1280,7 +1197,7 @@ class NullDereferenceRule(BaseRule):
         if receiver_field is None:
             return None
         obj = _peel_java_passthrough(node.child_by_field_name(receiver_field))
-        if obj is None or obj.type != _JAVA_METHOD_INVOCATION:
+        if obj is None or obj.type != _java.METHOD_INVOCATION:
             return None
         name = call_name(obj)
         return name if name and name in nullable else None
@@ -1309,26 +1226,26 @@ class NullDereferenceRule(BaseRule):
         ``(map.get(&k)).unwrap()`` and ``(&map.get(&k)).unwrap()``
         both fire.
         """
-        if node.type != _RUST_CALL_EXPRESSION:
+        if node.type != _rust.CALL_EXPRESSION:
             return None
         func = node.child_by_field_name("function")
-        if func is None or func.type != _RUST_FIELD_EXPRESSION:
+        if func is None or func.type != _rust.FIELD_EXPRESSION:
             return None
         field = func.child_by_field_name("field")
         if field is None or node_text(field) not in self._RUST_UNWRAP_METHODS:
             return None
         receiver = _peel_rust_passthrough(func.child_by_field_name("value"))
-        if receiver is None or receiver.type != _RUST_CALL_EXPRESSION:
+        if receiver is None or receiver.type != _rust.CALL_EXPRESSION:
             return None
         name = call_name(receiver)
         return name if name and name in nullable else None
 
     _PHP_RECEIVER_CALL_TYPES: ClassVar[frozenset[str]] = frozenset(
         {
-            _PHP_FUNCTION_CALL_EXPRESSION,
-            _PHP_MEMBER_CALL_EXPRESSION,
-            _PHP_NULLSAFE_MEMBER_CALL_EXPRESSION,
-            _PHP_SCOPED_CALL_EXPRESSION,
+            _php.FUNCTION_CALL_EXPRESSION,
+            _php.MEMBER_CALL_EXPRESSION,
+            _php.NULLSAFE_MEMBER_CALL_EXPRESSION,
+            _php.SCOPED_CALL_EXPRESSION,
         }
     )
 
@@ -1343,7 +1260,7 @@ class NullDereferenceRule(BaseRule):
         the ``?->`` operator) are the safe idiom and are excluded by node type,
         exactly like JS optional chaining (``?.``).
         """
-        if node.type not in (_PHP_MEMBER_CALL_EXPRESSION, _PHP_MEMBER_ACCESS_EXPRESSION):
+        if node.type not in (_php.MEMBER_CALL_EXPRESSION, _php.MEMBER_ACCESS_EXPRESSION):
             return None
         obj = node.child_by_field_name("object")
         if obj is None or obj.type not in self._PHP_RECEIVER_CALL_TYPES:
@@ -1375,13 +1292,13 @@ class NullDereferenceRule(BaseRule):
         loop because TS authors freely combine them
         (``(foo() as Bar)!.baz``).
         """
-        if node.type not in (_JS_MEMBER_EXPRESSION, _JS_SUBSCRIPT_EXPRESSION):
+        if node.type not in (_js.MEMBER_EXPRESSION, _js.SUBSCRIPT_EXPRESSION):
             return None
         # Optional chaining is the safe form - skip it entirely.
-        if any(c.type == _JS_OPTIONAL_CHAIN for c in node.children):
+        if any(c.type == _js.OPTIONAL_CHAIN for c in node.children):
             return None
         obj = _peel_js_passthrough(node.child_by_field_name("object"))
-        if obj is None or obj.type != _JS_CALL_EXPRESSION:
+        if obj is None or obj.type != _js.CALL_EXPRESSION:
             return None
         name = call_name(obj)
         return name if name and name in nullable else None

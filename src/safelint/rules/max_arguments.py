@@ -4,61 +4,16 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.languages import c as _c
+from safelint.languages import cpp as _cpp
+from safelint.languages import go as _go
+from safelint.languages import java as _java
+from safelint.languages import javascript as _js
+from safelint.languages import php as _php
+from safelint.languages import python as _py
+from safelint.languages import rust as _rust
+from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
-from safelint.languages.c import EXTRA_NAME as _C_EXTRA_NAME
-from safelint.languages.c import FUNCTION_DECLARATOR as _C_FUNCTION_DECLARATOR
-from safelint.languages.c import FUNCTION_TYPES as _C_FUNCTION_TYPES
-from safelint.languages.c import PARAMETER_DECLARATION as _C_PARAMETER_DECLARATION
-from safelint.languages.c import PRIMITIVE_TYPE as _C_PRIMITIVE_TYPE
-from safelint.languages.c import VARIADIC_PARAMETER as _C_VARIADIC_PARAMETER
-from safelint.languages.cpp import ABSTRACT_FUNCTION_DECLARATOR as _CPP_ABSTRACT_FUNCTION_DECLARATOR
-from safelint.languages.cpp import EXTRA_NAME as _CPP_EXTRA_NAME
-from safelint.languages.cpp import FUNCTION_TYPES as _CPP_FUNCTION_TYPES
-from safelint.languages.cpp import LAMBDA_EXPRESSION as _CPP_LAMBDA_EXPRESSION
-from safelint.languages.cpp import OPTIONAL_PARAMETER_DECLARATION as _CPP_OPTIONAL_PARAMETER_DECLARATION
-from safelint.languages.cpp import PARAMETER_DECLARATION as _CPP_PARAMETER_DECLARATION
-from safelint.languages.go import EXTRA_NAME as _GO_EXTRA_NAME
-from safelint.languages.go import FUNCTION_TYPES as _GO_FUNCTION_TYPES
-from safelint.languages.go import IDENTIFIER as _GO_IDENTIFIER
-from safelint.languages.go import PARAMETER_DECLARATION as _GO_PARAMETER_DECLARATION
-from safelint.languages.go import VARIADIC_PARAMETER_DECLARATION as _GO_VARIADIC_PARAMETER_DECLARATION
-from safelint.languages.java import EXTRA_NAME as _JAVA_EXTRA_NAME
-from safelint.languages.java import FORMAL_PARAMETER as _JAVA_FORMAL_PARAMETER
-from safelint.languages.java import FUNCTION_TYPES as _JAVA_FUNCTION_TYPES
-from safelint.languages.java import IDENTIFIER as _JAVA_IDENTIFIER
-from safelint.languages.java import INFERRED_PARAMETERS as _JAVA_INFERRED_PARAMETERS
-from safelint.languages.java import SPREAD_PARAMETER as _JAVA_SPREAD_PARAMETER
-from safelint.languages.javascript import ARRAY_PATTERN as _JS_ARRAY_PATTERN
-from safelint.languages.javascript import ASSIGNMENT_PATTERN as _JS_ASSIGNMENT_PATTERN
-from safelint.languages.javascript import EXTRA_NAME as _JS_EXTRA_NAME
-from safelint.languages.javascript import FUNCTION_TYPES as _JS_FUNCTION_TYPES
-from safelint.languages.javascript import IDENTIFIER as _JS_IDENTIFIER
-from safelint.languages.javascript import OBJECT_PATTERN as _JS_OBJECT_PATTERN
-from safelint.languages.javascript import REST_PATTERN as _JS_REST_PATTERN
-from safelint.languages.php import EXTRA_NAME as _PHP_EXTRA_NAME
-from safelint.languages.php import FUNCTION_TYPES as _PHP_FUNCTION_TYPES
-from safelint.languages.php import PROPERTY_PROMOTION_PARAMETER as _PHP_PROPERTY_PROMOTION_PARAMETER
-from safelint.languages.php import SIMPLE_PARAMETER as _PHP_SIMPLE_PARAMETER
-from safelint.languages.php import VARIADIC_PARAMETER as _PHP_VARIADIC_PARAMETER
-from safelint.languages.python import (
-    ASYNC_FUNCTION_DEF,
-    DEFAULT_PARAMETER,
-    DICTIONARY_SPLAT_PATTERN,
-    EXTRA_NAME,
-    FUNCTION_DEF,
-    IDENTIFIER,
-    LIST_SPLAT_PATTERN,
-    TYPED_DEFAULT_PARAMETER,
-    TYPED_PARAMETER,
-)
-from safelint.languages.rust import EXTRA_NAME as _RUST_EXTRA_NAME
-from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
-from safelint.languages.rust import IDENTIFIER as _RUST_IDENTIFIER
-from safelint.languages.rust import PARAMETER as _RUST_PARAMETER
-from safelint.languages.typescript import EXTRA_NAME as _TS_EXTRA_NAME
-from safelint.languages.typescript import OPTIONAL_PARAMETER as _TS_OPTIONAL_PARAMETER
-from safelint.languages.typescript import REQUIRED_PARAMETER as _TS_REQUIRED_PARAMETER
-from safelint.languages.typescript import REST_PARAMETER as _TS_REST_PARAMETER
 from safelint.rules.base import BaseRule
 
 
@@ -69,25 +24,25 @@ if TYPE_CHECKING:
 
 
 _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({FUNCTION_DEF, ASYNC_FUNCTION_DEF}),
-    "javascript": _JS_FUNCTION_TYPES,
-    "typescript": _JS_FUNCTION_TYPES,
-    "java": _JAVA_FUNCTION_TYPES,
-    "rust": _RUST_FUNCTION_TYPES,
-    "go": _GO_FUNCTION_TYPES,
-    "php": _PHP_FUNCTION_TYPES,
-    "c": _C_FUNCTION_TYPES,
-    "cpp": _CPP_FUNCTION_TYPES,
+    "python": frozenset({_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF}),
+    "javascript": _js.FUNCTION_TYPES,
+    "typescript": _js.FUNCTION_TYPES,
+    "java": _java.FUNCTION_TYPES,
+    "rust": _rust.FUNCTION_TYPES,
+    "go": _go.FUNCTION_TYPES,
+    "php": _php.FUNCTION_TYPES,
+    "c": _c.FUNCTION_TYPES,
+    "cpp": _cpp.FUNCTION_TYPES,
 }
 
-_PY_SPLAT_PARAM_TYPES = frozenset({LIST_SPLAT_PATTERN, DICTIONARY_SPLAT_PATTERN})
+_PY_SPLAT_PARAM_TYPES = frozenset({_py.LIST_SPLAT_PATTERN, _py.DICTIONARY_SPLAT_PATTERN})
 
 _PY_COUNTED_PARAM_TYPES = frozenset(
     {
-        IDENTIFIER,
-        TYPED_PARAMETER,
-        DEFAULT_PARAMETER,
-        TYPED_DEFAULT_PARAMETER,
+        _py.IDENTIFIER,
+        _py.TYPED_PARAMETER,
+        _py.DEFAULT_PARAMETER,
+        _py.TYPED_DEFAULT_PARAMETER,
     }
     | _PY_SPLAT_PARAM_TYPES
 )
@@ -99,11 +54,11 @@ _PY_COUNTED_PARAM_TYPES = frozenset(
 # the whole *point* of using a config object, so the count stays low).
 _JS_COUNTED_PARAM_TYPES = frozenset(
     {
-        _JS_IDENTIFIER,
-        _JS_ASSIGNMENT_PATTERN,
-        _JS_REST_PATTERN,
-        _JS_OBJECT_PATTERN,
-        _JS_ARRAY_PATTERN,
+        _js.IDENTIFIER,
+        _js.ASSIGNMENT_PATTERN,
+        _js.REST_PATTERN,
+        _js.OBJECT_PATTERN,
+        _js.ARRAY_PATTERN,
     }
 )
 
@@ -117,9 +72,9 @@ _JS_COUNTED_PARAM_TYPES = frozenset(
 # additional handling.
 _TS_COUNTED_PARAM_TYPES = frozenset(
     {
-        _TS_REQUIRED_PARAMETER,
-        _TS_OPTIONAL_PARAMETER,
-        _TS_REST_PARAMETER,
+        _ts.REQUIRED_PARAMETER,
+        _ts.OPTIONAL_PARAMETER,
+        _ts.REST_PARAMETER,
     }
 )
 
@@ -133,8 +88,8 @@ _TS_COUNTED_PARAM_TYPES = frozenset(
 # should not count toward user-facing argument count.
 _JAVA_COUNTED_PARAM_TYPES = frozenset(
     {
-        _JAVA_FORMAL_PARAMETER,
-        _JAVA_SPREAD_PARAMETER,
+        _java.FORMAL_PARAMETER,
+        _java.SPREAD_PARAMETER,
     }
 )
 
@@ -150,8 +105,8 @@ _JAVA_COUNTED_PARAM_TYPES = frozenset(
 # counted set so untyped closure arity is captured.
 _RUST_COUNTED_PARAM_TYPES = frozenset(
     {
-        _RUST_PARAMETER,
-        _RUST_IDENTIFIER,
+        _rust.PARAMETER,
+        _rust.IDENTIFIER,
     }
 )
 
@@ -164,9 +119,9 @@ _RUST_COUNTED_PARAM_TYPES = frozenset(
 # (same as Python / JS), so PHP routes through the generic counting path.
 _PHP_COUNTED_PARAM_TYPES = frozenset(
     {
-        _PHP_SIMPLE_PARAMETER,
-        _PHP_VARIADIC_PARAMETER,
-        _PHP_PROPERTY_PROMOTION_PARAMETER,
+        _php.SIMPLE_PARAMETER,
+        _php.VARIADIC_PARAMETER,
+        _php.PROPERTY_PROMOTION_PARAMETER,
     }
 )
 
@@ -187,7 +142,7 @@ def _python_param_identifier(child: tree_sitter.Node) -> str | None:
 
     Used to detect and skip ``self`` / ``cls`` - which JavaScript doesn't have.
     """
-    if child.type == IDENTIFIER:
+    if child.type == _py.IDENTIFIER:
         return node_text(child)
     if child.type in _PY_SPLAT_PARAM_TYPES:
         # `*args` / `**kwargs` carry their identifier as the first named child.
@@ -204,7 +159,7 @@ def _is_c_void_param(param: tree_sitter.Node) -> bool:
     and no declarator (an actual ``void *`` argument carries a
     ``pointer_declarator``, so it is not matched).
     """
-    return param.child_by_field_name("declarator") is None and any(c.type == _C_PRIMITIVE_TYPE and node_text(c) == "void" for c in param.named_children)
+    return param.child_by_field_name("declarator") is None and any(c.type == _c.PRIMITIVE_TYPE and node_text(c) == "void" for c in param.named_children)
 
 
 def _count_cpp_lambda_args(lambda_node: tree_sitter.Node) -> int:
@@ -216,11 +171,11 @@ def _count_cpp_lambda_args(lambda_node: tree_sitter.Node) -> int:
     and count every lambda as zero. A parameterless lambda (``[]{...}`` or
     ``[](){...}``) has no parameter list and counts as zero.
     """
-    afd = next((c for c in lambda_node.named_children if c.type == _CPP_ABSTRACT_FUNCTION_DECLARATOR), None)
+    afd = next((c for c in lambda_node.named_children if c.type == _cpp.ABSTRACT_FUNCTION_DECLARATOR), None)
     params_node = afd.child_by_field_name("parameters") if afd is not None else None
     if params_node is None:
         return 0
-    return len([c for c in params_node.named_children if c.type in (_CPP_PARAMETER_DECLARATION, _C_VARIADIC_PARAMETER, _CPP_OPTIONAL_PARAMETER_DECLARATION)])
+    return len([c for c in params_node.named_children if c.type in (_cpp.PARAMETER_DECLARATION, _c.VARIADIC_PARAMETER, _cpp.OPTIONAL_PARAMETER_DECLARATION)])
 
 
 def _c_function_params_node(func_node: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -232,10 +187,10 @@ def _c_function_params_node(func_node: tree_sitter.Node) -> tree_sitter.Node | N
     """
     decl = func_node.child_by_field_name("declarator")
     for _ in range(16):
-        if decl is None or decl.type == _C_FUNCTION_DECLARATOR:
+        if decl is None or decl.type == _c.FUNCTION_DECLARATOR:
             break
         decl = decl.child_by_field_name("declarator")
-    return decl.child_by_field_name("parameters") if decl is not None and decl.type == _C_FUNCTION_DECLARATOR else None
+    return decl.child_by_field_name("parameters") if decl is not None and decl.type == _c.FUNCTION_DECLARATOR else None
 
 
 def _count_c_args(func_node: tree_sitter.Node) -> int:
@@ -246,7 +201,7 @@ def _count_c_args(func_node: tree_sitter.Node) -> int:
     parameters and counts as zero. A C++ ``lambda_expression`` uses a different
     shape and is delegated to :func:`_count_cpp_lambda_args`.
     """
-    if func_node.type == _CPP_LAMBDA_EXPRESSION:
+    if func_node.type == _cpp.LAMBDA_EXPRESSION:
         return _count_cpp_lambda_args(func_node)
     params_node = _c_function_params_node(func_node)
     if params_node is None:  # pragma: no cover - defensive: a function_definition always has a parameter list
@@ -255,7 +210,7 @@ def _count_c_args(func_node: tree_sitter.Node) -> int:
     # ``int log(int a, ...)`` counts as 2 (omitting it leaves the count one short).
     # ``optional_parameter_declaration`` is a C++ default-valued parameter
     # (``int b = 5``) - still a real parameter slot, counted like the lambda path.
-    params = [c for c in params_node.named_children if c.type in (_C_PARAMETER_DECLARATION, _C_VARIADIC_PARAMETER, _CPP_OPTIONAL_PARAMETER_DECLARATION)]
+    params = [c for c in params_node.named_children if c.type in (_c.PARAMETER_DECLARATION, _c.VARIADIC_PARAMETER, _cpp.OPTIONAL_PARAMETER_DECLARATION)]
     if len(params) == 1 and _is_c_void_param(params[0]):
         return 0
     return len(params)
@@ -268,7 +223,7 @@ def _count_args(func_node: tree_sitter.Node, lang_name: str) -> tuple[int, str |
     ``self`` / ``cls``); JavaScript callers ignore it. Both languages
     expose the parameter list through ``func_node.child_by_field_name("parameters")``.
     """
-    if lang_name in (_C_EXTRA_NAME, _CPP_EXTRA_NAME):
+    if lang_name in (_c.EXTRA_NAME, _cpp.EXTRA_NAME):
         # C / C++ nest parameters under the ``function_declarator`` (which may itself
         # be wrapped in a ``pointer_declarator`` for a pointer-returning
         # function), and ``int f(void)`` is the spelling for *zero* parameters.
@@ -313,10 +268,10 @@ def _count_java_args(params_node: tree_sitter.Node) -> int:
     ``(a, b, c, d, e, f, g, h) -> ...`` that are increasingly common
     in stream / reactive pipelines.
     """
-    if params_node.type == _JAVA_IDENTIFIER:
+    if params_node.type == _java.IDENTIFIER:
         return 1
-    if params_node.type == _JAVA_INFERRED_PARAMETERS:
-        return sum(1 for c in params_node.named_children if c.type == _JAVA_IDENTIFIER)
+    if params_node.type == _java.INFERRED_PARAMETERS:
+        return sum(1 for c in params_node.named_children if c.type == _java.IDENTIFIER)
     return sum(1 for c in params_node.named_children if c.type in _JAVA_COUNTED_PARAM_TYPES)
 
 
@@ -337,9 +292,9 @@ def _count_go_args(params_node: tree_sitter.Node) -> int:
     """
     total = 0
     for child in params_node.named_children:
-        if child.type not in (_GO_PARAMETER_DECLARATION, _GO_VARIADIC_PARAMETER_DECLARATION):
+        if child.type not in (_go.PARAMETER_DECLARATION, _go.VARIADIC_PARAMETER_DECLARATION):
             continue
-        names = sum(1 for g in child.named_children if g.type == _GO_IDENTIFIER)
+        names = sum(1 for g in child.named_children if g.type == _go.IDENTIFIER)
         total += names or 1
     return total
 
@@ -354,7 +309,7 @@ class MaxArgumentsRule(BaseRule):
 
     name = "max_arguments"
     code = "SAFE103"
-    language = (EXTRA_NAME, _JS_EXTRA_NAME, _TS_EXTRA_NAME, _JAVA_EXTRA_NAME, _RUST_EXTRA_NAME, _GO_EXTRA_NAME, _PHP_EXTRA_NAME, _C_EXTRA_NAME, _CPP_EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _rust.EXTRA_NAME, _go.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag any function with more arguments than max_args."""

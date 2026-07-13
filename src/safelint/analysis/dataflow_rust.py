@@ -34,36 +34,8 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.languages import rust as _rust
 from safelint.languages._node_utils import call_name, node_text, walk
-from safelint.languages.rust import (
-    ARRAY_EXPRESSION,
-    ASSIGNMENT_EXPRESSION,
-    ASYNC_BLOCK,
-    AWAIT_EXPRESSION,
-    BINARY_EXPRESSION,
-    CALL_EXPRESSION,
-    CAPTURED_PATTERN,
-    COMPOUND_ASSIGNMENT_EXPR,
-    FIELD_EXPRESSION,
-    FIELD_PATTERN,
-    IDENTIFIER,
-    INDEX_EXPRESSION,
-    LET_DECLARATION,
-    MUT_PATTERN,
-    PARENTHESIZED_EXPRESSION,
-    RANGE_EXPRESSION,
-    REF_PATTERN,
-    REFERENCE_EXPRESSION,
-    SHORTHAND_FIELD_IDENTIFIER,
-    STRUCT_EXPRESSION,
-    STRUCT_PATTERN,
-    TRY_EXPRESSION,
-    TUPLE_EXPRESSION,
-    TUPLE_PATTERN,
-    TUPLE_STRUCT_PATTERN,
-    UNARY_EXPRESSION,
-)
-from safelint.languages.rust import FUNCTION_TYPES as _RUST_FUNCTION_TYPES
 
 
 if TYPE_CHECKING:
@@ -81,14 +53,14 @@ if TYPE_CHECKING:
 # tainted operand.
 _SPREADING_TYPES = frozenset(
     {
-        BINARY_EXPRESSION,
-        UNARY_EXPRESSION,
-        REFERENCE_EXPRESSION,
-        PARENTHESIZED_EXPRESSION,
-        TRY_EXPRESSION,
-        RANGE_EXPRESSION,
-        AWAIT_EXPRESSION,
-        ASYNC_BLOCK,
+        _rust.BINARY_EXPRESSION,
+        _rust.UNARY_EXPRESSION,
+        _rust.REFERENCE_EXPRESSION,
+        _rust.PARENTHESIZED_EXPRESSION,
+        _rust.TRY_EXPRESSION,
+        _rust.RANGE_EXPRESSION,
+        _rust.AWAIT_EXPRESSION,
+        _rust.ASYNC_BLOCK,
     }
 )
 
@@ -98,9 +70,9 @@ _SPREADING_TYPES = frozenset(
 # ``Foo { x, y }`` field literals.
 _CONTAINER_TYPES = frozenset(
     {
-        TUPLE_EXPRESSION,
-        ARRAY_EXPRESSION,
-        STRUCT_EXPRESSION,
+        _rust.TUPLE_EXPRESSION,
+        _rust.ARRAY_EXPRESSION,
+        _rust.STRUCT_EXPRESSION,
     }
 )
 
@@ -139,18 +111,18 @@ class RustTaintTracker:
         analysed separately by the caller for each function found, with
         their own parameter set.
         """
-        for node in walk(root, skip_types=tuple(_RUST_FUNCTION_TYPES)):
+        for node in walk(root, skip_types=tuple(_rust.FUNCTION_TYPES)):
             self._visit_node(node)
 
     def _visit_node(self, node: tree_sitter.Node) -> None:
         """Dispatch *node* to the right per-shape handler."""
-        if node.type == LET_DECLARATION:
+        if node.type == _rust.LET_DECLARATION:
             self._visit_let(node)
-        elif node.type == ASSIGNMENT_EXPRESSION:
+        elif node.type == _rust.ASSIGNMENT_EXPRESSION:
             self._visit_assignment(node)
-        elif node.type == COMPOUND_ASSIGNMENT_EXPR:
+        elif node.type == _rust.COMPOUND_ASSIGNMENT_EXPR:
             self._visit_compound_assignment(node)
-        elif node.type == CALL_EXPRESSION:
+        elif node.type == _rust.CALL_EXPRESSION:
             self._visit_call(node)
 
     def _iter_pattern_identifiers(self, pattern: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
@@ -184,13 +156,13 @@ class RustTaintTracker:
         anything and are skipped naturally.
         """
         nested_types = (
-            MUT_PATTERN,
-            REF_PATTERN,
-            TUPLE_PATTERN,
-            TUPLE_EXPRESSION,  # destructuring assignment: ``(a, b) = ...``
-            TUPLE_STRUCT_PATTERN,
-            STRUCT_PATTERN,
-            CAPTURED_PATTERN,
+            _rust.MUT_PATTERN,
+            _rust.REF_PATTERN,
+            _rust.TUPLE_PATTERN,
+            _rust.TUPLE_EXPRESSION,  # destructuring assignment: ``(a, b) = ...``
+            _rust.TUPLE_STRUCT_PATTERN,
+            _rust.STRUCT_PATTERN,
+            _rust.CAPTURED_PATTERN,
         )
         # Iterative DFS over the pattern shape; children pushed reversed to
         # preserve left-to-right yield order. ``field_pattern`` delegates to a
@@ -200,11 +172,11 @@ class RustTaintTracker:
         while len(stack) > 0:
             current = stack.pop()
             ptype = current.type
-            if ptype in (IDENTIFIER, SHORTHAND_FIELD_IDENTIFIER):
+            if ptype in (_rust.IDENTIFIER, _rust.SHORTHAND_FIELD_IDENTIFIER):
                 yield current
             elif ptype in nested_types:
                 stack.extend(reversed(current.named_children))
-            elif ptype == FIELD_PATTERN:
+            elif ptype == _rust.FIELD_PATTERN:
                 yield from self._iter_field_pattern_identifiers(current)
 
     def _iter_field_pattern_identifiers(self, pattern: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
@@ -218,7 +190,7 @@ class RustTaintTracker:
         if inner is not None:
             yield from self._iter_pattern_identifiers(inner)
             return
-        shorthand = next((c for c in pattern.named_children if c.type == SHORTHAND_FIELD_IDENTIFIER), None)
+        shorthand = next((c for c in pattern.named_children if c.type == _rust.SHORTHAND_FIELD_IDENTIFIER), None)
         if shorthand is not None:
             yield shorthand
 
@@ -272,12 +244,12 @@ class RustTaintTracker:
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
-        arg_name = node_text(arg_node) if arg_node.type == IDENTIFIER else "<expr>"
+        arg_name = node_text(arg_node) if arg_node.type == _rust.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
 
     def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool) -> None:
         """Add or remove *target* from the tainted set if it carries a bare name."""
-        if target.type not in (IDENTIFIER, SHORTHAND_FIELD_IDENTIFIER):
+        if target.type not in (_rust.IDENTIFIER, _rust.SHORTHAND_FIELD_IDENTIFIER):
             return
         name = node_text(target)
         if is_tainted:
@@ -304,9 +276,9 @@ class RustTaintTracker:
     def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if *node* is a leaf that itself carries taint."""
         node_type = node.type
-        if node_type == IDENTIFIER:
+        if node_type == _rust.IDENTIFIER:
             return node_text(node) in self.tainted
-        if node_type == CALL_EXPRESSION:
+        if node_type == _rust.CALL_EXPRESSION:
             return self._call_tainted(node)
         return False
 
@@ -323,10 +295,10 @@ class RustTaintTracker:
         taint dead-end.
         """
         node_type = node.type
-        if node_type == FIELD_EXPRESSION:
+        if node_type == _rust.FIELD_EXPRESSION:
             obj = node.child_by_field_name("value")
             return [obj] if obj is not None else []
-        if node_type == INDEX_EXPRESSION or node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
+        if node_type == _rust.INDEX_EXPRESSION or node_type in _SPREADING_TYPES or node_type in _CONTAINER_TYPES:
             return list(node.named_children)
         return []
 
@@ -360,7 +332,7 @@ class RustTaintTracker:
         # function calls (``foo(x)``) have an ``identifier`` /
         # ``scoped_identifier`` function and no receiver to read.
         function = node.child_by_field_name("function")
-        if function is not None and function.type == FIELD_EXPRESSION:
+        if function is not None and function.type == _rust.FIELD_EXPRESSION:
             receiver = function.child_by_field_name("value")
             if receiver is not None:
                 candidates.append(receiver)
