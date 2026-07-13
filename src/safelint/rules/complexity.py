@@ -362,6 +362,9 @@ def _is_branch_node(node: tree_sitter.Node, lang_name: str, branching_types: fro
     """
     if node.type in branching_types:
         return True
+    # ``binary_expression`` is the same node type in every supported grammar, so
+    # this generic (all-language) check is language-neutral; the constant is
+    # sourced from the c module arbitrarily, not because the check is C-specific.
     if node.type != _C_BINARY_EXPRESSION:
         return False
     branching_ops = _BRANCHING_BINARY_OPS_BY_LANG.get(lang_name)
