@@ -61,7 +61,7 @@ decisions now live in the referenced CHANGELOG entries and the shipped code.
 > Tree-sitter string literals to imported `src/safelint/languages/<lang>.py`
 > constants, for all languages at once. Pure refactor, no behaviour change. Its
 > spec, `plan/refactor-node-type-constants.md`, was removed on completion.
-
+>
 > **Module-access constants shipped in v2.8.3** (PR #111). Follow-up to the
 > above: switched the rules from ~1,350 per-constant aliased imports
 > (`... import IF_STATEMENT as _CPP_IF_STATEMENT`) to module-access
@@ -70,7 +70,7 @@ decisions now live in the referenced CHANGELOG entries and the shipped code.
 > the `Namespace.CONSTANT` ergonomics without a wrapper class and deletes the
 > alias soup. Its spec, `plan/refactor-module-access-constants.md`, was removed
 > on completion.
-
+>
 > **Security hardening shipped across v2.7.x / v2.8.1** (findings H1-H9). Defence
 > -in-depth fixes from the 2026-06-25 internal audit: `test_dirs` containment,
 > `skill install/remove` symlink/TOCTOU hardening, cache `mkstemp`. No HIGH /
