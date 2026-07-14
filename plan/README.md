@@ -48,6 +48,22 @@ planned, add its spec file and (re)introduce a status table here listing it in
 working-priority order (and remove the spec once the language ships, as was done
 for Go, PHP, C, and C++).
 
+## Planned: framework presets (not a language addition)
+
+The next planned work is **framework/runtime presets** (Part B of the
+add-language-support skill), not new languages: Django, Flask, FastAPI, and the
+Pydantic library toggle for **Python**, plus Laravel for **PHP**. Presets change
+rule *defaults* for an existing language, mirroring the Spring Boot precedent.
+
+| Spec | Scope | Status |
+|---|---|---|
+| [`framework-presets.md`](framework-presets.md) | New `[tool.safelint.python] framework` + `pydantic` axes and `[tool.safelint.php] framework` axis; taint-list extensions; three shared cross-framework 9xx rules (SAFE905-907) | Planned - not started |
+
+Core principle (owner's requirement): **extend, do not duplicate.** Most coverage
+is taint sink/source extension (zero new codes); a concern shared across
+frameworks becomes **one** shared rule, never a per-framework duplicate. Read the
+spec's decision order (§1) and the shared-rule catalogue (§3) before coding.
+
 ## Deferred cross-language refactors (run AFTER the languages above)
 
 These were not language additions; they were codebase-wide sweeps best done once
