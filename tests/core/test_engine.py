@@ -300,6 +300,28 @@ def test_engine_check_path_traverses_directory(tmp_path: Path) -> None:
     assert str(sub / "b.py") in paths
 
 
+def test_engine_discovery_skips_symlinked_files_escaping_the_tree(tmp_path: Path) -> None:
+    """A symlinked source file is not discovered, even if it points out of tree.
+
+    ``os.walk(followlinks=False)`` blocks descent into symlinked *directories*
+    but still lists symlinked *files*; the old ``is_file()``-only guard followed
+    them. A malicious repo committing ``evil.py -> <secret>`` must not have that
+    target read or echoed. The real in-tree file is still discovered.
+    """
+    outside = tmp_path / "outside_secret.py"
+    outside.write_text("SECRET = 'do-not-read'\n", encoding="utf-8")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "real.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "evil.py").symlink_to(outside)
+
+    paths = {r.path for r in _engine().check_path(repo)}
+
+    assert str(repo / "real.py") in paths
+    assert str(repo / "evil.py") not in paths
+    assert str(outside) not in paths
+
+
 def test_engine_parse_error_returns_parse_violation(tmp_path: Path) -> None:
     """A file with a syntax error produces a 'parse' violation instead of crashing."""
     sample = tmp_path / "broken.py"

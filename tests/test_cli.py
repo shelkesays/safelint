@@ -25,8 +25,10 @@ from safelint.cli import (
     _guard_hook_silent_failure,
     _make_summary,
     _matching_suffixes,
+    _print_violations,
     _run_hook,
     _scan_for_unavailable_extensions,
+    _visible,
 )
 from safelint.core.engine import LintResult
 from safelint.languages import extra_name_for
@@ -51,6 +53,46 @@ def _v(severity: str, code: str = "SAFE999", rule: str = "test_rule") -> Violati
         message="test message",
         severity=severity,
     )
+
+
+# ---------------------------------------------------------------------------
+# _visible - terminal control-character sanitisation
+# ---------------------------------------------------------------------------
+
+
+def test_visible_escapes_ansi_and_control_but_keeps_tab() -> None:
+    """ESC, CR, DEL, and C1 bytes become visible ``\\xNN``; tab is preserved."""
+    assert _visible("\x1b[2Jx") == "\\x1b[2Jx"  # ANSI escape neutralised
+    assert _visible("a\rb") == "a\\x0db"  # carriage return
+    assert _visible("a\x7fb") == "a\\x7fb"  # DEL
+    assert _visible("a\x9bb") == "a\\x9bb"  # C1 CSI
+    assert _visible("a\tb") == "a\tb"  # tab kept for indentation
+    assert _visible("plain text") == "plain text"  # ordinary text untouched
+
+
+def test_print_violations_sanitises_malicious_source_line(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A source line carrying raw ANSI escapes is neutralised in the gutter.
+
+    Guards the terminal-escape-injection fix: a cloned repo whose violating line
+    embeds ``\\x1b[2J`` must not have that byte reach the TTY when rendered.
+    """
+    evil = tmp_path / "evil.py"
+    evil.write_text("x = 1  # \x1b[2J\x1b]0;pwned\x07\n", encoding="utf-8")
+    v = Violation(rule="r", code="SAFE999", filepath=str(evil), lineno=1, message="m", severity="error")
+
+    _print_violations([v])
+
+    out = capsys.readouterr().out
+    assert "\x1b[2J" not in out
+    assert "\x1b]0;" not in out
+    assert "\\x1b" in out  # rendered visibly instead
+
+
+def test_file_summary_line_sanitises_malicious_filepath() -> None:
+    """A file path containing control bytes is neutralised in the summary line."""
+    line = _strip(_file_summary_line("a\x1b[2Kb.py", [_v("error")]))
+    assert "\x1b" not in line
+    assert "\\x1b" in line
 
 
 # ---------------------------------------------------------------------------

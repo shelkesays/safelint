@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Discovery no longer follows symlinked source files out of the linted tree.** `os.walk(followlinks=False)` blocks descent into symlinked *directories*, but a symlinked *file* was still admitted by the `is_file()` guard (which follows the link). A cloned repo could commit `evil.py -> /etc/passwd` (or `key.py -> ~/.ssh/id_rsa`) and, on `safelint check . --all-files`, have that out-of-tree target read and even echoed a line at a time into the violation gutter. Discovery now rejects symlinked files via an `is_symlink()` (lstat) check; a genuine in-tree file is still linted when the walk reaches it directly.
+- **Terminal output now visualises control characters in attacker-controlled strings.** The pretty renderer echoed the offending source line (plus the file path and rule message) verbatim to the TTY; a crafted line containing raw ANSI / OSC escapes could clear or redraw the terminal, spoof "All checks passed." output, set the window title, or drive OSC 52 clipboard writes when its violation was rendered. C0 (except tab), DEL, and C1 bytes are now shown as visible `\xNN` escapes, matching how ruff / ripgrep / git sanitise terminal output. JSON / SARIF output was already safe (escaped by `json.dumps` / percent-encoded).
+- **`test_dirs` containment now also rejects symlinked relative entries.** The v2.7.1 (H3) lexical `..` containment stopped string-based escapes, but a committed `tests -> /etc` symlink passed the lexical check and let the coverage-rule `rglob` follow it out of the tree (a weak existence oracle, no content read). Relative entries whose real path escapes the project root are now dropped; absolute entries remain honoured as the documented opt-in.
+- **Third-party pre-commit hooks are pinned to full commit SHAs** (`pre-commit-hooks`, `ruff-pre-commit`), matching the H9 workflow-pinning convention, so a moved upstream tag cannot alter what runs on a contributor's machine.
+
 ## [2.8.3] - 2026-07-13
 
 ### Changed
