@@ -91,12 +91,25 @@ pydantic  = true        # composes with ANY framework (or none)
 
 Mechanism: a fourth piece - `_resolve_python_pydantic(cfg)` returning a bool,
 and `_apply_python_pydantic_preset(defaults, on)` applied **after** the framework
-preset so both stack (framework sinks first, then Pydantic overrides layered on).
-This is a small, deliberate extension of the single-named-axis precedent; call it
-out in the PR. The `fastapi` framework preset should **not** silently force
-`pydantic` on (keep axes orthogonal and predictable); instead the docs recommend
-`framework = "fastapi"` + `pydantic = true` together, and the FastAPI section of
-the language page says so.
+preset.
+
+**Critical - the Pydantic applier must be ADDITIVE, not replace.** The Java/JS
+appliers assign list values *wholesale* (`target[key] = deepcopy(value)`, §2.3).
+Pydantic and the framework preset both write the **same bare `sinks` key**: if
+the framework applier writes the full Django sink list and a *replacing* Pydantic
+applier then writes `[..., "model_construct"]`, the second **clobbers** the first
+(and enabling both axes silently drops one set of sinks). So
+`_apply_python_pydantic_preset` must **read the current list from the defaults
+copy, append its additions (`model_construct`, `construct`), and dedupe** -
+a deliberate departure from the replace-semantics precedent, confined to this
+composable axis and documented in the PR + a test asserting Django-sinks survive
+`pydantic = true`. (The framework axis stays replace-based; only the
+compose-on-top axis is additive.)
+
+The `fastapi` framework preset should **not** silently force `pydantic` on (keep
+axes orthogonal and predictable); instead the docs recommend `framework =
+"fastapi"` + `pydantic = true` together, and the FastAPI section of the language
+page says so.
 
 ### 2.3 Replace-semantics reminder (the drift-test trap)
 
@@ -115,35 +128,39 @@ shell_exec, passthru, popen, proc_open, unserialize, query, mysqli_query,
 pg_query]`, `sources_php = [$_GET, $_POST, $_REQUEST, $_COOKIE, $_SERVER,
 $_FILES, $_ENV]`, `nullable_methods_php = [find, findOneBy, first, firstWhere]`.)
 
-### 2.4 Key technical risk to resolve FIRST: the Python taint-source shape
+### 2.4 The taint-source shape (probed: mostly a non-issue)
 
-The taint tracker matches Python **sources by call name** (`input()`,
-`file.read()`), whereas the Django/Flask request surface is largely
-**attribute / subscript reads**: `request.GET['id']`, `request.POST`,
-`request.args`, `request.json`. PHP already models superglobal **subscript**
-sources (`$_GET['id']`), but Python has no attribute/subscript source model
-today. This means naively adding `GET` / `POST` / `args` to the Python `sources`
-list may **not** taint `request.GET[...]` the way it taints `input()`.
+Probed `rules/dataflow.py` + `analysis/dataflow*.py` before writing this.
+**Every** language's SAFE801 pass seeds *all function parameters* as tainted
+(`TaintTracker(_python_param_names(node), ...)`, and the same for js/java/php/
+etc.), then propagates taint through the receiver of attribute / subscript /
+member accesses. Consequences for the request surface:
 
-**Resolve this before committing to sink/source lists** - probe
-`analysis/dataflow.py` (Python `TaintTracker`) and confirm which shapes it can
-treat as a source. Two outcomes:
+- **Django function-based views** (`def view(request): ...`), **FastAPI
+  handlers** (`async def ep(q: str = Query(...)): ...`), and **Laravel
+  controllers** (`function store(Request $request)`): the request object / bound
+  params are **parameters**, so they are **already tainted with no source-list
+  addition at all**. `request.GET['id']`, `request.data`, `$request->input()`
+  all flow via receiver propagation for free. This shrinks the "sources" work in
+  §5 to near-zero for these three.
+- **Flask** is the real gap: it uses a **module-global proxy**
+  (`from flask import request`), *not* a handler parameter, so `request.args`
+  is **not** auto-tainted. Flask genuinely needs a source: add `request` (and/or
+  the `.args`/`.form`/`.values`/`.get`/`.json` call names) so the global proxy
+  is treated as a source. Confirm the shape the tracker accepts for a
+  module-global read during the Flask sub-task.
+- **Edge case**: Django **class-based views** reach input via `self.request`
+  (an attribute, not a direct param); like Flask this may not auto-taint.
+  Document as a known limitation rather than chasing it.
 
-- If the tracker can be pointed at the `.get()` **call** form
-  (`request.args.get(...)`, `request.GET.get(...)`, `request.POST.get(...)`,
-  `request.json`), list those call names and document that direct-subscript
-  access (`request.GET['id']`) is a known blind spot (advise `.get()`).
-- If not, this becomes a **small, shared tracker enhancement** (attribute-source
-  support for Python, mirroring PHP's subscript-source handling) that lands
-  once and benefits every Python framework - still "extend existing", not a new
-  rule. Scope it explicitly in the Django sub-task; do not discover it late.
-
-The **sinks** side has no such issue (sinks are call-name matched, which fits
-`.raw()`, `render_template_string(...)`, `DB::raw(...)`), so the injection
-coverage in §5 lands cleanly regardless; only the *source* side carries this
-risk. Prior art the project already anticipated: `skill_files/languages/php.md`
-(~line 173) explicitly notes a `[tool.safelint.php] framework` axis is unbuilt
-and would "extend taint sources and take the 9xx band" - this plan realises it.
+Net: the earlier "small tracker enhancement" contingency is **not** needed for
+Django/FastAPI/Laravel; only Flask's global-proxy pattern needs source handling,
+and it is a normal list addition, not a tracker change. The **sinks** side has no
+issue anywhere (call-name matched, fits `.raw()`, `render_template_string(...)`,
+`DB::raw(...)`). Prior art the project anticipated:
+`skill_files/languages/php.md` (~line 173) notes a `[tool.safelint.php]
+framework` axis is unbuilt and would "extend taint sources and take the 9xx
+band" - this plan realises it.
 
 ---
 
@@ -217,6 +234,20 @@ the bulk), (b) which existing rules to **enable** (option 2), (c) which **shared
 Sink/source names below are *candidates to verify by probing the grammar and the
 library APIs at implementation time* - do not hardcode from memory (project
 convention).
+
+**Two cross-cutting caveats for the "Enable" lists below:**
+
+- **`dynamic_code_execution` (SAFE309) overlaps SAFE801 on `eval`/`exec`.**
+  Enabling both makes a bare `eval($x)` emit **two** violations (a SAFE309 hit
+  and a SAFE801 taint hit). The Spring preset notably does **not** enable SAFE309.
+  Decide ownership once: prefer SAFE801 (taint-aware, fewer FPs on constant
+  `eval`) and enable SAFE309 only if the framework has an eval surface taint
+  cannot reach. Do not blindly list both for every framework.
+- **`return_value_ignored` (SAFE802) has thin non-Java coverage.** There is no
+  `flagged_calls_php` default and `flagged_calls` (Python) is sparse - verify it
+  actually fires usefully on a given framework before listing it in that
+  framework's enable set; if not, either extend the `flagged_calls*` list (still
+  "extend existing") or drop SAFE802 for that framework.
 
 ### 5.1 Django (`framework = "django"`, Python)
 
@@ -343,13 +374,24 @@ Exact Java-clone axis on PHP. PHP already has superglobal taint **sources**
 (`$_GET`/`$_POST`/... at `config.py:1143`); Laravel adds its request helpers and
 Eloquent/Blade sinks.
 
-**Sinks to add to `sinks_php`** (re-include all vanilla PHP sinks + these):
-`raw`, `statement`, `whereRaw`, `orderByRaw`, `havingRaw`, `selectRaw` (`DB::`
-query builder raw SQL), `unprepared`, `render` (`Blade::render` SSTI),
-`unserialize` (already vanilla? verify), `file`/`download` (`response()->file`
-path traversal), `to`/`away` (`redirect()->to()` open redirect). **Sources to add
-to `sources_php`**: `all`, `input`, `query`, `post`, `get`, `request`, `json`,
-`only`, `except` (methods of the Laravel `$request` / `request()` helper).
+**Sinks to add to `sinks_php`** (re-include all vanilla PHP sinks + these). PHP
+sink matching is **call-name, receiver-blind** (`dataflow_php.py`), so include
+**only unambiguous compound names** and deliberately EXCLUDE common bare method
+names - the exact trap the Spring preset avoided by dropping `put`/`delete`:
+`whereRaw`, `orderByRaw`, `havingRaw`, `selectRaw`, `unprepared` (`DB::`/builder
+raw SQL - all unambiguous). **Exclude** `raw` (collides with everything),
+`statement`, `render` (Blade `render` collides with view/response `render`
+everywhere), `to`/`away`/`file`/`download` (redirect/response helpers whose names
+are far too common) - accept the coverage gap rather than the false-positive
+flood; note it in the docs. `unserialize` is already a vanilla PHP sink (verify,
+do not duplicate).
+
+**Sources**: mostly **unnecessary** - a Laravel controller's `Request $request`
+is a **parameter**, so it is already tainted and `$request->input(...)` /
+`->all()` flow via receiver propagation with zero source additions (§2.4). Only
+add a source for the **`request()` global helper** pattern (no injected param) if
+the tracker can model it; keep it to the single unambiguous helper name, not the
+`get`/`all`/`query`/`json`/`only` method soup (all receiver-blind, all collide).
 
 **Enable**: `tainted_sink`, `return_value_ignored`, `null_dereference`,
 `dynamic_code_execution` (PHP `eval` / dynamic). Caveat: `return_value_ignored`
@@ -401,7 +443,13 @@ rule) subclassing `BaseRule`; `language` tuple lists **every** language the rule
 serves (SAFE905 = `("python", "php")`; SAFE906/907 likewise); register in
 `ALL_RULES` + `__all__`, add to `DEFAULTS["rules"]` (disabled, severity) and
 `DEFAULTS["execution"]["order"]`. Obey safelint's own rules (iterative walks,
-`function_length<=60`, `nesting_depth<=2`, `complexity<=10`).
+`function_length<=60`, `nesting_depth<=2`, `complexity<=10`). Heads-up: **SAFE905**
+(walks module-level assignments for `DEBUG`/`app.debug`/`APP_DEBUG` across two
+languages) and **SAFE907** (inspects a handler's signature for a
+validation-typed param and whether it reads raw request data) are the two most
+likely to bump `complexity`/`nesting_depth` on their own source - factor helpers
+early rather than annotating. The test surface is large (3 rules x up to 5
+frameworks x violation+clean, plus the >=97% coverage gate); budget for it.
 
 **Tests**: preset-resolution tests per axis (model on
 `tests/core/test_java_framework_presets.py`): each override lands, user TOML
@@ -468,11 +516,19 @@ Confirmed with the owner:
 
 Still to settle *during* implementation (not blockers):
 
-4. **SAFE907 severity per framework** - propose `error` where the framework has a
-   first-class validation layer whose absence is a real defect (Django forms,
-   FastAPI Pydantic, Laravel FormRequest) and `warning` for Flask (no built-in
-   validation). Finalise when writing the rule.
+4. **SAFE907 severity: ONE value across all frameworks** (not per-framework).
+   `severity` is a single per-rule key; SAFE905-907 are shared `("python",
+   "php")` rules, and a Python+PHP monorepo can activate a Python `framework`
+   **and** `[php] framework = "laravel"` at once - both presets would write
+   `rules.unvalidated_request_input.severity` and the **last applier silently
+   wins**. So pick one severity per shared rule and keep it stable regardless of
+   which presets are active. **Recommend `warning` for SAFE907** (its absence is
+   advisory-shaped and Flask has no built-in validation at all); users who want
+   it blocking raise it in their own TOML. SAFE905/906 similarly get one severity
+   each (recommend `warning` for SAFE905, `error` for SAFE906). Do **not** try to
+   vary severity by active preset - the mechanism cannot express it safely.
 5. **Re-verify SAFE905-907 are free** with `uv run safelint list-rules` at
    implementation time; renumber within 9xx if any is taken.
-6. **Resolve the Python taint-source shape (§2.4) FIRST** - the one real unknown;
-   probe the tracker before finalising the Django/Flask/FastAPI source lists.
+6. **The Python taint-source shape is resolved (§2.4)** - params are auto-tainted
+   everywhere, so only Flask's global-proxy `request` needs a source addition;
+   no tracker change. Nothing to probe further.
