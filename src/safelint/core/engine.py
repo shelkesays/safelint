@@ -998,7 +998,15 @@ class SafetyEngine:
             # Avoids constructing ``dir_path / name`` twice and keeps the
             # comprehension readable.
             candidates = (dir_path / name for name in filenames if name.endswith(ext_tuple))
-            seen.update(str(p) for p in candidates if p.is_file())
+            # ``followlinks=False`` stops descent into symlinked *directories*,
+            # but a symlinked *file* is still listed here and ``is_file()``
+            # follows it. A malicious repo could commit ``evil.py -> /etc/passwd``
+            # (or ``key.py -> ~/.ssh/id_rsa``); discovery would then read that
+            # out-of-tree target and even echo a line of it into the violation
+            # gutter. ``is_symlink()`` (an lstat, evaluated first) drops it so
+            # discovery never leaves the walked tree; a genuine in-tree file is
+            # still linted when the walk reaches it directly.
+            seen.update(str(p) for p in candidates if not p.is_symlink() and p.is_file())
         return seen
 
     def _discover_files(self, target: Path) -> list[str]:

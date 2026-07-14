@@ -87,3 +87,20 @@ def test_contained_test_dir_unit(tmp_path: Path) -> None:
     # "/var/..." is relative on Windows and would skip the absolute branch there).
     external = tmp_path / "elsewhere" / "tests"
     assert _contained_test_dir(str(external), root) == external
+
+
+def test_relative_symlinked_test_dir_escaping_root_is_blocked(tmp_path: Path) -> None:
+    """A relative ``tests`` entry that is a symlink out of tree is rejected.
+
+    Lexical ``..`` containment passes for a plain name like ``tests``; the real
+    escape is a committed symlink whose target is outside the root. Without the
+    real-path guard the downstream ``rglob`` would follow the link and probe
+    ``/etc`` (or any victim dir). ``_contained_test_dir`` must return None so the
+    rglob never runs against the link target.
+    """
+    root = tmp_path / "root"
+    root.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (root / "tests").symlink_to(outside, target_is_directory=True)
+    assert _contained_test_dir("tests", root) is None

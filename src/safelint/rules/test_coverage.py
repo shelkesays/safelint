@@ -181,7 +181,18 @@ def _contained_test_dir(test_dir: str, root: Path) -> Path | None:
     if p.is_absolute():
         return Path(os.path.normpath(p))
     collapsed = Path(os.path.normpath(root / p))
-    return collapsed if collapsed.is_relative_to(root) else None
+    if not collapsed.is_relative_to(root):
+        return None
+    # Lexical containment above stops ``..`` *string* tricks, but a committed
+    # symlink whose name matches a relative entry (``tests -> /etc``) passes it
+    # and would make the downstream ``rglob`` follow the link out of the tree.
+    # Reject when the real path escapes root. ``resolve()`` is safe *here* - it
+    # runs only after lexical containment succeeds, on the final candidate, not
+    # as the ``..``-collapse mechanism the docstring warns against. Both sides
+    # are resolved so a symlinked ancestor of root itself does not over-reject.
+    if not collapsed.resolve().is_relative_to(root.resolve()):
+        return None
+    return collapsed
 
 
 def _path_components_contain(haystack: tuple[str, ...], needle: tuple[str, ...]) -> bool:
