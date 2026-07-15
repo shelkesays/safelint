@@ -195,12 +195,19 @@ def _contained_test_dir(test_dir: str, root: Path) -> Path | None:
     # "cannot prove containment" and drop the entry rather than crashing. Both
     # the candidate and the root are resolved inside the guard so a loop /
     # unreadable ancestor on *either* side is caught, not just the candidate.
+    # Python <= 3.12 raises ``RuntimeError`` on a symlink loop; Python 3.13+
+    # does NOT - it returns the unresolved symlink path (which stays under
+    # ``root``, so the containment check below would wrongly accept it). A fully
+    # resolved real path is never itself a symlink, so a still-symlink result
+    # means resolution hit a loop it could not follow: reject it too, keeping
+    # this guard robust across Python versions.
     try:
         resolved = collapsed.resolve()
         root_resolved = root.resolve()
+        looped = resolved.is_symlink()
     except (RuntimeError, OSError):  # nosafe: SAFE203
         return None
-    if not resolved.is_relative_to(root_resolved):
+    if looped or not resolved.is_relative_to(root_resolved):
         return None
     return collapsed
 
