@@ -389,6 +389,22 @@ def test_engine_check_file_skips_escaping_symlink_explicit_path(tmp_path: Path, 
     assert "symlink" in capsys.readouterr().err
 
 
+def test_engine_symlink_escapes_helper_fails_closed_on_oserror() -> None:
+    """_symlink_escapes returns True (skip) when is_symlink() raises OSError, not crash.
+
+    ``Path.is_symlink()`` re-raises OSError on a non-ignored errno (e.g. EACCES on
+    a parent dir); the helper must fail closed rather than propagate and crash
+    discovery / the pre-read guard.
+    """
+    from pathlib import Path  # noqa: PLC0415
+    from unittest.mock import patch  # noqa: PLC0415
+
+    from safelint.core.engine import _symlink_escapes  # noqa: PLC0415
+
+    with patch.object(Path, "is_symlink", side_effect=PermissionError("EACCES")):
+        assert _symlink_escapes(Path("/anything.py"), Path.cwd()) is True
+
+
 def test_engine_check_file_lints_in_tree_symlink_explicit_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """check_file() on an in-tree symlink follows it and reports the target's violations."""
     repo = tmp_path / "repo"

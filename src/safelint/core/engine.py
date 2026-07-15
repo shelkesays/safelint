@@ -324,15 +324,19 @@ def _symlink_escapes(path: Path, root_real: Path) -> bool:
     for a loop rather than raising - counts as an escape (containment cannot be
     proven, so fail closed).
     """
-    if not path.is_symlink():
-        return False
     try:
+        if not path.is_symlink():
+            return False
         real = path.resolve()
-    # Loop (<=3.12) / unreadable ancestor: fail closed. Practically untestable
-    # without fault injection for the OSError arm.
+        looped = real.is_symlink()
+    # ``is_symlink()`` re-raises OSError on a non-ignored errno (e.g. EACCES on a
+    # parent dir), and ``resolve()`` raises RuntimeError on a symlink loop
+    # (<=3.12); either way containment cannot be proven, so fail closed (treat as
+    # an escape). This one guard covers every caller - the discovery top target,
+    # the per-file walk filter, and ``_pre_read_skip`` - so none can crash.
     except (RuntimeError, OSError):  # nosafe: SAFE203
         return True
-    return real.is_symlink() or not real.is_relative_to(root_real)
+    return looped or not real.is_relative_to(root_real)
 
 
 @dataclass
