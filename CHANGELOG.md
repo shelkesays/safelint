@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.8.4] - 2026-07-15
+
 ### Security
 
 - **safelint no longer follows symlinked source files out of the linted tree, in any mode.** `os.walk(followlinks=False)` blocks descent into symlinked *directories*, but a symlinked *file* was still admitted by the `is_file()` guard (which follows the link). A cloned repo could commit `evil.py -> /etc/passwd` (or `key.py -> ~/.ssh/id_rsa`) and have that out-of-tree target read and even echoed a line at a time into the violation gutter. Symlinked files are now rejected via an `is_symlink()` (lstat) check both during directory discovery **and** in the central pre-read guard, so the pre-commit hook and single-file/explicit-path runs (which reach `check_file` directly, bypassing discovery) enforce the same boundary. A genuine in-tree file is still linted when reached directly.
