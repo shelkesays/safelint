@@ -419,8 +419,12 @@ def test_emit_missing_grammar_warnings_silent_when_no_unavailable_extensions(tmp
     assert capsys.readouterr().err == ""
 
 
-def test_emit_missing_grammar_warnings_emits_per_hint(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+def test_emit_missing_grammar_warnings_emits_per_hint(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     """One stderr line per unique install hint, listing the extensions covered."""
+    # This test asserts the direct-CLI install hint; force that branch so it is
+    # deterministic when the suite runs under pre-commit (which sets PRE_COMMIT=1,
+    # re-routing _format_install_action to additional_dependencies advice).
+    monkeypatch.delenv("PRE_COMMIT", raising=False)
     (tmp_path / "a.ts").write_text("x = 1;\n", encoding="utf-8")
     (tmp_path / "b.tsx").write_text("x = 1;\n", encoding="utf-8")
     mocker.patch(
@@ -440,8 +444,11 @@ def test_emit_missing_grammar_warnings_emits_per_hint(tmp_path: Path, capsys: py
     assert "pip install 'safelint[typescript]'" in err
 
 
-def test_emit_hook_grammar_warnings_emits_only_for_passed_files(capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+def test_emit_hook_grammar_warnings_emits_only_for_passed_files(capsys: pytest.CaptureFixture[str], mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     """Hook-mode helper takes the explicit file list - no directory walk."""
+    # Force the direct-CLI hint branch (see the per-hint test) so this stays
+    # green under pre-commit, which sets PRE_COMMIT=1.
+    monkeypatch.delenv("PRE_COMMIT", raising=False)
     mocker.patch(
         "safelint.cli.unavailable_extensions",
         return_value={".ts": "pip install 'safelint[typescript]'"},
