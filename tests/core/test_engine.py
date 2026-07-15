@@ -322,6 +322,46 @@ def test_engine_discovery_skips_symlinked_files_escaping_the_tree(tmp_path: Path
     assert str(outside) not in paths
 
 
+def test_engine_discovery_skips_symlinked_directory_target(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A symlinked directory passed as the top-level target is not walked into.
+
+    ``os.walk(followlinks=False)`` still walks *into* a symlinked top target
+    (the flag only governs sub-entries), so ``safelint check reports`` where
+    ``reports -> /outside`` would read out-of-tree files whose real paths are
+    not themselves symlinks. Reject the symlinked target outright.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "leak.py").write_text("SECRET = 1\n", encoding="utf-8")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    (repo / "reports").symlink_to(outside, target_is_directory=True)
+
+    results = _engine().check_path(repo / "reports")
+
+    assert results == []  # nothing discovered, nothing read
+    assert "symlink" in capsys.readouterr().err
+
+
+def test_engine_symlink_skip_warning_sanitises_control_chars(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A symlink whose name carries an ANSI escape is neutralised in the stderr warning.
+
+    The skip warning echoes the repo-controlled filepath; without sanitisation a
+    crafted symlink name would inject terminal escapes via stderr (the channel the
+    pretty-renderer sanitiser does not cover).
+    """
+    target = tmp_path / "target.py"
+    target.write_text("x = 1\n", encoding="utf-8")
+    link = tmp_path / "evil\x1b[2J.py"
+    link.symlink_to(target)
+
+    _engine().check_file(str(link))
+
+    err = capsys.readouterr().err
+    assert "\x1b[2J" not in err
+    assert "\\x1b" in err
+
+
 def test_engine_check_file_skips_symlink_explicit_path(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """check_file() on a symlink is skipped without reading the target.
 

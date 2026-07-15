@@ -361,8 +361,17 @@ def _test_dir_contains(test_dir: Path, candidates: list[str]) -> bool:
     rglob walk as soon as it yields one path, and the outer ``any``
     stops as soon as any candidate finds something. On a large repo
     this avoids a full materialised file listing per source file.
+
+    ``_contained_test_dir`` already drops a *leaf* symlink loop, but a loop in an
+    *ancestor* of the test dir can survive it on Python 3.13+ (where ``resolve()``
+    no longer raises and ``is_symlink()`` only inspects the leaf). Guard the walk
+    so such a loop - or any ``OSError`` mid-walk - yields "no test found" rather
+    than crashing discovery, uniformly across Python versions.
     """
-    return any(next(iter(test_dir.rglob(name)), None) is not None for name in candidates)
+    try:
+        return any(next(iter(test_dir.rglob(name)), None) is not None for name in candidates)
+    except (RuntimeError, OSError):  # nosafe: SAFE203
+        return False
 
 
 class TestExistenceRule(BaseRule):

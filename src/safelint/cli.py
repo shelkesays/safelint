@@ -78,15 +78,10 @@ def _is_error(severity: str) -> bool:
 # repo clear or redraw the terminal, spoof "All checks passed." output, set the
 # window title, or drive OSC 52 clipboard writes when its violation is rendered.
 # ruff / ripgrep / git (``core.quotePath``) sanitise terminal output the same
-# way. Tab (0x09) is preserved so source indentation still renders; everything
-# else in C0, DEL, and C1 becomes a visible ``\xNN`` escape.
-_CONTROL_ORDS = (*range(0x09), *range(0x0A, 0x20), 0x7F, *range(0x80, 0xA0))
-_CONTROL_TRANSLATION = {c: f"\\x{c:02x}" for c in _CONTROL_ORDS}
-
-
-def _visible(text: str) -> str:
-    r"""Replace control characters (except tab) with visible ``\xNN`` escapes."""
-    return text.translate(_CONTROL_TRANSLATION)
+# way. The sanitiser lives in ``_diagnostics`` so the stdout gutter (here) and
+# the stderr diagnostics share one table; re-exported as ``_visible`` for the
+# call sites below and the tests that import it.
+_visible = _diagnostics.visible
 
 
 def _c(text: str, *codes: str) -> str:

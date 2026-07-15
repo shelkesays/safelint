@@ -998,6 +998,15 @@ class SafetyEngine:
         rather than directories).
         """
         seen: set[str] = set()
+        # ``followlinks=False`` governs descent into symlinked *sub*-entries, but
+        # ``os.walk`` still walks *into* a symlinked directory passed as the top
+        # target - so ``safelint check reports`` where ``reports -> /etc`` would
+        # read out-of-tree files (they are real, non-symlink, so the per-file
+        # ``is_symlink()`` filter below would not catch them). Reject a symlinked
+        # top target outright, matching the symlinked-file posture.
+        if target.is_symlink():
+            _diagnostics.print_warning(f"skipping {target} (symlink)")
+            return seen
         for dirpath, dirnames, filenames in os.walk(target, followlinks=False):
             dir_path = Path(dirpath)
             # In-place mutation tells os.walk which subdirs to descend into.
