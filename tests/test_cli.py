@@ -70,6 +70,15 @@ def test_visible_escapes_ansi_and_control_but_keeps_tab() -> None:
     assert _visible("plain text") == "plain text"  # ordinary text untouched
 
 
+def test_visible_neutralises_unicode_bidi_and_zero_width() -> None:
+    """Trojan Source code points (bidi override, zero-width) become ``\\uNNNN``."""
+    assert _visible("a\u202eb") == "a\\u202eb"  # RIGHT-TO-LEFT OVERRIDE
+    assert _visible("a\u2066b") == "a\\u2066b"  # LEFT-TO-RIGHT ISOLATE
+    assert _visible("a\u200bb") == "a\\u200bb"  # ZERO WIDTH SPACE
+    assert _visible("a\ufeffb") == "a\\ufeffb"  # BOM / ZWNBSP
+    assert _visible("café") == "café"  # ordinary non-ASCII untouched
+
+
 def test_print_violations_sanitises_malicious_source_line(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
     """A source line carrying raw ANSI escapes is neutralised in the gutter.
 
