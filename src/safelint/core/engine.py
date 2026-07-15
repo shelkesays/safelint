@@ -698,9 +698,17 @@ class SafetyEngine:
     def _pre_read_skip(self, filepath: str, path_obj: Path) -> LintResult | None:
         """Return an empty LintResult to skip *filepath*, or None to proceed.
 
-        Catches the two pre-read conditions that mean we shouldn't even
+        Catches the pre-read conditions that mean we shouldn't even
         attempt to read the file:
 
+        * **Symlink** - a repo could commit ``evil.py -> /etc/passwd`` (or
+          ``key.py -> ~/.ssh/id_rsa``); ``is_file()`` follows the link, so the
+          out-of-tree target would be read and even echoed into the violation
+          gutter. Discovery already filters symlinks in ``_walk_supported_files``,
+          but ``check_file`` is also reached directly via CLI hook mode and a
+          single-file ``check_path`` target (bypassing discovery), so the guard
+          must live here too. ``is_symlink()`` (lstat) never follows the link; a
+          genuine in-tree file is linted when the walk reaches it directly.
         * **Non-regular path** - FIFOs, device files, broken symlinks.
           ``check_file`` is also called via CLI hook mode with an explicit
           file list (bypassing ``_discover_files``'s filter), so a FIFO
@@ -712,10 +720,13 @@ class SafetyEngine:
         real ``SAFE000`` parse-error rather than a misleading skip.
         """
         try:
+            if path_obj.is_symlink():
+                _diagnostics.print_warning(f"skipping {filepath} (symlink)")
+                return LintResult(path=filepath)
             is_regular = path_obj.is_file()
-        # Stat denial / device read errors: fail-open so read_text reports
-        # the real underlying issue as a SAFE000 violation. Practically
-        # untestable without fault injection.
+        # Stat denial / device read errors (lstat or stat): fail-open so
+        # read_text reports the real underlying issue as a SAFE000 violation.
+        # Practically untestable without fault injection.
         except OSError:  # nosafe: SAFE203
             return None
         if not is_regular:

@@ -190,7 +190,14 @@ def _contained_test_dir(test_dir: str, root: Path) -> Path | None:
     # runs only after lexical containment succeeds, on the final candidate, not
     # as the ``..``-collapse mechanism the docstring warns against. Both sides
     # are resolved so a symlinked ancestor of root itself does not over-reject.
-    if not collapsed.resolve().is_relative_to(root.resolve()):
+    # ``resolve()`` can raise ``RuntimeError`` on a symlink loop or ``OSError``
+    # (e.g. ``PermissionError``) on an unreadable ancestor; treat either as
+    # "cannot prove containment" and drop the entry rather than crashing.
+    try:
+        resolved = collapsed.resolve()
+    except (RuntimeError, OSError):  # nosafe: SAFE203
+        return None
+    if not resolved.is_relative_to(root.resolve()):
         return None
     return collapsed
 

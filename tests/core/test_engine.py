@@ -322,6 +322,25 @@ def test_engine_discovery_skips_symlinked_files_escaping_the_tree(tmp_path: Path
     assert str(outside) not in paths
 
 
+def test_engine_check_file_skips_symlink_explicit_path(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """check_file() on a symlink is skipped without reading the target.
+
+    Covers CLI hook mode and a single-file check_path target, which reach
+    check_file directly (bypassing discovery). A committed ``evil.py -> secret``
+    passed straight in must not have its target read - the content must never
+    surface as a violation.
+    """
+    outside = tmp_path / "secret.py"
+    outside.write_text("def (:  # a parse error the linter would report if read\n", encoding="utf-8")
+    link = tmp_path / "evil.py"
+    link.symlink_to(outside)
+
+    result = _engine().check_file(str(link))
+
+    assert result.violations == []  # nothing read, nothing reported
+    assert "symlink" in capsys.readouterr().err
+
+
 def test_engine_parse_error_returns_parse_violation(tmp_path: Path) -> None:
     """A file with a syntax error produces a 'parse' violation instead of crashing."""
     sample = tmp_path / "broken.py"
