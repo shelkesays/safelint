@@ -104,3 +104,17 @@ def test_relative_symlinked_test_dir_escaping_root_is_blocked(tmp_path: Path) ->
     outside.mkdir()
     (root / "tests").symlink_to(outside, target_is_directory=True)
     assert _contained_test_dir("tests", root) is None
+
+
+def test_symlink_loop_test_dir_is_dropped_not_crashed(tmp_path: Path) -> None:
+    """A symlink loop makes ``resolve()`` raise; it must be caught and dropped.
+
+    ``Path.resolve()`` raises ``RuntimeError`` on a cyclic symlink (and ``OSError``
+    on an unreadable ancestor). The containment check must return None rather than
+    crash the linter during discovery.
+    """
+    root = tmp_path / "root"
+    root.mkdir()
+    loop = root / "tests"
+    loop.symlink_to(loop)  # self-referential -> RuntimeError on resolve()
+    assert _contained_test_dir("tests", root) is None
