@@ -405,6 +405,23 @@ def test_engine_symlink_escapes_helper_fails_closed_on_oserror() -> None:
         assert _symlink_escapes(Path("/anything.py"), Path.cwd()) is True
 
 
+def test_engine_symlink_escapes_helper_rejects_real_symlink_loop(tmp_path: Path) -> None:
+    """_symlink_escapes returns True for a real two-link symlink loop (a -> b -> a).
+
+    Complements the mocked-OSError test with a genuine loop: on Python <=3.12
+    ``resolve()`` raises RuntimeError (caught -> True); on 3.13+ it returns a
+    still-symlink path caught by the ``real.is_symlink()`` check. Either way the
+    unresolvable loop fails closed.
+    """
+    from safelint.core.engine import _symlink_escapes  # noqa: PLC0415
+
+    a = tmp_path / "a.py"
+    b = tmp_path / "b.py"
+    a.symlink_to(b)
+    b.symlink_to(a)
+    assert _symlink_escapes(a, tmp_path.resolve()) is True
+
+
 def test_engine_check_file_lints_in_tree_symlink_explicit_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """check_file() on an in-tree symlink follows it and reports the target's violations."""
     repo = tmp_path / "repo"
