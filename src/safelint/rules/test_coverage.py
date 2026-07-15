@@ -192,12 +192,15 @@ def _contained_test_dir(test_dir: str, root: Path) -> Path | None:
     # are resolved so a symlinked ancestor of root itself does not over-reject.
     # ``resolve()`` can raise ``RuntimeError`` on a symlink loop or ``OSError``
     # (e.g. ``PermissionError``) on an unreadable ancestor; treat either as
-    # "cannot prove containment" and drop the entry rather than crashing.
+    # "cannot prove containment" and drop the entry rather than crashing. Both
+    # the candidate and the root are resolved inside the guard so a loop /
+    # unreadable ancestor on *either* side is caught, not just the candidate.
     try:
         resolved = collapsed.resolve()
+        root_resolved = root.resolve()
     except (RuntimeError, OSError):  # nosafe: SAFE203
         return None
-    if not resolved.is_relative_to(root.resolve()):
+    if not resolved.is_relative_to(root_resolved):
         return None
     return collapsed
 
