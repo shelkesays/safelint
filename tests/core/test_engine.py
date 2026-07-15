@@ -300,41 +300,44 @@ def test_engine_check_path_traverses_directory(tmp_path: Path) -> None:
     assert str(sub / "b.py") in paths
 
 
-def test_engine_discovery_skips_symlinked_files_escaping_the_tree(tmp_path: Path) -> None:
-    """A symlinked source file is not discovered, even if it points out of tree.
+def test_engine_discovery_lints_in_tree_symlink_but_skips_escaping_one(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Follow-if-resolved-within-tree: an in-tree symlink is linted, an escaping one is not.
 
-    ``os.walk(followlinks=False)`` blocks descent into symlinked *directories*
-    but still lists symlinked *files*; the old ``is_file()``-only guard followed
-    them. A malicious repo committing ``evil.py -> <secret>`` must not have that
-    target read or echoed. The real in-tree file is still discovered.
+    ``os.walk(followlinks=False)`` lists symlinked *files*; the guard follows one
+    only when its real path stays inside the repo root (cwd). A monorepo's
+    ``app/config.py -> ../shared/config.py`` (shared under the repo) is linted;
+    ``evil.py -> <out-of-tree secret>`` is dropped and never read.
     """
+    repo = tmp_path / "repo"
+    (repo / "app").mkdir(parents=True)
+    (repo / "shared").mkdir()
+    monkeypatch.chdir(repo)
+    (repo / "shared" / "config.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "app" / "config.py").symlink_to(repo / "shared" / "config.py")  # in-tree symlink
     outside = tmp_path / "outside_secret.py"
     outside.write_text("SECRET = 'do-not-read'\n", encoding="utf-8")
-    repo = tmp_path / "repo"
-    repo.mkdir()
-    (repo / "real.py").write_text("x = 1\n", encoding="utf-8")
-    (repo / "evil.py").symlink_to(outside)
+    (repo / "app" / "evil.py").symlink_to(outside)  # escaping symlink
 
     paths = {r.path for r in _engine().check_path(repo)}
 
-    assert str(repo / "real.py") in paths
-    assert str(repo / "evil.py") not in paths
+    assert str(repo / "app" / "config.py") in paths  # in-tree symlink linted
+    assert str(repo / "app" / "evil.py") not in paths  # escaping symlink skipped
     assert str(outside) not in paths
 
 
-def test_engine_discovery_skips_symlinked_directory_target(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """A symlinked directory passed as the top-level target is not walked into.
+def test_engine_discovery_skips_escaping_symlinked_directory_target(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """A symlinked directory target that escapes the repo is rejected, not walked into.
 
-    ``os.walk(followlinks=False)`` still walks *into* a symlinked top target
-    (the flag only governs sub-entries), so ``safelint check reports`` where
-    ``reports -> /outside`` would read out-of-tree files whose real paths are
-    not themselves symlinks. Reject the symlinked target outright.
+    ``os.walk(followlinks=False)`` still walks *into* a symlinked top target, so
+    ``safelint check reports`` where ``reports -> /outside`` would read out-of-tree
+    files. An escaping top target is rejected outright.
     """
     outside = tmp_path / "outside"
     outside.mkdir()
     (outside / "leak.py").write_text("SECRET = 1\n", encoding="utf-8")
     repo = tmp_path / "repo"
     repo.mkdir()
+    monkeypatch.chdir(repo)
     (repo / "reports").symlink_to(outside, target_is_directory=True)
 
     results = _engine().check_path(repo / "reports")
@@ -343,17 +346,20 @@ def test_engine_discovery_skips_symlinked_directory_target(tmp_path: Path, capsy
     assert "symlink" in capsys.readouterr().err
 
 
-def test_engine_symlink_skip_warning_sanitises_control_chars(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+def test_engine_symlink_skip_warning_sanitises_control_chars(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
     """A symlink whose name carries an ANSI escape is neutralised in the stderr warning.
 
     The skip warning echoes the repo-controlled filepath; without sanitisation a
     crafted symlink name would inject terminal escapes via stderr (the channel the
     pretty-renderer sanitiser does not cover).
     """
-    target = tmp_path / "target.py"
-    target.write_text("x = 1\n", encoding="utf-8")
-    link = tmp_path / "evil\x1b[2J.py"
-    link.symlink_to(target)
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.chdir(repo)
+    outside = tmp_path / "target.py"  # out of tree -> escapes -> skipped + warned
+    outside.write_text("x = 1\n", encoding="utf-8")
+    link = repo / "evil\x1b[2J.py"
+    link.symlink_to(outside)
 
     _engine().check_file(str(link))
 
@@ -362,23 +368,39 @@ def test_engine_symlink_skip_warning_sanitises_control_chars(tmp_path: Path, cap
     assert "\\x1b" in err
 
 
-def test_engine_check_file_skips_symlink_explicit_path(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """check_file() on a symlink is skipped without reading the target.
+def test_engine_check_file_skips_escaping_symlink_explicit_path(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """check_file() on a symlink escaping the repo is skipped without reading the target.
 
     Covers CLI hook mode and a single-file check_path target, which reach
     check_file directly (bypassing discovery). A committed ``evil.py -> secret``
-    passed straight in must not have its target read - the content must never
-    surface as a violation.
+    pointing out of tree must not have its target read.
     """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.chdir(repo)
     outside = tmp_path / "secret.py"
     outside.write_text("def (:  # a parse error the linter would report if read\n", encoding="utf-8")
-    link = tmp_path / "evil.py"
+    link = repo / "evil.py"
     link.symlink_to(outside)
 
     result = _engine().check_file(str(link))
 
     assert result.violations == []  # nothing read, nothing reported
     assert "symlink" in capsys.readouterr().err
+
+
+def test_engine_check_file_lints_in_tree_symlink_explicit_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """check_file() on an in-tree symlink follows it and reports the target's violations."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.chdir(repo)
+    (repo / "real.py").write_text("def foo(\n", encoding="utf-8")  # parse error
+    link = repo / "link.py"
+    link.symlink_to(repo / "real.py")  # in-tree symlink
+
+    result = _engine().check_file(str(link))
+
+    assert any(v.code == "SAFE000" for v in result.violations)  # followed + linted
 
 
 def test_engine_parse_error_returns_parse_violation(tmp_path: Path) -> None:
