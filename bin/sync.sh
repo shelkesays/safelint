@@ -32,11 +32,26 @@ else
 fi
 
 # Fast-forward the local branches to origin so a new feature starts clean.
+# Fast-forward-ONLY: this never rewrites local history. If a local branch has
+# diverged (local commits not on origin) it is left untouched with a note, so
+# you never silently lose work. Uncommitted changes abort the local update
+# entirely (nothing is checked out or moved).
+if [ -n "$(git status --porcelain)" ]; then
+  echo "working tree has uncommitted changes - skipping local fast-forward (commit or stash first)."
+  exit 0
+fi
+
 CURRENT=$(git branch --show-current)
 for b in main development; do
-  git checkout --quiet "$b"
-  git reset --hard --quiet "origin/$b"
+  if [ "$b" = "$CURRENT" ]; then
+    git merge --ff-only --quiet "origin/$b" 2>/dev/null \
+      && echo "  ${b} fast-forwarded." \
+      || echo "  ${b} has diverged from origin/${b} - left as-is (fast-forward only)."
+  else
+    # Update a non-checked-out branch ref, fast-forward-only (git fetch refuses
+    # a non-ff update without '+', so divergence fails safely).
+    git fetch --no-tags --quiet . "refs/remotes/origin/${b}:refs/heads/${b}" 2>/dev/null \
+      && echo "  ${b} fast-forwarded." \
+      || echo "  ${b} has diverged from origin/${b} - left as-is (fast-forward only)."
+  fi
 done
-# Leave you on development (the branch you cut features from), or where you were.
-git checkout --quiet "${CURRENT:-development}"
-echo "local main and development fast-forwarded to origin."
