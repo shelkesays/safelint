@@ -86,6 +86,7 @@ Nine languages are registered today (Python, JavaScript, TypeScript, Java, Rust,
 - **No breaking changes to rule names or codes.** Downstream users pin to these in config files and CI scripts. If a rule needs to change, add a new one and deprecate the old.
 - **Keep rules focused.** One rule, one concern. If you find yourself adding multiple `if` branches for different failure modes, it is probably two rules.
 - **Defaults must be safe.** New rules should default to `enabled: false` if they have a high false-positive rate or are expensive to run. Let users opt in.
+- **Bump the version with your work.** The version bump in `pyproject.toml` is what triggers the automated release; add your CHANGELOG entries under `## [Unreleased]` and leave the heading undated. See [Releasing](https://shelkesays.github.io/safelint/contributing/releasing/) for the full flow.
 
 ---
 
