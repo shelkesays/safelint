@@ -48,6 +48,18 @@ planned, add its spec file and (re)introduce a status table here listing it in
 working-priority order (and remove the spec once the language ships, as was done
 for Go, PHP, C, and C++).
 
+## Planned: release automation (CI/CD, not a code change)
+
+| Spec | Scope | Status |
+|---|---|---|
+| [`release-automation.md`](release-automation.md) | Auto-tag + PyPI + GitHub release on a version bump (rc from `development`, final from `main`); post-merge `development`->`main` reset-if-safe; CHANGELOG-section release notes; local `bin/sync.sh` | Planned - not started |
+
+Removes the manual `pull -> tag -> push -> release` steps and the recurring
+`development` / `main` divergence that forces squash-over-rebase. Confirmed
+design decisions: release notes from the CHANGELOG section, reset dev to main
+only when safe. High-stakes (PyPI + branch protection) - read the spec's setup
+(section 4) and open decisions (section 8) before implementing.
+
 ## Deferred cross-language refactors (run AFTER the languages above)
 
 These were not language additions; they were codebase-wide sweeps best done once
