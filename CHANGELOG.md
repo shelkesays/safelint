@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Release automation (internal tooling; the `safelint` package is unchanged).** A committed version bump now drives the release: merging a bumped version to `development` (a pre-release `X.Y.ZrcN`) or `main` (a final `X.Y.Z`) automatically tags it, publishes to PyPI, and creates the GitHub release. On a final release the CHANGELOG is auto-dated (`[Unreleased]` -> `[X.Y.Z] - <date>`) and `development` is reset to `main` so the two never diverge. New helpers `scripts/changelog_section.py` (release notes from the CHANGELOG) and `scripts/date_changelog.py` (the auto-date), plus `bin/sync.sh` for local branch sync. `scripts/` is now covered by ruff / ty / safelint.
+
 ## [2.8.4] - 2026-07-15
 
 ### Security
