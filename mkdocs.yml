@@ -160,6 +160,7 @@ nav:
       - Overview: contributing/index.md
       - Adding an AI client: contributing/adding-an-ai-client.md
       - Adding a language: contributing/adding-a-language.md
+      - Releasing: contributing/releasing.md
   - Project:
       - Changelog: project/changelog.md
       - Code of conduct: project/code-of-conduct.md
