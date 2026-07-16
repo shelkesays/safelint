@@ -227,9 +227,18 @@ else
   [ "$AHEAD" -eq 0 ] && echo "  -> safe to reset; run: git push --force-with-lease origin development after reset" \
                      || echo "  -> development has unmerged work; do NOT reset"
 fi
-# fast-forward local branches to origin for a clean start
-for b in main development; do git checkout "$b" && git reset --hard "origin/$b"; done
-git checkout development
+# Fast-forward-ONLY - never discards local work. Skip entirely if the tree is
+# dirty; leave a diverged branch untouched (a note, not a reset).
+[ -n "$(git status --porcelain)" ] && { echo "dirty tree - skipping"; exit 0; }
+cur=$(git branch --show-current)
+for b in main development; do
+  if [ "$b" = "$cur" ]; then
+    git merge --ff-only "origin/$b" || echo "  $b diverged - left as-is"
+  else
+    git fetch --no-tags . "refs/remotes/origin/$b:refs/heads/$b" \
+      || echo "  $b diverged - left as-is"
+  fi
+done
 ```
 
 With piece A running server-side, this is normally just a fast-forward + a green
