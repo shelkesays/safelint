@@ -65,8 +65,10 @@ jobs:
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
 
           # Classify: PEP 440 pre-release (rc/a/b/.dev) -> from development;
-          # otherwise a final release -> from main.
-          if printf '%s' "$VERSION" | grep -qE '(rc|a|b|\.dev)[0-9]*$'; then
+          # otherwise a final release -> from main. Case-insensitive (-i) so an
+          # uppercase suffix like 2.9.0RC1 is not misclassified as final - mirrors
+          # the changelog_section.py fix.
+          if printf '%s' "$VERSION" | grep -qiE '(rc|a|b|\.dev)[0-9]*$'; then
             echo "prerelease=true" >> "$GITHUB_OUTPUT"
             EXPECTED_BRANCH=development
           else
