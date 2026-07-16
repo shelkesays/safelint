@@ -179,7 +179,13 @@ jobs:
     if: needs.gate.outputs.release == 'true'
     runs-on: ubuntu-latest
     environment:
-      name: pypi
+      # Finals deploy to the reviewer-gated ``pypi`` environment - a human
+      # approves before the production upload (the safety valve). RC publishing
+      # is hands-off via ``pypi-rc`` (an environment with no reviewer rule).
+      # PyPI setup: either leave the trusted-publisher's Environment field blank
+      # so it trusts this workflow from any environment (simplest - one entry
+      # covers both), or add a second trusted-publisher entry for ``pypi-rc``.
+      name: ${{ needs.gate.outputs.prerelease == 'true' && 'pypi-rc' || 'pypi' }}
       url: https://pypi.org/p/safelint
 
     permissions:

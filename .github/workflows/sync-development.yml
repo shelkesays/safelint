@@ -22,6 +22,7 @@ on:
 
 permissions:
   contents: read
+  issues: write  # open a tracking issue when a sync is refused
 
 concurrency:
   group: sync-development
@@ -40,13 +41,29 @@ jobs:
           token: ${{ secrets.RELEASE_PAT }}
 
       - name: Reset development to main when safe
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           git fetch origin main development --quiet
 
           AHEAD=$(git rev-list origin/development ^origin/main --count)
           if [ "$AHEAD" -ne 0 ]; then
-            echo "::error::development has $AHEAD commit(s) not in main - refusing to reset (in-flight work). Resolve manually."
+            echo "::error::development has $AHEAD commit(s) not in main - refusing to reset (in-flight work)."
+            # Open a tracking issue (deduped by title so repeated main-pushes do
+            # not spam), then fail loudly so it also surfaces in the Actions tab.
+            TITLE="development is ahead of main - auto-sync blocked"
+            OPEN=$(gh issue list --state open --search "in:title $TITLE" --json number --jq 'length')
+            if [ "$OPEN" -eq 0 ]; then
+              gh issue create --title "$TITLE" --body \
+          "The **sync-development** workflow refused to reset \`development\` to \`main\`: development has $AHEAD commit(s) not in main (unmerged / in-flight work), so a reset would discard them.
+
+          Resolve manually - land that work through the release flow, or once it is contained in main run:
+
+              bin/sync.sh   # then: git branch -f development origin/main && git push --force-with-lease origin development
+
+          Triggered by ${GITHUB_SHA:0:7} on main. This issue was opened automatically; close it once development and main are back in sync."
+            fi
             exit 1
           fi
 
