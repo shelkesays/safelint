@@ -36,13 +36,16 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
-          # RELEASE_PAT: force-pushing development needs to bypass its protection
-          # (the default GITHUB_TOKEN cannot). Same token as publish.yml.
-          token: ${{ secrets.RELEASE_PAT }}
+          # Do not persist the token in .git/config (defence-in-depth, matches
+          # publish.yml). The force-push injects RELEASE_PAT via an explicit URL.
+          persist-credentials: false
 
       - name: Reset development to main when safe
         env:
           GH_TOKEN: ${{ github.token }}
+          # RELEASE_PAT: force-pushing development needs to bypass its protection
+          # (the default GITHUB_TOKEN cannot). Same token as publish.yml.
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
         run: |
           set -euo pipefail
           git fetch origin main development --quiet
@@ -50,10 +53,11 @@ jobs:
           AHEAD=$(git rev-list origin/development ^origin/main --count)
           if [ "$AHEAD" -ne 0 ]; then
             echo "::error::development has $AHEAD commit(s) not in main - refusing to reset (in-flight work)."
-            # Open a tracking issue (deduped by title so repeated main-pushes do
-            # not spam), then fail loudly so it also surfaces in the Actions tab.
+            # Open a tracking issue (deduped by exact-title phrase search - the
+            # quotes make the '-' in the title a literal, not a NOT operator, so
+            # repeated main-pushes do not spam duplicates), then fail loudly.
             TITLE="development is ahead of main - auto-sync blocked"
-            OPEN=$(gh issue list --state open --search "in:title $TITLE" --json number --jq 'length')
+            OPEN=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq 'length')
             if [ "$OPEN" -eq 0 ]; then
               gh issue create --title "$TITLE" --body \
           "The **sync-development** workflow refused to reset \`development\` to \`main\`: development has $AHEAD commit(s) not in main (unmerged / in-flight work), so a reset would discard them.
@@ -74,6 +78,8 @@ jobs:
 
           # Safe: development is fully contained in main, only the SHAs differ.
           # --force-with-lease guards against a race between the check and push.
+          # Push via an explicit PAT URL (credentials are not persisted).
+          REPO_URL="https://x-access-token:${RELEASE_PAT}@github.com/${GITHUB_REPOSITORY}.git"
           git branch -f development origin/main
-          git push --force-with-lease=development:"$(git rev-parse origin/development)" origin development
+          git push --force-with-lease=development:"$(git rev-parse origin/development)" "$REPO_URL" development
           echo "development reset to main ($(git rev-parse --short origin/main))."
