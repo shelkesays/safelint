@@ -27,8 +27,9 @@ Idempotent. All output paths are listed in ``.gitignore``.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
+import sys
+
 
 # Repo-root files copied into docs/ are gitignored at the destination, so
 # Material's auto-computed "Edit this page" link (``repo_url + edit_uri +
@@ -177,6 +178,11 @@ def _generate_rules_index(repo_root: Path) -> str:
 
 
 def main() -> None:
+    """Prepare the docs tree from the live registry and repo-root sources.
+
+    Copies the community-health files (with ``edit_url`` frontmatter and
+    cross-ref rewrites) and generates the rules-at-a-glance snippet.
+    """
     repo_root = Path(__file__).resolve().parent.parent
 
     # 1. Community-health files: copy + rewrite cross-refs + inject
@@ -204,6 +210,11 @@ def main() -> None:
 # MkDocs ``hooks:`` entry point - same logic, fires on every ``mkdocs build`` /
 # ``mkdocs serve`` so local previews don't need a manual prep step.
 def on_pre_build(config: object, **_: object) -> None:  # noqa: ARG001
+    """MkDocs ``on_pre_build`` hook: prepare the docs tree on every build.
+
+    Runs :func:`main` so a local ``mkdocs build`` / ``serve`` needs no separate
+    manual prep step.
+    """
     main()
 
 
@@ -220,7 +231,10 @@ def on_page_markdown(markdown: str, page: object, **_: object) -> str:
     """
     edit_url = getattr(page, "meta", {}).get("edit_url")
     if edit_url:
-        page.edit_url = edit_url  # type: ignore[attr-defined]
+        # ``page`` is typed ``object`` (MkDocs' Page has no public stub here);
+        # setattr sets the runtime attribute Material's template reads without
+        # tripping a static unresolved-attribute check.
+        setattr(page, "edit_url", edit_url)  # noqa: B010
     return markdown
 
 

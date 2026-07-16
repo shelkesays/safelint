@@ -20,6 +20,16 @@ fail_on = "warning" # "error" | "warning"
 # directories on top.
 extend_exclude_paths = ["tests/**", "docs/**"]
 
+# ``scripts/`` are command-line tools (release helpers + the mkdocs build hook),
+# not library code. Two rules that are right for ``src/`` do not fit a CLI and
+# are ignored here: SAFE304 ``side_effects`` (a CLI's job is to ``print``) and
+# SAFE203 ``logging_on_error`` (an ``except`` that prints the error to stderr and
+# returns a non-zero exit *is* the logging for a script). Everything else -
+# function length, nesting, complexity, no-recursion, unbounded loops - still
+# applies, so the scripts obey the same structural bar as the rest of the repo.
+[per_file_ignores]
+"scripts/**" = ["side_effects", "logging_on_error"]
+
 [execution]
 fail_fast = false
 order = [
