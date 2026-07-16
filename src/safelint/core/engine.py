@@ -311,6 +311,34 @@ def _is_safe004_self_reference(code: str) -> bool:
     return code.upper() == "SAFE004" or code == "unused_suppression"
 
 
+def _symlink_escapes(path: Path, root_real: Path) -> bool:
+    """Return True when *path* is a symlink whose real target escapes *root_real*.
+
+    Follow-if-resolved-within-tree: a symlinked source file is admitted only
+    when its real path stays inside the repo root (``root_real`` is the resolved
+    cwd), so an in-tree symlink (a monorepo's ``src/app/config.py ->
+    ../shared/config.py``, ``shared/`` under the repo) is still linted, while one
+    pointing out of tree (``evil.py -> /etc/passwd``) is rejected. A non-symlink
+    is never an escape. A symlink that cannot be resolved - a loop or broken
+    link, including Python 3.13+ where ``resolve()`` returns a still-symlink path
+    for a loop rather than raising - counts as an escape (containment cannot be
+    proven, so fail closed).
+    """
+    try:
+        if not path.is_symlink():
+            return False
+        real = path.resolve()
+        looped = real.is_symlink()
+    # ``is_symlink()`` re-raises OSError on a non-ignored errno (e.g. EACCES on a
+    # parent dir), and ``resolve()`` raises RuntimeError on a symlink loop
+    # (<=3.12); either way containment cannot be proven, so fail closed (treat as
+    # an escape). This one guard covers every caller - the discovery top target,
+    # the per-file walk filter, and ``_pre_read_skip`` - so none can crash.
+    except (RuntimeError, OSError):  # nosafe: SAFE203
+        return True
+    return looped or not real.is_relative_to(root_real)
+
+
 @dataclass
 class LintResult:
     """Aggregated violations for a single linted file.
@@ -698,9 +726,18 @@ class SafetyEngine:
     def _pre_read_skip(self, filepath: str, path_obj: Path) -> LintResult | None:
         """Return an empty LintResult to skip *filepath*, or None to proceed.
 
-        Catches the two pre-read conditions that mean we shouldn't even
+        Catches the pre-read conditions that mean we shouldn't even
         attempt to read the file:
 
+        * **Escaping symlink** - a repo could commit ``evil.py -> /etc/passwd``
+          (or ``key.py -> ~/.ssh/id_rsa``); ``is_file()`` follows the link, so an
+          out-of-tree target would be read and even echoed into the violation
+          gutter. Discovery filters these in ``_walk_supported_files``, but
+          ``check_file`` is also reached directly via CLI hook mode and a
+          single-file ``check_path`` target (bypassing discovery), so the guard
+          lives here too. Follow-if-resolved-within-tree: a symlink whose real
+          path stays inside the repo root (resolved cwd) is linted; only one that
+          escapes the tree is skipped.
         * **Non-regular path** - FIFOs, device files, broken symlinks.
           ``check_file`` is also called via CLI hook mode with an explicit
           file list (bypassing ``_discover_files``'s filter), so a FIFO
@@ -711,11 +748,14 @@ class SafetyEngine:
         Stat failures fall through to the read path so the user sees a
         real ``SAFE000`` parse-error rather than a misleading skip.
         """
+        if _symlink_escapes(path_obj, Path.cwd().resolve()):
+            _diagnostics.print_warning(f"skipping {filepath} (symlink escapes the tree)")
+            return LintResult(path=filepath)
         try:
             is_regular = path_obj.is_file()
-        # Stat denial / device read errors: fail-open so read_text reports
-        # the real underlying issue as a SAFE000 violation. Practically
-        # untestable without fault injection.
+        # Stat denial / device read errors (lstat or stat): fail-open so
+        # read_text reports the real underlying issue as a SAFE000 violation.
+        # Practically untestable without fault injection.
         except OSError:  # nosafe: SAFE203
             return None
         if not is_regular:
@@ -987,18 +1027,26 @@ class SafetyEngine:
         rather than directories).
         """
         seen: set[str] = set()
+        # ``root_real`` (resolved cwd = repo root) anchors the follow-if-resolved-
+        # within-tree symlink policy (see ``_symlink_escapes``), resolved once.
+        # ``followlinks=False`` protects sub-dir descent, but ``os.walk`` still
+        # walks *into* a symlinked top target, so reject one that escapes the repo
+        # (an in-tree symlinked directory target is walked normally).
+        root_real = Path.cwd().resolve()
+        if _symlink_escapes(target, root_real):
+            _diagnostics.print_warning(f"skipping {target} (symlink escapes the tree)")
+            return seen
         for dirpath, dirnames, filenames in os.walk(target, followlinks=False):
             dir_path = Path(dirpath)
             # In-place mutation tells os.walk which subdirs to descend into.
             # Use the directory-aware excluder so ``tests/**``-style globs
             # prune at descent time (not just per-file at the end).
             dirnames[:] = [d for d in dirnames if not self._is_excluded_dir(dir_path / d)]
-            # Two-stage generator: build the joined Path once per suffix
-            # match, then filter on ``is_file()`` using that same object.
-            # Avoids constructing ``dir_path / name`` twice and keeps the
-            # comprehension readable.
             candidates = (dir_path / name for name in filenames if name.endswith(ext_tuple))
-            seen.update(str(p) for p in candidates if p.is_file())
+            # ``_symlink_escapes`` (checked before ``is_file()`` stats the target)
+            # drops a symlinked file whose real path leaves the repo; an in-tree
+            # symlink and every regular file are still linted.
+            seen.update(str(p) for p in candidates if not _symlink_escapes(p, root_real) and p.is_file())
         return seen
 
     def _discover_files(self, target: Path) -> list[str]:

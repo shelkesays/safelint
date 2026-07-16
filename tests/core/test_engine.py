@@ -300,6 +300,142 @@ def test_engine_check_path_traverses_directory(tmp_path: Path) -> None:
     assert str(sub / "b.py") in paths
 
 
+def test_engine_discovery_lints_in_tree_symlink_but_skips_escaping_one(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Follow-if-resolved-within-tree: an in-tree symlink is linted, an escaping one is not.
+
+    ``os.walk(followlinks=False)`` lists symlinked *files*; the guard follows one
+    only when its real path stays inside the repo root (cwd). A monorepo's
+    ``app/config.py -> ../shared/config.py`` (shared under the repo) is linted;
+    ``evil.py -> <out-of-tree secret>`` is dropped and never read.
+    """
+    repo = tmp_path / "repo"
+    (repo / "app").mkdir(parents=True)
+    (repo / "shared").mkdir()
+    monkeypatch.chdir(repo)
+    (repo / "shared" / "config.py").write_text("x = 1\n", encoding="utf-8")
+    (repo / "app" / "config.py").symlink_to(repo / "shared" / "config.py")  # in-tree symlink
+    outside = tmp_path / "outside_secret.py"
+    outside.write_text("SECRET = 'do-not-read'\n", encoding="utf-8")
+    (repo / "app" / "evil.py").symlink_to(outside)  # escaping symlink
+
+    paths = {r.path for r in _engine().check_path(repo)}
+
+    assert str(repo / "app" / "config.py") in paths  # in-tree symlink linted
+    assert str(repo / "app" / "evil.py") not in paths  # escaping symlink skipped
+    assert str(outside) not in paths
+
+
+def test_engine_discovery_skips_escaping_symlinked_directory_target(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """A symlinked directory target that escapes the repo is rejected, not walked into.
+
+    ``os.walk(followlinks=False)`` still walks *into* a symlinked top target, so
+    ``safelint check reports`` where ``reports -> /outside`` would read out-of-tree
+    files. An escaping top target is rejected outright.
+    """
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (outside / "leak.py").write_text("SECRET = 1\n", encoding="utf-8")
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.chdir(repo)
+    (repo / "reports").symlink_to(outside, target_is_directory=True)
+
+    results = _engine().check_path(repo / "reports")
+
+    assert results == []  # nothing discovered, nothing read
+    assert "symlink" in capsys.readouterr().err
+
+
+def test_engine_symlink_skip_warning_sanitises_control_chars(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """A symlink whose name carries an ANSI escape is neutralised in the stderr warning.
+
+    The skip warning echoes the repo-controlled filepath; without sanitisation a
+    crafted symlink name would inject terminal escapes via stderr (the channel the
+    pretty-renderer sanitiser does not cover).
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.chdir(repo)
+    outside = tmp_path / "target.py"  # out of tree -> escapes -> skipped + warned
+    outside.write_text("x = 1\n", encoding="utf-8")
+    link = repo / "evil\x1b[2J.py"
+    link.symlink_to(outside)
+
+    _engine().check_file(str(link))
+
+    err = capsys.readouterr().err
+    assert "\x1b[2J" not in err
+    assert "\\x1b" in err
+
+
+def test_engine_check_file_skips_escaping_symlink_explicit_path(tmp_path: Path, capsys: pytest.CaptureFixture[str], monkeypatch: pytest.MonkeyPatch) -> None:
+    """check_file() on a symlink escaping the repo is skipped without reading the target.
+
+    Covers CLI hook mode and a single-file check_path target, which reach
+    check_file directly (bypassing discovery). A committed ``evil.py -> secret``
+    pointing out of tree must not have its target read.
+    """
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.chdir(repo)
+    outside = tmp_path / "secret.py"
+    outside.write_text("def (:  # a parse error the linter would report if read\n", encoding="utf-8")
+    link = repo / "evil.py"
+    link.symlink_to(outside)
+
+    result = _engine().check_file(str(link))
+
+    assert result.violations == []  # nothing read, nothing reported
+    assert "symlink" in capsys.readouterr().err
+
+
+def test_engine_symlink_escapes_helper_fails_closed_on_oserror() -> None:
+    """_symlink_escapes returns True (skip) when is_symlink() raises OSError, not crash.
+
+    ``Path.is_symlink()`` re-raises OSError on a non-ignored errno (e.g. EACCES on
+    a parent dir); the helper must fail closed rather than propagate and crash
+    discovery / the pre-read guard.
+    """
+    from pathlib import Path  # noqa: PLC0415
+    from unittest.mock import patch  # noqa: PLC0415
+
+    from safelint.core.engine import _symlink_escapes  # noqa: PLC0415
+
+    with patch.object(Path, "is_symlink", side_effect=PermissionError("EACCES")):
+        assert _symlink_escapes(Path("/anything.py"), Path.cwd()) is True
+
+
+def test_engine_symlink_escapes_helper_rejects_real_symlink_loop(tmp_path: Path) -> None:
+    """_symlink_escapes returns True for a real two-link symlink loop (a -> b -> a).
+
+    Complements the mocked-OSError test with a genuine loop: on Python <=3.12
+    ``resolve()`` raises RuntimeError (caught -> True); on 3.13+ it returns a
+    still-symlink path caught by the ``real.is_symlink()`` check. Either way the
+    unresolvable loop fails closed.
+    """
+    from safelint.core.engine import _symlink_escapes  # noqa: PLC0415
+
+    a = tmp_path / "a.py"
+    b = tmp_path / "b.py"
+    a.symlink_to(b)
+    b.symlink_to(a)
+    assert _symlink_escapes(a, tmp_path.resolve()) is True
+
+
+def test_engine_check_file_lints_in_tree_symlink_explicit_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """check_file() on an in-tree symlink follows it and reports the target's violations."""
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    monkeypatch.chdir(repo)
+    (repo / "real.py").write_text("def foo(\n", encoding="utf-8")  # parse error
+    link = repo / "link.py"
+    link.symlink_to(repo / "real.py")  # in-tree symlink
+
+    result = _engine().check_file(str(link))
+
+    assert any(v.code == "SAFE000" for v in result.violations)  # followed + linted
+
+
 def test_engine_parse_error_returns_parse_violation(tmp_path: Path) -> None:
     """A file with a syntax error produces a 'parse' violation instead of crashing."""
     sample = tmp_path / "broken.py"

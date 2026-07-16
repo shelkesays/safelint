@@ -5,7 +5,7 @@ repos:
   # General file hygiene
   # ---------------------------------------------------------------------------
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0
+    rev: 3e8a8703264a2f4a69428a0aa4dcb512790b2c8c  # v6.0.0 (SHA-pinned, matches the H9 workflow convention)
     hooks:
       - id: check-added-large-files
         files: ^src/
@@ -114,7 +114,7 @@ repos:
   # Config: [tool.ruff] / [tool.ruff.lint] in pyproject.toml
   # ---------------------------------------------------------------------------
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.15.12
+    rev: 01a675ea018f2fb714478a5ffb83fcea8374bb06  # v0.15.21 (SHA-pinned, matches the H9 workflow convention)
     hooks:
       - id: ruff
         args: [--fix, --unsafe-fixes, --exit-non-zero-on-fix]

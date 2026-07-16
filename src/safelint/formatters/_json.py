@@ -49,6 +49,7 @@ import json
 from typing import TYPE_CHECKING, Any
 
 from safelint import __version__
+from safelint.core._diagnostics import visible
 
 
 if TYPE_CHECKING:
@@ -83,12 +84,12 @@ def _violation_to_dict(v: Violation) -> dict[str, Any]:
         "code": v.code,
         "rule": v.rule,
         "severity": v.severity,
-        "filepath": v.filepath,
+        "filepath": visible(v.filepath),
         "lineno": v.lineno,
         "end_lineno": v.end_lineno,
         "column_start": v.column_start,
         "column_end": v.column_end,
-        "message": v.message,
+        "message": visible(v.message),
         "suggestions": [_suggestion_to_dict(s) for s in v.suggestions],
     }
 
@@ -106,7 +107,7 @@ def _suggestion_to_dict(s: Suggestion) -> dict[str, Any]:
     document.
     """
     return {
-        "description": s.description,
+        "description": visible(s.description),
         "edits": [_edit_to_dict(e) for e in s.edits],
     }
 
@@ -122,7 +123,7 @@ def _edit_to_dict(e: TextEdit) -> dict[str, Any]:
         "start_column": e.start_column,
         "end_line": e.end_line,
         "end_column": e.end_column,
-        "replacement": e.replacement,
+        "replacement": visible(e.replacement),
     }
 
 

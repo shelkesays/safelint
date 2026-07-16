@@ -181,7 +181,35 @@ def _contained_test_dir(test_dir: str, root: Path) -> Path | None:
     if p.is_absolute():
         return Path(os.path.normpath(p))
     collapsed = Path(os.path.normpath(root / p))
-    return collapsed if collapsed.is_relative_to(root) else None
+    if not collapsed.is_relative_to(root):
+        return None
+    # Lexical containment above stops ``..`` *string* tricks, but a committed
+    # symlink whose name matches a relative entry (``tests -> /etc``) passes it
+    # and would make the downstream ``rglob`` follow the link out of the tree.
+    # Reject when the real path escapes root. ``resolve()`` is safe *here* - it
+    # runs only after lexical containment succeeds, on the final candidate, not
+    # as the ``..``-collapse mechanism the docstring warns against. Both sides
+    # are resolved so a symlinked ancestor of root itself does not over-reject.
+    # ``resolve()`` can raise ``RuntimeError`` on a symlink loop or ``OSError``
+    # (e.g. ``PermissionError``) on an unreadable ancestor; treat either as
+    # "cannot prove containment" and drop the entry rather than crashing. Both
+    # the candidate and the root are resolved inside the guard so a loop /
+    # unreadable ancestor on *either* side is caught, not just the candidate.
+    # Python <= 3.12 raises ``RuntimeError`` on a symlink loop; Python 3.13+
+    # does NOT - it returns the unresolved symlink path (which stays under
+    # ``root``, so the containment check below would wrongly accept it). A fully
+    # resolved real path is never itself a symlink, so a still-symlink result
+    # means resolution hit a loop it could not follow: reject it too, keeping
+    # this guard robust across Python versions.
+    try:
+        resolved = collapsed.resolve()
+        root_resolved = root.resolve()
+        looped = resolved.is_symlink()
+    except (RuntimeError, OSError):  # nosafe: SAFE203
+        return None
+    if looped or not resolved.is_relative_to(root_resolved):
+        return None
+    return collapsed
 
 
 def _path_components_contain(haystack: tuple[str, ...], needle: tuple[str, ...]) -> bool:
@@ -333,8 +361,17 @@ def _test_dir_contains(test_dir: Path, candidates: list[str]) -> bool:
     rglob walk as soon as it yields one path, and the outer ``any``
     stops as soon as any candidate finds something. On a large repo
     this avoids a full materialised file listing per source file.
+
+    ``_contained_test_dir`` already drops a *leaf* symlink loop, but a loop in an
+    *ancestor* of the test dir can survive it on Python 3.13+ (where ``resolve()``
+    no longer raises and ``is_symlink()`` only inspects the leaf). Guard the walk
+    so such a loop - or any ``OSError`` mid-walk - yields "no test found" rather
+    than crashing discovery, uniformly across Python versions.
     """
-    return any(next(iter(test_dir.rglob(name)), None) is not None for name in candidates)
+    try:
+        return any(next(iter(test_dir.rglob(name)), None) is not None for name in candidates)
+    except (RuntimeError, OSError):  # nosafe: SAFE203
+        return False
 
 
 class TestExistenceRule(BaseRule):

@@ -25,8 +25,10 @@ from safelint.cli import (
     _guard_hook_silent_failure,
     _make_summary,
     _matching_suffixes,
+    _print_violations,
     _run_hook,
     _scan_for_unavailable_extensions,
+    _visible,
 )
 from safelint.core.engine import LintResult
 from safelint.languages import extra_name_for
@@ -51,6 +53,55 @@ def _v(severity: str, code: str = "SAFE999", rule: str = "test_rule") -> Violati
         message="test message",
         severity=severity,
     )
+
+
+# ---------------------------------------------------------------------------
+# _visible - terminal control-character sanitisation
+# ---------------------------------------------------------------------------
+
+
+def test_visible_escapes_ansi_and_control_but_keeps_tab() -> None:
+    """ESC, CR, DEL, and C1 bytes become visible ``\\xNN``; tab is preserved."""
+    assert _visible("\x1b[2Jx") == "\\x1b[2Jx"  # ANSI escape neutralised
+    assert _visible("a\rb") == "a\\x0db"  # carriage return
+    assert _visible("a\x7fb") == "a\\x7fb"  # DEL
+    assert _visible("a\x9bb") == "a\\x9bb"  # C1 CSI
+    assert _visible("a\tb") == "a\tb"  # tab kept for indentation
+    assert _visible("plain text") == "plain text"  # ordinary text untouched
+
+
+def test_visible_neutralises_unicode_bidi_and_zero_width() -> None:
+    """Trojan Source code points (bidi override, zero-width) become ``\\uNNNN``."""
+    assert _visible("a\u202eb") == "a\\u202eb"  # RIGHT-TO-LEFT OVERRIDE
+    assert _visible("a\u2066b") == "a\\u2066b"  # LEFT-TO-RIGHT ISOLATE
+    assert _visible("a\u200bb") == "a\\u200bb"  # ZERO WIDTH SPACE
+    assert _visible("a\ufeffb") == "a\\ufeffb"  # BOM / ZWNBSP
+    assert _visible("café") == "café"  # ordinary non-ASCII untouched
+
+
+def test_print_violations_sanitises_malicious_source_line(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A source line carrying raw ANSI escapes is neutralised in the gutter.
+
+    Guards the terminal-escape-injection fix: a cloned repo whose violating line
+    embeds ``\\x1b[2J`` must not have that byte reach the TTY when rendered.
+    """
+    evil = tmp_path / "evil.py"
+    evil.write_text("x = 1  # \x1b[2J\x1b]0;pwned\x07\n", encoding="utf-8")
+    v = Violation(rule="r", code="SAFE999", filepath=str(evil), lineno=1, message="m", severity="error")
+
+    _print_violations([v])
+
+    out = capsys.readouterr().out
+    assert "\x1b[2J" not in out
+    assert "\x1b]0;" not in out
+    assert "\\x1b" in out  # rendered visibly instead
+
+
+def test_file_summary_line_sanitises_malicious_filepath() -> None:
+    """A file path containing control bytes is neutralised in the summary line."""
+    line = _strip(_file_summary_line("a\x1b[2Kb.py", [_v("error")]))
+    assert "\x1b" not in line
+    assert "\\x1b" in line
 
 
 # ---------------------------------------------------------------------------
@@ -377,8 +428,12 @@ def test_emit_missing_grammar_warnings_silent_when_no_unavailable_extensions(tmp
     assert capsys.readouterr().err == ""
 
 
-def test_emit_missing_grammar_warnings_emits_per_hint(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+def test_emit_missing_grammar_warnings_emits_per_hint(tmp_path: Path, capsys: pytest.CaptureFixture[str], mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     """One stderr line per unique install hint, listing the extensions covered."""
+    # This test asserts the direct-CLI install hint; force that branch so it is
+    # deterministic when the suite runs under pre-commit (which sets PRE_COMMIT=1,
+    # re-routing _format_install_action to additional_dependencies advice).
+    monkeypatch.delenv("PRE_COMMIT", raising=False)
     (tmp_path / "a.ts").write_text("x = 1;\n", encoding="utf-8")
     (tmp_path / "b.tsx").write_text("x = 1;\n", encoding="utf-8")
     mocker.patch(
@@ -398,8 +453,11 @@ def test_emit_missing_grammar_warnings_emits_per_hint(tmp_path: Path, capsys: py
     assert "pip install 'safelint[typescript]'" in err
 
 
-def test_emit_hook_grammar_warnings_emits_only_for_passed_files(capsys: pytest.CaptureFixture[str], mocker: MockerFixture) -> None:
+def test_emit_hook_grammar_warnings_emits_only_for_passed_files(capsys: pytest.CaptureFixture[str], mocker: MockerFixture, monkeypatch: pytest.MonkeyPatch) -> None:
     """Hook-mode helper takes the explicit file list - no directory walk."""
+    # Force the direct-CLI hint branch (see the per-hint test) so this stays
+    # green under pre-commit, which sets PRE_COMMIT=1.
+    monkeypatch.delenv("PRE_COMMIT", raising=False)
     mocker.patch(
         "safelint.cli.unavailable_extensions",
         return_value={".ts": "pip install 'safelint[typescript]'"},

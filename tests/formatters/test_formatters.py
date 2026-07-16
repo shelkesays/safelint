@@ -29,6 +29,50 @@ def _v(severity: str = "error", code: str = "SAFE101", rule: str = "function_len
 
 
 # ---------------------------------------------------------------------------
+# Terminal-escape sanitisation (findings 6 + 8: C1 and Trojan Source bidi
+# survive json.dumps(ensure_ascii=False) / percent-encoding otherwise)
+# ---------------------------------------------------------------------------
+
+
+def test_json_sanitises_control_and_bidi_in_message_and_filepath() -> None:
+    """C1 (0x9B) and bidi override (U+202E) are neutralised in JSON output."""
+    v = Violation(
+        rule="r",
+        code="SAFE101",
+        filepath="a\x9bb\u202ec.py",
+        lineno=1,
+        message="msg \x9b\u202e end",
+        severity="error",
+    )
+    doc = json.loads(format_json([v], suppressed=[], blocking_count=1, fail_on="error", files_checked=1))
+    entry = doc["violations"][0]
+    assert "\x9b" not in entry["message"]
+    assert "\u202e" not in entry["message"]
+    assert "\x9b" not in entry["filepath"]
+    assert "\u202e" not in entry["filepath"]
+    assert "\\x9b" in entry["message"]
+    assert "\\u202e" in entry["filepath"]
+
+
+def test_sarif_sanitises_control_and_bidi_in_message() -> None:
+    """C1 / bidi bytes are neutralised in the SARIF result message text."""
+    v = Violation(
+        rule="r",
+        code="SAFE101",
+        filepath="src/x.py",
+        lineno=1,
+        message="msg \x9b\u202e end",
+        severity="error",
+    )
+    doc = json.loads(format_sarif([v], suppressed=[], blocking_count=1, fail_on="error", files_checked=1))
+    text = doc["runs"][0]["results"][0]["message"]["text"]
+    assert "\x9b" not in text
+    assert "\u202e" not in text
+    assert "\\x9b" in text
+    assert "\\u202e" in text
+
+
+# ---------------------------------------------------------------------------
 # JSON formatter
 # ---------------------------------------------------------------------------
 

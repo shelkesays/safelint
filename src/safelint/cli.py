@@ -71,6 +71,19 @@ def _is_error(severity: str) -> bool:
     return severity != "warning"
 
 
+# Control characters are visualised before any attacker-controlled string (a
+# linted source line, a file path, a rule message carrying source identifiers)
+# is echoed to a TTY. A crafted source line containing raw ANSI / OSC escapes
+# would otherwise be printed verbatim by the violation gutter, letting a cloned
+# repo clear or redraw the terminal, spoof "All checks passed." output, set the
+# window title, or drive OSC 52 clipboard writes when its violation is rendered.
+# ruff / ripgrep / git (``core.quotePath``) sanitise terminal output the same
+# way. The sanitiser lives in ``_diagnostics`` so the stdout gutter (here) and
+# the stderr diagnostics share one table; re-exported as ``_visible`` for the
+# call sites below and the tests that import it.
+_visible = _diagnostics.visible
+
+
 def _c(text: str, *codes: str) -> str:
     """Wrap *text* in ANSI *codes* when colour is enabled."""
     stream = getattr(sys, "stdout", None)
@@ -97,9 +110,9 @@ def _print_violations(violations: list[Violation]) -> None:
         tag = v.code or v.rule
         colour = _RED if _is_error(v.severity) else _YELLOW
         # First line: coloured CODE  message [rule]
-        print(f"{_c(tag, _BOLD, colour)} {v.message} [{v.rule}]")
+        print(f"{_c(tag, _BOLD, colour)} {_visible(v.message)} [{v.rule}]")
         # Second line: purple arrow + location
-        print(f"   {_c('-->', _PURPLE)} {v.filepath}:{v.lineno}")
+        print(f"   {_c('-->', _PURPLE)} {_visible(v.filepath)}:{v.lineno}")
         # Source context: gutter (line number + pipe) in purple, content normal
         lines = _source_lines(v.filepath)
         if lines and 1 <= v.lineno <= len(lines):
@@ -107,7 +120,7 @@ def _print_violations(violations: list[Violation]) -> None:
             sep = _c(" " * w + " |", _PURPLE)
             num = _c(str(v.lineno).rjust(w) + " |", _PURPLE)
             print(f"   {sep}")
-            print(f"   {num} {lines[v.lineno - 1].rstrip()}")
+            print(f"   {num} {_visible(lines[v.lineno - 1].rstrip())}")
             print(f"   {sep}")
         print()  # blank line between violations for readability
 
@@ -227,7 +240,7 @@ def _file_summary_line(filepath: str, violations: list[Violation]) -> str:
     if not violations:
         msg = "violations must be non-empty"
         raise ValueError(msg)
-    return f"{filepath} - {', '.join(_severity_parts(violations))}."
+    return f"{_visible(filepath)} - {', '.join(_severity_parts(violations))}."
 
 
 def _print_file_summary(filepath: str, violations: list[Violation]) -> None:

@@ -33,6 +33,7 @@ from typing import TYPE_CHECKING, Any
 from urllib.parse import quote
 
 from safelint import __version__
+from safelint.core._diagnostics import visible
 
 
 if TYPE_CHECKING:
@@ -156,7 +157,7 @@ def _build_fixes(v: Violation) -> list[dict[str, Any]]:
     artifact = {"uri": _artifact_uri(v.filepath)}
     return [
         {
-            "description": {"text": suggestion.description},
+            "description": {"text": visible(suggestion.description)},
             "artifactChanges": [
                 {
                     "artifactLocation": artifact,
@@ -182,7 +183,7 @@ def _text_edit_to_replacement(edit: TextEdit) -> dict[str, Any]:
             "endLine": edit.end_line,
             "endColumn": edit.end_column,
         },
-        "insertedContent": {"text": edit.replacement},
+        "insertedContent": {"text": visible(edit.replacement)},
     }
 
 
@@ -191,7 +192,7 @@ def _result_for_violation(v: Violation, *, suppressed: bool) -> dict[str, Any]:
     entry: dict[str, Any] = {
         "ruleId": v.code or v.rule,
         "level": _level(v.severity),
-        "message": {"text": v.message},
+        "message": {"text": visible(v.message)},
         "locations": [
             {
                 "physicalLocation": {
