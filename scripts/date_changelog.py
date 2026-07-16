@@ -52,6 +52,12 @@ def _previous_version(lines: list[str]) -> str | None:
     return None
 
 
+def _footer_lines(version: str, prev: str | None) -> list[str]:
+    """Return the repointed ``[Unreleased]`` footer and the new ``[version]`` link."""
+    link = f"{_COMPARE}/v{prev}...v{version}" if prev is not None else f"{_TAG}/v{version}"
+    return [f"[Unreleased]: {_COMPARE}/v{version}...HEAD", f"[{version}]: {link}"]
+
+
 def date_changelog(changelog: str, version: str, date: str) -> str:
     """Return *changelog* with ``[Unreleased]`` flipped to ``[version] - date``.
 
@@ -69,11 +75,7 @@ def date_changelog(changelog: str, version: str, date: str) -> str:
             body.extend(["## [Unreleased]", "", f"## [{version}] - {date}"])
             flipped = True
         elif line.startswith("[Unreleased]:"):
-            body.append(f"[Unreleased]: {_COMPARE}/v{version}...HEAD")
-            if prev is not None:
-                body.append(f"[{version}]: {_COMPARE}/v{prev}...v{version}")
-            else:
-                body.append(f"[{version}]: {_TAG}/v{version}")
+            body.extend(_footer_lines(version, prev))
         else:
             body.append(line)
     if not flipped:

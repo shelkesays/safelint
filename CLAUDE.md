@@ -22,16 +22,20 @@ uv run pytest
 uv run pytest tests/core/test_engine.py
 uv run pytest tests/core/test_engine.py::test_name -v
 
-# Lint + format check (CI runs both against src/ and tests/)
-uv run ruff check src/ tests/
-uv run ruff format --check src/ tests/
+# Lint + format check (CI runs all of these against src/, tests/, and scripts/)
+uv run ruff check src/ tests/ scripts/
+uv run ruff format --check src/ tests/ scripts/
 
 # Type check (ty replaces mypy here: config is [tool.ty] in pyproject.toml)
-uv run ty check src/
+uv run ty check src/ scripts/
 
-# Run safelint on itself: must produce zero blocking violations before merging
-# (--all-files matches CI; without it the check defaults to git-modified files only)
+# Run safelint on itself + the release/build scripts: zero blocking violations
+# before merging (--all-files matches CI; without it the check defaults to
+# git-modified files only). `check` takes a single path, so src/ and scripts/
+# are two invocations. scripts/ are CLIs, so safelint.toml's
+# `[per_file_ignores] "scripts/**"` exempts the CLI-inherent SAFE304/SAFE203.
 uv run safelint check src/ --all-files
+uv run safelint check scripts/ --all-files
 ```
 
 The CLI has two entry points:
