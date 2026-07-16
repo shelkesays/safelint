@@ -18,12 +18,14 @@ release workflow calls.
 
 from __future__ import annotations
 
+from pathlib import Path
 import re
 import sys
-from pathlib import Path
 
 
-_PRERELEASE = re.compile(r"(rc|a|b|\.dev)\d*$")
+# Case-insensitive: PEP 440 normalises ``2.9.0RC1`` -> ``2.9.0rc1``, but a
+# hand-written version could carry uppercase, so match either.
+_PRERELEASE = re.compile(r"(rc|a|b|\.dev)\d*$", re.IGNORECASE)
 
 
 def is_prerelease(version: str) -> bool:
@@ -47,6 +49,7 @@ def extract_section(changelog: str, version: str) -> str:
     Raises:
         ValueError: if the expected ``## [Unreleased]`` (pre-release) or
             ``## [X.Y.Z]`` (final) heading is not present.
+
     """
     wanted = "Unreleased" if is_prerelease(version) else version
     lines = changelog.splitlines()

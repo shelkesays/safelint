@@ -20,8 +20,8 @@ keeps :func:`date_changelog` pure and unit-testable.
 
 from __future__ import annotations
 
-import sys
 from pathlib import Path
+import sys
 
 
 _COMPARE = "https://github.com/shelkesays/safelint/compare"
@@ -62,10 +62,12 @@ def date_changelog(changelog: str, version: str, date: str) -> str:
     trailing_newline = changelog.endswith("\n")
     lines = changelog.splitlines()
     prev = _previous_version(lines)
+    flipped = False
     body: list[str] = []
     for line in lines:
         if line.strip() == "## [Unreleased]":
             body.extend(["## [Unreleased]", "", f"## [{version}] - {date}"])
+            flipped = True
         elif line.startswith("[Unreleased]:"):
             body.append(f"[Unreleased]: {_COMPARE}/v{version}...HEAD")
             if prev is not None:
@@ -74,6 +76,9 @@ def date_changelog(changelog: str, version: str, date: str) -> str:
                 body.append(f"[{version}]: {_TAG}/v{version}")
         else:
             body.append(line)
+    if not flipped:
+        msg = "no '## [Unreleased]' heading found in CHANGELOG - refusing to date a malformed changelog"
+        raise ValueError(msg)
     text = "\n".join(body)
     return text + "\n" if trailing_newline else text
 
@@ -86,7 +91,11 @@ def main() -> int:
     version, date = sys.argv[1], sys.argv[2]
     path = Path(sys.argv[3]) if len(sys.argv) > 3 else Path("CHANGELOG.md")
     original = path.read_text(encoding="utf-8")
-    updated = date_changelog(original, version, date)
+    try:
+        updated = date_changelog(original, version, date)
+    except ValueError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 1
     if updated != original:
         path.write_text(updated, encoding="utf-8")
         print(f"dated CHANGELOG: [Unreleased] -> [{version}] - {date}")

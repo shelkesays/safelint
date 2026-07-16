@@ -74,6 +74,12 @@ def test_is_prerelease_classifies_rc_and_final() -> None:
     assert not changelog_section.is_prerelease("2.9.0")
 
 
+def test_is_prerelease_is_case_insensitive() -> None:
+    """Uppercase suffixes (2.9.0RC1) are still classified as pre-releases."""
+    assert changelog_section.is_prerelease("2.9.0RC1")
+    assert changelog_section.is_prerelease("2.9.0.DEV1")
+
+
 def test_extract_section_prerelease_returns_unreleased() -> None:
     """A pre-release version pulls the [Unreleased] body."""
     out = changelog_section.extract_section(_SAMPLE, "2.9.0rc1")
@@ -131,3 +137,10 @@ def test_date_changelog_preserves_trailing_newline() -> None:
     """The rewrite keeps the file's trailing newline (no spurious diff)."""
     out = date_changelog.date_changelog(_SAMPLE, "2.9.0", "2026-08-01")
     assert out.endswith("\n")
+
+
+def test_date_changelog_raises_when_unreleased_heading_missing() -> None:
+    """A malformed changelog with no [Unreleased] heading fails loudly, not silently."""
+    malformed = "# Changelog\n\n## [2.8.4] - 2026-07-15\n\n- A thing.\n"
+    with pytest.raises(ValueError, match=r"\[Unreleased\]"):
+        date_changelog.date_changelog(malformed, "2.9.0", "2026-08-01")
