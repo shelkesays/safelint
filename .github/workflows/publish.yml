@@ -228,10 +228,16 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
           VERSION: ${{ needs.gate.outputs.version }}
           PRERELEASE: ${{ needs.gate.outputs.prerelease }}
         run: |
           set -euo pipefail
-          FLAGS=(--title "v$VERSION" --notes-file release-notes.md --verify-tag)
+          # This job does NOT check out the repo (it only needs the notes
+          # artifact), so there is no local .git. Target the repo via GH_REPO and
+          # drop --verify-tag, which shells out to local git and would fail with
+          # "not a git repository". The tag is guaranteed to exist already: the
+          # build job created + pushed it, and this job needs [build, publish].
+          FLAGS=(--title "v$VERSION" --notes-file release-notes.md)
           if [ "$PRERELEASE" = "true" ]; then FLAGS+=(--prerelease); fi
           gh release create "v$VERSION" "${FLAGS[@]}"
