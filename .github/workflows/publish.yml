@@ -1,67 +1,165 @@
 name: Publish to PyPI
 
-# Triggered by pushing a version tag, e.g.:  git tag v1.3.1 && git push --tags
+# Branch-triggered auto-release. The signal to release is the version in
+# ``pyproject.toml`` (a deliberate, committed edit): when a merge lands a
+# version that is not yet tagged, on its expected branch, this workflow tags
+# it, publishes to PyPI, and creates the GitHub release. RC versions
+# (``X.Y.ZrcN`` / a / b / .dev) release from ``development`` as pre-releases;
+# final versions (``X.Y.Z``) release from ``main``.
 #
-# PyPI setup (one-time, before the first release):
-#   1. Create the project on pypi.org (first upload) or configure Trusted Publishing.
-#   2. On pypi.org → your project → Manage → Publishing → add a trusted publisher:
-#        Owner:      shelkesays
-#        Repository: safelint
-#        Workflow:   publish.yml
-#        Environment: pypi
-#   3. In GitHub → Settings → Environments → create an environment named "pypi".
-#      (Optionally add a protection rule requiring a reviewer before deploy.)
-#   No API token or secret is needed when using Trusted Publishing.
+# On a final release it also date-stamps the CHANGELOG
+# (``[Unreleased] -> [X.Y.Z] - <date>``) and commits that to ``main`` before
+# tagging, so the separate manual dating step goes away.
+#
+# The workflow name is kept as ``publish.yml`` so the PyPI Trusted-Publishing
+# trust (owner + repo + workflow filename + ``pypi`` environment) is unchanged.
+#
+# PyPI setup (one-time): pypi.org -> project -> Manage -> Publishing -> trusted
+# publisher: owner ``shelkesays``, repo ``safelint``, workflow ``publish.yml``,
+# environment ``pypi``. Ensure it is NOT pinned to a specific ref, since this
+# now runs on branch pushes rather than tag pushes.
+#
+# Loop safety: the final-release path pushes the CHANGELOG date-stamp commit to
+# ``main``, which re-triggers this workflow. The gate below then finds the tag
+# already exists and skips - no loop. The tag is pushed BEFORE the branch commit
+# so the re-triggered gate is guaranteed to see it.
 
 on:
   push:
-    tags:
-      # Match GA tags (v1.2.3) and PEP 440 pre-release suffixes
-      # (v1.2.3rc1, v1.2.3a1, v1.2.3b2, v1.2.3.dev1). The trailing
-      # ``*`` is GitHub Actions glob (not regex) - matches any
-      # characters including empty. The "Verify tag matches project
-      # version" step below guards against malformed suffixes by
-      # comparing the tag to ``pyproject.toml`` ``project.version``,
-      # which PEP 440 normalises.
-      - "v[0-9]+.[0-9]+.[0-9]+*"
+    branches: [main, development]
+  # Manual re-publish safety net (e.g. PyPI upload failed after the tag existed).
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-jobs:
-  build:
-    name: Build distribution
-    runs-on: ubuntu-latest
+concurrency:
+  # Serialise releases per branch so two rapid version bumps cannot race the
+  # same tag. Do not cancel in progress - a release must finish.
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
+jobs:
+  gate:
+    name: Decide whether to release
+    runs-on: ubuntu-latest
+    outputs:
+      release: ${{ steps.decide.outputs.release }}
+      version: ${{ steps.decide.outputs.version }}
+      prerelease: ${{ steps.decide.outputs.prerelease }}
     steps:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
-          # Least privilege: the build job only reads the tree, verifies the tag,
-          # and builds/uploads artifacts - no git ops - so keep GITHUB_TOKEN out
-          # of .git/config. The publish job omits checkout entirely.
+          fetch-depth: 0  # need tags for the "already released" check
           persist-credentials: false
+
+      - id: decide
+        run: |
+          set -euo pipefail
+          VERSION=$(python3 - <<'PY'
+          import tomllib
+          with open("pyproject.toml", "rb") as f:
+              print(tomllib.load(f)["project"]["version"])
+          PY
+          )
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+          # Classify: PEP 440 pre-release (rc/a/b/.dev) -> from development;
+          # otherwise a final release -> from main.
+          if printf '%s' "$VERSION" | grep -qE '(rc|a|b|\.dev)[0-9]*$'; then
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+            EXPECTED_BRANCH=development
+          else
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+            EXPECTED_BRANCH=main
+          fi
+
+          # Guard 1: version type must match the branch it landed on.
+          if [ "$GITHUB_REF_NAME" != "$EXPECTED_BRANCH" ]; then
+            echo "::notice::version $VERSION is not releasable from $GITHUB_REF_NAME (expected $EXPECTED_BRANCH) - skipping"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # Guard 2: never release a version that is already tagged (the common
+          # case for a push that did not bump the version).
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "::notice::tag v$VERSION already exists - skipping"
+            echo "release=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::releasing v$VERSION from $GITHUB_REF_NAME"
+            echo "release=true" >> "$GITHUB_OUTPUT"
+          fi
+
+  build:
+    name: Date changelog, tag, build
+    needs: gate
+    if: needs.gate.outputs.release == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
+        with:
+          fetch-depth: 0
+          # RELEASE_PAT is needed to push the CHANGELOG date-stamp commit and the
+          # tag to protected main (the default GITHUB_TOKEN cannot bypass the
+          # branch ruleset). The PAT actor is in the ruleset bypass list.
+          token: ${{ secrets.RELEASE_PAT }}
 
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
         with:
           python-version: "3.11"
 
+      - name: Date CHANGELOG (final only), tag, and push
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+          PRERELEASE: ${{ needs.gate.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          COMMITTED=false
+          if [ "$PRERELEASE" = "false" ]; then
+            DATE=$(date -u +%Y-%m-%d)
+            python3 scripts/date_changelog.py "$VERSION" "$DATE"
+            if ! git diff --quiet -- CHANGELOG.md; then
+              git add CHANGELOG.md
+              git commit -m "chore: date CHANGELOG for v$VERSION"
+              COMMITTED=true
+            fi
+          fi
+
+          # Tag the (possibly date-stamped) HEAD. Push the TAG FIRST so a
+          # re-triggered gate (from the branch commit below) sees it and skips,
+          # then push the branch commit. The tag push does not re-trigger this
+          # workflow (it is branch-triggered, not tag-triggered).
+          git tag "v$VERSION"
+          git push origin "v$VERSION"
+          if [ "$COMMITTED" = "true" ]; then
+            git push origin "HEAD:$GITHUB_REF_NAME"
+          fi
+
       - name: Verify tag matches project version
         run: |
-          TAG="${GITHUB_REF#refs/tags/v}"
-          PROJECT_VERSION=$(uv run --no-project python - <<'EOF'  
+          set -euo pipefail
+          PROJECT_VERSION=$(python3 - <<'PY'
           import tomllib
           with open("pyproject.toml", "rb") as f:
               print(tomllib.load(f)["project"]["version"])
-          EOF
+          PY
           )
-          if [ "$TAG" != "$PROJECT_VERSION" ]; then
-            echo "Error: git tag 'v${TAG}' does not match project.version '${PROJECT_VERSION}' in pyproject.toml"
+          if [ "v${PROJECT_VERSION}" != "v${{ needs.gate.outputs.version }}" ]; then
+            echo "Error: project.version changed under the release - aborting"
             exit 1
           fi
-          echo "Version check passed: ${PROJECT_VERSION}"
 
       - name: Build sdist and wheel
         run: uv build
+
+      - name: Extract release notes from CHANGELOG
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
+        run: python3 scripts/changelog_section.py "$VERSION" > release-notes.md
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
         with:
@@ -69,9 +167,16 @@ jobs:
           path: dist/
           if-no-files-found: error
 
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a  # v7.0.1
+        with:
+          name: release-notes
+          path: release-notes.md
+          if-no-files-found: error
+
   publish:
     name: Publish to PyPI
-    needs: build
+    needs: [gate, build]
+    if: needs.gate.outputs.release == 'true'
     runs-on: ubuntu-latest
     environment:
       name: pypi
@@ -88,3 +193,29 @@ jobs:
 
       - name: Publish to PyPI
         uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b  # v1.14.0
+
+  github-release:
+    name: Create GitHub release
+    needs: [gate, build, publish]
+    if: needs.gate.outputs.release == 'true'
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: write  # gh release create
+
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c  # v8.0.1
+        with:
+          name: release-notes
+          path: .
+
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.gate.outputs.version }}
+          PRERELEASE: ${{ needs.gate.outputs.prerelease }}
+        run: |
+          set -euo pipefail
+          FLAGS=(--title "v$VERSION" --notes-file release-notes.md --verify-tag)
+          if [ "$PRERELEASE" = "true" ]; then FLAGS+=(--prerelease); fi
+          gh release create "v$VERSION" "${FLAGS[@]}"
