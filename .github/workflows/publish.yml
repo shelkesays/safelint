@@ -102,10 +102,11 @@ jobs:
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0  # v7.0.0
         with:
           fetch-depth: 0
-          # RELEASE_PAT is needed to push the CHANGELOG date-stamp commit and the
-          # tag to protected main (the default GITHUB_TOKEN cannot bypass the
-          # branch ruleset). The PAT actor is in the ruleset bypass list.
-          token: ${{ secrets.RELEASE_PAT }}
+          # Do NOT persist the token in .git/config: ``uv build`` below runs the
+          # build backend, so a persisted RELEASE_PAT could be read by backend
+          # code. The push step instead injects the PAT into an explicit remote
+          # URL for that single command.
+          persist-credentials: false
 
       - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990  # v8.3.2
         with:
@@ -115,10 +116,15 @@ jobs:
         env:
           VERSION: ${{ needs.gate.outputs.version }}
           PRERELEASE: ${{ needs.gate.outputs.prerelease }}
+          # RELEASE_PAT is needed to push the CHANGELOG date-stamp commit and the
+          # tag to protected main (the default GITHUB_TOKEN cannot bypass the
+          # branch ruleset). Passed as an env var + explicit URL, never persisted.
+          RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
         run: |
           set -euo pipefail
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          REPO_URL="https://x-access-token:${RELEASE_PAT}@github.com/${GITHUB_REPOSITORY}.git"
 
           COMMITTED=false
           if [ "$PRERELEASE" = "false" ]; then
@@ -136,12 +142,14 @@ jobs:
           # then push the branch commit. The tag push does not re-trigger this
           # workflow (it is branch-triggered, not tag-triggered).
           git tag "v$VERSION"
-          git push origin "v$VERSION"
+          git push "$REPO_URL" "v$VERSION"
           if [ "$COMMITTED" = "true" ]; then
-            git push origin "HEAD:$GITHUB_REF_NAME"
+            git push "$REPO_URL" "HEAD:$GITHUB_REF_NAME"
           fi
 
       - name: Verify tag matches project version
+        env:
+          VERSION: ${{ needs.gate.outputs.version }}
         run: |
           set -euo pipefail
           PROJECT_VERSION=$(python3 - <<'PY'
@@ -150,7 +158,7 @@ jobs:
               print(tomllib.load(f)["project"]["version"])
           PY
           )
-          if [ "v${PROJECT_VERSION}" != "v${{ needs.gate.outputs.version }}" ]; then
+          if [ "v${PROJECT_VERSION}" != "v${VERSION}" ]; then
             echo "Error: project.version changed under the release - aborting"
             exit 1
           fi
