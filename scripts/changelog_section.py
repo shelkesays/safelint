@@ -62,8 +62,10 @@ def extract_section(changelog: str, version: str) -> str:
         msg = f"no '## [{wanted}]' section found in CHANGELOG"
         raise ValueError(msg)
     end = start
-    while end < len(lines) and not lines[end].startswith("## "):
-        end += 1
+    for i in range(start, len(lines)):
+        if lines[i].startswith("## "):
+            break
+        end = i + 1
     return "\n".join(lines[start:end]).strip()
 
 

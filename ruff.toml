@@ -63,6 +63,9 @@ unfixable = []
 # Tests: security (S), assertions (S101 already global), and fixture/magic patterns
 # Migrated from: [bandit] exclude = tests in setup.cfg
 "tests/**" = ["S", "ANN", "D", "PLR2004", "ARG"]
+# scripts/ are standalone CLI tools + the mkdocs build hook, not an importable
+# package, so INP001 (implicit-namespace-package) does not apply.
+"scripts/**" = ["INP001"]
 
 [lint.flake8-comprehensions]
 allow-dict-calls-with-keyword-arguments = false
