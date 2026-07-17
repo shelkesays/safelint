@@ -7,6 +7,11 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
+    # Raise bumps against ``development`` (the RC branch), not the default
+    # ``main`` - so action updates flow through the normal
+    # feature/* -> development -> main release path and never diverge main from
+    # development (which would conflict at the next development -> main release).
+    target-branch: "development"
     schedule:
       interval: "weekly"
     commit-message:
