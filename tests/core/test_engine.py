@@ -569,6 +569,9 @@ _EXPECTED_LANGUAGES: dict[str, tuple[str, ...]] = {
     "SpringMissingTransactionalRule": ("java",),  # SAFE902
     "SpringUnvalidatedInputRule": ("java",),  # SAFE903
     "SpringAsyncCheckedExceptionRule": ("java",),  # SAFE904
+    # Shared cross-framework rules (SAFE9xx) - Python + PHP, enabled by the
+    # framework presets.
+    "DebugModeEnabledRule": ("python", "php"),  # SAFE905
     # Rust-only language-idiom rules (slotted into category bands).
     "NeedlessMutRule": ("rust",),  # SAFE110
     "UncheckedArithmeticOnInputRule": ("rust",),  # SAFE112

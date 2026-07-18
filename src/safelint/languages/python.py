@@ -100,6 +100,7 @@ LIST_SPLAT_PATTERN = "list_splat_pattern"
 CALL = "call"
 IDENTIFIER = "identifier"
 ATTRIBUTE = "attribute"
+KEYWORD_ARGUMENT = "keyword_argument"  # ``f(name=value)`` - ``name`` then ``value`` named children
 SUBSCRIPT = "subscript"
 
 GLOBAL_STATEMENT = "global_statement"
