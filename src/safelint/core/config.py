@@ -153,6 +153,7 @@ DEFAULTS: dict[str, Any] = {
             "spring_missing_transactional",
             "spring_unvalidated_input",
             "spring_async_checked_exception",
+            "debug_mode_enabled",
         ],
     },
     "rules": {
@@ -1551,6 +1552,10 @@ DEFAULTS: dict[str, Any] = {
         "spring_missing_transactional": {"enabled": False, "severity": "error"},
         "spring_unvalidated_input": {"enabled": False, "severity": "error"},
         "spring_async_checked_exception": {"enabled": False, "severity": "warning"},
+        # Shared cross-framework rules (SAFE905-907). Disabled by default;
+        # enabled by the [tool.safelint.python]/[php] framework presets. Serve
+        # multiple frameworks across Python + PHP.
+        "debug_mode_enabled": {"enabled": False, "severity": "warning"},
         # Rust-idiom rules. Slotted into category bands per the
         # SafeLint rule-numbering policy (see CLAUDE.md); all four
         # are language-specific (no cross-language counterpart) and
