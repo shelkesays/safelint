@@ -2335,6 +2335,258 @@ def _resolve_java_framework(cfg: dict[str, Any]) -> str:
     return framework
 
 
+# ---------------------------------------------------------------------------
+# Python framework presets (django / flask / fastapi) + the composable
+# ``pydantic`` toggle, and the PHP framework preset (laravel). These mirror the
+# Java ``framework`` axis (frozenset + preset dict + resolver + applier), with
+# one deliberate departure: the ``pydantic`` axis is a *boolean* that composes
+# on top of the framework preset, and its applier is ADDITIVE (appends to the
+# existing sink list) rather than replace - so ``framework = "django"`` +
+# ``pydantic = true`` keeps both sets of sinks. The framework axes stay
+# replace-based like Java. See ``plan/release-automation.md`` sibling
+# ``plan/framework-presets.md`` for the full design.
+#
+# The taint lists REPLACE the vanilla default (the applier assigns wholesale),
+# so each is built by spreading the current ``DEFAULTS`` list plus the framework
+# additions - this always re-includes vanilla, so a framework selection can
+# never silently drop stdlib coverage. Sink names are call-name matched and
+# receiver-blind, so only unambiguous / uncommon names are added (bare common
+# verbs like ``open`` / ``get`` are deliberately excluded to avoid false
+# positives, the same discipline the Spring preset used for ``put`` / ``delete``).
+_VANILLA_PY_SINKS: list[str] = DEFAULTS["rules"]["tainted_sink"]["sinks"]
+_VANILLA_PHP_SINKS: list[str] = DEFAULTS["rules"]["tainted_sink"]["sinks_php"]
+
+# The framework preset's core "turn on the framework-aware checks" knob. The
+# dataflow rules SAFE801/802/803 are opt-in for performance; the preset flips
+# them on (``"enabled": True`` is inlined into each rule's override dict below -
+# it must NOT be a separate dict-spread, or it would collide with and overwrite
+# the ``tainted_sink`` / ``null_dereference`` sink/nullable overrides). SAFE309
+# is NOT enabled (it overlaps SAFE801 on eval/exec; SAFE801 is taint-aware and
+# owns that surface). The three shared framework rules only need enabling, so
+# they can be spread in safely (no collision).
+_ENABLE_802: dict[str, dict[str, bool]] = {"return_value_ignored": {"enabled": True}}
+_ENABLE_FRAMEWORK_RULES: dict[str, dict[str, bool]] = {
+    "debug_mode_enabled": {"enabled": True},
+    "mass_assignment": {"enabled": True},
+    "unvalidated_request_input": {"enabled": True},
+}
+
+_PYTHON_VALID_FRAMEWORKS: frozenset[str] = frozenset({"vanilla", "django", "flask", "fastapi"})
+
+_PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
+    "vanilla": {},
+    "django": {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                # ORM raw SQL (``.raw()`` / ``.extra()`` / ``RawSQL`` / cursor
+                # ``execute`` - already vanilla), SSTI / XSS escape hatches
+                # (``mark_safe`` / ``format_html``), open-redirect / reflected
+                # output sinks, path traversal (``FileResponse``), command exec
+                # (``call_command``), and unsafe deserialisation (``loads`` -
+                # ``django.core.signing`` / ``pickle``). Bare ``open`` is
+                # excluded (far too common).
+                "sinks": [
+                    *_VANILLA_PY_SINKS,
+                    "raw",
+                    "extra",
+                    "RawSQL",
+                    "mark_safe",
+                    "format_html",
+                    "HttpResponse",
+                    "HttpResponseRedirect",
+                    "redirect",
+                    "FileResponse",
+                    "call_command",
+                    "loads",
+                ],
+            },
+            # ``QuerySet.first()`` and ``cache.get()`` return None; ``QuerySet.get``
+            # is NOT nullable (it raises ``DoesNotExist``), so it is not listed.
+            "null_dereference": {"enabled": True, "nullable_methods": ["first"]},
+            **_ENABLE_802,
+            **_ENABLE_FRAMEWORK_RULES,
+        },
+    },
+    "flask": {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                # SSTI (``render_template_string`` - the marquee Flask sink;
+                # the file-based ``render_template`` is safe and NOT listed),
+                # XSS (``Markup``), open redirect (``redirect``), path traversal
+                # (``send_file`` / ``send_from_directory``), and ``make_response``.
+                "sinks": [
+                    *_VANILLA_PY_SINKS,
+                    "render_template_string",
+                    "Markup",
+                    "redirect",
+                    "send_file",
+                    "send_from_directory",
+                    "make_response",
+                ],
+            },
+            "null_dereference": {"enabled": True},
+            **_ENABLE_802,
+            # Flask has no ORM / mass-assignment concept, so SAFE906 is NOT
+            # enabled here; SAFE905 + SAFE907 are.
+            "debug_mode_enabled": {"enabled": True},
+            "unvalidated_request_input": {"enabled": True},
+        },
+    },
+    "fastapi": {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                # SQLAlchemy raw SQL (``text`` / ``execute``), XSS via response
+                # bodies (``HTMLResponse`` / ``Response``), SSTI (Jinja2
+                # ``from_string``), open redirect (``RedirectResponse``), path
+                # traversal (``FileResponse``).
+                "sinks": [
+                    *_VANILLA_PY_SINKS,
+                    "text",
+                    "HTMLResponse",
+                    "Response",
+                    "from_string",
+                    "RedirectResponse",
+                    "FileResponse",
+                ],
+            },
+            "null_dereference": {"enabled": True},
+            **_ENABLE_802,
+            "debug_mode_enabled": {"enabled": True},
+            "unvalidated_request_input": {"enabled": True},
+        },
+    },
+}
+
+# Pydantic composable toggle. ADDITIVE applier (see ``_apply_python_pydantic_preset``)
+# so it stacks on top of any framework preset. ``model_construct`` / ``construct``
+# SKIP validation, so tainted data through them defeats Pydantic's guarantee.
+_PYDANTIC_SINK_ADDITIONS: list[str] = ["model_construct", "construct"]
+
+_PHP_VALID_FRAMEWORKS: frozenset[str] = frozenset({"vanilla", "laravel"})
+
+_PHP_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
+    "vanilla": {},
+    "laravel": {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                # Only unambiguous compound builder names (``whereRaw`` etc.);
+                # bare ``raw`` / ``statement`` / ``render`` / ``to`` are excluded
+                # (they collide with view/response/redirect helpers everywhere).
+                # ``unserialize`` is already vanilla.
+                "sinks_php": [
+                    *_VANILLA_PHP_SINKS,
+                    "whereRaw",
+                    "orderByRaw",
+                    "havingRaw",
+                    "selectRaw",
+                    "unprepared",
+                ],
+            },
+            "null_dereference": {"enabled": True},
+            **_ENABLE_802,
+            **_ENABLE_FRAMEWORK_RULES,
+        },
+    },
+}
+
+
+def _apply_python_framework_preset(defaults: dict[str, Any], framework: str) -> None:
+    """Apply the Python framework preset to *defaults* in place (replace semantics)."""
+    _apply_preset_rules(defaults, _PYTHON_FRAMEWORK_PRESETS.get(framework))
+
+
+def _apply_php_framework_preset(defaults: dict[str, Any], framework: str) -> None:
+    """Apply the PHP framework preset to *defaults* in place (replace semantics)."""
+    _apply_preset_rules(defaults, _PHP_FRAMEWORK_PRESETS.get(framework))
+
+
+def _apply_preset_rules(defaults: dict[str, Any], preset: dict[str, Any] | None) -> None:
+    """Deep-copy each rule override from *preset* into *defaults* (wholesale replace)."""
+    if not preset:
+        return
+    import copy  # noqa: PLC0415
+
+    for rule_name, rule_overrides in preset.get("rules", {}).items():
+        target = defaults["rules"].setdefault(rule_name, {})
+        for key, value in rule_overrides.items():
+            target[key] = copy.deepcopy(value)
+
+
+def _apply_python_pydantic_preset(defaults: dict[str, Any], *, enabled: bool) -> None:
+    """Apply the composable Pydantic overrides ADDITIVELY (append, do not replace).
+
+    Runs AFTER the framework preset, so it must not clobber the framework's
+    ``sinks`` list - it appends ``model_construct`` / ``construct`` and dedupes,
+    preserving whatever framework sinks are already present. Also enables SAFE801
+    and SAFE906 (``mass_assignment`` on ``extra="allow"`` input models).
+    """
+    if not enabled:
+        return
+    sink_rule = defaults["rules"].setdefault("tainted_sink", {})
+    existing = list(sink_rule.get("sinks", []))
+    for name in _PYDANTIC_SINK_ADDITIONS:
+        if name not in existing:
+            existing.append(name)
+    sink_rule["sinks"] = existing
+    sink_rule["enabled"] = True
+    defaults["rules"].setdefault("mass_assignment", {})["enabled"] = True
+
+
+def _resolve_python_framework(cfg: dict[str, Any]) -> str:
+    """Extract ``[tool.safelint.python] framework``, defaulting to ``"vanilla"`` (warn+fallback)."""
+    return _resolve_framework(cfg, "python", _PYTHON_VALID_FRAMEWORKS)
+
+
+def _resolve_php_framework(cfg: dict[str, Any]) -> str:
+    """Extract ``[tool.safelint.php] framework``, defaulting to ``"vanilla"`` (warn+fallback)."""
+    return _resolve_framework(cfg, "php", _PHP_VALID_FRAMEWORKS)
+
+
+def _resolve_framework(cfg: dict[str, Any], lang: str, valid: frozenset[str]) -> str:
+    """Shared framework-selector resolver: validate, warn on bad input, fall back to ``"vanilla"``."""
+    from safelint.core import _diagnostics  # noqa: PLC0415
+
+    section = cfg.get(lang, {})
+    if not isinstance(section, dict):
+        _diagnostics.print_warning(
+            f"[tool.safelint.{lang}] must be a table, got {type(section).__name__} - falling back to framework='vanilla'",
+        )
+        return "vanilla"
+    framework = section.get("framework", "vanilla")
+    if not isinstance(framework, str):
+        _diagnostics.print_warning(
+            f"[tool.safelint.{lang}].framework must be a string, got {type(framework).__name__} - falling back to 'vanilla'",
+        )
+        return "vanilla"
+    if framework not in valid:
+        names = ", ".join(sorted(valid))
+        _diagnostics.print_warning(
+            f"[tool.safelint.{lang}].framework={framework!r} is not recognised (valid: {names}) - falling back to 'vanilla'",
+        )
+        return "vanilla"
+    return framework
+
+
+def _resolve_python_pydantic(cfg: dict[str, Any]) -> bool:
+    """Extract ``[tool.safelint.python] pydantic`` (bool), defaulting to False (warn on non-bool)."""
+    from safelint.core import _diagnostics  # noqa: PLC0415
+
+    section = cfg.get("python", {})
+    if not isinstance(section, dict):
+        return False  # already warned by _resolve_python_framework
+    value = section.get("pydantic", False)
+    if not isinstance(value, bool):
+        _diagnostics.print_warning(
+            f"[tool.safelint.python].pydantic must be a boolean, got {type(value).__name__} - falling back to false",
+        )
+        return False
+    return value
+
+
 def _resolve_javascript_runtime(cfg: dict[str, Any]) -> str:
     """Extract the JS runtime selector from *cfg* (user TOML), defaulting to ``"node"``.
 
@@ -2694,5 +2946,10 @@ def load_config(search_from: Path | None = None) -> dict[str, Any]:
             defaults_with_preset = copy.deepcopy(DEFAULTS)
             _apply_javascript_runtime_preset(defaults_with_preset, _resolve_javascript_runtime(cfg))
             _apply_java_framework_preset(defaults_with_preset, _resolve_java_framework(cfg))
+            _apply_python_framework_preset(defaults_with_preset, _resolve_python_framework(cfg))
+            _apply_php_framework_preset(defaults_with_preset, _resolve_php_framework(cfg))
+            # Pydantic is applied LAST so it composes on top of the framework
+            # preset (its applier is additive, not replace).
+            _apply_python_pydantic_preset(defaults_with_preset, enabled=_resolve_python_pydantic(cfg))
             return _apply_extend_keys(deep_merge(defaults_with_preset, cfg))
     return copy.deepcopy(DEFAULTS)
