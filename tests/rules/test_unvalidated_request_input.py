@@ -51,6 +51,12 @@ def test_python_flask_request_json_flagged(tmp_path: Path) -> None:
     assert _codes(src) == ["SAFE907"]
 
 
+def test_python_self_request_data_flagged(tmp_path: Path) -> None:
+    """A class-based view reading ``self.request.data`` whole fires (self.request base)."""
+    src = _write(tmp_path, "views.py", "def post(self):\n    return Model(**self.request.data)\n")
+    assert _codes(src) == ["SAFE907"]
+
+
 def test_php_request_all_flagged(tmp_path: Path) -> None:
     """Laravel ``$request->all()`` with no ``validate`` fires."""
     src = _write(tmp_path, "C.php", "<?php class C { function store($request){ return M::create($request->all()); } } ?>")
