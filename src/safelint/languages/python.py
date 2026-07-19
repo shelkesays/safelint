@@ -126,6 +126,8 @@ COMPARISON_OPERATOR = "comparison_operator"
 CONDITIONAL_EXPRESSION = "conditional_expression"
 
 STRING = "string"
+DICTIONARY = "dictionary"  # ``{k: v, ...}`` literal - ``pair`` named children
+PAIR = "pair"  # ``k: v`` inside a dictionary - key then value named children
 CONCATENATED_STRING = "concatenated_string"
 INTERPOLATION = "interpolation"
 LIST = "list"
