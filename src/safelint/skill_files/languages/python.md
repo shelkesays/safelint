@@ -164,6 +164,34 @@ def render_report(data, write=print):
     write(format_report(data))   # caller controls the I/O primitive
 ```
 
+## Framework presets
+
+Python source is Python source - the parser, tree, and rule logic are framework-agnostic. But the *defaults* baked into the rules (taint sinks, nullable methods, which 9xx rules are on) shift with the web framework in use. `[tool.safelint.python] framework = "<name>"` selects the preset; the orthogonal `pydantic = true` boolean composes on top of any framework.
+
+| Framework | When to pick it | What changes |
+| --- | --- | --- |
+| `vanilla` (default) | Plain Python, libraries, CLIs, data pipelines with no web framework | Stdlib-only defaults. SAFE9xx framework rules stay disabled. Existing v2.8.x users see no change. |
+| `django` | Django / Django REST Framework projects | Adds `raw` / `extra` / `RawSQL` / `mark_safe` / `format_html` / `HttpResponse` / `redirect` / `FileResponse` / `call_command` / `loads` to SAFE801 sinks; treats `.first()` as nullable for SAFE803. Enables SAFE905-907. |
+| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks, and Flask's global-proxy `request` as a taint source. Enables SAFE905 / SAFE907 (not SAFE906 - Flask has no mass-assignment idiom). |
+| `fastapi` | FastAPI / Starlette apps | Adds `text` / `HTMLResponse` / `Response` / `from_string` / `RedirectResponse` / `FileResponse` to SAFE801 sinks. Enables SAFE905-907. |
+
+`pydantic = true` (independent of `framework`) additively adds `model_construct` / `construct` to the SAFE801 sinks - the Pydantic v2 / v1 "skip validation" constructors - and enables SAFE906 so `extra = "allow"` on a model config fires.
+
+```toml
+# pyproject.toml
+[tool.safelint.python]
+framework = "django"
+pydantic = true
+```
+
+```toml
+# standalone safelint.toml
+[python]
+framework = "fastapi"
+```
+
+Framework and pydantic presets merge *before* your explicit TOML, so per-rule keys (e.g. `[tool.safelint.rules.tainted_sink] sinks = [...]`) always win. Unknown framework names warn on stderr and fall back to `vanilla`.
+
 ## Stdin mode for editor / Claude Code unsaved buffers
 
 If the user is asking about a buffer that isn't saved to disk (e.g. they paste code in chat and ask for a safelint review), use stdin mode:
