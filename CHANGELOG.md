@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Python and PHP framework presets - Django / Flask / FastAPI / Pydantic (Python) and Laravel (PHP).** Mirroring the existing Java Spring Boot and JavaScript runtime presets, a `[tool.safelint.python] framework = "django" | "flask" | "fastapi"` key (plus an orthogonal composable `pydantic = true`) and a `[tool.safelint.php] framework = "laravel"` key shift the rule *defaults* for the chosen framework. The parser and rule logic are unchanged; only the taint sink lists, nullable-method lists, and which structural rules are active shift. The default is `vanilla` for both, so existing projects with no `[python]` / `[php]` config see no behaviour change. Unknown framework names warn on stderr and fall back to `vanilla`; explicit per-rule TOML keys always win over the preset.
+  - **Three new shared cross-framework rules (SAFE905-907)**, disabled by default and enabled by the presets. They are the non-Java analogue of the Spring `SAFE9xx` rules, each serving multiple frameworks:
+    - **SAFE905 `debug_mode_enabled`** (warning) - a debug / reload flag hard-enabled in code: Django `DEBUG = True`, Flask `app.debug = True` / `app.run(debug=True)`, FastAPI `uvicorn.run(reload=True)`, Laravel `'debug' => true` config entries.
+    - **SAFE906 `mass_assignment`** (error) - unbounded attribute binding from request data: Django `fields = "__all__"`, Pydantic `extra = "allow"`, Laravel Eloquent `$guarded = []`.
+    - **SAFE907 `unvalidated_request_input`** (warning) - request data consumed whole with no validation layer: Django / Flask / FastAPI raw `request.data` / `.json` / `.POST` without a serializer or `is_valid`, Laravel `$request->all()` without `validate()`.
+  - **Preset coverage is mostly taint-list extension (zero new codes):** the Django / Flask / FastAPI / Laravel presets add framework-specific sinks (e.g. `RawSQL` / `mark_safe`, `render_template_string`, `HTMLResponse`, `whereRaw` / `unprepared`) to SAFE801 `tainted_sink`, Flask registers its global-proxy `request` as a taint source, and `pydantic = true` additively adds `model_construct` / `construct` to the SAFE801 sinks. Django also treats `.first()` as nullable for SAFE803.
+  - Bundled AI-client skill files (all 14) and the Python / PHP language addenda document the new rules and presets.
+  - SafeLint now ships **50 rules** (up from 47).
+
 ### Changed
 
 - **Release automation (internal tooling; the `safelint` package is unchanged).** A committed version bump now drives the release: merging a bumped version to `development` (a pre-release `X.Y.ZrcN`) or `main` (a final `X.Y.Z`) automatically tags it, publishes to PyPI, and creates the GitHub release. On a final release the CHANGELOG is auto-dated (`[Unreleased]` -> `[X.Y.Z] - <date>`) and `development` is reset to `main` so the two never diverge. New helpers `scripts/changelog_section.py` (release notes from the CHANGELOG) and `scripts/date_changelog.py` (the auto-date), plus `bin/sync.sh` for local branch sync. `scripts/` is now covered by ruff / ty / safelint.

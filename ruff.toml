@@ -63,6 +63,10 @@ unfixable = []
 # Tests: security (S), assertions (S101 already global), and fixture/magic patterns
 # Migrated from: [bandit] exclude = tests in setup.cfg
 "tests/**" = ["S", "ANN", "D", "PLR2004", "ARG"]
+# Fixtures are intentionally framework-shaped sample code (undefined names,
+# mutable class attributes like Django Meta.fields, no package markers). They
+# are linted by safelint's own rules in the e2e suite, not by ruff.
+"tests/fixtures/**" = ["F821", "INP001", "RUF012"]
 # scripts/ are standalone CLI tools + the mkdocs build hook, not an importable
 # package, so INP001 (implicit-namespace-package) does not apply.
 "scripts/**" = ["INP001"]
