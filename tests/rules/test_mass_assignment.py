@@ -47,6 +47,12 @@ def test_django_explicit_fields_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_python_unrelated_all_string_is_clean(tmp_path: Path) -> None:
+    """An ``= "__all__"`` on a name other than ``fields`` (and non-``extra``) does not fire."""
+    src = _write(tmp_path, "forms.py", 'columns = "__all__"\nmode = "allow"\n')
+    assert _codes(src) == []
+
+
 def test_laravel_guarded_empty(tmp_path: Path) -> None:
     """Eloquent ``$guarded = []`` fires."""
     src = _write(tmp_path, "Model.php", "<?php class M { protected $guarded = []; } ?>")

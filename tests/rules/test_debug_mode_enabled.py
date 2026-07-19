@@ -74,6 +74,12 @@ def test_php_debug_false_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_php_non_debug_true_key_is_clean(tmp_path: Path) -> None:
+    """A ``true`` value under a non-debug key (``'cache' => true``) does not fire."""
+    src = _write(tmp_path, "app.php", "<?php return ['cache' => true]; ?>")
+    assert _codes(src) == []
+
+
 # ---------------------------------------------------------------------------
 # Gating
 # ---------------------------------------------------------------------------

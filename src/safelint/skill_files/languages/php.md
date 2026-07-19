@@ -36,7 +36,7 @@ safelint lints `.php` files. The skill doesn't need to filter by extension - `sa
 
 ## Rule count
 
-PHP is in scope for 21 rules: the cross-language structural and dataflow rules (SAFE101-105, SAFE202, SAFE203, SAFE301-304, SAFE309, SAFE401, SAFE501, SAFE601, SAFE603, SAFE701-702, SAFE801-803). The two rules deliberately skipped for PHP (SAFE201, SAFE305) are listed in the "Deliberately skipped" section below. PHP adds **no** new rule codes. Like the other languages' optional rules, every dataflow rule (SAFE801-803) is disabled by default, as are the other opt-in rules (SAFE309, SAFE601, SAFE603).
+PHP is in scope for 21 rules under the default (vanilla) preset: the cross-language structural and dataflow rules (SAFE101-105, SAFE202, SAFE203, SAFE301-304, SAFE309, SAFE401, SAFE501, SAFE601, SAFE603, SAFE701-702, SAFE801-803). The two rules deliberately skipped for PHP (SAFE201, SAFE305) are listed in the "Deliberately skipped" section below. PHP adds **no** PHP-only rule codes, but the `laravel` framework preset enables the three shared cross-framework rules SAFE905-907 (see "Framework presets" below). Like the other languages' optional rules, every dataflow rule (SAFE801-803) is disabled by default, as are the other opt-in rules (SAFE309, SAFE601, SAFE603).
 
 ## PHP shapes worth knowing
 
