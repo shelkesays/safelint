@@ -168,6 +168,25 @@ $name = $user->getProfile()->name;  // getProfile() may return null
 $name = $user->getProfile()?->name;
 ```
 
-## Future: framework / runtime presets
+## Framework presets
 
-PHP has no framework preset in this release. A future `[tool.safelint.php] framework` axis (Laravel / Symfony) would extend the taint sources with framework request accessors (`$request->input(...)` / `Request::get(...)`); any framework-specific structural rules would take the 9xx band.
+PHP source is PHP source - the parser and rule logic are framework-agnostic. The *defaults* shift with the framework via `[tool.safelint.php] framework = "<name>"`:
+
+| Framework | When to pick it | What changes |
+| --- | --- | --- |
+| `vanilla` (default) | Plain PHP, libraries, no framework | Stdlib-only defaults. SAFE9xx framework rules stay disabled. Existing v2.6.0+ users see no change. |
+| `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks. Enables SAFE905-907 (Eloquent `$guarded = []` mass-assignment, `$request->all()` unvalidated input, `'debug' => true` in config). |
+
+```toml
+# pyproject.toml
+[tool.safelint.php]
+framework = "laravel"
+```
+
+```toml
+# standalone safelint.toml
+[php]
+framework = "laravel"
+```
+
+The preset merges *before* your explicit TOML, so `[tool.safelint.rules.tainted_sink] sinks_php = [...]` still wins. An unknown framework name warns on stderr and falls back to `vanilla`.

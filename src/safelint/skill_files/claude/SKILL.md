@@ -204,6 +204,9 @@ The rule set is shared across all supported languages. Universal rationale crib 
 | SAFE902 | spring_missing_transactional | *Java + Spring Boot only.* Service-layer method does multiple repository writes (`save` / `delete` / etc.) without `@Transactional`; partial writes leak on failure. |
 | SAFE903 | spring_unvalidated_input | *Java + Spring Boot only.* Controller method parameter uses `@RequestBody` / `@ModelAttribute` without `@Valid` / `@Validated`; bean validation must run on deserialised request bodies. Complements SAFE801 structurally. |
 | SAFE904 | spring_async_checked_exception | *Java + Spring Boot only.* `@Async` method declares a `throws` clause; Spring runs `@Async` on a separate thread and swallows exceptions, the caller never sees them. Catch inside the body or return `CompletableFuture.failedFuture(...)`. |
+| SAFE905 | debug_mode_enabled | *Framework presets only (Python / PHP).* A debug or reload flag hard-enabled in code: Django `DEBUG = True`, Flask `app.debug = True` / `app.run(debug=True)`, FastAPI `uvicorn.run(reload=True)`, Laravel `'debug' => true`. Enabled by the `[tool.safelint.python]` / `[tool.safelint.php] framework` presets. |
+| SAFE906 | mass_assignment | *Framework presets only (Python / PHP).* Unbounded attribute binding from request data: Django `fields = "__all__"`, Pydantic `extra = "allow"`, Laravel Eloquent `$guarded = []`. Prefer an explicit allow-list. |
+| SAFE907 | unvalidated_request_input | *Framework presets only (Python / PHP).* Request body consumed whole with no validation layer (Django / Flask / FastAPI raw `request.data` / `.json` / `.POST` with no serialiser or `is_valid`; Laravel `$request->all()` without `validate()`). The non-Java analogue of SAFE903. |
 
 For language-specific phrasing (e.g. how `bare_except` translates to `catch (Throwable t)` in another language) read the relevant `languages/<lang>.md` addendum; locate it via `safelint skill path`.
 
