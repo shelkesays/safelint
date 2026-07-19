@@ -724,7 +724,7 @@ wheels = [
 
 [[package]]
 name = "safelint"
-version = "2.8.4"
+version = "2.9.0rc1"
 source = { editable = "." }
 dependencies = [
     { name = "tree-sitter" },
