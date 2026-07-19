@@ -199,6 +199,7 @@ PROPERTY_PROMOTION_PARAMETER = "property_promotion_parameter"  # ``private int $
 # Identifiers / scope keywords / literals.
 NAME = "name"  # a bareword identifier (function names, member names, the inner part of ``variable_name``)
 VARIABLE_NAME = "variable_name"  # ``$x`` - wraps a ``name`` child whose text is the variable (``this`` for ``$this``)
+PROPERTY_ELEMENT = "property_element"  # ``$guarded = []`` inside a ``property_declaration`` - variable then value
 QUALIFIED_NAME = "qualified_name"  # ``\\Foo\\Bar`` / ``Throwable``
 RELATIVE_SCOPE = "relative_scope"  # ``self`` / ``static`` / ``parent`` in a scoped call/access
 ANONYMOUS_FUNCTION_USE_CLAUSE = "anonymous_function_use_clause"  # ``use ($x)`` on a closure

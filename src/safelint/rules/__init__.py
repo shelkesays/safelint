@@ -20,7 +20,11 @@ from safelint.rules.dataflow import NullDereferenceRule, ReturnValueIgnoredRule,
 from safelint.rules.documentation import MissingAssertionsRule
 from safelint.rules.dynamic_code_execution import DynamicCodeExecutionRule
 from safelint.rules.error_handling import BareExceptRule, EmptyExceptRule, LoggingOnErrorRule
-from safelint.rules.framework_rules import DebugModeEnabledRule
+from safelint.rules.framework_rules import (
+    DebugModeEnabledRule,
+    MassAssignmentRule,
+    UnvalidatedRequestInputRule,
+)
 from safelint.rules.function_length import FunctionLengthRule
 from safelint.rules.go_rules import EmptyErrorCheckRule, PanicCallsOutsideTestsRule
 from safelint.rules.loop_safety import UnboundedLoopRule
@@ -94,6 +98,8 @@ ALL_RULES: list[type[BaseRule]] = [
     # [tool.safelint.python]/[php] framework presets. See
     # safelint.rules.framework_rules.
     DebugModeEnabledRule,
+    MassAssignmentRule,
+    UnvalidatedRequestInputRule,
     # Rust-idiom rules (slotted into category bands per the SafeLint
     # numbering policy: 1xx function-shape, 2xx error-handling, 3xx
     # side-effects, 6xx documentation). All disabled by default; opt
@@ -156,6 +162,7 @@ __all__ = [
     "InteriorMutableStaticRule",
     "LockPoisoningIgnoredRule",
     "LoggingOnErrorRule",
+    "MassAssignmentRule",
     "MaxArgumentsRule",
     "MissingAssertionsRule",
     "NeedlessMutRule",
@@ -185,6 +192,7 @@ __all__ = [
     "UncheckedArithmeticOnInputRule",
     "UndocumentedUnsafeRule",
     "UnloggedErrorBranchRule",
+    "UnvalidatedRequestInputRule",
     "Violation",
     "WideScopeDeclarationRule",
 ]
