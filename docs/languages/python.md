@@ -87,6 +87,32 @@ max_lines = 80
 
 See [Configuration file](../configuration/toml.md) for the full list of top-level keys and [Rules reference](../configuration/rules.md) for every per-rule option.
 
+### Framework presets
+
+Python source is Python source - the parser, tree, and rule logic are framework-agnostic. But the rule *defaults* (taint sinks, nullable methods, and which `SAFE9xx` rules are active) shift with the web framework. `[tool.safelint.python] framework = "<name>"` selects the preset, and an orthogonal `pydantic = true` boolean composes on top of any framework.
+
+| Framework | When to pick it | What changes |
+|---|---|---|
+| `vanilla` (default) | Plain Python, libraries, CLIs, data pipelines | Stdlib-only defaults (the lists in the rules table above). The `SAFE905-907` framework rules are disabled. |
+| `django` | Django / Django REST Framework projects | Adds `raw` / `extra` / `RawSQL` / `mark_safe` / `format_html` / `HttpResponse` / `HttpResponseRedirect` / `redirect` / `FileResponse` / `call_command` / `loads` to SAFE801 sinks; treats `.first()` as nullable for SAFE803. **Enables `SAFE905-907`.** |
+| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks and the global-proxy `request` as a taint source. **Enables `SAFE905` + `SAFE907`** (not `SAFE906` - Flask has no mass-assignment idiom). |
+| `fastapi` | FastAPI / Starlette apps | Adds `text` / `HTMLResponse` / `Response` / `from_string` / `RedirectResponse` / `FileResponse` to SAFE801 sinks. **Enables `SAFE905-907`.** |
+
+`pydantic = true` (independent of `framework`) additively adds Pydantic's validation-skipping constructors `model_construct` / `construct` to the SAFE801 sinks and enables `SAFE906` so an `extra = "allow"` model config fires. It composes with any framework, or stands alone in a vanilla project.
+
+```toml
+# pyproject.toml
+[tool.safelint.python]
+framework = "django"
+pydantic = true
+
+# Or standalone safelint.toml (no [tool.safelint] wrapper):
+[python]
+framework = "fastapi"
+```
+
+Explicit per-rule TOML config still wins over the preset; setting `[tool.safelint.rules.tainted_sink] sinks = [...]` overrides whatever the preset planted. The default framework is `vanilla`, so existing users with no `[python]` config see no behaviour change. Unknown framework names surface a `safelint: warning:` on stderr and fall back to `vanilla`.
+
 ## Installing the Python extra
 
 v2.0.0 ships every language grammar, Python included, as an opt-in extra so projects only install what they actually lint:
