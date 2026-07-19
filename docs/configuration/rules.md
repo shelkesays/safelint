@@ -15,13 +15,13 @@ For top-level config keys (`mode`, `ignore`, `per_file_ignores`, …) see the [C
 
 ### Currently supported
 
-- **Python** (`.py`, `.pyw`).
+- **Python** (`.py`, `.pyw`). Per-framework *defaults* (taint sinks, nullable methods, and which of the shared `SAFE905-907` framework rules are active) are switchable via the [`[tool.safelint.python] framework = "..."`](../languages/python.md#framework-presets) preset (`vanilla` / `django` / `flask` / `fastapi`), with an orthogonal `pydantic = true` axis.
 - **JavaScript** (`.js`, `.mjs`, `.cjs`), source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime *defaults* (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the [`[tool.safelint.javascript] runtime = "..."`](toml.md#javascript-runtime-presets) preset, the source-language rules themselves don't change.
 - **TypeScript** (`.ts`, `.tsx`), and **AssemblyScript** (`.as`, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, `as` casts, non-null assertions, `declare global` ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See [TypeScript](../languages/typescript.md) for the full language reference.
 - **Java** (`.java`), new in v2.1.0. 20 rules apply (the 15 cross-language core plus the 5 also registered for Python / JS / TS) plus 4 Spring Boot framework-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* (sinks, nullable methods, structural rule enablement) are switchable via the [`[tool.safelint.java] framework = "..."`](../languages/java.md#framework-presets) preset (`vanilla` / `spring-boot`). See [Java](../languages/java.md) for the full language reference.
 - **Rust** (`.rs`), new in v2.2.0. 15 of the cross-language rules port cleanly (the all-five-languages set) plus 11 Rust-only rules cover Rust-idiom-specific patterns (panic-in-non-test, lock poisoning, `unsafe` block documentation, truncating `as` casts, silent `Err` arms, dangerous `mem::*` ops, needless `mut`, unchecked arithmetic on integer parameters, broad `.unwrap()` outside tests, interior-mutable `static`s, plus the empty-`Err` / unlogged-`Err` Rust analogues of `empty_except` / `logging_on_error`). 7 rules deliberately skipped for Rust because their semantics don't translate cleanly (Rust has no try/catch / `global` keyword, RAII / Drop covers resource cleanup, and macros are opaque to the rule-8 dynamic-execution check). Recognises both inline `#[cfg(test)] mod tests` and Cargo `tests/<stem>.rs` integration-test conventions. See [Rust](../languages/rust.md) for the full language reference.
 - **Go** (`.go`), new in v2.5.0. 16 cross-language rules apply (the 13 all-language core plus SAFE302 / SAFE309 / SAFE401, which Go shares with Python / JS / TS / Java / PHP but Rust skips) and 2 Go-only rules cover Go-idiom patterns: SAFE209 (`empty_error_check`, the empty `if err != nil {}` swallow) and SAFE211 (`panic_calls_outside_tests`). 7 rules deliberately skipped for Go because their semantics don't translate cleanly (no try/catch, no `global` keyword, no `var` hoisting, no production assertion idiom, no chained-nullable idiom). Headline Go adaptations: the bare `for {}` infinite loop (SAFE501), the sibling `foo_test.go` convention (SAFE701 / SAFE702), the `_ = f()` explicit-discard exemption (SAFE802), and the `defer x.Close()` resource form (SAFE401). See [Go](../languages/go.md) for the full language reference.
-- **PHP** (`.php`), new in v2.6.0. 21 rules apply and only 2 are skipped (SAFE201 `bare_except` and SAFE305 `wide_scope_declaration`), the widest rule coverage of any non-Python language because PHP ports the largest share of the existing rule set. PHP is the **first non-Python home for SAFE301 (`global_state`)**: PHP has a literal `global` keyword, so the rule fires on `global $config;`-style declarations exactly as it does on Python. PHP also has try/catch (SAFE202 / SAFE203 apply), `eval` and dynamic-call surfaces (SAFE309), and resource lifecycles (SAFE401). Headline PHP highlights: the `@`-operator error-suppression idiom, superglobal taint sources (`$_GET` / `$_POST` / `$_REQUEST` / etc.) feeding SAFE801, and the `break N;` / `continue N;` multi-level loop forms. See [PHP](../languages/php.md) for the full language reference.
+- **PHP** (`.php`), new in v2.6.0. 21 rules apply and only 2 are skipped (SAFE201 `bare_except` and SAFE305 `wide_scope_declaration`), the widest rule coverage of any non-Python language because PHP ports the largest share of the existing rule set. PHP is the **first non-Python home for SAFE301 (`global_state`)**: PHP has a literal `global` keyword, so the rule fires on `global $config;`-style declarations exactly as it does on Python. PHP also has try/catch (SAFE202 / SAFE203 apply), `eval` and dynamic-call surfaces (SAFE309), and resource lifecycles (SAFE401). Headline PHP highlights: the `@`-operator error-suppression idiom, superglobal taint sources (`$_GET` / `$_POST` / `$_REQUEST` / etc.) feeding SAFE801, and the `break N;` / `continue N;` multi-level loop forms. Per-framework *defaults* are switchable via the [`[tool.safelint.php] framework = "..."`](../languages/php.md#framework-presets) preset (`vanilla` / `laravel`), which enables the shared `SAFE905-907` framework rules. See [PHP](../languages/php.md) for the full language reference.
 
 - **C** (`.c`, `.h`), new in v2.7.0. Holzmann's original target language. 21 rules apply: the 16 cross-language ports plus **5 new C-family rules** (the "homecoming", shared with C++) that express clauses every other language adapts away - SAFE106 (`nonlocal_jumps`, `goto` / `setjmp`), SAFE310 (`dynamic_allocation`, the `malloc` family), SAFE311 (`complex_macro`) and SAFE312 (`conditional_compilation`) for the preprocessor, and SAFE313 (`restricted_pointers`). SAFE106 is the only one enabled by default (warning severity, because `goto err` cleanup is idiomatic); the other four are opt-in. `.h` headers are linted as C. 7 rules are skipped: SAFE201/202/203, SAFE301 and SAFE305 (semantics don't translate) plus SAFE401 and SAFE803 (documented gaps - C cleanup and nil analysis need flow analysis). See [C](../languages/c.md) for the full language reference.
 - **C++** (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`), new in v2.8.0. Builds on C: the five C-family rules widen to C and C++, plus C++ gains its `try` / `catch` / `throw` rules (SAFE201 catch-all, SAFE202, SAFE203) and **two new C++-only rules** - SAFE315 (`raw_new_delete`) and SAFE316 (`dangerous_casts`). 26 rules apply. Plain `.h` headers are linted as C; use `.hpp` / `.hxx` / `.hh` for C++ headers. See [C++](../languages/cpp.md) for the full language reference.
@@ -44,6 +44,7 @@ No languages are currently on the near-term roadmap. SafeLint's registry-driven 
 | **Python + C++** | 1 | SAFE201 (`bare_except`); Python's bare `except:` and C++'s `catch (...)` catch-all. JS / TS / Java catches always bind the error, and Rust / Go / PHP / C have no bare-catch equivalent. |
 | **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`); Python / Java / Rust / Go / PHP have no `var` / `let` / `const` distinction. |
 | **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`); all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset. |
+| **Python / PHP framework presets only** | 3 | SAFE905 (`debug_mode_enabled`), SAFE906 (`mass_assignment`), SAFE907 (`unvalidated_request_input`); all default-disabled, enabled by the Python (`django` / `flask` / `fastapi` / `pydantic`) and PHP (`laravel`) framework presets. The non-Java analogue of the Spring `SAFE9xx` rules. |
 | **Rust-only** | 11 | SAFE110 (`needless_mut`), SAFE112 (`unchecked_arithmetic_on_input`), SAFE204 (`panic_macros_outside_tests`), SAFE205 (`lock_poisoning_ignored`), SAFE206 (`silent_result_discard`, the Rust analogue of SAFE202), SAFE207 (`unlogged_error_branch`, the Rust analogue of SAFE203), SAFE208 (`result_unwrap_outside_tests`), SAFE306 (`dangerous_mem_ops`), SAFE307 (`interior_mutable_static`), SAFE308 (`truncating_as_cast`), SAFE602 (`undocumented_unsafe`); all default-disabled. |
 | **Go-only** | 2 | SAFE209 (`empty_error_check`, the Go analogue of SAFE206), SAFE211 (`panic_calls_outside_tests`, the Go analogue of SAFE204); both default-disabled. |
 | **C-family** (C and C++) | 5 | SAFE106 (`nonlocal_jumps`, `goto` / `setjmp`; **enabled at warning severity**), SAFE310 (`dynamic_allocation`; on C++ also `new` / `delete`), SAFE311 (`complex_macro`), SAFE312 (`conditional_compilation`), SAFE313 (`restricted_pointers`; smart pointers exempt on C++); the last four default-disabled. The Power-of-Ten clauses (rules 1, 3, 8, 9) every other language adapts away. |
@@ -1362,6 +1363,103 @@ public class IngestService {
         }
     }
 }
+```
+
+## Framework preset rules (Python / PHP)
+
+The following three rules generalise across the Python (Django / Flask / FastAPI) and PHP (Laravel) framework presets. Each serves multiple frameworks and is gated purely by its `enabled` flag - a framework preset flips it on. Detection is language-family aware (Python vs PHP node shapes), not tied to one specific framework. All ship disabled by default; the `[tool.safelint.python] framework` / `[tool.safelint.php] framework` presets enable the applicable ones (see the [Python](../languages/python.md#framework-presets) and [PHP](../languages/php.md#framework-presets) language pages). They are the non-Java analogue of the Spring `SAFE9xx` rules.
+
+### SAFE905: `debug_mode_enabled`
+
+**What it flags:** A framework debug / reload flag hard-enabled in code. Python + PHP.
+
+Debug mode in production leaks stack traces, settings, and (Flask / Werkzeug) an interactive console; auto-reload is a development-only convenience. Detected patterns:
+
+- **Python**: `DEBUG = True` (Django settings), `app.debug = True` / `app.run(debug=True)` (Flask), `uvicorn.run(..., reload=True)` and any `debug=True` keyword (FastAPI / ASGI).
+- **PHP**: a config-array entry whose key ends in `debug` mapped to `true` (`'app.debug' => true`, `'debug' => true`). `.env` files are not parsed, so this is code-only.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (framework preset) | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```python
+DEBUG = True                 # Django settings.py - SAFE905
+app.run(debug=True)          # Flask - SAFE905
+uvicorn.run("main:app", reload=True)   # FastAPI - SAFE905
+```
+
+**Good:**
+
+```python
+import os
+
+DEBUG = os.environ.get("DJANGO_DEBUG") == "1"   # env-driven, off by default
+```
+
+### SAFE906: `mass_assignment`
+
+**What it flags:** Unbounded attribute binding from request data. Python + PHP.
+
+"Bind everything the client sent" defeats the point of an allow-list and lets a caller set fields they should not. Detected patterns:
+
+- **Python (Django)**: a `ModelForm` / serializer `Meta.fields = "__all__"`.
+- **Python (Pydantic)**: an input model declaring `extra = "allow"` - as `class Config: extra = "allow"` (v1), `model_config = ConfigDict(extra="allow")`, or `model_config = {"extra": "allow"}` (v2). Enabled by `pydantic = true` as well as the Django / FastAPI presets.
+- **PHP (Laravel)**: an Eloquent `$guarded = []` (guards nothing, so every attribute is mass-assignable). `$fillable` allow-lists are safe.
+
+Flask does not enable this rule (it has no comparable mass-assignment idiom).
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (Django / FastAPI / pydantic / Laravel) | Toggle the rule |
+| `severity` | `"error"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```python
+class Meta:
+    fields = "__all__"       # SAFE906
+```
+
+**Good:**
+
+```python
+class Meta:
+    fields = ["name", "email"]   # explicit allow-list
+```
+
+### SAFE907: `unvalidated_request_input`
+
+**What it flags:** Request data consumed whole with no validation layer. Python + PHP. The cross-framework generalisation of Spring's SAFE903.
+
+Per function / method: a whole-object request-data read with no validation call in the same scope. Detected patterns:
+
+- **Python**: `request.POST` / `request.data` / `request.json` / `request.form` / `request.body` / `request.query_params` consumed whole, with no `is_valid` / `full_clean` / `validate` / `model_validate` / `parse_obj` call and no `Serializer` / `Schema` reference in the function (Django / Flask / FastAPI). Single-field access (`request.POST.get('x')`, `request.GET['q']`) is targeted and NOT flagged.
+- **PHP (Laravel)**: `$request->all()` / `$request->input(...)` with no `$request->validate(...)` call in the method.
+
+The rule is conservative and heuristic: a validation signal *anywhere* in the scope clears the whole function.
+
+| Option | Default | Description |
+|---|---|---|
+| `enabled` | `false` (vanilla) / `true` (framework preset) | Toggle the rule |
+| `severity` | `"warning"` | `"error"` or `"warning"` |
+
+**Bad:**
+
+```python
+def create(request):
+    return Item(**request.data)      # SAFE907: whole body, no validation
+```
+
+**Good:**
+
+```python
+def create(request):
+    serializer = ItemSerializer(data=request.data)
+    serializer.is_valid(raise_exception=True)
+    return serializer.save()
 ```
 
 ## Rust-only rules

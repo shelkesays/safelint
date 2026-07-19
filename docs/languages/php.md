@@ -248,6 +248,25 @@ SafeLint runs alongside the standard PHP tool chain; it doesn't replace any of i
 * **CI**: invoke `safelint check src/ --fail-on warning` (or `--mode ci`) in your build pipeline. Exit code 0 / 1 / 2 maps cleanly to "passed" / "violations found" / "setup error - install hint emitted on stderr".
 * **IDE**: any JSON-output-consuming editor plugin (the safelint JSON schema is stable in v2.0.0+) can surface violations inline.
 
-## Future: framework presets
+## Framework presets
 
-PHP is the most framework-shaped of the supported languages, but this release ships **no** framework preset; the vanilla rule set is what runs. A future `[tool.safelint.php] framework` axis (tokens `laravel` / `symfony` / `wordpress`, lowercase) is on the roadmap, following the precedent of the Java `[tool.safelint.java] framework = "spring-boot"` knob. It would extend `sources_php` with framework request accessors (Laravel's `request()->input(...)`, Symfony's `$request->query->get(...)`, WordPress's `$_REQUEST` wrappers) and add framework-specific structural rules in the 9xx band. This is deferred to a follow-up and is **not** implemented today. Track via [GitHub issues](https://github.com/shelkesays/safelint/issues).
+PHP source is PHP source - the parser and rule logic are framework-agnostic. The rule *defaults* shift with the framework via `[tool.safelint.php] framework = "<name>"`:
+
+| Framework | When to pick it | What changes |
+|---|---|---|
+| `vanilla` (default) | Plain PHP, framework-free libraries | Stdlib-only defaults (the lists in the rules table above). The `SAFE905-907` framework rules are disabled. |
+| `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks. **Enables `SAFE905-907`**: Eloquent `$guarded = []` mass-assignment (SAFE906), `$request->all()` / `->input(...)` without `validate()` (SAFE907), and a `'debug' => true` config-array entry (SAFE905). |
+
+```toml
+# safelint.toml (standalone) - no [tool.safelint] wrapper
+[php]
+framework = "laravel"
+
+# Or, in pyproject.toml:
+[tool.safelint.php]
+framework = "laravel"
+```
+
+Explicit per-rule TOML config still wins over the preset; `[tool.safelint.rules.tainted_sink] sinks_php = [...]` overrides whatever the preset planted. The default framework is `vanilla`, so existing users with no `[php]` config see no behaviour change. An unknown framework name surfaces a `safelint: warning:` on stderr and falls back to `vanilla`.
+
+`.env` files are not parsed, so SAFE905 detects a debug flag only where it appears in PHP code (a `config([...])` array or a returned config array), not in `APP_DEBUG=true` env entries - a documented limit. Symfony / WordPress presets are not shipped; track them via [GitHub issues](https://github.com/shelkesays/safelint/issues).
