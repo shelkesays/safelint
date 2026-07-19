@@ -381,6 +381,61 @@ framework = "spring-boot"
 
 The preset only changes *defaults*, an explicit `[tool.safelint.rules.tainted_sink] sinks_java = [...]` still wins. Unknown framework names surface a `safelint: warning:` line on stderr and fall back to `vanilla`. See the [Java language page](../languages/java.md#framework-presets) for the full per-rule effect.
 
+## Python framework presets
+
+Python source is framework-agnostic to parse, but the rule *defaults* shift with the web framework. The `[tool.safelint.python]` table selects the framework; an orthogonal `pydantic` boolean composes on top of whichever framework is chosen:
+
+```toml
+# pyproject.toml
+[tool.safelint.python]
+framework = "django"   # or "vanilla" (default) / "flask" / "fastapi"
+pydantic = true        # independent axis; adds Pydantic-specific coverage
+```
+
+In a standalone `safelint.toml` (no `[tool.safelint]` wrapper), drop the prefix, the table name is just `[python]`:
+
+```toml
+# safelint.toml (standalone: no [tool.safelint] wrapper)
+[python]
+framework = "fastapi"
+```
+
+| Framework | When to pick it | What changes |
+|---|---|---|
+| `vanilla` (default) | Plain Python, libraries, CLIs, data pipelines | Stdlib-only defaults. The `SAFE905-907` framework rules stay disabled. |
+| `django` | Django / Django REST Framework projects | Adds `raw` / `extra` / `RawSQL` / `mark_safe` / `format_html` / `HttpResponse` / `redirect` / `FileResponse` / `call_command` / `loads` to SAFE801 sinks; treats `.first()` as nullable for SAFE803; **enables `SAFE905-907`**. |
+| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks and the global-proxy `request` as a taint source; enables `SAFE905` + `SAFE907` (not `SAFE906`, Flask has no mass-assignment idiom). |
+| `fastapi` | FastAPI / Starlette apps | Adds `text` / `HTMLResponse` / `Response` / `from_string` / `RedirectResponse` / `FileResponse` to SAFE801 sinks; **enables `SAFE905-907`**. |
+
+`pydantic = true` (independent of `framework`) additively adds Pydantic's validation-skipping constructors `model_construct` / `construct` to the SAFE801 sinks and enables `SAFE906` so an `extra = "allow"` model config fires. It composes with any framework, or stands alone in a vanilla project.
+
+The preset only changes *defaults*, an explicit `[tool.safelint.rules.tainted_sink] sinks = [...]` still wins. Unknown framework names surface a `safelint: warning:` line on stderr and fall back to `vanilla`. See the [Python language page](../languages/python.md#framework-presets) for the full per-rule effect.
+
+## PHP framework presets
+
+The `[tool.safelint.php]` table selects a PHP framework preset:
+
+```toml
+# pyproject.toml
+[tool.safelint.php]
+framework = "laravel"   # or "vanilla" (default)
+```
+
+In a standalone `safelint.toml`, the table name is just `[php]`:
+
+```toml
+# safelint.toml (standalone: no [tool.safelint] wrapper)
+[php]
+framework = "laravel"
+```
+
+| Framework | When to pick it | What changes |
+|---|---|---|
+| `vanilla` (default) | Plain PHP, framework-free libraries | Stdlib-only defaults. The `SAFE905-907` framework rules stay disabled. |
+| `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks; **enables `SAFE905-907`** (Eloquent `$guarded = []` mass-assignment, `$request->all()` unvalidated input, `'debug' => true` config). |
+
+The preset only changes *defaults*, an explicit `[tool.safelint.rules.tainted_sink] sinks_php = [...]` still wins. Unknown framework names surface a `safelint: warning:` line on stderr and fall back to `vanilla`. See the [PHP language page](../languages/php.md#framework-presets) for the full per-rule effect.
+
 ## Adoption path
 
 If you are adding SafeLint to an existing project with many existing violations, start permissive and tighten over time:
