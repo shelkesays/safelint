@@ -35,10 +35,32 @@ def test_pydantic_extra_allow_class_config(tmp_path: Path) -> None:
     assert _codes(src) == ["SAFE906"]
 
 
-def test_pydantic_extra_allow_configdict_and_dict(tmp_path: Path) -> None:
-    """``ConfigDict(extra="allow")`` and ``{"extra": "allow"}`` both fire (Pydantic v2)."""
-    src = _write(tmp_path, "models.py", 'a = ConfigDict(extra="allow")\nb = {"extra": "allow"}\n')
+def test_pydantic_extra_allow_configdict_and_model_config_dict(tmp_path: Path) -> None:
+    """``ConfigDict(extra="allow")`` and ``model_config = {"extra": "allow"}`` both fire (Pydantic v2)."""
+    src = _write(tmp_path, "models.py", 'a = ConfigDict(extra="allow")\nmodel_config = {"extra": "allow"}\n')
     assert _codes(src) == ["SAFE906", "SAFE906"]
+
+
+def test_pydantic_extra_allow_outside_config_context_is_clean(tmp_path: Path) -> None:
+    """``extra="allow"`` on an unrelated call / bare dict / non-Config class does not fire."""
+    src = _write(
+        tmp_path,
+        "models.py",
+        'foo(extra="allow")\nb = {"extra": "allow"}\nclass Foo:\n    extra = "allow"\n',
+    )
+    assert _codes(src) == []
+
+
+def test_attribute_lhs_and_non_config_key_are_clean(tmp_path: Path) -> None:
+    """An attribute-target assignment and a non-``extra`` ConfigDict key do not fire."""
+    src = _write(tmp_path, "models.py", 'x.fields = "__all__"\na = ConfigDict(frozen=True)\n')
+    assert _codes(src) == []
+
+
+def test_unassigned_extra_allow_dict_is_clean(tmp_path: Path) -> None:
+    """A ``{"extra": "allow"}`` dict not bound to ``model_config`` (returned) does not fire."""
+    src = _write(tmp_path, "models.py", 'def build():\n    return {"extra": "allow"}\n')
+    assert _codes(src) == []
 
 
 def test_django_explicit_fields_clean(tmp_path: Path) -> None:
@@ -68,6 +90,12 @@ def test_laravel_guarded_empty(tmp_path: Path) -> None:
 def test_laravel_fillable_clean(tmp_path: Path) -> None:
     """``$fillable`` (allow-list) and a non-empty ``$guarded`` do not fire."""
     src = _write(tmp_path, "Model.php", "<?php class M { protected $fillable = ['a']; protected $guarded = ['x']; } ?>")
+    assert _codes(src) == []
+
+
+def test_laravel_guarded_declared_without_value_clean(tmp_path: Path) -> None:
+    """A ``$guarded`` property with no initialiser does not fire (no empty-array value)."""
+    src = _write(tmp_path, "Model.php", "<?php class M { protected $guarded; } ?>")
     assert _codes(src) == []
 
 

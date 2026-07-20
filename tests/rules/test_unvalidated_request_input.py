@@ -45,9 +45,27 @@ def test_python_targeted_field_access_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_python_non_request_base_data_is_clean(tmp_path: Path) -> None:
+    """A ``.data`` read whose base is not a ``request`` (a call result) does not fire."""
+    src = _write(tmp_path, "views.py", "def one():\n    return save(get_payload().data)\n")
+    assert _codes(src) == []
+
+
 def test_python_flask_request_json_flagged(tmp_path: Path) -> None:
     """Flask ``request.json`` consumed whole with no schema fires."""
     src = _write(tmp_path, "app.py", "def handler(request):\n    return save(request.json)\n")
+    assert _codes(src) == ["SAFE907"]
+
+
+def test_python_fastapi_await_request_json_flagged(tmp_path: Path) -> None:
+    """FastAPI ``await request.json()`` bound whole with no validation fires."""
+    src = _write(tmp_path, "main.py", "async def create(request):\n    return Item(**await request.json())\n")
+    assert _codes(src) == ["SAFE907"]
+
+
+def test_python_serializer_name_without_validation_still_flagged(tmp_path: Path) -> None:
+    """A bare ``Serializer`` name (no ``is_valid()`` call) does NOT clear the finding."""
+    src = _write(tmp_path, "views.py", "def create(request):\n    s = FooSerializer\n    return Model(**request.data)\n")
     assert _codes(src) == ["SAFE907"]
 
 
