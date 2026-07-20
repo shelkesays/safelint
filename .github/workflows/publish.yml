@@ -137,14 +137,20 @@ jobs:
             fi
           fi
 
-          # Tag the (possibly date-stamped) HEAD. Push the TAG FIRST so a
-          # re-triggered gate (from the branch commit below) sees it and skips,
-          # then push the branch commit. The tag push does not re-trigger this
-          # workflow (it is branch-triggered, not tag-triggered).
+          # Tag the (possibly date-stamped) HEAD. When a CHANGELOG commit was
+          # made, push the tag AND the branch commit ATOMICALLY so the tag can
+          # never exist without its dated CHANGELOG landing on the branch - a
+          # non-atomic tag-then-branch would, on a branch-push failure, leave
+          # the release tagged but the CHANGELOG un-dated forever (the
+          # "already tagged" gate then skips every future retry). The branch
+          # push re-triggers this workflow, but the tag is already present so
+          # the gate skips (loop-safe); the tag push itself does not re-trigger
+          # (this workflow is branch-triggered, not tag-triggered).
           git tag "v$VERSION"
-          git push "$REPO_URL" "v$VERSION"
           if [ "$COMMITTED" = "true" ]; then
-            git push "$REPO_URL" "HEAD:$GITHUB_REF_NAME"
+            git push --atomic "$REPO_URL" "v$VERSION" "HEAD:$GITHUB_REF_NAME"
+          else
+            git push "$REPO_URL" "v$VERSION"
           fi
 
       - name: Verify tag matches project version

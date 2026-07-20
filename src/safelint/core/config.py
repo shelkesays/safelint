@@ -2412,8 +2412,10 @@ _PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                     "loads",
                 ],
             },
-            # ``QuerySet.first()`` and ``cache.get()`` return None; ``QuerySet.get``
-            # is NOT nullable (it raises ``DoesNotExist``), so it is not listed.
+            # ``QuerySet.first()`` returns None on no match. ``cache.get()`` is
+            # also nullable but deliberately NOT added - ``get`` is too common a
+            # method name and would be noisy; ``QuerySet.get`` is NOT nullable
+            # (it raises ``DoesNotExist``), so it is not listed either.
             # Applies only when the user enables ``null_dereference``.
             "null_dereference": {"nullable_methods": ["first"]},
             **_ENABLE_FRAMEWORK_RULES,
