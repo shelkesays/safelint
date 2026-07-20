@@ -52,6 +52,10 @@ _PY_DEBUG_RUNNER_CALLS = frozenset({"run"})
 # like a web-app object (``app`` / ``flask_app`` / ``application``), not
 # ``parser.debug`` / ``logger.debug`` etc.
 _PY_APP_RECEIVERS = frozenset({"application"})
+# SAFE906: Pydantic v2 ``model_config = ConfigDict(extra="allow")`` config
+# builders. The keyword-argument ``extra="allow"`` form only counts inside one
+# of these calls, not on any unrelated call.
+_PYDANTIC_CONFIG_CALLS = frozenset({"ConfigDict", "SettingsConfigDict"})
 
 
 def _enclosing_call_name(node: tree_sitter.Node) -> str:
@@ -64,14 +68,27 @@ def _enclosing_call_name(node: tree_sitter.Node) -> str:
     return ""
 
 
-def _inside_class(node: tree_sitter.Node) -> bool:
-    """Return True when *node* has a ``class_definition`` ancestor."""
+def _nearest_class_name(node: tree_sitter.Node) -> str:
+    """Return the name of the nearest enclosing ``class_definition``, or "" if none."""
     parent = node.parent
     while parent is not None:
         if parent.type == _py.CLASS_DEF:
-            return True
+            name = parent.child_by_field_name("name")
+            return node_text(name) if name is not None else ""
         parent = parent.parent
-    return False
+    return ""
+
+
+def _inside_model_config_dict(pair: tree_sitter.Node) -> bool:
+    """Return True when *pair* is inside a ``model_config = {...}`` dict literal."""
+    dictionary = pair.parent
+    if dictionary is None or dictionary.type != _py.DICTIONARY:
+        return False
+    assignment = dictionary.parent
+    if assignment is None or assignment.type != _py.ASSIGNMENT:
+        return False
+    left = assignment.child_by_field_name("left")
+    return left is not None and left.type == _py.IDENTIFIER and node_text(left) == "model_config"
 
 
 def _py_looks_like_app(attr: tree_sitter.Node) -> bool:
@@ -216,25 +233,29 @@ class MassAssignmentRule(BaseRule):
     def _python_hit(self, node: tree_sitter.Node) -> str | None:
         if node.type == _py.ASSIGNMENT:
             return self._python_assignment_hit(node)
-        if node.type == _py.KEYWORD_ARGUMENT:
+        # ``extra="allow"`` only counts inside a Pydantic config construct:
+        # a ``ConfigDict(...)`` call (keyword arg) or a ``model_config = {...}``
+        # dict (pair), not on any unrelated call / dict with the same key.
+        if node.type == _py.KEYWORD_ARGUMENT and _enclosing_call_name(node) in _PYDANTIC_CONFIG_CALLS:
             return _mass_assign_kv(node.named_children, "keyword argument")
-        if node.type == _py.PAIR:
+        if node.type == _py.PAIR and _inside_model_config_dict(node):
             return _mass_assign_kv(node.named_children, "dict entry")
         return None
 
     def _python_assignment_hit(self, node: tree_sitter.Node) -> str | None:
         left = node.child_by_field_name("left")
         right = node.child_by_field_name("right")
-        # ``fields = "__all__"`` / ``extra = "allow"`` are only mass-assignment
-        # signals inside a class body (a ModelForm ``Meta`` / Pydantic model
-        # config), not as bare module-level constants.
-        if left is None or left.type != _py.IDENTIFIER or not _inside_class(node):
+        if left is None or left.type != _py.IDENTIFIER:
             return None
         name = node_text(left)
         value = _py_string_value(right)
-        if name == "fields" and value == "__all__":
+        cls = _nearest_class_name(node)
+        # ``fields = "__all__"`` is a mass-assignment signal only in a ModelForm /
+        # serializer ``class Meta``; ``extra = "allow"`` only in a Pydantic v1
+        # ``class Config`` - not as bare constants or in unrelated classes.
+        if name == "fields" and value == "__all__" and cls == "Meta":
             return 'ModelForm fields = "__all__" binds every field - list fields explicitly instead'
-        if name == "extra" and value == "allow":
+        if name == "extra" and value == "allow" and cls == "Config":
             return 'Pydantic extra = "allow" accepts arbitrary extra input fields - use the default (ignore/forbid)'
         return None
 
@@ -279,10 +300,12 @@ def _php_guarded_empty(node: tree_sitter.Node) -> bool:
 # access (``request.POST.get('x')`` / ``request.POST['x']``) is targeted, not
 # "consume the whole body", so it is excluded via the parent-node check below.
 _PY_REQUEST_BULK = frozenset({"data", "json", "form", "POST", "GET", "values", "body", "query_params"})
-# Presence of any of these in the function marks it as validating - the raw read
-# is then assumed intentional and not flagged.
-_PY_VALIDATION_CALLS = frozenset({"is_valid", "full_clean", "validate", "model_validate", "parse_obj", "validated_data"})
-_PY_VALIDATION_HINTS = ("Serializer", "Schema")
+# A concrete validation *call* anywhere in the function marks it as validating -
+# the raw read is then assumed intentional and not flagged. A bare reference to a
+# ``Serializer`` / ``Schema`` class name is deliberately NOT accepted as proof:
+# naming a serializer without calling ``is_valid()`` does not validate anything,
+# so treating the name as validation would hide real unvalidated-input findings.
+_PY_VALIDATION_CALLS = frozenset({"is_valid", "full_clean", "validate", "model_validate", "parse_obj"})
 _PHP_BULK_REQUEST_METHODS = frozenset({"all", "input"})
 
 
@@ -315,12 +338,8 @@ def _py_bulk_request_read(node: tree_sitter.Node) -> bool:
 
 
 def _py_is_validation(node: tree_sitter.Node) -> bool:
-    """Return True when *node* is a validation call or a serializer/schema reference."""
-    if node.type == _py.CALL:
-        return call_name(node) in _PY_VALIDATION_CALLS
-    if node.type == _py.IDENTIFIER:
-        return any(hint in node_text(node) for hint in _PY_VALIDATION_HINTS)
-    return False
+    """Return True when *node* is a concrete validation call (``is_valid()`` / ``validate()`` / ...)."""
+    return node.type == _py.CALL and call_name(node) in _PY_VALIDATION_CALLS
 
 
 def _php_is_bulk_request_call(node: tree_sitter.Node) -> bool:
@@ -349,12 +368,14 @@ class UnvalidatedRequestInputRule(BaseRule):
     whole-object request-data read with no validation in the same scope.
 
     * **Python**: ``request.POST`` / ``request.data`` / ``request.json`` /
-      ``request.form`` / ``request.body`` consumed whole, with no ``is_valid`` /
-      ``full_clean`` / ``validate`` / ``model_validate`` call and no
-      ``Serializer`` / ``Schema`` reference in the function (Django / Flask /
-      FastAPI). Single-field access (``request.POST.get('x')``) is not flagged.
-    * **PHP (Laravel)**: ``$request->all()`` / ``$request->input(...)`` with no
-      ``$request->validate(...)`` call in the method.
+      ``request.form`` / ``request.body`` consumed whole, with no concrete
+      validation *call* (``is_valid`` / ``full_clean`` / ``validate`` /
+      ``model_validate`` / ``parse_obj``) in the function (Django / Flask /
+      FastAPI). A bare ``Serializer`` / ``Schema`` name is not accepted as
+      validation. Single-field access (``request.POST.get('x')``) is not flagged.
+    * **PHP (Laravel)**: ``$request->all()`` / bare ``$request->input()`` with no
+      ``$request->validate(...)`` call in the method (``$request->input('field')``
+      is a targeted read and is not flagged).
 
     Conservative + heuristic (a validation call *anywhere* in the scope clears
     the whole function); default-disabled, enabled by the framework presets.
