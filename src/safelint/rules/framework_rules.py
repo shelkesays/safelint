@@ -44,6 +44,45 @@ def _py_string_value(node: tree_sitter.Node | None) -> str | None:
     return node_text(node).strip("'\"")
 
 
+# SAFE905: a ``debug=True`` / ``reload=True`` keyword argument only counts on a
+# framework app-runner call (``app.run(debug=True)`` / ``uvicorn.run(reload=True)``),
+# not on unrelated calls like ``client.connect(debug=True)``.
+_PY_DEBUG_RUNNER_CALLS = frozenset({"run"})
+# An ``x.debug = True`` attribute assignment only counts when the receiver looks
+# like a web-app object (``app`` / ``flask_app`` / ``application``), not
+# ``parser.debug`` / ``logger.debug`` etc.
+_PY_APP_RECEIVERS = frozenset({"application"})
+
+
+def _enclosing_call_name(node: tree_sitter.Node) -> str:
+    """Return the callee name of the nearest enclosing ``call``, or "" if none."""
+    parent = node.parent
+    while parent is not None:
+        if parent.type == _py.CALL:
+            return call_name(parent) or ""
+        parent = parent.parent
+    return ""
+
+
+def _inside_class(node: tree_sitter.Node) -> bool:
+    """Return True when *node* has a ``class_definition`` ancestor."""
+    parent = node.parent
+    while parent is not None:
+        if parent.type == _py.CLASS_DEF:
+            return True
+        parent = parent.parent
+    return False
+
+
+def _py_looks_like_app(attr: tree_sitter.Node) -> bool:
+    """Return True when an attribute's receiver looks like a web-app object."""
+    kids = attr.named_children
+    if not kids:
+        return False
+    receiver = node_text(kids[0]).lower()
+    return receiver.endswith("app") or receiver in _PY_APP_RECEIVERS
+
+
 class DebugModeEnabledRule(BaseRule):
     """Flag a framework debug / reload flag hard-enabled in code (SAFE905).
 
@@ -96,13 +135,17 @@ class DebugModeEnabledRule(BaseRule):
             return None
         if left.type == _py.IDENTIFIER and node_text(left) == "DEBUG":
             return "DEBUG = True - never enable debug mode in production (Django)"
-        if left.type == _py.ATTRIBUTE and _py_attr_last_name(left) in _PY_DEBUG_ATTR_NAMES:
+        if left.type == _py.ATTRIBUTE and _py_attr_last_name(left) in _PY_DEBUG_ATTR_NAMES and _py_looks_like_app(left):
             return f"debug mode enabled via {node_text(left)} = True - disable it in production"
         return None
 
     def _python_kwarg_hit(self, node: tree_sitter.Node) -> str | None:
         kids = node.named_children
         if len(kids) < 2 or kids[1].type != _py.TRUE:
+            return None
+        # Only a framework app-runner call (``run(...)``) counts, so an unrelated
+        # ``client.connect(debug=True)`` is not misread as debug mode.
+        if _enclosing_call_name(node) not in _PY_DEBUG_RUNNER_CALLS:
             return None
         name = node_text(kids[0])
         if name in _PY_DEBUG_KWARGS:
@@ -182,7 +225,10 @@ class MassAssignmentRule(BaseRule):
     def _python_assignment_hit(self, node: tree_sitter.Node) -> str | None:
         left = node.child_by_field_name("left")
         right = node.child_by_field_name("right")
-        if left is None or left.type != _py.IDENTIFIER:
+        # ``fields = "__all__"`` / ``extra = "allow"`` are only mass-assignment
+        # signals inside a class body (a ModelForm ``Meta`` / Pydantic model
+        # config), not as bare module-level constants.
+        if left is None or left.type != _py.IDENTIFIER or not _inside_class(node):
             return None
         name = node_text(left)
         value = _py_string_value(right)
@@ -240,6 +286,12 @@ _PY_VALIDATION_HINTS = ("Serializer", "Schema")
 _PHP_BULK_REQUEST_METHODS = frozenset({"all", "input"})
 
 
+def _php_argc(node: tree_sitter.Node) -> int:
+    """Return the number of arguments passed in a PHP call node."""
+    args = node.child_by_field_name("arguments")
+    return len(args.named_children) if args is not None else 0
+
+
 def _py_is_request_base(node: tree_sitter.Node) -> bool:
     """Return True when *node* is a ``request`` reference (``request`` or ``self.request``)."""
     if node.type == _py.IDENTIFIER:
@@ -272,11 +324,21 @@ def _py_is_validation(node: tree_sitter.Node) -> bool:
 
 
 def _php_is_bulk_request_call(node: tree_sitter.Node) -> bool:
-    """Return True when *node* is ``$request->all()`` / ``->input(...)`` (a bulk request read)."""
+    """Return True when *node* is a whole-object request read (``$request->all()`` / bare ``->input()``).
+
+    ``$request->input('field')`` is a *targeted* single-field read, so it is
+    excluded - matching the Python side, which excludes ``request.POST.get('x')``.
+    Only ``->all()`` and a bare ``->input()`` (no field name) consume the whole body.
+    """
     if node.type != _php.MEMBER_CALL_EXPRESSION:
         return False
     obj = node.child_by_field_name("object")
-    return obj is not None and node_text(obj).lstrip("$").endswith("request") and call_name(node) in _PHP_BULK_REQUEST_METHODS
+    if obj is None or not node_text(obj).lstrip("$").endswith("request"):
+        return False
+    method = call_name(node)
+    if method == "all":
+        return True
+    return method == "input" and _php_argc(node) == 0
 
 
 class UnvalidatedRequestInputRule(BaseRule):

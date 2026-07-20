@@ -95,7 +95,7 @@ Python source is Python source - the parser, tree, and rule logic are framework-
 |---|---|---|
 | `vanilla` (default) | Plain Python, libraries, CLIs, data pipelines | Stdlib-only defaults (the lists in the rules table above). The `SAFE905-907` framework rules are disabled. |
 | `django` | Django / Django REST Framework projects | Adds `raw` / `extra` / `RawSQL` / `mark_safe` / `format_html` / `HttpResponse` / `HttpResponseRedirect` / `redirect` / `FileResponse` / `call_command` / `loads` to SAFE801 sinks; treats `.first()` as nullable for SAFE803. **Enables `SAFE905-907`.** |
-| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks and the global-proxy `request` as a taint source. **Enables `SAFE905` + `SAFE907`** (not `SAFE906` - Flask has no mass-assignment idiom). |
+| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks. **Enables `SAFE905` + `SAFE907`** (not `SAFE906` - Flask has no mass-assignment idiom). |
 | `fastapi` | FastAPI / Starlette apps | Adds `text` / `HTMLResponse` / `Response` / `from_string` / `RedirectResponse` / `FileResponse` to SAFE801 sinks. **Enables `SAFE905-907`.** |
 
 `pydantic = true` (independent of `framework`) additively adds Pydantic's validation-skipping constructors `model_construct` / `construct` to the SAFE801 sinks and enables `SAFE906` so an `extra = "allow"` model config fires. It composes with any framework, or stands alone in a vanilla project.
@@ -112,6 +112,8 @@ framework = "fastapi"
 ```
 
 Explicit per-rule TOML config still wins over the preset; setting `[tool.safelint.rules.tainted_sink] sinks = [...]` overrides whatever the preset planted. The default framework is `vanilla`, so existing users with no `[python]` config see no behaviour change. Unknown framework names surface a `safelint: warning:` on stderr and fall back to `vanilla`.
+
+The `SAFE905-907` structural rules are enabled by the preset directly. The dataflow additions (the extra SAFE801 sinks, `.first()` nullable, `pydantic`'s constructors) only extend the *lists* - the multi-language dataflow rules (`tainted_sink`, `return_value_ignored`, `null_dereference`) stay **opt-in**, exactly as with the Java Spring preset (a Python framework choice must not turn dataflow on for other languages in a polyglot repo). Enable them explicitly to use the framework sinks. As with every language, the intra-procedural tracker follows direct taint flows, not `request.<attr>` attribute chains.
 
 ## Installing the Python extra
 

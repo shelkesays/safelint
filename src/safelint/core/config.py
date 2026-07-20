@@ -2365,15 +2365,17 @@ def _resolve_java_framework(cfg: dict[str, Any]) -> str:
 _VANILLA_PY_SINKS: list[str] = DEFAULTS["rules"]["tainted_sink"]["sinks"]
 _VANILLA_PHP_SINKS: list[str] = DEFAULTS["rules"]["tainted_sink"]["sinks_php"]
 
-# The framework preset's core "turn on the framework-aware checks" knob. The
-# dataflow rules SAFE801/802/803 are opt-in for performance; the preset flips
-# them on (``"enabled": True`` is inlined into each rule's override dict below -
-# it must NOT be a separate dict-spread, or it would collide with and overwrite
-# the ``tainted_sink`` / ``null_dereference`` sink/nullable overrides). SAFE309
-# is NOT enabled (it overlaps SAFE801 on eval/exec; SAFE801 is taint-aware and
-# owns that surface). The three shared framework rules only need enabling, so
-# they can be spread in safely (no collision).
-_ENABLE_802: dict[str, dict[str, bool]] = {"return_value_ignored": {"enabled": True}}
+# A framework preset extends the SAFE801 sink lists so that *if* the user opts
+# into the dataflow rules, the framework's injection surface is recognised. It
+# deliberately does NOT flip
+# ``enabled = True`` on the shared multi-language dataflow rules
+# (SAFE801/802/803): those rules carry a multi-language ``language`` tuple, so
+# enabling them in the shared DEFAULTS would turn them on for *every* language
+# in a polyglot repo (a Go / JS / Rust file would start failing on a Python
+# framework selection). This mirrors the Java Spring preset, which likewise
+# extends the sink list but leaves ``tainted_sink`` opt-in. Only the framework
+# rules below - SAFE905/906/907, whose ``language`` tuple is exactly
+# ``("python", "php")`` - are auto-enabled by the preset.
 _ENABLE_FRAMEWORK_RULES: dict[str, dict[str, bool]] = {
     "debug_mode_enabled": {"enabled": True},
     "mass_assignment": {"enabled": True},
@@ -2387,14 +2389,14 @@ _PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
     "django": {
         "rules": {
             "tainted_sink": {
-                "enabled": True,
                 # ORM raw SQL (``.raw()`` / ``.extra()`` / ``RawSQL`` / cursor
                 # ``execute`` - already vanilla), SSTI / XSS escape hatches
                 # (``mark_safe`` / ``format_html``), open-redirect / reflected
                 # output sinks, path traversal (``FileResponse``), command exec
                 # (``call_command``), and unsafe deserialisation (``loads`` -
                 # ``django.core.signing`` / ``pickle``). Bare ``open`` is
-                # excluded (far too common).
+                # excluded (far too common). Recognised only when the user
+                # opts into ``tainted_sink`` (the preset does not enable it).
                 "sinks": [
                     *_VANILLA_PY_SINKS,
                     "raw",
@@ -2412,15 +2414,14 @@ _PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
             },
             # ``QuerySet.first()`` and ``cache.get()`` return None; ``QuerySet.get``
             # is NOT nullable (it raises ``DoesNotExist``), so it is not listed.
-            "null_dereference": {"enabled": True, "nullable_methods": ["first"]},
-            **_ENABLE_802,
+            # Applies only when the user enables ``null_dereference``.
+            "null_dereference": {"nullable_methods": ["first"]},
             **_ENABLE_FRAMEWORK_RULES,
         },
     },
     "flask": {
         "rules": {
             "tainted_sink": {
-                "enabled": True,
                 # SSTI (``render_template_string`` - the marquee Flask sink;
                 # the file-based ``render_template`` is safe and NOT listed),
                 # XSS (``Markup``), open redirect (``redirect``), path traversal
@@ -2434,9 +2435,13 @@ _PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                     "send_from_directory",
                     "make_response",
                 ],
+                # NOTE: Flask's ``request`` is a module-level global proxy, not a
+                # handler parameter, so it is never seeded as tainted (the
+                # tracker seeds function parameters and taints ``sources`` call
+                # *results*, not bare global identifiers). These sinks therefore
+                # fire only on taint the tracker does model; the request-global
+                # flow is a documented limitation, not modelled here.
             },
-            "null_dereference": {"enabled": True},
-            **_ENABLE_802,
             # Flask has no ORM / mass-assignment concept, so SAFE906 is NOT
             # enabled here; SAFE905 + SAFE907 are.
             "debug_mode_enabled": {"enabled": True},
@@ -2446,7 +2451,6 @@ _PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
     "fastapi": {
         "rules": {
             "tainted_sink": {
-                "enabled": True,
                 # SQLAlchemy raw SQL (``text`` / ``execute``), XSS via response
                 # bodies (``HTMLResponse`` / ``Response``), SSTI (Jinja2
                 # ``from_string``), open redirect (``RedirectResponse``), path
@@ -2461,8 +2465,6 @@ _PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                     "FileResponse",
                 ],
             },
-            "null_dereference": {"enabled": True},
-            **_ENABLE_802,
             "debug_mode_enabled": {"enabled": True},
             "unvalidated_request_input": {"enabled": True},
         },
@@ -2481,11 +2483,11 @@ _PHP_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
     "laravel": {
         "rules": {
             "tainted_sink": {
-                "enabled": True,
                 # Only unambiguous compound builder names (``whereRaw`` etc.);
                 # bare ``raw`` / ``statement`` / ``render`` / ``to`` are excluded
                 # (they collide with view/response/redirect helpers everywhere).
-                # ``unserialize`` is already vanilla.
+                # ``unserialize`` is already vanilla. Recognised only when the
+                # user opts into ``tainted_sink`` (the preset does not enable it).
                 "sinks_php": [
                     *_VANILLA_PHP_SINKS,
                     "whereRaw",
@@ -2495,8 +2497,6 @@ _PHP_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                     "unprepared",
                 ],
             },
-            "null_dereference": {"enabled": True},
-            **_ENABLE_802,
             **_ENABLE_FRAMEWORK_RULES,
         },
     },

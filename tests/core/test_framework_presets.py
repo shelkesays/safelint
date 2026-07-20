@@ -122,16 +122,36 @@ def test_laravel_preset_sinks_php_retain_all_vanilla() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_django_preset_lands_sinks_and_enables_rules() -> None:
-    """Applying django adds its sinks and enables the dataflow + framework rules."""
+def test_django_preset_lands_sinks_and_enables_framework_rules() -> None:
+    """Applying django adds its sinks and enables the SAFE905-907 framework rules."""
     d = copy.deepcopy(DEFAULTS)
     _apply_python_framework_preset(d, "django")
     sinks = d["rules"]["tainted_sink"]["sinks"]
     assert "RawSQL" in sinks
     assert "mark_safe" in sinks
-    assert d["rules"]["tainted_sink"]["enabled"] is True
     for rule in ("debug_mode_enabled", "mass_assignment", "unvalidated_request_input"):
         assert d["rules"][rule]["enabled"] is True
+
+
+def test_preset_does_not_enable_shared_dataflow_rules() -> None:
+    """A framework preset must NOT auto-enable the multi-language dataflow rules.
+
+    Those rules apply to every language, so enabling them in the shared
+    DEFAULTS would fire SAFE801/802/803 on Go / JS / Rust files when a
+    user selects a *Python* (or PHP) framework. The preset only extends the
+    sink lists; enabling stays the user's explicit, per-rule choice.
+    """
+    cases = (
+        ("django", _apply_python_framework_preset),
+        ("flask", _apply_python_framework_preset),
+        ("fastapi", _apply_python_framework_preset),
+        ("laravel", _apply_php_framework_preset),
+    )
+    for framework, applier in cases:
+        d = copy.deepcopy(DEFAULTS)
+        applier(d, framework)
+        for rule in ("tainted_sink", "return_value_ignored", "null_dereference"):
+            assert d["rules"][rule]["enabled"] is False, f"{framework} must not auto-enable {rule}"
 
 
 def test_flask_preset_does_not_enable_mass_assignment() -> None:
