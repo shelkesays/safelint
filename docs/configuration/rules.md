@@ -1375,7 +1375,7 @@ The following three rules generalise across the Python (Django / Flask / FastAPI
 
 Debug mode in production leaks stack traces, settings, and (Flask / Werkzeug) an interactive console; auto-reload is a development-only convenience. Detected patterns:
 
-- **Python**: `DEBUG = True` (Django settings), `app.debug = True` / `app.run(debug=True)` (Flask), `uvicorn.run(..., reload=True)` and any `debug=True` keyword (FastAPI / ASGI).
+- **Python**: `DEBUG = True` (Django settings), `app.debug = True` (Flask; the receiver must look like an app object), and a `debug=True` / `reload=True` keyword on a framework runner call - `app.run(debug=True)` (Flask), `uvicorn.run(..., reload=True)` (FastAPI / ASGI). A `debug=True` keyword on an unrelated call (e.g. `client.connect(debug=True)`) is not flagged.
 - **PHP**: a config-array entry whose key ends in `debug` mapped to `true` (`'app.debug' => true`, `'debug' => true`). `.env` files are not parsed, so this is code-only.
 
 | Option | Default | Description |

@@ -11,7 +11,7 @@ by GitHub Actions.
 Work happens on a `feature/*` branch that PRs into `development`, never straight
 into `main`.
 
-```
+```text
 feature/*  --PR-->  development  --PR-->  main
    (work)        (RC releases)      (final release)
 ```

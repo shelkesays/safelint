@@ -4,9 +4,14 @@
 -> release` dance and the recurring `development` / `main` divergence that forces
 squash-over-rebase. **Not** a code or rule change.
 
-**Status**: planned, not started. Design confirmed with the owner; this doc is
-the review artifact before any workflow changes land. High-stakes (touches PyPI
-publishing and branch protection), so review this end to end first.
+**Status**: **shipped** - live as of the 2.9.0 cycle. `publish.yml`,
+`sync-development.yml`, `scripts/changelog_section.py`,
+`scripts/date_changelog.py`, and `bin/sync.sh` all landed and cut the
+`v2.8.5rc1` / `v2.9.0rc1` pre-releases. The section 8 "open decisions" were all
+resolved as recommended (RELEASE_PAT; keep the `pypi` reviewer gate for finals
+only; fail+notify on an unsafe sync). This doc is retained as the design /
+reference record; the prospective "rollout plan" (section 6) and "open
+decisions" (section 8) below are kept for history and read in the past tense.
 
 **Confirmed decisions** (owner): release notes come from the **CHANGELOG
 section**; the post-merge sync **resets `development` to `main` only when safe**
