@@ -44,7 +44,7 @@ No languages are currently on the near-term roadmap. SafeLint's registry-driven 
 | **Python + C++** | 1 | SAFE201 (`bare_except`); Python's bare `except:` and C++'s `catch (...)` catch-all. JS / TS / Java catches always bind the error, and Rust / Go / PHP / C have no bare-catch equivalent. |
 | **JavaScript-family-only** (JS and TS) | 1 | SAFE305 (`wide_scope_declaration`); Python / Java / Rust / Go / PHP have no `var` / `let` / `const` distinction. |
 | **Java + Spring Boot only** | 4 | SAFE901 (`spring_field_injection`), SAFE902 (`spring_missing_transactional`), SAFE903 (`spring_unvalidated_input`), SAFE904 (`spring_async_checked_exception`); all default-disabled under vanilla, default-enabled by the `spring-boot` framework preset. |
-| **Python / PHP framework presets only** | 3 | SAFE905 (`debug_mode_enabled`), SAFE906 (`mass_assignment`), SAFE907 (`unvalidated_request_input`); all default-disabled, enabled by the Python (`django` / `flask` / `fastapi` / `pydantic`) and PHP (`laravel`) framework presets. The non-Java analogue of the Spring `SAFE9xx` rules. |
+| **Python / PHP framework presets only** | 3 | SAFE905 (`debug_mode_enabled`), SAFE906 (`mass_assignment`), SAFE907 (`unvalidated_request_input`); all default-disabled, enabled by the Python / PHP framework presets (Django / FastAPI / Laravel enable all three; Flask enables SAFE905 + SAFE907; `pydantic = true` enables SAFE906). The non-Java analogue of the Spring `SAFE9xx` rules. |
 | **Rust-only** | 11 | SAFE110 (`needless_mut`), SAFE112 (`unchecked_arithmetic_on_input`), SAFE204 (`panic_macros_outside_tests`), SAFE205 (`lock_poisoning_ignored`), SAFE206 (`silent_result_discard`, the Rust analogue of SAFE202), SAFE207 (`unlogged_error_branch`, the Rust analogue of SAFE203), SAFE208 (`result_unwrap_outside_tests`), SAFE306 (`dangerous_mem_ops`), SAFE307 (`interior_mutable_static`), SAFE308 (`truncating_as_cast`), SAFE602 (`undocumented_unsafe`); all default-disabled. |
 | **Go-only** | 2 | SAFE209 (`empty_error_check`, the Go analogue of SAFE206), SAFE211 (`panic_calls_outside_tests`, the Go analogue of SAFE204); both default-disabled. |
 | **C-family** (C and C++) | 5 | SAFE106 (`nonlocal_jumps`, `goto` / `setjmp`; **enabled at warning severity**), SAFE310 (`dynamic_allocation`; on C++ also `new` / `delete`), SAFE311 (`complex_macro`), SAFE312 (`conditional_compilation`), SAFE313 (`restricted_pointers`; smart pointers exempt on C++); the last four default-disabled. The Power-of-Ten clauses (rules 1, 3, 8, 9) every other language adapts away. |
@@ -1399,6 +1399,22 @@ import os
 DEBUG = os.environ.get("DJANGO_DEBUG") == "1"   # env-driven, off by default
 ```
 
+The framework presets enable this rule automatically; enable it directly with either TOML layout:
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.debug_mode_enabled]
+enabled = true
+severity = "warning"
+```
+
+```toml
+# safelint.toml
+[rules.debug_mode_enabled]
+enabled = true
+severity = "warning"
+```
+
 ### SAFE906: `mass_assignment`
 
 **What it flags:** Unbounded attribute binding from request data. Python + PHP.
@@ -1430,16 +1446,32 @@ class Meta:
     fields = ["name", "email"]   # explicit allow-list
 ```
 
+The `django` / `fastapi` / `laravel` presets and `pydantic = true` enable this rule automatically; enable it directly with either TOML layout:
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.mass_assignment]
+enabled = true
+severity = "error"
+```
+
+```toml
+# safelint.toml
+[rules.mass_assignment]
+enabled = true
+severity = "error"
+```
+
 ### SAFE907: `unvalidated_request_input`
 
 **What it flags:** Request data consumed whole with no validation layer. Python + PHP. The cross-framework generalisation of Spring's SAFE903.
 
 Per function / method: a whole-object request-data read with no validation call in the same scope. Detected patterns:
 
-- **Python**: `request.POST` / `request.data` / `request.json` / `request.form` / `request.body` / `request.query_params` consumed whole, with no `is_valid` / `full_clean` / `validate` / `model_validate` / `parse_obj` call and no `Serializer` / `Schema` reference in the function (Django / Flask / FastAPI). Single-field access (`request.POST.get('x')`, `request.GET['q']`) is targeted and NOT flagged.
-- **PHP (Laravel)**: `$request->all()` / `$request->input(...)` with no `$request->validate(...)` call in the method.
+- **Python**: `request.POST` / `request.data` / `request.json` / `request.form` / `request.body` / `request.query_params` consumed whole, with no concrete validation *call* (`is_valid` / `full_clean` / `validate` / `model_validate` / `parse_obj`) in the function (Django / Flask / FastAPI). A bare `Serializer` / `Schema` name reference is not accepted as validation. Single-field access (`request.POST.get('x')`, `request.GET['q']`) is targeted and NOT flagged.
+- **PHP (Laravel)**: `$request->all()` / bare `$request->input()` with no `$request->validate(...)` call in the method (`$request->input('field')` is a targeted read and is not flagged).
 
-The rule is conservative and heuristic: a validation signal *anywhere* in the scope clears the whole function.
+The rule is conservative and heuristic: a validation call *anywhere* in the scope clears the whole function.
 
 | Option | Default | Description |
 |---|---|---|
@@ -1460,6 +1492,22 @@ def create(request):
     serializer = ItemSerializer(data=request.data)
     serializer.is_valid(raise_exception=True)
     return serializer.save()
+```
+
+The framework presets enable this rule automatically; enable it directly with either TOML layout:
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.unvalidated_request_input]
+enabled = true
+severity = "warning"
+```
+
+```toml
+# safelint.toml
+[rules.unvalidated_request_input]
+enabled = true
+severity = "warning"
 ```
 
 ## Rust-only rules

@@ -154,6 +154,21 @@ def test_preset_does_not_enable_shared_dataflow_rules() -> None:
             assert d["rules"][rule]["enabled"] is False, f"{framework} must not auto-enable {rule}"
 
 
+def test_pydantic_preset_does_not_enable_tainted_sink() -> None:
+    """``pydantic = true`` must not enable the shared ``tainted_sink`` rule either.
+
+    Same polyglot-safety contract as the framework presets: the composable
+    Pydantic toggle appends its constructors to the sink list and enables the
+    Python/PHP-scoped ``mass_assignment`` rule, but leaves the multi-language
+    ``tainted_sink`` opt-in so it never fires on Go / JS / Rust files.
+    """
+    d = copy.deepcopy(DEFAULTS)
+    _apply_python_pydantic_preset(d, enabled=True)
+    assert d["rules"]["tainted_sink"]["enabled"] is False
+    assert "model_construct" in d["rules"]["tainted_sink"]["sinks"]
+    assert d["rules"]["mass_assignment"]["enabled"] is True
+
+
 def test_flask_preset_does_not_enable_mass_assignment() -> None:
     """Flask has no ORM, so SAFE906 stays disabled under the flask preset."""
     d = copy.deepcopy(DEFAULTS)
