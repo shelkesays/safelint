@@ -57,6 +57,18 @@ def test_python_unrelated_true_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_python_debug_kwarg_on_non_runner_call_is_clean(tmp_path: Path) -> None:
+    """``debug=True`` on a non-runner call (``client.connect``) is not debug mode."""
+    src = _write(tmp_path, "main.py", "def f():\n    client.connect(debug=True)\n")
+    assert _codes(src) == []
+
+
+def test_python_debug_attribute_on_non_app_receiver_is_clean(tmp_path: Path) -> None:
+    """``parser.debug = True`` / ``logger.debug = True`` (non-app receiver) do not fire."""
+    src = _write(tmp_path, "cli.py", "parser.debug = True\nlogger.debug = True\n")
+    assert _codes(src) == []
+
+
 # ---------------------------------------------------------------------------
 # PHP
 # ---------------------------------------------------------------------------
