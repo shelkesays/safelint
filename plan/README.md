@@ -63,10 +63,12 @@ only when safe. High-stakes (PyPI + branch protection) - read the spec's setup
 ## Deferred cross-language refactors (run AFTER the languages above)
 
 These were not language additions; they were codebase-wide sweeps best done once
-the language set is stable, so they didn't have to be redone per language.
-**All of them have shipped**, so - following the same convention as the shipped
-languages above - their spec files were removed on completion. The design
-decisions now live in the referenced CHANGELOG entries and the shipped code.
+the language set is stable, so they didn't have to be redone per language. The
+three below have **shipped**, so - following the same convention as the shipped
+languages above - their spec files were removed on completion (the design
+decisions now live in the referenced CHANGELOG entries and the shipped code). One
+new cross-language enhancement remains **planned**, listed in the table after
+them.
 
 > **Node-type / operator constants shipped in v2.8.2** (PR #107). Converted the
 > per-language node-type / operator tables in `src/safelint/rules/` from raw
@@ -89,7 +91,16 @@ decisions now live in the referenced CHANGELOG entries and the shipped code.
 > MEDIUM findings and none default-flow-exploitable; the backlog is empty. Its
 > spec, `plan/security-hardening.md`, was removed on completion.
 
-No deferred refactors remain.
+| Spec | Scope | Status |
+|---|---|---|
+| [`taint-attribute-propagation.md`](taint-attribute-propagation.md) | Make the intra-procedural taint trackers carry taint through attribute / subscript / tainted-receiver chains (`request.GET["q"]`, `$request->input('x')`), so the framework-preset (and Spring / JS-runtime) SAFE801 sink extensions actually fire on realistic request-driven code instead of only direct-parameter flows | Planned - not started |
+
+Surfaced by the v2.9.0 framework-presets code review: the added sinks are inert
+on idiomatic web-framework code because taint is lost at the first `request.<attr>`
+access (a pre-existing, cross-language tracker limitation the Spring preset shares).
+Cross-cutting change to all six trackers - read the spec's "Risks and open
+decisions" (whether to gate the noisy method-call-on-tainted-receiver step behind
+a config knob) before implementing.
 
 ## How to use these specs
 
