@@ -69,6 +69,12 @@ def test_python_debug_attribute_on_non_app_receiver_is_clean(tmp_path: Path) -> 
     assert _codes(src) == []
 
 
+def test_python_non_debug_kwarg_on_runner_call_is_clean(tmp_path: Path) -> None:
+    """A non-debug/reload keyword on a ``run(...)`` call (``threaded=True``) does not fire."""
+    src = _write(tmp_path, "app.py", "def f():\n    app.run(threaded=True)\n")
+    assert _codes(src) == []
+
+
 # ---------------------------------------------------------------------------
 # PHP
 # ---------------------------------------------------------------------------

@@ -162,11 +162,16 @@ def test_framework_rules_disabled_under_vanilla_php() -> None:
 
 
 def test_pydantic_enables_mass_assignment_under_fastapi() -> None:
-    """``pydantic = true`` enables SAFE906 so ``extra = "allow"`` fires even under FastAPI."""
-    src = FIXTURES_DIR / "fastapi" / "main.py"
-    # main.py has no extra="allow"; assert the toggle itself lands by
-    # checking the rule is enabled in the merged config.
-    cfg = _python_config("fastapi", pydantic=True)
-    assert cfg["rules"]["mass_assignment"]["enabled"] is True
-    assert "model_construct" in cfg["rules"]["tainted_sink"]["sinks"]
-    assert src.exists()
+    """``pydantic = true`` end-to-end: SAFE906 fires on ``extra = "allow"`` under FastAPI.
+
+    The FastAPI preset alone does NOT enable mass_assignment, so the same
+    fixture is clean without ``pydantic = true`` - proving the composable
+    toggle, not just the config flag, drives the detection.
+    """
+    with_pydantic = _codes(_python_config("fastapi", pydantic=True), "fastapi/schemas.py")
+    without_pydantic = _codes(_python_config("fastapi", pydantic=False), "fastapi/schemas.py")
+    assert _count(with_pydantic, "SAFE906") == 1, with_pydantic
+    assert _count(without_pydantic, "SAFE906") == 0, without_pydantic
+    # The composable toggle also adds the validation-skipping constructors to
+    # the SAFE801 sink list (used when the user opts into tainted_sink).
+    assert "model_construct" in _python_config("fastapi", pydantic=True)["rules"]["tainted_sink"]["sinks"]
