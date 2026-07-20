@@ -16,13 +16,13 @@ If either check returns non-zero (or the shell reports "command not found" / "is
 
   | Project contains | Install command |
   |---|---|
-  | `.py` / `.pyw` | `uv add 'safelint[python]'` or `pip install 'safelint[python]'` |
+  | `.py` / `.pyw` | `uv add 'safelint[python]'` or `pip install 'safelint[python]'` (Django / Flask / FastAPI + Pydantic via `[tool.safelint.python] framework = "..."` / `pydantic = true`, see `languages/python.md`) |
   | `.js` / `.mjs` / `.cjs` | `uv add 'safelint[javascript]'` or `pip install 'safelint[javascript]'` |
   | `.ts` / `.tsx` / `.as` | `uv add 'safelint[typescript]'` or `pip install 'safelint[typescript]'` (bundles JS) |
   | `.java` | `uv add 'safelint[java]'` or `pip install 'safelint[java]'` (Spring Boot via `[tool.safelint.java] framework = "spring-boot"`, see `languages/java.md`) |
   | `.rs` | `uv add 'safelint[rust]'` or `pip install 'safelint[rust]'` (Rust-specific rules and Holzmann-inspired additions; see `languages/rust.md`) |
   | `.go` | `uv add 'safelint[go]'` or `pip install 'safelint[go]'` (Go-specific rules and idiomatic adaptations; see `languages/go.md`) |
-  | `.php` | `uv add 'safelint[php]'` or `pip install 'safelint[php]'` (PHP-specific rules and idiomatic adaptations; see `languages/php.md`) |
+  | `.php` | `uv add 'safelint[php]'` or `pip install 'safelint[php]'` (Laravel via `[tool.safelint.php] framework = "laravel"`; PHP-specific rules and idiomatic adaptations; see `languages/php.md`) |
   | `.c`, `.h` | `uv add 'safelint[c]'` or `pip install 'safelint[c]'` (C-specific rules and the Power-of-Ten "homecoming"; see `languages/c.md`) |
   | `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh` | `uv add 'safelint[cpp]'` or `pip install 'safelint[cpp]'` (C++ idiom rules layered on the C family; see `languages/cpp.md`) |
   | Multiple languages | Compose, e.g. `pip install 'safelint[python,javascript]'` |
@@ -40,13 +40,13 @@ Look at the project files in cwd to figure out which languages safelint can lint
 
 | Language | Extensions | Addendum file |
 |---|---|---|
-| Python | `.py`, `.pyw` | `languages/python.md` |
+| Python (vanilla + Django / Flask / FastAPI / Pydantic presets) | `.py`, `.pyw` | `languages/python.md` |
 | JavaScript (Node) | `.js`, `.mjs`, `.cjs` | `languages/javascript.md` |
 | TypeScript (also AssemblyScript) | `.ts`, `.tsx`, `.as` | `languages/typescript.md` |
 | Java (vanilla and Spring Boot) | `.java` | `languages/java.md` |
 | Rust | `.rs` | `languages/rust.md` |
 | Go | `.go` | `languages/go.md` |
-| PHP | `.php` | `languages/php.md` |
+| PHP (vanilla + Laravel preset) | `.php` | `languages/php.md` |
 | C | `.c`, `.h` | `languages/c.md` |
 | C++ | `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh` | `languages/cpp.md` |
 
