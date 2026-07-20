@@ -21,7 +21,7 @@ v2.0.0+ ships every language grammar as an opt-in extra. Plain `pip install safe
 
 ## Rules that fire on Rust
 
-**26 rules apply to Rust**: 15 cross-language rules (the all-five-languages set) + 11 Rust-only rules. 7 cross-language rules are deliberately skipped, see the next section.
+**26 rules apply to Rust**: 15 cross-language rules + 11 Rust-only rules. 7 cross-language rules are deliberately skipped, see the next section.
 
 ### Cross-language rules
 
