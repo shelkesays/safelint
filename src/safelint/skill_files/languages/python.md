@@ -172,7 +172,7 @@ Python source is Python source - the parser, tree, and rule logic are framework-
 | --- | --- | --- |
 | `vanilla` (default) | Plain Python, libraries, CLIs, data pipelines with no web framework | Stdlib-only defaults. SAFE9xx framework rules stay disabled. Existing v2.8.x users see no change. |
 | `django` | Django / Django REST Framework projects | Adds `raw` / `extra` / `RawSQL` / `mark_safe` / `format_html` / `HttpResponse` / `redirect` / `FileResponse` / `call_command` / `loads` to SAFE801 sinks; treats `.first()` as nullable for SAFE803. Enables SAFE905-907. |
-| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks, and Flask's global-proxy `request` as a taint source. Enables SAFE905 / SAFE907 (not SAFE906 - Flask has no mass-assignment idiom). |
+| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks. Enables SAFE905 / SAFE907 (not SAFE906 - Flask has no mass-assignment idiom). |
 | `fastapi` | FastAPI / Starlette apps | Adds `text` / `HTMLResponse` / `Response` / `from_string` / `RedirectResponse` / `FileResponse` to SAFE801 sinks. Enables SAFE905-907. |
 
 `pydantic = true` (independent of `framework`) additively adds `model_construct` / `construct` to the SAFE801 sinks - the Pydantic v2 / v1 "skip validation" constructors - and enables SAFE906 so `extra = "allow"` on a model config fires.
@@ -191,6 +191,8 @@ framework = "fastapi"
 ```
 
 Framework and pydantic presets merge *before* your explicit TOML, so per-rule keys (e.g. `[tool.safelint.rules.tainted_sink] sinks = [...]`) always win. Unknown framework names warn on stderr and fall back to `vanilla`.
+
+The preset enables the `SAFE905-907` structural rules directly, but the dataflow additions (extra SAFE801 sinks, `.first()` nullable, pydantic constructors) only extend the *lists* - the multi-language dataflow rules stay opt-in (enable `tainted_sink` explicitly), so a Python framework choice never turns dataflow on for other languages in a polyglot repo. The intra-procedural tracker follows direct taint flows, not `request.<attr>` attribute chains.
 
 ## Stdin mode for editor / Claude Code unsaved buffers
 

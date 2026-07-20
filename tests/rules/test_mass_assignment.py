@@ -53,6 +53,12 @@ def test_python_unrelated_all_string_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_python_module_level_fields_and_extra_are_clean(tmp_path: Path) -> None:
+    """Bare module-level ``fields = "__all__"`` / ``extra = "allow"`` (no class) do not fire."""
+    src = _write(tmp_path, "consts.py", 'fields = "__all__"\nextra = "allow"\n')
+    assert _codes(src) == []
+
+
 def test_laravel_guarded_empty(tmp_path: Path) -> None:
     """Eloquent ``$guarded = []`` fires."""
     src = _write(tmp_path, "Model.php", "<?php class M { protected $guarded = []; } ?>")

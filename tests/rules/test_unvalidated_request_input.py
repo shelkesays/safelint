@@ -63,6 +63,12 @@ def test_php_request_all_flagged(tmp_path: Path) -> None:
     assert _codes(src) == ["SAFE907"]
 
 
+def test_php_input_single_field_is_clean(tmp_path: Path) -> None:
+    """``$request->input('name')`` is a targeted single-field read, not a bulk consume."""
+    src = _write(tmp_path, "C.php", "<?php class C { function s($request){ return $request->input('name'); } } ?>")
+    assert _codes(src) == []
+
+
 def test_php_validated_is_clean(tmp_path: Path) -> None:
     """A ``$request->validate([...])`` call clears the method."""
     src = _write(
