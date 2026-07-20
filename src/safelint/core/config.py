@@ -2530,8 +2530,11 @@ def _apply_python_pydantic_preset(defaults: dict[str, Any], *, enabled: bool) ->
 
     Runs AFTER the framework preset, so it must not clobber the framework's
     ``sinks`` list - it appends ``model_construct`` / ``construct`` and dedupes,
-    preserving whatever framework sinks are already present. Also enables SAFE801
-    and SAFE906 (``mass_assignment`` on ``extra="allow"`` input models).
+    preserving whatever framework sinks are already present. Enables SAFE906
+    (``mass_assignment`` on ``extra="allow"`` input models) but, like the
+    framework presets, does NOT enable the shared multi-language ``tainted_sink``
+    rule (that would fire SAFE801 on every language in a polyglot repo); the
+    added sinks are recognised only when the user opts into ``tainted_sink``.
     """
     if not enabled:
         return
@@ -2541,7 +2544,6 @@ def _apply_python_pydantic_preset(defaults: dict[str, Any], *, enabled: bool) ->
         if name not in existing:
             existing.append(name)
     sink_rule["sinks"] = existing
-    sink_rule["enabled"] = True
     defaults["rules"].setdefault("mass_assignment", {})["enabled"] = True
 
 

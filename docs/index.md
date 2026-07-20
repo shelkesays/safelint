@@ -8,7 +8,7 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 
 | Language | Extensions | Notes |
 |----------|------------|-------|
-| **Python** | `.py`, `.pyw` | Default language; the rule set was originally designed for Python and ports unchanged. Web-framework *defaults* are switchable via the `[tool.safelint.python] framework = "..."` preset (`django` / `flask` / `fastapi`) plus an orthogonal `pydantic = true`, which enable the shared `debug_mode_enabled` / `mass_assignment` / `unvalidated_request_input` rules (SAFE905-907). See [Python](languages/python.md). |
+| **Python** | `.py`, `.pyw` | Default language; the rule set was originally designed for Python and ports unchanged. Web-framework *defaults* are switchable via the `[tool.safelint.python] framework = "..."` preset (`django` / `flask` / `fastapi`) plus an orthogonal `pydantic = true`, which selectively enable the shared SAFE905-907 rules (Django / FastAPI enable all three; Flask enables `debug_mode_enabled` + `unvalidated_request_input`; `pydantic = true` enables `mass_assignment`). See [Python](languages/python.md). |
 | **JavaScript** | `.js`, `.mjs`, `.cjs` | Runtime-agnostic source analysis covering Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine. Per-runtime *defaults* are switchable via [`[tool.safelint.javascript] runtime = "..."`](configuration/toml.md#javascript-runtime-presets). |
 | **TypeScript** (including **AssemblyScript**) | `.ts`, `.tsx`, `.as` | Reuses the JS rule implementations end-to-end with TS-specific handling for type-only constructs (generics, `as` casts, non-null assertions, `declare global` blocks, etc.). Shares JS runtime presets since TS compiles to JS. |
 | **Java** (with **Spring Boot** framework preset) | `.java` | 20 rules apply (the 15 cross-language core plus 5 shared with Python / JS / TS); 4 Spring-specific structural rules (`SAFE901-904`) target Spring annotation patterns. Per-framework *defaults* are switchable via [`[tool.safelint.java] framework = "..."`](languages/java.md#framework-presets). |
@@ -32,7 +32,7 @@ SafeLint complements your existing linters. Where ruff handles style and pylint 
 | Python + C++ | 1 | `bare_except` (Python `except:` / C++ `catch (...)`) |
 | JavaScript family (JS / TS) | 1 | `wide_scope_declaration` (`var` → `let` / `const`) |
 | Java + Spring Boot only | 4 | `spring_*` (SAFE901-904) |
-| Python / PHP framework presets only | 3 | `debug_mode_enabled` (SAFE905), `mass_assignment` (SAFE906), `unvalidated_request_input` (SAFE907); enabled by the Python (`django` / `flask` / `fastapi` / `pydantic`) and PHP (`laravel`) presets |
+| Python / PHP framework presets only | 3 | `debug_mode_enabled` (SAFE905), `mass_assignment` (SAFE906), `unvalidated_request_input` (SAFE907); enabled by the Python / PHP framework presets (Django / FastAPI / Laravel: all three; Flask: SAFE905 + SAFE907; `pydantic = true`: SAFE906) |
 | Rust only | 11 | `needless_mut`, `unchecked_arithmetic_on_input`, `panic_macros_outside_tests`, `lock_poisoning_ignored`, `silent_result_discard`, `unlogged_error_branch`, `result_unwrap_outside_tests`, `dangerous_mem_ops`, `interior_mutable_static`, `truncating_as_cast`, `undocumented_unsafe` |
 | Go only | 2 | `empty_error_check`, `panic_calls_outside_tests` |
 | C family (C and C++) | 5 | `nonlocal_jumps`, `dynamic_allocation`, `complex_macro`, `conditional_compilation`, `restricted_pointers` |
