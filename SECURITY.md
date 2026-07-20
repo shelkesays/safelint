@@ -4,12 +4,12 @@ SafeLint is a static-analysis CLI that parses source code via Tree-sitter and wa
 
 ## Supported versions
 
-Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade. C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) is the most recent language addition; it ships on the current supported line.
+Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade. C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) is the most recent language addition (2.8.x); the current 2.9.x line adds the Python/PHP framework presets.
 
 | Version(s) | Status |
 |---|---|
-| **2.8.x** (current; C++ support) | ✅ Security fixes |
-| **2.2.x - 2.7.x** (Rust in 2.2.x-2.4.x; Go in 2.5.x; PHP in 2.6.x; C in 2.7.x) | ✅ Security fixes through ~6 months after the next minor lands |
+| **2.9.x** (current; Python/PHP framework presets) | ✅ Security fixes |
+| **2.2.x - 2.8.x** (Rust in 2.2.x-2.4.x; Go in 2.5.x; PHP in 2.6.x; C in 2.7.x; C++ in 2.8.x) | ✅ Security fixes through ~6 months after the next minor lands |
 | **2.1.x** (Java + Spring Boot) | ❌ Upgrade to a current 2.x line |
 | **2.0.x** (multi-language refactor) | ❌ Upgrade to a current 2.x line |
 | **1.x** | ❌ Upgrade to 2.x |
