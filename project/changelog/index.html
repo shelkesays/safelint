@@ -2090,7 +2090,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#290-2026-07-21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.9.0 - 2026-07-21
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.9.0 - 2026-07-21">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3912,7 +3923,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#290-2026-07-21" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.9.0 - 2026-07-21
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.9.0 - 2026-07-21">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -5628,7 +5650,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.8.2...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.9.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="290-2026-07-21"><a href="https://github.com/shelkesays/safelint/compare/v2.8.4...v2.9.0">2.9.0</a> - 2026-07-21<a class="headerlink" href="#290-2026-07-21" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>Python and PHP framework presets - Django / Flask / FastAPI / Pydantic (Python) and Laravel (PHP).</strong> Mirroring the existing Java Spring Boot and JavaScript runtime presets, a <code>[tool.safelint.python] framework = "django" | "flask" | "fastapi"</code> key (plus an orthogonal composable <code>pydantic = true</code>) and a <code>[tool.safelint.php] framework = "laravel"</code> key shift the rule <em>defaults</em> for the chosen framework. The parser and rule logic are unchanged; only the taint sink lists, nullable-method lists, and which structural rules are active shift. The default is <code>vanilla</code> for both, so existing projects with no <code>[python]</code> / <code>[php]</code> config see no behaviour change. Unknown framework names warn on stderr and fall back to <code>vanilla</code>; explicit per-rule TOML keys always win over the preset.</li>
