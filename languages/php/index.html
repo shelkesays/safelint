@@ -986,10 +986,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#future-framework-presets" class="md-nav__link">
+  <a href="#framework-presets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Future: framework presets
+        Framework presets
       
     </span>
   </a>
@@ -2008,6 +2008,8 @@
       
         
       
+        
+      
     
     
     
@@ -2105,6 +2107,34 @@
     
   
     Adding a language
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
   
 
     
@@ -2477,10 +2507,10 @@
 </li>
       
         <li class="md-nav__item">
-  <a href="#future-framework-presets" class="md-nav__link">
+  <a href="#framework-presets" class="md-nav__link">
     <span class="md-ellipsis">
       
-        Future: framework presets
+        Framework presets
       
     </span>
   </a>
@@ -2797,8 +2827,39 @@
 <li><strong>CI</strong>: invoke <code>safelint check src/ --fail-on warning</code> (or <code>--mode ci</code>) in your build pipeline. Exit code 0 / 1 / 2 maps cleanly to "passed" / "violations found" / "setup error - install hint emitted on stderr".</li>
 <li><strong>IDE</strong>: any JSON-output-consuming editor plugin (the safelint JSON schema is stable in v2.0.0+) can surface violations inline.</li>
 </ul>
-<h2 id="future-framework-presets">Future: framework presets<a class="headerlink" href="#future-framework-presets" title="Permanent link">#</a></h2>
-<p>PHP is the most framework-shaped of the supported languages, but this release ships <strong>no</strong> framework preset; the vanilla rule set is what runs. A future <code>[tool.safelint.php] framework</code> axis (tokens <code>laravel</code> / <code>symfony</code> / <code>wordpress</code>, lowercase) is on the roadmap, following the precedent of the Java <code>[tool.safelint.java] framework = "spring-boot"</code> knob. It would extend <code>sources_php</code> with framework request accessors (Laravel's <code>request()-&gt;input(...)</code>, Symfony's <code>$request-&gt;query-&gt;get(...)</code>, WordPress's <code>$_REQUEST</code> wrappers) and add framework-specific structural rules in the 9xx band. This is deferred to a follow-up and is <strong>not</strong> implemented today. Track via <a href="https://github.com/shelkesays/safelint/issues">GitHub issues</a>.</p>
+<h2 id="framework-presets">Framework presets<a class="headerlink" href="#framework-presets" title="Permanent link">#</a></h2>
+<p>PHP source is PHP source - the parser and rule logic are framework-agnostic. The rule <em>defaults</em> shift with the framework via <code>[tool.safelint.php] framework = "&lt;name&gt;"</code>:</p>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>When to pick it</th>
+<th>What changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vanilla</code> (default)</td>
+<td>Plain PHP, framework-free libraries</td>
+<td>Stdlib-only defaults (the lists in the rules table above). The <code>SAFE905-907</code> framework rules are disabled.</td>
+</tr>
+<tr>
+<td><code>laravel</code></td>
+<td>Laravel apps</td>
+<td>Adds the raw-SQL query-builder methods <code>whereRaw</code> / <code>orderByRaw</code> / <code>havingRaw</code> / <code>selectRaw</code> / <code>unprepared</code> to the SAFE801 PHP sinks. <strong>Enables <code>SAFE905-907</code></strong>: Eloquent <code>$guarded = []</code> mass-assignment (SAFE906), <code>$request-&gt;all()</code> / bare <code>$request-&gt;input()</code> without <code>validate()</code> (SAFE907; a targeted <code>$request-&gt;input('field')</code> read is not flagged), and a <code>'debug' =&gt; true</code> config-array entry (SAFE905).</td>
+</tr>
+</tbody>
+</table>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># safelint.toml (standalone) - no [tool.safelint] wrapper</span>
+<a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">[php]</span>
+<a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;laravel&quot;</span>
+<a id="__codelineno-18-4" name="__codelineno-18-4" href="#__codelineno-18-4"></a>
+<a id="__codelineno-18-5" name="__codelineno-18-5" href="#__codelineno-18-5"></a><span class="c1"># Or, in pyproject.toml:</span>
+<a id="__codelineno-18-6" name="__codelineno-18-6" href="#__codelineno-18-6"></a><span class="k">[tool.safelint.php]</span>
+<a id="__codelineno-18-7" name="__codelineno-18-7" href="#__codelineno-18-7"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;laravel&quot;</span>
+</code></pre></div>
+<p>Explicit per-rule TOML config still wins over the preset; <code>[tool.safelint.rules.tainted_sink] sinks_php = [...]</code> overrides whatever the preset planted. The default framework is <code>vanilla</code>, so existing users with no <code>[php]</code> config see no behaviour change. An unknown framework name surfaces a <code>safelint: warning:</code> on stderr and falls back to <code>vanilla</code>.</p>
+<p><code>.env</code> files are not parsed, so SAFE905 detects a debug flag only where it appears in PHP code (a <code>config([...])</code> array or a returned config array), not in <code>APP_DEBUG=true</code> env entries - a documented limit. Symfony / WordPress presets are not shipped; track them via <a href="https://github.com/shelkesays/safelint/issues">GitHub issues</a>.</p>
 
 
 

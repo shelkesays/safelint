@@ -1803,6 +1803,8 @@
       
         
       
+        
+      
     
     
     
@@ -1903,6 +1905,34 @@
     
   
     Adding a language
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
   
 
     
@@ -2320,6 +2350,7 @@
 <li><strong>No breaking changes to rule names or codes.</strong> Downstream users pin to these in config files and CI scripts. If a rule needs to change, add a new one and deprecate the old.</li>
 <li><strong>Keep rules focused.</strong> One rule, one concern. If you find yourself adding multiple <code>if</code> branches for different failure modes, it is probably two rules.</li>
 <li><strong>Defaults must be safe.</strong> New rules should default to <code>enabled: false</code> if they have a high false-positive rate or are expensive to run. Let users opt in.</li>
+<li><strong>Bump the version with your work.</strong> The version bump in <code>pyproject.toml</code> is what triggers the automated release; add your CHANGELOG entries under <code>## [Unreleased]</code> and leave the heading undated. See <a href="https://shelkesays.github.io/safelint/contributing/releasing/">Releasing</a> for the full flow.</li>
 </ul>
 <hr />
 <h2 id="reporting-issues">Reporting issues<a class="headerlink" href="#reporting-issues" title="Permanent link">#</a></h2>

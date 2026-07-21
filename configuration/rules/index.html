@@ -1733,6 +1733,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#framework-preset-rules-python-php" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Framework preset rules (Python / PHP)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Framework preset rules (Python / PHP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#safe905-debug_mode_enabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE905: debug_mode_enabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe906-mass_assignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE906: mass_assignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe907-unvalidated_request_input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE907: unvalidated_request_input
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rust-only-rules" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2674,6 +2724,8 @@
       
         
       
+        
+      
     
     
     
@@ -2771,6 +2823,34 @@
     
   
     Adding a language
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
   
 
     
@@ -3643,6 +3723,56 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#framework-preset-rules-python-php" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Framework preset rules (Python / PHP)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Framework preset rules (Python / PHP)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#safe905-debug_mode_enabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE905: debug_mode_enabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe906-mass_assignment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE906: mass_assignment
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#safe907-unvalidated_request_input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE907: unvalidated_request_input
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#rust-only-rules" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -3858,14 +3988,14 @@
 <h2 id="language-coverage">Language coverage<a class="headerlink" href="#language-coverage" title="Permanent link">#</a></h2>
 <h3 id="currently-supported">Currently supported<a class="headerlink" href="#currently-supported" title="Permanent link">#</a></h3>
 <ul>
-<li><strong>Python</strong> (<code>.py</code>, <code>.pyw</code>).</li>
+<li><strong>Python</strong> (<code>.py</code>, <code>.pyw</code>). Per-framework <em>defaults</em> (taint sinks, nullable methods, and which of the shared <code>SAFE905-907</code> framework rules are active) are switchable via the <a href="../../languages/python/#framework-presets"><code>[tool.safelint.python] framework = "..."</code></a> preset (<code>vanilla</code> / <code>django</code> / <code>flask</code> / <code>fastapi</code>), with an orthogonal <code>pydantic = true</code> axis.</li>
 <li><strong>JavaScript</strong> (<code>.js</code>, <code>.mjs</code>, <code>.cjs</code>), source analysis is runtime-agnostic and runs identically against Node.js, browser, Deno, Cloudflare Workers, Bun, and any WASM-hosted JS engine (QuickJS-WASM, Boa, etc.). Per-runtime <em>defaults</em> (the lists of tracked acquirers, sinks, sources, global namespaces, etc.) are switchable via the <a href="../toml/#javascript-runtime-presets"><code>[tool.safelint.javascript] runtime = "..."</code></a> preset, the source-language rules themselves don't change.</li>
 <li><strong>TypeScript</strong> (<code>.ts</code>, <code>.tsx</code>), and <strong>AssemblyScript</strong> (<code>.as</code>, TypeScript-syntax language compiling to WebAssembly, parsed by the same grammar). Reuses the JavaScript rule implementations end-to-end (TS compiles to JS at runtime; AST is a superset), with TS-specific handling for type-only constructs the JS rules wouldn't otherwise recognise (generic type parameters, <code>as</code> casts, non-null assertions, <code>declare global</code> ambient declarations, etc.). Shares the JavaScript runtime presets, TS doesn't get its own runtime config because TS source executes in the same runtimes JS does. See <a href="../../languages/typescript/">TypeScript</a> for the full language reference.</li>
 <li><strong>Java</strong> (<code>.java</code>), new in v2.1.0. 20 rules apply (the 15 cross-language core plus the 5 also registered for Python / JS / TS) plus 4 Spring Boot framework-specific structural rules (<code>SAFE901-904</code>) target Spring annotation patterns. Per-framework <em>defaults</em> (sinks, nullable methods, structural rule enablement) are switchable via the <a href="../../languages/java/#framework-presets"><code>[tool.safelint.java] framework = "..."</code></a> preset (<code>vanilla</code> / <code>spring-boot</code>). See <a href="../../languages/java/">Java</a> for the full language reference.</li>
-<li><strong>Rust</strong> (<code>.rs</code>), new in v2.2.0. 15 of the cross-language rules port cleanly (the all-five-languages set) plus 11 Rust-only rules cover Rust-idiom-specific patterns (panic-in-non-test, lock poisoning, <code>unsafe</code> block documentation, truncating <code>as</code> casts, silent <code>Err</code> arms, dangerous <code>mem::*</code> ops, needless <code>mut</code>, unchecked arithmetic on integer parameters, broad <code>.unwrap()</code> outside tests, interior-mutable <code>static</code>s, plus the empty-<code>Err</code> / unlogged-<code>Err</code> Rust analogues of <code>empty_except</code> / <code>logging_on_error</code>). 7 rules deliberately skipped for Rust because their semantics don't translate cleanly (Rust has no try/catch / <code>global</code> keyword, RAII / Drop covers resource cleanup, and macros are opaque to the rule-8 dynamic-execution check). Recognises both inline <code>#[cfg(test)] mod tests</code> and Cargo <code>tests/&lt;stem&gt;.rs</code> integration-test conventions. See <a href="../../languages/rust/">Rust</a> for the full language reference.</li>
+<li><strong>Rust</strong> (<code>.rs</code>), new in v2.2.0. 15 of the cross-language rules port cleanly plus 11 Rust-only rules cover Rust-idiom-specific patterns (panic-in-non-test, lock poisoning, <code>unsafe</code> block documentation, truncating <code>as</code> casts, silent <code>Err</code> arms, dangerous <code>mem::*</code> ops, needless <code>mut</code>, unchecked arithmetic on integer parameters, broad <code>.unwrap()</code> outside tests, interior-mutable <code>static</code>s, plus the empty-<code>Err</code> / unlogged-<code>Err</code> Rust analogues of <code>empty_except</code> / <code>logging_on_error</code>). 7 rules deliberately skipped for Rust because their semantics don't translate cleanly (Rust has no try/catch / <code>global</code> keyword, RAII / Drop covers resource cleanup, and macros are opaque to the rule-8 dynamic-execution check). Recognises both inline <code>#[cfg(test)] mod tests</code> and Cargo <code>tests/&lt;stem&gt;.rs</code> integration-test conventions. See <a href="../../languages/rust/">Rust</a> for the full language reference.</li>
 <li><strong>Go</strong> (<code>.go</code>), new in v2.5.0. 16 cross-language rules apply (the 13 all-language core plus SAFE302 / SAFE309 / SAFE401, which Go shares with Python / JS / TS / Java / PHP but Rust skips) and 2 Go-only rules cover Go-idiom patterns: SAFE209 (<code>empty_error_check</code>, the empty <code>if err != nil {}</code> swallow) and SAFE211 (<code>panic_calls_outside_tests</code>). 7 rules deliberately skipped for Go because their semantics don't translate cleanly (no try/catch, no <code>global</code> keyword, no <code>var</code> hoisting, no production assertion idiom, no chained-nullable idiom). Headline Go adaptations: the bare <code>for {}</code> infinite loop (SAFE501), the sibling <code>foo_test.go</code> convention (SAFE701 / SAFE702), the <code>_ = f()</code> explicit-discard exemption (SAFE802), and the <code>defer x.Close()</code> resource form (SAFE401). See <a href="../../languages/go/">Go</a> for the full language reference.</li>
 <li>
-<p><strong>PHP</strong> (<code>.php</code>), new in v2.6.0. 21 rules apply and only 2 are skipped (SAFE201 <code>bare_except</code> and SAFE305 <code>wide_scope_declaration</code>), the widest rule coverage of any non-Python language because PHP ports the largest share of the existing rule set. PHP is the <strong>first non-Python home for SAFE301 (<code>global_state</code>)</strong>: PHP has a literal <code>global</code> keyword, so the rule fires on <code>global $config;</code>-style declarations exactly as it does on Python. PHP also has try/catch (SAFE202 / SAFE203 apply), <code>eval</code> and dynamic-call surfaces (SAFE309), and resource lifecycles (SAFE401). Headline PHP highlights: the <code>@</code>-operator error-suppression idiom, superglobal taint sources (<code>$_GET</code> / <code>$_POST</code> / <code>$_REQUEST</code> / etc.) feeding SAFE801, and the <code>break N;</code> / <code>continue N;</code> multi-level loop forms. See <a href="../../languages/php/">PHP</a> for the full language reference.</p>
+<p><strong>PHP</strong> (<code>.php</code>), new in v2.6.0. 21 rules apply and only 2 are skipped (SAFE201 <code>bare_except</code> and SAFE305 <code>wide_scope_declaration</code>), the widest rule coverage of any non-Python language because PHP ports the largest share of the existing rule set. PHP is the <strong>first non-Python home for SAFE301 (<code>global_state</code>)</strong>: PHP has a literal <code>global</code> keyword, so the rule fires on <code>global $config;</code>-style declarations exactly as it does on Python. PHP also has try/catch (SAFE202 / SAFE203 apply), <code>eval</code> and dynamic-call surfaces (SAFE309), and resource lifecycles (SAFE401). Headline PHP highlights: the <code>@</code>-operator error-suppression idiom, superglobal taint sources (<code>$_GET</code> / <code>$_POST</code> / <code>$_REQUEST</code> / etc.) feeding SAFE801, and the <code>break N;</code> / <code>continue N;</code> multi-level loop forms. Per-framework <em>defaults</em> are switchable via the <a href="../../languages/php/#framework-presets"><code>[tool.safelint.php] framework = "..."</code></a> preset (<code>vanilla</code> / <code>laravel</code>), which enables the shared <code>SAFE905-907</code> framework rules. See <a href="../../languages/php/">PHP</a> for the full language reference.</p>
 </li>
 <li>
 <p><strong>C</strong> (<code>.c</code>, <code>.h</code>), new in v2.7.0. Holzmann's original target language. 21 rules apply: the 16 cross-language ports plus <strong>5 new C-family rules</strong> (the "homecoming", shared with C++) that express clauses every other language adapts away - SAFE106 (<code>nonlocal_jumps</code>, <code>goto</code> / <code>setjmp</code>), SAFE310 (<code>dynamic_allocation</code>, the <code>malloc</code> family), SAFE311 (<code>complex_macro</code>) and SAFE312 (<code>conditional_compilation</code>) for the preprocessor, and SAFE313 (<code>restricted_pointers</code>). SAFE106 is the only one enabled by default (warning severity, because <code>goto err</code> cleanup is idiomatic); the other four are opt-in. <code>.h</code> headers are linted as C. 7 rules are skipped: SAFE201/202/203, SAFE301 and SAFE305 (semantics don't translate) plus SAFE401 and SAFE803 (documented gaps - C cleanup and nil analysis need flow analysis). See <a href="../../languages/c/">C</a> for the full language reference.</p>
@@ -3933,6 +4063,11 @@
 <td><strong>Java + Spring Boot only</strong></td>
 <td>4</td>
 <td>SAFE901 (<code>spring_field_injection</code>), SAFE902 (<code>spring_missing_transactional</code>), SAFE903 (<code>spring_unvalidated_input</code>), SAFE904 (<code>spring_async_checked_exception</code>); all default-disabled under vanilla, default-enabled by the <code>spring-boot</code> framework preset.</td>
+</tr>
+<tr>
+<td><strong>Python / PHP framework presets only</strong></td>
+<td>3</td>
+<td>SAFE905 (<code>debug_mode_enabled</code>), SAFE906 (<code>mass_assignment</code>), SAFE907 (<code>unvalidated_request_input</code>); all default-disabled, enabled by the Python / PHP framework presets (Django / FastAPI / Laravel enable all three; Flask enables SAFE905 + SAFE907; <code>pydantic = true</code> enables SAFE906). The non-Java analogue of the Spring <code>SAFE9xx</code> rules.</td>
 </tr>
 <tr>
 <td><strong>Rust-only</strong></td>
@@ -4130,6 +4265,24 @@
 <tr>
 <td><a href="#safe904-spring_async_checked_exception"><code>SAFE904</code></a></td>
 <td><code>spring_async_checked_exception</code></td>
+<td>warning</td>
+<td>no</td>
+</tr>
+<tr>
+<td><a href="#safe905-debug_mode_enabled"><code>SAFE905</code></a></td>
+<td><code>debug_mode_enabled</code></td>
+<td>warning</td>
+<td>no</td>
+</tr>
+<tr>
+<td><a href="#safe906-mass_assignment"><code>SAFE906</code></a></td>
+<td><code>mass_assignment</code></td>
+<td>error</td>
+<td>no</td>
+</tr>
+<tr>
+<td><a href="#safe907-unvalidated_request_input"><code>SAFE907</code></a></td>
+<td><code>unvalidated_request_input</code></td>
 <td>warning</td>
 <td>no</td>
 </tr>
@@ -5766,6 +5919,156 @@
 <a id="__codelineno-91-11" name="__codelineno-91-11" href="#__codelineno-91-11"></a><span class="w">    </span><span class="p">}</span>
 <a id="__codelineno-91-12" name="__codelineno-91-12" href="#__codelineno-91-12"></a><span class="p">}</span>
 </code></pre></div>
+<h2 id="framework-preset-rules-python-php">Framework preset rules (Python / PHP)<a class="headerlink" href="#framework-preset-rules-python-php" title="Permanent link">#</a></h2>
+<p>The following three rules generalise across the Python (Django / Flask / FastAPI) and PHP (Laravel) framework presets. Each serves multiple frameworks and is gated purely by its <code>enabled</code> flag - a framework preset flips it on. Detection is language-family aware (Python vs PHP node shapes), not tied to one specific framework. All ship disabled by default; the <code>[tool.safelint.python] framework</code> / <code>[tool.safelint.php] framework</code> presets enable the applicable ones (see the <a href="../../languages/python/#framework-presets">Python</a> and <a href="../../languages/php/#framework-presets">PHP</a> language pages). They are the non-Java analogue of the Spring <code>SAFE9xx</code> rules.</p>
+<h3 id="safe905-debug_mode_enabled">SAFE905: <code>debug_mode_enabled</code><a class="headerlink" href="#safe905-debug_mode_enabled" title="Permanent link">#</a></h3>
+<p><strong>What it flags:</strong> A framework debug / reload flag hard-enabled in code. Python + PHP.</p>
+<p>Debug mode in production leaks stack traces, settings, and (Flask / Werkzeug) an interactive console; auto-reload is a development-only convenience. Detected patterns:</p>
+<ul>
+<li><strong>Python</strong>: <code>DEBUG = True</code> (Django settings), <code>app.debug = True</code> (Flask; the receiver must look like an app object), and a <code>debug=True</code> / <code>reload=True</code> keyword on a framework runner call - <code>app.run(debug=True)</code> (Flask), <code>uvicorn.run(..., reload=True)</code> (FastAPI / ASGI). A <code>debug=True</code> keyword on an unrelated call (e.g. <code>client.connect(debug=True)</code>) is not flagged.</li>
+<li><strong>PHP</strong>: a config-array entry whose key ends in <code>debug</code> mapped to <code>true</code> (<code>'app.debug' =&gt; true</code>, <code>'debug' =&gt; true</code>). <code>.env</code> files are not parsed, so this is code-only.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code> (vanilla) / <code>true</code> (framework preset)</td>
+<td>Toggle the rule</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>"warning"</code></td>
+<td><code>"error"</code> or <code>"warning"</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bad:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-92-1" name="__codelineno-92-1" href="#__codelineno-92-1"></a><span class="n">DEBUG</span> <span class="o">=</span> <span class="kc">True</span>                 <span class="c1"># Django settings.py - SAFE905</span>
+<a id="__codelineno-92-2" name="__codelineno-92-2" href="#__codelineno-92-2"></a><span class="n">app</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>          <span class="c1"># Flask - SAFE905</span>
+<a id="__codelineno-92-3" name="__codelineno-92-3" href="#__codelineno-92-3"></a><span class="n">uvicorn</span><span class="o">.</span><span class="n">run</span><span class="p">(</span><span class="s2">&quot;main:app&quot;</span><span class="p">,</span> <span class="n">reload</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>   <span class="c1"># FastAPI - SAFE905</span>
+</code></pre></div>
+<p><strong>Good:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-93-1" name="__codelineno-93-1" href="#__codelineno-93-1"></a><span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<a id="__codelineno-93-2" name="__codelineno-93-2" href="#__codelineno-93-2"></a>
+<a id="__codelineno-93-3" name="__codelineno-93-3" href="#__codelineno-93-3"></a><span class="n">DEBUG</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">environ</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;DJANGO_DEBUG&quot;</span><span class="p">)</span> <span class="o">==</span> <span class="s2">&quot;1&quot;</span>   <span class="c1"># env-driven, off by default</span>
+</code></pre></div>
+<p>The framework presets enable this rule automatically; enable it directly with either TOML layout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-94-1" name="__codelineno-94-1" href="#__codelineno-94-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-94-2" name="__codelineno-94-2" href="#__codelineno-94-2"></a><span class="k">[tool.safelint.rules.debug_mode_enabled]</span>
+<a id="__codelineno-94-3" name="__codelineno-94-3" href="#__codelineno-94-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-94-4" name="__codelineno-94-4" href="#__codelineno-94-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-95-1" name="__codelineno-95-1" href="#__codelineno-95-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-95-2" name="__codelineno-95-2" href="#__codelineno-95-2"></a><span class="k">[rules.debug_mode_enabled]</span>
+<a id="__codelineno-95-3" name="__codelineno-95-3" href="#__codelineno-95-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-95-4" name="__codelineno-95-4" href="#__codelineno-95-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
+</code></pre></div>
+<h3 id="safe906-mass_assignment">SAFE906: <code>mass_assignment</code><a class="headerlink" href="#safe906-mass_assignment" title="Permanent link">#</a></h3>
+<p><strong>What it flags:</strong> Unbounded attribute binding from request data. Python + PHP.</p>
+<p>"Bind everything the client sent" defeats the point of an allow-list and lets a caller set fields they should not. Detected patterns:</p>
+<ul>
+<li><strong>Python (Django)</strong>: a <code>ModelForm</code> / serializer <code>Meta.fields = "__all__"</code>.</li>
+<li><strong>Python (Pydantic)</strong>: an input model declaring <code>extra = "allow"</code> - as <code>class Config: extra = "allow"</code> (v1), <code>model_config = ConfigDict(extra="allow")</code>, or <code>model_config = {"extra": "allow"}</code> (v2). Enabled by <code>pydantic = true</code> as well as the Django / FastAPI presets.</li>
+<li><strong>PHP (Laravel)</strong>: an Eloquent <code>$guarded = []</code> (guards nothing, so every attribute is mass-assignable). <code>$fillable</code> allow-lists are safe.</li>
+</ul>
+<p>Flask does not enable this rule (it has no comparable mass-assignment idiom).</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code> (vanilla) / <code>true</code> (Django / FastAPI / pydantic / Laravel)</td>
+<td>Toggle the rule</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>"error"</code></td>
+<td><code>"error"</code> or <code>"warning"</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bad:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-96-1" name="__codelineno-96-1" href="#__codelineno-96-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Meta</span><span class="p">:</span>
+<a id="__codelineno-96-2" name="__codelineno-96-2" href="#__codelineno-96-2"></a>    <span class="n">fields</span> <span class="o">=</span> <span class="s2">&quot;__all__&quot;</span>       <span class="c1"># SAFE906</span>
+</code></pre></div>
+<p><strong>Good:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-97-1" name="__codelineno-97-1" href="#__codelineno-97-1"></a><span class="k">class</span><span class="w"> </span><span class="nc">Meta</span><span class="p">:</span>
+<a id="__codelineno-97-2" name="__codelineno-97-2" href="#__codelineno-97-2"></a>    <span class="n">fields</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;name&quot;</span><span class="p">,</span> <span class="s2">&quot;email&quot;</span><span class="p">]</span>   <span class="c1"># explicit allow-list</span>
+</code></pre></div>
+<p>The <code>django</code> / <code>fastapi</code> / <code>laravel</code> presets and <code>pydantic = true</code> enable this rule automatically; enable it directly with either TOML layout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-98-1" name="__codelineno-98-1" href="#__codelineno-98-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-98-2" name="__codelineno-98-2" href="#__codelineno-98-2"></a><span class="k">[tool.safelint.rules.mass_assignment]</span>
+<a id="__codelineno-98-3" name="__codelineno-98-3" href="#__codelineno-98-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-98-4" name="__codelineno-98-4" href="#__codelineno-98-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;error&quot;</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-99-1" name="__codelineno-99-1" href="#__codelineno-99-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-99-2" name="__codelineno-99-2" href="#__codelineno-99-2"></a><span class="k">[rules.mass_assignment]</span>
+<a id="__codelineno-99-3" name="__codelineno-99-3" href="#__codelineno-99-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-99-4" name="__codelineno-99-4" href="#__codelineno-99-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;error&quot;</span>
+</code></pre></div>
+<h3 id="safe907-unvalidated_request_input">SAFE907: <code>unvalidated_request_input</code><a class="headerlink" href="#safe907-unvalidated_request_input" title="Permanent link">#</a></h3>
+<p><strong>What it flags:</strong> Request data consumed whole with no validation layer. Python + PHP. The cross-framework generalisation of Spring's SAFE903.</p>
+<p>Per function / method: a whole-object request-data read with no validation call in the same scope. Detected patterns:</p>
+<ul>
+<li><strong>Python</strong>: <code>request.POST</code> / <code>request.data</code> / <code>request.json</code> / <code>request.form</code> / <code>request.body</code> / <code>request.query_params</code> consumed whole, with no concrete validation <em>call</em> (<code>is_valid</code> / <code>full_clean</code> / <code>validate</code> / <code>model_validate</code> / <code>parse_obj</code>) in the function (Django / Flask / FastAPI). A bare <code>Serializer</code> / <code>Schema</code> name reference is not accepted as validation. Single-field access (<code>request.POST.get('x')</code>, <code>request.GET['q']</code>) is targeted and NOT flagged.</li>
+<li><strong>PHP (Laravel)</strong>: <code>$request-&gt;all()</code> / bare <code>$request-&gt;input()</code> with no <code>$request-&gt;validate(...)</code> call in the method (<code>$request-&gt;input('field')</code> is a targeted read and is not flagged).</li>
+</ul>
+<p>The rule is conservative and heuristic: a validation call <em>anywhere</em> in the scope clears the whole function.</p>
+<table>
+<thead>
+<tr>
+<th>Option</th>
+<th>Default</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>enabled</code></td>
+<td><code>false</code> (vanilla) / <code>true</code> (framework preset)</td>
+<td>Toggle the rule</td>
+</tr>
+<tr>
+<td><code>severity</code></td>
+<td><code>"warning"</code></td>
+<td><code>"error"</code> or <code>"warning"</code></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Bad:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-100-1" name="__codelineno-100-1" href="#__codelineno-100-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<a id="__codelineno-100-2" name="__codelineno-100-2" href="#__codelineno-100-2"></a>    <span class="k">return</span> <span class="n">Item</span><span class="p">(</span><span class="o">**</span><span class="n">request</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>      <span class="c1"># SAFE907: whole body, no validation</span>
+</code></pre></div>
+<p><strong>Good:</strong></p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-101-1" name="__codelineno-101-1" href="#__codelineno-101-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">create</span><span class="p">(</span><span class="n">request</span><span class="p">):</span>
+<a id="__codelineno-101-2" name="__codelineno-101-2" href="#__codelineno-101-2"></a>    <span class="n">serializer</span> <span class="o">=</span> <span class="n">ItemSerializer</span><span class="p">(</span><span class="n">data</span><span class="o">=</span><span class="n">request</span><span class="o">.</span><span class="n">data</span><span class="p">)</span>
+<a id="__codelineno-101-3" name="__codelineno-101-3" href="#__codelineno-101-3"></a>    <span class="n">serializer</span><span class="o">.</span><span class="n">is_valid</span><span class="p">(</span><span class="n">raise_exception</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<a id="__codelineno-101-4" name="__codelineno-101-4" href="#__codelineno-101-4"></a>    <span class="k">return</span> <span class="n">serializer</span><span class="o">.</span><span class="n">save</span><span class="p">()</span>
+</code></pre></div>
+<p>The framework presets enable this rule automatically; enable it directly with either TOML layout:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-102-1" name="__codelineno-102-1" href="#__codelineno-102-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-102-2" name="__codelineno-102-2" href="#__codelineno-102-2"></a><span class="k">[tool.safelint.rules.unvalidated_request_input]</span>
+<a id="__codelineno-102-3" name="__codelineno-102-3" href="#__codelineno-102-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-102-4" name="__codelineno-102-4" href="#__codelineno-102-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-103-1" name="__codelineno-103-1" href="#__codelineno-103-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-103-2" name="__codelineno-103-2" href="#__codelineno-103-2"></a><span class="k">[rules.unvalidated_request_input]</span>
+<a id="__codelineno-103-3" name="__codelineno-103-3" href="#__codelineno-103-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-103-4" name="__codelineno-103-4" href="#__codelineno-103-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
+</code></pre></div>
 <h2 id="rust-only-rules">Rust-only rules<a class="headerlink" href="#rust-only-rules" title="Permanent link">#</a></h2>
 <p>The following 10 rules apply only to Rust source. They cover patterns the cross-language rules don't translate to cleanly (Rust has no try/catch, no <code>global</code> keyword, RAII handles resource cleanup), or that are uniquely valuable in Rust idiom (<code>unsafe</code> documentation, panic placement, lock poisoning, etc.). All ship disabled by default; opt in via <code>[tool.safelint.rules.&lt;name&gt;] enabled = true</code>. See <a href="../../languages/rust/">Rust</a> for the full language reference including idiomatic fix patterns.</p>
 <h3 id="safe110-needless_mut">SAFE110: <code>needless_mut</code><a class="headerlink" href="#safe110-needless_mut" title="Permanent link">#</a></h3>
@@ -5793,12 +6096,12 @@
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-92-1" name="__codelineno-92-1" href="#__codelineno-92-1"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">compute</span><span class="p">();</span>
-<a id="__codelineno-92-2" name="__codelineno-92-2" href="#__codelineno-92-2"></a><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">);</span><span class="w">   </span><span class="c1">// never reassigned - SAFE110</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-104-1" name="__codelineno-104-1" href="#__codelineno-104-1"></a><span class="kd">let</span><span class="w"> </span><span class="k">mut</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">compute</span><span class="p">();</span>
+<a id="__codelineno-104-2" name="__codelineno-104-2" href="#__codelineno-104-2"></a><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">);</span><span class="w">   </span><span class="c1">// never reassigned - SAFE110</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-93-1" name="__codelineno-93-1" href="#__codelineno-93-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">compute</span><span class="p">();</span>
-<a id="__codelineno-93-2" name="__codelineno-93-2" href="#__codelineno-93-2"></a><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-105-1" name="__codelineno-105-1" href="#__codelineno-105-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">x</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">compute</span><span class="p">();</span>
+<a id="__codelineno-105-2" name="__codelineno-105-2" href="#__codelineno-105-2"></a><span class="fm">println!</span><span class="p">(</span><span class="s">&quot;{}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">x</span><span class="p">);</span>
 </code></pre></div>
 <h3 id="safe112-unchecked_arithmetic_on_input">SAFE112: <code>unchecked_arithmetic_on_input</code><a class="headerlink" href="#safe112-unchecked_arithmetic_on_input" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> <code>+</code> / <code>-</code> / <code>*</code> (NOT <code>/</code> or <code>%</code>) where at least one operand is an <code>identifier</code> matching an integer-typed function parameter. Rust only.</p>
@@ -5825,14 +6128,14 @@
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-94-1" name="__codelineno-94-1" href="#__codelineno-94-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">total</span><span class="p">(</span><span class="n">price</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">quantity</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-94-2" name="__codelineno-94-2" href="#__codelineno-94-2"></a><span class="w">    </span><span class="n">price</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">quantity</span><span class="w">        </span><span class="c1">// silent overflow in release - SAFE112</span>
-<a id="__codelineno-94-3" name="__codelineno-94-3" href="#__codelineno-94-3"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-106-1" name="__codelineno-106-1" href="#__codelineno-106-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">total</span><span class="p">(</span><span class="n">price</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">quantity</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-106-2" name="__codelineno-106-2" href="#__codelineno-106-2"></a><span class="w">    </span><span class="n">price</span><span class="w"> </span><span class="o">*</span><span class="w"> </span><span class="n">quantity</span><span class="w">        </span><span class="c1">// silent overflow in release - SAFE112</span>
+<a id="__codelineno-106-3" name="__codelineno-106-3" href="#__codelineno-106-3"></a><span class="p">}</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-95-1" name="__codelineno-95-1" href="#__codelineno-95-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">total</span><span class="p">(</span><span class="n">price</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">quantity</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;&#39;</span><span class="nb">static</span><span class="w"> </span><span class="kt">str</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-95-2" name="__codelineno-95-2" href="#__codelineno-95-2"></a><span class="w">    </span><span class="n">price</span><span class="p">.</span><span class="n">checked_mul</span><span class="p">(</span><span class="n">quantity</span><span class="p">).</span><span class="n">ok_or</span><span class="p">(</span><span class="s">&quot;overflow&quot;</span><span class="p">)</span>
-<a id="__codelineno-95-3" name="__codelineno-95-3" href="#__codelineno-95-3"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-107-1" name="__codelineno-107-1" href="#__codelineno-107-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">total</span><span class="p">(</span><span class="n">price</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="n">quantity</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="kt">u32</span><span class="p">,</span><span class="w"> </span><span class="o">&amp;&#39;</span><span class="nb">static</span><span class="w"> </span><span class="kt">str</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-107-2" name="__codelineno-107-2" href="#__codelineno-107-2"></a><span class="w">    </span><span class="n">price</span><span class="p">.</span><span class="n">checked_mul</span><span class="p">(</span><span class="n">quantity</span><span class="p">).</span><span class="n">ok_or</span><span class="p">(</span><span class="s">&quot;overflow&quot;</span><span class="p">)</span>
+<a id="__codelineno-107-3" name="__codelineno-107-3" href="#__codelineno-107-3"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="safe204-panic_macros_outside_tests">SAFE204: <code>panic_macros_outside_tests</code><a class="headerlink" href="#safe204-panic_macros_outside_tests" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> <code>panic!</code> / <code>todo!</code> / <code>unimplemented!</code> macro invocations in non-test code. Rust only.</p>
@@ -5864,22 +6167,22 @@
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-96-1" name="__codelineno-96-1" href="#__codelineno-96-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">parse_config</span><span class="p">(</span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="kt">str</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Config</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-96-2" name="__codelineno-96-2" href="#__codelineno-96-2"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">fs</span><span class="p">::</span><span class="n">read_to_string</span><span class="p">(</span><span class="n">path</span><span class="p">).</span><span class="n">unwrap</span><span class="p">();</span>
-<a id="__codelineno-96-3" name="__codelineno-96-3" href="#__codelineno-96-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">raw</span><span class="p">.</span><span class="n">is_empty</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-96-4" name="__codelineno-96-4" href="#__codelineno-96-4"></a><span class="w">        </span><span class="fm">panic!</span><span class="p">(</span><span class="s">&quot;config is empty&quot;</span><span class="p">);</span><span class="w">   </span><span class="c1">// SAFE204</span>
-<a id="__codelineno-96-5" name="__codelineno-96-5" href="#__codelineno-96-5"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-96-6" name="__codelineno-96-6" href="#__codelineno-96-6"></a><span class="w">    </span><span class="n">serde_yaml</span><span class="p">::</span><span class="n">from_str</span><span class="p">(</span><span class="o">&amp;</span><span class="n">raw</span><span class="p">).</span><span class="n">unwrap</span><span class="p">()</span>
-<a id="__codelineno-96-7" name="__codelineno-96-7" href="#__codelineno-96-7"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-108-1" name="__codelineno-108-1" href="#__codelineno-108-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">parse_config</span><span class="p">(</span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="kt">str</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Config</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-108-2" name="__codelineno-108-2" href="#__codelineno-108-2"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">fs</span><span class="p">::</span><span class="n">read_to_string</span><span class="p">(</span><span class="n">path</span><span class="p">).</span><span class="n">unwrap</span><span class="p">();</span>
+<a id="__codelineno-108-3" name="__codelineno-108-3" href="#__codelineno-108-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">raw</span><span class="p">.</span><span class="n">is_empty</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-108-4" name="__codelineno-108-4" href="#__codelineno-108-4"></a><span class="w">        </span><span class="fm">panic!</span><span class="p">(</span><span class="s">&quot;config is empty&quot;</span><span class="p">);</span><span class="w">   </span><span class="c1">// SAFE204</span>
+<a id="__codelineno-108-5" name="__codelineno-108-5" href="#__codelineno-108-5"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-108-6" name="__codelineno-108-6" href="#__codelineno-108-6"></a><span class="w">    </span><span class="n">serde_yaml</span><span class="p">::</span><span class="n">from_str</span><span class="p">(</span><span class="o">&amp;</span><span class="n">raw</span><span class="p">).</span><span class="n">unwrap</span><span class="p">()</span>
+<a id="__codelineno-108-7" name="__codelineno-108-7" href="#__codelineno-108-7"></a><span class="p">}</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-97-1" name="__codelineno-97-1" href="#__codelineno-97-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">parse_config</span><span class="p">(</span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="kt">str</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="n">Config</span><span class="p">,</span><span class="w"> </span><span class="n">ConfigError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-97-2" name="__codelineno-97-2" href="#__codelineno-97-2"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">fs</span><span class="p">::</span><span class="n">read_to_string</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<a id="__codelineno-97-3" name="__codelineno-97-3" href="#__codelineno-97-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">raw</span><span class="p">.</span><span class="n">is_empty</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-97-4" name="__codelineno-97-4" href="#__codelineno-97-4"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">Err</span><span class="p">(</span><span class="n">ConfigError</span><span class="p">::</span><span class="n">Empty</span><span class="p">);</span>
-<a id="__codelineno-97-5" name="__codelineno-97-5" href="#__codelineno-97-5"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-97-6" name="__codelineno-97-6" href="#__codelineno-97-6"></a><span class="w">    </span><span class="n">serde_yaml</span><span class="p">::</span><span class="n">from_str</span><span class="p">(</span><span class="o">&amp;</span><span class="n">raw</span><span class="p">).</span><span class="n">map_err</span><span class="p">(</span><span class="n">ConfigError</span><span class="p">::</span><span class="n">Parse</span><span class="p">)</span>
-<a id="__codelineno-97-7" name="__codelineno-97-7" href="#__codelineno-97-7"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-109-1" name="__codelineno-109-1" href="#__codelineno-109-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">parse_config</span><span class="p">(</span><span class="n">path</span><span class="p">:</span><span class="w"> </span><span class="kp">&amp;</span><span class="kt">str</span><span class="p">)</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="n">Config</span><span class="p">,</span><span class="w"> </span><span class="n">ConfigError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-109-2" name="__codelineno-109-2" href="#__codelineno-109-2"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">fs</span><span class="p">::</span><span class="n">read_to_string</span><span class="p">(</span><span class="n">path</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<a id="__codelineno-109-3" name="__codelineno-109-3" href="#__codelineno-109-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="n">raw</span><span class="p">.</span><span class="n">is_empty</span><span class="p">()</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-109-4" name="__codelineno-109-4" href="#__codelineno-109-4"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nb">Err</span><span class="p">(</span><span class="n">ConfigError</span><span class="p">::</span><span class="n">Empty</span><span class="p">);</span>
+<a id="__codelineno-109-5" name="__codelineno-109-5" href="#__codelineno-109-5"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-109-6" name="__codelineno-109-6" href="#__codelineno-109-6"></a><span class="w">    </span><span class="n">serde_yaml</span><span class="p">::</span><span class="n">from_str</span><span class="p">(</span><span class="o">&amp;</span><span class="n">raw</span><span class="p">).</span><span class="n">map_err</span><span class="p">(</span><span class="n">ConfigError</span><span class="p">::</span><span class="n">Parse</span><span class="p">)</span>
+<a id="__codelineno-109-7" name="__codelineno-109-7" href="#__codelineno-109-7"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="safe205-lock_poisoning_ignored">SAFE205: <code>lock_poisoning_ignored</code><a class="headerlink" href="#safe205-lock_poisoning_ignored" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> <code>mutex.lock().unwrap()</code> / <code>rwlock.read().unwrap()</code> / <code>.write().unwrap()</code> / <code>try_lock().unwrap()</code> / <code>try_read().unwrap()</code> / <code>try_write().unwrap()</code> and the <code>.expect("...")</code> variants. Rust only.</p>
@@ -5906,10 +6209,10 @@
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-98-1" name="__codelineno-98-1" href="#__codelineno-98-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">guard</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mutex</span><span class="p">.</span><span class="n">lock</span><span class="p">().</span><span class="n">unwrap</span><span class="p">();</span><span class="w">   </span><span class="c1">// panics on poison - SAFE205</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-110-1" name="__codelineno-110-1" href="#__codelineno-110-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">guard</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mutex</span><span class="p">.</span><span class="n">lock</span><span class="p">().</span><span class="n">unwrap</span><span class="p">();</span><span class="w">   </span><span class="c1">// panics on poison - SAFE205</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-99-1" name="__codelineno-99-1" href="#__codelineno-99-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">guard</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mutex</span><span class="p">.</span><span class="n">lock</span><span class="p">().</span><span class="n">unwrap_or_else</span><span class="p">(</span><span class="o">|</span><span class="n">poisoned</span><span class="o">|</span><span class="w"> </span><span class="n">poisoned</span><span class="p">.</span><span class="n">into_inner</span><span class="p">());</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-111-1" name="__codelineno-111-1" href="#__codelineno-111-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">guard</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">mutex</span><span class="p">.</span><span class="n">lock</span><span class="p">().</span><span class="n">unwrap_or_else</span><span class="p">(</span><span class="o">|</span><span class="n">poisoned</span><span class="o">|</span><span class="w"> </span><span class="n">poisoned</span><span class="p">.</span><span class="n">into_inner</span><span class="p">());</span>
 </code></pre></div>
 <h3 id="safe206-silent_result_discard">SAFE206: <code>silent_result_discard</code><a class="headerlink" href="#safe206-silent_result_discard" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> Empty <code>Err</code> arms in <code>match</code> (<code>Err(_) =&gt; {}</code>) and empty <code>if let Err(_) = ... { }</code> bodies. Rust only.</p>
@@ -5936,16 +6239,16 @@
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-100-1" name="__codelineno-100-1" href="#__codelineno-100-1"></a><span class="k">match</span><span class="w"> </span><span class="n">maybe_save</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-100-2" name="__codelineno-100-2" href="#__codelineno-100-2"></a><span class="w">    </span><span class="nb">Ok</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{},</span>
-<a id="__codelineno-100-3" name="__codelineno-100-3" href="#__codelineno-100-3"></a><span class="w">    </span><span class="nb">Err</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{}</span><span class="w">   </span><span class="c1">// silent swallow - SAFE206</span>
-<a id="__codelineno-100-4" name="__codelineno-100-4" href="#__codelineno-100-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-112-1" name="__codelineno-112-1" href="#__codelineno-112-1"></a><span class="k">match</span><span class="w"> </span><span class="n">maybe_save</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-112-2" name="__codelineno-112-2" href="#__codelineno-112-2"></a><span class="w">    </span><span class="nb">Ok</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{},</span>
+<a id="__codelineno-112-3" name="__codelineno-112-3" href="#__codelineno-112-3"></a><span class="w">    </span><span class="nb">Err</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{}</span><span class="w">   </span><span class="c1">// silent swallow - SAFE206</span>
+<a id="__codelineno-112-4" name="__codelineno-112-4" href="#__codelineno-112-4"></a><span class="p">}</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-101-1" name="__codelineno-101-1" href="#__codelineno-101-1"></a><span class="k">match</span><span class="w"> </span><span class="n">maybe_save</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-101-2" name="__codelineno-101-2" href="#__codelineno-101-2"></a><span class="w">    </span><span class="nb">Ok</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{},</span>
-<a id="__codelineno-101-3" name="__codelineno-101-3" href="#__codelineno-101-3"></a><span class="w">    </span><span class="nb">Err</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">log</span><span class="p">::</span><span class="n">error</span><span class="o">!</span><span class="p">(</span><span class="s">&quot;save failed: {:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">),</span>
-<a id="__codelineno-101-4" name="__codelineno-101-4" href="#__codelineno-101-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-113-1" name="__codelineno-113-1" href="#__codelineno-113-1"></a><span class="k">match</span><span class="w"> </span><span class="n">maybe_save</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-113-2" name="__codelineno-113-2" href="#__codelineno-113-2"></a><span class="w">    </span><span class="nb">Ok</span><span class="p">(</span><span class="n">_</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="p">{},</span>
+<a id="__codelineno-113-3" name="__codelineno-113-3" href="#__codelineno-113-3"></a><span class="w">    </span><span class="nb">Err</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="o">=&gt;</span><span class="w"> </span><span class="n">log</span><span class="p">::</span><span class="n">error</span><span class="o">!</span><span class="p">(</span><span class="s">&quot;save failed: {:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">),</span>
+<a id="__codelineno-113-4" name="__codelineno-113-4" href="#__codelineno-113-4"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="safe207-unlogged_error_branch">SAFE207: <code>unlogged_error_branch</code><a class="headerlink" href="#safe207-unlogged_error_branch" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> <code>Err</code> arms / <code>if let Err(...)</code> bodies with non-empty bodies that contain no log call and don't propagate / panic. Rust only.</p>
@@ -5972,15 +6275,15 @@
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-102-1" name="__codelineno-102-1" href="#__codelineno-102-1"></a><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Err</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">save</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-102-2" name="__codelineno-102-2" href="#__codelineno-102-2"></a><span class="w">    </span><span class="n">cleanup</span><span class="p">();</span><span class="w">   </span><span class="c1">// handled but unlogged - SAFE207</span>
-<a id="__codelineno-102-3" name="__codelineno-102-3" href="#__codelineno-102-3"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-114-1" name="__codelineno-114-1" href="#__codelineno-114-1"></a><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Err</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">save</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-114-2" name="__codelineno-114-2" href="#__codelineno-114-2"></a><span class="w">    </span><span class="n">cleanup</span><span class="p">();</span><span class="w">   </span><span class="c1">// handled but unlogged - SAFE207</span>
+<a id="__codelineno-114-3" name="__codelineno-114-3" href="#__codelineno-114-3"></a><span class="p">}</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-103-1" name="__codelineno-103-1" href="#__codelineno-103-1"></a><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Err</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">save</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-103-2" name="__codelineno-103-2" href="#__codelineno-103-2"></a><span class="w">    </span><span class="n">log</span><span class="p">::</span><span class="n">error</span><span class="o">!</span><span class="p">(</span><span class="s">&quot;save failed: {:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
-<a id="__codelineno-103-3" name="__codelineno-103-3" href="#__codelineno-103-3"></a><span class="w">    </span><span class="n">cleanup</span><span class="p">();</span>
-<a id="__codelineno-103-4" name="__codelineno-103-4" href="#__codelineno-103-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-115-1" name="__codelineno-115-1" href="#__codelineno-115-1"></a><span class="k">if</span><span class="w"> </span><span class="kd">let</span><span class="w"> </span><span class="nb">Err</span><span class="p">(</span><span class="n">e</span><span class="p">)</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">save</span><span class="p">(</span><span class="n">record</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-115-2" name="__codelineno-115-2" href="#__codelineno-115-2"></a><span class="w">    </span><span class="n">log</span><span class="p">::</span><span class="n">error</span><span class="o">!</span><span class="p">(</span><span class="s">&quot;save failed: {:?}&quot;</span><span class="p">,</span><span class="w"> </span><span class="n">e</span><span class="p">);</span>
+<a id="__codelineno-115-3" name="__codelineno-115-3" href="#__codelineno-115-3"></a><span class="w">    </span><span class="n">cleanup</span><span class="p">();</span>
+<a id="__codelineno-115-4" name="__codelineno-115-4" href="#__codelineno-115-4"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="safe208-result_unwrap_outside_tests">SAFE208: <code>result_unwrap_outside_tests</code><a class="headerlink" href="#safe208-result_unwrap_outside_tests" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> Any <code>.unwrap()</code> / <code>.expect()</code> / <code>.unwrap_unchecked()</code> outside test code (<code>#[test]</code> / <code>#[cfg(test)] mod</code> exempt). Rust only.</p>
@@ -6007,16 +6310,16 @@
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-104-1" name="__codelineno-104-1" href="#__codelineno-104-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">read_config</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Config</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-104-2" name="__codelineno-104-2" href="#__codelineno-104-2"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">fs</span><span class="p">::</span><span class="n">read_to_string</span><span class="p">(</span><span class="s">&quot;config.toml&quot;</span><span class="p">).</span><span class="n">unwrap</span><span class="p">();</span><span class="w">   </span><span class="c1">// SAFE208</span>
-<a id="__codelineno-104-3" name="__codelineno-104-3" href="#__codelineno-104-3"></a><span class="w">    </span><span class="n">toml</span><span class="p">::</span><span class="n">from_str</span><span class="p">(</span><span class="o">&amp;</span><span class="n">raw</span><span class="p">).</span><span class="n">unwrap</span><span class="p">()</span><span class="w">                                  </span><span class="c1">// SAFE208</span>
-<a id="__codelineno-104-4" name="__codelineno-104-4" href="#__codelineno-104-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-116-1" name="__codelineno-116-1" href="#__codelineno-116-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">read_config</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nc">Config</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-116-2" name="__codelineno-116-2" href="#__codelineno-116-2"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">fs</span><span class="p">::</span><span class="n">read_to_string</span><span class="p">(</span><span class="s">&quot;config.toml&quot;</span><span class="p">).</span><span class="n">unwrap</span><span class="p">();</span><span class="w">   </span><span class="c1">// SAFE208</span>
+<a id="__codelineno-116-3" name="__codelineno-116-3" href="#__codelineno-116-3"></a><span class="w">    </span><span class="n">toml</span><span class="p">::</span><span class="n">from_str</span><span class="p">(</span><span class="o">&amp;</span><span class="n">raw</span><span class="p">).</span><span class="n">unwrap</span><span class="p">()</span><span class="w">                                  </span><span class="c1">// SAFE208</span>
+<a id="__codelineno-116-4" name="__codelineno-116-4" href="#__codelineno-116-4"></a><span class="p">}</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-105-1" name="__codelineno-105-1" href="#__codelineno-105-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">read_config</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="n">Config</span><span class="p">,</span><span class="w"> </span><span class="n">ConfigError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-105-2" name="__codelineno-105-2" href="#__codelineno-105-2"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">fs</span><span class="p">::</span><span class="n">read_to_string</span><span class="p">(</span><span class="s">&quot;config.toml&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
-<a id="__codelineno-105-3" name="__codelineno-105-3" href="#__codelineno-105-3"></a><span class="w">    </span><span class="n">toml</span><span class="p">::</span><span class="n">from_str</span><span class="p">(</span><span class="o">&amp;</span><span class="n">raw</span><span class="p">).</span><span class="n">map_err</span><span class="p">(</span><span class="n">ConfigError</span><span class="p">::</span><span class="n">Parse</span><span class="p">)</span>
-<a id="__codelineno-105-4" name="__codelineno-105-4" href="#__codelineno-105-4"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-117-1" name="__codelineno-117-1" href="#__codelineno-117-1"></a><span class="k">pub</span><span class="w"> </span><span class="k">fn</span><span class="w"> </span><span class="nf">read_config</span><span class="p">()</span><span class="w"> </span><span class="p">-&gt;</span><span class="w"> </span><span class="nb">Result</span><span class="o">&lt;</span><span class="n">Config</span><span class="p">,</span><span class="w"> </span><span class="n">ConfigError</span><span class="o">&gt;</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-117-2" name="__codelineno-117-2" href="#__codelineno-117-2"></a><span class="w">    </span><span class="kd">let</span><span class="w"> </span><span class="n">raw</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">fs</span><span class="p">::</span><span class="n">read_to_string</span><span class="p">(</span><span class="s">&quot;config.toml&quot;</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<a id="__codelineno-117-3" name="__codelineno-117-3" href="#__codelineno-117-3"></a><span class="w">    </span><span class="n">toml</span><span class="p">::</span><span class="n">from_str</span><span class="p">(</span><span class="o">&amp;</span><span class="n">raw</span><span class="p">).</span><span class="n">map_err</span><span class="p">(</span><span class="n">ConfigError</span><span class="p">::</span><span class="n">Parse</span><span class="p">)</span>
+<a id="__codelineno-117-4" name="__codelineno-117-4" href="#__codelineno-117-4"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="safe306-dangerous_mem_ops">SAFE306: <code>dangerous_mem_ops</code><a class="headerlink" href="#safe306-dangerous_mem_ops" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> Calls to <code>std::mem::transmute</code> / <code>transmute_copy</code> / <code>forget</code> / <code>zeroed</code> / <code>uninitialized</code>. Rust only.</p>
@@ -6049,10 +6352,10 @@
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-106-1" name="__codelineno-106-1" href="#__codelineno-106-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">i8</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">::</span><span class="o">&lt;</span><span class="kt">u8</span><span class="p">,</span><span class="w"> </span><span class="kt">i8</span><span class="o">&gt;</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span><span class="w"> </span><span class="p">};</span><span class="w">   </span><span class="c1">// SAFE306</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-118-1" name="__codelineno-118-1" href="#__codelineno-118-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">i8</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span><span class="w"> </span><span class="n">std</span><span class="p">::</span><span class="n">mem</span><span class="p">::</span><span class="n">transmute</span><span class="p">::</span><span class="o">&lt;</span><span class="kt">u8</span><span class="p">,</span><span class="w"> </span><span class="kt">i8</span><span class="o">&gt;</span><span class="p">(</span><span class="mi">255</span><span class="p">)</span><span class="w"> </span><span class="p">};</span><span class="w">   </span><span class="c1">// SAFE306</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-107-1" name="__codelineno-107-1" href="#__codelineno-107-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">i8</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">i8</span><span class="p">::</span><span class="n">try_from</span><span class="p">(</span><span class="mi">255</span><span class="p">).</span><span class="n">unwrap_or</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-119-1" name="__codelineno-119-1" href="#__codelineno-119-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">x</span><span class="p">:</span><span class="w"> </span><span class="kt">i8</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">i8</span><span class="p">::</span><span class="n">try_from</span><span class="p">(</span><span class="mi">255</span><span class="p">).</span><span class="n">unwrap_or</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span>
 </code></pre></div>
 <h3 id="safe307-interior_mutable_static">SAFE307: <code>interior_mutable_static</code><a class="headerlink" href="#safe307-interior_mutable_static" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> <code>static</code> items whose type provides safe interior mutability, and <code>lazy_static!</code> declarations. Rust only. Disabled by default.</p>
@@ -6084,24 +6387,24 @@
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-108-1" name="__codelineno-108-1" href="#__codelineno-108-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-108-2" name="__codelineno-108-2" href="#__codelineno-108-2"></a><span class="k">[tool.safelint.rules.interior_mutable_static]</span>
-<a id="__codelineno-108-3" name="__codelineno-108-3" href="#__codelineno-108-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-108-4" name="__codelineno-108-4" href="#__codelineno-108-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
-<a id="__codelineno-108-5" name="__codelineno-108-5" href="#__codelineno-108-5"></a><span class="c1"># Narrow or extend the wrapper-type set (replaces the default list):</span>
-<a id="__codelineno-108-6" name="__codelineno-108-6" href="#__codelineno-108-6"></a><span class="n">interior_mutable_types_rust</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Mutex&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;RwLock&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;OnceLock&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;AtomicUsize&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-120-1" name="__codelineno-120-1" href="#__codelineno-120-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-120-2" name="__codelineno-120-2" href="#__codelineno-120-2"></a><span class="k">[tool.safelint.rules.interior_mutable_static]</span>
+<a id="__codelineno-120-3" name="__codelineno-120-3" href="#__codelineno-120-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-120-4" name="__codelineno-120-4" href="#__codelineno-120-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
+<a id="__codelineno-120-5" name="__codelineno-120-5" href="#__codelineno-120-5"></a><span class="c1"># Narrow or extend the wrapper-type set (replaces the default list):</span>
+<a id="__codelineno-120-6" name="__codelineno-120-6" href="#__codelineno-120-6"></a><span class="n">interior_mutable_types_rust</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;Mutex&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;RwLock&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;OnceLock&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;AtomicUsize&quot;</span><span class="p">]</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-109-1" name="__codelineno-109-1" href="#__codelineno-109-1"></a><span class="c1"># standalone safelint.toml (same keys, no [tool.safelint] prefix)</span>
-<a id="__codelineno-109-2" name="__codelineno-109-2" href="#__codelineno-109-2"></a><span class="k">[rules.interior_mutable_static]</span>
-<a id="__codelineno-109-3" name="__codelineno-109-3" href="#__codelineno-109-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-121-1" name="__codelineno-121-1" href="#__codelineno-121-1"></a><span class="c1"># standalone safelint.toml (same keys, no [tool.safelint] prefix)</span>
+<a id="__codelineno-121-2" name="__codelineno-121-2" href="#__codelineno-121-2"></a><span class="k">[rules.interior_mutable_static]</span>
+<a id="__codelineno-121-3" name="__codelineno-121-3" href="#__codelineno-121-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-110-1" name="__codelineno-110-1" href="#__codelineno-110-1"></a><span class="k">static</span><span class="w"> </span><span class="n">CACHE</span><span class="p">:</span><span class="w"> </span><span class="nc">Mutex</span><span class="o">&lt;</span><span class="nb">Vec</span><span class="o">&lt;</span><span class="kt">u8</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Mutex</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">());</span><span class="w">   </span><span class="c1">// SAFE307</span>
-<a id="__codelineno-110-2" name="__codelineno-110-2" href="#__codelineno-110-2"></a><span class="k">static</span><span class="w"> </span><span class="n">COUNT</span><span class="p">:</span><span class="w"> </span><span class="nc">AtomicUsize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AtomicUsize</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">          </span><span class="c1">// SAFE307</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-122-1" name="__codelineno-122-1" href="#__codelineno-122-1"></a><span class="k">static</span><span class="w"> </span><span class="n">CACHE</span><span class="p">:</span><span class="w"> </span><span class="nc">Mutex</span><span class="o">&lt;</span><span class="nb">Vec</span><span class="o">&lt;</span><span class="kt">u8</span><span class="o">&gt;&gt;</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">Mutex</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="nb">Vec</span><span class="p">::</span><span class="n">new</span><span class="p">());</span><span class="w">   </span><span class="c1">// SAFE307</span>
+<a id="__codelineno-122-2" name="__codelineno-122-2" href="#__codelineno-122-2"></a><span class="k">static</span><span class="w"> </span><span class="n">COUNT</span><span class="p">:</span><span class="w"> </span><span class="nc">AtomicUsize</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">AtomicUsize</span><span class="p">::</span><span class="n">new</span><span class="p">(</span><span class="mi">0</span><span class="p">);</span><span class="w">          </span><span class="c1">// SAFE307</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-111-1" name="__codelineno-111-1" href="#__codelineno-111-1"></a><span class="k">const</span><span class="w"> </span><span class="n">MAX_RETRIES</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w">          </span><span class="c1">// immutable constant, not flagged</span>
-<a id="__codelineno-111-2" name="__codelineno-111-2" href="#__codelineno-111-2"></a><span class="c1">// or pass the Mutex&lt;Vec&lt;u8&gt;&gt; explicitly to the consumers that need it</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-123-1" name="__codelineno-123-1" href="#__codelineno-123-1"></a><span class="k">const</span><span class="w"> </span><span class="n">MAX_RETRIES</span><span class="p">:</span><span class="w"> </span><span class="kt">u32</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">5</span><span class="p">;</span><span class="w">          </span><span class="c1">// immutable constant, not flagged</span>
+<a id="__codelineno-123-2" name="__codelineno-123-2" href="#__codelineno-123-2"></a><span class="c1">// or pass the Mutex&lt;Vec&lt;u8&gt;&gt; explicitly to the consumers that need it</span>
 </code></pre></div>
 <h3 id="safe308-truncating_as_cast">SAFE308: <code>truncating_as_cast</code><a class="headerlink" href="#safe308-truncating_as_cast" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> <code>as u8</code> / <code>as i8</code> / <code>as u16</code> / <code>as i16</code> / <code>as u32</code> / <code>as i32</code> / <code>as u64</code> / <code>as i64</code> / <code>as f32</code> casts. Rust only.</p>
@@ -6133,10 +6436,10 @@
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-112-1" name="__codelineno-112-1" href="#__codelineno-112-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">small</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">big_value</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">u8</span><span class="p">;</span><span class="w">   </span><span class="c1">// silent truncation - SAFE308</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-124-1" name="__codelineno-124-1" href="#__codelineno-124-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">small</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="n">big_value</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="kt">u8</span><span class="p">;</span><span class="w">   </span><span class="c1">// silent truncation - SAFE308</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-113-1" name="__codelineno-113-1" href="#__codelineno-113-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">small</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u8</span><span class="p">::</span><span class="n">try_from</span><span class="p">(</span><span class="n">big_value</span><span class="p">).</span><span class="n">map_err</span><span class="p">(</span><span class="o">|</span><span class="n">_</span><span class="o">|</span><span class="w"> </span><span class="n">MyError</span><span class="p">::</span><span class="n">OutOfRange</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-125-1" name="__codelineno-125-1" href="#__codelineno-125-1"></a><span class="kd">let</span><span class="w"> </span><span class="n">small</span><span class="p">:</span><span class="w"> </span><span class="kt">u8</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kt">u8</span><span class="p">::</span><span class="n">try_from</span><span class="p">(</span><span class="n">big_value</span><span class="p">).</span><span class="n">map_err</span><span class="p">(</span><span class="o">|</span><span class="n">_</span><span class="o">|</span><span class="w"> </span><span class="n">MyError</span><span class="p">::</span><span class="n">OutOfRange</span><span class="p">)</span><span class="o">?</span><span class="p">;</span>
 </code></pre></div>
 <h3 id="safe602-undocumented_unsafe">SAFE602: <code>undocumented_unsafe</code><a class="headerlink" href="#safe602-undocumented_unsafe" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> <code>unsafe { ... }</code> blocks lacking a <code>// SAFETY:</code> comment (case-insensitive) on a preceding line. Rust only.</p>
@@ -6164,16 +6467,16 @@
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-114-1" name="__codelineno-114-1" href="#__codelineno-114-1"></a><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-114-2" name="__codelineno-114-2" href="#__codelineno-114-2"></a><span class="w">    </span><span class="n">std</span><span class="p">::</span><span class="n">ptr</span><span class="p">::</span><span class="n">write</span><span class="p">(</span><span class="n">dst</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">);</span><span class="w">   </span><span class="c1">// SAFE602</span>
-<a id="__codelineno-114-3" name="__codelineno-114-3" href="#__codelineno-114-3"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-126-1" name="__codelineno-126-1" href="#__codelineno-126-1"></a><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-126-2" name="__codelineno-126-2" href="#__codelineno-126-2"></a><span class="w">    </span><span class="n">std</span><span class="p">::</span><span class="n">ptr</span><span class="p">::</span><span class="n">write</span><span class="p">(</span><span class="n">dst</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">);</span><span class="w">   </span><span class="c1">// SAFE602</span>
+<a id="__codelineno-126-3" name="__codelineno-126-3" href="#__codelineno-126-3"></a><span class="p">}</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-115-1" name="__codelineno-115-1" href="#__codelineno-115-1"></a><span class="c1">// SAFETY: dst was allocated and aligned by the caller (see `Buffer::reserve`);</span>
-<a id="__codelineno-115-2" name="__codelineno-115-2" href="#__codelineno-115-2"></a><span class="c1">// value is a Copy type so this can&#39;t leak Drop.</span>
-<a id="__codelineno-115-3" name="__codelineno-115-3" href="#__codelineno-115-3"></a><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-115-4" name="__codelineno-115-4" href="#__codelineno-115-4"></a><span class="w">    </span><span class="n">std</span><span class="p">::</span><span class="n">ptr</span><span class="p">::</span><span class="n">write</span><span class="p">(</span><span class="n">dst</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
-<a id="__codelineno-115-5" name="__codelineno-115-5" href="#__codelineno-115-5"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-127-1" name="__codelineno-127-1" href="#__codelineno-127-1"></a><span class="c1">// SAFETY: dst was allocated and aligned by the caller (see `Buffer::reserve`);</span>
+<a id="__codelineno-127-2" name="__codelineno-127-2" href="#__codelineno-127-2"></a><span class="c1">// value is a Copy type so this can&#39;t leak Drop.</span>
+<a id="__codelineno-127-3" name="__codelineno-127-3" href="#__codelineno-127-3"></a><span class="k">unsafe</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-127-4" name="__codelineno-127-4" href="#__codelineno-127-4"></a><span class="w">    </span><span class="n">std</span><span class="p">::</span><span class="n">ptr</span><span class="p">::</span><span class="n">write</span><span class="p">(</span><span class="n">dst</span><span class="p">,</span><span class="w"> </span><span class="n">value</span><span class="p">);</span>
+<a id="__codelineno-127-5" name="__codelineno-127-5" href="#__codelineno-127-5"></a><span class="p">}</span>
 </code></pre></div>
 <h2 id="go-only-rules">Go-only rules<a class="headerlink" href="#go-only-rules" title="Permanent link">#</a></h2>
 <p>The following 2 rules apply only to Go source. They cover Go-idiom patterns the cross-language rules don't translate to cleanly (Go has no try/catch, so the swallowed-error and panic-placement hazards take Go-specific shapes). Both ship disabled by default; opt in via <code>[tool.safelint.rules.&lt;name&gt;] enabled = true</code>. See <a href="../../languages/go/">Go</a> for the full language reference including idiomatic fix patterns.</p>
@@ -6207,23 +6510,23 @@
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-116-1" name="__codelineno-116-1" href="#__codelineno-116-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-116-2" name="__codelineno-116-2" href="#__codelineno-116-2"></a><span class="k">[tool.safelint.rules.empty_error_check]</span>
-<a id="__codelineno-116-3" name="__codelineno-116-3" href="#__codelineno-116-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-116-4" name="__codelineno-116-4" href="#__codelineno-116-4"></a><span class="n">error_names_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;err&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;e&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rerr&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-128-1" name="__codelineno-128-1" href="#__codelineno-128-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-128-2" name="__codelineno-128-2" href="#__codelineno-128-2"></a><span class="k">[tool.safelint.rules.empty_error_check]</span>
+<a id="__codelineno-128-3" name="__codelineno-128-3" href="#__codelineno-128-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-128-4" name="__codelineno-128-4" href="#__codelineno-128-4"></a><span class="n">error_names_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;err&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;e&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rerr&quot;</span><span class="p">]</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-117-1" name="__codelineno-117-1" href="#__codelineno-117-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-117-2" name="__codelineno-117-2" href="#__codelineno-117-2"></a><span class="k">[rules.empty_error_check]</span>
-<a id="__codelineno-117-3" name="__codelineno-117-3" href="#__codelineno-117-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-117-4" name="__codelineno-117-4" href="#__codelineno-117-4"></a><span class="n">error_names_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;err&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;e&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rerr&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-129-1" name="__codelineno-129-1" href="#__codelineno-129-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-129-2" name="__codelineno-129-2" href="#__codelineno-129-2"></a><span class="k">[rules.empty_error_check]</span>
+<a id="__codelineno-129-3" name="__codelineno-129-3" href="#__codelineno-129-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-129-4" name="__codelineno-129-4" href="#__codelineno-129-4"></a><span class="n">error_names_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;err&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;e&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;rerr&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-118-1" name="__codelineno-118-1" href="#__codelineno-118-1"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{}</span><span class="w">   </span><span class="c1">// SAFE209 - the error was checked and dropped</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-130-1" name="__codelineno-130-1" href="#__codelineno-130-1"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{}</span><span class="w">   </span><span class="c1">// SAFE209 - the error was checked and dropped</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-119-1" name="__codelineno-119-1" href="#__codelineno-119-1"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-119-2" name="__codelineno-119-2" href="#__codelineno-119-2"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;read config: %w&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
-<a id="__codelineno-119-3" name="__codelineno-119-3" href="#__codelineno-119-3"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-131-1" name="__codelineno-131-1" href="#__codelineno-131-1"></a><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-131-2" name="__codelineno-131-2" href="#__codelineno-131-2"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;read config: %w&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<a id="__codelineno-131-3" name="__codelineno-131-3" href="#__codelineno-131-3"></a><span class="p">}</span>
 </code></pre></div>
 <h3 id="safe211-panic_calls_outside_tests">SAFE211: <code>panic_calls_outside_tests</code><a class="headerlink" href="#safe211-panic_calls_outside_tests" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> <code>panic(...)</code> calls in non-<code>_test.go</code> files. Go only.</p>
@@ -6255,33 +6558,33 @@
 </tr>
 </tbody>
 </table>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-120-1" name="__codelineno-120-1" href="#__codelineno-120-1"></a><span class="c1"># pyproject.toml</span>
-<a id="__codelineno-120-2" name="__codelineno-120-2" href="#__codelineno-120-2"></a><span class="k">[tool.safelint.rules.panic_calls_outside_tests]</span>
-<a id="__codelineno-120-3" name="__codelineno-120-3" href="#__codelineno-120-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-120-4" name="__codelineno-120-4" href="#__codelineno-120-4"></a><span class="n">panic_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;panic&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Fatal&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Exit&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-132-1" name="__codelineno-132-1" href="#__codelineno-132-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-132-2" name="__codelineno-132-2" href="#__codelineno-132-2"></a><span class="k">[tool.safelint.rules.panic_calls_outside_tests]</span>
+<a id="__codelineno-132-3" name="__codelineno-132-3" href="#__codelineno-132-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-132-4" name="__codelineno-132-4" href="#__codelineno-132-4"></a><span class="n">panic_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;panic&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Fatal&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Exit&quot;</span><span class="p">]</span>
 </code></pre></div>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-121-1" name="__codelineno-121-1" href="#__codelineno-121-1"></a><span class="c1"># safelint.toml</span>
-<a id="__codelineno-121-2" name="__codelineno-121-2" href="#__codelineno-121-2"></a><span class="k">[rules.panic_calls_outside_tests]</span>
-<a id="__codelineno-121-3" name="__codelineno-121-3" href="#__codelineno-121-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
-<a id="__codelineno-121-4" name="__codelineno-121-4" href="#__codelineno-121-4"></a><span class="n">panic_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;panic&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Fatal&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Exit&quot;</span><span class="p">]</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-133-1" name="__codelineno-133-1" href="#__codelineno-133-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-133-2" name="__codelineno-133-2" href="#__codelineno-133-2"></a><span class="k">[rules.panic_calls_outside_tests]</span>
+<a id="__codelineno-133-3" name="__codelineno-133-3" href="#__codelineno-133-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-133-4" name="__codelineno-133-4" href="#__codelineno-133-4"></a><span class="n">panic_calls_go</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;panic&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Fatal&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;Exit&quot;</span><span class="p">]</span>
 </code></pre></div>
 <p><strong>Bad:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-122-1" name="__codelineno-122-1" href="#__codelineno-122-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">mustParse</span><span class="p">(</span><span class="nx">s</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="nx">Config</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-122-2" name="__codelineno-122-2" href="#__codelineno-122-2"></a><span class="w">    </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">parse</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span>
-<a id="__codelineno-122-3" name="__codelineno-122-3" href="#__codelineno-122-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-122-4" name="__codelineno-122-4" href="#__codelineno-122-4"></a><span class="w">        </span><span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w">   </span><span class="c1">// SAFE211</span>
-<a id="__codelineno-122-5" name="__codelineno-122-5" href="#__codelineno-122-5"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-122-6" name="__codelineno-122-6" href="#__codelineno-122-6"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">c</span>
-<a id="__codelineno-122-7" name="__codelineno-122-7" href="#__codelineno-122-7"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-134-1" name="__codelineno-134-1" href="#__codelineno-134-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">mustParse</span><span class="p">(</span><span class="nx">s</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="nx">Config</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-134-2" name="__codelineno-134-2" href="#__codelineno-134-2"></a><span class="w">    </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">parse</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span>
+<a id="__codelineno-134-3" name="__codelineno-134-3" href="#__codelineno-134-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-134-4" name="__codelineno-134-4" href="#__codelineno-134-4"></a><span class="w">        </span><span class="nb">panic</span><span class="p">(</span><span class="nx">err</span><span class="p">)</span><span class="w">   </span><span class="c1">// SAFE211</span>
+<a id="__codelineno-134-5" name="__codelineno-134-5" href="#__codelineno-134-5"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-134-6" name="__codelineno-134-6" href="#__codelineno-134-6"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">c</span>
+<a id="__codelineno-134-7" name="__codelineno-134-7" href="#__codelineno-134-7"></a><span class="p">}</span>
 </code></pre></div>
 <p><strong>Good:</strong></p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-123-1" name="__codelineno-123-1" href="#__codelineno-123-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">parseConfig</span><span class="p">(</span><span class="nx">s</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="nx">Config</span><span class="p">,</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-123-2" name="__codelineno-123-2" href="#__codelineno-123-2"></a><span class="w">    </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">parse</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span>
-<a id="__codelineno-123-3" name="__codelineno-123-3" href="#__codelineno-123-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
-<a id="__codelineno-123-4" name="__codelineno-123-4" href="#__codelineno-123-4"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">Config</span><span class="p">{},</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;parse config: %w&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
-<a id="__codelineno-123-5" name="__codelineno-123-5" href="#__codelineno-123-5"></a><span class="w">    </span><span class="p">}</span>
-<a id="__codelineno-123-6" name="__codelineno-123-6" href="#__codelineno-123-6"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span>
-<a id="__codelineno-123-7" name="__codelineno-123-7" href="#__codelineno-123-7"></a><span class="p">}</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-135-1" name="__codelineno-135-1" href="#__codelineno-135-1"></a><span class="kd">func</span><span class="w"> </span><span class="nx">parseConfig</span><span class="p">(</span><span class="nx">s</span><span class="w"> </span><span class="kt">string</span><span class="p">)</span><span class="w"> </span><span class="p">(</span><span class="nx">Config</span><span class="p">,</span><span class="w"> </span><span class="kt">error</span><span class="p">)</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-135-2" name="__codelineno-135-2" href="#__codelineno-135-2"></a><span class="w">    </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">:=</span><span class="w"> </span><span class="nx">parse</span><span class="p">(</span><span class="nx">s</span><span class="p">)</span>
+<a id="__codelineno-135-3" name="__codelineno-135-3" href="#__codelineno-135-3"></a><span class="w">    </span><span class="k">if</span><span class="w"> </span><span class="nx">err</span><span class="w"> </span><span class="o">!=</span><span class="w"> </span><span class="kc">nil</span><span class="w"> </span><span class="p">{</span>
+<a id="__codelineno-135-4" name="__codelineno-135-4" href="#__codelineno-135-4"></a><span class="w">        </span><span class="k">return</span><span class="w"> </span><span class="nx">Config</span><span class="p">{},</span><span class="w"> </span><span class="nx">fmt</span><span class="p">.</span><span class="nx">Errorf</span><span class="p">(</span><span class="s">&quot;parse config: %w&quot;</span><span class="p">,</span><span class="w"> </span><span class="nx">err</span><span class="p">)</span>
+<a id="__codelineno-135-5" name="__codelineno-135-5" href="#__codelineno-135-5"></a><span class="w">    </span><span class="p">}</span>
+<a id="__codelineno-135-6" name="__codelineno-135-6" href="#__codelineno-135-6"></a><span class="w">    </span><span class="k">return</span><span class="w"> </span><span class="nx">c</span><span class="p">,</span><span class="w"> </span><span class="kc">nil</span>
+<a id="__codelineno-135-7" name="__codelineno-135-7" href="#__codelineno-135-7"></a><span class="p">}</span>
 </code></pre></div>
 
 

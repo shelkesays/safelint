@@ -1920,6 +1920,8 @@
       
         
       
+        
+      
     
     
     
@@ -2017,6 +2019,34 @@
     
   
     Adding a language
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../contributing/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
   
 
     
@@ -2394,8 +2424,8 @@
 <tr>
 <td>7</td>
 <td>Check every return value; validate parameters</td>
-<td><a href="../configuration/rules/#safe802-return_value_ignored">SAFE802</a> <code>return_value_ignored</code>, <a href="../configuration/rules/#safe803-null_dereference">SAFE803</a> <code>null_dereference</code>, <a href="../configuration/rules/#safe205-lock_poisoning_ignored">SAFE205</a>–<a href="../configuration/rules/#safe208-result_unwrap_outside_tests">SAFE208</a> (Rust), <a href="../configuration/rules/#safe112-unchecked_arithmetic_on_input">SAFE112</a> (Rust), <a href="../configuration/rules/#safe903-spring_unvalidated_input">SAFE903</a> (Spring)</td>
-<td>Return-value checking is broadly covered; parameter validation is covered precisely where it can be (Spring <code>@Valid</code>, Rust arithmetic-on-input) rather than via a noisy generic rule.</td>
+<td><a href="../configuration/rules/#safe802-return_value_ignored">SAFE802</a> <code>return_value_ignored</code>, <a href="../configuration/rules/#safe803-null_dereference">SAFE803</a> <code>null_dereference</code>, <a href="../configuration/rules/#safe205-lock_poisoning_ignored">SAFE205</a>–<a href="../configuration/rules/#safe208-result_unwrap_outside_tests">SAFE208</a> (Rust), <a href="../configuration/rules/#safe112-unchecked_arithmetic_on_input">SAFE112</a> (Rust), <a href="../configuration/rules/#safe903-spring_unvalidated_input">SAFE903</a> (Spring), <a href="../configuration/rules/#safe907-unvalidated_request_input">SAFE907</a> + <a href="../configuration/rules/#safe906-mass_assignment">SAFE906</a> (Python / PHP framework presets)</td>
+<td>Return-value checking is broadly covered; parameter validation is covered precisely where it can be (Spring <code>@Valid</code>, the Django / Flask / FastAPI / Laravel request-validation rules, Rust arithmetic-on-input) rather than via a noisy generic rule.</td>
 </tr>
 <tr>
 <td>8</td>
@@ -2451,7 +2481,7 @@
 <ul>
 <li><strong>Indirect / mutual recursion</strong> (rule 1): SAFE105 covers direct self-recursion only. Detecting <code>a -&gt; b -&gt; a</code> cycles needs a call graph and is out of scope for now.</li>
 <li><strong>Recursive macro calls</strong> (rule 8, C): <a href="../configuration/rules/#safe311-complex_macro">SAFE311</a> flags token pasting, <code>__VA_ARGS__</code>, and unbalanced replacements, but does not detect mutually recursive macro definitions - that needs a macro-table analysis. (Direct self-reference is inert in standard C: the preprocessor never re-expands a macro inside its own expansion.)</li>
-<li><strong>Generic parameter validation</strong> (rule 7, second half): a blanket "validate every parameter" rule is unacceptably noisy without type information. The intent is served precisely where it can be: Spring <code>@Valid</code> (<a href="../configuration/rules/#safe903-spring_unvalidated_input">SAFE903</a>) and Rust arithmetic-on-input (<a href="../configuration/rules/#safe112-unchecked_arithmetic_on_input">SAFE112</a>).</li>
+<li><strong>Generic parameter validation</strong> (rule 7, second half): a blanket "validate every parameter" rule is unacceptably noisy without type information. The intent is served precisely where it can be: Spring <code>@Valid</code> (<a href="../configuration/rules/#safe903-spring_unvalidated_input">SAFE903</a>), the non-Java web frameworks' request-validation (<a href="../configuration/rules/#safe907-unvalidated_request_input">SAFE907</a>, enabled by the Django / Flask / FastAPI / Laravel presets) and mass-assignment (<a href="../configuration/rules/#safe906-mass_assignment">SAFE906</a>, enabled by the Django / FastAPI / Laravel presets and <code>pydantic = true</code>, but not Flask) checks, and Rust arithmetic-on-input (<a href="../configuration/rules/#safe112-unchecked_arithmetic_on_input">SAFE112</a>).</li>
 <li><strong>Rust allocation-in-loop</strong> (rule 3): a real but niche check, recorded above as a possible future rule.</li>
 <li><strong>Java <code>static final</code> interior mutability</strong> (rule 6): a <code>static final</code> field holding a mutable collection is not flagged by <a href="../configuration/rules/#safe302-global_mutation">SAFE302</a>; detecting interior mutability needs type resolution SafeLint does not do.</li>
 <li><strong>Typedef- / macro-hidden indirection</strong> (rule 9, C): <a href="../configuration/rules/#safe313-restricted_pointers">SAFE313</a> counts pointer levels syntactically in the declarator, so a level hidden behind a <code>typedef</code> (<code>typedef int *intp; intp *pp;</code>) or a macro is not seen; detecting it needs type resolution SafeLint does not do. The paper bans exactly this hiding, so paper-strict projects should also avoid pointer typedefs by convention.</li>

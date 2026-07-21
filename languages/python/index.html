@@ -715,6 +715,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#framework-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Framework presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -1941,6 +1958,8 @@
       
         
       
+        
+      
     
     
     
@@ -2038,6 +2057,34 @@
     
   
     Adding a language
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
   
 
     
@@ -2307,6 +2354,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#framework-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Framework presets
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2543,24 +2607,69 @@
 <a id="__codelineno-2-9" name="__codelineno-2-9" href="#__codelineno-2-9"></a><span class="n">max_lines</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">80</span>
 </code></pre></div>
 <p>See <a href="../../configuration/toml/">Configuration file</a> for the full list of top-level keys and <a href="../../configuration/rules/">Rules reference</a> for every per-rule option.</p>
+<h3 id="framework-presets">Framework presets<a class="headerlink" href="#framework-presets" title="Permanent link">#</a></h3>
+<p>Python source is Python source - the parser, tree, and rule logic are framework-agnostic. But the rule <em>defaults</em> (taint sinks, nullable methods, and which <code>SAFE9xx</code> rules are active) shift with the web framework. <code>[tool.safelint.python] framework = "&lt;name&gt;"</code> selects the preset, and an orthogonal <code>pydantic = true</code> boolean composes on top of any framework.</p>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>When to pick it</th>
+<th>What changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vanilla</code> (default)</td>
+<td>Plain Python, libraries, CLIs, data pipelines</td>
+<td>Stdlib-only defaults (the lists in the rules table above). The <code>SAFE905-907</code> framework rules are disabled.</td>
+</tr>
+<tr>
+<td><code>django</code></td>
+<td>Django / Django REST Framework projects</td>
+<td>Adds <code>raw</code> / <code>extra</code> / <code>RawSQL</code> / <code>mark_safe</code> / <code>format_html</code> / <code>HttpResponse</code> / <code>HttpResponseRedirect</code> / <code>redirect</code> / <code>FileResponse</code> / <code>call_command</code> / <code>loads</code> to SAFE801 sinks; treats <code>.first()</code> as nullable for SAFE803. <strong>Enables <code>SAFE905-907</code>.</strong></td>
+</tr>
+<tr>
+<td><code>flask</code></td>
+<td>Flask / Werkzeug apps</td>
+<td>Adds <code>render_template_string</code> / <code>Markup</code> / <code>redirect</code> / <code>send_file</code> / <code>send_from_directory</code> / <code>make_response</code> to SAFE801 sinks. <strong>Enables <code>SAFE905</code> + <code>SAFE907</code></strong> (not <code>SAFE906</code> - Flask has no mass-assignment idiom).</td>
+</tr>
+<tr>
+<td><code>fastapi</code></td>
+<td>FastAPI / Starlette apps</td>
+<td>Adds <code>text</code> / <code>HTMLResponse</code> / <code>Response</code> / <code>from_string</code> / <code>RedirectResponse</code> / <code>FileResponse</code> to SAFE801 sinks. <strong>Enables <code>SAFE905-907</code>.</strong></td>
+</tr>
+</tbody>
+</table>
+<p><code>pydantic = true</code> (independent of <code>framework</code>) additively adds Pydantic's validation-skipping constructors <code>model_construct</code> / <code>construct</code> to the SAFE801 sinks and enables <code>SAFE906</code> so an <code>extra = "allow"</code> model config fires. It composes with any framework, or stands alone in a vanilla project.</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">[tool.safelint.python]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;django&quot;</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a><span class="n">pydantic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="c1"># Or standalone safelint.toml (no [tool.safelint] wrapper):</span>
+<a id="__codelineno-3-7" name="__codelineno-3-7" href="#__codelineno-3-7"></a><span class="k">[python]</span>
+<a id="__codelineno-3-8" name="__codelineno-3-8" href="#__codelineno-3-8"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;fastapi&quot;</span>
+</code></pre></div>
+<p>Explicit per-rule TOML config still wins over the preset; setting <code>[tool.safelint.rules.tainted_sink] sinks = [...]</code> overrides whatever the preset planted. The default framework is <code>vanilla</code>, so existing users with no <code>[python]</code> config see no behaviour change. Unknown framework names surface a <code>safelint: warning:</code> on stderr and fall back to <code>vanilla</code>.</p>
+<p>The <code>SAFE905-907</code> structural rules are enabled by the preset directly. The dataflow additions (the extra SAFE801 sinks, <code>.first()</code> nullable, <code>pydantic</code>'s constructors) only extend the <em>lists</em> - the multi-language dataflow rules (<code>tainted_sink</code>, <code>return_value_ignored</code>, <code>null_dereference</code>) stay <strong>opt-in</strong>, exactly as with the Java Spring preset (a Python framework choice must not turn dataflow on for other languages in a polyglot repo). Enable them explicitly to use the framework sinks. As with every language, the intra-procedural tracker follows direct taint flows, not <code>request.&lt;attr&gt;</code> attribute chains.</p>
 <h2 id="installing-the-python-extra">Installing the Python extra<a class="headerlink" href="#installing-the-python-extra" title="Permanent link">#</a></h2>
 <p>v2.0.0 ships every language grammar, Python included, as an opt-in extra so projects only install what they actually lint:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python]&#39;</span><span class="w">              </span><span class="c1"># Python-only project</span>
-<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python,javascript]&#39;</span><span class="w">   </span><span class="c1"># Python + JS monorepo</span>
-<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span><span class="w">                 </span><span class="c1"># kitchen-sink</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python]&#39;</span><span class="w">              </span><span class="c1"># Python-only project</span>
+<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[python,javascript]&#39;</span><span class="w">   </span><span class="c1"># Python + JS monorepo</span>
+<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a>pip<span class="w"> </span>install<span class="w"> </span><span class="s1">&#39;safelint[all]&#39;</span><span class="w">                 </span><span class="c1"># kitchen-sink</span>
 </code></pre></div>
 <p><code>pip install safelint</code> (no extras) installs only the engine. safelint will emit <code>safelint: warning: skipping .py files, install with: pip install 'safelint[python]'</code> on first run when it finds Python files but the grammar isn't installed. <strong>Heads-up for CI:</strong> in a Python-only project that pattern means <em>every</em> candidate file gets skipped, which fires the <a href="../../configuration/cli/#exit-code-2-silent-failure-triggers">silent-failure guard</a> and exits with code 2 plus the install hint embedded in the error, so CI / pre-commit can't accidentally report green on an un-linted run.</p>
 <h2 id="pre-commit-integration">Pre-commit integration<a class="headerlink" href="#pre-commit-integration" title="Permanent link">#</a></h2>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a><span class="c1"># .pre-commit-config.yaml</span>
-<a id="__codelineno-4-2" name="__codelineno-4-2" href="#__codelineno-4-2"></a><span class="nt">repos</span><span class="p">:</span>
-<a id="__codelineno-4-3" name="__codelineno-4-3" href="#__codelineno-4-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
-<a id="__codelineno-4-4" name="__codelineno-4-4" href="#__codelineno-4-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.1.0</span><span class="w">      </span><span class="c1"># pin to a release (use a recent tag; v2.1.0+ also unlocks the Java extra if you later add .java files)</span>
-<a id="__codelineno-4-5" name="__codelineno-4-5" href="#__codelineno-4-5"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
-<a id="__codelineno-4-6" name="__codelineno-4-6" href="#__codelineno-4-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
-<a id="__codelineno-4-7" name="__codelineno-4-7" href="#__codelineno-4-7"></a><span class="w">        </span><span class="c1"># Every safelint hook needs an extra in v2.0.0+, including Python-only projects.</span>
-<a id="__codelineno-4-8" name="__codelineno-4-8" href="#__codelineno-4-8"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[python]&#39;</span><span class="p p-Indicator">]</span>
-<a id="__codelineno-4-9" name="__codelineno-4-9" href="#__codelineno-4-9"></a><span class="w">        </span><span class="c1"># Optional: scope to a directory</span>
-<a id="__codelineno-4-10" name="__codelineno-4-10" href="#__codelineno-4-10"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># .pre-commit-config.yaml</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a><span class="nt">repos</span><span class="p">:</span>
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a><span class="w">  </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">repo</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">https://github.com/shelkesays/safelint</span>
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a><span class="w">    </span><span class="nt">rev</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">v2.1.0</span><span class="w">      </span><span class="c1"># pin to a release (use a recent tag; v2.1.0+ also unlocks the Java extra if you later add .java files)</span>
+<a id="__codelineno-5-5" name="__codelineno-5-5" href="#__codelineno-5-5"></a><span class="w">    </span><span class="nt">hooks</span><span class="p">:</span>
+<a id="__codelineno-5-6" name="__codelineno-5-6" href="#__codelineno-5-6"></a><span class="w">      </span><span class="p p-Indicator">-</span><span class="w"> </span><span class="nt">id</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">safelint</span>
+<a id="__codelineno-5-7" name="__codelineno-5-7" href="#__codelineno-5-7"></a><span class="w">        </span><span class="c1"># Every safelint hook needs an extra in v2.0.0+, including Python-only projects.</span>
+<a id="__codelineno-5-8" name="__codelineno-5-8" href="#__codelineno-5-8"></a><span class="w">        </span><span class="nt">additional_dependencies</span><span class="p">:</span><span class="w"> </span><span class="p p-Indicator">[</span><span class="s">&#39;safelint[python]&#39;</span><span class="p p-Indicator">]</span>
+<a id="__codelineno-5-9" name="__codelineno-5-9" href="#__codelineno-5-9"></a><span class="w">        </span><span class="c1"># Optional: scope to a directory</span>
+<a id="__codelineno-5-10" name="__codelineno-5-10" href="#__codelineno-5-10"></a><span class="w">        </span><span class="nt">files</span><span class="p">:</span><span class="w"> </span><span class="l l-Scalar l-Scalar-Plain">^src/</span>
 </code></pre></div>
 <p>The published hook spec sets <code>types_or: [python, javascript, ts, tsx, java, rust, go, php, c, c++]</code> and no <code>files:</code> filter, add your own <code>files:</code> / <code>exclude:</code> keys to scope it. Mixed-language projects compose extras: <code>additional_dependencies: ['safelint[python,javascript]']</code> (or <code>[all]</code>).</p>
 <h2 id="python-specific-config-keys">Python-specific config keys<a class="headerlink" href="#python-specific-config-keys" title="Permanent link">#</a></h2>

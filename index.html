@@ -1890,6 +1890,8 @@
       
         
       
+        
+      
     
     
     
@@ -1987,6 +1989,34 @@
     
   
     Adding a language
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="contributing/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
   
 
     
@@ -2301,7 +2331,7 @@
 <tr>
 <td><strong>Python</strong></td>
 <td><code>.py</code>, <code>.pyw</code></td>
-<td>Default language; the rule set was originally designed for Python and ports unchanged. No per-runtime configuration.</td>
+<td>Default language; the rule set was originally designed for Python and ports unchanged. Web-framework <em>defaults</em> are switchable via the <code>[tool.safelint.python] framework = "..."</code> preset (<code>django</code> / <code>flask</code> / <code>fastapi</code>) plus an orthogonal <code>pydantic = true</code>, which selectively enable the shared SAFE905-907 rules (Django / FastAPI enable all three; Flask enables <code>debug_mode_enabled</code> + <code>unvalidated_request_input</code>; <code>pydantic = true</code> enables <code>mass_assignment</code>). See <a href="languages/python/">Python</a>.</td>
 </tr>
 <tr>
 <td><strong>JavaScript</strong></td>
@@ -2321,7 +2351,7 @@
 <tr>
 <td><strong>Rust</strong></td>
 <td><code>.rs</code></td>
-<td>15 cross-language rules port cleanly (the all-five-languages set); 11 Rust-only rules cover panic placement, lock poisoning, <code>unsafe</code> block documentation, truncating <code>as</code> casts, silent <code>Err</code> arms, dangerous <code>mem::*</code> ops, needless <code>mut</code>, unchecked arithmetic on integer params, broad <code>.unwrap()</code> outside tests, interior-mutable <code>static</code>s, plus the empty-<code>Err</code> / unlogged-<code>Err</code> Rust analogues of <code>empty_except</code> / <code>logging_on_error</code>. Recognises both inline <code>#[cfg(test)] mod tests</code> and Cargo <code>tests/&lt;stem&gt;.rs</code> integration-test conventions. See <a href="languages/rust/">Rust</a>. New in v2.2.0.</td>
+<td>15 cross-language rules port cleanly; 11 Rust-only rules cover panic placement, lock poisoning, <code>unsafe</code> block documentation, truncating <code>as</code> casts, silent <code>Err</code> arms, dangerous <code>mem::*</code> ops, needless <code>mut</code>, unchecked arithmetic on integer params, broad <code>.unwrap()</code> outside tests, interior-mutable <code>static</code>s, plus the empty-<code>Err</code> / unlogged-<code>Err</code> Rust analogues of <code>empty_except</code> / <code>logging_on_error</code>. Recognises both inline <code>#[cfg(test)] mod tests</code> and Cargo <code>tests/&lt;stem&gt;.rs</code> integration-test conventions. See <a href="languages/rust/">Rust</a>. New in v2.2.0.</td>
 </tr>
 <tr>
 <td><strong>Go</strong></td>
@@ -2331,7 +2361,7 @@
 <tr>
 <td><strong>PHP</strong></td>
 <td><code>.php</code></td>
-<td>21 rules apply, the widest coverage of any non-Python language (only <code>bare_except</code> and <code>wide_scope_declaration</code> are skipped). First non-Python home for <code>global_state</code> (PHP has a literal <code>global</code> keyword). Headline highlights: the <code>@</code>-operator error-suppression idiom, superglobal taint sources (<code>$_GET</code> / <code>$_POST</code> / <code>$_REQUEST</code>) feeding <code>tainted_sink</code>, and the <code>break N;</code> / <code>continue N;</code> multi-level loop forms. See <a href="languages/php/">PHP</a>. New in v2.6.0.</td>
+<td>21 rules apply, the widest coverage of any non-Python language (only <code>bare_except</code> and <code>wide_scope_declaration</code> are skipped). First non-Python home for <code>global_state</code> (PHP has a literal <code>global</code> keyword). Headline highlights: the <code>@</code>-operator error-suppression idiom, superglobal taint sources (<code>$_GET</code> / <code>$_POST</code> / <code>$_REQUEST</code>) feeding <code>tainted_sink</code>, and the <code>break N;</code> / <code>continue N;</code> multi-level loop forms. Web-framework <em>defaults</em> are switchable via the <code>[tool.safelint.php] framework = "laravel"</code> preset, which enables the shared SAFE905-907 rules. See <a href="languages/php/">PHP</a>. New in v2.6.0.</td>
 </tr>
 <tr>
 <td><strong>C</strong></td>
@@ -2345,7 +2375,7 @@
 </tr>
 </tbody>
 </table>
-<p><strong>Rule coverage</strong> - 47 rules total, scoped per language:</p>
+<p><strong>Rule coverage</strong> - 50 rules total, scoped per language:</p>
 <table>
 <thead>
 <tr>
@@ -2404,6 +2434,11 @@
 <td>Java + Spring Boot only</td>
 <td>4</td>
 <td><code>spring_*</code> (SAFE901-904)</td>
+</tr>
+<tr>
+<td>Python / PHP framework presets only</td>
+<td>3</td>
+<td><code>debug_mode_enabled</code> (SAFE905), <code>mass_assignment</code> (SAFE906), <code>unvalidated_request_input</code> (SAFE907); enabled by the Python / PHP framework presets (Django / FastAPI / Laravel: all three; Flask: SAFE905 + SAFE907; <code>pydantic = true</code>: SAFE906)</td>
 </tr>
 <tr>
 <td>Rust only</td>

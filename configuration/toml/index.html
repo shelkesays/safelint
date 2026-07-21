@@ -1261,6 +1261,28 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#python-framework-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python framework presets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#php-framework-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PHP framework presets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#adoption-path" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2064,6 +2086,8 @@
       
         
       
+        
+      
     
     
     
@@ -2161,6 +2185,34 @@
     
   
     Adding a language
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../contributing/releasing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Releasing
   
 
     
@@ -2582,6 +2634,28 @@
     <span class="md-ellipsis">
       
         Java framework presets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#python-framework-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Python framework presets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#php-framework-presets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        PHP framework presets
       
     </span>
   </a>
@@ -3125,24 +3199,103 @@
 </tbody>
 </table>
 <p>The preset only changes <em>defaults</em>, an explicit <code>[tool.safelint.rules.tainted_sink] sinks_java = [...]</code> still wins. Unknown framework names surface a <code>safelint: warning:</code> line on stderr and fall back to <code>vanilla</code>. See the <a href="../../languages/java/#framework-presets">Java language page</a> for the full per-rule effect.</p>
+<h2 id="python-framework-presets">Python framework presets<a class="headerlink" href="#python-framework-presets" title="Permanent link">#</a></h2>
+<p>Python source is framework-agnostic to parse, but the rule <em>defaults</em> shift with the web framework. The <code>[tool.safelint.python]</code> table selects the framework; an orthogonal <code>pydantic</code> boolean composes on top of whichever framework is chosen:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a><span class="k">[tool.safelint.python]</span>
+<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;django&quot;</span><span class="w">   </span><span class="c1"># or &quot;vanilla&quot; (default) / &quot;flask&quot; / &quot;fastapi&quot;</span>
+<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a><span class="n">pydantic</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">        </span><span class="c1"># independent axis; adds Pydantic-specific coverage</span>
+</code></pre></div>
+<p>In a standalone <code>safelint.toml</code> (no <code>[tool.safelint]</code> wrapper), drop the prefix, the table name is just <code>[python]</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-22-1" name="__codelineno-22-1" href="#__codelineno-22-1"></a><span class="c1"># safelint.toml (standalone: no [tool.safelint] wrapper)</span>
+<a id="__codelineno-22-2" name="__codelineno-22-2" href="#__codelineno-22-2"></a><span class="k">[python]</span>
+<a id="__codelineno-22-3" name="__codelineno-22-3" href="#__codelineno-22-3"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;fastapi&quot;</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>When to pick it</th>
+<th>What changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vanilla</code> (default)</td>
+<td>Plain Python, libraries, CLIs, data pipelines</td>
+<td>Stdlib-only defaults. The <code>SAFE905-907</code> framework rules stay disabled.</td>
+</tr>
+<tr>
+<td><code>django</code></td>
+<td>Django / Django REST Framework projects</td>
+<td>Adds <code>raw</code> / <code>extra</code> / <code>RawSQL</code> / <code>mark_safe</code> / <code>format_html</code> / <code>HttpResponse</code> / <code>redirect</code> / <code>FileResponse</code> / <code>call_command</code> / <code>loads</code> to SAFE801 sinks; treats <code>.first()</code> as nullable for SAFE803; <strong>enables <code>SAFE905-907</code></strong>.</td>
+</tr>
+<tr>
+<td><code>flask</code></td>
+<td>Flask / Werkzeug apps</td>
+<td>Adds <code>render_template_string</code> / <code>Markup</code> / <code>redirect</code> / <code>send_file</code> / <code>send_from_directory</code> / <code>make_response</code> to SAFE801 sinks; enables <code>SAFE905</code> + <code>SAFE907</code> (not <code>SAFE906</code>, Flask has no mass-assignment idiom).</td>
+</tr>
+<tr>
+<td><code>fastapi</code></td>
+<td>FastAPI / Starlette apps</td>
+<td>Adds <code>text</code> / <code>HTMLResponse</code> / <code>Response</code> / <code>from_string</code> / <code>RedirectResponse</code> / <code>FileResponse</code> to SAFE801 sinks; <strong>enables <code>SAFE905-907</code></strong>.</td>
+</tr>
+</tbody>
+</table>
+<p><code>pydantic = true</code> (independent of <code>framework</code>) additively adds Pydantic's validation-skipping constructors <code>model_construct</code> / <code>construct</code> to the SAFE801 sinks and enables <code>SAFE906</code> so an <code>extra = "allow"</code> model config fires. It composes with any framework, or stands alone in a vanilla project.</p>
+<p>The preset only changes <em>defaults</em>, an explicit <code>[tool.safelint.rules.tainted_sink] sinks = [...]</code> still wins. Unknown framework names surface a <code>safelint: warning:</code> line on stderr and fall back to <code>vanilla</code>. See the <a href="../../languages/python/#framework-presets">Python language page</a> for the full per-rule effect.</p>
+<p>The <code>SAFE905-907</code> structural rules are enabled directly by the preset. The <strong>dataflow</strong> additions (the extra SAFE801 sinks, Django's <code>.first()</code> nullable, <code>pydantic</code>'s <code>model_construct</code> / <code>construct</code>) extend the <em>lists</em> but leave the multi-language dataflow rules (<code>tainted_sink</code>, <code>return_value_ignored</code>, <code>null_dereference</code>) <strong>opt-in</strong> - enable them explicitly (e.g. <code>[tool.safelint.rules.tainted_sink] enabled = true</code>), exactly as the Java Spring preset does. This is deliberate: those rules apply to every language, so a Python framework selection must not silently turn dataflow on for the Go / JS / Rust files in a polyglot repo. Like every language's intra-procedural tracker, SAFE801 follows direct taint flows (a tainted parameter reaching a sink), not <code>request.&lt;attr&gt;</code> attribute chains.</p>
+<h2 id="php-framework-presets">PHP framework presets<a class="headerlink" href="#php-framework-presets" title="Permanent link">#</a></h2>
+<p>The <code>[tool.safelint.php]</code> table selects a PHP framework preset:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-23-2" name="__codelineno-23-2" href="#__codelineno-23-2"></a><span class="k">[tool.safelint.php]</span>
+<a id="__codelineno-23-3" name="__codelineno-23-3" href="#__codelineno-23-3"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;laravel&quot;</span><span class="w">   </span><span class="c1"># or &quot;vanilla&quot; (default)</span>
+</code></pre></div>
+<p>In a standalone <code>safelint.toml</code>, the table name is just <code>[php]</code>:</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-24-1" name="__codelineno-24-1" href="#__codelineno-24-1"></a><span class="c1"># safelint.toml (standalone: no [tool.safelint] wrapper)</span>
+<a id="__codelineno-24-2" name="__codelineno-24-2" href="#__codelineno-24-2"></a><span class="k">[php]</span>
+<a id="__codelineno-24-3" name="__codelineno-24-3" href="#__codelineno-24-3"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;laravel&quot;</span>
+</code></pre></div>
+<table>
+<thead>
+<tr>
+<th>Framework</th>
+<th>When to pick it</th>
+<th>What changes</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>vanilla</code> (default)</td>
+<td>Plain PHP, framework-free libraries</td>
+<td>Stdlib-only defaults. The <code>SAFE905-907</code> framework rules stay disabled.</td>
+</tr>
+<tr>
+<td><code>laravel</code></td>
+<td>Laravel apps</td>
+<td>Adds the raw-SQL query-builder methods <code>whereRaw</code> / <code>orderByRaw</code> / <code>havingRaw</code> / <code>selectRaw</code> / <code>unprepared</code> to the SAFE801 PHP sinks; <strong>enables <code>SAFE905-907</code></strong> (Eloquent <code>$guarded = []</code> mass-assignment, <code>$request-&gt;all()</code> unvalidated input, <code>'debug' =&gt; true</code> config).</td>
+</tr>
+</tbody>
+</table>
+<p>The preset only changes <em>defaults</em>, an explicit <code>[tool.safelint.rules.tainted_sink] sinks_php = [...]</code> still wins. Unknown framework names surface a <code>safelint: warning:</code> line on stderr and fall back to <code>vanilla</code>. See the <a href="../../languages/php/#framework-presets">PHP language page</a> for the full per-rule effect.</p>
 <h2 id="adoption-path">Adoption path<a class="headerlink" href="#adoption-path" title="Permanent link">#</a></h2>
 <p>If you are adding SafeLint to an existing project with many existing violations, start permissive and tighten over time:</p>
-<div class="highlight"><pre><span></span><code><a id="__codelineno-21-1" name="__codelineno-21-1" href="#__codelineno-21-1"></a>Week 1  - mode: local,  fail_on: error    - get used to the tool, fix errors only
-<a id="__codelineno-21-2" name="__codelineno-21-2" href="#__codelineno-21-2"></a>Week 4  - mode: ci,     fail_on: warning  - enforce warnings in CI
-<a id="__codelineno-21-3" name="__codelineno-21-3" href="#__codelineno-21-3"></a>Later   - enable opt-in rules as needed:
-<a id="__codelineno-21-4" name="__codelineno-21-4" href="#__codelineno-21-4"></a>          - dataflow:   tainted_sink, return_value_ignored, null_dereference
-<a id="__codelineno-21-5" name="__codelineno-21-5" href="#__codelineno-21-5"></a>          - rule 8/10:  dynamic_code_execution, blanket_suppression (all languages)
-<a id="__codelineno-21-6" name="__codelineno-21-6" href="#__codelineno-21-6"></a>          - Rust:       interior_mutable_static and the other Rust-only rules
-<a id="__codelineno-21-7" name="__codelineno-21-7" href="#__codelineno-21-7"></a>          - Go:         empty_error_check, panic_calls_outside_tests
-<a id="__codelineno-21-8" name="__codelineno-21-8" href="#__codelineno-21-8"></a>          - PHP:        global_state (PHP is the first non-Python language it
-<a id="__codelineno-21-9" name="__codelineno-21-9" href="#__codelineno-21-9"></a>                        applies to; no PHP-only rules, all PHP coverage is shared)
-<a id="__codelineno-21-10" name="__codelineno-21-10" href="#__codelineno-21-10"></a>          - C:          dynamic_allocation, complex_macro, conditional_compilation,
-<a id="__codelineno-21-11" name="__codelineno-21-11" href="#__codelineno-21-11"></a>                        restricted_pointers (the rule 3 / 8 / 9 &quot;homecoming&quot;;
-<a id="__codelineno-21-12" name="__codelineno-21-12" href="#__codelineno-21-12"></a>                        nonlocal_jumps is already on at warning severity)
-<a id="__codelineno-21-13" name="__codelineno-21-13" href="#__codelineno-21-13"></a>          - C++:        the C-family rules above (widened) plus raw_new_delete
-<a id="__codelineno-21-14" name="__codelineno-21-14" href="#__codelineno-21-14"></a>                        and dangerous_casts (modern-ownership / cast safety)
-<a id="__codelineno-21-15" name="__codelineno-21-15" href="#__codelineno-21-15"></a>          - test discipline: missing_assertions (set min_assertions = 2 for the
-<a id="__codelineno-21-16" name="__codelineno-21-16" href="#__codelineno-21-16"></a>                        Holzmann density), test_existence, test_coupling
+<div class="highlight"><pre><span></span><code><a id="__codelineno-25-1" name="__codelineno-25-1" href="#__codelineno-25-1"></a>Week 1  - mode: local,  fail_on: error    - get used to the tool, fix errors only
+<a id="__codelineno-25-2" name="__codelineno-25-2" href="#__codelineno-25-2"></a>Week 4  - mode: ci,     fail_on: warning  - enforce warnings in CI
+<a id="__codelineno-25-3" name="__codelineno-25-3" href="#__codelineno-25-3"></a>Later   - enable opt-in rules as needed:
+<a id="__codelineno-25-4" name="__codelineno-25-4" href="#__codelineno-25-4"></a>          - dataflow:   tainted_sink, return_value_ignored, null_dereference
+<a id="__codelineno-25-5" name="__codelineno-25-5" href="#__codelineno-25-5"></a>          - rule 8/10:  dynamic_code_execution, blanket_suppression (all languages)
+<a id="__codelineno-25-6" name="__codelineno-25-6" href="#__codelineno-25-6"></a>          - Rust:       interior_mutable_static and the other Rust-only rules
+<a id="__codelineno-25-7" name="__codelineno-25-7" href="#__codelineno-25-7"></a>          - Go:         empty_error_check, panic_calls_outside_tests
+<a id="__codelineno-25-8" name="__codelineno-25-8" href="#__codelineno-25-8"></a>          - PHP:        global_state (PHP is the first non-Python language it
+<a id="__codelineno-25-9" name="__codelineno-25-9" href="#__codelineno-25-9"></a>                        applies to; no PHP-only rules, all PHP coverage is shared)
+<a id="__codelineno-25-10" name="__codelineno-25-10" href="#__codelineno-25-10"></a>          - C:          dynamic_allocation, complex_macro, conditional_compilation,
+<a id="__codelineno-25-11" name="__codelineno-25-11" href="#__codelineno-25-11"></a>                        restricted_pointers (the rule 3 / 8 / 9 &quot;homecoming&quot;;
+<a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a>                        nonlocal_jumps is already on at warning severity)
+<a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a>          - C++:        the C-family rules above (widened) plus raw_new_delete
+<a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a>                        and dangerous_casts (modern-ownership / cast safety)
+<a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a>          - test discipline: missing_assertions (set min_assertions = 2 for the
+<a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a>                        Holzmann density), test_existence, test_coupling
 </code></pre></div>
 <p>All of the opt-in rules listed above are off by default; see the <a href="../rules/">Rules reference</a> for each rule's config knobs. <code>no_recursion</code> (SAFE105) and the C-family <code>nonlocal_jumps</code> (SAFE106) are the rules that are <strong>on by default</strong> (at <code>warning</code> severity), so no opt-in step is needed for them.</p>
 
