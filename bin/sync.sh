@@ -20,14 +20,19 @@ DEV=$(git rev-parse origin/development)
 if [ "$MAIN" = "$DEV" ]; then
   echo "✓ main and development are in sync (${MAIN:0:7})"
 else
-  AHEAD=$(git rev-list origin/development ^origin/main --count)
+  # AHEAD counts development commits whose CONTENT is not in main (patch-id via
+  # git cherry), NOT raw SHA count - so a squash/rebase-merged release, where
+  # development's commits are content-identical to main but carry new SHAs,
+  # reads as 0 (safe to reset) instead of a false "ahead". BEHIND is the plain
+  # count of main commits development lacks (informational).
+  AHEAD=$(git cherry origin/main origin/development | grep -c '^+' || true)
   BEHIND=$(git rev-list origin/main ^origin/development --count)
-  echo "✗ out of sync: main=${MAIN:0:7} development=${DEV:0:7} (development +${AHEAD} / -${BEHIND})"
+  echo "✗ out of sync: main=${MAIN:0:7} development=${DEV:0:7} (development has ${AHEAD} content-unique commit(s); behind by ${BEHIND})"
   if [ "$AHEAD" -eq 0 ]; then
-    echo "  development has nothing main is missing -> safe to reset:"
+    echo "  development has no content main is missing -> safe to reset:"
     echo "    git branch -f development origin/main && git push --force-with-lease origin development"
   else
-    echo "  development has ${AHEAD} commit(s) not in main -> do NOT reset (unmerged work)."
+    echo "  development has ${AHEAD} commit(s) with content not in main -> do NOT reset (unmerged work)."
   fi
 fi
 
