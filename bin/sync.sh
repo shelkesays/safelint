@@ -25,7 +25,11 @@ else
   # development's commits are content-identical to main but carry new SHAs,
   # reads as 0 (safe to reset) instead of a false "ahead". BEHIND is the plain
   # count of main commits development lacks (informational).
-  AHEAD=$(git cherry origin/main origin/development | grep -c '^+' || true)
+  # Run git cherry on its own line so a real git failure aborts under `set -e`
+  # (never masked as 0 == "safe"); the `|| true` then only absorbs grep -c's
+  # exit 1 on the expected no-'+'-lines case.
+  CHERRY=$(git cherry origin/main origin/development)
+  AHEAD=$(printf '%s\n' "$CHERRY" | grep -c '^+' || true)
   BEHIND=$(git rev-list origin/main ^origin/development --count)
   echo "✗ out of sync: main=${MAIN:0:7} development=${DEV:0:7} (development has ${AHEAD} content-unique commit(s); behind by ${BEHIND})"
   if [ "$AHEAD" -eq 0 ]; then
