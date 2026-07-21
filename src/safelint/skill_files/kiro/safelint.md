@@ -16,7 +16,7 @@ If either check returns non-zero (or the shell reports "command not found" / "is
 
   | Project contains | Install command |
   |---|---|
-  | `.py` / `.pyw` | `uv add 'safelint[python]'` or `pip install 'safelint[python]'` (Django / Flask / FastAPI + Pydantic via `[tool.safelint.python] framework = "..."` / `pydantic = true`, see `languages/python.md`) |
+  | `.py` / `.pyw` | `uv add 'safelint[python]'` or `pip install 'safelint[python]'` (Django / Flask / FastAPI via `[tool.safelint.python] framework = "..."`, plus the optional `pydantic = true` toggle, see `languages/python.md`) |
   | `.js` / `.mjs` / `.cjs` | `uv add 'safelint[javascript]'` or `pip install 'safelint[javascript]'` |
   | `.ts` / `.tsx` / `.as` | `uv add 'safelint[typescript]'` or `pip install 'safelint[typescript]'` (bundles JS) |
   | `.java` | `uv add 'safelint[java]'` or `pip install 'safelint[java]'` (Spring Boot via `[tool.safelint.java] framework = "spring-boot"`, see `languages/java.md`) |
@@ -40,7 +40,7 @@ Look at the project files in cwd to figure out which languages safelint can lint
 
 | Language | Extensions | Addendum file |
 |---|---|---|
-| Python (vanilla + Django / Flask / FastAPI / Pydantic presets) | `.py`, `.pyw` | `languages/python.md` |
+| Python (vanilla + Django / Flask / FastAPI presets; optional `pydantic = true` toggle) | `.py`, `.pyw` | `languages/python.md` |
 | JavaScript (Node) | `.js`, `.mjs`, `.cjs` | `languages/javascript.md` |
 | TypeScript (also AssemblyScript) | `.ts`, `.tsx`, `.as` | `languages/typescript.md` |
 | Java (vanilla and Spring Boot) | `.java` | `languages/java.md` |
