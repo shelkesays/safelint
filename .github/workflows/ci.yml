@@ -48,11 +48,10 @@ jobs:
         # is the strict CI mode (``--mode=ci`` default), so warnings block
         # too - safelint's own source is warning-clean. ``scripts/`` is
         # linted too (its CLI-inherent SAFE304/SAFE203 are ignored per
-        # ``safelint.toml``'s ``scripts/**`` per-file-ignore); ``check`` takes a
-        # single path, so src/ and scripts/ are two invocations.
+        # ``safelint.toml``'s ``scripts/**`` per-file-ignore). ``check`` now
+        # accepts multiple paths, so src/ and scripts/ are one invocation.
         run: |
-          uv run safelint check src/ --all-files --fail-on=warning
-          uv run safelint check scripts/ --all-files --fail-on=warning
+          uv run safelint check src/ scripts/ --all-files --fail-on=warning
 
   test:
     name: Test / Python ${{ matrix.python-version }}

@@ -46,14 +46,17 @@ Equivalent invocations:
 
 ## `safelint check`
 
-The primary linting command. Scans a file or directory and emits violations.
+The primary linting command. Scans one or more files/directories and emits violations.
 
 ```bash
 safelint check src/                  # lint git-modified files under src/
 safelint check src/ --all-files      # lint every supported source file under src/
 safelint check src/app.py            # lint a single file
+safelint check src/ tests/ scripts/  # multiple paths in one run (ruff/ty-style)
 safelint check . --format=json       # machine-readable output for editors / CI
 ```
+
+**Multiple paths** (like `ruff` / `ty`): pass any number of files or directories and safelint lints them all, then emits **one** aggregated violation list, summary, suppression breakdown, and exit code. A file reached via two overlapping paths (e.g. `src/` and `src/foo.py`) is linted and reported once. Config is resolved **per path** (each target walks up to its nearest `safelint.toml` / `pyproject.toml`, so a monorepo with per-subtree config behaves correctly); a single `--config` overrides that for every path, and `--all-files` / `--fail-on` / `--mode` / `--ignore` apply to the whole invocation.
 
 | Flag | Default | What it does |
 |---|---|---|
