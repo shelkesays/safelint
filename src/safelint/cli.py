@@ -1117,45 +1117,54 @@ def _load_config_and_excludes(target: Path, config_path: str | None) -> tuple[di
     return config, SafetyEngine._resolve_exclude_paths(config)
 
 
-def _run_check(args: argparse.Namespace) -> int:
-    """Execute directory/file scan mode."""
-    if getattr(args, "check_skill_freshness", False):
-        _emit_skill_freshness_warnings()
-    config_path = getattr(args, "config", None)
-    target = Path(args.target)
-    output_format: str = getattr(args, "output_format", "pretty")
+def _extend_deduped(results: list, seen: set[str], new_results: list) -> None:
+    """Append each result from *new_results* whose resolved path is unseen.
 
-    config, exclude_paths = _load_config_and_excludes(target, config_path)
+    Overlapping targets (``safelint check src/ src/foo.py``) surface the same
+    file twice; dedupe by resolved path so it is linted/reported once, matching
+    ruff / ty.
+    """
+    for result in new_results:
+        key = str(Path(result.path).resolve())
+        if key in seen:
+            continue
+        seen.add(key)
+        results.append(result)
 
-    # Compute the unavailable-extension set in every output mode so the
-    # silent-failure guard fires for JSON / SARIF runs too. Stderr
-    # warnings are pretty-mode only - JSON / SARIF consumers expect a
-    # quiet stderr alongside the parseable stdout document.
-    unavailable_found = _emit_missing_grammar_warnings(
-        target,
-        silent=(output_format != "pretty"),
-        exclude_paths=exclude_paths,
-    )
 
-    changed_files, files, no_targets, considered_modified = _resolve_check_targets(args, target, output_format)
-    fail_on, fail_threshold = _resolve_fail_on(args, config)
+def _lint_targets(args: argparse.Namespace, config_path: str | None, output_format: str) -> tuple[list, set[str], set[str], bool]:
+    """Collect deduped lint results across every path in ``args.targets``.
 
-    if no_targets:
-        return _handle_no_targets(output_format, fail_on, considered_modified)
+    Returns ``(results, unavailable_found, considered_modified, all_no_targets)``.
+    Each target resolves its own config inside :func:`run` (correct for
+    monorepos with per-subtree ``safelint.toml``); the missing-grammar warnings
+    and git-modified resolution are per-target too, then unioned.
+    """
+    results: list = []
+    unavailable_found: set[str] = set()
+    considered_modified: set[str] = set()
+    seen: set[str] = set()
+    all_no_targets = True
+    for target in args.targets:
+        _, exclude_paths = _load_config_and_excludes(target, config_path)
+        unavailable_found |= _emit_missing_grammar_warnings(target, silent=(output_format != "pretty"), exclude_paths=exclude_paths)
+        changed_files, files, no_targets, considered = _resolve_check_targets(args, target, output_format)
+        considered_modified |= considered
+        if no_targets:
+            continue
+        all_no_targets = False
+        _extend_deduped(results, seen, run(target, config_path=config_path, files=files, changed_files=changed_files, ignore=args.ignore, no_cache=getattr(args, "no_cache", False)))
+    return results, unavailable_found, considered_modified, all_no_targets
 
-    results = run(
-        target,
-        config_path=config_path,
-        files=files,
-        changed_files=changed_files,
-        ignore=args.ignore,
-        no_cache=getattr(args, "no_cache", False),
-    )
 
+def _aggregate_results(results: list, output_format: str, fail_threshold: int) -> tuple[list, list, list]:
+    """Partition every result, print per-file in pretty mode, and return the combined lists.
+
+    Returns ``(all_blocking, all_violations, all_suppressed)`` across all files.
+    """
     all_blocking: list[Violation] = []
     all_violations: list[Violation] = []
     all_suppressed: list[Violation] = []
-
     for result in results:
         all_suppressed.extend(result.suppressed)
         if not result.violations:
@@ -1166,6 +1175,29 @@ def _run_check(args: argparse.Namespace) -> int:
         blocking, _ = SafetyEngine.partition_violations(result.violations, fail_threshold)
         all_blocking.extend(blocking)
         all_violations.extend(result.violations)
+    return all_blocking, all_violations, all_suppressed
+
+
+def _run_check(args: argparse.Namespace) -> int:
+    """Execute directory/file scan mode over one or more target paths."""
+    if getattr(args, "check_skill_freshness", False):
+        _emit_skill_freshness_warnings()
+    config_path = getattr(args, "config", None)
+    output_format: str = getattr(args, "output_format", "pretty")
+
+    # The primary config (from --config, else the first target) drives the
+    # fail-on threshold + summary label for the whole invocation, so there is
+    # one exit code across all paths. Each target still lints under its own
+    # config inside run(); --fail-on / --mode override for divergent subtrees.
+    primary_config, _ = _load_config_and_excludes(args.targets[0], config_path)
+    fail_on, fail_threshold = _resolve_fail_on(args, primary_config)
+
+    results, unavailable_found, considered_modified, all_no_targets = _lint_targets(args, config_path, output_format)
+
+    if all_no_targets:
+        return _handle_no_targets(output_format, fail_on, considered_modified)
+
+    all_blocking, all_violations, all_suppressed = _aggregate_results(results, output_format, fail_threshold)
 
     _print_results(
         output_format,
@@ -1279,7 +1311,7 @@ def _build_check_parser() -> argparse.ArgumentParser:
         prog="safelint check",
         description="Scan a file or directory for safety violations",
     )
-    parser.add_argument("target", type=Path, help="File or directory to scan")
+    parser.add_argument("targets", type=Path, nargs="+", metavar="PATH", help="One or more files or directories to scan (e.g. `safelint check src/ tests/ scripts/`)")
     parser.add_argument(
         "--config",
         type=Path,

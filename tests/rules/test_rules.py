@@ -903,7 +903,7 @@ def test_cli_check_mode_clean_run_with_suppressions_still_shows_breakdown(
 
     mocker.patch.object(_cli, "_get_git_modified_supported_files", return_value=None)
     args = argparse.Namespace(
-        target=sample,
+        targets=[sample],
         config=None,
         all_files=True,
         fail_on=None,
@@ -950,7 +950,7 @@ def test_cli_check_mode_suppression_breakdown_is_collective_and_language_agnosti
 
     mocker.patch.object(_cli, "_get_git_modified_supported_files", return_value=None)
     args = argparse.Namespace(
-        target=tmp_path,
+        targets=[tmp_path],
         config=None,
         all_files=True,
         fail_on=None,
@@ -975,7 +975,7 @@ def test_cli_check_mode_exits_0_on_clean_directory(tmp_path: Path) -> None:
 
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
 
-    args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, ignore=None)
+    args = argparse.Namespace(targets=[tmp_path], config=None, fail_on=None, mode=None, ignore=None)
     result = _run_check(args)
 
     assert result == 0
@@ -989,7 +989,7 @@ def test_cli_check_mode_exits_1_on_violation(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    args = argparse.Namespace(target=tmp_path, config=None, fail_on="error", mode=None, ignore=None)
+    args = argparse.Namespace(targets=[tmp_path], config=None, fail_on="error", mode=None, ignore=None)
     result = _run_check(args)
 
     assert result == 1
@@ -2268,7 +2268,7 @@ def test_cli_run_check_advisory_only_returns_0(tmp_path: Path) -> None:
     """)
     (tmp_path / "warn.py").write_text(source, encoding="utf-8")
 
-    args = argparse.Namespace(target=tmp_path, config=None, fail_on="error", mode=None, ignore=None)
+    args = argparse.Namespace(targets=[tmp_path], config=None, fail_on="error", mode=None, ignore=None)
     result = _run_check(args)
 
     assert result == 0
@@ -2379,7 +2379,7 @@ def test_cli_check_git_unavailable_falls_back_to_full_scan(tmp_path: Path, mocke
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
     mocker.patch("safelint.cli.subprocess.run", side_effect=FileNotFoundError)
 
-    args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False, ignore=None)
+    args = argparse.Namespace(targets=[tmp_path], config=None, fail_on=None, mode=None, all_files=False, ignore=None)
     assert _run_check(args) == 0
 
 
@@ -2392,7 +2392,7 @@ def test_cli_check_git_diff_failure_falls_back_to_full_scan(tmp_path: Path, mock
     ok_proc = _make_proc(mocker, returncode=0, stdout="")
     mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, diff_fail, ok_proc, ok_proc])
 
-    args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False, ignore=None)
+    args = argparse.Namespace(targets=[tmp_path], config=None, fail_on=None, mode=None, all_files=False, ignore=None)
     assert _run_check(args) == 0
 
 
@@ -2404,7 +2404,7 @@ def test_cli_check_no_modified_files_exits_0(tmp_path: Path, mocker, capsys) -> 
     empty_diff = _make_proc(mocker, returncode=0, stdout="")
     mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, empty_diff, empty_diff, empty_diff])
 
-    args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=False, ignore=None)
+    args = argparse.Namespace(targets=[tmp_path], config=None, fail_on=None, mode=None, all_files=False, ignore=None)
     assert _run_check(args) == 0
     assert "No modified supported source files detected" in capsys.readouterr().out
 
@@ -2415,7 +2415,7 @@ def test_cli_check_all_files_bypasses_git(tmp_path: Path, mocker) -> None:
     (tmp_path / "clean.py").write_text("x = 1\n", encoding="utf-8")
     spy = mocker.patch("safelint.cli.subprocess.run")
 
-    args = argparse.Namespace(target=tmp_path, config=None, fail_on=None, mode=None, all_files=True, ignore=None)
+    args = argparse.Namespace(targets=[tmp_path], config=None, fail_on=None, mode=None, all_files=True, ignore=None)
     result = _run_check(args)
 
     spy.assert_not_called()
@@ -2445,7 +2445,7 @@ def test_cli_check_only_in_target_files_linted(tmp_path: Path, mocker) -> None:
     mocker.patch("safelint.cli.subprocess.run", side_effect=[rev_parse, diff_proc, diff_proc, empty_proc])
 
     # Target is src/ only - test_mod.py must not be linted
-    args = argparse.Namespace(target=src_dir, config=None, fail_on="error", mode=None, all_files=False, ignore=None)
+    args = argparse.Namespace(targets=[src_dir], config=None, fail_on="error", mode=None, all_files=False, ignore=None)
     assert _run_check(args) == 0
 
 
