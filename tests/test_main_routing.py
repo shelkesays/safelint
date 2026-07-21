@@ -618,7 +618,7 @@ def test_run_check_json_emits_empty_doc_when_no_modified_files(
     # filtered out by missing-grammar extensions" which is the silent-pass case.
     mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=([], [], set()))
     args = argparse.Namespace(
-        target=tmp_path,
+        targets=[tmp_path],
         config=None,
         all_files=False,
         fail_on=None,
@@ -650,7 +650,7 @@ def test_run_check_pretty_prints_all_clear_on_clean_run(
     # Skip the git-modified-files probe so all_files-style discovery runs.
     mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
     args = argparse.Namespace(
-        target=sample,
+        targets=[sample],
         config=None,
         all_files=True,
         fail_on=None,
@@ -680,7 +680,7 @@ def test_run_check_json_emits_doc_with_violations(
     sample.write_text("def f():\n" + "    a = 1\n" * 80 + "    return a\n", encoding="utf-8")
     mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
     args = argparse.Namespace(
-        target=sample,
+        targets=[sample],
         config=None,
         all_files=True,
         fail_on=None,
@@ -729,7 +729,7 @@ def test_run_check_returns_2_when_only_modified_files_have_unavailable_grammar(t
         return_value={".ts": "pip install 'safelint[typescript]'"},
     )
     args = argparse.Namespace(
-        target=tmp_path,
+        targets=[tmp_path],
         config=None,
         all_files=False,
         ignore=None,
@@ -756,7 +756,7 @@ def test_run_check_returns_0_when_genuinely_no_modifications(tmp_path: Path, moc
         return_value={".ts": "pip install 'safelint[typescript]'"},
     )
     args = argparse.Namespace(
-        target=tmp_path,
+        targets=[tmp_path],
         config=None,
         all_files=False,
         ignore=None,
@@ -768,3 +768,70 @@ def test_run_check_returns_0_when_genuinely_no_modifications(tmp_path: Path, moc
     )
     rc = cli._run_check(args)
     assert rc == 0, f"Expected exit 0 (genuine clean run) when considered_modified is empty; got {rc}"
+
+
+def _multipath_args(targets: list[Path], **overrides: object) -> argparse.Namespace:
+    """Build a ``check``-mode Namespace for the multi-path tests."""
+    base = {
+        "targets": targets,
+        "config": None,
+        "all_files": True,
+        "fail_on": "warning",
+        "mode": None,
+        "ignore": None,
+        "output_format": "json",
+        "no_cache": True,
+        "stdin": False,
+        "stdin_filename": "",
+        "statistics": False,
+    }
+    base.update(overrides)
+    return argparse.Namespace(**base)
+
+
+def test_run_check_multiple_paths_aggregate_violations(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """``safelint check <a> <b>`` lints both paths and aggregates into one JSON doc + one exit code."""
+    import json  # noqa: PLC0415
+
+    a = tmp_path / "a" / "long.py"
+    a.parent.mkdir()
+    a.write_text("def f():\n" + "    x = 1\n" * 80 + "    return x\n", encoding="utf-8")  # SAFE101 (error)
+    b = tmp_path / "b" / "ok.py"
+    b.parent.mkdir()
+    b.write_text("y = 1\n", encoding="utf-8")  # clean
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
+
+    rc = cli._run_check(_multipath_args([a.parent, b.parent]))
+    doc = json.loads(capsys.readouterr().out)
+    assert rc == 1  # SAFE101 from path a blocks
+    assert any(v["code"] == "SAFE101" for v in doc["violations"])
+    assert doc["summary"]["files_checked"] == 2
+
+
+def test_run_check_overlapping_paths_dedupe_file(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """A file reached via both a directory and its explicit path is linted/reported once."""
+    import json  # noqa: PLC0415
+
+    bad = tmp_path / "bad.py"
+    bad.write_text("def r(n):\n    return r(n - 1)\n", encoding="utf-8")  # SAFE105 (warning)
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
+
+    rc = cli._run_check(_multipath_args([tmp_path, bad]))
+    doc = json.loads(capsys.readouterr().out)
+    assert rc == 1  # fail_on=warning -> SAFE105 blocks
+    assert doc["summary"]["files_checked"] == 1, "overlapping targets must dedupe to one file"
+    assert sum(1 for v in doc["violations"] if v["code"] == "SAFE105") == 1
+
+
+def test_run_check_all_paths_clean_returns_zero(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """Two clean paths aggregate to a clean run (exit 0)."""
+    import json  # noqa: PLC0415
+
+    for name in ("one.py", "two.py"):
+        (tmp_path / name).write_text("z = 1\n", encoding="utf-8")
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
+
+    rc = cli._run_check(_multipath_args([tmp_path / "one.py", tmp_path / "two.py"]))
+    doc = json.loads(capsys.readouterr().out)
+    assert rc == 0
+    assert doc["violations"] == []
