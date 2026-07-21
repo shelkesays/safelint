@@ -149,6 +149,12 @@ safelint check src/
 safelint check src/ --all-files
 ```
 
+**Check multiple paths** in one run (ruff/ty-style; overlapping paths lint each file once, config resolved per path):
+
+```bash
+safelint check src/ tests/ scripts/ --all-files
+```
+
 **Check specific files** (pre-commit style):
 
 ```bash

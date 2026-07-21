@@ -269,7 +269,7 @@ The `languages/` subdirectory mirrors `src/safelint/languages/` in the safelint 
 1. Verifies `safelint` is installed (cross-platform: `safelint --version`, falling back to a `shutil.which` Python check).
 2. Identifies the language(s) in the project against the registry in `claude/SKILL.md` Step 2 (or the equivalent step in the peer client's own file).
 3. Picks a target based on what you said (modified files / all files / a specific path).
-4. Runs `safelint check <target> --format json` and parses the result.
+4. Runs `safelint check <target>... --format json` (one or more paths) and parses the result.
 5. Optionally reads `languages/<lang>.md` for deeper language-specific guidance (idiomatic fixes, rule rationale tweaks).
 6. Prints a one-line headline plus a per-file (and per-language, if multi-language) breakdown.
 7. Offers a single concrete next step.

@@ -71,7 +71,7 @@ If the user mentions CI strictness, also pass `--mode ci` (treats warnings as bl
 Always use `--format json` so you can parse the result reliably. safelint walks the target tree and lints every file whose extension matches a registered language; you don't need to filter by language yourself.
 
 ```bash
-safelint check <target> --format json [--all-files]
+safelint check <target>... --format json [--all-files]   # one or more paths (ruff/ty-style)
 ```
 
 Notes:

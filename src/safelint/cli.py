@@ -8,7 +8,7 @@ Pre-commit hook (files passed by pre-commit as positional arguments)::
 
 Direct invocation (default: git-modified files only when target is a directory)::
 
-    safelint check <path> [--all-files] [--config <cfg>] [--fail-on=error|warning] [--mode=local|ci]
+    safelint check <path>... [--all-files] [--config <cfg>] [--fail-on=error|warning] [--mode=local|ci]
 
 Severity model
 --------------
