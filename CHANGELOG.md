@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`safelint check` accepts multiple paths (ruff / ty-style).** You can now pass any number of files or directories in one run - e.g. `safelint check src/ tests/ scripts/` - instead of one target per invocation. safelint lints them all and emits a single aggregated violation list, summary, suppression breakdown, and exit code. A file reached via two overlapping paths (`src/` and `src/foo.py`) is linted and reported once (deduped by resolved path). Config is resolved **per path** (each target walks up to its nearest `safelint.toml` / `pyproject.toml`, so a monorepo with per-subtree config behaves correctly); a single `--config` overrides that for every path, and `--all-files` / `--fail-on` / `--mode` / `--ignore` apply to the whole invocation. Single-path usage is unchanged. The CI self-lint step now lints `src/` and `scripts/` in one invocation.
+
 ### Changed
 
 - **Release automation (internal tooling; the `safelint` package is unchanged).** The `development`->`main` post-release sync now decides "is it safe to reset development?" by **content** (patch-id via `git cherry`) instead of raw SHA commit count. A squash- or rebase-merged release leaves `development`'s commits content-identical to `main` but with different SHAs; the old count-based check read those as "26 commits ahead" and refused every release (opening a tracking issue and requiring a manual reset), even though nothing was actually unmerged. The patch-id check reads that case as 0 in-flight commits and auto-resolves, while still refusing when genuinely unmerged content exists. Applied to both `.github/workflows/sync-development.yml` and the local `bin/sync.sh` advisor.

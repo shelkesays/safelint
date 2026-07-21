@@ -31,15 +31,16 @@ uv run ty check src/ scripts/
 
 # Run safelint on itself + the release/build scripts: zero blocking violations
 # before merging (--all-files matches CI; without it the check defaults to
-# git-modified files only). `check` takes a single path, so src/ and scripts/
-# are two invocations. scripts/ are CLIs, so safelint.toml's
-# `[per_file_ignores] "scripts/**"` exempts the CLI-inherent SAFE304/SAFE203.
-uv run safelint check src/ --all-files
-uv run safelint check scripts/ --all-files
+# git-modified files only). `check` accepts multiple paths (ruff/ty-style), so
+# src/ and scripts/ lint in one invocation. scripts/ are CLIs, so safelint.toml's
+# `[per_file_ignores] "scripts/**"` exempts the CLI-inherent SAFE304/SAFE203
+# (per-file-ignores are glob-matched per file, so they still apply when src/ and
+# scripts/ are passed together).
+uv run safelint check src/ scripts/ --all-files
 ```
 
 The CLI has two entry points:
-- `safelint check <path>`: direct invocation; defaults to git-modified files unless `--all-files` is passed
+- `safelint check <path>...`: direct invocation, one or more files/directories; defaults to git-modified files unless `--all-files` is passed. Overlapping paths (e.g. `src/` and `src/foo.py`) lint each file once; config is resolved per-target (monorepo-friendly).
 - `safelint <file1.py> <file2.py> ...`: pre-commit style, lints exact files
 
 `--fail-on=error|warning` overrides the per-rule severity threshold; `--mode=local|ci` sets a default (`local` → fail-on=error, `ci` → fail-on=warning).
