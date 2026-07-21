@@ -7,9 +7,11 @@ name: Sync development with main
 # the next release branch cut from development cannot rebase onto main. Keeping
 # development identical to main after each release removes the whole class.
 #
-# Reset-if-safe: development is reset ONLY when it has no commits that are not
-# already in main. If in-flight work exists on development, the job refuses and
-# fails loudly (visible in the Actions tab) rather than clobbering it.
+# Reset-if-safe: development is reset ONLY when it has no commits whose CONTENT
+# is not already in main (measured by patch-id via git cherry, so a squash- or
+# rebase-merged release - content-identical to main but different SHAs - still
+# reads as safe). If genuinely unmerged work exists on development, the job
+# refuses and fails loudly (visible in the Actions tab) rather than clobbering it.
 #
 # Loop safety: this force-pushes development, which triggers publish.yml on the
 # development branch. After the reset development == main (a final version), and
@@ -50,7 +52,14 @@ jobs:
           set -euo pipefail
           git fetch origin main development --quiet
 
-          AHEAD=$(git rev-list origin/development ^origin/main --count)
+          # Count development commits whose PATCH is not already in main, via
+          # git cherry (patch-id) rather than `rev-list --count` (SHA). A
+          # squash- or rebase-merged release leaves development's commits
+          # content-identical to main but with different SHAs; a SHA count reads
+          # those as "ahead" and refuses every time, whereas the patch-id count
+          # correctly reads 0 and lets the reset auto-resolve. Only genuinely
+          # unmerged content still counts as in-flight work.
+          AHEAD=$(git cherry origin/main origin/development | grep -c '^+' || true)
           if [ "$AHEAD" -ne 0 ]; then
             echo "::error::development has $AHEAD commit(s) not in main - refusing to reset (in-flight work)."
             # Open a tracking issue (deduped by exact-title phrase search - the
