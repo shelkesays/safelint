@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Release automation (internal tooling; the `safelint` package is unchanged).** The `development`->`main` post-release sync now decides "is it safe to reset development?" by **content** (patch-id via `git cherry`) instead of raw SHA commit count. A squash- or rebase-merged release leaves `development`'s commits content-identical to `main` but with different SHAs; the old count-based check read those as "26 commits ahead" and refused every release (opening a tracking issue and requiring a manual reset), even though nothing was actually unmerged. The patch-id check reads that case as 0 in-flight commits and auto-resolves, while still refusing when genuinely unmerged content exists. Applied to both `.github/workflows/sync-development.yml` and the local `bin/sync.sh` advisor.
+
 ## [2.9.0] - 2026-07-21
 
 ### Added
