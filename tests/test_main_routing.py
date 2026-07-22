@@ -900,6 +900,24 @@ def test_run_check_all_files_silent_pass_not_masked_by_sibling(tmp_path: Path, m
     assert rc == 2, f"a grammar-missing --all-files target must not be masked green by a clean sibling; got {rc}"
 
 
+def test_run_check_all_files_zero_files_still_prints_all_clear(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """An ``--all-files`` run that discovers ZERO lintable files (all excluded / empty tree) still prints ``All checks passed.``.
+
+    Regression: the multi-path refactor routed every "nothing linted" case
+    through the silent (pre-commit-friendly) no-targets path, so
+    ``safelint check <excluded-or-empty> --all-files`` printed nothing at all
+    instead of the interactive clean-run message it printed before 2.10.
+    Only the git-modified *no-targets* short-circuit should stay silent.
+    """
+    empty = tmp_path / "empty"
+    empty.mkdir()
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
+
+    rc = cli._run_check(_multipath_args([empty], all_files=True, output_format="pretty"))
+    assert rc == 0
+    assert "All checks passed." in capsys.readouterr().out
+
+
 def test_run_check_empty_sibling_does_not_inherit_missing_grammar(tmp_path: Path, mocker: MockerFixture) -> None:
     """An empty (or no-op) target must not inherit an earlier target's missing-grammar extension.
 

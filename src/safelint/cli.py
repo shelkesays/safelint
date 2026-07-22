@@ -1084,6 +1084,7 @@ class _TargetOutcome:
         self.considered: set[str] = set()  # git-modified paths considered under any target
         self.silent_pass = False  # some target had grammar-missing files and linted nothing
         self.any_linted = False  # at least one target linted a real file
+        self.all_no_targets = True  # every target hit the git-modified no-targets short-circuit
 
 
 def _target_config(target: Path, config_path: str | None, cache: dict) -> tuple[dict, list[str]]:
@@ -1133,6 +1134,9 @@ def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | 
             out.unavailable |= missing
             out.silent_pass = True
         return
+    # Past the git-modified no-targets short-circuit: this target actually ran
+    # discovery, so the run is NOT the "nothing modified" case that stays silent.
+    out.all_no_targets = False
     raw = run(target, config_path=config_path, files=files, changed_files=changed_files, ignore=args.ignore, no_cache=getattr(args, "no_cache", False))
     added = _extend_deduped(out.results, out.seen, raw)
     _partition_into(out.blocking, added, fail_threshold)
@@ -1214,9 +1218,13 @@ def _run_check(args: argparse.Namespace) -> int:
     if output_format == "pretty" and out.unavailable:
         _print_grammar_warnings(out.unavailable)
 
-    if not out.any_linted:
-        # Nothing was linted under any target: an empty (but valid) document,
-        # plus exit 2 when files existed but every one was grammar-missing.
+    if not out.any_linted and (out.all_no_targets or out.silent_pass):
+        # Nothing was linted AND either every target hit the git-modified
+        # no-targets short-circuit (stay quiet - pre-commit friendliness) or a
+        # grammar was missing (exit 2). A genuinely clean --all-files / file
+        # run that simply discovered zero files (everything excluded, or an
+        # empty tree) falls through to the normal summary below, so it still
+        # prints "All checks passed." as it did before multi-path support.
         return _finish_unlinted(output_format, fail_on, silent_pass=out.silent_pass, unavailable=out.unavailable)
 
     _print_check_results(out.results, output_format, fail_on, len(out.blocking), statistics=getattr(args, "statistics", False))
