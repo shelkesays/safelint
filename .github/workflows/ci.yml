@@ -4,7 +4,12 @@ on:
   push:
     branches: [main, development, "release/*"]
   pull_request:
-    branches: [main, "release/*"]
+    # Include `development` so feature -> development RC PRs get the full
+    # lint/test/self-lint matrix BEFORE merge. Without it, a merge to
+    # `development` triggers publish.yml (which auto-releases a new RC to PyPI)
+    # and ci.yml independently, so a broken RC could publish while CI fails
+    # separately - pre-merge validation on the PR closes that gap.
+    branches: [main, development, "release/*"]
 
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
