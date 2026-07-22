@@ -835,3 +835,87 @@ def test_run_check_all_paths_clean_returns_zero(tmp_path: Path, mocker: MockerFi
     doc = json.loads(capsys.readouterr().out)
     assert rc == 0
     assert doc["violations"] == []
+
+
+def test_run_check_empty_targets_returns_zero(tmp_path: Path) -> None:
+    """A direct caller passing an empty targets list is handled cleanly (no IndexError)."""
+    rc = cli._run_check(_multipath_args([], output_format="json"))
+    assert rc == 0  # nothing to lint, nothing considered modified
+
+
+def test_run_check_silent_pass_not_masked_by_a_sibling_target(tmp_path: Path, mocker: MockerFixture) -> None:
+    """One target whose only git-modified file has a missing grammar still forces exit 2, even when a sibling target lints clean files.
+
+    Regression for the multi-target masking bug: the exit-2 silent-pass guard
+    used to fire only when EVERY target had no files, so a clean sibling made
+    the un-linted, grammar-missing target read green.
+    """
+    strict = tmp_path / "frontend"
+    strict.mkdir()
+    clean = tmp_path / "backend"
+    clean.mkdir()
+    (clean / "api.py").write_text("x = 1\n", encoding="utf-8")
+
+    # frontend: a modified app.ts with no TS grammar (silent-pass); backend: a clean modified .py.
+    def _modified(target: Path) -> tuple | None:
+        if target == strict:
+            return ([], [], {"app.ts"})  # no supported files, considered has .ts
+        return ([str(clean / "api.py")], [str(clean / "api.py")], {str(clean / "api.py")})
+
+    mocker.patch.object(cli, "_get_git_modified_supported_files", side_effect=_modified)
+    mocker.patch.object(cli, "unavailable_extensions", return_value={".ts": "pip install 'safelint[typescript]'"})
+
+    rc = cli._run_check(_multipath_args([strict, clean], all_files=False, output_format="pretty"))
+    assert rc == 2, f"a grammar-missing target must not be masked green by a clean sibling; got {rc}"
+
+
+def test_run_check_all_files_silent_pass_not_masked_by_sibling(tmp_path: Path, mocker: MockerFixture) -> None:
+    """--all-files discovery: a target whose only file is grammar-missing forces exit 2, even beside a clean sibling.
+
+    The all-files analogue of the git-modified masking regression: discovery
+    returns a skipped placeholder for the grammar-missing file, which must
+    still trip the exit-2 guard rather than reading green off the sibling.
+    """
+    from safelint.core.engine import LintResult  # noqa: PLC0415
+
+    strict = tmp_path / "frontend"
+    strict.mkdir()
+    (strict / "app.ts").write_text("const x = 1;\n", encoding="utf-8")
+    clean = tmp_path / "backend"
+    clean.mkdir()
+    (clean / "api.py").write_text("x = 1\n", encoding="utf-8")
+
+    mocker.patch.object(cli, "unavailable_extensions", return_value={".ts": "pip install 'safelint[typescript]'"})
+    # Discovery on the frontend target returns only a skipped .ts placeholder.
+    real_run = cli.run
+
+    def _run(target: Path, **kwargs: object) -> list:
+        if target == strict:
+            return [LintResult(path=str(strict / "app.ts"))]
+        return real_run(target, **kwargs)
+
+    mocker.patch.object(cli, "run", side_effect=_run)
+
+    rc = cli._run_check(_multipath_args([strict, clean], all_files=True, output_format="pretty"))
+    assert rc == 2, f"a grammar-missing --all-files target must not be masked green by a clean sibling; got {rc}"
+
+
+def test_run_check_per_target_fail_on_keeps_stricter_subtree_gate(tmp_path: Path, mocker: MockerFixture) -> None:
+    """A stricter subtree's fail_on is honoured even when bundled with a laxer first target.
+
+    Regression: fail_on used to be resolved once from the first target and
+    applied to all, so a warning in a fail_on=warning subtree bundled after a
+    default (fail_on=error) target was downgraded to advisory and exited 0.
+    """
+    lax = tmp_path / "root"
+    lax.mkdir()
+    (lax / "ok.py").write_text("k = 1\n", encoding="utf-8")  # clean
+    strict = tmp_path / "strict"
+    strict.mkdir()
+    (strict / "safelint.toml").write_text("fail_on = 'warning'\n", encoding="utf-8")
+    (strict / "warn.py").write_text("def r(n):\n    return r(n - 1)\n", encoding="utf-8")  # SAFE105 (warning)
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
+
+    # No CLI --fail-on/--mode, so each target's own config governs its threshold.
+    rc = cli._run_check(_multipath_args([lax, strict], all_files=True, fail_on=None, mode=None, output_format="pretty"))
+    assert rc == 1, f"the strict subtree's fail_on=warning must still block; got {rc}"

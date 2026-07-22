@@ -40,7 +40,7 @@ uv run safelint check src/ scripts/ --all-files
 ```
 
 The CLI has two entry points:
-- `safelint check <path>...`: direct invocation, one or more files/directories; defaults to git-modified files unless `--all-files` is passed. Overlapping paths (e.g. `src/` and `src/foo.py`) lint each file once; config is resolved per-target (monorepo-friendly).
+- `safelint check <path>...`: direct invocation, one or more files/directories; defaults to git-modified files unless `--all-files` is passed. Overlapping paths (e.g. `src/` and `src/foo.py`) are reported once (deduped by resolved path, processed most-specific-first so config is order-independent); config and `fail_on` are resolved per-target (monorepo-friendly).
 - `safelint <file1.py> <file2.py> ...`: pre-commit style, lints exact files
 
 `--fail-on=error|warning` overrides the per-rule severity threshold; `--mode=local|ci` sets a default (`local` → fail-on=error, `ci` → fail-on=warning).

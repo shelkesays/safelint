@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 import pytest
 
 from safelint.cli import (
-    _check_exit_code,
+    _any_result_was_linted,
     _compose_extras_install_command,
     _emit_hook_grammar_warnings,
     _emit_missing_grammar_warnings,
@@ -581,54 +581,17 @@ def test_emit_warnings_use_precommit_hint_when_running_under_precommit(capsys: p
 # ---------------------------------------------------------------------------
 
 
-def test_check_exit_code_returns_2_when_all_files_skipped_for_missing_grammar() -> None:
-    """``_check_exit_code`` returns 2 when discovery found unavailable files AND zero files got linted.
-
-    Regression guard: the silent-failure guard must fire in *every*
-    output mode (pretty / json / sarif), since CI pipelines often run
-    ``--format sarif`` and a hidden-green run there is the worst case
-    - a code-quality dashboard would show "no issues" when actually no
-    linting happened.
-    """
-    assert _check_exit_code(results=[], unavailable_found={".py"}, all_blocking=[]) == 2
-
-
-def test_check_exit_code_returns_2_for_single_file_target_with_unavailable_grammar() -> None:
-    """``safelint check foo.ts`` (TS grammar missing) must exit 2, not 0.
-
-    Regression for the bug where ``check_path`` returns ``[LintResult(path="foo.ts")]``
-    - a 1-element list whose lone entry was an empty placeholder produced
-    at language-lookup time. The old guard only checked ``not results``,
-    so the 1-element list bypassed it and the run exited 0 with a
-    misleading "clean" verdict on a file that was never actually linted.
-    The new guard treats any result whose suffix is in *unavailable_found*
-    as skipped.
-    """
-    skipped_result = LintResult(path="path/to/foo.ts")
-    assert _check_exit_code(results=[skipped_result], unavailable_found={".ts"}, all_blocking=[]) == 2
-
-
-def test_check_exit_code_returns_0_when_at_least_one_result_was_actually_linted() -> None:
-    """Mixed-extension run with one lintable file → exit 0 even when other paths had missing grammars."""
+def test_any_result_was_linted_true_when_a_supported_file_present() -> None:
+    """``_any_result_was_linted`` is True when any result's suffix is not in the unavailable set."""
     skipped = LintResult(path="ui/widget.ts")
-    linted = LintResult(path="api/server.py")  # .py is supported
-    assert _check_exit_code(results=[skipped, linted], unavailable_found={".ts"}, all_blocking=[]) == 0
+    linted = LintResult(path="api/server.py")
+    assert _any_result_was_linted([skipped, linted], {".ts"}) is True
 
 
-def test_check_exit_code_returns_1_when_blocking_violations_present() -> None:
-    """Normal failure: at least one blocking violation → exit 1."""
-    fake_violation = object()  # type doesn't matter for the boolean test
-    assert _check_exit_code(results=[object()], unavailable_found=set(), all_blocking=[fake_violation]) == 1
-
-
-def test_check_exit_code_returns_0_on_clean_run() -> None:
-    """No violations, nothing skipped → exit 0."""
-    assert _check_exit_code(results=[object()], unavailable_found=set(), all_blocking=[]) == 0
-
-
-def test_check_exit_code_returns_0_when_no_files_and_no_unavailable() -> None:
-    """Zero files discovered but no unavailable extensions either - likely an empty dir, not a misconfig. Exit 0."""
-    assert _check_exit_code(results=[], unavailable_found=set(), all_blocking=[]) == 0
+def test_any_result_was_linted_false_when_every_result_is_grammar_missing() -> None:
+    """False when every result's suffix is in the unavailable set (all skipped placeholders) - drives the exit-2 silent-pass."""
+    skipped = LintResult(path="path/to/foo.ts")
+    assert _any_result_was_linted([skipped], {".ts"}) is False
 
 
 def test_guard_hook_silent_failure_returns_2_when_every_passed_file_unavailable() -> None:
