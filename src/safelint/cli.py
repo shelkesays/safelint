@@ -1116,7 +1116,13 @@ def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | 
     config, exclude_paths = _target_config(target, config_path, cache)
     _, fail_threshold = _resolve_fail_on(args, config)
     # Scan silently here; the deduplicated union is emitted once after the loop.
-    out.unavailable |= _emit_missing_grammar_warnings(target, silent=True, exclude_paths=exclude_paths)
+    # ``target_unavail`` is THIS target's own missing-grammar set - the
+    # silent-pass decisions below must key off it, never the cross-target
+    # ``out.unavailable`` union, or an empty sibling processed after a
+    # grammar-missing target would inherit its extensions and wrongly force
+    # exit 2 even though that target linted real files.
+    target_unavail = _emit_missing_grammar_warnings(target, silent=True, exclude_paths=exclude_paths)
+    out.unavailable |= target_unavail
     changed_files, files, no_targets, considered = _resolve_check_targets(args, target, output_format)
     out.considered |= considered
     if no_targets:
@@ -1130,9 +1136,9 @@ def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | 
     raw = run(target, config_path=config_path, files=files, changed_files=changed_files, ignore=args.ignore, no_cache=getattr(args, "no_cache", False))
     added = _extend_deduped(out.results, out.seen, raw)
     _partition_into(out.blocking, added, fail_threshold)
-    if _any_result_was_linted(raw, out.unavailable):
+    if _any_result_was_linted(raw, target_unavail):
         out.any_linted = True
-    elif out.unavailable:  # discovered only grammar-missing placeholders
+    elif target_unavail:  # THIS target discovered only grammar-missing placeholders
         out.silent_pass = True
 
 
