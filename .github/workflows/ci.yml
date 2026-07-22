@@ -46,12 +46,15 @@ jobs:
         # locally, this step enforces it at the CI tier so a push that
         # bypasses pre-commit can't slip through. ``--fail-on=warning``
         # is the strict CI mode (``--mode=ci`` default), so warnings block
-        # too - safelint's own source is warning-clean. ``scripts/`` is
-        # linted too (its CLI-inherent SAFE304/SAFE203 are ignored per
-        # ``safelint.toml``'s ``scripts/**`` per-file-ignore). ``check`` now
-        # accepts multiple paths, so src/ and scripts/ are one invocation.
+        # too - safelint's own source is warning-clean. ``scripts/`` and
+        # ``tests/`` are linted too: their per-file-ignores live in
+        # ``safelint.toml`` (``scripts/**`` drops the CLI-inherent
+        # SAFE304/SAFE203; ``tests/fixtures/**`` is deliberately non-compliant
+        # so it drops every rule; ``tests/**`` relaxes the structure/style
+        # rules test scaffolding trips). ``check`` accepts multiple paths, so
+        # all three lint in one invocation.
         run: |
-          uv run safelint check src/ scripts/ --all-files --fail-on=warning
+          uv run safelint check src/ scripts/ tests/ --all-files --fail-on=warning
 
   test:
     name: Test / Python ${{ matrix.python-version }}

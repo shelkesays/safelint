@@ -29,14 +29,18 @@ uv run ruff format --check src/ tests/ scripts/
 # Type check (ty replaces mypy here: config is [tool.ty] in pyproject.toml)
 uv run ty check src/ scripts/
 
-# Run safelint on itself + the release/build scripts: zero blocking violations
-# before merging (--all-files matches CI; without it the check defaults to
-# git-modified files only). `check` accepts multiple paths (ruff/ty-style), so
-# src/ and scripts/ lint in one invocation. scripts/ are CLIs, so safelint.toml's
-# `[per_file_ignores] "scripts/**"` exempts the CLI-inherent SAFE304/SAFE203
-# (per-file-ignores are glob-matched per file, so they still apply when src/ and
-# scripts/ are passed together).
-uv run safelint check src/ scripts/ --all-files
+# Run safelint on itself + the release/build scripts + the test tree: zero
+# blocking violations before merging (--all-files matches CI; without it the
+# check defaults to git-modified files only). `check` accepts multiple paths
+# (ruff/ty-style), so all three lint in one invocation. Per-file-ignores in
+# safelint.toml keep the non-src trees honest: `scripts/**` drops the
+# CLI-inherent SAFE304/SAFE203; `tests/fixtures/**` is deliberately
+# non-compliant (it exists to make rules fire in the e2e tests) so it drops
+# every rule; `tests/**` relaxes the structure/style rules test scaffolding
+# trips (function_length, nesting_depth, logging_on_error). Per-file-ignores
+# are glob-matched per file, so they still apply when the trees are passed
+# together.
+uv run safelint check src/ scripts/ tests/ --all-files
 ```
 
 The CLI has two entry points:
@@ -110,7 +114,7 @@ Each rule has a per-rule `severity` (`error` | `warning`). `SafetyEngine.partiti
 6. Update **all 14 bundled client skill files** plus the applicable `skill_files/languages/*.md` crib sheets - `tests/test_skill_install.py::test_skill_documents_every_active_rule` fails for every client whose docs miss the new code or name, so land these in the same commit as the registry change.
 7. Add a `CHANGELOG.md` entry under `[Unreleased]`. New rules / languages are MINOR, never MAJOR. **The version bump is a mandatory, easily-missed step of finishing the work - do not skip it** (it has been missed twice). The bump is what triggers the automated release (see "Release workflow" below), so it must land with the work; the *number* is derived by convention (additive = next `X.Y.0`), the owner controls release timing. The static version (no `setuptools_scm`) plus the branch-triggered `publish.yml` gate (which only releases a *new, untagged* version on its expected branch) is what makes the bump a deliberate, one-time authorisation. **Leave the `CHANGELOG.md` heading as `## [Unreleased]`; the release workflow flips it to `## [X.Y.Z] - <date>` automatically at the final tag - do not date it by hand.**
 
-**Critical constraint**: SafeLint must pass itself. `safelint check src/ --all-files` must report zero blocking violations before any merge (the `--all-files` flag matches CI; a bare `safelint check src/` only scans git-modified files and can read clean falsely). This means new rule code must obey its own rules - `no_recursion` (use iterative worklists), `function_length=60`, `nesting_depth=2`, `complexity=10`, etc. The only sanctioned inline suppressions in safelint's source are the documented `# nosafe: SAFE203` logging exemptions; prefer rewriting over annotating (the project's rule-10 stance).
+**Critical constraint**: SafeLint must pass itself. `safelint check src/ scripts/ tests/ --all-files` must report zero blocking violations before any merge (the `--all-files` flag matches CI; a bare `safelint check src/` only scans git-modified files and can read clean falsely). This means new rule code must obey its own rules - `no_recursion` (use iterative worklists), `function_length=60`, `nesting_depth=2`, `complexity=10`, etc. Test code is held to the same bar minus the scaffolding-inherent rules relaxed for `tests/**` (function_length, nesting_depth, logging_on_error); `tests/fixtures/**` is exempt entirely (its files are deliberately non-compliant rule-triggers). So a new test that trips, say, `complexity` or `max_arguments` still fails CI - keep test helpers within the same structural bar. The only sanctioned inline suppressions in safelint's source are the documented `# nosafe: SAFE203` logging exemptions; prefer rewriting over annotating (the project's rule-10 stance).
 
 ### Adding a new language or framework/runtime preset
 

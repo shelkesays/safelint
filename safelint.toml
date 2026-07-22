@@ -18,7 +18,7 @@ fail_on = "warning" # "error" | "warning"
 # .pytest_cache/, .mypy_cache/, .ruff_cache/, htmlcov/, etc.) stay
 # active for this repo while we add a couple of project-specific
 # directories on top.
-extend_exclude_paths = ["tests/**", "docs/**"]
+extend_exclude_paths = ["docs/**"]
 
 # ``scripts/`` are command-line tools (release helpers + the mkdocs build hook),
 # not library code. Two rules that are right for ``src/`` do not fit a CLI and
@@ -29,6 +29,18 @@ extend_exclude_paths = ["tests/**", "docs/**"]
 # applies, so the scripts obey the same structural bar as the rest of the repo.
 [per_file_ignores]
 "scripts/**" = ["side_effects", "logging_on_error"]
+# Test fixtures are deliberately non-compliant: they exist to make the rules
+# FIRE so the e2e tests can assert on them (e.g. spring_boot/*.java trip
+# nesting / complexity / empty-catch / resource rules on purpose). They can
+# never satisfy their own rules, so ignore every rule for the fixture tree.
+"tests/fixtures/**" = ["*"]
+# Test scaffolding legitimately breaks a few production structure/style rules:
+# long inline-source test bodies (SAFE101 function_length), nested
+# parametrize / setup blocks (SAFE102 nesting_depth), and ``except`` blocks
+# that assert an expected error rather than log it (SAFE203 logging_on_error).
+# Everything else - complexity, no-recursion, dataflow, etc. - still applies to
+# test code.
+"tests/**" = ["function_length", "nesting_depth", "logging_on_error"]
 
 [execution]
 fail_fast = false
