@@ -900,6 +900,39 @@ def test_run_check_all_files_silent_pass_not_masked_by_sibling(tmp_path: Path, m
     assert rc == 2, f"a grammar-missing --all-files target must not be masked green by a clean sibling; got {rc}"
 
 
+def test_run_check_empty_sibling_does_not_inherit_missing_grammar(tmp_path: Path, mocker: MockerFixture) -> None:
+    """An empty (or no-op) target must not inherit an earlier target's missing-grammar extension.
+
+    Regression: silent-pass was keyed off the cross-target ``out.unavailable``
+    union, so ``check src/ empty/`` where src/ has both app.ts (grammar missing)
+    and a clean app.py would wrongly exit 2 - even though app.py linted fine and
+    empty/ simply has nothing. Silent-pass must key off each target's OWN
+    missing-grammar set.
+    """
+    from safelint.core.engine import LintResult  # noqa: PLC0415
+
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "app.ts").write_text("const x = 1;\n", encoding="utf-8")
+    (src / "app.py").write_text("x = 1\n", encoding="utf-8")  # clean, real
+    empty = tmp_path / "empty"
+    empty.mkdir()
+
+    mocker.patch.object(cli, "unavailable_extensions", return_value={".ts": "pip install 'safelint[typescript]'"})
+    real_run = cli.run
+
+    def _run(target: Path, **kwargs: object) -> list:
+        if target == src:
+            # src lints app.py for real, app.ts is a skipped placeholder.
+            return [LintResult(path=str(src / "app.ts")), *real_run(src, **kwargs)]
+        return real_run(target, **kwargs)
+
+    mocker.patch.object(cli, "run", side_effect=_run)
+
+    rc = cli._run_check(_multipath_args([src, empty], all_files=True, output_format="pretty"))
+    assert rc == 0, f"empty sibling must not inherit src/'s missing .ts grammar; app.py linted clean, so exit 0. got {rc}"
+
+
 def test_run_check_per_target_fail_on_keeps_stricter_subtree_gate(tmp_path: Path, mocker: MockerFixture) -> None:
     """A stricter subtree's fail_on is honoured even when bundled with a laxer first target.
 
