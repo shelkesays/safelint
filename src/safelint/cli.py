@@ -531,8 +531,8 @@ def _filter_modified_under_target(raw: set[str], git_root: Path, target_abs: Pat
     installed (those wouldn't reach ``_filter_supported_files`` because
     its extension filter drops them). The existence check matters
     because ``git diff --name-only HEAD`` reports *deleted* files too;
-    without it, a deleted ``.ts`` under target would tip
-    ``_handle_no_targets`` into exit 2 ("install the typescript extra")
+    without it, a deleted ``.ts`` under target would tip the
+    silent-pass guard into exit 2 ("install the typescript extra")
     even though the user has no remaining ``.ts`` file to lint. Returns
     the git-relative form (same as *raw*) so downstream callers that
     key off ``Path(...).suffix`` work the same as they did against the
@@ -844,8 +844,8 @@ def _emit_missing_grammar_warnings(
     """Walk *target*, return the set of unavailable extensions found; emit warnings unless *silent*.
 
     The walk and the set-return run unconditionally - that's what the
-    silent-failure guard in :func:`_check_exit_code` consumes to fire
-    exit code 2 in *every* output mode. The stderr warnings, however,
+    silent-pass guard in :func:`_run_check` (via ``_any_result_was_linted``)
+    consumes to fire exit code 2 in *every* output mode. The stderr warnings, however,
     are gated on *silent*: pretty mode prints them, JSON / SARIF mode
     suppresses them so the tooling-consumer stderr stays clean for
     parsing pipelines (matching the changelog claim).
@@ -865,13 +865,25 @@ def _emit_missing_grammar_warnings(
     seen_exts = _scan_for_unavailable_extensions(target, unavailable, exclude_paths=exclude_paths)
     if not seen_exts or silent:
         return seen_exts
-    grouped: dict[str, list[str]] = {}
-    for ext in sorted(seen_exts):
-        grouped.setdefault(unavailable[ext], []).append(ext)
-    for hint, exts in grouped.items():
-        exts_str = ", ".join(exts)
-        _diagnostics.print_warning(f"skipping {exts_str} files - {_format_install_action(hint)}")
+    _print_grammar_warnings(seen_exts)
     return seen_exts
+
+
+def _print_grammar_warnings(exts: set[str]) -> None:
+    """Emit one ``safelint: warning: skipping .X files - <install action>`` line per missing grammar.
+
+    Factored out of :func:`_emit_missing_grammar_warnings` so a multi-target
+    ``check`` run can scan each target silently and then emit the deduplicated
+    union of missing-grammar extensions ONCE, rather than repeating the same
+    ``skipping .ts files`` warning per overlapping target.
+    """
+    unavailable = unavailable_extensions()
+    grouped: dict[str, list[str]] = {}
+    for ext in sorted(exts):
+        if ext in unavailable:
+            grouped.setdefault(unavailable[ext], []).append(ext)
+    for hint, group in grouped.items():
+        _diagnostics.print_warning(f"skipping {', '.join(group)} files - {_format_install_action(hint)}")
 
 
 def _emit_hook_grammar_warnings(files: list[str], *, silent: bool = False) -> set[str]:
@@ -909,37 +921,6 @@ def _emit_hook_grammar_warnings(files: list[str], *, silent: bool = False) -> se
         exts_str = ", ".join(exts)
         _diagnostics.print_warning(f"skipping {exts_str} files - {_format_install_action(hint)}")
     return seen_exts
-
-
-def _check_exit_code(
-    results: list,  # list[LintResult] - typed loosely to avoid an import cycle in tests
-    unavailable_found: set[str],
-    all_blocking: list,  # list[Violation]
-) -> int:
-    """Resolve the exit code for ``_run_check`` after the lint completes.
-
-    Three cases:
-
-    * **Silent-failure** - file discovery saw unavailable-grammar files
-      AND no file actually got linted (every entry in *results* either
-      doesn't exist or was an empty placeholder for a file whose grammar
-      isn't installed). The run is reporting "clean" only because no
-      files were processed; surface this as exit 2 (configuration error)
-      so pre-commit / CI shows the hook as failed. The "no file got
-      linted" check must look past raw list length because ``check_path``
-      on a single ``.ts`` target with the TS grammar missing returns
-      ``[LintResult(path='foo.ts')]`` - a 1-element list whose lone
-      entry was actually skipped at language-lookup time. Treat any
-      result whose path's suffix is in *unavailable_found* as skipped.
-    * **Blocking violations** - exit 1.
-    * **Clean / advisory only** - exit 0.
-    """
-    if unavailable_found and not _any_result_was_linted(results, unavailable_found):
-        action = _install_action_for_extensions(unavailable_found)
-        suffix = f" - {action}" if action else ""
-        _diagnostics.print_error(f"no files linted - every supported file was skipped because its grammar package isn't installed{suffix}")
-        return 2
-    return 1 if all_blocking else 0
 
 
 def _any_result_was_linted(results: list, unavailable_found: set[str]) -> bool:
@@ -1056,36 +1037,6 @@ def _emit_skill_install_grammar_hint(target: Path) -> None:
     _diagnostics.print_warning(f"Detected source files for {len(needed_extras)} language{plural} ({extras_list}) whose tree-sitter grammar isn't installed. Run: {install}")
 
 
-def _handle_no_targets(output_format: str, fail_on: str, considered_modified: set[str]) -> int:
-    """Resolve the exit code for the ``_resolve_check_targets`` no-targets short-circuit.
-
-    Two distinct cases land here and the exit code differs:
-
-    * **Genuine clean run / nothing under target** - the current
-      invocation has no modified files to consider
-      (``considered_modified`` is empty - either the user truly hasn't
-      modified anything, or the only modified files live outside the
-      requested target). Print the empty results document and exit 0.
-      Machine output modes still need a parseable empty document on
-      stdout so downstream CI uploaders / SARIF consumers don't choke
-      on empty input.
-    * **Silent-pass** - files under target were modified, but every one
-      was dropped by the supported-extensions filter because its grammar
-      isn't installed. ``considered_modified`` intersects
-      ``unavailable_extensions()``. Print the empty document AND a stderr
-      error AND exit 2 so pre-commit / CI shows the run as Failed rather
-      than silently Passed.
-    """
-    unavailable_in_modified = _matching_suffixes(list(considered_modified), unavailable_extensions())
-    _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, options=_PrintOptions(silent_on_clean=True))
-    if unavailable_in_modified:
-        action = _install_action_for_extensions(unavailable_in_modified)
-        suffix = f" - {action}" if action else ""
-        _diagnostics.print_error(f"no files linted - every git-modified source file has a grammar that isn't installed{suffix}")
-        return 2
-    return 0
-
-
 def _emit_skill_freshness_warnings() -> None:
     """Emit a stderr warning for each stale AI-client skill install.
 
@@ -1117,65 +1068,122 @@ def _load_config_and_excludes(target: Path, config_path: str | None) -> tuple[di
     return config, SafetyEngine._resolve_exclude_paths(config)
 
 
-def _extend_deduped(results: list, seen: set[str], new_results: list) -> None:
-    """Append each result from *new_results* whose resolved path is unseen.
+class _TargetOutcome:
+    """Per-target lint outcome, aggregated across ``args.targets`` in :func:`_lint_targets`.
 
-    Overlapping targets (``safelint check src/ src/foo.py``) surface the same
-    file twice; dedupe by resolved path so it is linted/reported once, matching
-    ruff / ty.
+    Kept as a tiny mutable accumulator rather than a return tuple so the
+    per-target loop stays flat (safelint's own ``nesting_depth`` / ``complexity``
+    limits) while threading several running totals.
     """
+
+    def __init__(self) -> None:
+        self.results: list = []  # deduped LintResults, most-specific target wins
+        self.seen: set[str] = set()  # resolved paths already kept
+        self.blocking: list = []  # partitioned under each target's OWN fail_on
+        self.unavailable: set[str] = set()  # union of missing-grammar extensions
+        self.considered: set[str] = set()  # git-modified paths considered under any target
+        self.silent_pass = False  # some target had grammar-missing files and linted nothing
+        self.any_linted = False  # at least one target linted a real file
+
+
+def _target_config(target: Path, config_path: str | None, cache: dict) -> tuple[dict, list[str]]:
+    """Resolve ``(config, exclude_paths)`` for *target*, memoised by resolved path.
+
+    The cache means ``targets[0]`` - loaded once for the summary fail-on label
+    and again inside the lint loop - only walks the config-discovery tree once.
+    """
+    key = str(target.resolve())
+    hit = cache.get(key)
+    if hit is None:
+        hit = _load_config_and_excludes(target, config_path)
+        cache[key] = hit
+    return hit
+
+
+def _specificity(target: Path) -> int:
+    """Rank targets so the MOST specific (deepest resolved path) sorts first.
+
+    Overlapping targets (``check pkg/ pkg/a/foo.py``) are processed
+    most-specific-first, so the file is kept under its narrowest target's
+    config and the broad target's duplicate is deduped away - making the result
+    independent of the user's argument order.
+    """
+    return len(target.resolve().parts)
+
+
+def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | None, output_format: str, cache: dict, out: _TargetOutcome) -> None:
+    """Lint a single *target*, folding its outcome into *out* (dedup, per-target fail_on, silent-pass)."""
+    config, exclude_paths = _target_config(target, config_path, cache)
+    _, fail_threshold = _resolve_fail_on(args, config)
+    # Scan silently here; the deduplicated union is emitted once after the loop.
+    out.unavailable |= _emit_missing_grammar_warnings(target, silent=True, exclude_paths=exclude_paths)
+    changed_files, files, no_targets, considered = _resolve_check_targets(args, target, output_format)
+    out.considered |= considered
+    if no_targets:
+        # Git-modified files existed under target but were all dropped for a
+        # missing grammar: this target linted nothing yet must not read green.
+        missing = _matching_suffixes(list(considered), unavailable_extensions())
+        if missing:
+            out.unavailable |= missing
+            out.silent_pass = True
+        return
+    raw = run(target, config_path=config_path, files=files, changed_files=changed_files, ignore=args.ignore, no_cache=getattr(args, "no_cache", False))
+    added = _extend_deduped(out.results, out.seen, raw)
+    _partition_into(out.blocking, added, fail_threshold)
+    if _any_result_was_linted(raw, out.unavailable):
+        out.any_linted = True
+    elif out.unavailable:  # discovered only grammar-missing placeholders
+        out.silent_pass = True
+
+
+def _extend_deduped(results: list, seen: set[str], new_results: list) -> list:
+    """Append each result whose resolved path is unseen; return the newly-added ones.
+
+    A file reached via two overlapping targets is kept once (the first - i.e.
+    most-specific - target's result), so it is reported once. Returning only the
+    additions lets the caller partition each file under exactly one target's
+    fail-on threshold without double-counting.
+    """
+    added: list = []
     for result in new_results:
         key = str(Path(result.path).resolve())
         if key in seen:
             continue
         seen.add(key)
         results.append(result)
+        added.append(result)
+    return added
 
 
-def _lint_targets(args: argparse.Namespace, config_path: str | None, output_format: str) -> tuple[list, set[str], set[str], bool]:
-    """Collect deduped lint results across every path in ``args.targets``.
-
-    Returns ``(results, unavailable_found, considered_modified, all_no_targets)``.
-    Each target resolves its own config inside :func:`run` (correct for
-    monorepos with per-subtree ``safelint.toml``); the missing-grammar warnings
-    and git-modified resolution are per-target too, then unioned.
-    """
-    results: list = []
-    unavailable_found: set[str] = set()
-    considered_modified: set[str] = set()
-    seen: set[str] = set()
-    all_no_targets = True
-    for target in args.targets:
-        _, exclude_paths = _load_config_and_excludes(target, config_path)
-        unavailable_found |= _emit_missing_grammar_warnings(target, silent=(output_format != "pretty"), exclude_paths=exclude_paths)
-        changed_files, files, no_targets, considered = _resolve_check_targets(args, target, output_format)
-        considered_modified |= considered
-        if no_targets:
-            continue
-        all_no_targets = False
-        _extend_deduped(results, seen, run(target, config_path=config_path, files=files, changed_files=changed_files, ignore=args.ignore, no_cache=getattr(args, "no_cache", False)))
-    return results, unavailable_found, considered_modified, all_no_targets
+def _partition_into(blocking: list, results: list, fail_threshold: int) -> None:
+    """Accumulate the blocking violations of *results* (under *fail_threshold*) into *blocking*."""
+    for result in results:
+        if result.violations:
+            blocked, _ = SafetyEngine.partition_violations(result.violations, fail_threshold)
+            blocking.extend(blocked)
 
 
-def _aggregate_results(results: list, output_format: str, fail_threshold: int) -> tuple[list, list, list]:
-    """Partition every result, print per-file in pretty mode, and return the combined lists.
+def _lint_targets(args: argparse.Namespace, config_path: str | None, output_format: str, cache: dict) -> _TargetOutcome:
+    """Lint every target most-specific-first, returning the aggregated :class:`_TargetOutcome`."""
+    out = _TargetOutcome()
+    for target in sorted(args.targets, key=_specificity, reverse=True):
+        _lint_one_target(args, target, config_path, output_format, cache, out)
+    return out
 
-    Returns ``(all_blocking, all_violations, all_suppressed)`` across all files.
-    """
-    all_blocking: list[Violation] = []
-    all_violations: list[Violation] = []
-    all_suppressed: list[Violation] = []
+
+def _print_check_results(results: list, output_format: str, fail_on: str, blocking_count: int, *, statistics: bool) -> None:
+    """Print the per-file violations (pretty mode) and the run summary for the deduped *results*."""
+    all_violations: list = []
+    all_suppressed: list = []
     for result in results:
         all_suppressed.extend(result.suppressed)
         if not result.violations:
             continue
+        all_violations.extend(result.violations)
         if output_format == "pretty":
             _print_violations(result.violations)
             _print_file_summary(result.path, result.violations)
-        blocking, _ = SafetyEngine.partition_violations(result.violations, fail_threshold)
-        all_blocking.extend(blocking)
-        all_violations.extend(result.violations)
-    return all_blocking, all_violations, all_suppressed
+    _print_results(output_format, all_violations, all_suppressed, blocking_count=blocking_count, fail_on=fail_on, files_checked=len(results), options=_PrintOptions(statistics=statistics))
 
 
 def _run_check(args: argparse.Namespace) -> int:
@@ -1184,31 +1192,50 @@ def _run_check(args: argparse.Namespace) -> int:
         _emit_skill_freshness_warnings()
     config_path = getattr(args, "config", None)
     output_format: str = getattr(args, "output_format", "pretty")
+    if not args.targets:  # argparse's nargs='+' guards the CLI; this guards direct callers
+        return _finish_unlinted(output_format, "error", silent_pass=False, unavailable=set())
 
-    # The primary config (from --config, else the first target) drives the
-    # fail-on threshold + summary label for the whole invocation, so there is
-    # one exit code across all paths. Each target still lints under its own
-    # config inside run(); --fail-on / --mode override for divergent subtrees.
-    primary_config, _ = _load_config_and_excludes(args.targets[0], config_path)
-    fail_on, fail_threshold = _resolve_fail_on(args, primary_config)
+    # The user's first target drives the summary fail-on label (cosmetic); each
+    # target's violations are partitioned under its OWN config's fail_on inside
+    # the loop, so a stricter subtree keeps its gate. The config cache means
+    # targets[0] is only resolved once despite this extra look-up.
+    cache: dict = {}
+    primary_config, _ = _target_config(Path(args.targets[0]), config_path, cache)
+    fail_on, _ = _resolve_fail_on(args, primary_config)
 
-    results, unavailable_found, considered_modified, all_no_targets = _lint_targets(args, config_path, output_format)
+    out = _lint_targets(args, config_path, output_format, cache)
 
-    if all_no_targets:
-        return _handle_no_targets(output_format, fail_on, considered_modified)
+    if output_format == "pretty" and out.unavailable:
+        _print_grammar_warnings(out.unavailable)
 
-    all_blocking, all_violations, all_suppressed = _aggregate_results(results, output_format, fail_threshold)
+    if not out.any_linted:
+        # Nothing was linted under any target: an empty (but valid) document,
+        # plus exit 2 when files existed but every one was grammar-missing.
+        return _finish_unlinted(output_format, fail_on, silent_pass=out.silent_pass, unavailable=out.unavailable)
 
-    _print_results(
-        output_format,
-        all_violations,
-        all_suppressed,
-        blocking_count=len(all_blocking),
-        fail_on=fail_on,
-        files_checked=len(results),
-        options=_PrintOptions(statistics=getattr(args, "statistics", False)),
-    )
-    return _check_exit_code(results, unavailable_found, all_blocking)
+    _print_check_results(out.results, output_format, fail_on, len(out.blocking), statistics=getattr(args, "statistics", False))
+    # Silent-pass (2) takes precedence over blocking (1), matching single-target
+    # order: an un-checked file is a setup error the user must fix first.
+    if out.silent_pass:
+        _print_unlinted_error(out.unavailable)
+        return 2
+    return 1 if out.blocking else 0
+
+
+def _finish_unlinted(output_format: str, fail_on: str, *, silent_pass: bool, unavailable: set[str]) -> int:
+    """Emit the empty results document for a run that linted nothing; exit 2 on a grammar silent-pass else 0."""
+    _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, options=_PrintOptions(silent_on_clean=True))
+    if silent_pass:
+        _print_unlinted_error(unavailable)
+        return 2
+    return 0
+
+
+def _print_unlinted_error(unavailable: set[str]) -> None:
+    """Print the ``no files linted - grammar not installed`` stderr diagnostic."""
+    action = _install_action_for_extensions(unavailable)
+    suffix = f" - {action}" if action else ""
+    _diagnostics.print_error(f"no files linted - every git-modified or discovered source file has a grammar that isn't installed{suffix}")
 
 
 def _add_severity_args(parser: argparse.ArgumentParser) -> None:
