@@ -918,6 +918,36 @@ def test_run_check_all_files_zero_files_still_prints_all_clear(tmp_path: Path, m
     assert "All checks passed." in capsys.readouterr().out
 
 
+def test_run_check_warns_when_a_named_target_lints_zero_files(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """A named target that contributes 0 files (all excluded / empty) emits a stderr transparency note.
+
+    Without it, ``check src excluded/`` reads identically to ``check src`` and
+    the user cannot tell whether the second target was scanned or silently
+    skipped. The note is informational only - it does not change the exit code.
+    """
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "ok.py").write_text("x = 1\n", encoding="utf-8")  # real, clean
+    empty = tmp_path / "vendored"
+    empty.mkdir()  # no supported files
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
+
+    rc = cli._run_check(_multipath_args([src, empty], all_files=True, output_format="pretty"))
+    err = capsys.readouterr().err
+    assert rc == 0
+    assert "no files linted under" in err
+    assert "vendored" in err
+
+
+def test_run_check_no_empty_note_when_all_targets_lint(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """A target that actually lints files produces no spurious 'no files linted' note."""
+    (tmp_path / "a.py").write_text("x = 1\n", encoding="utf-8")
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
+
+    cli._run_check(_multipath_args([tmp_path], all_files=True, output_format="pretty"))
+    assert "no files linted under" not in capsys.readouterr().err
+
+
 def test_run_check_empty_sibling_does_not_inherit_missing_grammar(tmp_path: Path, mocker: MockerFixture) -> None:
     """An empty (or no-op) target must not inherit an earlier target's missing-grammar extension.
 
