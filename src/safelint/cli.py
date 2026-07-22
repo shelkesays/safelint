@@ -1085,6 +1085,7 @@ class _TargetOutcome:
         self.silent_pass = False  # some target had grammar-missing files and linted nothing
         self.any_linted = False  # at least one target linted a real file
         self.all_no_targets = True  # every target hit the git-modified no-targets short-circuit
+        self.empty_targets: list[str] = []  # explicitly-named targets that ran discovery but linted 0 files (all excluded / empty)
 
 
 def _target_config(target: Path, config_path: str | None, cache: dict) -> tuple[dict, list[str]]:
@@ -1144,6 +1145,8 @@ def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | 
         out.any_linted = True
     elif target_unavail:  # THIS target discovered only grammar-missing placeholders
         out.silent_pass = True
+    else:  # ran discovery but found no lintable files here (all excluded, or empty)
+        out.empty_targets.append(str(target))
 
 
 def _extend_deduped(results: list, seen: set[str], new_results: list) -> list:
@@ -1196,6 +1199,21 @@ def _print_check_results(results: list, output_format: str, fail_on: str, blocki
     _print_results(output_format, all_violations, all_suppressed, blocking_count=blocking_count, fail_on=fail_on, files_checked=len(results), options=_PrintOptions(statistics=statistics))
 
 
+def _emit_scan_notes(out: _TargetOutcome) -> None:
+    """Emit the pretty-mode stderr notes for a completed multi-target scan.
+
+    Two informational (non-failing) signals: the deduplicated missing-grammar
+    union, and a per-target "no files linted under '<target>'" note so a named
+    target that contributed zero files (all excluded / empty) is distinguishable
+    from one that linted clean - e.g. ``check src tests`` where ``tests/**`` is
+    excluded would otherwise read identically to ``check src``.
+    """
+    if out.unavailable:
+        _print_grammar_warnings(out.unavailable)
+    for empty in out.empty_targets:
+        _diagnostics.print_warning(f"no files linted under '{empty}' - all excluded by config, empty, or no supported source files")
+
+
 def _run_check(args: argparse.Namespace) -> int:
     """Execute directory/file scan mode over one or more target paths."""
     if getattr(args, "check_skill_freshness", False):
@@ -1215,8 +1233,8 @@ def _run_check(args: argparse.Namespace) -> int:
 
     out = _lint_targets(args, config_path, output_format, cache)
 
-    if output_format == "pretty" and out.unavailable:
-        _print_grammar_warnings(out.unavailable)
+    if output_format == "pretty":
+        _emit_scan_notes(out)
 
     if not out.any_linted and (out.all_no_targets or out.silent_pass):
         # Nothing was linted AND either every target hit the git-modified
