@@ -39,8 +39,10 @@ uv run ty check src/ scripts/
 # every rule; `tests/**` relaxes the structure/style rules test scaffolding
 # trips (function_length, nesting_depth, logging_on_error). Per-file-ignores
 # are glob-matched per file, so they still apply when the trees are passed
-# together.
-uv run safelint check src/ scripts/ tests/ --all-files
+# together. `--fail-on=warning` matches CI's strict gate (the repo's
+# safelint.toml already sets `fail_on = "warning"`, so it is explicit here
+# rather than load-bearing).
+uv run safelint check src/ scripts/ tests/ --all-files --fail-on=warning
 ```
 
 The CLI has two entry points:

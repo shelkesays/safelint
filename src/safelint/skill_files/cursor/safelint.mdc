@@ -82,7 +82,7 @@ safelint check <target>... --format json [--all-files]   # one or more paths (ru
 
 Notes:
 - **Exit 0** = no blocking violations; **exit 1** = at least one blocking violation. The JSON document is on stdout in both cases; keep parsing it.
-- **Exit 2** = setup error: safelint linted zero files because every candidate's grammar isn't installed (silent-failure guard). The stderr will name the extra to install (e.g. `add 'safelint[typescript]' to additional_dependencies …` under pre-commit, or `install with: pip install 'safelint[typescript]'` direct). The JSON on stdout will look clean (zero violations), so **do not report this as "lint clean"**; surface the stderr install hint to the user.
+- **Exit 2** = setup error: at least one candidate file could not be linted because its grammar isn't installed (silent-failure guard). The stderr will name the extra to install (e.g. `add 'safelint[typescript]' to additional_dependencies …` under pre-commit, or `install with: pip install 'safelint[typescript]'` direct). Surface that install hint to the user. Under a multi-path `check`, exit 2 takes precedence but sibling targets may still have linted files, so the JSON on stdout can carry real violations - report every violation present, and never treat exit 2 as an automatic "lint clean".
 - Stderr may contain config warnings (typo guards, oversize-skip notes). Surface those to the user only if non-empty.
 - If `safelint` itself crashes (bug), say so and include the stderr verbatim.
 
