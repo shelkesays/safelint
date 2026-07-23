@@ -1130,7 +1130,14 @@ def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | 
     if no_targets:
         # Git-modified files existed under target but were all dropped for a
         # missing grammar: this target linted nothing yet must not read green.
-        missing = _matching_suffixes(list(considered), unavailable_extensions())
+        # Exclude-filter first: a modified file under a user-excluded subtree
+        # (e.g. ``generated/**/*.ts``) is one safelint would never lint, so it
+        # must not trip the silent-pass guard - mirror the exclude-awareness
+        # ``target_unavail`` already applies (via ``_scan_for_unavailable_extensions``).
+        # ``considered`` is git-relative (== cwd-relative for the common repo-root
+        # invocation), the frame ``_path_matches_exclude`` expects.
+        kept = [p for p in considered if not (exclude_paths and _path_matches_exclude(Path(p), exclude_paths))]
+        missing = _matching_suffixes(kept, unavailable_extensions())
         if missing:
             out.unavailable |= missing
             out.silent_pass = True

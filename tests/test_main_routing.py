@@ -869,6 +869,32 @@ def test_run_check_silent_pass_not_masked_by_a_sibling_target(tmp_path: Path, mo
     assert rc == 2, f"a grammar-missing target must not be masked green by a clean sibling; got {rc}"
 
 
+def test_run_check_excluded_only_missing_grammar_edit_stays_clean(tmp_path: Path, mocker: MockerFixture) -> None:
+    """A git-modified file whose only candidate is an EXCLUDED missing-grammar file must not force exit 2.
+
+    Regression: the ``no_targets`` silent-pass branch recomputed the missing
+    grammar from the raw ``considered`` set (git-modified, NOT exclude-filtered)
+    instead of the exclude-aware scan. So editing only ``generated/foo.ts`` under
+    an excluded ``generated/**`` subtree - with the TS grammar absent - wrongly
+    tripped the ``install typescript`` silent-pass (exit 2), even though safelint
+    would never lint that file. The branch now exclude-filters ``considered``
+    first, mirroring ``target_unavail``'s exclude-awareness, so it stays clean.
+    """
+    target = tmp_path / "app"
+    target.mkdir()
+
+    mocker.patch.object(cli, "_target_config", return_value=({}, ["generated/**"]))
+    mocker.patch.object(
+        cli,
+        "_get_git_modified_supported_files",
+        return_value=([], [], {"generated/foo.ts"}),  # excluded .ts, no supported files
+    )
+    mocker.patch.object(cli, "unavailable_extensions", return_value={".ts": "pip install 'safelint[typescript]'"})
+
+    rc = cli._run_check(_multipath_args([target], all_files=False, output_format="pretty"))
+    assert rc == 0, f"an excluded-only missing-grammar edit must stay clean, not trip exit 2; got {rc}"
+
+
 def test_run_check_all_files_silent_pass_not_masked_by_sibling(tmp_path: Path, mocker: MockerFixture) -> None:
     """--all-files discovery: a target whose only file is grammar-missing forces exit 2, even beside a clean sibling.
 
