@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.10.0] - 2026-07-23
+
 ### Added
 
 - **`safelint check` accepts multiple paths (ruff / ty-style).** You can now pass any number of files or directories in one run - e.g. `safelint check src/ tests/ scripts/` - instead of one target per invocation. safelint lints them all and emits a single aggregated violation list, summary, suppression breakdown, and exit code. A file reached via two overlapping paths (`src/` and `src/foo.py`) is **reported once** (deduped by resolved path). Config is resolved **per path** (each target walks up to its nearest `safelint.toml` / `pyproject.toml`, so a monorepo with per-subtree config behaves correctly), and **each path's violations are gated by its own `fail_on`** so bundling a stricter subtree with a laxer one never weakens the strict subtree's gate. Overlaps are processed most-specific-first, so a shared file is governed by the narrowest target's config independent of argument order, and a target whose only files have an uninstalled grammar still forces the exit-2 "install the grammar" signal even alongside a clean sibling. A single `--config` / `--fail-on` / `--mode` overrides per-path resolution for the whole invocation; `--all-files` / `--ignore` apply to every path. When a named path contributes zero files (all excluded, or empty / no supported files), pretty mode prints a `no files linted under '<path>'` note on stderr so a skipped-by-exclusion target is distinguishable from a clean one (informational; the exit code is unchanged). Single-path usage is unchanged. The CI self-lint step now lints `src/` and `scripts/` in one invocation.
@@ -947,7 +949,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.9.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.10.0...HEAD
+[2.10.0]: https://github.com/shelkesays/safelint/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/shelkesays/safelint/compare/v2.8.4...v2.9.0
 [2.8.2]: https://github.com/shelkesays/safelint/compare/v2.8.1...v2.8.2
 [2.8.1]: https://github.com/shelkesays/safelint/compare/v2.8.0...v2.8.1
