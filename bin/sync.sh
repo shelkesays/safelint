@@ -30,13 +30,19 @@ else
   # exit 1 on the expected no-'+'-lines case.
   CHERRY=$(git cherry origin/main origin/development)
   AHEAD=$(printf '%s\n' "$CHERRY" | grep -c '^+' || true)
+  # git cherry (patch-id) skips MERGE commits, so a merge whose resolution added
+  # content unique to development would be invisible to AHEAD. Development is
+  # linear under this repo's squash/rebase flow, so MERGES is normally 0; a merge
+  # in the range cannot be patch-compared, so treat it as unsafe-to-reset too
+  # (matches the server-side sync-development guard).
+  MERGES=$(git rev-list --merges origin/main..origin/development --count)
   BEHIND=$(git rev-list origin/main ^origin/development --count)
-  echo "✗ out of sync: main=${MAIN:0:7} development=${DEV:0:7} (development has ${AHEAD} content-unique commit(s); behind by ${BEHIND})"
-  if [ "$AHEAD" -eq 0 ]; then
+  echo "✗ out of sync: main=${MAIN:0:7} development=${DEV:0:7} (development has ${AHEAD} content-unique + ${MERGES} merge commit(s); behind by ${BEHIND})"
+  if [ "$AHEAD" -eq 0 ] && [ "$MERGES" -eq 0 ]; then
     echo "  development has no content main is missing -> safe to reset:"
     echo "    git branch -f development origin/main && git push --force-with-lease origin development"
   else
-    echo "  development has ${AHEAD} commit(s) with content not in main -> do NOT reset (unmerged work)."
+    echo "  development has ${AHEAD} non-merge + ${MERGES} merge commit(s) not patch-verified in main -> do NOT reset (possible unmerged work)."
   fi
 fi
 

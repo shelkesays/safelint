@@ -64,8 +64,19 @@ jobs:
           # only absorbs grep -c's exit 1 on the expected no-'+'-lines case.
           CHERRY=$(git cherry origin/main origin/development)
           AHEAD=$(printf '%s\n' "$CHERRY" | grep -c '^+' || true)
-          if [ "$AHEAD" -ne 0 ]; then
-            echo "::error::development has $AHEAD commit(s) not in main - refusing to reset (in-flight work)."
+          # git cherry is patch-id based and by construction SKIPS merge commits,
+          # so a merge whose conflict-resolution introduced content unique to
+          # development would be invisible to AHEAD. This repo's flow is
+          # squash/rebase-merge, so development is linear after each reset and this
+          # is normally 0; a merge commit in the range cannot be patch-compared,
+          # so we refuse rather than risk clobbering unmerged resolution content -
+          # the same conservative posture as the AHEAD guard. A human confirms the
+          # merge is contained in main, then resets manually.
+          MERGES=$(git rev-list --merges origin/main..origin/development --count)
+          if [ "$AHEAD" -ne 0 ] || [ "$MERGES" -ne 0 ]; then
+            DETAIL="$AHEAD commit(s) not in main"
+            [ "$MERGES" -ne 0 ] && DETAIL="$DETAIL, $MERGES un-patch-comparable merge commit(s)"
+            echo "::error::development diverges from main - refusing to reset ($DETAIL)."
             # Open a tracking issue (deduped by exact-title phrase search - the
             # quotes make the '-' in the title a literal, not a NOT operator, so
             # repeated main-pushes do not spam duplicates), then fail loudly.
@@ -73,7 +84,7 @@ jobs:
             OPEN=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq 'length')
             if [ "$OPEN" -eq 0 ]; then
               gh issue create --title "$TITLE" --body \
-          "The **sync-development** workflow refused to reset \`development\` to \`main\`: development has $AHEAD commit(s) not in main (unmerged / in-flight work), so a reset would discard them.
+          "The **sync-development** workflow refused to reset \`development\` to \`main\`: $DETAIL, so a reset could discard unmerged work.
 
           Resolve manually - land that work through the release flow, or once it is contained in main run:
 
