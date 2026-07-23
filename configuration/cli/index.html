@@ -2584,12 +2584,15 @@
 </tbody>
 </table>
 <h2 id="safelint-check"><code>safelint check</code><a class="headerlink" href="#safelint-check" title="Permanent link">#</a></h2>
-<p>The primary linting command. Scans a file or directory and emits violations.</p>
+<p>The primary linting command. Scans one or more files/directories and emits violations.</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w">                  </span><span class="c1"># lint git-modified files under src/</span>
 <a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>--all-files<span class="w">      </span><span class="c1"># lint every supported source file under src/</span>
 <a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/app.py<span class="w">            </span><span class="c1"># lint a single file</span>
-<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span>--format<span class="o">=</span>json<span class="w">       </span><span class="c1"># machine-readable output for editors / CI</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>safelint<span class="w"> </span>check<span class="w"> </span>src/<span class="w"> </span>tests/<span class="w"> </span>scripts/<span class="w">  </span><span class="c1"># multiple paths in one run (ruff/ty-style)</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a>safelint<span class="w"> </span>check<span class="w"> </span>.<span class="w"> </span>--format<span class="o">=</span>json<span class="w">       </span><span class="c1"># machine-readable output for editors / CI</span>
 </code></pre></div>
+<p><strong>Multiple paths</strong> (like <code>ruff</code> / <code>ty</code>): pass any number of files or directories and safelint lints them all, then emits <strong>one</strong> aggregated violation list, summary, suppression breakdown, and exit code. A file reached via two overlapping paths (e.g. <code>src/</code> and <code>src/foo.py</code>) is <strong>reported once</strong>, deduped by resolved path. Config is resolved <strong>per path</strong> (each target walks up to its nearest <code>safelint.toml</code> / <code>pyproject.toml</code>, so a monorepo with per-subtree config behaves correctly), and <strong>each path's violations are gated by its own <code>fail_on</code></strong> - bundling a stricter subtree with a laxer one does not weaken the strict subtree's gate. Overlaps are processed most-specific-first, so the narrowest target's config governs a shared file regardless of the order you pass the paths. A single <code>--config</code> / <code>--fail-on</code> / <code>--mode</code> overrides per-path resolution for the whole invocation; <code>--all-files</code> / <code>--ignore</code> apply to every path.</p>
+<p>If a named path contributes <strong>zero</strong> files (everything under it is excluded by <code>exclude_paths</code> / <code>extend_exclude_paths</code>, or it is empty / has no supported source files), pretty mode prints a <code>safelint: warning: no files linted under '&lt;path&gt;' …</code> note on stderr, so <code>safelint check src tests</code> (where <code>tests/**</code> is excluded) is distinguishable from <code>safelint check src</code>. The note is informational and does not change the exit code.</p>
 <table>
 <thead>
 <tr>
@@ -2984,8 +2987,8 @@
 </tr>
 <tr>
 <td><strong>Git-modified mode</strong> (default <code>safelint check src/</code>), user modified files but every one was dropped by the supported-extensions filter</td>
-<td><code>_handle_no_targets</code> in the no-targets short-circuit</td>
-<td><code>safelint: error: no files linted, every git-modified source file has a grammar that isn't installed, install with: pip install 'safelint[&lt;lang&gt;]'</code></td>
+<td>the silent-pass guard in <code>_run_check</code> / <code>_finish_unlinted</code></td>
+<td><code>safelint: error: no files linted - every git-modified or discovered source file has a grammar that isn't installed - install with: pip install 'safelint[&lt;lang&gt;]'</code></td>
 </tr>
 <tr>
 <td><strong>Hook mode</strong> (pre-commit invokes <code>safelint &lt;files&gt;</code>), every passed file has an extension whose grammar isn't installed</td>
