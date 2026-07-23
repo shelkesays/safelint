@@ -2090,7 +2090,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2100-2026-07-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.10.0 - 2026-07-23
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.10.0 - 2026-07-23">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -3951,7 +3962,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2100-2026-07-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.10.0 - 2026-07-23
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.10.0 - 2026-07-23">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -5706,7 +5728,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.9.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.10.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="2100-2026-07-23"><a href="https://github.com/shelkesays/safelint/compare/v2.9.0...v2.10.0">2.10.0</a> - 2026-07-23<a class="headerlink" href="#2100-2026-07-23" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
 <li><strong><code>safelint check</code> accepts multiple paths (ruff / ty-style).</strong> You can now pass any number of files or directories in one run - e.g. <code>safelint check src/ tests/ scripts/</code> - instead of one target per invocation. safelint lints them all and emits a single aggregated violation list, summary, suppression breakdown, and exit code. A file reached via two overlapping paths (<code>src/</code> and <code>src/foo.py</code>) is <strong>reported once</strong> (deduped by resolved path). Config is resolved <strong>per path</strong> (each target walks up to its nearest <code>safelint.toml</code> / <code>pyproject.toml</code>, so a monorepo with per-subtree config behaves correctly), and <strong>each path's violations are gated by its own <code>fail_on</code></strong> so bundling a stricter subtree with a laxer one never weakens the strict subtree's gate. Overlaps are processed most-specific-first, so a shared file is governed by the narrowest target's config independent of argument order, and a target whose only files have an uninstalled grammar still forces the exit-2 "install the grammar" signal even alongside a clean sibling. A single <code>--config</code> / <code>--fail-on</code> / <code>--mode</code> overrides per-path resolution for the whole invocation; <code>--all-files</code> / <code>--ignore</code> apply to every path. When a named path contributes zero files (all excluded, or empty / no supported files), pretty mode prints a <code>no files linted under '&lt;path&gt;'</code> note on stderr so a skipped-by-exclusion target is distinguishable from a clean one (informational; the exit code is unchanged). Single-path usage is unchanged. The CI self-lint step now lints <code>src/</code> and <code>scripts/</code> in one invocation.</li>
