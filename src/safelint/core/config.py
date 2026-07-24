@@ -2352,8 +2352,10 @@ def _resolve_java_framework(cfg: dict[str, Any]) -> str:
 # on top of the framework preset, and its applier is ADDITIVE (appends to the
 # existing sink list) rather than replace - so ``framework = "django"`` +
 # ``pydantic = true`` keeps both sets of sinks. The framework axes stay
-# replace-based like Java. See ``plan/release-automation.md`` sibling
-# ``plan/framework-presets.md`` for the full design.
+# replace-based like Java. The full design now lives in the framework sections
+# of ``docs/configuration/toml.md`` and the per-language pages (the
+# ``plan/framework-presets.md`` spec was removed once the presets shipped in
+# v2.9.0).
 #
 # The taint lists REPLACE the vanilla default (the applier assigns wholesale),
 # so each is built by spreading the current ``DEFAULTS`` list plus the framework
