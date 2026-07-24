@@ -1,8 +1,16 @@
 # Language-expansion plan
 
 **Audience**: the AI coding agent (or human contributor) implementing the next
-piece of work. Each item has its own self-contained spec in this directory.
-Implement **one spec at a time, in working-priority order**.
+piece of work.
+
+> **All open work now lives in a single prioritised backlog:
+> [`PENDING.md`](PENDING.md).** Start there. This README is retained for the
+> standing references, the non-negotiables, the Go-port pitfalls, and the
+> validation gate that every item in `PENDING.md` still depends on, plus the
+> shipped-history record below. When a new language or framework preset is
+> planned, add its own self-contained spec file here and list it in
+> `PENDING.md`; remove the spec once it ships (the convention followed for Go,
+> PHP, C, C++, and the framework presets).
 
 **No language addition is currently planned.** C++ shipped in v2.8.0 (see the
 blockquote below); the remaining work in this directory is the deferred
@@ -48,6 +56,22 @@ planned, add its spec file and (re)introduce a status table here listing it in
 working-priority order (and remove the spec once the language ships, as was done
 for Go, PHP, C, and C++).
 
+## Shipped: framework / runtime presets
+
+> **Python + PHP framework presets shipped in v2.9.0** (PR #124). Django /
+> Flask / FastAPI + the composable `pydantic = true` toggle (Python) and
+> Laravel (PHP), mirroring the Java Spring Boot and JavaScript runtime presets:
+> a `[tool.safelint.python] framework = "..."` / `[tool.safelint.php] framework
+> = "laravel"` key shifts rule *defaults* (taint sink lists, nullable-method
+> lists, which structural rules are active). Three new shared 9xx rules landed
+> with it - SAFE905 `debug_mode_enabled`, SAFE906 `mass_assignment`, SAFE907
+> `unvalidated_request_input`. Its spec, `plan/framework-presets.md`, was
+> removed on completion - the design decisions now live in the language pages,
+> `docs/configuration/toml.md`, the skill-file addenda, and the shipped code.
+> **Deferred fast-follows from that work** (the `csrf_protection_disabled` /
+> `hardcoded_secret` rules, and the taint-tracker sanitiser framework) are now
+> tracked in [`PENDING.md`](PENDING.md).
+
 ## Shipped: release automation (CI/CD, not a code change)
 
 | Spec | Scope | Status |
@@ -70,9 +94,11 @@ These were not language additions; they were codebase-wide sweeps best done once
 the language set is stable, so they didn't have to be redone per language. The
 three below have **shipped**, so - following the same convention as the shipped
 languages above - their spec files were removed on completion (the design
-decisions now live in the referenced CHANGELOG entries and the shipped code). One
-new cross-language enhancement remains **planned**, listed in the table after
-them.
+decisions now live in the referenced CHANGELOG entries and the shipped code). The
+one cross-language enhancement that remains **planned** (taint propagation through
+attribute / subscript / receiver chains) is now **Priority 1 in
+[`PENDING.md`](PENDING.md)** - its standalone spec was folded into that single
+backlog.
 
 > **Node-type / operator constants shipped in v2.8.2** (PR #107). Converted the
 > per-language node-type / operator tables in `src/safelint/rules/` from raw
@@ -95,14 +121,12 @@ them.
 > MEDIUM findings and none default-flow-exploitable; the backlog is empty. Its
 > spec, `plan/security-hardening.md`, was removed on completion.
 
-| Spec | Scope | Status |
-|---|---|---|
-| [`taint-attribute-propagation.md`](taint-attribute-propagation.md) | Make the intra-procedural taint trackers carry taint through attribute / subscript / tainted-receiver chains (`request.GET["q"]`, `$request->input('x')`), so the framework-preset (and Spring / JS-runtime) SAFE801 sink extensions actually fire on realistic request-driven code instead of only direct-parameter flows | Planned - not started |
-
-Surfaced by the v2.9.0 framework-presets code review: the added sinks are inert
-on idiomatic web-framework code because taint is lost at the first `request.<attr>`
-access (a pre-existing, cross-language tracker limitation the Spring preset shares).
-Cross-cutting change to all six trackers - read the spec's "Risks and open
+See **[`PENDING.md`](PENDING.md) Priority 1** for the full spec: make the
+intra-procedural taint trackers carry taint through attribute / subscript /
+tainted-receiver chains (`request.GET["q"]`, `$request->input('x')`), so the
+framework-preset (and Spring / JS-runtime) SAFE801 sink extensions actually fire
+on realistic request-driven code instead of only direct-parameter flows. It is a
+cross-cutting change to all six trackers; read that item's "Risks and open
 decisions" (whether to gate the noisy method-call-on-tainted-receiver step behind
 a config knob) before implementing.
 
