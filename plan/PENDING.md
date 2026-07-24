@@ -172,13 +172,36 @@ downstream of Priority 1, so last.
 ### Exact requirement
 
 The trackers have **no sanitiser-clears-taint framework** beyond the flat
-`sanitizers` name list. The motivating use case: a value that passes through a
-validating boundary should **clear** taint. Pydantic is the natural first such
-sanitiser - a value through `Model(...)` / `model_validate()` is validated, so
-tainted data flowing through it could be considered clean (`parse_obj_as` /
-`TypeAdapter` are safe too; `model_construct` / `construct` deliberately are
-**not** - they skip validation and are already SAFE801 *sinks*). Build a general
-sanitiser mechanism (not a Pydantic special-case), then register Pydantic's
-validating constructors as its first consumers. Design it to compose cleanly with
-the Priority 1 receiver-taint step (the sanitiser check must run *before* the
-receiver-taint check, per Priority 1's risk note).
+`sanitizers` name list, which clears taint unconditionally for every sink.
+
+**Do not model validation as universal sanitisation.** Passing attacker-
+controlled data through a validating boundary establishes only the *specific*
+safety property that validation enforces - it does **not** make the value safe
+for every sink. Pydantic is the clearest example: `Model(...)` /
+`model_validate()` enforce **type / schema** (so they legitimately clear the
+mass-assignment and type-confusion concerns), but a Pydantic-validated `str` is
+still fully injectable into a SQL / shell / template sink. Treating "went through
+`Model(...)`" as blanket taint-clearing would therefore create **false
+negatives**, silently suppressing real injection findings.
+
+The requirement is a **property-typed sanitiser mechanism**, not a flat clear:
+
+- A sanitiser declares **which safety property it establishes** (e.g.
+  `sql_escaped`, `html_escaped`, `shell_quoted`, `schema_validated`), and each
+  sink declares **which property it requires**. Taint is cleared for a given sink
+  only when a sanitiser on the path satisfies **that sink's** required property;
+  otherwise the flow stays tainted. Contracts are **per sink / context**, never
+  global.
+- Register Pydantic's validating constructors (`Model(...)` /
+  `model_validate()` / `parse_obj_as` / `TypeAdapter`) as providers of the
+  **schema-validation** property only - so they clear taint for schema-shaped
+  concerns but leave string-injection sinks tainted.
+- `model_construct` / `construct` stay **SAFE801 sinks** (they skip validation
+  and establish no property); a sanitiser must never be inferred from them.
+- Preserve **sanitiser-before-receiver-taint ordering**: the sanitiser check must
+  run *before* the Priority 1 receiver-taint step, so an explicit sanitiser on a
+  tainted receiver still clears (for the properties it covers) rather than being
+  re-tainted.
+- Migrate the existing flat `sanitizers` list into this model as a compatibility
+  default (a bare name clears the sink's required property for backward
+  compatibility) so no current config silently changes meaning.
