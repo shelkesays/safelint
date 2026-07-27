@@ -34,7 +34,7 @@ jobs:
           persist-credentials: false
 
       - name: Claude Code review
-        uses: anthropics/claude-code-action@b76a0776ae74036e77cd11018083743453d7ad35  # v1.0.179
+        uses: anthropics/claude-code-action@44423bdec74b97d67543eb16c110546762c110b2  # v1.0.181
         with:
           anthropic_api_key: ${{ secrets.ANTHROPIC_API_KEY }}
           prompt: |
