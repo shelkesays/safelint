@@ -992,7 +992,7 @@ class TaintedSinkRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
-            tracker = CTaintTracker(param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = CTaintTracker(param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, is_cpp=(lang_name == "cpp"))
             tracker.visit(node)
             violations.extend(self._format_hits(filepath, _dedupe_hits(tracker.sink_hits, seen)))
         return violations

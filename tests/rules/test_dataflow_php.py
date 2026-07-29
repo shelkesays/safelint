@@ -129,3 +129,11 @@ def test_php_nullsafe_chain_is_clean(tmp_path: Path) -> None:
     sample = tmp_path / "x.php"
     sample.write_text("<?php\nfunction f($r) {\n    return $r->find(1)?->getName();\n}\n", encoding="utf-8")
     assert not any(v.code == "SAFE803" for v in _engine(_SAFE803).check_file(str(sample)).violations)
+
+
+def test_php_sink_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> None:
+    """A sink method on a tainted receiver (``$req->runQuery()``) fires even with no arguments."""
+    sample = tmp_path / "recv.php"
+    sample.write_text("<?php\nfunction f($req) {\n    $req->runQuery();\n}\n", encoding="utf-8")
+    eng = _engine({"rules": {"tainted_sink": {"enabled": True, "sinks_php": ["runQuery"]}}})
+    assert any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)

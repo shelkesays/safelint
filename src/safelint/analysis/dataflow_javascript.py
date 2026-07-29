@@ -229,16 +229,28 @@ class JsTaintTracker:
             self._update_name(ident, is_tainted=is_tainted)
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
-        """Check whether this call reaches a sink with tainted arguments."""
+        """Check whether this call reaches a sink via a tainted argument or method receiver."""
         name = call_name(node)
         if name not in self.sinks:
             return
+        if self._record_arg_hits(node, name):
+            return  # a tainted argument already reached the sink; receiver is redundant
+        # Else, a sink method on a tainted receiver (``req.exec()`` / ``new req.Sink()``).
+        receiver = self._method_receiver(node)
+        if receiver is not None and self._is_tainted(receiver):
+            self._record_sink_hit(node, receiver, name)
+
+    def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:
+        """Record one sink hit per tainted positional argument; return True if any fired."""
         args_node = node.child_by_field_name("arguments")
-        if not args_node:
-            return
+        if args_node is None:
+            return False
+        fired = False
         for arg in args_node.named_children:
             if self._is_tainted(arg):
                 self._record_sink_hit(node, arg, name)
+                fired = True
+        return fired
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
@@ -319,12 +331,23 @@ class JsTaintTracker:
         args_node = node.child_by_field_name("arguments")
         if args_node is not None:
             candidates.extend(args_node.named_children)
-        function = node.child_by_field_name("function")
-        if function is not None and function.type == _js.MEMBER_EXPRESSION:
-            receiver = function.child_by_field_name("object")
-            if receiver is not None:
-                candidates.append(receiver)
+        receiver = self._method_receiver(node)
+        if receiver is not None:
+            candidates.append(receiver)
         return any(self._is_tainted(c) for c in candidates)
+
+    @staticmethod
+    def _method_receiver(node: tree_sitter.Node) -> tree_sitter.Node | None:
+        """Return the receiver object of a method call / member construction, or None.
+
+        Covers both ``call_expression`` (callee on the ``function`` field) and
+        ``new_expression`` (callee on the ``constructor`` field), so
+        ``req.query.get("q")`` and ``new req.Factory()`` both expose ``req``.
+        """
+        callee = node.child_by_field_name("function") or node.child_by_field_name("constructor")
+        if callee is None or callee.type != _js.MEMBER_EXPRESSION:
+            return None
+        return callee.child_by_field_name("object")
 
     def _template_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if any ``${expr}`` substitution in a template string is tainted."""

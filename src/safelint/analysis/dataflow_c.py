@@ -99,13 +99,22 @@ class CTaintTracker:
         sources: frozenset[str],
         *,
         assume_taint_preserving: bool = True,
+        is_cpp: bool = False,
     ) -> None:
-        """Initialise tracker with tainted entry parameters and rule config."""
+        """Initialise tracker with tainted entry parameters and rule config.
+
+        *is_cpp* enables method-receiver taint on ``obj.method()`` /
+        ``ptr->method()``. It is C++-only: in C, ``req->callback()`` invokes a
+        function pointer stored on the struct, whose result need not derive from
+        the struct, so treating the receiver as a taint input there would be a
+        false positive. The rule sets it from the file's language.
+        """
         self.tainted: set[str] = set(params)
         self.sinks = sinks
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
+        self.is_cpp = is_cpp
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -143,16 +152,28 @@ class CTaintTracker:
         self._update_name(left, is_tainted=self._is_tainted(right), keep_existing=keep_existing)
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
-        """Check whether this call reaches a sink with tainted arguments."""
+        """Check whether this call reaches a sink via a tainted argument or (C++) receiver."""
         name = call_name(node)
         if name not in self.sinks:
             return
+        if self._record_arg_hits(node, name):
+            return  # a tainted argument already reached the sink; receiver is redundant
+        # Else, a sink C++ method on a tainted receiver (``req->execute()``); None in C.
+        receiver = self._cpp_method_receiver(node)
+        if receiver is not None and self._is_tainted(receiver):
+            self._record_sink_hit(node, receiver, name)
+
+    def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:
+        """Record one sink hit per tainted positional argument; return True if any fired."""
         args_node = node.child_by_field_name("arguments")
-        if args_node is None:  # pragma: no cover - defensive: call_expression always has arguments
-            return
+        if args_node is None:
+            return False
+        fired = False
         for arg in args_node.named_children:
             if self._is_tainted(arg):
                 self._record_sink_hit(node, arg, name)
+                fired = True
+        return fired
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
@@ -219,15 +240,27 @@ class CTaintTracker:
         candidates: list[tree_sitter.Node] = list(args_node.named_children) if args_node is not None else []
         # C++ method-call shape: ``call.function`` is a ``field_expression``
         # (``obj.method()`` / ``ptr->method()``) whose ``argument`` is the
-        # receiver, so ``req.body()`` / ``req->param("q")`` stay tainted. C has
-        # no methods - its calls have an ``identifier`` function - so this branch
-        # is C++-only in practice.
-        function = node.child_by_field_name("function")
-        if function is not None and function.type == _c.FIELD_EXPRESSION:
-            receiver = function.child_by_field_name("argument")
-            if receiver is not None:
-                candidates.append(receiver)
+        # receiver, so ``req.body()`` / ``req->param("q")`` stay tainted. Gated
+        # to C++: in C the same shape is a function-POINTER call
+        # (``req->callback()``) whose result need not derive from the struct, so
+        # treating the receiver as a taint input there is a false positive.
+        receiver = self._cpp_method_receiver(node)
+        if receiver is not None:
+            candidates.append(receiver)
         return False, candidates
+
+    def _cpp_method_receiver(self, node: tree_sitter.Node) -> tree_sitter.Node | None:
+        """Return the receiver of a C++ member call (``obj.m()`` / ``p->m()``), or None.
+
+        None in C (``is_cpp`` False) and for plain function calls, so C
+        function-pointer member calls never contribute receiver taint.
+        """
+        if not self.is_cpp:
+            return None
+        function = node.child_by_field_name("function")
+        if function is None or function.type != _c.FIELD_EXPRESSION:
+            return None
+        return function.child_by_field_name("argument")
 
     @staticmethod
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:

@@ -47,6 +47,13 @@ def test_cpp_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> None:
     assert "SAFE801" in _codes(src, tmp_path, enable=["tainted_sink"])
 
 
+def test_cpp_sink_method_on_tainted_receiver_fires(tmp_path: Path) -> None:
+    """A sink C++ method on a tainted receiver (``req->runCommand()``) fires even with no arguments."""
+    src = "void run(Req* req) {\n    req->runCommand();\n}\n"
+    codes = _codes(src, tmp_path, config={"tainted_sink": {"enabled": True, "sinks_cpp": ["runCommand"]}})
+    assert "SAFE801" in codes
+
+
 def test_cpp_reference_param_seeds_taint(tmp_path: Path) -> None:
     """A reference parameter (``const std::string& s``) is seeded and flows to a sink.
 
