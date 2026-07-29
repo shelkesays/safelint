@@ -185,3 +185,11 @@ def test_go_blank_assignment_discard_is_clean(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert not any(v.code == "SAFE802" for v in _engine(_SAFE802).check_file(str(sample)).violations)
+
+
+def test_go_sink_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> None:
+    """A sink method on a tainted receiver (``req.RunQuery()``) fires even with no arguments."""
+    sample = tmp_path / "recv.go"
+    sample.write_text("package main\nfunc h(req Req) {\n\treq.RunQuery()\n}\n", encoding="utf-8")
+    eng = _engine({"rules": {"tainted_sink": {"enabled": True, "sinks_go": ["RunQuery"]}}})
+    assert any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
