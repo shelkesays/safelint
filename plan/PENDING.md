@@ -30,7 +30,21 @@ uv run mkdocs build --strict                   # broken anchors fail the build
 
 ---
 
-## Priority 1 - Taint propagation through attribute / subscript / receiver chains
+## Priority 1 - Taint propagation through attribute / subscript / receiver chains  ✅ IMPLEMENTED (2.11.0rc1)
+
+**Status**: done, shipping in 2.11.0. **The spec below was substantially stale**:
+an empirical per-language audit (run the SAFE801 rule on `request.<attr>` -> sink
+snippets) showed Java, Rust, Go, PHP, and C **already** propagated taint through
+attribute / subscript projections, and Java / Rust / Go / PHP **already** checked
+the method receiver (via the existing `assume_taint_preserving = true` default).
+The real gaps were narrow: **Python** (no attribute/subscript, no receiver),
+**JavaScript / TypeScript** (had attribute/subscript, no receiver), and **C++**
+(had attribute/subscript, no receiver). Those three were brought up to parity
+under the *existing* `assume_taint_preserving` knob - **no new config knob** was
+added (the spec's proposed `follow_receiver_taint` flag would have contradicted
+the 4 languages that already do receiver-taint unconditionally). Per-language
+tests, a Django request-chain -> sink e2e, and docs landed with it. Original spec
+retained below for context.
 
 **Type**: cross-language enhancement to the intra-procedural taint trackers (not
 a language addition). Do it as **one comprehensive change across all trackers**,
