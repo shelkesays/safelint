@@ -150,7 +150,16 @@ etc.). Probe each grammar; do not assume node names. Keep every walk iterative
 
 ---
 
-## Priority 2 - Framework rules `csrf_protection_disabled` + `hardcoded_secret` (9xx fast-follow)
+## Priority 2 - Framework rules `csrf_protection_disabled` + `hardcoded_secret` (9xx fast-follow)  ✅ IMPLEMENTED (2.11.0rc1)
+
+**Status**: done, shipping in 2.11.0 alongside Priority 1. SAFE908
+`csrf_protection_disabled` (Django `@csrf_exempt` / Laravel non-empty `$except`)
+and SAFE909 `hardcoded_secret` (Django `SECRET_KEY` / Flask `app.secret_key`
+literal / Laravel `base64:` `APP_KEY`) landed as `("python","php")`-scoped 9xx
+rules, disabled by default and enabled by the presets that scope them (Django +
+Laravel for both; Flask also enables SAFE909; FastAPI neither). Per-rule tests,
+both-form config docs, language pages, all 14 skill files, and the CHANGELOG
+Added entry all landed. Original spec retained below for context.
 
 **Type**: two new framework-specific structural rules (9xx band), enabled by the
 existing Python/PHP framework presets. **Deferred from the v2.9.0 first cut** by
