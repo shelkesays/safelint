@@ -113,7 +113,7 @@ framework = "fastapi"
 
 Explicit per-rule TOML config still wins over the preset; setting `[tool.safelint.rules.tainted_sink] sinks = [...]` overrides whatever the preset planted. The default framework is `vanilla`, so existing users with no `[python]` config see no behaviour change. Unknown framework names surface a `safelint: warning:` on stderr and fall back to `vanilla`.
 
-The `SAFE905-907` structural rules are enabled by the preset directly. The dataflow additions (the extra SAFE801 sinks, `.first()` nullable, `pydantic`'s constructors) only extend the *lists* - the multi-language dataflow rules (`tainted_sink`, `return_value_ignored`, `null_dereference`) stay **opt-in**, exactly as with the Java Spring preset (a Python framework choice must not turn dataflow on for other languages in a polyglot repo). Enable them explicitly to use the framework sinks. As with every language, the intra-procedural tracker follows direct taint flows, not `request.<attr>` attribute chains.
+The `SAFE905-907` structural rules are enabled by the preset directly. The dataflow additions (the extra SAFE801 sinks, `.first()` nullable, `pydantic`'s constructors) only extend the *lists* - the multi-language dataflow rules (`tainted_sink`, `return_value_ignored`, `null_dereference`) stay **opt-in**, exactly as with the Java Spring preset (a Python framework choice must not turn dataflow on for other languages in a polyglot repo). Enable them explicitly to use the framework sinks. As with every language, the intra-procedural tracker follows taint through `request.<attr>` attribute / subscript / method-receiver chains (`request.GET["q"]`), so the framework sinks fire on idiomatic request-driven code, not only direct-parameter flows.
 
 ## Installing the Python extra
 

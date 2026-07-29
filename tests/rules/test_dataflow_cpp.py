@@ -35,6 +35,18 @@ def test_cpp_tainted_param_into_system_fires_safe801(tmp_path: Path) -> None:
     assert "SAFE801" in _codes(src, tmp_path, enable=["tainted_sink"])
 
 
+def test_cpp_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> None:
+    """A method call on a tainted receiver (``req->param(...)``) stays tainted into a sink.
+
+    C++ member calls parse as ``call_expression`` whose ``function`` is a
+    ``field_expression``; the receiver (its ``argument``) is inspected so the
+    zero-tainted-arg method call still reaches the sink. C itself has no
+    methods, so this branch is C++-only.
+    """
+    src = 'void run(Req* req) {\n    system(req->param("q"));\n}\n'
+    assert "SAFE801" in _codes(src, tmp_path, enable=["tainted_sink"])
+
+
 def test_cpp_reference_param_seeds_taint(tmp_path: Path) -> None:
     """A reference parameter (``const std::string& s``) is seeded and flows to a sink.
 

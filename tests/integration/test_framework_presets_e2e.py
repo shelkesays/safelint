@@ -83,6 +83,23 @@ def test_django_unvalidated_request() -> None:
     assert _count(codes, "SAFE907") == 1, codes
 
 
+def test_django_request_chain_reaches_sink_when_tainted_sink_enabled() -> None:
+    """With ``tainted_sink`` enabled, a request attribute / subscript / method chain into a
+    Django-preset sink (``RawSQL`` / ``mark_safe``) fires SAFE801 three times.
+
+    This is the payoff of taint propagating through request projections: before
+    that, the preset's added sinks were inert on idiomatic request-driven code
+    (the taint was lost at the first ``request.<attr>`` access). The sanitised
+    view (``escape(...)``) is the negative control. Flask / FastAPI share the
+    identical intra-procedural taint mechanism; this Django case is the
+    representative end-to-end proof through a preset.
+    """
+    cfg = _python_config("django")
+    cfg["rules"]["tainted_sink"]["enabled"] = True
+    codes = _codes(cfg, "django/injection.py")
+    assert _count(codes, "SAFE801") == 3, codes
+
+
 # ---------------------------------------------------------------------------
 # Flask
 # ---------------------------------------------------------------------------

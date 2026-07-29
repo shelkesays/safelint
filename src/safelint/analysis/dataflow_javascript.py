@@ -300,9 +300,13 @@ class JsTaintTracker:
     def _call_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if this call produces a tainted value.
 
-        Mirrors the Python tracker's :meth:`_call_tainted` exactly -
-        sanitizers clear, sources inject, unknowns either preserve or
-        drop based on ``assume_taint_preserving``.
+        Sanitizers clear, sources inject, unknowns either preserve or drop
+        based on ``assume_taint_preserving``. When preserving, both the
+        positional arguments and the method receiver (the ``object`` of a
+        ``member_expression`` callee) are inspected, so ``req.query.get("q")``
+        / ``tainted.trim()`` stay tainted even with no tainted positional
+        args. Mirrors the Java / Rust / Go / PHP trackers; the sanitizer check
+        runs first, so ``escape(req.data)`` still clears.
         """
         name = call_name(node)
         if name in self.sanitizers:
@@ -311,10 +315,16 @@ class JsTaintTracker:
             return True
         if not self.assume_taint_preserving:
             return False
+        candidates: list[tree_sitter.Node] = []
         args_node = node.child_by_field_name("arguments")
-        if not args_node:  # pragma: no cover - defensive: every call_expression has an arguments child
-            return False
-        return any(self._is_tainted(arg) for arg in args_node.named_children)
+        if args_node is not None:
+            candidates.extend(args_node.named_children)
+        function = node.child_by_field_name("function")
+        if function is not None and function.type == _js.MEMBER_EXPRESSION:
+            receiver = function.child_by_field_name("object")
+            if receiver is not None:
+                candidates.append(receiver)
+        return any(self._is_tainted(c) for c in candidates)
 
     def _template_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if any ``${expr}`` substitution in a template string is tainted."""
