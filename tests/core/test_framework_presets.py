@@ -123,13 +123,13 @@ def test_laravel_preset_sinks_php_retain_all_vanilla() -> None:
 
 
 def test_django_preset_lands_sinks_and_enables_framework_rules() -> None:
-    """Applying django adds its sinks and enables the SAFE905-907 framework rules."""
+    """Applying django adds its sinks and enables the full SAFE905-909 framework-rule set."""
     d = copy.deepcopy(DEFAULTS)
     _apply_python_framework_preset(d, "django")
     sinks = d["rules"]["tainted_sink"]["sinks"]
     assert "RawSQL" in sinks
     assert "mark_safe" in sinks
-    for rule in ("debug_mode_enabled", "mass_assignment", "unvalidated_request_input"):
+    for rule in ("debug_mode_enabled", "mass_assignment", "unvalidated_request_input", "csrf_protection_disabled", "hardcoded_secret"):
         assert d["rules"][rule]["enabled"] is True
 
 
@@ -169,20 +169,32 @@ def test_pydantic_preset_does_not_enable_tainted_sink() -> None:
     assert d["rules"]["mass_assignment"]["enabled"] is True
 
 
-def test_flask_preset_does_not_enable_mass_assignment() -> None:
-    """Flask has no ORM, so SAFE906 stays disabled under the flask preset."""
+def test_flask_preset_does_not_enable_mass_assignment_or_csrf() -> None:
+    """Flask has no ORM (SAFE906 off) and no core `@csrf_exempt` pattern (SAFE908 off), but SAFE909 is on."""
     d = copy.deepcopy(DEFAULTS)
     _apply_python_framework_preset(d, "flask")
     assert "render_template_string" in d["rules"]["tainted_sink"]["sinks"]
     assert d["rules"].get("mass_assignment", {}).get("enabled") is not True
+    assert d["rules"].get("csrf_protection_disabled", {}).get("enabled") is not True
+    assert d["rules"]["hardcoded_secret"]["enabled"] is True
+
+
+def test_fastapi_preset_does_not_enable_csrf_or_hardcoded_secret() -> None:
+    """FastAPI enables SAFE905 + SAFE907 only; SAFE908 / SAFE909 stay off (not in the spec's scope)."""
+    d = copy.deepcopy(DEFAULTS)
+    _apply_python_framework_preset(d, "fastapi")
+    assert d["rules"]["debug_mode_enabled"]["enabled"] is True
+    assert d["rules"].get("csrf_protection_disabled", {}).get("enabled") is not True
+    assert d["rules"].get("hardcoded_secret", {}).get("enabled") is not True
 
 
 def test_laravel_preset_lands_php_sinks() -> None:
-    """Applying laravel adds its PHP sinks and enables the rules."""
+    """Applying laravel adds its PHP sinks and enables the full SAFE905-909 set (incl. csrf + hardcoded)."""
     d = copy.deepcopy(DEFAULTS)
     _apply_php_framework_preset(d, "laravel")
     assert "whereRaw" in d["rules"]["tainted_sink"]["sinks_php"]
-    assert d["rules"]["debug_mode_enabled"]["enabled"] is True
+    for rule in ("debug_mode_enabled", "mass_assignment", "unvalidated_request_input", "csrf_protection_disabled", "hardcoded_secret"):
+        assert d["rules"][rule]["enabled"] is True
 
 
 def test_vanilla_preset_is_a_noop() -> None:

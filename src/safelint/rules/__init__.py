@@ -21,7 +21,9 @@ from safelint.rules.documentation import MissingAssertionsRule
 from safelint.rules.dynamic_code_execution import DynamicCodeExecutionRule
 from safelint.rules.error_handling import BareExceptRule, EmptyExceptRule, LoggingOnErrorRule
 from safelint.rules.framework_rules import (
+    CsrfProtectionDisabledRule,
     DebugModeEnabledRule,
+    HardcodedSecretRule,
     MassAssignmentRule,
     UnvalidatedRequestInputRule,
 )
@@ -100,6 +102,8 @@ ALL_RULES: list[type[BaseRule]] = [
     DebugModeEnabledRule,
     MassAssignmentRule,
     UnvalidatedRequestInputRule,
+    CsrfProtectionDisabledRule,
+    HardcodedSecretRule,
     # Rust-idiom rules (slotted into category bands per the SafeLint
     # numbering policy: 1xx function-shape, 2xx error-handling, 3xx
     # side-effects, 6xx documentation). All disabled by default; opt
@@ -149,6 +153,7 @@ __all__ = [
     "ComplexMacroRule",
     "ComplexityRule",
     "ConditionalCompilationRule",
+    "CsrfProtectionDisabledRule",
     "DangerousCastsRule",
     "DangerousMemOpsRule",
     "DebugModeEnabledRule",
@@ -159,6 +164,7 @@ __all__ = [
     "FunctionLengthRule",
     "GlobalMutationRule",
     "GlobalStateRule",
+    "HardcodedSecretRule",
     "InteriorMutableStaticRule",
     "LockPoisoningIgnoredRule",
     "LoggingOnErrorRule",
