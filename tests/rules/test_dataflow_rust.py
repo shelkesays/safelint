@@ -652,3 +652,11 @@ def test_rust_unwrap_message_recommends_if_let(tmp_path: Path) -> None:
     assert "if let Some" in msg
     assert "match" in msg
     assert "?" in msg
+
+
+def test_rust_sink_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> None:
+    """A sink method on a tainted receiver (``req.run_query()``) fires even with no arguments."""
+    sample = tmp_path / "recv.rs"
+    sample.write_text("fn h(req: Req) {\n    req.run_query();\n}\n", encoding="utf-8")
+    eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["run_query"]}}})
+    assert any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)

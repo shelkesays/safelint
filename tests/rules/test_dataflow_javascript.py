@@ -130,6 +130,26 @@ def test_js_method_on_tainted_receiver_fires(tmp_path: Path) -> None:
     assert any(v.code == "SAFE801" for v in result.violations)
 
 
+def test_js_method_sink_on_tainted_receiver_fires(tmp_path: Path) -> None:
+    """A sink method on a tainted receiver (``req.runQuery()``) fires even with no arguments."""
+    sample = tmp_path / "recv_sink.js"
+    sample.write_text("function f(req) { req.runQuery(); }\n", encoding="utf-8")
+    engine = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_javascript": ["runQuery"]}}})
+    assert any(v.code == "SAFE801" for v in engine.check_file(str(sample)).violations)
+
+
+def test_js_new_on_tainted_receiver_flows_to_sink(tmp_path: Path) -> None:
+    """``eval(new req.Factory())`` - a constructor on a tainted receiver keeps the result tainted.
+
+    ``new_expression`` puts the callee on the ``constructor`` field (not
+    ``function``); the receiver check handles both, so ``req`` is seen.
+    """
+    sample = tmp_path / "new_recv.js"
+    sample.write_text("function f(req) { eval(new req.Factory()); }\n", encoding="utf-8")
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    assert any(v.code == "SAFE801" for v in result.violations)
+
+
 def test_js_dompurify_sanitizer(tmp_path: Path) -> None:
     """``DOMPurify`` is in the default sanitizer list."""
     sample = tmp_path / "dompurify.js"

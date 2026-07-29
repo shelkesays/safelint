@@ -166,16 +166,29 @@ class PhpTaintTracker:
         return None
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
-        """Check whether this call reaches a sink with tainted arguments."""
+        """Check whether this call reaches a sink via a tainted argument or method receiver."""
         name = call_name(node)
         if name not in self.sinks:
             return
+        if self._record_arg_hits(node, name):
+            return  # a tainted argument already reached the sink; receiver is redundant
+        # Else, a sink method on a tainted receiver (``$input->query()``): the
+        # member / nullsafe / scoped call's ``object`` is itself a tainted value.
+        receiver = node.child_by_field_name("object")
+        if receiver is not None and self._is_tainted(receiver):
+            self._record_sink_hit(node, receiver, name)
+
+    def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:
+        """Record one sink hit per tainted positional argument; return True if any fired."""
         args_node = node.child_by_field_name("arguments")
-        if args_node is None:  # pragma: no cover - defensive: call nodes always have an arguments child
-            return
+        if args_node is None:
+            return False
+        fired = False
         for arg in args_node.named_children:
             if self._is_tainted(arg):
                 self._record_sink_hit(node, arg, name)
+                fired = True
+        return fired
 
     def _visit_include(self, node: tree_sitter.Node) -> None:
         """Flag a tainted path flowing into ``include`` / ``require`` (dynamic file load)."""

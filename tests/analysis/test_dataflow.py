@@ -472,6 +472,26 @@ def test_tainted_sink_receiver_taint_gated_by_assume_taint_preserving():
     assert not any("eval" in v.message for v in vs)
 
 
+def test_tainted_sink_method_sink_on_tainted_receiver_fires():
+    """``request.execute()`` - a sink method on a tainted receiver fires even with no arguments."""
+    src = """
+    def view(request):
+        request.execute()
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert any("execute" in v.message for v in vs)
+
+
+def test_tainted_sink_receiver_not_double_counted_with_tainted_arg():
+    """A tainted arg AND a tainted receiver on the same sink call report once (arg wins, no double-count)."""
+    src = """
+    def view(request, cur):
+        cur.execute(request.data)
+    """
+    vs = [v for v in violations(TaintedSinkRule, src) if v.code == "SAFE801"]
+    assert len(vs) == 1
+
+
 # ---------------------------------------------------------------------------
 # ReturnValueIgnoredRule tests
 # ---------------------------------------------------------------------------

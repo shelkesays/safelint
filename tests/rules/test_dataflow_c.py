@@ -59,6 +59,17 @@ def test_c_literal_argument_is_clean_for_safe801(tmp_path: Path) -> None:
     assert "SAFE801" not in _codes(src, tmp_path, "tainted_sink")
 
 
+def test_c_function_pointer_member_call_is_not_receiver_taint(tmp_path: Path) -> None:
+    """A C function-pointer member call (``req->handler()``) must NOT treat ``req`` as receiver taint.
+
+    Unlike a C++ method, the member is a function pointer whose result need not
+    derive from the struct, so ``system(req->handler())`` is not a taint flow -
+    the C++ receiver-taint step is gated off for C (``is_cpp=False``).
+    """
+    src = "int f(Req *req) {\n    return system(req->handler());\n}\n"
+    assert "SAFE801" not in _codes(src, tmp_path, "tainted_sink")
+
+
 def test_c_self_assignment_preserves_taint_for_safe801(tmp_path: Path) -> None:
     """A self-assignment (``p = p``) does not clear an already-tainted variable."""
     src = "void f(char **argv) {\n    char *p = argv[1];\n    p = p;\n    system(p);\n}\n"
