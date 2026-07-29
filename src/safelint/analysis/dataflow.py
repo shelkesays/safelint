@@ -238,14 +238,26 @@ class TaintTracker:
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
         """Return the child nodes through which taint can flow into *node*.
 
-        ``keyword_argument`` (``foo(name=expr)``) propagates only its value;
-        splats, f-string concat, containers, and spreading expressions
-        propagate every named child. Everything else is a taint dead-end.
+        ``attribute`` (``obj.attr``), ``subscript`` (``obj[k]``), and
+        ``keyword_argument`` (``foo(name=expr)``) each propagate exactly one
+        field-named child - the receiver / base / value - so ``request.data``
+        and ``request.GET["q"]`` stay tainted while the attribute-name and
+        subscript-index (name lookups, not data) are ignored. Splats, f-string
+        concat, containers, and spreading expressions propagate every named
+        child. Everything else is a taint dead-end.
         """
-        if node.type == "keyword_argument":
-            value = node.child_by_field_name("value")
-            return [value] if value is not None else []
-        if node.type in _SPLAT_TYPES or node.type == _py.CONCATENATED_STRING or node.type in _CONTAINER_TYPES or node.type in _SPREADING_TYPES:
+        # Local, single-use lookup for the one-field-child shapes above.
+        single_field_child = {
+            _py.ATTRIBUTE: "object",
+            _py.SUBSCRIPT: "value",
+            "keyword_argument": "value",
+        }
+        node_type = node.type
+        field = single_field_child.get(node_type)
+        if field is not None:
+            child = node.child_by_field_name(field)
+            return [child] if child is not None else []
+        if node_type in _SPLAT_TYPES or node_type == _py.CONCATENATED_STRING or node_type in _CONTAINER_TYPES or node_type in _SPREADING_TYPES:
             return list(node.named_children)
         return []
 
@@ -254,8 +266,13 @@ class TaintTracker:
 
         Unknown calls (neither sanitizer nor source) consult
         ``assume_taint_preserving``: when True, the call's result is
-        tainted iff any argument is tainted; when False, the result is
-        always clean.
+        tainted iff any argument **or the method receiver** is tainted;
+        when False, the result is always clean. Reading the receiver is
+        what makes ``request.GET.get("q")`` / ``tainted.strip()`` stay
+        tainted - those return a value derived from the receiver but take
+        no tainted positional args, so a positional-only check would miss
+        them. Mirrors the Java / Rust / Go / PHP trackers. The sanitizer
+        check runs first, so ``escape(request.data)`` still clears.
         """
         name = call_name(node)
         if name in self.sanitizers:
@@ -264,10 +281,19 @@ class TaintTracker:
             return True
         if not self.assume_taint_preserving:
             return False
+        candidates: list[tree_sitter.Node] = []
         args_node = node.child_by_field_name("arguments")
-        if not args_node:
-            return False
-        return any(self._is_tainted(arg) for arg in args_node.named_children)
+        if args_node is not None:
+            candidates.extend(args_node.named_children)
+        # Method-call shape: ``call.function`` is an ``attribute`` whose
+        # ``object`` is the receiver. Plain calls (``foo(x)``) have an
+        # ``identifier`` function and no receiver to read.
+        function = node.child_by_field_name("function")
+        if function is not None and function.type == _py.ATTRIBUTE:
+            receiver = function.child_by_field_name("object")
+            if receiver is not None:
+                candidates.append(receiver)
+        return any(self._is_tainted(c) for c in candidates)
 
     def _fstring_tainted(self, node: tree_sitter.Node) -> bool:
         """Return True if any interpolated expression in an f-string is tainted."""

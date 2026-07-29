@@ -397,6 +397,82 @@ def test_tainted_sink_assume_taint_preserving_rejects_int_value():
 
 
 # ---------------------------------------------------------------------------
+# Taint through attribute / subscript / receiver chains (Priority-1 work):
+# request-driven web code carries taint behind a projection of the request
+# object, so these must fire for the framework-preset sinks to be useful.
+# ---------------------------------------------------------------------------
+
+
+def test_tainted_sink_attribute_chain_fires():
+    """``eval(request.data)`` - taint propagates through an attribute access."""
+    src = """
+    def view(request):
+        eval(request.data)
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert any("eval" in v.message for v in vs)
+
+
+def test_tainted_sink_subscript_of_attribute_fires():
+    """``eval(request.GET["q"])`` - taint propagates through subscript of an attribute."""
+    src = """
+    def view(request):
+        eval(request.GET["q"])
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert any("eval" in v.message for v in vs)
+
+
+def test_tainted_sink_method_on_tainted_receiver_fires():
+    """``eval(request.GET.get("q"))`` - a method call on a tainted receiver stays tainted."""
+    src = """
+    def view(request):
+        eval(request.GET.get("q"))
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert any("eval" in v.message for v in vs)
+
+
+def test_tainted_sink_attribute_of_clean_base_does_not_fire():
+    """An attribute / method chain on a NON-tainted base must not fire (no over-flagging)."""
+    src = """
+    import settings
+    def view(request):
+        eval(settings.SAFE_TEMPLATE.render())
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert not any("eval" in v.message for v in vs)
+
+
+def test_tainted_sink_sanitised_attribute_clears():
+    """``eval(escape(request.data))`` - the sanitiser check runs before receiver taint, so this clears."""
+    src = """
+    def view(request):
+        eval(escape(request.data))
+    """
+    vs = violations(
+        TaintedSinkRule,
+        src,
+        config={"enabled": True, "severity": "error", "sinks": ["eval"], "sources": [], "sanitizers": ["escape"]},
+    )
+    assert not any("eval" in v.message for v in vs)
+
+
+def test_tainted_sink_receiver_taint_gated_by_assume_taint_preserving():
+    """With ``assume_taint_preserving = false`` the method-receiver step is off, matching the other trackers."""
+    src = """
+    def view(request):
+        eval(request.GET.get("q"))
+    """
+    vs = violations(
+        TaintedSinkRule,
+        src,
+        config={"enabled": True, "severity": "error", "sinks": ["eval"], "sources": [], "sanitizers": [], "assume_taint_preserving": False},
+    )
+    assert not any("eval" in v.message for v in vs)
+
+
+# ---------------------------------------------------------------------------
 # ReturnValueIgnoredRule tests
 # ---------------------------------------------------------------------------
 

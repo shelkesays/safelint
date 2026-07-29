@@ -1041,6 +1041,14 @@ These combine AST analysis with intra-procedural taint tracking. They are more e
 
 The rule tracks data flow through assignments: if `x = user_data` then `x` is tainted. If `y = x + "_suffix"` then `y` is tainted too. Calling `eval(y)` then triggers a violation. Passing the value through a configured sanitizer (e.g. `escape(x)`) clears the taint.
 
+**Taint propagates through projections of a tainted base**, uniformly across all languages. Request-driven web code almost never passes a bare tainted parameter to a sink; the data arrives behind an attribute, a subscript, or a method call on the request object. All three keep the taint:
+
+- **Attribute / member access** - `request.data`, `req.body`, `$request->input` stays tainted (the receiver's taint dominates; the attribute name itself is a lookup, not data).
+- **Subscript / index** - `request.GET["q"]`, `req.query['q']`, `argv[1]` stays tainted (the base carries the taint, not the index).
+- **Method call on a tainted receiver** - `request.GET.get("q")`, `input.trim()`, `req->param("q")` stays tainted even with no tainted positional arguments. This receiver step is part of the conservative `assume_taint_preserving = true` posture (see below), so it is off when that flag is `false`. The sanitizer check runs first, so `escape(request.data)` still clears.
+
+So under a framework preset (which adds request-injection sinks like Django `RawSQL` / `mark_safe`, Flask `render_template_string`, Laravel `whereRaw`), an idiomatic `RawSQL(request.GET["q"])` is detected, not just the rare direct-parameter `RawSQL(request)`.
+
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `false` | Disabled by default, opt-in |
