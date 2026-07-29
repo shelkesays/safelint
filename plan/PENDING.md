@@ -185,14 +185,27 @@ implementation time.
 
 ---
 
-## Priority 3 - Sanitiser framework for the taint tracker (Pydantic as first sanitiser)
+## Priority 3 - Taint-tracker core overhaul (do 3a + 3b together)
 
-**Type**: architectural enhancement to the taint trackers. Previously noted as a
-**v3.x roadmap** item; the framework-presets work explicitly deferred it ("do
-**not** build sanitiser support here"). Largest of the three and strategically
-downstream of Priority 1, so last.
+**Type**: architectural enhancement to the taint trackers. Two sub-items that
+**both rewrite `_is_tainted` / `_call_tainted` across all seven trackers**, so
+they must land as **one refactor pass**, not two:
 
-### Exact requirement
+- **3a - Property-typed sanitiser framework** (Pydantic as first sanitiser).
+  Previously the standalone Priority 3; a v3.x-roadmap item the framework-presets
+  work explicitly deferred. **Independently re-flagged by CodeRabbit on PR #133**
+  (the `escape()`-clears-`RawSQL` false negative), which corroborates the need.
+- **3b - Convert the trackers to a single iterative worklist** (eliminate the
+  `_is_tainted` -> `_call_tainted` -> `_is_tainted` mutual recursion). Raised by
+  CodeRabbit on PR #133 (`dataflow_javascript.py`). See "3b" below.
+
+Both are strategically downstream of Priority 1 (which is now shipped), and both
+touch the same two methods in `dataflow.py` + the five `dataflow_<lang>.py`
+siblings - hence the single-pass requirement. Largest item in this backlog.
+The two PR #133 review threads (sanitiser-property, recursive-descent) are left
+**open** as the tracking anchors for 3a / 3b.
+
+### 3a - Exact requirement
 
 The trackers have **no sanitiser-clears-taint framework** beyond the flat
 `sanitizers` name list, which clears taint unconditionally for every sink.
@@ -228,3 +241,30 @@ The requirement is a **property-typed sanitiser mechanism**, not a flat clear:
 - Migrate the existing flat `sanitizers` list into this model as a compatibility
   default (a bare name clears the sink's required property for backward
   compatibility) so no current config silently changes meaning.
+
+### 3b - Convert the trackers to a single iterative worklist
+
+**Problem**: in `dataflow.py` and the `dataflow_<lang>.py` siblings (all except
+`dataflow_c.py`), `_is_tainted` is an iterative worklist, but it calls
+`_node_directly_tainted` -> `_call_tainted`, and `_call_tainted` re-enters
+`_is_tainted` for every argument **and** (since the v2.11.0 receiver work) every
+method receiver. That is a mutual recursion whose depth grows with call /
+method-chain nesting (`f(g(h(...)))`, `a().b().c()...`). It is pre-existing (the
+argument path always did this) and stays within safelint's own SAFE105 (which
+polices *direct* self-recursion; this is mutual), but it violates the project
+guideline that **all tree-walking in the analysis modules must be iterative
+worklists, never recursive**, and a pathologically deep input could grow the
+Python stack.
+
+**Exact requirement**: `dataflow_c.py` already models the correct shape - its
+`_taint_step(node) -> (is_tainted_here, children_to_examine)` reduces each
+worklist node without re-entering `_is_tainted`; sources return `(True, [])`,
+sanitisers `(False, [])`, and unknown calls return their argument / receiver
+nodes as children for the *same* worklist to drain. Refactor the other six
+trackers to that single-worklist model: fold the `_call_tainted` classification
+into the worklist step so a call's arguments and receiver are pushed as children
+rather than recursed into. Behaviour must be preserved exactly (same sink hits on
+the existing per-language test suites); this is a structural refactor, not a
+detection change. Do it in the **same pass** as 3a, since 3a also rewrites the
+sanitiser handling inside these same methods (a sanitiser must short-circuit the
+worklist step with `(False, [])`, matching `dataflow_c.py`).
