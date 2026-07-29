@@ -402,16 +402,16 @@ framework = "fastapi"
 
 | Framework | When to pick it | What changes |
 |---|---|---|
-| `vanilla` (default) | Plain Python, libraries, CLIs, data pipelines | Stdlib-only defaults. The `SAFE905-907` framework rules stay disabled. |
-| `django` | Django / Django REST Framework projects | Adds `raw` / `extra` / `RawSQL` / `mark_safe` / `format_html` / `HttpResponse` / `redirect` / `FileResponse` / `call_command` / `loads` to SAFE801 sinks; treats `.first()` as nullable for SAFE803; **enables `SAFE905-907`**. |
-| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks; enables `SAFE905` + `SAFE907` (not `SAFE906`, Flask has no mass-assignment idiom). |
-| `fastapi` | FastAPI / Starlette apps | Adds `text` / `HTMLResponse` / `Response` / `from_string` / `RedirectResponse` / `FileResponse` to SAFE801 sinks; **enables `SAFE905-907`**. |
+| `vanilla` (default) | Plain Python, libraries, CLIs, data pipelines | Stdlib-only defaults. The `SAFE905-909` framework rules stay disabled. |
+| `django` | Django / Django REST Framework projects | Adds `raw` / `extra` / `RawSQL` / `mark_safe` / `format_html` / `HttpResponse` / `redirect` / `FileResponse` / `call_command` / `loads` to SAFE801 sinks; treats `.first()` as nullable for SAFE803; **enables the full `SAFE905-909` set** (incl. `SAFE908` `@csrf_exempt`, `SAFE909` hardcoded `SECRET_KEY`). |
+| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks; enables `SAFE905` + `SAFE907` + `SAFE909` (not `SAFE906` / `SAFE908`). |
+| `fastapi` | FastAPI / Starlette apps | Adds `text` / `HTMLResponse` / `Response` / `from_string` / `RedirectResponse` / `FileResponse` to SAFE801 sinks; **enables `SAFE905` + `SAFE907`** (`SAFE906` via `pydantic`; `SAFE908` / `SAFE909` out of scope). |
 
 `pydantic = true` (independent of `framework`) additively adds Pydantic's validation-skipping constructors `model_construct` / `construct` to the SAFE801 sinks and enables `SAFE906` so an `extra = "allow"` model config fires. It composes with any framework, or stands alone in a vanilla project.
 
 The preset only changes *defaults*, an explicit `[tool.safelint.rules.tainted_sink] sinks = [...]` still wins. Unknown framework names surface a `safelint: warning:` line on stderr and fall back to `vanilla`. See the [Python language page](../languages/python.md#framework-presets) for the full per-rule effect.
 
-The `SAFE905-907` structural rules are enabled directly by the preset. The **dataflow** additions (the extra SAFE801 sinks, Django's `.first()` nullable, `pydantic`'s `model_construct` / `construct`) extend the *lists* but leave the multi-language dataflow rules (`tainted_sink`, `return_value_ignored`, `null_dereference`) **opt-in** - enable them explicitly (e.g. `[tool.safelint.rules.tainted_sink] enabled = true`), exactly as the Java Spring preset does. This is deliberate: those rules apply to every language, so a Python framework selection must not silently turn dataflow on for the Go / JS / Rust files in a polyglot repo. Like every language's intra-procedural tracker, SAFE801 follows taint through `request.<attr>` attribute / subscript / method-receiver chains (`request.GET["q"]`, `request.GET.get("q")`), not only direct-parameter flows - so the framework sinks fire on idiomatic request-driven code.
+The `SAFE905-909` structural rules are enabled directly by the preset (which subset depends on the framework - see the tables above). The **dataflow** additions (the extra SAFE801 sinks, Django's `.first()` nullable, `pydantic`'s `model_construct` / `construct`) extend the *lists* but leave the multi-language dataflow rules (`tainted_sink`, `return_value_ignored`, `null_dereference`) **opt-in** - enable them explicitly (e.g. `[tool.safelint.rules.tainted_sink] enabled = true`), exactly as the Java Spring preset does. This is deliberate: those rules apply to every language, so a Python framework selection must not silently turn dataflow on for the Go / JS / Rust files in a polyglot repo. Like every language's intra-procedural tracker, SAFE801 follows taint through `request.<attr>` attribute / subscript / method-receiver chains (`request.GET["q"]`, `request.GET.get("q")`), not only direct-parameter flows - so the framework sinks fire on idiomatic request-driven code.
 
 ## PHP framework presets
 
@@ -433,8 +433,8 @@ framework = "laravel"
 
 | Framework | When to pick it | What changes |
 |---|---|---|
-| `vanilla` (default) | Plain PHP, framework-free libraries | Stdlib-only defaults. The `SAFE905-907` framework rules stay disabled. |
-| `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks; **enables `SAFE905-907`** (Eloquent `$guarded = []` mass-assignment, `$request->all()` unvalidated input, `'debug' => true` config). |
+| `vanilla` (default) | Plain PHP, framework-free libraries | Stdlib-only defaults. The `SAFE905-909` framework rules stay disabled. |
+| `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks; **enables the full `SAFE905-909` set** (Eloquent `$guarded = []` mass-assignment, `$request->all()` unvalidated input, `'debug' => true` config, non-empty `$except` CSRF allow-list, hardcoded `base64:` `APP_KEY`). |
 
 The preset only changes *defaults*, an explicit `[tool.safelint.rules.tainted_sink] sinks_php = [...]` still wins. Unknown framework names surface a `safelint: warning:` line on stderr and fall back to `vanilla`. See the [PHP language page](../languages/php.md#framework-presets) for the full per-rule effect.
 
