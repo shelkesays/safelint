@@ -1527,7 +1527,7 @@ CSRF protection is on by default in these frameworks; disabling it opens a hole 
 - **Python (Django)**: a `@csrf_exempt` decorator - bare (`@csrf_exempt`), called (`@csrf_exempt()`), or wrapped for a class-based view (`@method_decorator(csrf_exempt)`).
 - **PHP (Laravel)**: a non-empty `$except` property - the `VerifyCsrfToken` middleware's route allow-list. An empty `$except = []` exempts nothing and is clean.
 
-More false-positive-prone than SAFE905-907 (a same-named decorator or `$except` property elsewhere would match), so it is **off by default even under the framework presets that scope it**: the Django and Laravel presets enable it; Flask (CSRF is extension-provided) and FastAPI do not.
+More false-positive-prone than SAFE905-907 (a same-named decorator or `$except` property elsewhere would match), so it is **off under `vanilla` and switched on only by the presets that scope it**: the Django and Laravel presets enable it; Flask (CSRF is extension-provided) and FastAPI do not.
 
 | Option | Default | Description |
 |---|---|---|
@@ -1575,7 +1575,7 @@ A committed secret is a credential leak the moment it lands in version control. 
 - **Python**: `SECRET_KEY = "..."` (Django) or `x.secret_key = "..."` (Flask `app.secret_key`) where the value is a **string literal**. Reading from the environment (`SECRET_KEY = os.environ["X"]` / `= env("X")`) is a call, not a literal, and is clean. An empty-string placeholder is not flagged.
 - **PHP (Laravel)**: a `base64:`-prefixed string literal - a hardcoded `APP_KEY`. `'key' => env('APP_KEY')` has no literal and is clean. `.env` files are not parsed, so this is code-only (a documented limit).
 
-Off by default even under the presets that scope it (a literal placeholder in an example or test-settings file can be a false positive): the Django, Flask, and Laravel presets enable it; FastAPI does not.
+Off under `vanilla` and switched on only by the presets that scope it (a literal placeholder in an example or test-settings file can be a false positive): the Django, Flask, and Laravel presets enable it; FastAPI does not.
 
 | Option | Default | Description |
 |---|---|---|
