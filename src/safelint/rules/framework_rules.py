@@ -422,3 +422,131 @@ class UnvalidatedRequestInputRule(BaseRule):
             if raw_read is None and _php_is_bulk_request_call(node):
                 raw_read = node
         return raw_read
+
+
+class CsrfProtectionDisabledRule(BaseRule):
+    """Flag CSRF protection explicitly disabled in code (SAFE908).
+
+    CSRF protection is on by default in these frameworks; turning it off in code
+    is a deliberate hole an attacker can drive state-changing requests through.
+    Detected patterns:
+
+    * **Python (Django)**: a ``@csrf_exempt`` decorator - bare (``@csrf_exempt``),
+      called (``@csrf_exempt()``), or wrapped for a class-based view
+      (``@method_decorator(csrf_exempt)``).
+    * **PHP (Laravel)**: a non-empty ``$except`` property - the
+      ``VerifyCsrfToken`` middleware's route allow-list. An empty ``$except = []``
+      exempts nothing and is clean.
+
+    Serves django (python) + laravel (php); default-disabled, enabled by those
+    presets. More false-positive-prone than SAFE905-907 (a same-named decorator
+    or ``$except`` property elsewhere would match), hence off by default.
+    """
+
+    name = "csrf_protection_disabled"
+    code = "SAFE908"
+    language = ("python", "php")
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Dispatch to the per-language detector for *filepath*."""
+        lang = resolve_lang_name(filepath)
+        if lang == "python":
+            return self._check_python(filepath, tree)
+        if lang == "php":
+            return self._check_php(filepath, tree)
+        return []  # pragma: no cover - engine dispatch already filters by language tuple
+
+    def _check_python(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type == _py.DECORATOR and self._python_exempts_csrf(node):
+                message = "@csrf_exempt disables CSRF protection - remove it or scope protection explicitly"
+                violations.append(self._make_violation_for_node(filepath, node, message))
+        return violations
+
+    @staticmethod
+    def _python_exempts_csrf(decorator: tree_sitter.Node) -> bool:
+        """Return True if ``csrf_exempt`` appears anywhere in the decorator expression."""
+        return any(n.type == _py.IDENTIFIER and node_text(n) == "csrf_exempt" for n in walk(decorator))
+
+    def _check_php(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type == _php.PROPERTY_ELEMENT and self._php_except_nonempty(node):
+                message = "$except exempts routes from CSRF protection - keep the allow-list empty or minimal"
+                violations.append(self._make_violation_for_node(filepath, node, message))
+        return violations
+
+    @staticmethod
+    def _php_except_nonempty(element: tree_sitter.Node) -> bool:
+        """Return True if *element* is a ``$except`` property initialised to a non-empty array."""
+        name = element.child_by_field_name("name")
+        if name is None or node_text(name).lstrip("$") != "except":
+            return False
+        value = element.child_by_field_name("default_value")
+        if value is None or value.type != _php.ARRAY_CREATION_EXPRESSION:
+            return False
+        return any(child.type == _php.ARRAY_ELEMENT_INITIALIZER for child in value.named_children)
+
+
+class HardcodedSecretRule(BaseRule):
+    """Flag a secret key assigned a string literal in code (SAFE909).
+
+    A committed secret is a credential leak the moment it lands in version
+    control. Detected patterns:
+
+    * **Python**: ``SECRET_KEY = "..."`` (Django) / ``x.secret_key = "..."``
+      (Flask ``app.secret_key``), where the value is a **string literal**.
+      Reading from the environment (``SECRET_KEY = os.environ["X"]`` /
+      ``= env("X")``) is a call, not a literal, and is clean.
+    * **PHP (Laravel)**: a ``base64:``-prefixed string literal - a hardcoded
+      ``APP_KEY``. ``'key' => env('APP_KEY')`` has no literal and is clean.
+      ``.env`` files are not parsed, so this is code-only (a documented limit).
+
+    Serves django / flask (python) + laravel (php); default-disabled, enabled by
+    those presets. Off by default because a literal placeholder in an example or
+    test settings file can be a false positive.
+    """
+
+    name = "hardcoded_secret"
+    code = "SAFE909"
+    language = ("python", "php")
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Dispatch to the per-language detector for *filepath*."""
+        lang = resolve_lang_name(filepath)
+        if lang == "python":
+            return self._check_python(filepath, tree)
+        if lang == "php":
+            return self._check_php(filepath, tree)
+        return []  # pragma: no cover - engine dispatch already filters by language tuple
+
+    def _check_python(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type != _py.ASSIGNMENT:
+                continue
+            message = self._python_secret_hit(node)
+            if message is not None:
+                violations.append(self._make_violation_for_node(filepath, node, message))
+        return violations
+
+    @staticmethod
+    def _python_secret_hit(node: tree_sitter.Node) -> str | None:
+        left = node.child_by_field_name("left")
+        right = node.child_by_field_name("right")
+        if left is None or right is None or right.type != _py.STRING or not _py_string_value(right):
+            return None
+        if left.type == _py.IDENTIFIER and node_text(left) == "SECRET_KEY":
+            return "SECRET_KEY is a hardcoded string literal - load it from the environment instead"
+        if left.type == _py.ATTRIBUTE and _py_attr_last_name(left) == "secret_key":
+            return f"{node_text(left)} is a hardcoded secret - load it from the environment instead"
+        return None
+
+    def _check_php(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        violations: list[Violation] = []
+        for node in walk(tree.root_node):
+            if node.type in _PHP_STRING_TYPES and node_text(node).strip("'\"").startswith("base64:"):
+                message = "hardcoded base64: key literal - load APP_KEY from the environment instead"
+                violations.append(self._make_violation_for_node(filepath, node, message))
+        return violations

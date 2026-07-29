@@ -574,6 +574,8 @@ _EXPECTED_LANGUAGES: dict[str, tuple[str, ...]] = {
     "DebugModeEnabledRule": ("python", "php"),  # SAFE905
     "MassAssignmentRule": ("python", "php"),  # SAFE906
     "UnvalidatedRequestInputRule": ("python", "php"),  # SAFE907
+    "CsrfProtectionDisabledRule": ("python", "php"),  # SAFE908
+    "HardcodedSecretRule": ("python", "php"),  # SAFE909
     # Rust-only language-idiom rules (slotted into category bands).
     "NeedlessMutRule": ("rust",),  # SAFE110
     "UncheckedArithmeticOnInputRule": ("rust",),  # SAFE112

@@ -156,6 +156,8 @@ DEFAULTS: dict[str, Any] = {
             "debug_mode_enabled",
             "mass_assignment",
             "unvalidated_request_input",
+            "csrf_protection_disabled",
+            "hardcoded_secret",
         ],
     },
     "rules": {
@@ -1560,6 +1562,8 @@ DEFAULTS: dict[str, Any] = {
         "debug_mode_enabled": {"enabled": False, "severity": "warning"},
         "mass_assignment": {"enabled": False, "severity": "error"},
         "unvalidated_request_input": {"enabled": False, "severity": "warning"},
+        "csrf_protection_disabled": {"enabled": False, "severity": "error"},
+        "hardcoded_secret": {"enabled": False, "severity": "error"},
         # Rust-idiom rules. Slotted into category bands per the
         # SafeLint rule-numbering policy (see CLAUDE.md); all four
         # are language-specific (no cross-language counterpart) and
@@ -2376,12 +2380,17 @@ _VANILLA_PHP_SINKS: list[str] = DEFAULTS["rules"]["tainted_sink"]["sinks_php"]
 # in a polyglot repo (a Go / JS / Rust file would start failing on a Python
 # framework selection). This mirrors the Java Spring preset, which likewise
 # extends the sink list but leaves ``tainted_sink`` opt-in. Only the framework
-# rules below - SAFE905/906/907, whose ``language`` tuple is exactly
-# ``("python", "php")`` - are auto-enabled by the preset.
+# rules below - SAFE905-909, whose ``language`` tuple is exactly
+# ``("python", "php")`` - are auto-enabled by the preset. This shared set is
+# spread into the Django and Laravel presets (both cover the full range,
+# including ``@csrf_exempt`` / ``$except`` and hardcoded secrets); Flask and
+# FastAPI enable a narrower subset inline below.
 _ENABLE_FRAMEWORK_RULES: dict[str, dict[str, bool]] = {
     "debug_mode_enabled": {"enabled": True},
     "mass_assignment": {"enabled": True},
     "unvalidated_request_input": {"enabled": True},
+    "csrf_protection_disabled": {"enabled": True},
+    "hardcoded_secret": {"enabled": True},
 }
 
 _PYTHON_VALID_FRAMEWORKS: frozenset[str] = frozenset({"vanilla", "django", "flask", "fastapi"})
@@ -2447,9 +2456,12 @@ _PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                 # flow is a documented limitation, not modelled here.
             },
             # Flask has no ORM / mass-assignment concept, so SAFE906 is NOT
-            # enabled here; SAFE905 + SAFE907 are.
+            # enabled here; nor is SAFE908 (Flask CSRF is extension-provided, not
+            # a `@csrf_exempt`-in-core pattern). SAFE905 + SAFE907 apply, and
+            # SAFE909 covers a hardcoded ``app.secret_key``.
             "debug_mode_enabled": {"enabled": True},
             "unvalidated_request_input": {"enabled": True},
+            "hardcoded_secret": {"enabled": True},
         },
     },
     "fastapi": {
