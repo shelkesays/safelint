@@ -204,8 +204,9 @@ class CTaintTracker:
 
         A sanitizer clears -> ``(False, [])`` (its arguments are not followed).
         A source taints -> ``(True, [])``. An unknown call propagates only under
-        ``assume_taint_preserving``, in which case its argument nodes are
-        returned for the worklist to examine; otherwise it clears.
+        ``assume_taint_preserving``, in which case its argument nodes - plus the
+        method receiver for a C++ member call - are returned for the worklist to
+        examine; otherwise it clears.
         """
         name = call_name(node)
         if name in self.sanitizers:
@@ -215,9 +216,18 @@ class CTaintTracker:
         if not self.assume_taint_preserving:
             return False, []
         args_node = node.child_by_field_name("arguments")
-        if args_node is None:  # pragma: no cover - defensive: a call_expression always has an arguments child
-            return False, []
-        return False, list(args_node.named_children)
+        candidates: list[tree_sitter.Node] = list(args_node.named_children) if args_node is not None else []
+        # C++ method-call shape: ``call.function`` is a ``field_expression``
+        # (``obj.method()`` / ``ptr->method()``) whose ``argument`` is the
+        # receiver, so ``req.body()`` / ``req->param("q")`` stay tainted. C has
+        # no methods - its calls have an ``identifier`` function - so this branch
+        # is C++-only in practice.
+        function = node.child_by_field_name("function")
+        if function is not None and function.type == _c.FIELD_EXPRESSION:
+            receiver = function.child_by_field_name("argument")
+            if receiver is not None:
+                candidates.append(receiver)
+        return False, candidates
 
     @staticmethod
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:

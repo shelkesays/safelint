@@ -192,7 +192,7 @@ framework = "fastapi"
 
 Framework and pydantic presets merge *before* your explicit TOML, so per-rule keys (e.g. `[tool.safelint.rules.tainted_sink] sinks = [...]`) always win. Unknown framework names warn on stderr and fall back to `vanilla`.
 
-The preset enables the `SAFE905-907` structural rules directly, but the dataflow additions (extra SAFE801 sinks, `.first()` nullable, pydantic constructors) only extend the *lists* - the multi-language dataflow rules stay opt-in (enable `tainted_sink` explicitly), so a Python framework choice never turns dataflow on for other languages in a polyglot repo. The intra-procedural tracker follows direct taint flows, not `request.<attr>` attribute chains.
+The preset enables the `SAFE905-907` structural rules directly, but the dataflow additions (extra SAFE801 sinks, `.first()` nullable, pydantic constructors) only extend the *lists* - the multi-language dataflow rules stay opt-in (enable `tainted_sink` explicitly), so a Python framework choice never turns dataflow on for other languages in a polyglot repo. The intra-procedural tracker follows taint through `request.<attr>` attribute / subscript / method-receiver chains (`request.GET["q"]`), so the framework sinks fire on idiomatic request-driven code, not only direct-parameter flows.
 
 ## Stdin mode for editor / Claude Code unsaved buffers
 

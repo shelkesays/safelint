@@ -114,6 +114,22 @@ def test_js_sanitizer_clears_taint(tmp_path: Path) -> None:
     assert not any(v.code == "SAFE801" for v in result.violations)
 
 
+def test_js_method_on_tainted_receiver_fires(tmp_path: Path) -> None:
+    """``eval(req.query.get('q'))`` - a method call on a tainted receiver stays tainted.
+
+    The taint arrives behind an attribute chain and a zero-tainted-arg method
+    call (the idiomatic web-framework shape), which a positional-only check
+    would miss; the receiver step catches it.
+    """
+    sample = tmp_path / "receiver.js"
+    sample.write_text(
+        "function f(req) {\n  eval(req.query.get('q'));\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    assert any(v.code == "SAFE801" for v in result.violations)
+
+
 def test_js_dompurify_sanitizer(tmp_path: Path) -> None:
     """``DOMPurify`` is in the default sanitizer list."""
     sample = tmp_path / "dompurify.js"
