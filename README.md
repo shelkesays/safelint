@@ -280,7 +280,7 @@ SafeLint ships **52 rules** across the Holzmann safety categories. **16 are on b
 | [SAFE401](https://shelkesays.github.io/safelint/configuration/rules/#safe401-resource_lifecycle) | `resource_lifecycle` | error | Files or connections opened outside a `with` block (Python), without paired `try`/`finally` cleanup (JS / TS), or outside try-with-resources / a `finally` close (Java) |
 | [SAFE501](https://shelkesays.github.io/safelint/configuration/rules/#safe501-unbounded_loops) | `unbounded_loops` | warning | `while True` loops with no `break` |
 
-### Opt-in rules (34): enable via `[tool.safelint.rules.<name>] enabled = true`
+### Opt-in rules (36): enable via `[tool.safelint.rules.<name>] enabled = true`
 
 | Code | Rule | Severity | What it flags |
 |---|---|---|---|
@@ -299,6 +299,8 @@ SafeLint ships **52 rules** across the Holzmann safety categories. **16 are on b
 | [SAFE905](https://shelkesays.github.io/safelint/configuration/rules/#safe905-debug_mode_enabled) | `debug_mode_enabled` | warning | A debug/reload flag hard-enabled in code (`DEBUG = True`, `app.run(debug=True)`, `uvicorn.run(reload=True)`, Laravel `'debug' => true`) *(Python / PHP; auto-enabled by the `django` / `flask` / `fastapi` / `laravel` presets)* |
 | [SAFE906](https://shelkesays.github.io/safelint/configuration/rules/#safe906-mass_assignment) | `mass_assignment` | error | Unbounded attribute binding from request data (`fields = "__all__"`, Pydantic `extra = "allow"`, Eloquent `$guarded = []`) *(Python / PHP; auto-enabled by the `django` / `fastapi` / `laravel` presets and `pydantic = true`; NOT Flask)* |
 | [SAFE907](https://shelkesays.github.io/safelint/configuration/rules/#safe907-unvalidated_request_input) | `unvalidated_request_input` | warning | Request body consumed whole with no validation layer *(Python / PHP; auto-enabled by the `django` / `flask` / `fastapi` / `laravel` presets)* |
+| [SAFE908](https://shelkesays.github.io/safelint/configuration/rules/#safe908-csrf_protection_disabled) | `csrf_protection_disabled` | error | CSRF protection turned off in code (Django `@csrf_exempt`, Laravel non-empty `$except`) *(Python / PHP; auto-enabled by the `django` / `laravel` presets)* |
+| [SAFE909](https://shelkesays.github.io/safelint/configuration/rules/#safe909-hardcoded_secret) | `hardcoded_secret` | error | A secret key assigned a string literal (Django `SECRET_KEY`, Flask `app.secret_key`, Laravel `base64:` `APP_KEY`) *(Python / PHP; auto-enabled by the `django` / `flask` / `laravel` presets)* |
 | [SAFE110](https://shelkesays.github.io/safelint/configuration/rules/#safe110-needless_mut) | `needless_mut` | warning | `let mut x = ...` where `x` is never reassigned / mutably referenced *(Rust-only; Holzmann rule 6)* |
 | [SAFE112](https://shelkesays.github.io/safelint/configuration/rules/#safe112-unchecked_arithmetic_on_input) | `unchecked_arithmetic_on_input` | warning | `+` / `-` / `*` on integer-typed function parameters (use `checked_*` / `wrapping_*` / `saturating_*`) *(Rust-only; Holzmann rule 7)* |
 | [SAFE204](https://shelkesays.github.io/safelint/configuration/rules/#safe204-panic_macros_outside_tests) | `panic_macros_outside_tests` | warning | `panic!` / `todo!` / `unimplemented!` in non-test code *(Rust-only)* |
