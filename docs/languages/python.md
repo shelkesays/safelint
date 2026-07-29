@@ -93,10 +93,10 @@ Python source is Python source - the parser, tree, and rule logic are framework-
 
 | Framework | When to pick it | What changes |
 |---|---|---|
-| `vanilla` (default) | Plain Python, libraries, CLIs, data pipelines | Stdlib-only defaults (the lists in the rules table above). The `SAFE905-907` framework rules are disabled. |
-| `django` | Django / Django REST Framework projects | Adds `raw` / `extra` / `RawSQL` / `mark_safe` / `format_html` / `HttpResponse` / `HttpResponseRedirect` / `redirect` / `FileResponse` / `call_command` / `loads` to SAFE801 sinks; treats `.first()` as nullable for SAFE803. **Enables `SAFE905-907`.** |
-| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks. **Enables `SAFE905` + `SAFE907`** (not `SAFE906` - Flask has no mass-assignment idiom). |
-| `fastapi` | FastAPI / Starlette apps | Adds `text` / `HTMLResponse` / `Response` / `from_string` / `RedirectResponse` / `FileResponse` to SAFE801 sinks. **Enables `SAFE905-907`.** |
+| `vanilla` (default) | Plain Python, libraries, CLIs, data pipelines | Stdlib-only defaults (the lists in the rules table above). The `SAFE905-909` framework rules are disabled. |
+| `django` | Django / Django REST Framework projects | Adds `raw` / `extra` / `RawSQL` / `mark_safe` / `format_html` / `HttpResponse` / `HttpResponseRedirect` / `redirect` / `FileResponse` / `call_command` / `loads` to SAFE801 sinks; treats `.first()` as nullable for SAFE803. **Enables the full `SAFE905-909` set** (incl. `SAFE908` `@csrf_exempt` and `SAFE909` hardcoded `SECRET_KEY`). |
+| `flask` | Flask / Werkzeug apps | Adds `render_template_string` / `Markup` / `redirect` / `send_file` / `send_from_directory` / `make_response` to SAFE801 sinks. **Enables `SAFE905` + `SAFE907` + `SAFE909`** (hardcoded `app.secret_key`); not `SAFE906` (no mass-assignment idiom) or `SAFE908` (Flask CSRF is extension-provided). |
+| `fastapi` | FastAPI / Starlette apps | Adds `text` / `HTMLResponse` / `Response` / `from_string` / `RedirectResponse` / `FileResponse` to SAFE801 sinks. **Enables `SAFE905` + `SAFE907`** (`SAFE906` via `pydantic = true`; `SAFE908` / `SAFE909` not in scope). |
 
 `pydantic = true` (independent of `framework`) additively adds Pydantic's validation-skipping constructors `model_construct` / `construct` to the SAFE801 sinks and enables `SAFE906` so an `extra = "allow"` model config fires. It composes with any framework, or stands alone in a vanilla project.
 
@@ -113,7 +113,7 @@ framework = "fastapi"
 
 Explicit per-rule TOML config still wins over the preset; setting `[tool.safelint.rules.tainted_sink] sinks = [...]` overrides whatever the preset planted. The default framework is `vanilla`, so existing users with no `[python]` config see no behaviour change. Unknown framework names surface a `safelint: warning:` on stderr and fall back to `vanilla`.
 
-The `SAFE905-907` structural rules are enabled by the preset directly. The dataflow additions (the extra SAFE801 sinks, `.first()` nullable, `pydantic`'s constructors) only extend the *lists* - the multi-language dataflow rules (`tainted_sink`, `return_value_ignored`, `null_dereference`) stay **opt-in**, exactly as with the Java Spring preset (a Python framework choice must not turn dataflow on for other languages in a polyglot repo). Enable them explicitly to use the framework sinks. As with every language, the intra-procedural tracker follows taint through `request.<attr>` attribute / subscript / method-receiver chains (`request.GET["q"]`), so the framework sinks fire on idiomatic request-driven code, not only direct-parameter flows.
+The `SAFE905-909` structural rules are enabled by the preset directly (which subset depends on the framework - see the table above). The dataflow additions (the extra SAFE801 sinks, `.first()` nullable, `pydantic`'s constructors) only extend the *lists* - the multi-language dataflow rules (`tainted_sink`, `return_value_ignored`, `null_dereference`) stay **opt-in**, exactly as with the Java Spring preset (a Python framework choice must not turn dataflow on for other languages in a polyglot repo). Enable them explicitly to use the framework sinks. As with every language, the intra-procedural tracker follows taint through `request.<attr>` attribute / subscript / method-receiver chains (`request.GET["q"]`), so the framework sinks fire on idiomatic request-driven code, not only direct-parameter flows.
 
 ## Installing the Python extra
 

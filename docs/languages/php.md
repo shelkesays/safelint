@@ -254,8 +254,8 @@ PHP source is PHP source - the parser and rule logic are framework-agnostic. The
 
 | Framework | When to pick it | What changes |
 |---|---|---|
-| `vanilla` (default) | Plain PHP, framework-free libraries | Stdlib-only defaults (the lists in the rules table above). The `SAFE905-907` framework rules are disabled. |
-| `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks. **Enables `SAFE905-907`**: Eloquent `$guarded = []` mass-assignment (SAFE906), `$request->all()` / bare `$request->input()` without `validate()` (SAFE907; a targeted `$request->input('field')` read is not flagged), and a `'debug' => true` config-array entry (SAFE905). |
+| `vanilla` (default) | Plain PHP, framework-free libraries | Stdlib-only defaults (the lists in the rules table above). The `SAFE905-909` framework rules are disabled. |
+| `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks. **Enables the full `SAFE905-909` set**: Eloquent `$guarded = []` mass-assignment (SAFE906), `$request->all()` / bare `$request->input()` without `validate()` (SAFE907; a targeted `$request->input('field')` read is not flagged), a `'debug' => true` config-array entry (SAFE905), a non-empty `$except` CSRF allow-list (SAFE908), and a hardcoded `base64:` `APP_KEY` literal (SAFE909). |
 
 ```toml
 # safelint.toml (standalone) - no [tool.safelint] wrapper

@@ -36,7 +36,7 @@ safelint lints `.php` files. The skill doesn't need to filter by extension - `sa
 
 ## Rule count
 
-PHP is in scope for 21 rules under the default (vanilla) preset: the cross-language structural and dataflow rules (SAFE101-105, SAFE202, SAFE203, SAFE301-304, SAFE309, SAFE401, SAFE501, SAFE601, SAFE603, SAFE701-702, SAFE801-803). The two rules deliberately skipped for PHP (SAFE201, SAFE305) are listed in the "Deliberately skipped" section below. PHP adds **no** PHP-only rule codes, but the `laravel` framework preset enables the three shared cross-framework rules SAFE905-907 (see "Framework presets" below). Like the other languages' optional rules, every dataflow rule (SAFE801-803) is disabled by default, as are the other opt-in rules (SAFE309, SAFE601, SAFE603).
+PHP is in scope for 21 rules under the default (vanilla) preset: the cross-language structural and dataflow rules (SAFE101-105, SAFE202, SAFE203, SAFE301-304, SAFE309, SAFE401, SAFE501, SAFE601, SAFE603, SAFE701-702, SAFE801-803). The two rules deliberately skipped for PHP (SAFE201, SAFE305) are listed in the "Deliberately skipped" section below. PHP adds **no** PHP-only rule codes, but the `laravel` framework preset enables the five shared cross-framework rules SAFE905-909 (see "Framework presets" below). Like the other languages' optional rules, every dataflow rule (SAFE801-803) is disabled by default, as are the other opt-in rules (SAFE309, SAFE601, SAFE603).
 
 ## PHP shapes worth knowing
 
@@ -175,7 +175,7 @@ PHP source is PHP source - the parser and rule logic are framework-agnostic. The
 | Framework | When to pick it | What changes |
 | --- | --- | --- |
 | `vanilla` (default) | Plain PHP, libraries, no framework | Stdlib-only defaults. SAFE9xx framework rules stay disabled. Existing v2.6.0+ users see no change. |
-| `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks. Enables SAFE905-907 (Eloquent `$guarded = []` mass-assignment, `$request->all()` unvalidated input, `'debug' => true` in config). |
+| `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks. Enables the full SAFE905-909 set (Eloquent `$guarded = []` mass-assignment, `$request->all()` unvalidated input, `'debug' => true` config, non-empty `$except` CSRF allow-list, hardcoded `base64:` `APP_KEY`). |
 
 ```toml
 # pyproject.toml
