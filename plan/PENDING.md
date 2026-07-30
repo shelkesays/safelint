@@ -268,3 +268,35 @@ the existing per-language test suites); this is a structural refactor, not a
 detection change. Do it in the **same pass** as 3a, since 3a also rewrites the
 sanitiser handling inside these same methods (a sanitiser must short-circuit the
 worklist step with `(False, [])`, matching `dataflow_c.py`).
+
+---
+
+## Priority 4 - Overlapping file + dir `check` targets drop the changed-files context
+
+**Type**: small correctness fix in the multi-path CLI (`cli.py`), narrow but real.
+Surfaced by the high-effort code review of the v2.11.0 branch.
+
+**Problem**: a file target returns `changed_files=None` from
+`_resolve_check_targets` (only directory targets in git-modified mode carry the
+repo-wide diff). Overlapping targets dedup **most-specific-first**, so a file
+reached via both `pkg/` and `pkg/foo.py` keeps the *file* target's result, whose
+`changed_files` is `None`. Any rule that needs the repo-wide changed-files
+context - notably `test_coupling` (SAFE7xx) - therefore behaves differently
+depending on whether the file is *also* named explicitly: `safelint check pkg/`
+flags `foo.py` (modified without its test), but `safelint check pkg/ pkg/foo.py`
+silently drops that finding.
+
+**Why deferred, not fixed in v2.11.0**: it is pre-existing (shipped with the
+2.10.0 multi-path feature), gated to an opt-in rule (`test_coupling`) in an
+unusual invocation, and the clean fix touches the target-resolution core
+(threading the repo-wide `changed_files` to file / explicit targets too) - which
+also changes single-file-run semantics (`check foo.py` would start running
+`test_coupling`) and adds a git call per file target. That deserves its own
+focused change with tests, not a rushed edit in the taint branch.
+
+**Exact requirement**: make a file's changed-files context independent of how it
+is named. Simplest approach: compute the repo-wide changed-files list once per
+run (in git-modified mode) and hand it to **every** target's `run(...)`
+(directory and file alike), so the deduped result is identical regardless of
+overlap. Add a regression test asserting `check pkg/ pkg/foo.py` and
+`check pkg/` produce the same `test_coupling` result for `foo.py`.

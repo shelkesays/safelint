@@ -646,7 +646,18 @@ def _config_dir(config_path: Path | None, target: Path) -> Path:
     return target if target.is_dir() else target.parent
 
 
-def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format: str) -> tuple[list[str] | None, list[str] | None, bool, set[str]]:
+def _git_fell_back_to_all_files(args: argparse.Namespace, target: Path, changed_files: list[str] | None, *, no_targets: bool) -> bool:
+    """Return True when a dir target in git-modified mode fell back to all-files because git was unavailable.
+
+    ``_resolve_check_targets`` returns ``changed_files=None`` with
+    ``no_targets=False`` for a dir target only in that fallback (a normal dir
+    returns a list; the nothing-modified case sets ``no_targets``). Used to
+    record the fallback once for the consolidated note instead of per target.
+    """
+    return changed_files is None and not no_targets and not getattr(args, "all_files", False) and target.is_dir()
+
+
+def _resolve_check_targets(args: argparse.Namespace, target: Path) -> tuple[list[str] | None, list[str] | None, bool, set[str]]:
     """Resolve the (changed_files, files, no_targets, considered_modified) tuple for ``check`` mode.
 
     Returns a 4-tuple:
@@ -673,10 +684,8 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
         return None, None, False, set()
     modified = _get_git_modified_supported_files(target)
     if modified is None:
-        _print_status(
-            "Note: could not determine modified files via git - scanning all files.",
-            output_format=output_format,
-        )
+        # git unavailable: fall back to scanning all files. No inline note - the
+        # caller records it once (out.git_unavailable) for the consolidated note.
         return None, None, False, set()
     if not modified[1]:
         # No inline note here: the caller collects every no-modified target and
@@ -1078,9 +1087,9 @@ class _TargetOutcome:
         self.seen: set[str] = set()  # resolved paths already kept
         self.blocking: list = []  # partitioned under each target's OWN fail_on
         self.unavailable: set[str] = set()  # union of missing-grammar extensions
-        self.considered: set[str] = set()  # git-modified paths considered under any target
         self.silent_pass = False  # some target had grammar-missing files and linted nothing
         self.any_linted = False  # at least one target linted a real file
+        self.git_unavailable = False  # some target fell back to all-files because git was unavailable
         self.all_no_targets = True  # every target hit the git-modified no-targets short-circuit
         self.empty_targets: list[str] = []  # explicitly-named targets that ran discovery but linted 0 files (all excluded / empty)
         self.no_modified_targets: list[str] = []  # targets with no git-modified supported files (default mode; not a grammar miss)
@@ -1111,7 +1120,7 @@ def _specificity(target: Path) -> int:
     return len(target.resolve().parts)
 
 
-def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | None, output_format: str, cache: dict, out: _TargetOutcome) -> None:
+def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | None, cache: dict, out: _TargetOutcome) -> None:
     """Lint a single *target*, folding its outcome into *out* (dedup, per-target fail_on, silent-pass)."""
     config, exclude_paths = _target_config(target, config_path, cache)
     _, fail_threshold = _resolve_fail_on(args, config)
@@ -1123,8 +1132,9 @@ def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | 
     # exit 2 even though that target linted real files.
     target_unavail = _emit_missing_grammar_warnings(target, silent=True, exclude_paths=exclude_paths)
     out.unavailable |= target_unavail
-    changed_files, files, no_targets, considered = _resolve_check_targets(args, target, output_format)
-    out.considered |= considered
+    changed_files, files, no_targets, considered = _resolve_check_targets(args, target)
+    if _git_fell_back_to_all_files(args, target, changed_files, no_targets=no_targets):
+        out.git_unavailable = True
     if no_targets:
         # Git-modified files existed under target but were all dropped for a
         # missing grammar: this target linted nothing yet must not read green.
@@ -1185,11 +1195,11 @@ def _partition_into(blocking: list, results: list, fail_threshold: int) -> None:
             blocking.extend(blocked)
 
 
-def _lint_targets(args: argparse.Namespace, config_path: str | None, output_format: str, cache: dict) -> _TargetOutcome:
+def _lint_targets(args: argparse.Namespace, config_path: str | None, cache: dict) -> _TargetOutcome:
     """Lint every target most-specific-first, returning the aggregated :class:`_TargetOutcome`."""
     out = _TargetOutcome()
     for target in sorted(args.targets, key=_specificity, reverse=True):
-        _lint_one_target(args, target, config_path, output_format, cache, out)
+        _lint_one_target(args, target, config_path, cache, out)
     return out
 
 
@@ -1214,29 +1224,38 @@ def _quoted_targets(targets: list[str]) -> tuple[str, str]:
     return noun, ", ".join(f"'{t}'" for t in targets)
 
 
-def _emit_scan_notes(out: _TargetOutcome) -> None:
-    """Emit the pretty-mode informational notes for a completed multi-target scan.
+def _emit_scan_notes(out: _TargetOutcome, output_format: str) -> None:
+    """Emit the informational notes for a completed multi-target scan.
 
     Each note-kind is emitted **once**, listing every affected target, rather
     than repeating a near-identical line per target (so ``check src tests
-    examples`` prints one line naming all three, not three). Three
-    non-failing signals: the deduplicated missing-grammar union; the
-    git-modified "no modified files" note (default mode); and the "no files
-    linted" note for named targets that discovered zero files (all excluded /
-    empty), which keeps a skipped-by-exclusion target distinguishable from a
+    examples`` prints one line naming all three, not three).
+
+    The git-discovery notes (``git unavailable`` fallback and the "no modified
+    files" note) go through :func:`_print_status`, so - as before the multi-path
+    refactor - they reach **every** output mode (stdout in pretty, stderr in
+    json / sarif) and still explain an empty JSON document to a CI operator. The
+    missing-grammar warnings and the "no files linted" note stay **pretty-only**
+    (json / sarif stderr must stay clean for parsing pipelines): the "no files
+    linted" note keeps a skipped-by-exclusion target distinguishable from a
     clean one - e.g. ``check src tests`` where ``tests/**`` is excluded would
     otherwise read identically to ``check src``.
     """
-    if out.unavailable:
-        _print_grammar_warnings(out.unavailable)
+    if out.git_unavailable:
+        _print_status("Note: could not determine modified files via git - scanning all files.", output_format=output_format)
     if out.no_modified_targets:
         noun, targets = _quoted_targets(out.no_modified_targets)
         pronoun = "it" if len(out.no_modified_targets) == 1 else "them"
         _print_status(
             f"No modified supported source files detected under {noun} {targets}. "
             f"Modified files may be outside {pronoun}, or skipped due to missing grammar support; "
-            "use --all-files to scan everything or install the needed grammar extra."
+            "use --all-files to scan everything or install the needed grammar extra.",
+            output_format=output_format,
         )
+    if output_format != "pretty":
+        return
+    if out.unavailable:
+        _print_grammar_warnings(out.unavailable)
     if out.empty_targets:
         noun, targets = _quoted_targets(out.empty_targets)
         _diagnostics.print_warning(f"no files linted under {noun} {targets} - all excluded by config, empty, or no supported source files")
@@ -1259,10 +1278,11 @@ def _run_check(args: argparse.Namespace) -> int:
     primary_config, _ = _target_config(Path(args.targets[0]), config_path, cache)
     fail_on, _ = _resolve_fail_on(args, primary_config)
 
-    out = _lint_targets(args, config_path, output_format, cache)
+    out = _lint_targets(args, config_path, cache)
 
-    if output_format == "pretty":
-        _emit_scan_notes(out)
+    # Runs in every mode: it routes the git-discovery notes to stdout (pretty) or
+    # stderr (json / sarif) and keeps the grammar / empty-target notes pretty-only.
+    _emit_scan_notes(out, output_format)
 
     if not out.any_linted and (out.all_no_targets or out.silent_pass):
         # Nothing was linted AND either every target hit the git-modified
@@ -1277,7 +1297,9 @@ def _run_check(args: argparse.Namespace) -> int:
     # Silent-pass (2) takes precedence over blocking (1), matching single-target
     # order: an un-checked file is a setup error the user must fix first.
     if out.silent_pass:
-        _print_unlinted_error(out.unavailable)
+        # Mixed run: other targets WERE linted (we're past the all-unlinted
+        # early return), so the message must not claim "no files linted".
+        _print_unlinted_error(out.unavailable, some_linted=out.any_linted)
         return 2
     return 1 if out.blocking else 0
 
@@ -1291,11 +1313,19 @@ def _finish_unlinted(output_format: str, fail_on: str, *, silent_pass: bool, una
     return 0
 
 
-def _print_unlinted_error(unavailable: set[str]) -> None:
-    """Print the ``no files linted - grammar not installed`` stderr diagnostic."""
+def _print_unlinted_error(unavailable: set[str], *, some_linted: bool = False) -> None:
+    """Print the grammar-not-installed stderr diagnostic (exit-2 setup error).
+
+    *some_linted* switches the wording for a multi-target run where other targets
+    were checked: without it the message would read "no files linted" right after
+    the run printed those targets' results and "All checks passed.".
+    """
     action = _install_action_for_extensions(unavailable)
     suffix = f" - {action}" if action else ""
-    _diagnostics.print_error(f"no files linted - every git-modified or discovered source file has a grammar that isn't installed{suffix}")
+    if some_linted:
+        _diagnostics.print_error(f"some targets were skipped - their source files have a grammar that isn't installed{suffix}")
+    else:
+        _diagnostics.print_error(f"no files linted - every git-modified or discovered source file has a grammar that isn't installed{suffix}")
 
 
 def _add_severity_args(parser: argparse.ArgumentParser) -> None:
