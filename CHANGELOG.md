@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Multi-path `check`: the "nothing to lint here" notes are now emitted once, listing every affected target, instead of a near-identical line per target.** A `safelint check src tests examples` run with nothing modified previously printed the "No modified supported source files detected under target …" note three times (once per target); it now prints one line: `… under targets 'src', 'tests', 'examples'. …`. Likewise the `--all-files` "no files linted under '<target>'" note is consolidated into a single warning naming all the empty / fully-excluded targets. Single-target runs are unchanged (singular wording).
+
 ### Added
 
 - **Two new framework-preset security rules - SAFE908 `csrf_protection_disabled` and SAFE909 `hardcoded_secret`** (Python + PHP; SafeLint now ships **52 rules**). They complete the shared cross-framework 9xx band (SAFE905-909) begun in v2.9.0, and like the others are disabled by default and switched on by the framework presets that scope them.
