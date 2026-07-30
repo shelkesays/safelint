@@ -1,4 +1,4 @@
-"""Shared cross-framework rules (SAFE905-907) for the Python + PHP presets.
+"""Shared cross-framework rules (SAFE905-909) for the Python + PHP presets.
 
 Each rule serves multiple frameworks and is gated purely by ``enabled`` (a
 framework preset flips it on), exactly like the Spring 9xx rules. Detection is

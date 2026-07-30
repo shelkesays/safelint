@@ -926,6 +926,55 @@ def test_run_check_all_files_silent_pass_not_masked_by_sibling(tmp_path: Path, m
     assert rc == 2, f"a grammar-missing --all-files target must not be masked green by a clean sibling; got {rc}"
 
 
+def test_run_check_mixed_grammar_missing_message_does_not_claim_no_files_linted(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """When a sibling WAS linted, the exit-2 grammar diagnostic must not read 'no files linted' (it contradicts the printed results)."""
+    from safelint.core.engine import LintResult  # noqa: PLC0415
+
+    strict = tmp_path / "frontend"
+    strict.mkdir()
+    (strict / "app.ts").write_text("const x = 1;\n", encoding="utf-8")
+    clean = tmp_path / "backend"
+    clean.mkdir()
+    (clean / "api.py").write_text("x = 1\n", encoding="utf-8")
+    mocker.patch.object(cli, "unavailable_extensions", return_value={".ts": "pip install 'safelint[typescript]'"})
+    real_run = cli.run
+
+    def _run(target: Path, **kwargs: object) -> list:
+        if target == strict:
+            return [LintResult(path=str(strict / "app.ts"))]
+        return real_run(target, **kwargs)
+
+    mocker.patch.object(cli, "run", side_effect=_run)
+    rc = cli._run_check(_multipath_args([clean, strict], all_files=True, output_format="pretty"))
+    err = capsys.readouterr().err
+    assert rc == 2
+    assert "some targets were skipped" in err
+    assert "no files linted" not in err  # backend WAS linted - must not claim otherwise
+
+
+def test_run_check_no_modified_note_reaches_stderr_in_json_mode(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """The 'no modified files' note must still reach stderr in JSON mode, explaining the empty document."""
+    (tmp_path / "src").mkdir()
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=([], [], set()))
+
+    cli._run_check(_multipath_args([tmp_path / "src"], all_files=False, output_format="json"))
+    cap = capsys.readouterr()
+    assert "No modified supported source files" in cap.err  # stderr (json stdout stays a clean document)
+    assert "No modified supported source files" not in cap.out
+
+
+def test_run_check_git_unavailable_note_emitted_once(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """git unavailable across several targets emits ONE 'could not determine modified files' note, not one per target."""
+    for name in ("a", "b", "c"):
+        (tmp_path / name).mkdir()
+        (tmp_path / name / "f.py").write_text("x = 1\n", encoding="utf-8")
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)  # git unavailable
+
+    cli._run_check(_multipath_args([tmp_path / "a", tmp_path / "b", tmp_path / "c"], all_files=False, output_format="pretty"))
+    notes = [ln for ln in capsys.readouterr().out.splitlines() if "could not determine modified files" in ln]
+    assert len(notes) == 1, notes
+
+
 def test_run_check_all_files_zero_files_still_prints_all_clear(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
     """An ``--all-files`` run that discovers ZERO lintable files (all excluded / empty tree) still prints ``All checks passed.``.
 
