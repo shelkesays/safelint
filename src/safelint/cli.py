@@ -679,12 +679,9 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path, output_format
         )
         return None, None, False, set()
     if not modified[1]:
-        _print_status(
-            f"No modified supported source files detected under target {target}. "
-            "Modified files may be outside the target, or skipped due to missing grammar support; "
-            "use --all-files to scan everything or install the needed grammar extra.",
-            output_format=output_format,
-        )
+        # No inline note here: the caller collects every no-modified target and
+        # emits ONE consolidated note after the loop (see ``_emit_scan_notes``),
+        # so a multi-target run doesn't repeat a near-identical line per target.
         return None, None, True, modified[2]
     changed_files, files, considered = modified
     return changed_files, files, False, considered
@@ -1086,6 +1083,7 @@ class _TargetOutcome:
         self.any_linted = False  # at least one target linted a real file
         self.all_no_targets = True  # every target hit the git-modified no-targets short-circuit
         self.empty_targets: list[str] = []  # explicitly-named targets that ran discovery but linted 0 files (all excluded / empty)
+        self.no_modified_targets: list[str] = []  # targets with no git-modified supported files (default mode; not a grammar miss)
 
 
 def _target_config(target: Path, config_path: str | None, cache: dict) -> tuple[dict, list[str]]:
@@ -1141,6 +1139,10 @@ def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | 
         if missing:
             out.unavailable |= missing
             out.silent_pass = True
+        else:
+            # Plain "nothing modified under this target" (git worked, no grammar
+            # gap): collected for the single consolidated note after the loop.
+            out.no_modified_targets.append(str(target))
         return
     # Past the git-modified no-targets short-circuit: this target actually ran
     # discovery, so the run is NOT the "nothing modified" case that stays silent.
@@ -1206,19 +1208,38 @@ def _print_check_results(results: list, output_format: str, fail_on: str, blocki
     _print_results(output_format, all_violations, all_suppressed, blocking_count=blocking_count, fail_on=fail_on, files_checked=len(results), options=_PrintOptions(statistics=statistics))
 
 
-def _emit_scan_notes(out: _TargetOutcome) -> None:
-    """Emit the pretty-mode stderr notes for a completed multi-target scan.
+def _quoted_targets(targets: list[str]) -> tuple[str, str]:
+    """Return ``(noun, list)`` for a target list: ``("target", "'src'")`` or ``("targets", "'a', 'b'")``."""
+    noun = "target" if len(targets) == 1 else "targets"
+    return noun, ", ".join(f"'{t}'" for t in targets)
 
-    Two informational (non-failing) signals: the deduplicated missing-grammar
-    union, and a per-target "no files linted under '<target>'" note so a named
-    target that contributed zero files (all excluded / empty) is distinguishable
-    from one that linted clean - e.g. ``check src tests`` where ``tests/**`` is
-    excluded would otherwise read identically to ``check src``.
+
+def _emit_scan_notes(out: _TargetOutcome) -> None:
+    """Emit the pretty-mode informational notes for a completed multi-target scan.
+
+    Each note-kind is emitted **once**, listing every affected target, rather
+    than repeating a near-identical line per target (so ``check src tests
+    examples`` prints one line naming all three, not three). Three
+    non-failing signals: the deduplicated missing-grammar union; the
+    git-modified "no modified files" note (default mode); and the "no files
+    linted" note for named targets that discovered zero files (all excluded /
+    empty), which keeps a skipped-by-exclusion target distinguishable from a
+    clean one - e.g. ``check src tests`` where ``tests/**`` is excluded would
+    otherwise read identically to ``check src``.
     """
     if out.unavailable:
         _print_grammar_warnings(out.unavailable)
-    for empty in out.empty_targets:
-        _diagnostics.print_warning(f"no files linted under '{empty}' - all excluded by config, empty, or no supported source files")
+    if out.no_modified_targets:
+        noun, targets = _quoted_targets(out.no_modified_targets)
+        pronoun = "it" if len(out.no_modified_targets) == 1 else "them"
+        _print_status(
+            f"No modified supported source files detected under {noun} {targets}. "
+            f"Modified files may be outside {pronoun}, or skipped due to missing grammar support; "
+            "use --all-files to scan everything or install the needed grammar extra."
+        )
+    if out.empty_targets:
+        noun, targets = _quoted_targets(out.empty_targets)
+        _diagnostics.print_warning(f"no files linted under {noun} {targets} - all excluded by config, empty, or no supported source files")
 
 
 def _run_check(args: argparse.Namespace) -> int:
