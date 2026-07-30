@@ -974,6 +974,39 @@ def test_run_check_no_empty_note_when_all_targets_lint(tmp_path: Path, mocker: M
     assert "no files linted under" not in capsys.readouterr().err
 
 
+def test_run_check_consolidates_empty_target_notes_into_one_line(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """Several empty targets emit ONE 'no files linted' warning listing them all, not one line each."""
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "ok.py").write_text("x = 1\n", encoding="utf-8")  # real, clean
+    for name in ("vendored", "generated"):
+        (tmp_path / name).mkdir()
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
+
+    cli._run_check(_multipath_args([src, tmp_path / "vendored", tmp_path / "generated"], all_files=True, output_format="pretty"))
+    notes = [ln for ln in capsys.readouterr().err.splitlines() if "no files linted under" in ln]
+    assert len(notes) == 1, notes  # consolidated, not one per target
+    assert "targets" in notes[0]  # plural form
+    assert "vendored" in notes[0]
+    assert "generated" in notes[0]
+
+
+def test_run_check_consolidates_no_modified_notes_into_one_line(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """Several no-modified targets (git-modified mode) emit ONE consolidated note listing them all."""
+    for name in ("src", "tests"):
+        (tmp_path / name).mkdir()
+    # git worked but reported nothing modified under either target (no grammar gap).
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=([], [], set()))
+
+    rc = cli._run_check(_multipath_args([tmp_path / "src", tmp_path / "tests"], all_files=False, output_format="pretty"))
+    notes = [ln for ln in capsys.readouterr().out.splitlines() if "No modified supported source files" in ln]
+    assert rc == 0
+    assert len(notes) == 1, notes  # consolidated, not one per target
+    assert "targets" in notes[0]  # plural form
+    assert str(tmp_path / "src") in notes[0]
+    assert str(tmp_path / "tests") in notes[0]
+
+
 def test_run_check_empty_sibling_does_not_inherit_missing_grammar(tmp_path: Path, mocker: MockerFixture) -> None:
     """An empty (or no-op) target must not inherit an earlier target's missing-grammar extension.
 
