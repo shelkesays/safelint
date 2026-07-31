@@ -187,9 +187,8 @@ implementation time.
 
 ## Priority 3 - Taint-tracker core overhaul (do 3a + 3b together)
 
-**Type**: architectural enhancement to the taint trackers. Two sub-items that
-**both rewrite `_is_tainted` / `_call_tainted` across all seven trackers**, so
-they must land as **one refactor pass**, not two:
+**Type**: architectural enhancement to the taint trackers. Two sub-items,
+strategically downstream of Priority 1 (which is now shipped):
 
 - **3a - Property-typed sanitiser framework** (Pydantic as first sanitiser).
   Previously the standalone Priority 3; a v3.x-roadmap item the framework-presets
@@ -199,11 +198,25 @@ they must land as **one refactor pass**, not two:
   `_is_tainted` -> `_call_tainted` -> `_is_tainted` mutual recursion). Raised by
   CodeRabbit on PR #133 (`dataflow_javascript.py`). See "3b" below.
 
-Both are strategically downstream of Priority 1 (which is now shipped), and both
-touch the same two methods in `dataflow.py` + the five `dataflow_<lang>.py`
-siblings - hence the single-pass requirement. Largest item in this backlog.
-The two PR #133 review threads (sanitiser-property, recursive-descent) are left
-**open** as the tracking anchors for 3a / 3b.
+**Which trackers each item touches** - there are **seven** trackers: `dataflow.py`
+(Python) plus the **six** `dataflow_<lang>.py` siblings (c, go, java, javascript,
+php, rust):
+
+- **3a** rewrites the sanitiser-clearing logic in **all seven** - the
+  `_call_tainted` classification in the six non-C trackers, and the
+  `_classify_call` step in `dataflow_c.py`.
+- **3b** rewrites only the **six non-C trackers** (Python + go/java/javascript/
+  php/rust) to remove the mutual recursion. `dataflow_c.py` is **excluded**: it is
+  **already** in the target shape - its `_taint_step` reduces each worklist node
+  to `(is_tainted_here, children)` and its `_classify_call` returns argument /
+  receiver nodes as children rather than re-entering `_is_tainted` - so it is the
+  **reference exemplar** for 3b, not something 3b changes.
+
+So the **single-pass requirement applies to the six non-C trackers**, which both
+items rewrite; `dataflow_c.py` is touched by **3a only** (its `_classify_call`
+sanitiser step). Largest item in this backlog. The two PR #133 review threads
+(sanitiser-property, recursive-descent) are left **open** as the tracking anchors
+for 3a / 3b.
 
 ### 3a - Exact requirement
 
