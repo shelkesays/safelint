@@ -499,9 +499,11 @@ class HardcodedSecretRule(BaseRule):
       (Flask ``app.secret_key``), where the value is a **string literal**.
       Reading from the environment (``SECRET_KEY = os.environ["X"]`` /
       ``= env("X")``) is a call, not a literal, and is clean.
-    * **PHP (Laravel)**: a ``base64:``-prefixed string literal - a hardcoded
-      ``APP_KEY``. ``'key' => env('APP_KEY')`` has no literal and is clean.
-      ``.env`` files are not parsed, so this is code-only (a documented limit).
+    * **PHP (Laravel)**: a ``'key' => 'base64:...'`` config entry - a hardcoded
+      ``APP_KEY`` in ``config/app.php``. Restricted to the ``key`` / ``app_key``
+      config value, so an unrelated ``base64:`` literal elsewhere is not flagged.
+      ``'key' => env('APP_KEY')`` has no literal and is clean; ``.env`` files are
+      not parsed, so this is code-only (a documented limit).
 
     Serves django / flask (python) + laravel (php); default-disabled, enabled by
     those presets. Off by default because a literal placeholder in an example or
@@ -546,7 +548,23 @@ class HardcodedSecretRule(BaseRule):
     def _check_php(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            if node.type in _PHP_STRING_TYPES and node_text(node).strip("'\"").startswith("base64:"):
-                message = "hardcoded base64: key literal - load APP_KEY from the environment instead"
+            if node.type == _php.ARRAY_ELEMENT_INITIALIZER and self._php_app_key_hit(node):
+                message = "hardcoded base64: APP_KEY config value - load it from the environment (env('APP_KEY')) instead"
                 violations.append(self._make_violation_for_node(filepath, node, message))
         return violations
+
+    @staticmethod
+    def _php_app_key_hit(element: tree_sitter.Node) -> bool:
+        """Return True if *element* is a ``'key' => 'base64:...'`` app-key config entry.
+
+        Restricted to the Laravel app-key shape (a ``key`` / ``app_key`` config
+        entry whose value is a ``base64:`` literal) so an unrelated ``base64:``
+        string elsewhere (a fixture, a ciphertext, ``return "base64:x";``) is not
+        misread as a hardcoded secret.
+        """
+        kids = element.named_children
+        if len(kids) < 2 or kids[0].type not in _PHP_STRING_TYPES or kids[1].type not in _PHP_STRING_TYPES:
+            return False
+        if node_text(kids[0]).strip("'\"").lower() not in ("key", "app_key"):
+            return False
+        return node_text(kids[1]).strip("'\"").startswith("base64:")

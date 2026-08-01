@@ -76,6 +76,16 @@ def test_php_env_key_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_php_unrelated_base64_literal_is_clean(tmp_path: Path) -> None:
+    """A ``base64:`` literal that is NOT a ``'key'`` config value must not fire (no false positive)."""
+    src = _write(
+        tmp_path,
+        "misc.php",
+        "<?php\n$x = 'base64:justsomedata';\nreturn ['token' => 'base64:notthekey', 'name' => 'base64:x'];\n",
+    )
+    assert _codes(src) == []
+
+
 # ---------------------------------------------------------------------------
 # Gating
 # ---------------------------------------------------------------------------

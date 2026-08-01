@@ -1375,7 +1375,7 @@ public class IngestService {
 
 ## Framework preset rules (Python / PHP)
 
-The following three rules generalise across the Python (Django / Flask / FastAPI) and PHP (Laravel) framework presets. Each serves multiple frameworks and is gated purely by its `enabled` flag - a framework preset flips it on. Detection is language-family aware (Python vs PHP node shapes), not tied to one specific framework. All ship disabled by default; the `[tool.safelint.python] framework` / `[tool.safelint.php] framework` presets enable the applicable ones (see the [Python](../languages/python.md#framework-presets) and [PHP](../languages/php.md#framework-presets) language pages). They are the non-Java analogue of the Spring `SAFE9xx` rules.
+The following five rules (SAFE905-909) generalise across the Python (Django / Flask / FastAPI) and PHP (Laravel) framework presets. Each serves multiple frameworks and is gated purely by its `enabled` flag - a framework preset flips it on. Detection is language-family aware (Python vs PHP node shapes), not tied to one specific framework. All ship disabled by default; the `[tool.safelint.python] framework` / `[tool.safelint.php] framework` presets enable the applicable ones (see the [Python](../languages/python.md#framework-presets) and [PHP](../languages/php.md#framework-presets) language pages). They are the non-Java analogue of the Spring `SAFE9xx` rules.
 
 ### SAFE905: `debug_mode_enabled`
 

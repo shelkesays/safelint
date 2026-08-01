@@ -972,7 +972,10 @@ def test_run_check_git_unavailable_note_emitted_once(tmp_path: Path, mocker: Moc
 
     cli._run_check(_multipath_args([tmp_path / "a", tmp_path / "b", tmp_path / "c"], all_files=False, output_format="pretty"))
     notes = [ln for ln in capsys.readouterr().out.splitlines() if "could not determine modified files" in ln]
-    assert len(notes) == 1, notes
+    assert len(notes) == 1, notes  # consolidated, not one per target
+    assert str(tmp_path / "a") in notes[0]
+    assert str(tmp_path / "b") in notes[0]
+    assert str(tmp_path / "c") in notes[0]
 
 
 def test_run_check_all_files_zero_files_still_prints_all_clear(tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:

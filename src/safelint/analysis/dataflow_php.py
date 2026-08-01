@@ -173,7 +173,10 @@ class PhpTaintTracker:
         if self._record_arg_hits(node, name):
             return  # a tainted argument already reached the sink; receiver is redundant
         # Else, a sink method on a tainted receiver (``$input->query()``): the
-        # member / nullsafe / scoped call's ``object`` is itself a tainted value.
+        # ``object`` receiver of a member / nullsafe call is itself a tainted
+        # value. (A scoped call ``C::m()`` has a ``scope`` class name, not an
+        # ``object``, so ``child_by_field_name("object")`` is None there - no
+        # receiver taint, correctly.)
         receiver = node.child_by_field_name("object")
         if receiver is not None and self._is_tainted(receiver):
             self._record_sink_hit(node, receiver, name)
@@ -285,8 +288,9 @@ class PhpTaintTracker:
         Sanitizers clear, call-name sources inject, unknowns either preserve
         or drop based on ``assume_taint_preserving``. When preserving, both
         the positional arguments and the method receiver (the ``object`` field
-        of a member / nullsafe / scoped call) are inspected, so
-        ``trim($input)`` and ``$input->raw()`` stay tainted.
+        of a member / nullsafe call - a scoped ``C::m()`` call has a ``scope``,
+        not an ``object``, so it contributes no receiver taint) are inspected,
+        so ``trim($input)`` and ``$input->raw()`` stay tainted.
         """
         name = call_name(node)
         if name in self.sanitizers:
