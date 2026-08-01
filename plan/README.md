@@ -68,9 +68,10 @@ for Go, PHP, C, and C++).
 > `unvalidated_request_input`. Its spec, `plan/framework-presets.md`, was
 > removed on completion - the design decisions now live in the language pages,
 > `docs/configuration/toml.md`, the skill-file addenda, and the shipped code.
-> **Deferred fast-follows from that work** (the `csrf_protection_disabled` /
-> `hardcoded_secret` rules, and the taint-tracker sanitiser framework) are now
-> tracked in [`PENDING.md`](PENDING.md).
+> The `csrf_protection_disabled` (SAFE908) and `hardcoded_secret` (SAFE909)
+> fast-follows **shipped in v2.11.0**, completing the SAFE905-909 band. The
+> taint-tracker sanitiser framework remains deferred (Priority 3 in
+> [`PENDING.md`](PENDING.md)).
 
 ## Shipped: release automation (CI/CD, not a code change)
 
@@ -95,10 +96,11 @@ the language set is stable, so they didn't have to be redone per language. The
 three below have **shipped**, so - following the same convention as the shipped
 languages above - their spec files were removed on completion (the design
 decisions now live in the referenced CHANGELOG entries and the shipped code). The
-one cross-language enhancement that remains **planned** (taint propagation through
-attribute / subscript / receiver chains) is now **Priority 1 in
-[`PENDING.md`](PENDING.md)** - its standalone spec was folded into that single
-backlog.
+one-time cross-language taint-propagation enhancement (attribute / subscript /
+receiver chains) **shipped in v2.11.0** (Priority 1 in [`PENDING.md`](PENDING.md),
+now marked implemented). The remaining taint-core work - the property-typed
+sanitiser framework and the iterative-worklist conversion of the six non-C
+trackers - is **Priority 3** there.
 
 > **Node-type / operator constants shipped in v2.8.2** (PR #107). Converted the
 > per-language node-type / operator tables in `src/safelint/rules/` from raw
@@ -121,14 +123,15 @@ backlog.
 > MEDIUM findings and none default-flow-exploitable; the backlog is empty. Its
 > spec, `plan/security-hardening.md`, was removed on completion.
 
-See **[`PENDING.md`](PENDING.md) Priority 1** for the full spec: make the
-intra-procedural taint trackers carry taint through attribute / subscript /
-tainted-receiver chains (`request.GET["q"]`, `$request->input('x')`), so the
-framework-preset (and Spring / JS-runtime) SAFE801 sink extensions actually fire
-on realistic request-driven code instead of only direct-parameter flows. It is a
-cross-cutting change to all six trackers; read that item's "Risks and open
-decisions" (whether to gate the noisy method-call-on-tainted-receiver step behind
-a config knob) before implementing.
+**Taint propagation through attribute / subscript / receiver chains shipped in
+v2.11.0** (Priority 1 in [`PENDING.md`](PENDING.md), now marked implemented): the
+intra-procedural taint trackers carry taint through those chains
+(`request.GET["q"]`, `$request->input('x')`), so the framework-preset (and Spring
+/ JS-runtime) SAFE801 sink extensions fire on realistic request-driven code, not
+only direct-parameter flows. The method-receiver step rides on the existing
+`assume_taint_preserving` default (no new config knob). See the v2.11.0 CHANGELOG
+entry and PENDING.md P1 for the details, including why the change was narrower
+than the original spec (only Python / JS / TS / C++ needed work).
 
 ## How to use these specs
 

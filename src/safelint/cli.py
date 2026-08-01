@@ -1089,7 +1089,7 @@ class _TargetOutcome:
         self.unavailable: set[str] = set()  # union of missing-grammar extensions
         self.silent_pass = False  # some target had grammar-missing files and linted nothing
         self.any_linted = False  # at least one target linted a real file
-        self.git_unavailable = False  # some target fell back to all-files because git was unavailable
+        self.git_fallback_targets: list[str] = []  # targets that fell back to all-files because git was unavailable
         self.all_no_targets = True  # every target hit the git-modified no-targets short-circuit
         self.empty_targets: list[str] = []  # explicitly-named targets that ran discovery but linted 0 files (all excluded / empty)
         self.no_modified_targets: list[str] = []  # targets with no git-modified supported files (default mode; not a grammar miss)
@@ -1134,7 +1134,7 @@ def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | 
     out.unavailable |= target_unavail
     changed_files, files, no_targets, considered = _resolve_check_targets(args, target)
     if _git_fell_back_to_all_files(args, target, changed_files, no_targets=no_targets):
-        out.git_unavailable = True
+        out.git_fallback_targets.append(str(target))
     if no_targets:
         # Git-modified files existed under target but were all dropped for a
         # missing grammar: this target linted nothing yet must not read green.
@@ -1241,8 +1241,9 @@ def _emit_scan_notes(out: _TargetOutcome, output_format: str) -> None:
     clean one - e.g. ``check src tests`` where ``tests/**`` is excluded would
     otherwise read identically to ``check src``.
     """
-    if out.git_unavailable:
-        _print_status("Note: could not determine modified files via git - scanning all files.", output_format=output_format)
+    if out.git_fallback_targets:
+        noun, targets = _quoted_targets(out.git_fallback_targets)
+        _print_status(f"Note: could not determine modified files via git for {noun} {targets} - scanning all files.", output_format=output_format)
     if out.no_modified_targets:
         noun, targets = _quoted_targets(out.no_modified_targets)
         pronoun = "it" if len(out.no_modified_targets) == 1 else "them"
