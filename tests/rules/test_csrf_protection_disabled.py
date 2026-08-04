@@ -53,6 +53,14 @@ def test_python_unrelated_decorator_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_python_csrf_exempt_kwarg_name_is_clean(tmp_path: Path) -> None:
+    """``csrf_exempt`` as an unrelated keyword-argument NAME does not fire -
+    ``@foo(csrf_exempt=True)`` configures ``foo``; it does not apply the
+    ``csrf_exempt`` decorator."""
+    src = _write(tmp_path, "views.py", "@foo(csrf_exempt=True)\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
 # ---------------------------------------------------------------------------
 # PHP (Laravel)
 # ---------------------------------------------------------------------------

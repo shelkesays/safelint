@@ -20,6 +20,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Multi-path `check`: the "nothing to lint here" notes are now emitted once, listing every affected target, instead of a near-identical line per target.** A `safelint check src tests examples` run with nothing modified previously printed the "No modified supported source files detected under target …" note three times (once per target); it now prints one line: `… under targets 'src', 'tests', 'examples'. …`. Likewise the `--all-files` "no files linted under '<target>'" note and the git-unavailable "scanning all files" fallback note are each consolidated into a single line naming all affected targets. Single-target runs are unchanged (singular wording). The git-discovery notes ("no modified files" and the git-unavailable fallback) still reach **every** output mode - stdout in pretty, stderr in JSON / SARIF - so a CI operator still gets an explanation for an empty JSON document; the grammar and "no files linted" notes stay pretty-only. In a mixed run where some targets were linted and another was skipped for a missing grammar, the exit-2 diagnostic now reads "some targets were skipped …" instead of the contradictory "no files linted …" that followed the printed results.
 
+### Fixed
+
+- **SAFE908 `csrf_protection_disabled` no longer fires on an unrelated keyword-argument named `csrf_exempt`.** `@some_decorator(csrf_exempt=True)` configures that decorator; it does not apply Django's `csrf_exempt` and so does not disable CSRF. The Python detector now ignores `csrf_exempt` when it is a keyword-argument *name*, while still firing on the bare (`@csrf_exempt`), called (`@csrf_exempt()`), and `method_decorator(csrf_exempt)` forms.
+
 ## [2.10.0] - 2026-07-23
 
 ### Added
