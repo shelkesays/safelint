@@ -24,6 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **SAFE908 `csrf_protection_disabled` no longer fires on an unrelated keyword-argument named `csrf_exempt`.** `@some_decorator(csrf_exempt=True)` configures that decorator; it does not apply Django's `csrf_exempt` and so does not disable CSRF. The Python detector now ignores `csrf_exempt` when it is a keyword-argument *name*, while still firing on the bare (`@csrf_exempt`), called (`@csrf_exempt()`), and `method_decorator(csrf_exempt)` forms.
 - **SAFE909 `hardcoded_secret` no longer fires on an empty *prefixed* string placeholder** (`SECRET_KEY = r""`, `APP_KEY = f""`). The Python empty-value check stripped only quote characters, so a string prefix (`r` / `b` / `f` / `u`) survived and read as non-empty content. Empty prefixed literals are now correctly treated as clean placeholders; non-empty prefixed literals (`r"real-secret"`) still fire.
+- **`safelint check <file>` is now diff-aware like `safelint <file>`.** An explicit file target passed to `check` was not treated as its own changed set, so diff-aware rules - notably `test_coupling` (SAFE702) - silently did nothing, whereas the same file named in pre-commit style (`safelint <file>`) ran them. A named file is now its own changed set (the same contract as the pre-commit invocation), so the two forms behave identically. `check <dir>` (git-modified discovery) and `check <file> --all-files` (diff-awareness opted out) are unchanged.
 
 ## [2.10.0] - 2026-07-23
 
