@@ -664,8 +664,11 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path) -> tuple[list
 
     * ``changed_files`` - the full repo-wide diff list passed to the engine
       so cross-file rules see the right context, or None to skip that hint.
-    * ``files`` - the explicit list of files to lint (a subset of *target*
-      that's been git-modified), or None to fall back to directory discovery.
+    * ``files`` - the explicit list of files to lint. For a directory target
+      this is the subset of *target* that's been git-modified; for an explicit
+      file target it is that one file (linted regardless of git status, and
+      reused as ``changed_files`` by the runner so diff-aware rules run). None
+      falls back to directory discovery (``--all-files`` / git-unavailable dir).
     * ``no_targets`` - True when git reported no modified files under
       *target* and the caller should short-circuit with an empty result.
     * ``considered_modified`` - the set of paths git reported as modified
@@ -680,8 +683,16 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path) -> tuple[list
       in the repo must NOT trip the guard when the user ran
       ``safelint check src/python/``.
     """
-    if getattr(args, "all_files", False) or not target.is_dir():
+    if getattr(args, "all_files", False):
         return None, None, False, set()
+    if not target.is_dir():
+        # An explicit file target IS its own changed set - the same contract as
+        # ``safelint <file>`` (pre-commit style). Returning it as ``files`` lets
+        # the runner reuse it as ``changed_files`` (see ``runner.run``), so
+        # diff-aware rules like ``test_coupling`` behave identically whether a
+        # file is named via ``safelint <file>`` or ``safelint check <file>``.
+        # (``--all-files`` above opts out of diff-awareness, as for directories.)
+        return None, [str(target)], False, set()
     modified = _get_git_modified_supported_files(target)
     if modified is None:
         # git unavailable: fall back to scanning all files. No inline note - the
