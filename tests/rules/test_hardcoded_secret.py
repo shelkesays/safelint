@@ -53,6 +53,19 @@ def test_python_empty_secret_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_python_empty_prefixed_secret_is_clean(tmp_path: Path) -> None:
+    """An empty *prefixed* placeholder (``r""`` / ``f""``) does not fire - the
+    prefix must not be mistaken for content."""
+    src = _write(tmp_path, "settings.py", 'SECRET_KEY = r""\nAPP_KEY = f""\n')
+    assert _codes(src) == []
+
+
+def test_python_prefixed_secret_literal_still_fires(tmp_path: Path) -> None:
+    """A non-empty prefixed literal is still a hardcoded secret."""
+    src = _write(tmp_path, "settings.py", "SECRET_KEY = r'django-insecure-abc'\n")
+    assert _codes(src) == ["SAFE909"]
+
+
 def test_python_unrelated_literal_is_clean(tmp_path: Path) -> None:
     """An unrelated string assignment does not fire."""
     src = _write(tmp_path, "settings.py", "APP_NAME = 'myapp'\n")

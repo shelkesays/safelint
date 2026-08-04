@@ -23,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **SAFE908 `csrf_protection_disabled` no longer fires on an unrelated keyword-argument named `csrf_exempt`.** `@some_decorator(csrf_exempt=True)` configures that decorator; it does not apply Django's `csrf_exempt` and so does not disable CSRF. The Python detector now ignores `csrf_exempt` when it is a keyword-argument *name*, while still firing on the bare (`@csrf_exempt`), called (`@csrf_exempt()`), and `method_decorator(csrf_exempt)` forms.
+- **SAFE909 `hardcoded_secret` no longer fires on an empty *prefixed* string placeholder** (`SECRET_KEY = r""`, `APP_KEY = f""`). The Python empty-value check stripped only quote characters, so a string prefix (`r` / `b` / `f` / `u`) survived and read as non-empty content. Empty prefixed literals are now correctly treated as clean placeholders; non-empty prefixed literals (`r"real-secret"`) still fire.
 
 ## [2.10.0] - 2026-07-23
 

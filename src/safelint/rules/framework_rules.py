@@ -38,10 +38,18 @@ def _py_attr_last_name(attr: tree_sitter.Node) -> str:
 
 
 def _py_string_value(node: tree_sitter.Node | None) -> str | None:
-    """Return the literal content of a Python ``string`` node, or None if not a string."""
+    """Return the literal content of a Python ``string`` node, or None if not a string.
+
+    A string prefix (``r`` / ``b`` / ``f`` / ``u``, in any case or combination)
+    sits before the opening quote, so drop everything up to the first quote before
+    stripping quotes - otherwise an empty prefixed literal like ``r""`` would read
+    as the non-empty ``r`` and be mistaken for a real value.
+    """
     if node is None or node.type != _py.STRING:
         return None
-    return node_text(node).strip("'\"")
+    text = node_text(node)
+    quote_at = next((i for i, ch in enumerate(text) if ch in "'\""), 0)
+    return text[quote_at:].strip("'\"")
 
 
 # SAFE905: a ``debug=True`` / ``reload=True`` keyword argument only counts on a
