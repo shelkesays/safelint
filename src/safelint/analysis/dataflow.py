@@ -269,7 +269,7 @@ class TaintTracker:
         if node_type == _py.ATTRIBUTE:
             obj = node.child_by_field_name("object")
             return [obj] if obj is not None else []
-        if node_type in (_py.SUBSCRIPT, "keyword_argument"):
+        if node_type in (_py.SUBSCRIPT, _py.KEYWORD_ARGUMENT):
             value = node.child_by_field_name("value")
             return [value] if value is not None else []
         if node_type in _SPLAT_TYPES or node_type == _py.CONCATENATED_STRING or node_type in _CONTAINER_TYPES or node_type in _SPREADING_TYPES:

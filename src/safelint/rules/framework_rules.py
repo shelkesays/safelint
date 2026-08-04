@@ -466,8 +466,20 @@ class CsrfProtectionDisabledRule(BaseRule):
 
     @staticmethod
     def _python_exempts_csrf(decorator: tree_sitter.Node) -> bool:
-        """Return True if ``csrf_exempt`` appears anywhere in the decorator expression."""
-        return any(n.type == _py.IDENTIFIER and node_text(n) == "csrf_exempt" for n in walk(decorator))
+        """Return True if ``csrf_exempt`` is applied as a decorator.
+
+        It counts as a name, a call, or an argument. An unrelated keyword-argument
+        NAME that happens to be ``csrf_exempt`` (e.g. ``@foo(csrf_exempt=True)``)
+        does not disable CSRF and must not fire.
+        """
+        for node in walk(decorator):
+            if node.type != _py.IDENTIFIER or node_text(node) != "csrf_exempt":
+                continue
+            parent = node.parent
+            is_kwarg_name = parent is not None and parent.type == _py.KEYWORD_ARGUMENT and parent.child_by_field_name("name") == node
+            if not is_kwarg_name:
+                return True
+        return False
 
     def _check_php(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         violations: list[Violation] = []
