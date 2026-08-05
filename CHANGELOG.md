@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.0] - 2026-08-05
+
 ### Added
 
 - **Two new framework-preset security rules - SAFE908 `csrf_protection_disabled` and SAFE909 `hardcoded_secret`** (Python + PHP; SafeLint now ships **52 rules**). They complete the shared cross-framework 9xx band (SAFE905-909) begun in v2.9.0, and like the others are disabled by default and switched on by the framework presets that scope them.
@@ -968,7 +970,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.10.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.11.0...HEAD
+[2.11.0]: https://github.com/shelkesays/safelint/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/shelkesays/safelint/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/shelkesays/safelint/compare/v2.8.4...v2.9.0
 [2.8.2]: https://github.com/shelkesays/safelint/compare/v2.8.1...v2.8.2
