@@ -2841,12 +2841,12 @@
 <tr>
 <td><code>vanilla</code> (default)</td>
 <td>Plain PHP, framework-free libraries</td>
-<td>Stdlib-only defaults (the lists in the rules table above). The <code>SAFE905-907</code> framework rules are disabled.</td>
+<td>Stdlib-only defaults (the lists in the rules table above). The <code>SAFE905-909</code> framework rules are disabled.</td>
 </tr>
 <tr>
 <td><code>laravel</code></td>
 <td>Laravel apps</td>
-<td>Adds the raw-SQL query-builder methods <code>whereRaw</code> / <code>orderByRaw</code> / <code>havingRaw</code> / <code>selectRaw</code> / <code>unprepared</code> to the SAFE801 PHP sinks. <strong>Enables <code>SAFE905-907</code></strong>: Eloquent <code>$guarded = []</code> mass-assignment (SAFE906), <code>$request-&gt;all()</code> / bare <code>$request-&gt;input()</code> without <code>validate()</code> (SAFE907; a targeted <code>$request-&gt;input('field')</code> read is not flagged), and a <code>'debug' =&gt; true</code> config-array entry (SAFE905).</td>
+<td>Adds the raw-SQL query-builder methods <code>whereRaw</code> / <code>orderByRaw</code> / <code>havingRaw</code> / <code>selectRaw</code> / <code>unprepared</code> to the SAFE801 PHP sinks. <strong>Enables the full <code>SAFE905-909</code> set</strong>: Eloquent <code>$guarded = []</code> mass-assignment (SAFE906), <code>$request-&gt;all()</code> / bare <code>$request-&gt;input()</code> without <code>validate()</code> (SAFE907; a targeted <code>$request-&gt;input('field')</code> read is not flagged), a <code>'debug' =&gt; true</code> config-array entry (SAFE905), a non-empty <code>$except</code> CSRF allow-list (SAFE908), and a hardcoded <code>base64:</code> <code>APP_KEY</code> literal (SAFE909).</td>
 </tr>
 </tbody>
 </table>

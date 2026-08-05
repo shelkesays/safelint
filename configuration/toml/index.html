@@ -3223,28 +3223,28 @@
 <tr>
 <td><code>vanilla</code> (default)</td>
 <td>Plain Python, libraries, CLIs, data pipelines</td>
-<td>Stdlib-only defaults. The <code>SAFE905-907</code> framework rules stay disabled.</td>
+<td>Stdlib-only defaults. The <code>SAFE905-909</code> framework rules stay disabled.</td>
 </tr>
 <tr>
 <td><code>django</code></td>
 <td>Django / Django REST Framework projects</td>
-<td>Adds <code>raw</code> / <code>extra</code> / <code>RawSQL</code> / <code>mark_safe</code> / <code>format_html</code> / <code>HttpResponse</code> / <code>redirect</code> / <code>FileResponse</code> / <code>call_command</code> / <code>loads</code> to SAFE801 sinks; treats <code>.first()</code> as nullable for SAFE803; <strong>enables <code>SAFE905-907</code></strong>.</td>
+<td>Adds <code>raw</code> / <code>extra</code> / <code>RawSQL</code> / <code>mark_safe</code> / <code>format_html</code> / <code>HttpResponse</code> / <code>redirect</code> / <code>FileResponse</code> / <code>call_command</code> / <code>loads</code> to SAFE801 sinks; treats <code>.first()</code> as nullable for SAFE803; <strong>enables the full <code>SAFE905-909</code> set</strong> (incl. <code>SAFE908</code> <code>@csrf_exempt</code>, <code>SAFE909</code> hardcoded <code>SECRET_KEY</code>).</td>
 </tr>
 <tr>
 <td><code>flask</code></td>
 <td>Flask / Werkzeug apps</td>
-<td>Adds <code>render_template_string</code> / <code>Markup</code> / <code>redirect</code> / <code>send_file</code> / <code>send_from_directory</code> / <code>make_response</code> to SAFE801 sinks; enables <code>SAFE905</code> + <code>SAFE907</code> (not <code>SAFE906</code>, Flask has no mass-assignment idiom).</td>
+<td>Adds <code>render_template_string</code> / <code>Markup</code> / <code>redirect</code> / <code>send_file</code> / <code>send_from_directory</code> / <code>make_response</code> to SAFE801 sinks; enables <code>SAFE905</code> + <code>SAFE907</code> + <code>SAFE909</code> (not <code>SAFE906</code> / <code>SAFE908</code>).</td>
 </tr>
 <tr>
 <td><code>fastapi</code></td>
 <td>FastAPI / Starlette apps</td>
-<td>Adds <code>text</code> / <code>HTMLResponse</code> / <code>Response</code> / <code>from_string</code> / <code>RedirectResponse</code> / <code>FileResponse</code> to SAFE801 sinks; <strong>enables <code>SAFE905-907</code></strong>.</td>
+<td>Adds <code>text</code> / <code>HTMLResponse</code> / <code>Response</code> / <code>from_string</code> / <code>RedirectResponse</code> / <code>FileResponse</code> to SAFE801 sinks; <strong>enables <code>SAFE905</code> + <code>SAFE907</code></strong> (<code>SAFE906</code> via <code>pydantic</code>; <code>SAFE908</code> / <code>SAFE909</code> out of scope).</td>
 </tr>
 </tbody>
 </table>
 <p><code>pydantic = true</code> (independent of <code>framework</code>) additively adds Pydantic's validation-skipping constructors <code>model_construct</code> / <code>construct</code> to the SAFE801 sinks and enables <code>SAFE906</code> so an <code>extra = "allow"</code> model config fires. It composes with any framework, or stands alone in a vanilla project.</p>
 <p>The preset only changes <em>defaults</em>, an explicit <code>[tool.safelint.rules.tainted_sink] sinks = [...]</code> still wins. Unknown framework names surface a <code>safelint: warning:</code> line on stderr and fall back to <code>vanilla</code>. See the <a href="../../languages/python/#framework-presets">Python language page</a> for the full per-rule effect.</p>
-<p>The <code>SAFE905-907</code> structural rules are enabled directly by the preset. The <strong>dataflow</strong> additions (the extra SAFE801 sinks, Django's <code>.first()</code> nullable, <code>pydantic</code>'s <code>model_construct</code> / <code>construct</code>) extend the <em>lists</em> but leave the multi-language dataflow rules (<code>tainted_sink</code>, <code>return_value_ignored</code>, <code>null_dereference</code>) <strong>opt-in</strong> - enable them explicitly (e.g. <code>[tool.safelint.rules.tainted_sink] enabled = true</code>), exactly as the Java Spring preset does. This is deliberate: those rules apply to every language, so a Python framework selection must not silently turn dataflow on for the Go / JS / Rust files in a polyglot repo. Like every language's intra-procedural tracker, SAFE801 follows direct taint flows (a tainted parameter reaching a sink), not <code>request.&lt;attr&gt;</code> attribute chains.</p>
+<p>The <code>SAFE905-909</code> structural rules are enabled directly by the preset (which subset depends on the framework - see the tables above). The <strong>dataflow</strong> additions (the extra SAFE801 sinks, Django's <code>.first()</code> nullable, <code>pydantic</code>'s <code>model_construct</code> / <code>construct</code>) extend the <em>lists</em> but leave the multi-language dataflow rules (<code>tainted_sink</code>, <code>return_value_ignored</code>, <code>null_dereference</code>) <strong>opt-in</strong> - enable them explicitly (e.g. <code>[tool.safelint.rules.tainted_sink] enabled = true</code>), exactly as the Java Spring preset does. This is deliberate: those rules apply to every language, so a Python framework selection must not silently turn dataflow on for the Go / JS / Rust files in a polyglot repo. Like every language's intra-procedural tracker, SAFE801 follows taint through <code>request.&lt;attr&gt;</code> attribute / subscript / method-receiver chains (<code>request.GET["q"]</code>, <code>request.GET.get("q")</code>), not only direct-parameter flows - <strong>provided the request object is itself tracked as tainted</strong>, i.e. it is a handler parameter (Django / FastAPI <code>def view(request)</code>) or a configured <code>sources</code> call result. <strong>Flask's <code>request</code> is a module-level global proxy, not a handler parameter, so the tracker does not seed it</strong> - the chain-propagation there only helps once the tainted value is bound to a local; the global-proxy flow is a documented limitation, not modelled.</p>
 <h2 id="php-framework-presets">PHP framework presets<a class="headerlink" href="#php-framework-presets" title="Permanent link">#</a></h2>
 <p>The <code>[tool.safelint.php]</code> table selects a PHP framework preset:</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-23-1" name="__codelineno-23-1" href="#__codelineno-23-1"></a><span class="c1"># pyproject.toml</span>
@@ -3268,12 +3268,12 @@
 <tr>
 <td><code>vanilla</code> (default)</td>
 <td>Plain PHP, framework-free libraries</td>
-<td>Stdlib-only defaults. The <code>SAFE905-907</code> framework rules stay disabled.</td>
+<td>Stdlib-only defaults. The <code>SAFE905-909</code> framework rules stay disabled.</td>
 </tr>
 <tr>
 <td><code>laravel</code></td>
 <td>Laravel apps</td>
-<td>Adds the raw-SQL query-builder methods <code>whereRaw</code> / <code>orderByRaw</code> / <code>havingRaw</code> / <code>selectRaw</code> / <code>unprepared</code> to the SAFE801 PHP sinks; <strong>enables <code>SAFE905-907</code></strong> (Eloquent <code>$guarded = []</code> mass-assignment, <code>$request-&gt;all()</code> unvalidated input, <code>'debug' =&gt; true</code> config).</td>
+<td>Adds the raw-SQL query-builder methods <code>whereRaw</code> / <code>orderByRaw</code> / <code>havingRaw</code> / <code>selectRaw</code> / <code>unprepared</code> to the SAFE801 PHP sinks; <strong>enables the full <code>SAFE905-909</code> set</strong> (Eloquent <code>$guarded = []</code> mass-assignment, <code>$request-&gt;all()</code> unvalidated input, <code>'debug' =&gt; true</code> config, non-empty <code>$except</code> CSRF allow-list, hardcoded <code>base64:</code> <code>APP_KEY</code>).</td>
 </tr>
 </tbody>
 </table>
