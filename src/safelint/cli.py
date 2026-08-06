@@ -6,9 +6,10 @@ Pre-commit hook (files passed by pre-commit as positional arguments)::
 
     safelint [--fail-on=error|warning] [--mode=local|ci] file1.py file2.py …
 
-Direct invocation (default: git-modified files only when target is a directory)::
+Direct invocation (paths optional - defaults to the current directory; a
+directory target lints its git-modified files unless ``--all-files``)::
 
-    safelint check <path>... [--all-files] [--config <cfg>] [--fail-on=error|warning] [--mode=local|ci]
+    safelint check [<path>...] [--all-files] [--config <cfg>] [--fail-on=error|warning] [--mode=local|ci]
 
 Severity model
 --------------
