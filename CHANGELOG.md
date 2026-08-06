@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **`safelint check` now defaults to the current directory when no PATH is given.** `safelint check --all-files` (or a bare `safelint check`) previously exited with `error: the following arguments are required: PATH`; the positional is now optional and defaults to `.`, matching `safelint check .`. Explicit paths are unchanged.
+
 ## [2.11.0] - 2026-08-05
 
 ### Added

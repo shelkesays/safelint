@@ -637,6 +637,41 @@ def test_run_check_json_emits_empty_doc_when_no_modified_files(
     assert doc["violations"] == []
 
 
+def test_check_defaults_to_cwd_when_no_path_given(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    mocker: MockerFixture,
+    capsys: pytest.CaptureFixture[str],
+) -> None:
+    """``safelint check --all-files`` with no PATH defaults to the current
+    directory instead of erroring that PATH is required."""
+    from pathlib import Path as _Path  # noqa: PLC0415
+
+    # Parser now accepts zero positionals (previously nargs='+' raised SystemExit).
+    assert cli._build_check_parser().parse_args(["--all-files"]).targets == []
+
+    # And _run_check treats an empty target list as the current directory.
+    (tmp_path / "ok.py").write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
+    args = argparse.Namespace(
+        targets=[],
+        config=None,
+        all_files=True,
+        fail_on=None,
+        mode=None,
+        ignore=None,
+        output_format="pretty",
+        no_cache=True,
+        stdin=False,
+        stdin_filename="",
+    )
+    rc = cli._run_check(args)
+    assert rc == 0
+    assert args.targets == [_Path()]  # defaulted in place
+    assert "All checks passed." in capsys.readouterr().out
+
+
 def test_run_check_pretty_prints_all_clear_on_clean_run(
     tmp_path: Path,
     mocker: MockerFixture,
@@ -837,10 +872,16 @@ def test_run_check_all_paths_clean_returns_zero(tmp_path: Path, mocker: MockerFi
     assert doc["violations"] == []
 
 
-def test_run_check_empty_targets_returns_zero(tmp_path: Path) -> None:
-    """A direct caller passing an empty targets list is handled cleanly (no IndexError)."""
-    rc = cli._run_check(_multipath_args([], output_format="json"))
-    assert rc == 0  # nothing to lint, nothing considered modified
+def test_run_check_empty_targets_defaults_to_cwd(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A direct caller passing an empty targets list defaults to the current
+    directory (not a silent no-op), and is handled cleanly (no IndexError)."""
+    from pathlib import Path as _Path  # noqa: PLC0415
+
+    monkeypatch.chdir(tmp_path)  # empty dir -> clean run, deterministic
+    args = _multipath_args([], output_format="json")
+    rc = cli._run_check(args)
+    assert rc == 0
+    assert args.targets == [_Path()]  # defaulted in place
 
 
 def test_run_check_silent_pass_not_masked_by_a_sibling_target(tmp_path: Path, mocker: MockerFixture) -> None:

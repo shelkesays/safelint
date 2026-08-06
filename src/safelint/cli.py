@@ -1279,8 +1279,11 @@ def _run_check(args: argparse.Namespace) -> int:
         _emit_skill_freshness_warnings()
     config_path = getattr(args, "config", None)
     output_format: str = getattr(args, "output_format", "pretty")
-    if not args.targets:  # argparse's nargs='+' guards the CLI; this guards direct callers
-        return _finish_unlinted(output_format, "error", silent_pass=False, unavailable=set())
+    if not args.targets:
+        # No PATH given (e.g. `safelint check --all-files`): default to the
+        # current directory, matching `safelint check .`. ``nargs="*"`` lets the
+        # CLI reach here; direct callers that pass no targets get the same default.
+        args.targets = [Path()]
 
     # The user's first target drives the summary fail-on label (cosmetic); each
     # target's violations are partitioned under its OWN config's fail_on inside
@@ -1440,7 +1443,13 @@ def _build_check_parser() -> argparse.ArgumentParser:
         prog="safelint check",
         description="Scan a file or directory for safety violations",
     )
-    parser.add_argument("targets", type=Path, nargs="+", metavar="PATH", help="One or more files or directories to scan (e.g. `safelint check src/ tests/ scripts/`)")
+    parser.add_argument(
+        "targets",
+        type=Path,
+        nargs="*",
+        metavar="PATH",
+        help="Files or directories to scan (e.g. `safelint check src/ tests/`). Defaults to the current directory when omitted.",
+    )
     parser.add_argument(
         "--config",
         type=Path,
