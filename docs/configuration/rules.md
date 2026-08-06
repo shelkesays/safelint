@@ -1613,7 +1613,7 @@ severity = "error"
 
 ## Rust-only rules
 
-The following 10 rules apply only to Rust source. They cover patterns the cross-language rules don't translate to cleanly (Rust has no try/catch, no `global` keyword, RAII handles resource cleanup), or that are uniquely valuable in Rust idiom (`unsafe` documentation, panic placement, lock poisoning, etc.). All ship disabled by default; opt in via `[tool.safelint.rules.<name>] enabled = true`. See [Rust](../languages/rust.md) for the full language reference including idiomatic fix patterns.
+The following 11 rules apply only to Rust source. They cover patterns the cross-language rules don't translate to cleanly (Rust has no try/catch, no `global` keyword, RAII handles resource cleanup), or that are uniquely valuable in Rust idiom (`unsafe` documentation, panic placement, lock poisoning, etc.). All ship disabled by default; opt in via `[tool.safelint.rules.<name>] enabled = true`. See [Rust](../languages/rust.md) for the full language reference including idiomatic fix patterns.
 
 ### SAFE110: `needless_mut`
 
