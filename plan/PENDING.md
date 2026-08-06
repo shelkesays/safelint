@@ -113,20 +113,29 @@ Priority 1, hence paired with it ahead of the taint overhaul.
 
 ### Problem
 
-SAFE907 fires on reading request input (`request.GET` / `request.POST` /
-`request.body`; PHP superglobals) and recognises only schema libraries as
-validation. Real Django / Laravel apps validate through project-specific
-functions the rule cannot see, so the accurate-and-strict posture users want is
-impossible without disabling the rule for whole files.
+SAFE907 fires on a **whole-object** request-data read - Python
+`request.{POST, GET, data, json, form, values, body, query_params}` as a bare
+read (a *targeted* field access like `request.POST['x']` / `request.POST.get('x')`
+is deliberately excluded), and Laravel `$request->all()` / a bare
+`$request->input()` with no field argument (`$request->input('field')` is
+excluded). It is **not** driven by PHP superglobals. It treats the read as
+validated only when one of a **hardcoded, non-configurable** set of validation
+calls appears in the same function - `_PY_VALIDATION_CALLS` = `is_valid`,
+`full_clean`, `validate`, `model_validate`, `parse_obj`. Real Django / Laravel
+apps validate through project-specific functions (`validate_export_request()`)
+that are not in that set and cannot be added, so the accurate-and-strict posture
+users want is impossible without disabling the rule for whole files.
 
 ### Exact requirement
 
 Give the rule a precision lever, one of:
 
-- **(a) Minimal, standalone**: a configurable list of **validator call names**
-  (e.g. `validators` / `request_validators_python` / `_php`); a request read that
-  flows through a named validator in the same scope no longer fires. Matches the
-  exact-call-name mechanism `tainted_sink.sanitizers` already uses. Validate via
+- **(a) Minimal, standalone**: make the existing hardcoded validation-call set
+  **extensible** - a configurable list (e.g. `validators` /
+  `request_validators_python` / `_php`) whose names are unioned with the built-in
+  `_PY_VALIDATION_CALLS` (and the PHP equivalent), so a request read validated by
+  a project function named in it no longer fires. Same exact-call-name matching
+  the built-in set and `tainted_sink.sanitizers` already use. Validate via
   `_validated_string_list`; both-TOML-form docs; tests (validated read clean,
   unvalidated read still fires, unknown name warns).
 - **(b) Principled, ties into Priority 3**: integrate SAFE907 with the
