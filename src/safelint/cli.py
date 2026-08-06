@@ -1105,6 +1105,7 @@ class _TargetOutcome:
         self.all_no_targets = True  # every target hit the git-modified no-targets short-circuit
         self.empty_targets: list[str] = []  # explicitly-named targets that ran discovery but linted 0 files (all excluded / empty)
         self.no_modified_targets: list[str] = []  # targets with no git-modified supported files (default mode; not a grammar miss)
+        self.missing_targets: list[str] = []  # explicitly-named targets whose PATH does not exist (usage error - never a clean pass)
 
 
 def _target_config(target: Path, config_path: str | None, cache: dict) -> tuple[dict, list[str]]:
@@ -1134,6 +1135,14 @@ def _specificity(target: Path) -> int:
 
 def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | None, cache: dict, out: _TargetOutcome) -> None:
     """Lint a single *target*, folding its outcome into *out* (dedup, per-target fail_on, silent-pass)."""
+    if not target.exists():
+        # An explicitly-named path that does not exist is a usage error (typo,
+        # wrong cwd), NOT an empty-but-clean run. Record it so the run reports an
+        # error and exits non-zero rather than silently printing "All checks
+        # passed." This is distinct from an existing-but-empty target (fully
+        # excluded / no supported files), which stays a legitimate clean pass.
+        out.missing_targets.append(str(target))
+        return
     config, exclude_paths = _target_config(target, config_path, cache)
     _, fail_threshold = _resolve_fail_on(args, config)
     # Scan silently here; the deduplicated union is emitted once after the loop.
@@ -1215,8 +1224,13 @@ def _lint_targets(args: argparse.Namespace, config_path: str | None, cache: dict
     return out
 
 
-def _print_check_results(results: list, output_format: str, fail_on: str, blocking_count: int, *, statistics: bool) -> None:
-    """Print the per-file violations (pretty mode) and the run summary for the deduped *results*."""
+def _print_check_results(results: list, output_format: str, fail_on: str, blocking_count: int, *, statistics: bool, silent_on_clean: bool = False) -> None:
+    """Print the per-file violations (pretty mode) and the run summary for the deduped *results*.
+
+    *silent_on_clean* suppresses the "All checks passed." banner when there are no
+    violations (used by the missing-target path, where the clean banner would
+    contradict the accompanying path-does-not-exist error).
+    """
     all_violations: list = []
     all_suppressed: list = []
     for result in results:
@@ -1227,7 +1241,15 @@ def _print_check_results(results: list, output_format: str, fail_on: str, blocki
         if output_format == "pretty":
             _print_violations(result.violations)
             _print_file_summary(result.path, result.violations)
-    _print_results(output_format, all_violations, all_suppressed, blocking_count=blocking_count, fail_on=fail_on, files_checked=len(results), options=_PrintOptions(statistics=statistics))
+    _print_results(
+        output_format,
+        all_violations,
+        all_suppressed,
+        blocking_count=blocking_count,
+        fail_on=fail_on,
+        files_checked=len(results),
+        options=_PrintOptions(statistics=statistics, silent_on_clean=silent_on_clean),
+    )
 
 
 def _quoted_targets(targets: list[str]) -> tuple[str, str]:
@@ -1300,6 +1322,13 @@ def _run_check(args: argparse.Namespace) -> int:
     # stderr (json / sarif) and keeps the grammar / empty-target notes pretty-only.
     _emit_scan_notes(out, output_format)
 
+    if out.missing_targets:
+        # A named path does not exist: usage error. Takes precedence over every
+        # clean / blocking outcome so a typo'd or wrong-cwd path can never read
+        # as "All checks passed." Valid sibling targets' violations still print.
+        _report_missing_targets(out, output_format, fail_on, statistics=getattr(args, "statistics", False))
+        return 2
+
     if not out.any_linted and (out.all_no_targets or out.silent_pass):
         # Nothing was linted AND either every target hit the git-modified
         # no-targets short-circuit (stay quiet - pre-commit friendliness) or a
@@ -1327,6 +1356,20 @@ def _finish_unlinted(output_format: str, fail_on: str, *, silent_pass: bool, una
         _print_unlinted_error(unavailable)
         return 2
     return 0
+
+
+def _report_missing_targets(out: _TargetOutcome, output_format: str, fail_on: str, *, statistics: bool) -> None:
+    """Print output for a run where a named target path does not exist.
+
+    Shows any violations from valid sibling targets first, then a
+    ``safelint: error: path does not exist: '<path>'`` line per missing target on
+    stderr. Crucially it never prints "All checks passed." - when there are no
+    violations it emits only the silent-on-clean empty document (so json / sarif
+    stdout stays parseable and pretty stays quiet), leaving the error(s) to stand.
+    """
+    _print_check_results(out.results, output_format, fail_on, len(out.blocking), statistics=statistics, silent_on_clean=True)
+    for missing in out.missing_targets:
+        _diagnostics.print_error(f"path does not exist: '{missing}'")
 
 
 def _print_unlinted_error(unavailable: set[str], *, some_linted: bool = False) -> None:

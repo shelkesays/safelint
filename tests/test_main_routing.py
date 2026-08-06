@@ -672,6 +672,36 @@ def test_check_defaults_to_cwd_when_no_path_given(
     assert "All checks passed." in capsys.readouterr().out
 
 
+def test_run_check_missing_target_errors_and_exits_2(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A named target path that does not exist is a usage error (exit 2), never a
+    clean pass - covers both --all-files and the default (previously silent 0)."""
+    missing = tmp_path / "nope"
+    for all_files in (True, False):
+        args = _multipath_args([missing], output_format="pretty", all_files=all_files)
+        rc = cli._run_check(args)
+        assert rc == 2, f"all_files={all_files} should exit 2 for a missing path"
+        cap = capsys.readouterr()
+        assert f"path does not exist: '{missing}'" in cap.err
+        assert "All checks passed" not in cap.out
+
+
+def test_run_check_valid_plus_missing_target_has_no_false_pass(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """A clean valid target alongside a missing one must not print "All checks
+    passed." and must exit 2 - the missing path takes precedence."""
+    (tmp_path / "ok.py").write_text("x = 1\n", encoding="utf-8")
+    args = _multipath_args([tmp_path / "ok.py", tmp_path / "gone"], output_format="pretty", all_files=True)
+    rc = cli._run_check(args)
+    assert rc == 2
+    assert "All checks passed" not in capsys.readouterr().out
+
+
+def test_run_check_existing_empty_dir_still_passes(tmp_path: Path) -> None:
+    """An existing but empty / all-excluded dir stays a clean pass (exit 0) - it is
+    distinct from a missing path, which errors."""
+    args = _multipath_args([tmp_path], output_format="pretty", all_files=True)
+    assert cli._run_check(args) == 0
+
+
 def test_run_check_pretty_prints_all_clear_on_clean_run(
     tmp_path: Path,
     mocker: MockerFixture,

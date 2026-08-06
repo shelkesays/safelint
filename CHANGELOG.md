@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **`safelint check` now defaults to the current directory when no PATH is given.** `safelint check --all-files` (or a bare `safelint check`) previously exited with `error: the following arguments are required: PATH`; the positional is now optional and defaults to `.`, matching `safelint check .`. Explicit paths are unchanged.
+- **A `check` target path that does not exist is now a hard error, not a silent pass.** `safelint check <missing-path>` previously printed `All checks passed.` and exited `0` (and with `--all-files`, a confusing "no files linted … all excluded" note followed by success) - so a typo'd or wrong-cwd path read as green. It now emits `safelint: error: path does not exist: '<path>'` on stderr and exits `2`, while still linting any valid sibling paths. An existing-but-empty or fully-excluded directory remains a legitimate clean pass (exit `0`) - only genuinely-missing paths error.
 
 ## [2.11.0] - 2026-08-05
 
