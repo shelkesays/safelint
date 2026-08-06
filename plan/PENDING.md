@@ -81,7 +81,7 @@ file-wide ignore, which also hides genuinely under-asserted production code.
   assertIs, assertIsNot, assertIsNone, assertIsNotNone, assertIn, assertNotIn,
   assertRaises, assertRaisesRegex, assertWarns, assertAlmostEqual, assertGreater,
   assertGreaterEqual, assertLess, assertLessEqual, assertListEqual,
-  assertDictEqual, assertSetEqual, assertCountEqual, assertRegex, assertItemsEqual,
+  assertDictEqual, assertSetEqual, assertCountEqual, assertRegex,
   fail` plus pytest's `raises` / `warns` where the receiver is detectable.
 - The Python detector must count a matching **method call** (resolve via
   `call_name`, so `self.assertEqual(...)` and `pytest.raises(...)` both match) as
