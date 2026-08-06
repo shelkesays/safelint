@@ -46,7 +46,7 @@ Equivalent invocations:
 
 ## `safelint check`
 
-The primary linting command. Scans one or more files/directories and emits violations.
+The primary linting command. Scans one or more files/directories - or the current directory when no path is given - and emits violations.
 
 ```bash
 safelint check src/                  # lint git-modified files under src/
@@ -54,7 +54,10 @@ safelint check src/ --all-files      # lint every supported source file under sr
 safelint check src/app.py            # lint a single file
 safelint check src/ tests/ scripts/  # multiple paths in one run (ruff/ty-style)
 safelint check . --format=json       # machine-readable output for editors / CI
+safelint check --all-files           # no path -> scan the current directory
 ```
+
+The `PATH` argument is **optional**: with none given, safelint scans the current directory (equivalent to `safelint check .`), so `safelint check` and `safelint check --all-files` work from a project root without repeating the path.
 
 **Multiple paths** (like `ruff` / `ty`): pass any number of files or directories and safelint lints them all, then emits **one** aggregated violation list, summary, suppression breakdown, and exit code. A file reached via two overlapping paths (e.g. `src/` and `src/foo.py`) is **reported once**, deduped by resolved path. Config is resolved **per path** (each target walks up to its nearest `safelint.toml` / `pyproject.toml`, so a monorepo with per-subtree config behaves correctly), and **each path's violations are gated by its own `fail_on`** - bundling a stricter subtree with a laxer one does not weaken the strict subtree's gate. Overlaps are processed most-specific-first, so the narrowest target's config governs a shared file regardless of the order you pass the paths. A single `--config` / `--fail-on` / `--mode` overrides per-path resolution for the whole invocation; `--all-files` / `--ignore` apply to every path.
 
