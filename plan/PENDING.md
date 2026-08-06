@@ -67,11 +67,12 @@ On Python, SAFE601 only recognises the `assert` **keyword**. unittest /
 Django `TestCase` tests assert via **method calls** (`self.assertEqual(...)`,
 `self.assertTrue(...)`, `self.assertRaises(...)`), which the rule cannot see, so
 every unittest-style test reads as assertion-less. Every other language SAFE601
-*supports* already resolves method-call assertions via an `assertion_calls_<lang>`
-config list (JS / Java / Rust / PHP / C / C++; TS inherits JS's) - **Python alone
-has none**, only the bare-keyword path. (Go is outside SAFE601's scope entirely,
-so it is not a counterexample.) So the only recourse is a file-wide ignore, which
-also hides genuinely under-asserted production code.
+*supports* already has a configurable `assertion_calls_<lang>` **name list**,
+matched against that language's assertion form (JS / Java / PHP / C / C++ call
+names, Rust `assert!`-family macros; TS inherits JS's) - **Python alone has none**,
+only the bare-keyword path. (Go is outside SAFE601's scope entirely, so it is not
+a counterexample.) So the only recourse is a file-wide ignore, which also hides
+genuinely under-asserted production code.
 
 ### Exact requirement
 
@@ -121,9 +122,10 @@ read (a *targeted* field access like `request.POST['x']` / `request.POST.get('x'
 is deliberately excluded), and Laravel `$request->all()` / a bare
 `$request->input()` with no field argument (`$request->input('field')` is
 excluded). It is **not** driven by PHP superglobals. It treats the read as
-validated only when one of a **hardcoded, non-configurable** set of validation
-calls appears in the same function - `_PY_VALIDATION_CALLS` = `is_valid`,
-`full_clean`, `validate`, `model_validate`, `parse_obj`. Real Django / Laravel
+validated only when a **hardcoded, non-configurable** validation call appears in
+the same function/method - Python `_PY_VALIDATION_CALLS` = `is_valid` /
+`full_clean` / `validate` / `model_validate` / `parse_obj`, and PHP a
+`$request->validate(...)` member call. Real Django / Laravel
 apps validate through project-specific functions (`validate_export_request()`)
 that are not in that set and cannot be added, so the accurate-and-strict posture
 users want is impossible without disabling the rule for whole files.
