@@ -63,6 +63,8 @@ The `PATH` argument is **optional**: with none given, safelint scans the current
 
 If a named path contributes **zero** files (everything under it is excluded by `exclude_paths` / `extend_exclude_paths`, or it is empty / has no supported source files), pretty mode prints a `safelint: warning: no files linted under '<path>' …` note on stderr, so `safelint check src tests` (where `tests/**` is excluded) is distinguishable from `safelint check src`. The note is informational and does not change the exit code.
 
+If a named path **does not exist**, that is a **usage error**, not an empty target: safelint prints `safelint: error: path does not exist: '<path>'` on stderr and exits `2`, while still linting any valid sibling paths (so a typo'd or wrong-directory path can never read as a clean pass). This is distinct from the zero-files case above - an existing path that is empty or fully excluded remains a valid target and a clean pass (exit `0`).
+
 | Flag | Default | What it does |
 |---|---|---|
 | `--all-files` | off | Scan every supported source file under the target (`.py`, `.pyw`, `.js`, `.mjs`, `.cjs`, `.ts`, `.tsx`, `.as`, `.java`, `.rs`, `.go`, `.php`, `.c`, `.h`, `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`). Default (without this flag) is to check only git-modified files. |

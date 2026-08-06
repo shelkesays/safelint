@@ -647,7 +647,9 @@ def test_check_defaults_to_cwd_when_no_path_given(
     directory instead of erroring that PATH is required."""
     from pathlib import Path as _Path  # noqa: PLC0415
 
-    # Parser now accepts zero positionals (previously nargs='+' raised SystemExit).
+    # Parser now accepts zero positionals (previously nargs='+' raised SystemExit) -
+    # both a bare `check` and `check --all-files` parse to an empty target list.
+    assert cli._build_check_parser().parse_args([]).targets == []
     assert cli._build_check_parser().parse_args(["--all-files"]).targets == []
 
     # And _run_check treats an empty target list as the current directory.
@@ -686,13 +688,18 @@ def test_run_check_missing_target_errors_and_exits_2(tmp_path: Path, capsys: pyt
 
 
 def test_run_check_valid_plus_missing_target_has_no_false_pass(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
-    """A clean valid target alongside a missing one must not print "All checks
-    passed." and must exit 2 - the missing path takes precedence."""
-    (tmp_path / "ok.py").write_text("x = 1\n", encoding="utf-8")
-    args = _multipath_args([tmp_path / "ok.py", tmp_path / "gone"], output_format="pretty", all_files=True)
+    """A *violating* valid target alongside a missing one still prints the valid
+    file's diagnostics (stdout) AND the missing-target error (stderr), never "All
+    checks passed.", and exits 2 - the missing path takes precedence."""
+    bad = tmp_path / "bad.py"
+    bad.write_text("def f():\n    try:\n        pass\n    except:\n        pass\n", encoding="utf-8")  # bare except -> SAFE201
+    args = _multipath_args([bad, tmp_path / "gone"], output_format="pretty", all_files=True)
     rc = cli._run_check(args)
     assert rc == 2
-    assert "All checks passed" not in capsys.readouterr().out
+    cap = capsys.readouterr()
+    assert "SAFE201" in cap.out  # the valid target's violation is still reported
+    assert "path does not exist: '" in cap.err  # the missing target errors on stderr
+    assert "All checks passed" not in cap.out
 
 
 def test_run_check_existing_empty_dir_still_passes(tmp_path: Path) -> None:
