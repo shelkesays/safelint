@@ -2401,7 +2401,7 @@
 <h1 id="security-policy">Security policy<a class="headerlink" href="#security-policy" title="Permanent link">#</a></h1>
 <p>SafeLint is a static-analysis CLI that parses source code via Tree-sitter and walks the resulting trees. It does not execute the code it lints, make network requests, or open sockets. The threat surface is therefore narrow but not zero - see the <a href="#in-scope">in-scope</a> section below for what counts as a vulnerability.</p>
 <h2 id="supported-versions">Supported versions<a class="headerlink" href="#supported-versions" title="Permanent link">#</a></h2>
-<p>Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade. C++ (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>) is the most recent language addition (2.8.x); the current 2.9.x line adds the Python/PHP framework presets.</p>
+<p>Security fixes ship to the supported lines below. Lines marked ❌ receive no security backports; the recommended action is to upgrade. C++ (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>) is the most recent language addition (2.8.x); the current 2.11.x line extends the Python/PHP framework presets (SAFE908/909) and adds cross-language taint-projection parity.</p>
 <table>
 <thead>
 <tr>
@@ -2411,11 +2411,11 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>2.9.x</strong> (current; Python/PHP framework presets)</td>
+<td><strong>2.11.x</strong> (current; framework presets extended with SAFE908/909 + cross-language taint-projection parity)</td>
 <td>✅ Security fixes</td>
 </tr>
 <tr>
-<td><strong>2.2.x - 2.8.x</strong> (Rust in 2.2.x-2.4.x; Go in 2.5.x; PHP in 2.6.x; C in 2.7.x; C++ in 2.8.x)</td>
+<td><strong>2.2.x - 2.10.x</strong> (Rust in 2.2.x-2.4.x; Go in 2.5.x; PHP in 2.6.x; C in 2.7.x; C++ in 2.8.x; framework presets in 2.9.x; multi-path <code>check</code> in 2.10.x)</td>
 <td>✅ Security fixes through ~6 months after the next minor lands</td>
 </tr>
 <tr>
