@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.11.1] - 2026-08-07
+
 ### Fixed
 
 - **`safelint check` now defaults to the current directory when no PATH is given.** `safelint check --all-files` (or a bare `safelint check`) previously exited with `error: the following arguments are required: PATH`; the positional is now optional and defaults to `.`, matching `safelint check .`. Explicit paths are unchanged.
@@ -975,7 +977,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.11.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.11.1...HEAD
+[2.11.1]: https://github.com/shelkesays/safelint/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/shelkesays/safelint/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/shelkesays/safelint/compare/v2.9.0...v2.10.0
 [2.9.0]: https://github.com/shelkesays/safelint/compare/v2.8.4...v2.9.0
