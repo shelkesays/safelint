@@ -51,7 +51,109 @@ uv run mkdocs build --strict                   # broken anchors fail the build
 
 ---
 
-## Priority 1 - Taint-tracker core overhaul (do 3a + 3b together)
+## Priority 1 - SAFE601 `missing_assertions`: recognise Python method-call asserts
+
+**Type**: config + rule enhancement to `missing_assertions` (SAFE601), Python
+detector. **Surfaced by the optimus-secure-fdn Django config review** (Aug 2026):
+a real project had to blanket-ignore SAFE601 across its whole audit app because
+the rule flagged ~281 of ~300 functions - all noise. Prioritised **above the
+taint overhaul** by owner decision: it removes a systemic false-positive class
+that forces blanket ignores in every Python unittest / Django codebase (a
+headline safelint audience), and it is small and self-contained.
+
+### Problem
+
+On Python, SAFE601 only recognises the `assert` **keyword**. unittest /
+Django `TestCase` tests assert via **method calls** (`self.assertEqual(...)`,
+`self.assertTrue(...)`, `self.assertRaises(...)`), which the rule cannot see, so
+every unittest-style test reads as assertion-less. Every other language SAFE601
+*supports* already has a configurable `assertion_calls_<lang>` **name list**,
+matched against that language's assertion form (JS / Java / PHP / C / C++ call
+names, Rust `assert!`-family macros; TS inherits JS's) - **Python alone has none**,
+only the bare-keyword path. (Go is outside SAFE601's scope entirely, so it is not
+a counterexample.) So the only recourse is a file-wide ignore, which also hides
+genuinely under-asserted production code.
+
+### Exact requirement
+
+- Add a Python assertion-call list to `DEFAULTS["rules"]["missing_assertions"]`.
+  Match the Python-uses-bare-key convention the other rules follow (Python =
+  bare key, others suffixed) - check the sibling rules before picking
+  `assertion_calls` vs `assertion_calls_python`. Seed it with the unittest /
+  pytest surface: `assertEqual, assertNotEqual, assertTrue, assertFalse,
+  assertIs, assertIsNot, assertIsNone, assertIsNotNone, assertIn, assertNotIn,
+  assertRaises, assertRaisesRegex, assertWarns, assertAlmostEqual, assertGreater,
+  assertGreaterEqual, assertLess, assertLessEqual, assertListEqual,
+  assertDictEqual, assertSetEqual, assertCountEqual, assertRegex,
+  fail` plus pytest's `raises` / `warns` where the receiver is detectable.
+- The Python detector must count a matching **method call** (resolve via
+  `call_name`, so `self.assertEqual(...)` and `pytest.raises(...)` both match) as
+  an assertion, in addition to the `assert` keyword it already counts. Keep the
+  walk iterative (SAFE105) and skip nested function defs (the standard
+  per-function-metric pattern).
+- Follow the "Adding a new rule" config discipline for the new key: validate via
+  `_validated_string_list`, document in **both TOML forms** in
+  `docs/configuration/rules.md`, update the Python language page / skill-file
+  crib if they enumerate the rule's config surface.
+- Tests: a unittest-style test whose only assertions are `self.assertEqual(...)`
+  is no longer flagged; a genuinely assertion-less test still fires; the bare
+  `assert` keyword path is unchanged; a mistyped scalar for the new list warns
+  (typo guard) rather than silently disabling matching.
+
+Additive = MINOR.
+
+---
+
+## Priority 2 - SAFE907 `unvalidated_request_input`: a validator / allowlist knob
+
+**Type**: rule enhancement to `unvalidated_request_input` (SAFE907), Python + PHP.
+**Also surfaced by the optimus-secure-fdn review**: SAFE907 has **no config knob
+at all**, so a project that validates request input with hand-rolled functions
+(`validate_export_request()`, an allowlist filter builder) can only silence it
+with a **file-level ignore** - which then hides any genuinely-unvalidated read
+elsewhere in that file. Same false-positive-forces-blanket-ignore problem as
+Priority 1, hence paired with it ahead of the taint overhaul.
+
+### Problem
+
+SAFE907 fires on a **whole-object** request-data read - Python
+`request.{POST, GET, data, json, form, values, body, query_params}` as a bare
+read (a *targeted* field access like `request.POST['x']` / `request.POST.get('x')`
+is deliberately excluded), and Laravel `$request->all()` / a bare
+`$request->input()` with no field argument (`$request->input('field')` is
+excluded). It is **not** driven by PHP superglobals. It treats the read as
+validated only when a **hardcoded, non-configurable** validation call appears in
+the same function/method - Python `_PY_VALIDATION_CALLS` = `is_valid` /
+`full_clean` / `validate` / `model_validate` / `parse_obj`, and PHP a
+`$request->validate(...)` member call. Real Django / Laravel
+apps validate through project-specific functions (`validate_export_request()`)
+that are not in that set and cannot be added, so the accurate-and-strict posture
+users want is impossible without disabling the rule for whole files.
+
+### Exact requirement
+
+Give the rule a precision lever, one of:
+
+- **(a) Minimal, standalone**: make the existing hardcoded validation-call set
+  **extensible** - a configurable list (e.g. `validators` /
+  `request_validators_python` / `_php`) whose names are unioned with the built-in
+  `_PY_VALIDATION_CALLS` (and the PHP equivalent), so a request read validated by
+  a project function named in it no longer fires. Same exact-call-name matching
+  the built-in set and `tainted_sink.sanitizers` already use. Validate via
+  `_validated_string_list`; both-TOML-form docs; tests (validated read clean,
+  unvalidated read still fires, unknown name warns).
+- **(b) Principled, ties into Priority 3**: integrate SAFE907 with the
+  property-typed sanitiser framework (P3/3a) - a validator registered as a
+  sanitiser establishing a `schema_validated` / `allowlisted` property clears the
+  "unvalidated input" concern but NOT injection sinks. Prefer (b) if it can ride
+  on 3a; sequence it as part of / immediately after that work. (a) is independent
+  and can land first if 907 is wanted before the overhaul.
+
+Additive = MINOR.
+
+---
+
+## Priority 3 - Taint-tracker core overhaul (do 3a + 3b together)
 
 **Type**: architectural enhancement to the taint trackers. Two sub-items,
 strategically downstream of the shipped 2.11.0 taint-projection parity work:
@@ -150,7 +252,7 @@ worklist step with `(False, [])`, matching `dataflow_c.py`).
 
 ---
 
-## Priority 2 - file / overlapping `check` targets: changed-files context
+## Priority 4 - file / overlapping `check` targets: changed-files context
 
 **Type**: small correctness fix in the multi-path CLI (`cli.py`), narrow but real.
 Originally surfaced by the high-effort code review of the v2.11.0 branch, and
