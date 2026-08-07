@@ -4,7 +4,7 @@ SafeLint is a static-analysis CLI that parses source code via Tree-sitter and wa
 
 ## Supported versions
 
-Security fixes ship to the supported lines below. Older lines receive no security backports; the recommended action is to upgrade. C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) is the most recent language addition (2.8.x); the current 2.11.x line extends the Python/PHP framework presets (SAFE908/909) and adds cross-language taint-projection parity.
+Security fixes ship to the supported lines below. Lines marked ❌ receive no security backports; the recommended action is to upgrade. C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) is the most recent language addition (2.8.x); the current 2.11.x line extends the Python/PHP framework presets (SAFE908/909) and adds cross-language taint-projection parity.
 
 | Version(s) | Status |
 |---|---|
