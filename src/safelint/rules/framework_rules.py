@@ -366,6 +366,35 @@ def _php_is_bulk_request_call(node: tree_sitter.Node) -> bool:
     return method == "input" and _php_argc(node) == 0
 
 
+def _php_receiver_is_request(node: tree_sitter.Node) -> bool:
+    """Return True when a member call's receiver is a ``$request`` variable."""
+    obj = node.child_by_field_name("object")
+    return obj is not None and node_text(obj).lstrip("$").endswith("request")
+
+
+def _php_is_validation(node: tree_sitter.Node, configured: frozenset[str]) -> bool:
+    """Return True when *node* is a validation call that clears the SAFE907 finding.
+
+    Two forms, deliberately asymmetric to avoid a security false negative:
+
+    * the **built-in** Laravel validator (``_PHP_VALIDATION_CALLS``) is matched
+      ONLY as ``$request->validate(...)`` - a member call whose receiver is a
+      ``$request``. A bare / static / other-receiver ``validate``
+      (``Validator::validate($other)``, ``$otherValidator->validate($other)``)
+      does not validate THIS request, so it must not clear the finding.
+    * a **configured** project validator (``request_validators_php``) is matched
+      in ANY PHP call form (``call_name`` resolves the bareword across member /
+      nullsafe / scoped / plain function calls), so a global helper such as
+      ``validate_export_request($req)`` clears - the user opted into that name.
+    """
+    name = call_name(node)
+    if name is None:
+        return False
+    if name in _PHP_VALIDATION_CALLS and node.type == _php.MEMBER_CALL_EXPRESSION and _php_receiver_is_request(node):
+        return True
+    return node.type in CALL_TYPES and name in configured
+
+
 class UnvalidatedRequestInputRule(BaseRule):
     """Flag request data consumed without a validation layer (SAFE907).
 
@@ -398,25 +427,30 @@ class UnvalidatedRequestInputRule(BaseRule):
     code = "SAFE907"
     language = ("python", "php")
 
-    def _resolve_validators(self, lang_name: str) -> frozenset[str]:
-        """Union the built-in validation-call names with the configured extension list.
+    def _resolve_configured_validators(self, lang_name: str) -> frozenset[str]:
+        """Return the configured project-validator names for *lang_name* (built-ins added separately).
 
         Python uses the bare ``request_validators`` key; PHP uses
         ``request_validators_php`` (the standard per-language suffix convention).
         A mistyped scalar fails loud via :func:`_validated_string_list`, matching
         every other configurable name list.
         """
-        builtin = _PY_VALIDATION_CALLS if lang_name == "python" else _PHP_VALIDATION_CALLS
         raw, error_key = resolve_lang_config_lookup(self.config, "request_validators", lang_name, default=[])
-        return builtin | frozenset(_validated_string_list(raw, error_key))
+        return frozenset(_validated_string_list(raw, error_key))
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Dispatch to the per-language detector for *filepath*."""
         lang = resolve_lang_name(filepath)
         if lang == "python":
-            return self._check(filepath, tree, _PY_FUNCTION_TYPES, self._python_function_hit, self._resolve_validators("python"))
+            # Python built-ins (``is_valid`` / ``validate`` / ...) match any
+            # receiver by name - idiomatic Python validates on a serializer /
+            # form object, not on ``request`` - so they union with the config set.
+            validators = _PY_VALIDATION_CALLS | self._resolve_configured_validators("python")
+            return self._check(filepath, tree, _PY_FUNCTION_TYPES, self._python_function_hit, validators)
         if lang == "php":
-            return self._check(filepath, tree, _php.FUNCTION_TYPES, self._php_function_hit, self._resolve_validators("php"))
+            # PHP passes CONFIGURED names only; the built-in ``$request->validate``
+            # is matched separately (receiver-scoped) inside ``_php_function_hit``.
+            return self._check(filepath, tree, _php.FUNCTION_TYPES, self._php_function_hit, self._resolve_configured_validators("php"))
         return []  # pragma: no cover - engine dispatch already filters by language tuple
 
     def _check(self, filepath: str, tree: tree_sitter.Tree, func_types: frozenset[str], analyse, validators: frozenset[str]) -> list[Violation]:  # noqa: ANN001
@@ -439,15 +473,13 @@ class UnvalidatedRequestInputRule(BaseRule):
                 return None  # a validation signal clears the whole function
         return raw_read
 
-    def _php_function_hit(self, func: tree_sitter.Node, func_types: frozenset[str], validators: frozenset[str]) -> tree_sitter.Node | None:
+    def _php_function_hit(self, func: tree_sitter.Node, func_types: frozenset[str], configured: frozenset[str]) -> tree_sitter.Node | None:
         raw_read = None
         for node in walk(func, skip_types=tuple(func_types)):
-            # Match a validator in ANY PHP call form (``call_name`` resolves the
-            # bareword across member / nullsafe-member / scoped / plain function
-            # calls), so a configured global (``validate_export_request($req)``),
-            # static (``Validator::validate(...)``), or nullsafe validator clears
-            # the read - not only the ``$request->validate(...)`` member form.
-            if node.type in CALL_TYPES and call_name(node) in validators:
+            # The built-in ``validate`` clears only as ``$request->validate(...)``;
+            # a configured project validator clears in any call form. See
+            # ``_php_is_validation`` for the security rationale.
+            if _php_is_validation(node, configured):
                 return None
             if raw_read is None and _php_is_bulk_request_call(node):
                 raw_read = node

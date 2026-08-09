@@ -667,9 +667,12 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path) -> tuple[list
       so cross-file rules see the right context, or None to skip that hint.
     * ``files`` - the explicit list of files to lint. For a directory target
       this is the subset of *target* that's been git-modified; for an explicit
-      file target it is that one file (linted regardless of git status, and
-      reused as ``changed_files`` by the runner so diff-aware rules run). None
-      falls back to directory discovery (``--all-files`` / git-unavailable dir).
+      file target it is that one file (linted regardless of git status). A file
+      target's ``changed_files`` is the repo-wide diff (above), NOT the file
+      itself - so diff-aware rules judge it the same however it is named; only
+      when git is unavailable does ``changed_files`` stay None and the runner
+      reuse ``files`` as the changed set. None ``files`` falls back to directory
+      discovery (``--all-files`` / git-unavailable dir).
     * ``no_targets`` - True when git reported no modified files under
       *target* and the caller should short-circuit with an empty result.
     * ``considered_modified`` - the set of paths git reported as modified
