@@ -366,20 +366,39 @@ def test_scan_for_unavailable_extensions_handles_single_file_target(tmp_path: Pa
     assert _scan_for_unavailable_extensions(single, {".ts": "hint"}) == {".ts"}
 
 
-def test_resolve_check_targets_file_target_is_its_own_changed_set(tmp_path: Path) -> None:
-    """An explicit file target returns itself as ``files`` so the runner reuses it as
-    ``changed_files`` - making ``safelint check <file>`` diff-aware like ``safelint
-    <file>`` (so rules such as test_coupling fire consistently)."""
+def test_resolve_check_targets_file_target_uses_repo_wide_changed_set(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An explicit file target is linted as itself but gets the REPO-WIDE changed set.
+
+    This is what makes ``test_coupling``'s verdict independent of how a file is
+    named: ``check foo.py`` and ``check pkg/ pkg/foo.py`` (which dedups to the
+    file target) both hand ``foo.py`` the full diff, so a sibling test updated in
+    the same commit is seen either way. Reusing ``[foo.py]`` alone as the changed
+    set (the pre-2.12.0 behaviour) dropped that sibling and false-positived.
+    """
     single = tmp_path / "widget.py"
     single.write_text("x = 1\n", encoding="utf-8")
+    repo_wide = ["pkg/widget.py", "tests/test_widget.py"]
+    monkeypatch.setattr("safelint.cli._get_git_modified_supported_files", lambda _target: (repo_wide, [str(single)], set()))
     args = argparse.Namespace(all_files=False)
     changed_files, files, no_targets, considered = _resolve_check_targets(args, single)
     assert files == [str(single)]
-    # changed_files stays None here on purpose - the runner reuses ``files`` as the
-    # changed set, which is what makes the file diff-aware.
-    assert changed_files is None
+    assert changed_files == repo_wide  # the repo-wide diff, NOT [widget.py]
     assert no_targets is False
     assert considered == set()
+
+
+def test_resolve_check_targets_file_target_git_unavailable_falls_back(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """When git is unavailable, a file target reuses itself as its own changed set.
+
+    ``changed_files=None`` makes the runner fall back to ``files`` (``[foo.py]``)
+    as the changed set - best effort, matching the pre-commit ``safelint <file>``
+    contract, since no repo-wide diff is obtainable.
+    """
+    single = tmp_path / "widget.py"
+    single.write_text("x = 1\n", encoding="utf-8")
+    monkeypatch.setattr("safelint.cli._get_git_modified_supported_files", lambda _target: None)
+    args = argparse.Namespace(all_files=False)
+    assert _resolve_check_targets(args, single) == (None, [str(single)], False, set())
 
 
 def test_resolve_check_targets_all_files_opts_out_of_diff_awareness(tmp_path: Path) -> None:

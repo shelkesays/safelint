@@ -222,6 +222,18 @@ def _rust_has_test_marker(tree: tree_sitter.Tree) -> bool:
     return any(node.type == _rust.ATTRIBUTE and attribute_is_test_marker(node) for node in walk(tree.root_node))
 
 
+def _path_in_changed_set(path: Path, changed: set[str]) -> bool:
+    """Return True if *path* is present in *changed*, comparing absolute forms.
+
+    ``changed`` entries and *path* can each be relative (to cwd) or absolute
+    depending on how they were produced, so both sides are normalised via
+    ``.absolute()`` (not ``.resolve()`` - no symlink following), mirroring
+    :func:`_paired_test_in_changed_under_test_dirs`.
+    """
+    target = path.absolute()
+    return any(Path(f).absolute() == target for f in changed)
+
+
 def _paired_test_in_changed_under_test_dirs(src: Path, changed: set[str], test_dirs: list[str], lang_name: str) -> bool:
     """Return True if any candidate paired-test filename for *src* is in *changed* and under *test_dirs*.
 
@@ -324,34 +336,42 @@ class TestCouplingRule(BaseRule):
     code = "SAFE702"
     language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
+    def _coupling_not_applicable(self, filepath: str, tree: tree_sitter.Tree, lang_name: str, changed: set[str], test_dirs: list[str]) -> bool:
+        """Return True when SAFE702 does not apply to *filepath* (skip it).
+
+        Four skip conditions, OR'd:
+
+        * *filepath* is itself a test file (a test has no paired test of its own).
+        * Rust file with inline tests (``#[test]`` / ``#[cfg(test)]``) - the tests
+          live in the same file, so editing the source necessarily reaches them.
+        * The source is NOT in the changed set - it did not change, so there is
+          nothing to couple. In directory / pre-commit modes every linted file is
+          in the changed set (no-op there); this matters for an explicit
+          ``check <file>`` target, which is always linted but whose repo-wide
+          changed set need not include it, so the verdict is independent of how
+          the file is named.
+        * No paired test file exists at all - defer to ``test_existence``.
+        """
+        if _is_test_file(filepath, test_dirs, lang_name):
+            return True
+        if lang_name == "rust" and _rust_has_test_marker(tree):
+            return True
+        if not _path_in_changed_set(Path(filepath), changed):
+            return True
+        return not _find_test_file(Path(filepath), test_dirs, lang_name)
+
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Return a violation when the paired test file was not part of this commit."""
         # No coupling context means we are not in a diff-aware run (e.g. --all-files).
         # Firing on every file would be noise, so skip entirely.
         if "_changed_files" not in self.config:
             return []
-
         lang_name = resolve_lang_name(filepath)
-
         test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
-        # A test file isn't a source file with a paired test - skip
-        # the coupling check rather than asking the test file's own
-        # test to also change.
-        if _is_test_file(filepath, test_dirs, lang_name):
-            return []
-        # Rust files with inline tests are themselves the test file -
-        # if the source changed, the inline tests in the same file
-        # were necessarily reachable for editing in the same commit,
-        # so the coupling guarantee is satisfied by definition.
-        if lang_name == "rust" and _rust_has_test_marker(tree):
-            return []
         changed: set[str] = set(self.config["_changed_files"])
-        src = Path(filepath)
-
-        # If no test file exists at all, defer to test_existence.
-        if not _find_test_file(src, test_dirs, lang_name):
+        if self._coupling_not_applicable(filepath, tree, lang_name, changed, test_dirs):
             return []
-
+        src = Path(filepath)
         if _paired_test_in_changed_under_test_dirs(src, changed, test_dirs, lang_name):
             return []
 
