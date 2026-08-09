@@ -355,10 +355,7 @@ def _php_is_bulk_request_call(node: tree_sitter.Node) -> bool:
     excluded - matching the Python side, which excludes ``request.POST.get('x')``.
     Only ``->all()`` and a bare ``->input()`` (no field name) consume the whole body.
     """
-    if node.type != _php.MEMBER_CALL_EXPRESSION:
-        return False
-    obj = node.child_by_field_name("object")
-    if obj is None or not node_text(obj).lstrip("$").endswith("request"):
+    if node.type != _php.MEMBER_CALL_EXPRESSION or not _php_receiver_is_request(node):
         return False
     method = call_name(node)
     if method == "all":
@@ -367,7 +364,21 @@ def _php_is_bulk_request_call(node: tree_sitter.Node) -> bool:
 
 
 def _php_receiver_is_request(node: tree_sitter.Node) -> bool:
-    """Return True when a member call's receiver is a ``$request`` variable."""
+    """Return True when a member call's receiver is a request variable.
+
+    Matches a receiver whose name ends with the literal ``request``
+    (case-sensitive) - the standard Laravel ``$request``. The match is
+    **shared** with the bulk-read detector :func:`_php_is_bulk_request_call`, so
+    the read and validate sides use ONE receiver notion and cannot drift:
+    whatever receiver a bulk read fires on, that receiver's own ``validate()``
+    clears it. That symmetry is why the built-in validator is not tightened to an
+    exact-``$request`` compare on the validate side alone - doing so would let a
+    read fire while its own validate no longer cleared it (a false positive). An
+    unrelated receiver (``$other``, ``Validator::``) still does not match, which
+    is the case the security fix targets; a second variable that also ends in
+    ``request`` used only to validate a different request read is a corner of an
+    already function-scoped heuristic.
+    """
     obj = node.child_by_field_name("object")
     return obj is not None and node_text(obj).lstrip("$").endswith("request")
 
