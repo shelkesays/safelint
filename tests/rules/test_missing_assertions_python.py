@@ -156,6 +156,14 @@ def test_scope_test_dir_membership_via_explicit_test_dirs(tmp_path: Path) -> Non
     assert "test_foo" in hits[0].message
 
 
+def test_scope_test_dirs_scalar_typo_raises(tmp_path: Path) -> None:
+    """A scalar ``test_dirs`` fails loud (not silently iterating characters)."""
+    sample = _write(tmp_path, "tests/test_thing.py", "def test_x():\n    do()\n")
+    engine = _enabled_engine({"rules": {"missing_assertions": {"test_functions_only": True, "test_dirs": "tests"}}})
+    with pytest.raises(TypeError, match="test_dirs"):
+        engine.check_file(str(sample))
+
+
 def test_scope_custom_prefix(tmp_path: Path) -> None:
     """``test_function_prefixes`` is honoured (``should_*`` marks a test)."""
     src = "def should_do_thing():\n    do_thing()\n"
