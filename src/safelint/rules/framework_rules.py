@@ -11,6 +11,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages import php as _php
 from safelint.languages import python as _py
 from safelint.languages._node_utils import call_name, node_text, resolve_lang_name, walk
@@ -314,6 +315,8 @@ _PY_REQUEST_BULK = frozenset({"data", "json", "form", "POST", "GET", "values", "
 # naming a serializer without calling ``is_valid()`` does not validate anything,
 # so treating the name as validation would hide real unvalidated-input findings.
 _PY_VALIDATION_CALLS = frozenset({"is_valid", "full_clean", "validate", "model_validate", "parse_obj"})
+# PHP (Laravel): ``$request->validate(...)`` is the built-in validating call.
+_PHP_VALIDATION_CALLS = frozenset({"validate"})
 _PHP_BULK_REQUEST_METHODS = frozenset({"all", "input"})
 
 
@@ -343,11 +346,6 @@ def _py_bulk_request_read(node: tree_sitter.Node) -> bool:
     parent = node.parent
     # Exclude ``request.POST.get(...)`` / ``request.POST['x']`` - targeted reads.
     return parent is None or parent.type not in (_py.ATTRIBUTE, _py.SUBSCRIPT)
-
-
-def _py_is_validation(node: tree_sitter.Node) -> bool:
-    """Return True when *node* is a concrete validation call (``is_valid()`` / ``validate()`` / ...)."""
-    return node.type == _py.CALL and call_name(node) in _PY_VALIDATION_CALLS
 
 
 def _php_is_bulk_request_call(node: tree_sitter.Node) -> bool:
@@ -385,6 +383,13 @@ class UnvalidatedRequestInputRule(BaseRule):
       ``$request->validate(...)`` call in the method (``$request->input('field')``
       is a targeted read and is not flagged).
 
+    The validating-call set is extensible: a project that validates request
+    input through its own helper (``validate_export_request`` / an allowlist
+    filter builder) adds its names to ``request_validators`` (Python, bare key)
+    / ``request_validators_php`` (PHP), unioned with the built-ins above - so the
+    raw read no longer fires without resorting to a file-level ignore that would
+    also hide a genuinely-unvalidated read added later.
+
     Conservative + heuristic (a validation call *anywhere* in the scope clears
     the whole function); default-disabled, enabled by the framework presets.
     """
@@ -393,39 +398,51 @@ class UnvalidatedRequestInputRule(BaseRule):
     code = "SAFE907"
     language = ("python", "php")
 
+    def _resolve_validators(self, lang_name: str) -> frozenset[str]:
+        """Union the built-in validation-call names with the configured extension list.
+
+        Python uses the bare ``request_validators`` key; PHP uses
+        ``request_validators_php`` (the standard per-language suffix convention).
+        A mistyped scalar fails loud via :func:`_validated_string_list`, matching
+        every other configurable name list.
+        """
+        builtin = _PY_VALIDATION_CALLS if lang_name == "python" else _PHP_VALIDATION_CALLS
+        raw, error_key = resolve_lang_config_lookup(self.config, "request_validators", lang_name, default=[])
+        return builtin | frozenset(_validated_string_list(raw, error_key))
+
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Dispatch to the per-language detector for *filepath*."""
         lang = resolve_lang_name(filepath)
         if lang == "python":
-            return self._check(filepath, tree, _PY_FUNCTION_TYPES, self._python_function_hit)
+            return self._check(filepath, tree, _PY_FUNCTION_TYPES, self._python_function_hit, self._resolve_validators("python"))
         if lang == "php":
-            return self._check(filepath, tree, _php.FUNCTION_TYPES, self._php_function_hit)
+            return self._check(filepath, tree, _php.FUNCTION_TYPES, self._php_function_hit, self._resolve_validators("php"))
         return []  # pragma: no cover - engine dispatch already filters by language tuple
 
-    def _check(self, filepath: str, tree: tree_sitter.Tree, func_types: frozenset[str], analyse) -> list[Violation]:  # noqa: ANN001
+    def _check(self, filepath: str, tree: tree_sitter.Tree, func_types: frozenset[str], analyse, validators: frozenset[str]) -> list[Violation]:  # noqa: ANN001
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type not in func_types:
                 continue
-            hit = analyse(node, func_types)
+            hit = analyse(node, func_types, validators)
             if hit is not None:
                 message = "request data consumed without a validation layer - validate/deserialise input before use"
                 violations.append(self._make_violation_for_node(filepath, hit, message))
         return violations
 
-    def _python_function_hit(self, func: tree_sitter.Node, func_types: frozenset[str]) -> tree_sitter.Node | None:
+    def _python_function_hit(self, func: tree_sitter.Node, func_types: frozenset[str], validators: frozenset[str]) -> tree_sitter.Node | None:
         raw_read = None
         for node in walk(func, skip_types=tuple(func_types)):
             if raw_read is None and _py_bulk_request_read(node):
                 raw_read = node
-            elif _py_is_validation(node):
+            elif node.type == _py.CALL and call_name(node) in validators:
                 return None  # a validation signal clears the whole function
         return raw_read
 
-    def _php_function_hit(self, func: tree_sitter.Node, func_types: frozenset[str]) -> tree_sitter.Node | None:
+    def _php_function_hit(self, func: tree_sitter.Node, func_types: frozenset[str], validators: frozenset[str]) -> tree_sitter.Node | None:
         raw_read = None
         for node in walk(func, skip_types=tuple(func_types)):
-            if node.type == _php.MEMBER_CALL_EXPRESSION and call_name(node) == "validate":
+            if node.type == _php.MEMBER_CALL_EXPRESSION and call_name(node) in validators:
                 return None
             if raw_read is None and _php_is_bulk_request_call(node):
                 raw_read = node
