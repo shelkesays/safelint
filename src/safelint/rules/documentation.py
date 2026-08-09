@@ -53,6 +53,17 @@ def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozens
       unittest-style test reads as assertion-less and forces a file-wide
       SAFE601 ignore.
 
+    Matching is deliberately by call NAME only (receiver stripped), the
+    same allowlist approach as the other languages' detectors and
+    ``tainted_sink.sanitizers`` - and what lets a *bare* project helper
+    (``verify_invariant(x)``) count when added to ``assertion_calls``.
+    Requiring a specific receiver (``self`` / ``pytest``) to reduce the
+    name-collision false-negative (a production call literally named
+    ``fail`` / ``raises`` credited as an assertion) would break that
+    configurability and newly false-positive on assertions written with
+    an unrecognised receiver, so it is intentionally not done;
+    ``test_functions_only`` scopes the rule to test functions instead.
+
     Skips nested function bodies so the outer function isn't credited
     for asserts that live inside an inner ``def``. Counting stops as
     soon as *minimum* is reached - the rule only needs to know whether
