@@ -679,12 +679,74 @@ DEFAULTS: dict[str, Any] = {
             # Holzmann's rule 5 asks for a density of two per function, so
             # paper-strict projects set ``min_assertions = 2``.
             "min_assertions": 1,
+            # Scope the rule to test functions only. Default ``false`` keeps
+            # Holzmann rule 5's production-assertion intent (every function is
+            # checked). Set ``true`` to treat SAFE601 as a "tests must assert
+            # something" guard: production code that validates by raising, and
+            # fixtures / ``setUp`` / helper methods that legitimately have no
+            # assertions, are then skipped. When on, a function is checked only
+            # if it is named for a ``test_function_prefixes`` entry AND lives in
+            # a test file (under ``test_dirs`` or matching the language's
+            # test-filename convention - the SAFE701/702 definition).
+            "test_functions_only": False,
+            # Name prefixes that mark a function as a test (used only when
+            # ``test_functions_only`` is on). Default ``["test"]`` matches the
+            # unittest / pytest convention (``test_*`` / ``testFoo``); ``setUp``
+            # / ``tearDown`` / ``_helper`` / pytest fixtures do not start with
+            # it and are skipped.
+            "test_function_prefixes": ["test"],
+            # Directories that mark a file as a test file, matched as a
+            # path-component subsequence (same semantics + default as SAFE701 /
+            # SAFE702). Only consulted when ``test_functions_only`` is on.
+            "test_dirs": ["tests"],
+            # Python assertion-CALL names (bare key, per the Python
+            # convention - every other language suffixes with ``_<lang>``).
+            # Python has the built-in ``assert`` keyword, which the rule
+            # ALWAYS counts; this list is counted *in addition*, so that
+            # unittest / Django ``TestCase`` bodies whose only assertions
+            # are method calls (``self.assertEqual(...)`` /
+            # ``self.assertRaises(...)``) are not flagged as
+            # assertion-less. ``call_name`` strips the receiver, so
+            # ``self.assertEqual`` and ``pytest.raises`` resolve to the
+            # bareword names below. Defaults cover the unittest
+            # ``assert*`` surface plus pytest's ``raises`` / ``warns``.
+            "assertion_calls": [
+                "assertEqual",
+                "assertNotEqual",
+                "assertTrue",
+                "assertFalse",
+                "assertIs",
+                "assertIsNot",
+                "assertIsNone",
+                "assertIsNotNone",
+                "assertIn",
+                "assertNotIn",
+                "assertRaises",
+                "assertRaisesRegex",
+                "assertWarns",
+                "assertAlmostEqual",
+                "assertGreater",
+                "assertGreaterEqual",
+                "assertLess",
+                "assertLessEqual",
+                "assertListEqual",
+                "assertDictEqual",
+                "assertSetEqual",
+                "assertCountEqual",
+                "assertRegex",
+                "fail",
+                # pytest context-manager assertions (``pytest.raises(...)`` /
+                # ``pytest.warns(...)``) - the receiver is stripped, so the
+                # bareword suffices.
+                "raises",
+                "warns",
+            ],
             # JavaScript assertion-function names. Python uses the
-            # built-in ``assert`` keyword (no config needed); JS doesn't
-            # have an assert keyword, so the rule walks for *calls* to
-            # any of these names. Default covers Node's ``assert``
-            # module (top-level + the asserting helpers), browser/Node
-            # ``console.assert``, and common test frameworks.
+            # built-in ``assert`` keyword (plus the ``assertion_calls``
+            # list above); JS doesn't have an assert keyword, so the rule
+            # walks for *calls* to any of these names. Default covers
+            # Node's ``assert`` module (top-level + the asserting helpers),
+            # browser/Node ``console.assert``, and common test frameworks.
             "assertion_calls_javascript": [
                 # Node ``assert`` module
                 "assert",
@@ -1561,7 +1623,20 @@ DEFAULTS: dict[str, Any] = {
         # multiple frameworks across Python + PHP.
         "debug_mode_enabled": {"enabled": False, "severity": "warning"},
         "mass_assignment": {"enabled": False, "severity": "error"},
-        "unvalidated_request_input": {"enabled": False, "severity": "warning"},
+        "unvalidated_request_input": {
+            "enabled": False,
+            "severity": "warning",
+            # Project validation helpers whose presence in a handler clears the
+            # "unvalidated request read" concern, unioned with the built-in set
+            # (Python: is_valid / full_clean / validate / model_validate /
+            # parse_obj; PHP: validate). Matched by exact call name, receiver
+            # stripped (like ``tainted_sink.sanitizers``). Python uses the bare
+            # key; PHP suffixes with ``_php``. Empty by default - a project adds
+            # its own validators (``validate_export_request``, an allowlist
+            # filter builder) rather than silencing the rule file-wide.
+            "request_validators": [],
+            "request_validators_php": [],
+        },
         "csrf_protection_disabled": {"enabled": False, "severity": "error"},
         "hardcoded_secret": {"enabled": False, "severity": "error"},
         # Rust-idiom rules. Slotted into category bands per the
