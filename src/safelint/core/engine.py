@@ -38,7 +38,7 @@ _ENGINE_INTERNAL_CODES = frozenset({"SAFE000", "SAFE004"})
 _ENGINE_INTERNAL_NAMES = frozenset({"parse", "unused_suppression"})
 
 
-def _nosafe_codes(comment: str, prefix: str = "#") -> set[str] | None | Literal[False]:
+def _nosafe_codes(comment: str, prefix: str = "#") -> set[str] | Literal[False] | None:
     """Parse a single comment string and return the nosafe payload.
 
     Returns:
@@ -64,7 +64,7 @@ def _nosafe_codes(comment: str, prefix: str = "#") -> set[str] | None | Literal[
     return False
 
 
-def _file_ignore_codes(comment_text: str, prefix: str = "#") -> set[str] | None | Literal[False]:
+def _file_ignore_codes(comment_text: str, prefix: str = "#") -> set[str] | Literal[False] | None:
     """Parse a comment for ``# safelint: ignore[: codes]`` file-level directives.
 
     Returns:
