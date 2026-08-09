@@ -14,6 +14,7 @@ from safelint.languages import python as _py
 from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
+from safelint.rules._test_files import _is_test_file
 from safelint.rules.base import BaseRule
 
 
@@ -35,8 +36,22 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 }
 
 
-def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], minimum: int) -> int:
-    """Count ``assert`` statements in the function body, stopping at *minimum*.
+def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str], minimum: int) -> int:
+    """Count assertions in the Python function body, stopping at *minimum*.
+
+    Two recognised forms, OR'd together:
+
+    * **Built-in ``assert`` keyword**: ``assert x > 0`` parses as
+      ``assert_statement`` - the original, always-counted form.
+    * **Assertion method calls**: unittest / Django ``TestCase`` bodies
+      assert via method calls (``self.assertEqual(...)`` /
+      ``self.assertRaises(...)``), and pytest via ``pytest.raises(...)`` /
+      ``pytest.warns(...)``. The rule counts *calls* matching the
+      configured ``assertion_calls`` set; ``call_name`` strips the
+      receiver (``self.assertEqual`` and ``pytest.raises`` resolve to
+      ``"assertEqual"`` / ``"raises"``). Without this, every
+      unittest-style test reads as assertion-less and forces a file-wide
+      SAFE601 ignore.
 
     Skips nested function bodies so the outer function isn't credited
     for asserts that live inside an inner ``def``. Counting stops as
@@ -45,7 +60,10 @@ def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozens
     """
     count = 0
     for c in walk(func_node, skip_types=tuple(function_types)):
-        if c is func_node or c.type != _py.ASSERT_STATEMENT:
+        if c is func_node:
+            continue
+        is_assert = c.type == _py.ASSERT_STATEMENT or (c.type in CALL_TYPES and call_name(c) in assertion_calls)
+        if not is_assert:
             continue
         count += 1
         if count >= minimum:
@@ -161,7 +179,11 @@ def _javascript_assertion_count(func_node: tree_sitter.Node, function_types: fro
 class MissingAssertionsRule(BaseRule):
     """Warn when a function has fewer than ``min_assertions`` assertions (disabled by default).
 
-    Python: walks for the AST ``assert_statement`` (built-in keyword).
+    Python: counts the AST ``assert_statement`` (built-in keyword) AND
+    *calls* to a configured set of assertion-method names
+    (``assertion_calls``), so unittest / Django ``TestCase`` bodies that
+    assert only via ``self.assertEqual(...)`` / ``pytest.raises(...)``
+    are recognised rather than read as assertion-less.
 
     JavaScript: walks for *calls* to a configured set of assertion
     function names. Default set covers Node's ``assert`` module
@@ -191,7 +213,13 @@ class MissingAssertionsRule(BaseRule):
         on ``io_functions_javascript`` and ``global_namespaces_javascript``.
         """
         if lang_name == "python":
-            return _python_assertion_count(func_node, function_types, minimum)
+            # Python counts the built-in ``assert`` keyword (inside
+            # ``_python_assertion_count``) AND configured assertion-method
+            # calls (unittest ``self.assertEqual`` / pytest
+            # ``pytest.raises``). Bare key per the Python convention.
+            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _py.EXTRA_NAME, default=[])
+            assertion_calls = frozenset(_validated_string_list(raw, error_key))
+            return _python_assertion_count(func_node, function_types, assertion_calls, minimum)
         if lang_name == "java":
             # Java accepts BOTH the built-in ``assert`` keyword (handled
             # inside ``_java_assertion_count``) AND configured JUnit / AssertJ
@@ -245,20 +273,54 @@ class MissingAssertionsRule(BaseRule):
             return f'Function "{func_name}" has no assertions'
         return f'Function "{func_name}" has {count} assertion(s), minimum is {minimum} (Holzmann rule 5 asks for two per function)'
 
+    def _test_scope(self, filepath: str, lang_name: str) -> tuple[bool, tuple[str, ...] | None]:
+        """Resolve the ``test_functions_only`` scoping for *filepath*.
+
+        By default the rule checks *every* function (Holzmann rule 5's
+        production-assertion intent). Projects that instead treat SAFE601 as a
+        "tests must assert something" guard - where production code validates by
+        raising and fixtures / setup helpers legitimately have no assertions -
+        set ``test_functions_only = true`` to restrict firing to functions that
+        look like tests: named for a ``test_function_prefixes`` entry (default
+        ``["test"]``) **and** living in a file safelint recognises as a test
+        file (under ``test_dirs``, or matching the language's test-filename
+        convention - the same definition SAFE701/702 use).
+
+        Returns ``(skip_file, prefixes)``:
+
+        * ``(False, None)`` - scoping off; check every function.
+        * ``(True, None)`` - scoping on but *filepath* is not a test file; the
+          caller skips the whole file.
+        * ``(False, prefixes)`` - scoping on and this is a test file; the caller
+          checks only functions whose name starts with one of *prefixes*.
+        """
+        if not self.config.get("test_functions_only", False):
+            return False, None
+        test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
+        if not _is_test_file(filepath, test_dirs, lang_name):
+            return True, None
+        prefixes = tuple(_validated_string_list(self.config.get("test_function_prefixes", ["test"]), "test_function_prefixes"))
+        return False, prefixes
+
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag functions with fewer than ``min_assertions`` assertions."""
         lang_name = resolve_lang_name(filepath)
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         minimum = self._resolve_min_assertions()
+        skip_file, prefixes = self._test_scope(filepath, lang_name)
+        if skip_file:
+            return []
         violations = []
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
+            name_node = function_name_node(node, lang_name)
+            func_name = node_text(name_node) if name_node else "<anonymous>"
+            if prefixes is not None and not func_name.startswith(prefixes):
+                continue
             count = self._assertion_count(node, lang_name, function_types, minimum)
             if count >= minimum:
                 continue
-            name_node = function_name_node(node, lang_name)
-            func_name = node_text(name_node) if name_node else "<anonymous>"
             violations.append(
                 self._make_violation_for_node(
                     filepath,

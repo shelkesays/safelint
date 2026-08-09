@@ -10,6 +10,7 @@ from safelint.languages import JAVASCRIPT, TSX, TYPESCRIPT
 from safelint.languages import rust as _rust
 from safelint.languages._node_utils import resolve_lang_name, walk
 from safelint.rules._rust_test_attribute import attribute_is_test_marker
+from safelint.rules._test_files import _JAVA_TEST_SUFFIXES, _is_test_file, _path_components_contain
 from safelint.rules.base import BaseRule
 
 
@@ -24,19 +25,10 @@ from safelint.rules.base import BaseRule
 _JS_EXTENSIONS: tuple[str, ...] = tuple(sorted(JAVASCRIPT.file_extensions))
 _TS_EXTENSIONS: tuple[str, ...] = tuple(sorted(TYPESCRIPT.file_extensions | TSX.file_extensions))
 
-# Java's three conventional test-filename suffixes. Maven and Gradle
-# both expect a test class to live alongside the production class
-# with one of these forms:
-#
-# * ``<ClassName>Test.java``  - JUnit unit tests (default for new code)
-# * ``<ClassName>Tests.java`` - Spring's preferred form
-#   (``@SpringBootTest`` examples in spring.io docs use this)
-# * ``<ClassName>IT.java``    - Maven Surefire / Failsafe integration tests
-#
-# Plus the ``Test<ClassName>.java`` *prefix* form, which is older but
-# still legal in JUnit. The candidate list yields all four so projects
-# can mix conventions without false-positive misses.
-_JAVA_TEST_SUFFIXES: tuple[str, ...] = ("Test", "Tests", "IT")
+# ``_JAVA_TEST_SUFFIXES`` (the three Maven/Spring test-class suffixes) and the
+# ``_is_test_file`` / ``_filename_matches_test_pattern`` / ``_path_components_contain``
+# family now live in ``rules/_test_files.py`` so SAFE601 shares the exact same
+# "is this a test file" definition; imported above.
 
 # Rust test-filename suffixes. Cargo's integration-test convention is
 # ``tests/<stem>.rs`` (exact stem, no suffix); some projects also use a
@@ -210,101 +202,6 @@ def _contained_test_dir(test_dir: str, root: Path) -> Path | None:
     if looped or not resolved.is_relative_to(root_resolved):
         return None
     return collapsed
-
-
-def _path_components_contain(haystack: tuple[str, ...], needle: tuple[str, ...]) -> bool:
-    """Return True if *needle* appears as a contiguous subsequence in *haystack*.
-
-    Used by :func:`_is_test_file` to recognise test-dir membership for
-    multi-component (``"tests/unit"``) and absolute (``"/abs/path/tests"``)
-    ``test_dirs`` entries. ``Path(td).parts`` produces a tuple per
-    component, and matching the whole tuple as a contiguous slice of
-    ``Path(filepath).parts`` correctly handles both single-component
-    (``"tests"``) and nested (``"tests/unit"``) forms - a plain
-    ``in path.parts`` membership check would only match the
-    single-component case.
-    """
-    if not needle:
-        return False
-    n = len(needle)
-    return any(haystack[i : i + n] == needle for i in range(len(haystack) - n + 1))
-
-
-def _filename_matches_test_pattern(filepath: str, lang_name: str) -> bool:
-    """Return True if *filepath*'s bare filename matches a test-file naming convention.
-
-    Per-language conventions:
-
-    * JS / TS: ``.test.`` or ``.spec.`` infix (Jest / Mocha / Karma).
-    * Java: stem ending in ``Test`` / ``Tests`` / ``IT``. The legacy
-      ``Test<Name>.java`` prefix form is deliberately NOT recognised
-      here because production utilities (``TestDataFactory``,
-      ``TestConfig``) under ``src/main/java`` use the same prefix and
-      would be wrongly classified as tests; legitimate JUnit 3
-      ``Test``-prefix tests get picked up via the path-component check
-      in :func:`_is_test_file` when they live in the configured test
-      directory.
-    * Rust: stem ending in ``_test`` (colocated convention). Bare
-      ``<stem>.rs`` under ``tests/`` is handled by path-component
-      matching at the call site, not here.
-    * C: stem ending in ``_test`` or starting with ``test_`` (Unity /
-      Check / CMocka both conventions).
-    * Python (fallback): filename starting with ``test_``.
-    """
-    name = Path(filepath).name
-    if lang_name in ("javascript", "typescript"):
-        return ".test." in name or ".spec." in name
-    if lang_name == "java":
-        return any(Path(filepath).stem.endswith(suf) for suf in _JAVA_TEST_SUFFIXES)
-    if lang_name in ("rust", "go"):
-        # Rust: colocated ``<stem>_test.rs``. Go: sibling ``<stem>_test.go``.
-        # Both mark the file itself as a test via the ``_test`` stem suffix.
-        return Path(filepath).stem.endswith("_test")
-    if lang_name == "php":
-        # PHPUnit's ``<ClassName>Test.php`` (StudlyCaps suffix).
-        return Path(filepath).stem.endswith("Test")
-    if lang_name in ("c", "cpp"):
-        # C (Unity / Check / CMocka) and C++ (GoogleTest / Catch2) share a
-        # ``<stem>_test`` / ``test_<stem>`` convention. The match is on the stem
-        # only, so it holds for any C / C++ extension (``.c`` / ``.cpp`` /
-        # ``.cc`` / ``.cxx`` / ``.hpp`` / ...); recognise either form so a
-        # canonical test is not treated as production code.
-        stem = Path(filepath).stem
-        return stem.endswith("_test") or stem.startswith("test_")
-    return name.startswith("test_")
-
-
-def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
-    """Return True if *filepath* is itself a test file (so SAFE701/702 should not run on it).
-
-    Without this guard the test-coverage rules would treat a test file
-    as a source file and look for *its* paired test (e.g. ``tests/foo.test.js``
-    would search for ``foo.test.test.js``, ``tests/test_bar.py`` would
-    search for ``test_test_bar.py``).
-
-    Two checks, OR'd together:
-
-    1. **Path-component match.** ``filepath`` lives under any
-       configured ``test_dirs`` entry - covers test files even if
-       their filenames don't follow the pattern convention
-       (``conftest.py``, ``__init__.py``, fixtures, helpers).
-       Handles multi-component entries (``"tests/unit"``) and
-       absolute paths by matching each ``test_dirs`` entry's full
-       ``Path.parts`` tuple as a contiguous subsequence.
-    2. **Filename-pattern match.** Delegated to
-       :func:`_filename_matches_test_pattern`.
-    """
-    # Normalise both sides to absolute paths before the parts comparison.
-    # Without this, a relative ``filepath`` (``tests/conftest.js``) wouldn't
-    # match against an absolute ``test_dirs`` entry (``/abs/project/tests``)
-    # and helper files under the test root would be misclassified as source.
-    # ``.absolute()`` (not ``.resolve()``) avoids following symlinks.
-    path_parts = Path(filepath).absolute().parts
-    for td in test_dirs:
-        td_parts = Path(td).absolute().parts
-        if _path_components_contain(path_parts, td_parts):
-            return True
-    return _filename_matches_test_pattern(filepath, lang_name)
 
 
 def _rust_has_test_marker(tree: tree_sitter.Tree) -> bool:

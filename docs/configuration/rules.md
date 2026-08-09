@@ -892,14 +892,24 @@ Based on Holzmann rule 5: the paper asks for an assertion density averaging a mi
 
 Two further clauses of the paper's rule 5 are intentionally out of scope: assertions must be **side-effect free** (safelint does not analyse assertion expressions for effects), and a trivially-true assertion (`assert True`) **counts toward the threshold** even though the paper disallows assertions a static checker can prove never fail. Both need analysis machinery (effect inference, constant propagation) that does not fit a structural rule; review remains the guard there.
 
-Python walks for the AST `assert_statement` (built-in keyword). JavaScript has no built-in `assert` keyword, so the rule walks for *calls* to a configured set of assertion-function names, Node's `assert` module (`assert`, `ok`, `equal`, `strictEqual`, `deepEqual`, `match`, ...), `console.assert`, and test-framework idioms (`expect` for Jest / Chai-via-`expect`, `should` for Should.js, `vi.expect` for Vitest). Configure via `assertion_calls_javascript`.
+Python counts the AST `assert_statement` (built-in keyword) **and** *calls* to a configured set of assertion-method names (`assertion_calls`), so unittest / Django `TestCase` bodies that assert only via `self.assertEqual(...)` / `self.assertRaises(...)` and pytest bodies using `pytest.raises(...)` / `pytest.warns(...)` are recognised instead of being flagged as assertion-less. The default set covers the unittest `assert*` surface (`assertEqual`, `assertTrue`, `assertRaises`, `assertIn`, `assertIsNone`, `fail`, ...) plus pytest's `raises` / `warns`; `call_name` strips the receiver, so `self.assertEqual` and `pytest.raises` match on the bareword. Add project-specific assertion helpers by extending `assertion_calls`.
+
+JavaScript has no built-in `assert` keyword, so the rule walks for *calls* to a configured set of assertion-function names, Node's `assert` module (`assert`, `ok`, `equal`, `strictEqual`, `deepEqual`, `match`, ...), `console.assert`, and test-framework idioms (`expect` for Jest / Chai-via-`expect`, `should` for Should.js, `vi.expect` for Vitest). Configure via `assertion_calls_javascript`.
+
+**Scoping to test functions only.** By default the rule enforces the paper's intent - assertions in *every* function. Some teams instead run SAFE601 as a "a test must actually assert something" guard: their production code validates by raising exceptions (Python `assert` is stripped under `-O`), and fixtures / `setUp` / helper methods legitimately have no assertions. Set `test_functions_only = true` to restrict firing to functions that look like tests - named for a `test_function_prefixes` entry (default `["test"]`) **and** living in a file safelint recognises as a test file (under `test_dirs`, or matching the language's test-filename convention, the same definition SAFE701 / SAFE702 use). With it on, `setUp` / `tearDown` / `_helper` / fixtures and all production code are skipped, while a `test_*` function that asserts nothing - a genuinely broken test - still fires.
 
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `false` | Disabled by default, opt-in |
 | `severity` | `"warning"` | `"error"` or `"warning"` |
 | `min_assertions` | `1` | Minimum assertions per function; set `2` for the paper's density. *Added in 2.4.0.* |
+| `assertion_calls` | (see default Python list above) | (Python only.) Assertion-method call names counted *in addition* to the `assert` keyword. *Added in 2.12.0.* |
 | `assertion_calls_javascript` | (see default JS list above) | (JavaScript only.) Call names that satisfy the assertion check. *Added in 1.13.0.* |
+| `test_functions_only` | `false` | Restrict the rule to test-named functions in test files (see above). *Added in 2.12.0.* |
+| `test_function_prefixes` | `["test"]` | Name prefixes marking a function as a test (used only when `test_functions_only` is on). *Added in 2.12.0.* |
+| `test_dirs` | `["tests"]` | Directories marking a file as a test file, matched as a path-component subsequence (same as SAFE701/702; used only when `test_functions_only` is on). *Added in 2.12.0.* |
+
+Java, Rust, PHP, C, and C++ have their own `assertion_calls_<lang>` lists (see each language page).
 
 ```toml
 # pyproject.toml
@@ -907,7 +917,12 @@ Python walks for the AST `assert_statement` (built-in keyword). JavaScript has n
 enabled = true
 severity = "warning"
 min_assertions = 2                # Holzmann rule 5 density; default is 1
+assertion_calls = ["assertEqual", "assertTrue", "verify_invariant"]   # Python; extends the built-in assert keyword
 assertion_calls_javascript = ["assert", "expect", "should"]
+# Treat SAFE601 as a "tests must assert" guard (skips production / fixtures / setUp):
+test_functions_only = true
+test_function_prefixes = ["test"]
+test_dirs = ["tests"]
 ```
 
 ```toml
@@ -915,6 +930,8 @@ assertion_calls_javascript = ["assert", "expect", "should"]
 [rules.missing_assertions]
 enabled = true
 min_assertions = 2
+assertion_calls = ["assertEqual", "assertTrue", "verify_invariant"]
+test_functions_only = true
 ```
 
 **Python, Bad:**
@@ -1481,10 +1498,14 @@ Per function / method: a whole-object request-data read with no validation call 
 
 The rule is conservative and heuristic: a validation call *anywhere* in the scope clears the whole function.
 
+**Project validators.** Real apps often validate through their own helper (`validate_export_request()`, an allowlist filter builder) rather than the framework's built-in call. Add those names to `request_validators` (Python, bare key) / `request_validators_php` (PHP) and they are unioned with the built-in set, so a read they guard no longer fires. Matched by exact call name (receiver stripped, like `tainted_sink.sanitizers`). This replaces the previous only-recourse of a file-level ignore, which also hid any genuinely-unvalidated read added to the same file later.
+
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `false` (vanilla) / `true` (framework preset) | Toggle the rule |
 | `severity` | `"warning"` | `"error"` or `"warning"` |
+| `request_validators` | `[]` | (Python.) Project validation-call names, unioned with the built-in set. *Added in 2.12.0.* |
+| `request_validators_php` | `[]` | (PHP.) Project validation-call names, unioned with the built-in `validate`. *Added in 2.12.0.* |
 
 **Bad:**
 
@@ -1509,6 +1530,8 @@ The framework presets enable this rule automatically; enable it directly with ei
 [tool.safelint.rules.unvalidated_request_input]
 enabled = true
 severity = "warning"
+request_validators = ["validate_export_request", "clean_filters"]   # Python; unioned with the built-ins
+request_validators_php = ["allowlist"]                               # PHP; unioned with `validate`
 ```
 
 ```toml
@@ -1516,6 +1539,7 @@ severity = "warning"
 [rules.unvalidated_request_input]
 enabled = true
 severity = "warning"
+request_validators = ["validate_export_request", "clean_filters"]
 ```
 
 ### SAFE908: `csrf_protection_disabled`

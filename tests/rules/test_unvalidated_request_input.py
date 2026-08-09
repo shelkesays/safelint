@@ -17,6 +17,12 @@ def _codes(src: Path) -> list[str]:
     return [v.code for v in SafetyEngine(cfg).check_file(str(src)).violations if v.code == "SAFE907"]
 
 
+def _codes_with(src: Path, rule_overrides: dict) -> list[str]:
+    """SAFE907 codes with extra ``unvalidated_request_input`` config merged in."""
+    cfg = deep_merge(DEFAULTS, {"rules": {"unvalidated_request_input": {"enabled": True, **rule_overrides}}})
+    return [v.code for v in SafetyEngine(cfg).check_file(str(src)).violations if v.code == "SAFE907"]
+
+
 def _write(tmp_path: Path, name: str, body: str) -> Path:
     path = tmp_path / name
     path.write_text(body, encoding="utf-8")
@@ -101,3 +107,37 @@ def test_disabled_by_default(tmp_path: Path) -> None:
     """At the default (disabled) nothing fires."""
     src = _write(tmp_path, "views.py", "def create(request):\n    return Model(**request.data)\n")
     assert [v.code for v in SafetyEngine(DEFAULTS).check_file(str(src)).violations if v.code == "SAFE907"] == []
+
+
+# ---------------------------------------------------------------------------
+# request_validators: extensible project validator names (2.12.0)
+# ---------------------------------------------------------------------------
+
+
+def test_python_project_validator_clears(tmp_path: Path) -> None:
+    """A project validator named in ``request_validators`` clears the read."""
+    src = _write(tmp_path, "api.py", "def export(request):\n    validate_export_request(request.data)\n    return Model(**request.data)\n")
+    assert _codes(src) == ["SAFE907"]  # not cleared with default (empty) list
+    assert _codes_with(src, {"request_validators": ["validate_export_request"]}) == []
+
+
+def test_python_unlisted_helper_still_fires(tmp_path: Path) -> None:
+    """A helper NOT in ``request_validators`` does not clear the read."""
+    src = _write(tmp_path, "api.py", "def export(request):\n    massage(request.data)\n    return Model(**request.data)\n")
+    assert _codes_with(src, {"request_validators": ["validate_export_request"]}) == ["SAFE907"]
+
+
+def test_php_project_validator_clears(tmp_path: Path) -> None:
+    """A Laravel project validator named in ``request_validators_php`` clears the read."""
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ $request->allowlist(); return M::create($request->all()); } } ?>")
+    assert _codes(src) == ["SAFE907"]
+    assert _codes_with(src, {"request_validators_php": ["allowlist"]}) == []
+
+
+def test_request_validators_scalar_typo_raises(tmp_path: Path) -> None:
+    """A bare-string typo for ``request_validators`` fails loud."""
+    import pytest  # noqa: PLC0415
+
+    src = _write(tmp_path, "api.py", "def export(request):\n    return Model(**request.data)\n")
+    with pytest.raises(TypeError, match="request_validators"):
+        _codes_with(src, {"request_validators": "validate_export_request"})
