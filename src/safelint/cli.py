@@ -687,13 +687,22 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path) -> tuple[list
     if getattr(args, "all_files", False):
         return None, None, False, set()
     if not target.is_dir():
-        # An explicit file target IS its own changed set - the same contract as
-        # ``safelint <file>`` (pre-commit style). Returning it as ``files`` lets
-        # the runner reuse it as ``changed_files`` (see ``runner.run``), so
-        # diff-aware rules like ``test_coupling`` behave identically whether a
-        # file is named via ``safelint <file>`` or ``safelint check <file>``.
-        # (``--all-files`` above opts out of diff-awareness, as for directories.)
-        return None, [str(target)], False, set()
+        # An explicit file target is always linted (returned as ``files``), but
+        # its diff-aware context must be the REPO-WIDE changed set, not just the
+        # named file - so ``test_coupling`` (SAFE702) reaches the same verdict
+        # whether ``foo.py`` is named directly (``check foo.py``) or via an
+        # overlapping directory (``check pkg/ pkg/foo.py``); an overlapping run
+        # dedups to the file target, and reusing ``[foo.py]`` alone as the
+        # changed set would drop a sibling test that WAS updated in the same
+        # diff (false positive). ``test_coupling`` itself gates on the source
+        # being in the changed set, so a named-but-unmodified file stays quiet.
+        # When git is unavailable we cannot obtain a repo-wide diff, so fall back
+        # to reusing the named file as its own changed set (runner behaviour when
+        # ``changed_files`` is None) - best effort, matching the pre-commit
+        # ``safelint <file>`` contract. (``--all-files`` above opts out entirely.)
+        modified = _get_git_modified_supported_files(target)
+        changed_files = modified[0] if modified is not None else None
+        return changed_files, [str(target)], False, set()
     modified = _get_git_modified_supported_files(target)
     if modified is None:
         # git unavailable: fall back to scanning all files. No inline note - the
