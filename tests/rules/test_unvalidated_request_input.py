@@ -134,6 +134,19 @@ def test_php_project_validator_clears(tmp_path: Path) -> None:
     assert _codes_with(src, {"request_validators_php": ["allowlist"]}) == []
 
 
+def test_php_global_function_validator_clears(tmp_path: Path) -> None:
+    """A GLOBAL-function validator (not a ``$request->`` member call) also clears the read.
+
+    ``call_name`` resolves the bareword across all PHP call forms, so a configured
+    validator invoked as a plain function (``allowlist(...)``), static
+    (``Validator::validate(...)``), or nullsafe call must be honoured - not only
+    the ``$request->validate(...)`` member form.
+    """
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ allowlist($request->all()); return M::create($request->all()); } } ?>")
+    assert _codes(src) == ["SAFE907"]
+    assert _codes_with(src, {"request_validators_php": ["allowlist"]}) == []
+
+
 def test_request_validators_scalar_typo_raises(tmp_path: Path) -> None:
     """A bare-string typo for ``request_validators`` fails loud."""
     import pytest  # noqa: PLC0415

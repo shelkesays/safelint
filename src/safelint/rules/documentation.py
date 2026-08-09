@@ -296,7 +296,10 @@ class MissingAssertionsRule(BaseRule):
         """
         if not self.config.get("test_functions_only", False):
             return False, None
-        test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
+        # Validate as a string list so a scalar typo (``test_dirs = "mytests"``)
+        # fails loud rather than iterating characters and silently skipping the
+        # whole file - matching the fail-loud guard on every other list key.
+        test_dirs = _validated_string_list(self.config.get("test_dirs", ["tests"]), "test_dirs")
         if not _is_test_file(filepath, test_dirs, lang_name):
             return True, None
         prefixes = tuple(_validated_string_list(self.config.get("test_function_prefixes", ["test"]), "test_function_prefixes"))

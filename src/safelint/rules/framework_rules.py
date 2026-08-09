@@ -14,7 +14,7 @@ from typing import TYPE_CHECKING
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages import php as _php
 from safelint.languages import python as _py
-from safelint.languages._node_utils import call_name, node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import CALL_TYPES, call_name, node_text, resolve_lang_name, walk
 from safelint.rules.base import BaseRule
 
 
@@ -442,7 +442,12 @@ class UnvalidatedRequestInputRule(BaseRule):
     def _php_function_hit(self, func: tree_sitter.Node, func_types: frozenset[str], validators: frozenset[str]) -> tree_sitter.Node | None:
         raw_read = None
         for node in walk(func, skip_types=tuple(func_types)):
-            if node.type == _php.MEMBER_CALL_EXPRESSION and call_name(node) in validators:
+            # Match a validator in ANY PHP call form (``call_name`` resolves the
+            # bareword across member / nullsafe-member / scoped / plain function
+            # calls), so a configured global (``validate_export_request($req)``),
+            # static (``Validator::validate(...)``), or nullsafe validator clears
+            # the read - not only the ``$request->validate(...)`` member form.
+            if node.type in CALL_TYPES and call_name(node) in validators:
                 return None
             if raw_read is None and _php_is_bulk_request_call(node):
                 raw_read = node
