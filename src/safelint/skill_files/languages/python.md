@@ -85,6 +85,7 @@ def f(user):
                 return load(user)
     return None
 
+
 # After
 def f(user):
     if user is None:
@@ -102,8 +103,8 @@ Group related arguments into a dataclass or `TypedDict`. For instance:
 
 ```python
 # Before
-def render(width, height, dpi, colour, font, font_size, line_height, padding):
-    ...
+def render(width, height, dpi, colour, font, font_size, line_height, padding): ...
+
 
 # After
 @dataclass
@@ -117,8 +118,8 @@ class RenderOptions:
     line_height: float
     padding: int
 
-def render(options: RenderOptions):
-    ...
+
+def render(options: RenderOptions): ...
 ```
 
 ### SAFE201 (bare except)
@@ -153,15 +154,17 @@ Two patterns work well:
 ```python
 # Before
 def render_report(data):
-    print(format_report(data))   # SAFE304
+    print(format_report(data))  # SAFE304
+
 
 # After (option 1: rename)
 def print_report(data):
-    print(format_report(data))   # name signals intent, suppressed by rule heuristic
+    print(format_report(data))  # name signals intent, suppressed by rule heuristic
+
 
 # After (option 2: inject)
 def render_report(data, write=print):
-    write(format_report(data))   # caller controls the I/O primitive
+    write(format_report(data))  # caller controls the I/O primitive
 ```
 
 ## Framework presets
