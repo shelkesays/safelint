@@ -103,6 +103,19 @@ def test_php_validated_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_php_builtin_validate_only_clears_for_request_receiver(tmp_path: Path) -> None:
+    """The built-in ``validate`` clears ONLY as ``$request->validate(...)``.
+
+    An unrelated ``$other->validate(...)`` or static ``Validator::validate(...)``
+    does not validate the request, so it must not suppress SAFE907 (a security
+    false negative). Configured project validators keep their any-call-form match.
+    """
+    other = _write(tmp_path, "A.php", "<?php class A { function store($request){ $other->validate($x); return M::create($request->all()); } } ?>")
+    assert _codes(other) == ["SAFE907"]
+    static = _write(tmp_path, "B.php", "<?php class B { function store($request){ Validator::validate($x); return M::create($request->all()); } } ?>")
+    assert _codes(static) == ["SAFE907"]
+
+
 def test_disabled_by_default(tmp_path: Path) -> None:
     """At the default (disabled) nothing fires."""
     src = _write(tmp_path, "views.py", "def create(request):\n    return Model(**request.data)\n")
