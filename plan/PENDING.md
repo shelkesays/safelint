@@ -48,112 +48,28 @@ uv run mkdocs build --strict                   # broken anchors fail the build
   config docs, language pages, all 14 skill files, CHANGELOG. Post-release
   false-positive fixes (a kwarg *named* `csrf_exempt`; an empty prefixed literal
   `r""` / `f""`) also shipped in 2.11.0. See CHANGELOG `[2.11.0]`.
+- **SAFE601 `missing_assertions`: Python method-call asserts + test-only scoping**
+  ✅ DONE (2.12.0). Counts assertion *method calls* (`self.assertEqual`,
+  `pytest.raises`) via a configurable `assertion_calls` list (bare Python key),
+  in addition to the `assert` keyword; plus `test_functions_only` scoping
+  (`test_function_prefixes` + `test_dirs`) so the rule fires only on test-named
+  functions in test files. Shared test-file identification extracted to
+  `rules/_test_files.py`. See CHANGELOG `[Unreleased]`.
+- **SAFE907 `unvalidated_request_input`: configurable validator allowlist**
+  ✅ DONE (2.12.0). `request_validators` (Python, bare key) /
+  `request_validators_php` lists union with the built-in validation calls, so a
+  project validator (`validate_export_request`, ...) clears a read without a
+  file-level ignore. See CHANGELOG `[Unreleased]`.
+- **`test_coupling` (SAFE702): file-target changed-files context**  ✅ DONE
+  (2.12.0). An explicit `check <file>` target now carries the repo-wide diff
+  (not just the named file), and the rule gates on the source being in the
+  changed set, so overlapping targets (`check pkg/ pkg/foo.py`) reach the same
+  verdict as `check pkg/` and a named-but-unmodified file no longer trips
+  coupling. This was Priority 4. See CHANGELOG `[Unreleased]`.
 
 ---
 
-## Priority 1 - SAFE601 `missing_assertions`: recognise Python method-call asserts
-
-**Type**: config + rule enhancement to `missing_assertions` (SAFE601), Python
-detector. **Surfaced by the optimus-secure-fdn Django config review** (Aug 2026):
-a real project had to blanket-ignore SAFE601 across its whole audit app because
-the rule flagged ~281 of ~300 functions - all noise. Prioritised **above the
-taint overhaul** by owner decision: it removes a systemic false-positive class
-that forces blanket ignores in every Python unittest / Django codebase (a
-headline safelint audience), and it is small and self-contained.
-
-### Problem
-
-On Python, SAFE601 only recognises the `assert` **keyword**. unittest /
-Django `TestCase` tests assert via **method calls** (`self.assertEqual(...)`,
-`self.assertTrue(...)`, `self.assertRaises(...)`), which the rule cannot see, so
-every unittest-style test reads as assertion-less. Every other language SAFE601
-*supports* already has a configurable `assertion_calls_<lang>` **name list**,
-matched against that language's assertion form (JS / Java / PHP / C / C++ call
-names, Rust `assert!`-family macros; TS inherits JS's) - **Python alone has none**,
-only the bare-keyword path. (Go is outside SAFE601's scope entirely, so it is not
-a counterexample.) So the only recourse is a file-wide ignore, which also hides
-genuinely under-asserted production code.
-
-### Exact requirement
-
-- Add a Python assertion-call list to `DEFAULTS["rules"]["missing_assertions"]`.
-  Match the Python-uses-bare-key convention the other rules follow (Python =
-  bare key, others suffixed) - check the sibling rules before picking
-  `assertion_calls` vs `assertion_calls_python`. Seed it with the unittest /
-  pytest surface: `assertEqual, assertNotEqual, assertTrue, assertFalse,
-  assertIs, assertIsNot, assertIsNone, assertIsNotNone, assertIn, assertNotIn,
-  assertRaises, assertRaisesRegex, assertWarns, assertAlmostEqual, assertGreater,
-  assertGreaterEqual, assertLess, assertLessEqual, assertListEqual,
-  assertDictEqual, assertSetEqual, assertCountEqual, assertRegex,
-  fail` plus pytest's `raises` / `warns` where the receiver is detectable.
-- The Python detector must count a matching **method call** (resolve via
-  `call_name`, so `self.assertEqual(...)` and `pytest.raises(...)` both match) as
-  an assertion, in addition to the `assert` keyword it already counts. Keep the
-  walk iterative (SAFE105) and skip nested function defs (the standard
-  per-function-metric pattern).
-- Follow the "Adding a new rule" config discipline for the new key: validate via
-  `_validated_string_list`, document in **both TOML forms** in
-  `docs/configuration/rules.md`, update the Python language page / skill-file
-  crib if they enumerate the rule's config surface.
-- Tests: a unittest-style test whose only assertions are `self.assertEqual(...)`
-  is no longer flagged; a genuinely assertion-less test still fires; the bare
-  `assert` keyword path is unchanged; a mistyped scalar for the new list warns
-  (typo guard) rather than silently disabling matching.
-
-Additive = MINOR.
-
----
-
-## Priority 2 - SAFE907 `unvalidated_request_input`: a validator / allowlist knob
-
-**Type**: rule enhancement to `unvalidated_request_input` (SAFE907), Python + PHP.
-**Also surfaced by the optimus-secure-fdn review**: SAFE907 has **no config knob
-at all**, so a project that validates request input with hand-rolled functions
-(`validate_export_request()`, an allowlist filter builder) can only silence it
-with a **file-level ignore** - which then hides any genuinely-unvalidated read
-elsewhere in that file. Same false-positive-forces-blanket-ignore problem as
-Priority 1, hence paired with it ahead of the taint overhaul.
-
-### Problem
-
-SAFE907 fires on a **whole-object** request-data read - Python
-`request.{POST, GET, data, json, form, values, body, query_params}` as a bare
-read (a *targeted* field access like `request.POST['x']` / `request.POST.get('x')`
-is deliberately excluded), and Laravel `$request->all()` / a bare
-`$request->input()` with no field argument (`$request->input('field')` is
-excluded). It is **not** driven by PHP superglobals. It treats the read as
-validated only when a **hardcoded, non-configurable** validation call appears in
-the same function/method - Python `_PY_VALIDATION_CALLS` = `is_valid` /
-`full_clean` / `validate` / `model_validate` / `parse_obj`, and PHP a
-`$request->validate(...)` member call. Real Django / Laravel
-apps validate through project-specific functions (`validate_export_request()`)
-that are not in that set and cannot be added, so the accurate-and-strict posture
-users want is impossible without disabling the rule for whole files.
-
-### Exact requirement
-
-Give the rule a precision lever, one of:
-
-- **(a) Minimal, standalone**: make the existing hardcoded validation-call set
-  **extensible** - a configurable list (e.g. `validators` /
-  `request_validators_python` / `_php`) whose names are unioned with the built-in
-  `_PY_VALIDATION_CALLS` (and the PHP equivalent), so a request read validated by
-  a project function named in it no longer fires. Same exact-call-name matching
-  the built-in set and `tainted_sink.sanitizers` already use. Validate via
-  `_validated_string_list`; both-TOML-form docs; tests (validated read clean,
-  unvalidated read still fires, unknown name warns).
-- **(b) Principled, ties into Priority 3**: integrate SAFE907 with the
-  property-typed sanitiser framework (P3/3a) - a validator registered as a
-  sanitiser establishing a `schema_validated` / `allowlisted` property clears the
-  "unvalidated input" concern but NOT injection sinks. Prefer (b) if it can ride
-  on 3a; sequence it as part of / immediately after that work. (a) is independent
-  and can land first if 907 is wanted before the overhaul.
-
-Additive = MINOR.
-
----
-
-## Priority 3 - Taint-tracker core overhaul (do 3a + 3b together)
+## Priority 1 - Taint-tracker core overhaul (do 3a + 3b together)
 
 **Type**: architectural enhancement to the taint trackers. Two sub-items,
 strategically downstream of the shipped 2.11.0 taint-projection parity work:
@@ -250,57 +166,3 @@ detection change. Do it in the **same pass** as 3a, since 3a also rewrites the
 sanitiser handling inside these same methods (a sanitiser must short-circuit the
 worklist step with `(False, [])`, matching `dataflow_c.py`).
 
----
-
-## Priority 4 - file / overlapping `check` targets: changed-files context
-
-**Type**: small correctness fix in the multi-path CLI (`cli.py`), narrow but real.
-Originally surfaced by the high-effort code review of the v2.11.0 branch, and
-re-raised by Copilot on PR #135.
-
-**Update (2.11.0)**: the *standalone* half was fixed - `safelint check <file>`
-now returns the named file as its own changed set (commit `2d55abd`,
-"fix(cli): `check <file>` is diff-aware like `safelint <file>`"), so a single
-named file runs `test_coupling` consistently with the pre-commit `safelint
-<file>` invocation. The **overlapping-targets** half is still open, and the fix
-**flipped its direction**: because a file target now carries a *single-file*
-changed set (just that file), not the repo-wide diff, an overlapping run can now
-**false-positive**.
-
-**Remaining problem**: overlapping targets dedup **most-specific-first**, so a
-file reached via both `pkg/` and `pkg/foo.py` keeps the *file* target's result,
-whose changed set is `[foo.py]` alone. `test_coupling` then fires on `foo.py`
-even when the user *did* update `pkg/foo.py`'s test in the same commit (the test
-is in the repo-wide diff but not in the single-file set), whereas `safelint check
-pkg/` alone stays quiet. Verified: with both `pkg/foo.py` and `tests/test_foo.py`
-modified, `check pkg/` exits 0 (clean) but `check pkg/ pkg/foo.py` exits 1
-(fires). Pre-2.11.0 the divergence was the opposite - the file target was inert,
-so the finding was silently **dropped**; now it is spuriously **added**.
-
-**The design decision this needs (do not skip):** the 2.11.0 standalone fix and
-the overlap fix pull in different directions. Making standalone `check <file>`
-behave like the pre-commit hook means "the named file *is* the change set"
-(`changed_files = [foo.py]`); making overlap consistent means "the run has one
-repo-wide change set, regardless of how a file is named" (`changed_files =
-repo-wide diff`). Pick one coherent model. **Recommended end-state**: compute
-the repo-wide changed-files list once per run (git-modified mode) and hand it to
-**every** target's `run(...)` as `changed_files`, keeping the named file(s) as
-`files`. That makes the deduped result identical regardless of overlap AND is
-strictly more correct (a named-but-unmodified file stops tripping `test_coupling`
-because it is genuinely not in the diff). Note this **supersedes the 2.11.0
-`[foo.py]`-as-changed-set choice**: standalone `check foo.py` on an *unmodified*
-file would then no longer fire `test_coupling` (correct - it wasn't changed),
-diverging from the positional `safelint foo.py` hook contract, which is
-acceptable because `check` is git-aware while the hook asserts "these are my
-staged files". Update the 2.11.0 unit tests
-(`test_resolve_check_targets_file_target_is_its_own_changed_set`) accordingly.
-
-**Why still deferred**: gated to an opt-in rule (`test_coupling`) in an unusual
-overlapping invocation; the clean fix touches target-resolution core and adds a
-git call for file targets.
-
-**Exact requirement**: make a file's changed-files context independent of how it
-is named, per the recommended end-state above. Add a regression test asserting
-`check pkg/ pkg/foo.py` and `check pkg/` produce the same `test_coupling` result
-for `foo.py` - both clean when the test was updated in the same diff, both firing
-when it was not.

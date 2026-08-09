@@ -815,6 +815,43 @@ def test_test_coupling_ignores_same_basename_outside_test_dirs(tmp_path: Path) -
     assert any(v.rule == "test_coupling" for v in violations), "Same-basename file outside test_dirs should not satisfy the coupling check"
 
 
+def test_test_coupling_skips_source_not_in_changed_set(tmp_path: Path) -> None:
+    """SAFE702 does not fire on a linted file that is NOT in the changed set.
+
+    A named-but-unmodified ``check <file>`` target is always linted, but its
+    repo-wide changed set need not contain it. Coupling must stay quiet then -
+    the file did not change, so there is nothing to couple. Without this gate the
+    rule fired whenever a paired test existed but was not in the (repo-wide)
+    diff, making ``check foo.py`` on an unmodified file a false positive and
+    diverging from ``check pkg/`` (which never lints the unmodified file).
+    """
+    src_dir = tmp_path / "src"
+    src_dir.mkdir()
+    test_dir = tmp_path / "tests"
+    test_dir.mkdir()
+    sample = src_dir / "mymodule.py"
+    sample.write_text("x = 1\n", encoding="utf-8")
+    (test_dir / "test_mymodule.py").write_text("def test_x(): pass\n", encoding="utf-8")
+
+    config = deep_merge(
+        DEFAULTS,
+        {
+            "rules": {
+                "test_coupling": {
+                    "enabled": True,
+                    "test_dirs": [str(test_dir)],
+                    # The diff is non-empty but does NOT include ``mymodule.py``.
+                    "_changed_files": [str(src_dir / "other.py")],
+                }
+            }
+        },
+    )
+    engine = SafetyEngine(config)
+    violations = engine.check_file(str(sample)).violations
+
+    assert not any(v.rule == "test_coupling" for v in violations), "An unmodified source (not in the changed set) must not trip coupling"
+
+
 # ---------------------------------------------------------------------------
 # CLI entry points (tested via the underlying functions, not subprocess)
 # ---------------------------------------------------------------------------
