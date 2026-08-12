@@ -222,16 +222,31 @@ def _rust_has_test_marker(tree: tree_sitter.Tree) -> bool:
     return any(node.type == _rust.ATTRIBUTE and attribute_is_test_marker(node) for node in walk(tree.root_node))
 
 
-def _path_in_changed_set(path: Path, changed: set[str]) -> bool:
-    """Return True if *path* is present in *changed*, comparing absolute forms.
+def _canonical_path(p: Path) -> Path:
+    """Best-effort canonical path: ``resolve()`` (symlinks + ``..`` collapsed), ``absolute()`` on error.
 
-    ``changed`` entries and *path* can each be relative (to cwd) or absolute
-    depending on how they were produced, so both sides are normalised via
-    ``.absolute()`` (not ``.resolve()`` - no symlink following), mirroring
-    :func:`_paired_test_in_changed_under_test_dirs`.
+    ``resolve()`` can raise ``RuntimeError`` on a symlink loop (Python <= 3.12)
+    or ``OSError`` on an unreadable ancestor; fall back to ``absolute()`` rather
+    than crash discovery.
     """
-    target = path.absolute()
-    return any(Path(f).absolute() == target for f in changed)
+    try:
+        return p.resolve()
+    except (RuntimeError, OSError):  # nosafe: SAFE203
+        return p.absolute()
+
+
+def _path_in_changed_set(path: Path, changed: set[str]) -> bool:
+    """Return True if *path* is present in *changed*, comparing RESOLVED forms.
+
+    The changed-set entries are produced from ``(git_root / rel).resolve()`` in
+    the CLI, so both sides must be resolved (symlinks followed, ``..`` collapsed)
+    to compare equal. ``.absolute()`` alone would leave a file target reached via
+    a symlinked or ``..``-containing path (``check ./symlinked/foo.py``)
+    unresolved, so it would not match its resolved changed entry and SAFE702
+    would silently skip the coupling check (false negative).
+    """
+    target = _canonical_path(path)
+    return any(_canonical_path(Path(f)) == target for f in changed)
 
 
 def _paired_test_in_changed_under_test_dirs(src: Path, changed: set[str], test_dirs: list[str], lang_name: str) -> bool:

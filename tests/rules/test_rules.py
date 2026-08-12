@@ -852,6 +852,43 @@ def test_test_coupling_skips_source_not_in_changed_set(tmp_path: Path) -> None:
     assert not any(v.rule == "test_coupling" for v in violations), "An unmodified source (not in the changed set) must not trip coupling"
 
 
+def test_test_coupling_matches_symlinked_target_against_resolved_changed_set(tmp_path: Path) -> None:
+    """A file reached via a symlinked path matches the RESOLVED changed-set entries.
+
+    The CLI builds ``changed_files`` from ``(git_root / rel).resolve()``. If the
+    coupling gate compared only ``.absolute()`` (symlink NOT followed), linting
+    ``check ./symlink/foo.py`` would not match the resolved changed entry and
+    SAFE702 would silently skip - a false negative. Comparing resolved forms
+    fixes it.
+    """
+    real = tmp_path / "real"
+    (real / "tests").mkdir(parents=True)
+    src = real / "mymodule.py"
+    src.write_text("x = 1\n", encoding="utf-8")
+    (real / "tests" / "test_mymodule.py").write_text("def test_x(): pass\n", encoding="utf-8")
+    link = tmp_path / "link"
+    link.symlink_to(real, target_is_directory=True)
+
+    config = deep_merge(
+        DEFAULTS,
+        {
+            "rules": {
+                "test_coupling": {
+                    "enabled": True,
+                    "test_dirs": [str(real / "tests")],
+                    # Resolved source path is in the diff; the paired test is NOT.
+                    "_changed_files": [str(src.resolve())],
+                }
+            }
+        },
+    )
+    engine = SafetyEngine(config)
+    # Lint via the SYMLINKED path - it must still resolve to the changed entry.
+    violations = engine.check_file(str(link / "mymodule.py")).violations
+
+    assert any(v.rule == "test_coupling" for v in violations), "A symlinked target must match the resolved changed set and fire coupling"
+
+
 # ---------------------------------------------------------------------------
 # CLI entry points (tested via the underlying functions, not subprocess)
 # ---------------------------------------------------------------------------
