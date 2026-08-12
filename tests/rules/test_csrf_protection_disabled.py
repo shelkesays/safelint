@@ -70,6 +70,16 @@ def test_python_csrf_exempt_kwarg_value_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_python_method_decorator_keyword_decorator_fires(tmp_path: Path) -> None:
+    """``@method_decorator(decorator=csrf_exempt)`` DOES apply csrf_exempt and fires.
+
+    Unlike an unrelated ``handler=csrf_exempt`` value, ``decorator=`` is the
+    ``method_decorator`` argument that actually applies the decorator to a
+    class-based view."""
+    src = _write(tmp_path, "views.py", "@method_decorator(decorator=csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == ["SAFE908"]
+
+
 # ---------------------------------------------------------------------------
 # PHP (Laravel)
 # ---------------------------------------------------------------------------

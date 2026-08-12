@@ -229,7 +229,13 @@ def test_call_name_returns_none_for_unresolvable_function() -> None:
 
 
 def test_call_has_named_arguments_all_branches() -> None:
-    """``call_has_named_arguments``: args present -> True, empty -> False, no field -> False."""
+    """``call_has_named_arguments``: real args -> True; empty / comment-only / no field -> False.
+
+    A comment inside the argument list is a tree-sitter *extra* (``is_extra``),
+    not a semantic argument, so it must not count - the ``is_extra`` filter is a
+    tree-sitter primitive and grammar-independent, exercised here on Python
+    (``#``) and JavaScript (``/* */``) as the two comment-syntax families.
+    """
     parser = tree_sitter.Parser(tree_sitter.Language(tree_sitter_python.language()))
 
     def _first_call(src: str) -> tree_sitter.Node:
@@ -238,6 +244,13 @@ def test_call_has_named_arguments_all_branches() -> None:
 
     assert _call_has_named_arguments(_first_call("f(1)\n")) is True
     assert _call_has_named_arguments(_first_call("f()\n")) is False
+    assert _call_has_named_arguments(_first_call("f(  # a comment\n)\n")) is False
+
+    import tree_sitter_javascript  # noqa: PLC0415
+
+    js_parser = tree_sitter.Parser(tree_sitter.Language(tree_sitter_javascript.language()))
+    js_call = next(n for n in _walk(js_parser.parse(b"f(/* c */);").root_node) if n.type == "call_expression")
+    assert _call_has_named_arguments(js_call) is False
 
     class _NoArgsNode:
         def child_by_field_name(self, _name: str) -> None:

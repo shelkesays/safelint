@@ -577,22 +577,30 @@ class CsrfProtectionDisabledRule(BaseRule):
     def _python_exempts_csrf(decorator: tree_sitter.Node) -> bool:
         """Return True if ``csrf_exempt`` is applied as a decorator.
 
-        Fires on the bare (``@csrf_exempt``), called (``@csrf_exempt()``), and
-        ``@method_decorator(csrf_exempt)`` (positional-argument) forms. An
-        unrelated **keyword argument** whose NAME or VALUE happens to be
-        ``csrf_exempt`` - ``@foo(csrf_exempt=True)`` (name) or
-        ``@register(handler=csrf_exempt)`` (value) - does not apply the decorator
-        and must not fire; a keyword argument on either side is excluded, while a
-        positional ``csrf_exempt`` argument still counts.
+        Fires on the bare (``@csrf_exempt``), called (``@csrf_exempt()``),
+        positional ``@method_decorator(csrf_exempt)``, and keyword
+        ``@method_decorator(decorator=csrf_exempt)`` forms. Does NOT fire when
+        ``csrf_exempt`` is a keyword-argument NAME (``@foo(csrf_exempt=True)``) or
+        an unrelated keyword-argument VALUE (``@register(handler=csrf_exempt)``),
+        neither of which applies the decorator.
         """
-        for node in walk(decorator):
-            if node.type != _py.IDENTIFIER or node_text(node) != "csrf_exempt":
-                continue
-            parent = node.parent
-            is_in_kwarg = parent is not None and parent.type == _py.KEYWORD_ARGUMENT
-            if not is_in_kwarg:
-                return True
-        return False
+        return any(node.type == _py.IDENTIFIER and node_text(node) == "csrf_exempt" and CsrfProtectionDisabledRule._csrf_exempt_applied(node) for node in walk(decorator))
+
+    @staticmethod
+    def _csrf_exempt_applied(node: tree_sitter.Node) -> bool:
+        """Return True if the ``csrf_exempt`` identifier *node* actually applies the decorator.
+
+        Outside a keyword argument (bare / called / positional) it always applies.
+        Inside a keyword argument it applies only as the VALUE of a ``decorator=``
+        keyword (the ``method_decorator(decorator=csrf_exempt)`` form) - a kwarg
+        NAME (``csrf_exempt=True``) or an unrelated kwarg value
+        (``handler=csrf_exempt``) does not.
+        """
+        parent = node.parent
+        if parent is None or parent.type != _py.KEYWORD_ARGUMENT:
+            return True
+        name = parent.child_by_field_name("name")
+        return parent.child_by_field_name("value") == node and name is not None and node_text(name) == "decorator"
 
     def _check_php(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         violations: list[Violation] = []
