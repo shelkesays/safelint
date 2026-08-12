@@ -140,6 +140,7 @@ class JavaTaintTracker:
         sources: frozenset[str],
         *,
         assume_taint_preserving: bool = True,
+        receiver_sinks: frozenset[str] = frozenset(),
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config."""
         self.tainted: set[str] = set(params)
@@ -147,6 +148,7 @@ class JavaTaintTracker:
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
+        self.receiver_sinks = receiver_sinks
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -303,7 +305,7 @@ class JavaTaintTracker:
         # passed only constant arguments (``stmt.executeQuery("SELECT 1")``) is
         # not injection. (This also stops double-reporting a tainted receiver
         # alongside a tainted argument - the argument hit already fired above.)
-        if node.type == _java.METHOD_INVOCATION and not call_has_named_arguments(node):
+        if node.type == _java.METHOD_INVOCATION and (name in self.receiver_sinks or not call_has_named_arguments(node)):
             obj = node.child_by_field_name("object")
             if obj is not None and self._is_tainted(obj):
                 self._record_sink_hit(node, obj, name)
