@@ -103,6 +103,19 @@ def test_php_validated_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_php_validates_requests_trait_form_clears(tmp_path: Path) -> None:
+    """The Laravel ValidatesRequests trait form ``$this->validate($request, $rules)`` clears.
+
+    The request is validated as the FIRST ARGUMENT (receiver is ``$this``), so a
+    receiver-only match would false-positive on this stock controller idiom.
+    """
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ $this->validate($request, ['name'=>'required']); return M::create($request->all()); } } ?>")
+    assert _codes(src) == []
+    # But $this->validate with NO request argument does not clear an unrelated read.
+    unrelated = _write(tmp_path, "D.php", "<?php class D { function store($request){ $this->validate($payload, []); return M::create($request->all()); } } ?>")
+    assert _codes(unrelated) == ["SAFE907"]
+
+
 def test_php_builtin_validate_only_clears_for_request_receiver(tmp_path: Path) -> None:
     """The built-in ``validate`` clears ONLY as ``$request->validate(...)``.
 

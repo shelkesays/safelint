@@ -386,19 +386,42 @@ def _php_receiver_is_request(node: tree_sitter.Node) -> bool:
     no longer cleared it).
     """
     obj = node.child_by_field_name("object")
-    return obj is not None and node_text(obj).lstrip("$") in ("request", "this->request")
+    return obj is not None and _php_text_is_request(node_text(obj))
+
+
+def _php_text_is_request(text: str) -> bool:
+    """Return True when *text* names the framework request (``$request`` / ``$this->request``)."""
+    return text.lstrip("$") in ("request", "this->request")
+
+
+def _php_first_arg_is_request(node: tree_sitter.Node) -> bool:
+    """Return True when the call's first argument is the framework request.
+
+    Recognises the Laravel ``ValidatesRequests`` trait form
+    ``$this->validate($request, $rules)`` (and ``validate($request, $rules)``),
+    where the request is validated as the first *argument* rather than being the
+    receiver. Without this, that stock controller idiom - receiver ``$this`` -
+    would not clear the ``$request->all()`` read and SAFE907 would false-positive
+    on correctly-validated code.
+    """
+    args = node.child_by_field_name("arguments")
+    if args is None or not args.named_children:
+        return False
+    return _php_text_is_request(node_text(args.named_children[0]))
 
 
 def _php_is_validation(node: tree_sitter.Node, configured: frozenset[str]) -> bool:
     """Return True when *node* is a validation call that clears the SAFE907 finding.
 
-    Two forms, deliberately asymmetric to avoid a security false negative:
+    Two forms, deliberately scoped to avoid a security false negative:
 
     * the **built-in** Laravel validator (``_PHP_VALIDATION_CALLS``) is matched
-      ONLY as ``$request->validate(...)`` - a member call whose receiver is a
-      ``$request``. A bare / static / other-receiver ``validate``
-      (``Validator::validate($other)``, ``$otherValidator->validate($other)``)
-      does not validate THIS request, so it must not clear the finding.
+      only when it actually validates THE request - either as
+      ``$request->validate(...)`` (request as receiver) or as the
+      ``ValidatesRequests`` trait form ``$this->validate($request, $rules)``
+      (request as first argument). A ``validate`` on an unrelated receiver with
+      no request argument (``Validator::validate($other)``,
+      ``$otherValidator->validate($other)``) does not clear the finding.
     * a **configured** project validator (``request_validators_php``) is matched
       in ANY PHP call form (``call_name`` resolves the bareword across member /
       nullsafe / scoped / plain function calls), so a global helper such as
@@ -407,7 +430,7 @@ def _php_is_validation(node: tree_sitter.Node, configured: frozenset[str]) -> bo
     name = call_name(node)
     if name is None:
         return False
-    if name in _PHP_VALIDATION_CALLS and node.type == _php.MEMBER_CALL_EXPRESSION and _php_receiver_is_request(node):
+    if name in _PHP_VALIDATION_CALLS and node.type == _php.MEMBER_CALL_EXPRESSION and (_php_receiver_is_request(node) or _php_first_arg_is_request(node)):
         return True
     return node.type in CALL_TYPES and name in configured
 
