@@ -935,7 +935,7 @@ def test_run_check_silent_pass_not_masked_by_a_sibling_target(tmp_path: Path, mo
     (clean / "api.py").write_text("x = 1\n", encoding="utf-8")
 
     # frontend: a modified app.ts with no TS grammar (silent-pass); backend: a clean modified .py.
-    def _modified(target: Path) -> tuple | None:
+    def _modified(target: Path, _cache: dict | None = None) -> tuple | None:
         if target == strict:
             return ([], [], {"app.ts"})  # no supported files, considered has .ts
         return ([str(clean / "api.py")], [str(clean / "api.py")], {str(clean / "api.py")})

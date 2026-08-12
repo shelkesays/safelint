@@ -578,8 +578,29 @@ def _get_raw_changed_files(git_bin: str, git_root: Path) -> set[str] | None:
     return set(diff_proc.stdout.splitlines()) | set(cached_proc.stdout.splitlines()) | set(untracked_proc.stdout.splitlines())
 
 
-def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str], set[str]] | None:
+def _cached_raw_changed_files(git_bin: str, git_root: Path, cache: dict | None) -> set[str] | None:
+    """Return the raw git changed-file set for *git_root*, memoised in *cache*.
+
+    The raw diff (``git diff HEAD`` / ``--cached`` / ``ls-files --others``)
+    depends only on the repository root, not on the lint target, so a multi-target
+    run (``safelint check a.py b.py c.py``) computes it once per repo instead of
+    re-spawning the git batch for every target. *cache* is the per-run dict from
+    ``_run_check`` (created fresh each CLI invocation, so no cross-run staleness);
+    ``None`` disables caching (the direct-call / test path).
+    """
+    if cache is None:
+        return _get_raw_changed_files(git_bin, git_root)
+    key = ("_git_raw_changed", str(git_root))
+    if key not in cache:
+        cache[key] = _get_raw_changed_files(git_bin, git_root)
+    return cache[key]
+
+
+def _get_git_modified_supported_files(target: Path, cache: dict | None = None) -> tuple[list[str], list[str], set[str]] | None:
     """Return changed supported-source-file lists + the considered-modified set, or ``None`` on git failure.
+
+    *cache* (optional) is the per-run dict used to memoise the raw git diff by
+    repository root across targets in one ``safelint check`` invocation.
 
     Filtering is registry-driven via :func:`safelint.languages.supported_extensions`,
     so any language registered in ``safelint.languages`` is included. Includes
@@ -609,23 +630,12 @@ def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str
         git_bin = shutil.which("git")
         if not git_bin:
             return None
-
         target_abs = target.resolve()
         work_dir = target_abs if target_abs.is_dir() else target_abs.parent
-
-        root_proc = subprocess.run(  # noqa: S603
-            [git_bin, "rev-parse", "--show-toplevel"],
-            capture_output=True,
-            text=True,
-            cwd=work_dir,
-            timeout=10,
-            check=False,
-        )
-        if root_proc.returncode != 0:
+        git_root = _git_toplevel(git_bin, work_dir)
+        if git_root is None:
             return None
-        git_root = Path(root_proc.stdout.strip())
-
-        raw = _get_raw_changed_files(git_bin, git_root)
+        raw = _cached_raw_changed_files(git_bin, git_root, cache)
         if raw is None:
             return None
         return (
@@ -633,11 +643,23 @@ def _get_git_modified_supported_files(target: Path) -> tuple[list[str], list[str
             _filter_supported_files(raw, git_root, target_abs),
             _filter_modified_under_target(raw, git_root, target_abs),
         )
-
     # Any git-side failure (no git, not a repo, timeout) means we fall back
     # to scanning all files - that's a documented behaviour, not an error.
     except (FileNotFoundError, OSError, subprocess.TimeoutExpired):  # nosafe: SAFE203
         return None
+
+
+def _git_toplevel(git_bin: str, work_dir: Path) -> Path | None:
+    """Return the git repository root for *work_dir*, or None when it is not a repo."""
+    proc = subprocess.run(  # noqa: S603
+        [git_bin, "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        cwd=work_dir,
+        timeout=10,
+        check=False,
+    )
+    return Path(proc.stdout.strip()) if proc.returncode == 0 else None
 
 
 def _config_dir(config_path: Path | None, target: Path) -> Path:
@@ -658,8 +680,10 @@ def _git_fell_back_to_all_files(args: argparse.Namespace, target: Path, changed_
     return changed_files is None and not no_targets and not getattr(args, "all_files", False) and target.is_dir()
 
 
-def _resolve_check_targets(args: argparse.Namespace, target: Path) -> tuple[list[str] | None, list[str] | None, bool, set[str]]:
+def _resolve_check_targets(args: argparse.Namespace, target: Path, cache: dict | None = None) -> tuple[list[str] | None, list[str] | None, bool, set[str]]:
     """Resolve the (changed_files, files, no_targets, considered_modified) tuple for ``check`` mode.
+
+    *cache* memoises the raw git diff by repo root across targets in one run.
 
     Returns a 4-tuple:
 
@@ -690,23 +714,19 @@ def _resolve_check_targets(args: argparse.Namespace, target: Path) -> tuple[list
     if getattr(args, "all_files", False):
         return None, None, False, set()
     if not target.is_dir():
-        # An explicit file target is always linted (returned as ``files``), but
-        # its diff-aware context must be the REPO-WIDE changed set, not just the
-        # named file - so ``test_coupling`` (SAFE702) reaches the same verdict
-        # whether ``foo.py`` is named directly (``check foo.py``) or via an
-        # overlapping directory (``check pkg/ pkg/foo.py``); an overlapping run
-        # dedups to the file target, and reusing ``[foo.py]`` alone as the
-        # changed set would drop a sibling test that WAS updated in the same
-        # diff (false positive). ``test_coupling`` itself gates on the source
-        # being in the changed set, so a named-but-unmodified file stays quiet.
-        # When git is unavailable we cannot obtain a repo-wide diff, so fall back
-        # to reusing the named file as its own changed set (runner behaviour when
-        # ``changed_files`` is None) - best effort, matching the pre-commit
-        # ``safelint <file>`` contract. (``--all-files`` above opts out entirely.)
-        modified = _get_git_modified_supported_files(target)
+        # An explicit file target is always linted, but its diff-aware context is
+        # the REPO-WIDE changed set, not just the named file - so ``test_coupling``
+        # reaches the same verdict whether ``foo.py`` is named directly or via an
+        # overlapping directory (``check pkg/ pkg/foo.py`` dedups to the file
+        # target; reusing ``[foo.py]`` alone would drop a sibling test updated in
+        # the same diff). The rule itself gates on the source being in the changed
+        # set, so a named-but-unmodified file stays quiet. Git unavailable -> None
+        # changed set, the runner reuses ``files`` (pre-commit ``safelint <file>``
+        # contract). ``--all-files`` above opts out entirely.
+        modified = _get_git_modified_supported_files(target, cache)
         changed_files = modified[0] if modified is not None else None
         return changed_files, [str(target)], False, set()
-    modified = _get_git_modified_supported_files(target)
+    modified = _get_git_modified_supported_files(target, cache)
     if modified is None:
         # git unavailable: fall back to scanning all files. No inline note - the
         # caller records it once (out.git_unavailable) for the consolidated note.
@@ -1165,7 +1185,7 @@ def _lint_one_target(args: argparse.Namespace, target: Path, config_path: str | 
     # exit 2 even though that target linted real files.
     target_unavail = _emit_missing_grammar_warnings(target, silent=True, exclude_paths=exclude_paths)
     out.unavailable |= target_unavail
-    changed_files, files, no_targets, considered = _resolve_check_targets(args, target)
+    changed_files, files, no_targets, considered = _resolve_check_targets(args, target, cache)
     if _git_fell_back_to_all_files(args, target, changed_files, no_targets=no_targets):
         out.git_fallback_targets.append(str(target))
     if no_targets:

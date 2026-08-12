@@ -16,6 +16,7 @@ import pytest
 
 from safelint.cli import (
     _any_result_was_linted,
+    _cached_raw_changed_files,
     _compose_extras_install_command,
     _emit_hook_grammar_warnings,
     _emit_missing_grammar_warnings,
@@ -378,7 +379,7 @@ def test_resolve_check_targets_file_target_uses_repo_wide_changed_set(tmp_path: 
     single = tmp_path / "widget.py"
     single.write_text("x = 1\n", encoding="utf-8")
     repo_wide = ["pkg/widget.py", "tests/test_widget.py"]
-    monkeypatch.setattr("safelint.cli._get_git_modified_supported_files", lambda _target: (repo_wide, [str(single)], set()))
+    monkeypatch.setattr("safelint.cli._get_git_modified_supported_files", lambda _target, _cache=None: (repo_wide, [str(single)], set()))
     args = argparse.Namespace(all_files=False)
     changed_files, files, no_targets, considered = _resolve_check_targets(args, single)
     assert files == [str(single)]
@@ -396,7 +397,7 @@ def test_resolve_check_targets_file_target_git_unavailable_falls_back(tmp_path: 
     """
     single = tmp_path / "widget.py"
     single.write_text("x = 1\n", encoding="utf-8")
-    monkeypatch.setattr("safelint.cli._get_git_modified_supported_files", lambda _target: None)
+    monkeypatch.setattr("safelint.cli._get_git_modified_supported_files", lambda _target, _cache=None: None)
     args = argparse.Namespace(all_files=False)
     assert _resolve_check_targets(args, single) == (None, [str(single)], False, set())
 
@@ -408,6 +409,27 @@ def test_resolve_check_targets_all_files_opts_out_of_diff_awareness(tmp_path: Pa
     single.write_text("x = 1\n", encoding="utf-8")
     args = argparse.Namespace(all_files=True)
     assert _resolve_check_targets(args, single) == (None, None, False, set())
+
+
+def test_cached_raw_changed_files_memoises_by_git_root(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The raw git diff is computed once per repo root and reused across targets.
+
+    A multi-target ``check a.py b.py c.py`` must not re-spawn the git batch per
+    target; ``None`` cache disables memoisation (the direct-call path).
+    """
+    calls: list[str] = []
+
+    def fake_raw(_git_bin: str, git_root: Path) -> set[str]:
+        calls.append(str(git_root))
+        return {"foo.py"}
+
+    monkeypatch.setattr("safelint.cli._get_raw_changed_files", fake_raw)
+    cache: dict = {}
+    assert _cached_raw_changed_files("git", tmp_path, cache) == {"foo.py"}
+    assert _cached_raw_changed_files("git", tmp_path, cache) == {"foo.py"}
+    assert calls == [str(tmp_path)], "raw diff computed once despite two cached calls"
+    _cached_raw_changed_files("git", tmp_path, None)
+    assert calls == [str(tmp_path), str(tmp_path)], "None cache disables memoisation"
 
 
 def test_scan_for_unavailable_extensions_handles_nonexistent_target(tmp_path: Path) -> None:
