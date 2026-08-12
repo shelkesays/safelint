@@ -61,6 +61,15 @@ def test_python_csrf_exempt_kwarg_name_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_python_csrf_exempt_kwarg_value_is_clean(tmp_path: Path) -> None:
+    """``csrf_exempt`` as a keyword-argument VALUE does not fire -
+    ``@register(handler=csrf_exempt)`` passes the callable to ``register``; it
+    does not apply ``@csrf_exempt``. A positional ``method_decorator(csrf_exempt)``
+    still fires (covered above)."""
+    src = _write(tmp_path, "views.py", "@register(handler=csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
 # ---------------------------------------------------------------------------
 # PHP (Laravel)
 # ---------------------------------------------------------------------------

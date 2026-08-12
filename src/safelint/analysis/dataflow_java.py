@@ -41,7 +41,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages import java as _java
-from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.languages._node_utils import call_has_named_arguments, call_name, node_text, walk
 
 
 if TYPE_CHECKING:
@@ -298,7 +298,12 @@ class JavaTaintTracker:
         if name not in self.sinks:
             return
         self._record_tainted_arg_hits(node, name)
-        if node.type == _java.METHOD_INVOCATION:
+        # Receiver-as-payload hit ONLY when the call has no arguments: an
+        # argument-consuming sink's payload is its argument, so a tainted receiver
+        # passed only constant arguments (``stmt.executeQuery("SELECT 1")``) is
+        # not injection. (This also stops double-reporting a tainted receiver
+        # alongside a tainted argument - the argument hit already fired above.)
+        if node.type == _java.METHOD_INVOCATION and not call_has_named_arguments(node):
             obj = node.child_by_field_name("object")
             if obj is not None and self._is_tainted(obj):
                 self._record_sink_hit(node, obj, name)
