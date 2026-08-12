@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.0] - 2026-08-12
+
 ### Added
 
 - **SAFE601 `missing_assertions` now recognises Python assertion *method calls*, not just the `assert` keyword.** unittest / Django `TestCase` bodies assert via `self.assertEqual(...)` / `self.assertRaises(...)` and pytest via `pytest.raises(...)` / `pytest.warns(...)`, none of which the rule could previously see - so every unittest-style test read as assertion-less and forced a file-wide SAFE601 ignore (which also hid genuinely under-asserted production code). Python gains a configurable `assertion_calls` list (bare key, per the Python convention), counted *in addition* to the `assert` keyword; `call_name` strips the receiver so `self.assertEqual` / `pytest.raises` match on the bareword. The default set covers the unittest `assert*` surface plus pytest's `raises` / `warns`; extend it with project-specific assertion helpers. This closes the systemic false-positive class surfaced by the optimus-secure-fdn Django review. A mistyped scalar (`assertion_calls = "assertEqual"`) fails loud rather than silently matching characters, matching the other per-language lists.
@@ -987,7 +989,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.11.1...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.12.0...HEAD
+[2.12.0]: https://github.com/shelkesays/safelint/compare/v2.11.1...v2.12.0
 [2.11.1]: https://github.com/shelkesays/safelint/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/shelkesays/safelint/compare/v2.10.0...v2.11.0
 [2.10.0]: https://github.com/shelkesays/safelint/compare/v2.9.0...v2.10.0
