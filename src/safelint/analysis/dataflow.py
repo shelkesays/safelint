@@ -67,6 +67,7 @@ class TaintTracker:
         sources: frozenset[str],
         *,
         assume_taint_preserving: bool = True,
+        receiver_sinks: frozenset[str] = frozenset(),
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config.
 
@@ -97,6 +98,7 @@ class TaintTracker:
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
+        self.receiver_sinks = receiver_sinks
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -194,7 +196,7 @@ class TaintTracker:
         function = node.child_by_field_name("function")
         if function is not None and function.type == _py.ATTRIBUTE:
             receiver = function.child_by_field_name("object")
-            if receiver is not None and self._is_tainted(receiver) and not call_has_named_arguments(node):
+            if receiver is not None and self._is_tainted(receiver) and (name in self.receiver_sinks or not call_has_named_arguments(node)):
                 self._record_sink_hit(node, receiver, name)
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:
