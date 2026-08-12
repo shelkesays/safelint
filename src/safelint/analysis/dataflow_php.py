@@ -39,7 +39,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages import php as _php
-from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.languages._node_utils import call_has_named_arguments, call_name, node_text, walk
 
 
 if TYPE_CHECKING:
@@ -176,9 +176,11 @@ class PhpTaintTracker:
         # ``object`` receiver of a member / nullsafe call is itself a tainted
         # value. (A scoped call ``C::m()`` has a ``scope`` class name, not an
         # ``object``, so ``child_by_field_name("object")`` is None there - no
-        # receiver taint, correctly.)
+        # receiver taint, correctly.) Fires ONLY when the call has no arguments: an
+        # argument-consuming sink's payload is its argument, so a tainted receiver
+        # passed only constant arguments (``$conn->query("SELECT 1")``) is not injection.
         receiver = node.child_by_field_name("object")
-        if receiver is not None and self._is_tainted(receiver):
+        if receiver is not None and self._is_tainted(receiver) and not call_has_named_arguments(node):
             self._record_sink_hit(node, receiver, name)
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:

@@ -344,6 +344,33 @@ def test_sink_fires_on_tainted_receiver_with_no_arguments() -> None:
     assert tracker.sink_hits[0][1] == "url"
 
 
+def test_sink_does_not_fire_on_tainted_receiver_with_constant_argument() -> None:
+    """A tainted receiver passed only a CONSTANT argument is not injection.
+
+    ``stmt.executeQuery("SELECT 1")`` where ``stmt`` is tainted but the query is
+    hard-coded conveys no user data into the sink - the payload is the argument,
+    not the receiver. (Also asserts no double-report when the receiver is tainted
+    but the sole argument is constant.)
+    """
+    tree = _parse(
+        """
+        class C {
+            void m(Stmt stmt) {
+                stmt.executeQuery("SELECT 1");
+            }
+        }
+        """
+    )
+    tracker = JavaTaintTracker(
+        params={"stmt"},
+        sinks=frozenset({"executeQuery"}),
+        sanitizers=frozenset(),
+        sources=frozenset(),
+    )
+    tracker.visit(_find_method(tree, "m"))
+    assert tracker.sink_hits == []
+
+
 def test_single_arg_lambda_seeds_parameter() -> None:
     """Untyped single-arg lambda ``u -> ...`` seeds ``u`` as tainted.
 
