@@ -25,7 +25,7 @@
       
       
       <link rel="icon" href="../../assets/safelint-icon.svg">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
     
     
       
@@ -33,7 +33,7 @@
       
     
     
-      <link rel="stylesheet" href="../../assets/stylesheets/main.484c7ddc.min.css">
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
       
         
         <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
@@ -5422,7 +5422,10 @@
 <p><strong>What it flags:</strong> Functions with fewer than <code>min_assertions</code> assertions. Cross-language.</p>
 <p>Based on Holzmann rule 5: the paper asks for an assertion density averaging a minimum of <strong>two</strong> assertions per function. The rule defaults to <code>min_assertions = 1</code> (any assertion satisfies it) to keep noise low; paper-strict projects set <code>min_assertions = 2</code>. Disabled by default because many functions legitimately have no assertions (e.g. simple data transformations).</p>
 <p>Two further clauses of the paper's rule 5 are intentionally out of scope: assertions must be <strong>side-effect free</strong> (safelint does not analyse assertion expressions for effects), and a trivially-true assertion (<code>assert True</code>) <strong>counts toward the threshold</strong> even though the paper disallows assertions a static checker can prove never fail. Both need analysis machinery (effect inference, constant propagation) that does not fit a structural rule; review remains the guard there.</p>
-<p>Python walks for the AST <code>assert_statement</code> (built-in keyword). JavaScript has no built-in <code>assert</code> keyword, so the rule walks for <em>calls</em> to a configured set of assertion-function names, Node's <code>assert</code> module (<code>assert</code>, <code>ok</code>, <code>equal</code>, <code>strictEqual</code>, <code>deepEqual</code>, <code>match</code>, ...), <code>console.assert</code>, and test-framework idioms (<code>expect</code> for Jest / Chai-via-<code>expect</code>, <code>should</code> for Should.js, <code>vi.expect</code> for Vitest). Configure via <code>assertion_calls_javascript</code>.</p>
+<p>Python counts the AST <code>assert_statement</code> (built-in keyword) <strong>and</strong> <em>calls</em> to a configured set of assertion-method names (<code>assertion_calls</code>), so unittest / Django <code>TestCase</code> bodies that assert only via <code>self.assertEqual(...)</code> / <code>self.assertRaises(...)</code> and pytest bodies using <code>pytest.raises(...)</code> / <code>pytest.warns(...)</code> are recognised instead of being flagged as assertion-less. The default set covers the unittest <code>assert*</code> surface (<code>assertEqual</code>, <code>assertTrue</code>, <code>assertRaises</code>, <code>assertIn</code>, <code>assertIsNone</code>, <code>fail</code>, ...) plus pytest's <code>raises</code> / <code>warns</code>; <code>call_name</code> strips the receiver, so <code>self.assertEqual</code> and <code>pytest.raises</code> match on the bareword. Add project-specific assertion helpers by extending <code>assertion_calls</code>.</p>
+<p>Matching is by call name only (receiver stripped) - the same allowlist approach every other language's SAFE601 detector and <code>tainted_sink.sanitizers</code> use, and the reason a <em>bare</em> project helper (<code>verify_invariant(x)</code>) counts. The tradeoff: a production call whose name coincides with a configured entry (a helper literally named <code>fail</code> / <code>raises</code>) is also credited, so SAFE601 may under-report an assertion-less function. This is a false-negative on an opt-in advisory rule; enable <code>test_functions_only</code> (below) to confine the rule to test functions, where these names are unambiguously assertions.</p>
+<p>JavaScript has no built-in <code>assert</code> keyword, so the rule walks for <em>calls</em> to a configured set of assertion-function names, Node's <code>assert</code> module (<code>assert</code>, <code>ok</code>, <code>equal</code>, <code>strictEqual</code>, <code>deepEqual</code>, <code>match</code>, ...), <code>console.assert</code>, and test-framework idioms (<code>expect</code> for Jest / Chai-via-<code>expect</code>, <code>should</code> for Should.js, <code>vi.expect</code> for Vitest). Configure via <code>assertion_calls_javascript</code>.</p>
+<p><strong>Scoping to test functions only.</strong> By default the rule enforces the paper's intent - assertions in <em>every</em> function. Some teams instead run SAFE601 as a "test must actually assert something" guard: their production code validates by raising exceptions (Python <code>assert</code> is stripped under <code>-O</code>), and fixtures / <code>setUp</code> / helper methods legitimately have no assertions. Set <code>test_functions_only = true</code> to restrict firing to functions that look like tests - named for a <code>test_function_prefixes</code> entry (default <code>["test"]</code>) <strong>and</strong> living in a file safelint recognises as a test file (under <code>test_dirs</code>, or matching the language's test-filename convention, the same definition SAFE701 / SAFE702 use). With it on, <code>setUp</code> / <code>tearDown</code> / <code>_helper</code> / fixtures and all production code are skipped, while a <code>test_*</code> function that asserts nothing - a genuinely broken test - still fires.</p>
 <table>
 <thead>
 <tr>
@@ -5448,23 +5451,51 @@
 <td>Minimum assertions per function; set <code>2</code> for the paper's density. <em>Added in 2.4.0.</em></td>
 </tr>
 <tr>
+<td><code>assertion_calls</code></td>
+<td>(see default Python list above)</td>
+<td>(Python only.) Assertion-method call names counted <em>in addition</em> to the <code>assert</code> keyword. <em>Added in 2.12.0.</em></td>
+</tr>
+<tr>
 <td><code>assertion_calls_javascript</code></td>
 <td>(see default JS list above)</td>
 <td>(JavaScript only.) Call names that satisfy the assertion check. <em>Added in 1.13.0.</em></td>
 </tr>
+<tr>
+<td><code>test_functions_only</code></td>
+<td><code>false</code></td>
+<td>Restrict the rule to test-named functions in test files (see above). <em>Added in 2.12.0.</em></td>
+</tr>
+<tr>
+<td><code>test_function_prefixes</code></td>
+<td><code>["test"]</code></td>
+<td>Name prefixes marking a function as a test (used only when <code>test_functions_only</code> is on). <em>Added in 2.12.0.</em></td>
+</tr>
+<tr>
+<td><code>test_dirs</code></td>
+<td><code>["tests"]</code></td>
+<td>Directories marking a file as a test file, matched as a path-component subsequence (same as SAFE701/702; used only when <code>test_functions_only</code> is on). <em>Added in 2.12.0.</em></td>
+</tr>
 </tbody>
 </table>
+<p>Java, Rust, PHP, C, and C++ have their own <code>assertion_calls_&lt;lang&gt;</code> lists (see each language page).</p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-60-1" name="__codelineno-60-1" href="#__codelineno-60-1"></a><span class="c1"># pyproject.toml</span>
 <a id="__codelineno-60-2" name="__codelineno-60-2" href="#__codelineno-60-2"></a><span class="k">[tool.safelint.rules.missing_assertions]</span>
 <a id="__codelineno-60-3" name="__codelineno-60-3" href="#__codelineno-60-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-60-4" name="__codelineno-60-4" href="#__codelineno-60-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
 <a id="__codelineno-60-5" name="__codelineno-60-5" href="#__codelineno-60-5"></a><span class="n">min_assertions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span><span class="w">                </span><span class="c1"># Holzmann rule 5 density; default is 1</span>
-<a id="__codelineno-60-6" name="__codelineno-60-6" href="#__codelineno-60-6"></a><span class="n">assertion_calls_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;assert&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;expect&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;should&quot;</span><span class="p">]</span>
+<a id="__codelineno-60-6" name="__codelineno-60-6" href="#__codelineno-60-6"></a><span class="n">assertion_calls</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;assertEqual&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assertTrue&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;verify_invariant&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># Python; extends the built-in assert keyword</span>
+<a id="__codelineno-60-7" name="__codelineno-60-7" href="#__codelineno-60-7"></a><span class="n">assertion_calls_javascript</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;assert&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;expect&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;should&quot;</span><span class="p">]</span>
+<a id="__codelineno-60-8" name="__codelineno-60-8" href="#__codelineno-60-8"></a><span class="c1"># Treat SAFE601 as a &quot;tests must assert&quot; guard (skips production / fixtures / setUp):</span>
+<a id="__codelineno-60-9" name="__codelineno-60-9" href="#__codelineno-60-9"></a><span class="n">test_functions_only</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-60-10" name="__codelineno-60-10" href="#__codelineno-60-10"></a><span class="n">test_function_prefixes</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;test&quot;</span><span class="p">]</span>
+<a id="__codelineno-60-11" name="__codelineno-60-11" href="#__codelineno-60-11"></a><span class="n">test_dirs</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;tests&quot;</span><span class="p">]</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-61-1" name="__codelineno-61-1" href="#__codelineno-61-1"></a><span class="c1"># standalone safelint.toml (same keys, no [tool.safelint] prefix)</span>
 <a id="__codelineno-61-2" name="__codelineno-61-2" href="#__codelineno-61-2"></a><span class="k">[rules.missing_assertions]</span>
 <a id="__codelineno-61-3" name="__codelineno-61-3" href="#__codelineno-61-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-61-4" name="__codelineno-61-4" href="#__codelineno-61-4"></a><span class="n">min_assertions</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="mi">2</span>
+<a id="__codelineno-61-5" name="__codelineno-61-5" href="#__codelineno-61-5"></a><span class="n">assertion_calls</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;assertEqual&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;assertTrue&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;verify_invariant&quot;</span><span class="p">]</span>
+<a id="__codelineno-61-6" name="__codelineno-61-6" href="#__codelineno-61-6"></a><span class="n">test_functions_only</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 </code></pre></div>
 <p><strong>Python, Bad:</strong></p>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-62-1" name="__codelineno-62-1" href="#__codelineno-62-1"></a><span class="k">def</span><span class="w"> </span><span class="nf">transfer</span><span class="p">(</span><span class="n">amount</span><span class="p">,</span> <span class="n">src</span><span class="p">,</span> <span class="n">dst</span><span class="p">):</span>    <span class="c1"># SAFE601 - no assert statements</span>
@@ -6090,6 +6121,7 @@
 <li><strong>PHP (Laravel)</strong>: <code>$request-&gt;all()</code> / bare <code>$request-&gt;input()</code> with no <code>$request-&gt;validate(...)</code> call in the method (<code>$request-&gt;input('field')</code> is a targeted read and is not flagged).</li>
 </ul>
 <p>The rule is conservative and heuristic: a validation call <em>anywhere</em> in the scope clears the whole function.</p>
+<p><strong>Project validators.</strong> Real apps often validate through their own helper (<code>validate_export_request()</code>, an allowlist filter builder) rather than the framework's built-in call. Add those names to <code>request_validators</code> (Python, bare key) / <code>request_validators_php</code> (PHP) and they are unioned with the built-in set, so a read they guard no longer fires. Matched by exact call name (receiver stripped, like <code>tainted_sink.sanitizers</code>). This replaces the previous only-recourse of a file-level ignore, which also hid any genuinely-unvalidated read added to the same file later.</p>
 <table>
 <thead>
 <tr>
@@ -6109,6 +6141,16 @@
 <td><code>"warning"</code></td>
 <td><code>"error"</code> or <code>"warning"</code></td>
 </tr>
+<tr>
+<td><code>request_validators</code></td>
+<td><code>[]</code></td>
+<td>(Python.) Project validation-call names, unioned with the built-in set. <em>Added in 2.12.0.</em></td>
+</tr>
+<tr>
+<td><code>request_validators_php</code></td>
+<td><code>[]</code></td>
+<td>(PHP.) Project validation-call names, unioned with the built-in <code>validate</code>. <em>Added in 2.12.0.</em></td>
+</tr>
 </tbody>
 </table>
 <p><strong>Bad:</strong></p>
@@ -6126,11 +6168,14 @@
 <a id="__codelineno-102-2" name="__codelineno-102-2" href="#__codelineno-102-2"></a><span class="k">[tool.safelint.rules.unvalidated_request_input]</span>
 <a id="__codelineno-102-3" name="__codelineno-102-3" href="#__codelineno-102-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-102-4" name="__codelineno-102-4" href="#__codelineno-102-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
+<a id="__codelineno-102-5" name="__codelineno-102-5" href="#__codelineno-102-5"></a><span class="n">request_validators</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;validate_export_request&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;clean_filters&quot;</span><span class="p">]</span><span class="w">   </span><span class="c1"># Python; unioned with the built-ins</span>
+<a id="__codelineno-102-6" name="__codelineno-102-6" href="#__codelineno-102-6"></a><span class="n">request_validators_php</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;allowlist&quot;</span><span class="p">]</span><span class="w">                               </span><span class="c1"># PHP; unioned with `validate`</span>
 </code></pre></div>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-103-1" name="__codelineno-103-1" href="#__codelineno-103-1"></a><span class="c1"># safelint.toml</span>
 <a id="__codelineno-103-2" name="__codelineno-103-2" href="#__codelineno-103-2"></a><span class="k">[rules.unvalidated_request_input]</span>
 <a id="__codelineno-103-3" name="__codelineno-103-3" href="#__codelineno-103-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
 <a id="__codelineno-103-4" name="__codelineno-103-4" href="#__codelineno-103-4"></a><span class="n">severity</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;warning&quot;</span>
+<a id="__codelineno-103-5" name="__codelineno-103-5" href="#__codelineno-103-5"></a><span class="n">request_validators</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;validate_export_request&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;clean_filters&quot;</span><span class="p">]</span>
 </code></pre></div>
 <h3 id="safe908-csrf_protection_disabled">SAFE908: <code>csrf_protection_disabled</code><a class="headerlink" href="#safe908-csrf_protection_disabled" title="Permanent link">#</a></h3>
 <p><strong>What it flags:</strong> CSRF protection explicitly turned off in code. Python (Django) + PHP (Laravel). New in v2.11.0.</p>
@@ -6867,7 +6912,7 @@
       <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.action.edit", "content.code.copy", "content.code.annotate", "content.tabs.link", "navigation.tabs", "navigation.sections", "navigation.indexes", "navigation.top", "navigation.footer", "search.suggest", "search.highlight", "search.share", "toc.follow"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
     
     
-      <script src="../../assets/javascripts/bundle.79ae519e.min.js"></script>
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
       
     
   </body>
