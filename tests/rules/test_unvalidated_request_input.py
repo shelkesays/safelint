@@ -118,6 +118,10 @@ def test_php_builtin_validate_only_clears_for_request_receiver(tmp_path: Path) -
     # must not clear the real $request read (case-sensitive suffix false negative).
     suffixed = _write(tmp_path, "C.php", "<?php class C { function store($request){ $otherrequest->validate($x); return M::create($request->all()); } } ?>")
     assert _codes(suffixed) == ["SAFE907"]
+    # An arbitrary object's ``request`` property (``$foo->request``) is not the
+    # framework request either, so its validate() must not clear the read.
+    prop = _write(tmp_path, "F.php", "<?php class F { function store($request){ $foo->request->validate($x); return M::create($request->all()); } } ?>")
+    assert _codes(prop) == ["SAFE907"]
     # The genuine request receivers still clear.
     ok = _write(tmp_path, "D.php", "<?php class D { function store($request){ $request->validate([]); return M::create($request->all()); } } ?>")
     assert _codes(ok) == []

@@ -364,24 +364,29 @@ def _php_is_bulk_request_call(node: tree_sitter.Node) -> bool:
 
 
 def _php_receiver_is_request(node: tree_sitter.Node) -> bool:
-    """Return True when a member call's receiver is the request object.
+    """Return True when a member call's receiver is THE framework request object.
 
-    The receiver's final segment must be exactly ``request`` - matching the
-    standard Laravel ``$request`` and ``$this->request``, but NOT a merely
-    request-*suffixed* variable (``$otherrequest``, ``$userRequest``). A
-    different variable that happens to end in ``request`` is not the request
-    being read, so accepting its ``validate()`` would clear a real
+    Accepts only the two canonical Laravel receivers - ``$request`` (the injected
+    ``Request``) and ``$this->request`` (a controller storing it as a property).
+    Deliberately NOT matched:
+
+    * a merely request-*suffixed* variable (``$otherrequest``, ``$userRequest``)
+      - a different variable, not the request being read;
+    * an arbitrary ``*->request`` property chain (``$foo->request``) - ``$foo``
+      is some other object whose ``request`` property is not the framework
+      request.
+
+    Accepting either would let an unrelated ``validate()`` clear a real
     ``$request->all()`` read it never validated (a security false negative).
 
     Shared with the bulk-read detector :func:`_php_is_bulk_request_call`, so the
     read and validate sides use ONE receiver notion and cannot drift: applying
-    the same exact-``request`` match to both keeps them symmetric (tightening
+    the same canonical-receiver match to both keeps them symmetric (tightening
     only the validate side would instead let a read fire while its own validate
-    no longer cleared it). The residual gap - two *different* variables both
-    named exactly ``request`` in one function - cannot occur.
+    no longer cleared it).
     """
     obj = node.child_by_field_name("object")
-    return obj is not None and node_text(obj).lstrip("$").rsplit("->", 1)[-1] == "request"
+    return obj is not None and node_text(obj).lstrip("$") in ("request", "this->request")
 
 
 def _php_is_validation(node: tree_sitter.Node, configured: frozenset[str]) -> bool:
