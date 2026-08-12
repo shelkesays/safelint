@@ -88,8 +88,17 @@ Failure case: `conn = request.get_connection(); conn.execute("SELECT 1")` -
 `conn` is tainted (derived from `request`; `_call_tainted` propagates receiver
 taint), `execute` is a sink, so `_visit_call`'s receiver branch records a
 SAFE801 hit on the receiver even though the query argument is a hard-coded
-constant. The same new-hit path exists in `dataflow_go` / `dataflow_rust` /
-`dataflow_javascript` / `dataflow_php` (C excludes the receiver step by design).
+constant.
+
+**Affected trackers - the receiver-taint-reaches-sink step lives in ALL of:**
+`dataflow.py` (**Python**), `dataflow_go.py` (**Go**), `dataflow_java.py`
+(**Java**), `dataflow_javascript.py` (**JavaScript / TypeScript**),
+`dataflow_php.py` (**PHP**), `dataflow_rust.py` (**Rust**) - the six non-C
+trackers - **plus the C++ path in `dataflow_c.py`** (its receiver step is gated
+by `is_cpp`; a C++ member call `req->execute(...)` keeps it). **C is excluded by
+design** (a C `req->handler()` is a function-pointer call whose result need not
+derive from the struct, so `is_cpp=False` turns the receiver step off). Every
+one of these is subject to the constant-argument false positive.
 
 ### Exact requirement
 
@@ -99,9 +108,13 @@ receiver alone conveys no user data into the sink. Decide the precise rule:
 either require at least one tainted argument for argument-consuming sinks, or
 restrict the receiver-only hit to sinks where the receiver itself is the
 injected value. Preserve the true positives the 2.11.0 work added
-(`tainted.execute(user_input)`, and receiver-as-payload cases). Per-language
-tests across all six affected trackers; a regression test for the
-constant-argument case.
+(`tainted.execute(user_input)`, and receiver-as-payload cases). **Add regression
+coverage for each affected tracker (the six non-C trackers + the C++ path in
+`dataflow_c.py`), asserting BOTH directions:** a receiver-as-payload sink on a
+tainted receiver still reports (true positive), and an argument-consuming sink
+on a tainted receiver with all-constant arguments does NOT report (the fixed
+false positive). C stays excluded - a test pins that its receiver step remains
+off.
 
 **Relationship to Priority 3** (taint overhaul): the fix touches the same
 `_call_tainted` / receiver classification the overhaul rewrites; if Priority 3
