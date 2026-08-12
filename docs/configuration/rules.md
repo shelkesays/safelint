@@ -1076,6 +1076,9 @@ So under a framework preset (which adds request-injection sinks like Django `Raw
 | `sanitizers` | see below | Call names that clear taint |
 | `sources` | see below | Call names that inject taint (in addition to parameters) |
 | `assume_taint_preserving` | `true` | How unknown calls (neither sanitizer nor source) propagate taint. *Added in 1.8.0.* |
+| `receiver_sinks` | Java: `openConnection`, `openStream` | Sinks whose payload is the *receiver*, not an argument (see below). *Added in 2.12.1.* |
+
+**Receiver vs argument payload.** When a sink is called as a method on a **tainted receiver** (`x.execute(...)`), whether that is an injection depends on where the payload is. For most sinks the payload is an **argument** (`conn.execute(sql)`), so a tainted receiver passed only constant arguments - `conn.execute("SELECT 1")` where `conn` merely derives from user input - is **not** flagged (the receiver conveys no user data into the sink). A tainted receiver on such a sink is reported only when the call has **no arguments** (`tainted.execute()`). Some sinks, though, carry their payload in the **receiver** itself - `url.openConnection(proxy)` is SSRF even when `proxy` is clean. List those in `receiver_sinks` (per-language `receiver_sinks_<lang>`, bare `receiver_sinks` for Python) and they fire on a tainted receiver **regardless of arguments**. A `receiver_sinks` entry must also appear in the matching `sinks` list. Defaults ship Java's URL SSRF methods (`openConnection`, `openStream`).
 
 Default `sinks`: `eval`, `exec`, `compile`, `system`, `popen`, `Popen`, `run`, `call`, `check_output`, `execute`
 
@@ -1091,6 +1094,9 @@ sinks = ["eval", "exec", "system", "execute"]
 sanitizers = ["escape", "sanitize", "quote"]
 sources = ["input", "readline"]
 assume_taint_preserving = true   # default; set false for taint-dropping mode
+# Sinks whose payload is the receiver, not an argument (fire on a tainted
+# receiver regardless of arguments). Per-language: receiver_sinks_java, etc.
+receiver_sinks_java = ["openConnection", "openStream"]
 ```
 
 #### `assume_taint_preserving` modes (1.8.0)

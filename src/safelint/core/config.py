@@ -1021,6 +1021,20 @@ DEFAULTS: dict[str, Any] = {
                 "getRequestURI",
                 "getRemoteUser",
             ],
+            # Receiver-payload sinks: the injected payload is the *receiver*, not
+            # an argument, so a tainted receiver fires regardless of the call's
+            # arguments (``url.openConnection(proxy)`` is SSRF even with a clean
+            # proxy). Every OTHER sink reports a tainted receiver only when the
+            # call has no arguments (an argument-consuming sink's payload is its
+            # argument, so ``stmt.executeQuery("SELECT 1")`` on a tainted receiver
+            # is not injection). Java's URL SSRF methods are the built-in members;
+            # add ``receiver_sinks_<lang>`` (bare ``receiver_sinks`` for Python)
+            # for a project's own receiver-payload sinks. Must also appear in the
+            # matching ``sinks_<lang>`` list to be a sink at all.
+            "receiver_sinks_java": [
+                "openConnection",  # URL.openConnection([proxy]) - SSRF, receiver URL is the payload
+                "openStream",  # URL.openStream() - SSRF
+            ],
             # Rust stdlib sink / sanitizer / source lists. Rust has no
             # ``eval`` / dynamic-code-execution analogue; the security
             # surface is shell execution (``Command`` / ``arg`` /
