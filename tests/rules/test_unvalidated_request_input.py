@@ -116,6 +116,12 @@ def test_php_validates_requests_trait_form_clears(tmp_path: Path) -> None:
     assert _codes(unrelated) == ["SAFE907"]
 
 
+def test_php_nullsafe_builtin_validate_clears(tmp_path: Path) -> None:
+    """The built-in ``validate`` clears in the nullsafe member-call form ``$request?->validate(...)``."""
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ $request?->validate([]); return M::create($request->all()); } } ?>")
+    assert _codes(src) == []
+
+
 def test_php_builtin_validate_only_clears_for_request_receiver(tmp_path: Path) -> None:
     """The built-in ``validate`` clears ONLY as ``$request->validate(...)``.
 

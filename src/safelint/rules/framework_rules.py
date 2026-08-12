@@ -425,7 +425,8 @@ def _php_is_validation(node: tree_sitter.Node, configured: frozenset[str]) -> bo
       only when it actually validates THE request - either as
       ``$request->validate(...)`` (request as receiver) or as the
       ``ValidatesRequests`` trait form ``$this->validate($request, $rules)``
-      (request as first argument). A ``validate`` on an unrelated receiver with
+      (request as first argument), in both the plain (``->``) and nullsafe
+      (``?->``) member-call forms. A ``validate`` on an unrelated receiver with
       no request argument (``Validator::validate($other)``,
       ``$otherValidator->validate($other)``) does not clear the finding.
     * a **configured** project validator (``request_validators_php``) is matched
@@ -436,7 +437,7 @@ def _php_is_validation(node: tree_sitter.Node, configured: frozenset[str]) -> bo
     name = call_name(node)
     if name is None:
         return False
-    if name in _PHP_VALIDATION_CALLS and node.type == _php.MEMBER_CALL_EXPRESSION and (_php_receiver_is_request(node) or _php_first_arg_is_request(node)):
+    if name in _PHP_VALIDATION_CALLS and node.type in (_php.MEMBER_CALL_EXPRESSION, _php.NULLSAFE_MEMBER_CALL_EXPRESSION) and (_php_receiver_is_request(node) or _php_first_arg_is_request(node)):
         return True
     return node.type in CALL_TYPES and name in configured
 
