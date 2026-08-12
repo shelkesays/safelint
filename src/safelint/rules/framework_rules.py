@@ -364,23 +364,24 @@ def _php_is_bulk_request_call(node: tree_sitter.Node) -> bool:
 
 
 def _php_receiver_is_request(node: tree_sitter.Node) -> bool:
-    """Return True when a member call's receiver is a request variable.
+    """Return True when a member call's receiver is the request object.
 
-    Matches a receiver whose name ends with the literal ``request``
-    (case-sensitive) - the standard Laravel ``$request``. The match is
-    **shared** with the bulk-read detector :func:`_php_is_bulk_request_call`, so
-    the read and validate sides use ONE receiver notion and cannot drift:
-    whatever receiver a bulk read fires on, that receiver's own ``validate()``
-    clears it. That symmetry is why the built-in validator is not tightened to an
-    exact-``$request`` compare on the validate side alone - doing so would let a
-    read fire while its own validate no longer cleared it (a false positive). An
-    unrelated receiver (``$other``, ``Validator::``) still does not match, which
-    is the case the security fix targets; a second variable that also ends in
-    ``request`` used only to validate a different request read is a corner of an
-    already function-scoped heuristic.
+    The receiver's final segment must be exactly ``request`` - matching the
+    standard Laravel ``$request`` and ``$this->request``, but NOT a merely
+    request-*suffixed* variable (``$otherrequest``, ``$userRequest``). A
+    different variable that happens to end in ``request`` is not the request
+    being read, so accepting its ``validate()`` would clear a real
+    ``$request->all()`` read it never validated (a security false negative).
+
+    Shared with the bulk-read detector :func:`_php_is_bulk_request_call`, so the
+    read and validate sides use ONE receiver notion and cannot drift: applying
+    the same exact-``request`` match to both keeps them symmetric (tightening
+    only the validate side would instead let a read fire while its own validate
+    no longer cleared it). The residual gap - two *different* variables both
+    named exactly ``request`` in one function - cannot occur.
     """
     obj = node.child_by_field_name("object")
-    return obj is not None and node_text(obj).lstrip("$").endswith("request")
+    return obj is not None and node_text(obj).lstrip("$").rsplit("->", 1)[-1] == "request"
 
 
 def _php_is_validation(node: tree_sitter.Node, configured: frozenset[str]) -> bool:

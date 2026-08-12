@@ -114,6 +114,15 @@ def test_php_builtin_validate_only_clears_for_request_receiver(tmp_path: Path) -
     assert _codes(other) == ["SAFE907"]
     static = _write(tmp_path, "B.php", "<?php class B { function store($request){ Validator::validate($x); return M::create($request->all()); } } ?>")
     assert _codes(static) == ["SAFE907"]
+    # A merely request-*suffixed* variable is a different object - its validate()
+    # must not clear the real $request read (case-sensitive suffix false negative).
+    suffixed = _write(tmp_path, "C.php", "<?php class C { function store($request){ $otherrequest->validate($x); return M::create($request->all()); } } ?>")
+    assert _codes(suffixed) == ["SAFE907"]
+    # The genuine request receivers still clear.
+    ok = _write(tmp_path, "D.php", "<?php class D { function store($request){ $request->validate([]); return M::create($request->all()); } } ?>")
+    assert _codes(ok) == []
+    this_req = _write(tmp_path, "E.php", "<?php class E { function store(){ $this->request->validate([]); return M::create($this->request->all()); } } ?>")
+    assert _codes(this_req) == []
 
 
 def test_disabled_by_default(tmp_path: Path) -> None:
@@ -156,6 +165,26 @@ def test_php_global_function_validator_clears(tmp_path: Path) -> None:
     the ``$request->validate(...)`` member form.
     """
     src = _write(tmp_path, "C.php", "<?php class C { function store($request){ allowlist($request->all()); return M::create($request->all()); } } ?>")
+    assert _codes(src) == ["SAFE907"]
+    assert _codes_with(src, {"request_validators_php": ["allowlist"]}) == []
+
+
+def test_php_static_call_validator_clears(tmp_path: Path) -> None:
+    """A configured validator invoked as a STATIC call (``Validator::allowlist(...)``) clears.
+
+    Covers the ``scoped_call_expression`` branch of ``CALL_TYPES`` independently.
+    """
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::allowlist($request); return M::create($request->all()); } } ?>")
+    assert _codes(src) == ["SAFE907"]
+    assert _codes_with(src, {"request_validators_php": ["allowlist"]}) == []
+
+
+def test_php_nullsafe_call_validator_clears(tmp_path: Path) -> None:
+    """A configured validator invoked as a NULLSAFE call (``$request?->allowlist(...)``) clears.
+
+    Covers the ``nullsafe_member_call_expression`` branch of ``CALL_TYPES``.
+    """
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ $request?->allowlist(); return M::create($request->all()); } } ?>")
     assert _codes(src) == ["SAFE907"]
     assert _codes_with(src, {"request_validators_php": ["allowlist"]}) == []
 
