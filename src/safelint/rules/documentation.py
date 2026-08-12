@@ -213,52 +213,36 @@ class MissingAssertionsRule(BaseRule):
     code = "SAFE601"
     language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _rust.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
 
-    def _assertion_count(self, func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str], minimum: int) -> int:
+    def _resolve_assertion_calls(self, lang_name: str) -> frozenset[str]:
+        """Resolve + validate the per-language ``assertion_calls`` list once (frozenset).
+
+        Called once per file in :meth:`check_file` (not per function), so the
+        config lookup and frozenset construction are not repeated for every
+        function node. Validates as strings so a bare-string typo
+        (``assertion_calls_javascript = "assert"``) fails loud instead of
+        silently degrading into a set of single characters. TypeScript inherits
+        the JS list via the TS→JS fallback in :func:`resolve_lang_config_lookup`;
+        Python uses the bare key, every other language the ``_<lang>`` suffix.
+        """
+        raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", lang_name, default=[])
+        return frozenset(_validated_string_list(raw, error_key))
+
+    @staticmethod
+    def _assertion_count(func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str], assertion_calls: frozenset[str], minimum: int) -> int:
         """Dispatch to the language-appropriate assertion counter (early-exits at *minimum*).
 
-        Validates the per-language ``assertion_calls`` list as strings
-        before building the frozenset. A bare-string typo
-        (``assertion_calls_javascript = "assert"``) would otherwise be
-        coerced into ``{'a', 's', 'e', 'r', 't'}`` and silently break
-        detection - fail loud instead. Same shape as the validation
-        on ``io_functions_javascript`` and ``global_namespaces_javascript``.
+        Python / Java count the built-in ``assert`` keyword AND *calls* in
+        *assertion_calls*; Rust matches assertion macros; PHP and the JS family
+        use the generic call-name counter. *assertion_calls* is pre-resolved by
+        :meth:`_resolve_assertion_calls`.
         """
         if lang_name == "python":
-            # Python counts the built-in ``assert`` keyword (inside
-            # ``_python_assertion_count``) AND configured assertion-method
-            # calls (unittest ``self.assertEqual`` / pytest
-            # ``pytest.raises``). Bare key per the Python convention.
-            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _py.EXTRA_NAME, default=[])
-            assertion_calls = frozenset(_validated_string_list(raw, error_key))
             return _python_assertion_count(func_node, function_types, assertion_calls, minimum)
         if lang_name == "java":
-            # Java accepts BOTH the built-in ``assert`` keyword (handled
-            # inside ``_java_assertion_count``) AND configured JUnit / AssertJ
-            # method-call names. TypeScript inherits the JS list by default
-            # via the TS→JS fallback; Java has its own dedicated set.
-            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _java.EXTRA_NAME, default=[])
-            assertion_calls = frozenset(_validated_string_list(raw, error_key))
             return _java_assertion_count(func_node, function_types, assertion_calls, minimum)
         if lang_name == "rust":
-            # Rust assertions are macros (``assert!``, ``assert_eq!``,
-            # ``debug_assert!`` etc.), NOT function calls. The rule walks
-            # ``macro_invocation`` nodes and matches the bareword macro
-            # name (stripped of any ``std::`` / ``core::`` qualifier).
-            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _rust.EXTRA_NAME, default=[])
-            assertion_calls = frozenset(_validated_string_list(raw, error_key))
             return _rust_assertion_count(func_node, function_types, assertion_calls, minimum)
-        if lang_name == "php":
-            # PHP has no ``assert`` keyword; ``assert()`` is a function and
-            # PHPUnit assertions are method calls (``assertSame`` /
-            # ``assertEquals`` / ``expectException`` / ...). The generic
-            # call-based counter handles both forms via ``assertion_calls_php``.
-            raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", _php.EXTRA_NAME, default=[])
-            assertion_calls = frozenset(_validated_string_list(raw, error_key))
-            return _javascript_assertion_count(func_node, function_types, assertion_calls, minimum)
-        # JS-family (JS / TS): TypeScript inherits the JS list by default
-        # via the TS→JS fallback in ``get_per_language_config``.
-        raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", lang_name, default=[])
-        assertion_calls = frozenset(_validated_string_list(raw, error_key))
+        # PHP + JS-family (JS / TS): the generic call-name counter.
         return _javascript_assertion_count(func_node, function_types, assertion_calls, minimum)
 
     def _resolve_min_assertions(self) -> int:
@@ -324,6 +308,7 @@ class MissingAssertionsRule(BaseRule):
         skip_file, prefixes = self._test_scope(filepath, lang_name)
         if skip_file:
             return []
+        assertion_calls = self._resolve_assertion_calls(lang_name)  # resolved once per file, not per function
         violations = []
         for node in walk(tree.root_node):
             if node.type not in function_types:
@@ -332,7 +317,7 @@ class MissingAssertionsRule(BaseRule):
             func_name = node_text(name_node) if name_node else "<anonymous>"
             if prefixes is not None and not func_name.startswith(prefixes):
                 continue
-            count = self._assertion_count(node, lang_name, function_types, minimum)
+            count = self._assertion_count(node, lang_name, function_types, assertion_calls, minimum)
             if count >= minimum:
                 continue
             violations.append(
