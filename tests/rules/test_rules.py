@@ -869,20 +869,11 @@ def test_test_coupling_matches_symlinked_target_against_resolved_changed_set(tmp
     link = tmp_path / "link"
     link.symlink_to(real, target_is_directory=True)
 
-    config = deep_merge(
-        DEFAULTS,
-        {
-            "rules": {
-                "test_coupling": {
-                    "enabled": True,
-                    "test_dirs": [str(real / "tests")],
-                    # Resolved source path is in the diff; the paired test is NOT.
-                    "_changed_files": [str(src.resolve())],
-                }
-            }
-        },
-    )
-    engine = SafetyEngine(config)
+    config = deep_merge(DEFAULTS, {"rules": {"test_coupling": {"enabled": True, "test_dirs": [str(real / "tests")]}}})
+    # Pass the changed set through the production engine contract (the engine
+    # injects it into TestCouplingRule as ``_changed_files``). Resolved source
+    # path is in the diff; the paired test is NOT.
+    engine = SafetyEngine(config, changed_files=[str(src.resolve())])
     # Lint via the SYMLINKED path - it must still resolve to the changed entry.
     violations = engine.check_file(str(link / "mymodule.py")).violations
 

@@ -398,11 +398,17 @@ def _php_first_arg_is_request(node: tree_sitter.Node) -> bool:
     """Return True when the call's first argument is the framework request.
 
     Recognises the Laravel ``ValidatesRequests`` trait form
-    ``$this->validate($request, $rules)`` (and ``validate($request, $rules)``),
-    where the request is validated as the first *argument* rather than being the
-    receiver. Without this, that stock controller idiom - receiver ``$this`` -
-    would not clear the ``$request->all()`` read and SAFE907 would false-positive
-    on correctly-validated code.
+    ``$this->validate($request, $rules)``, where the request is validated as the
+    first *argument* rather than being the receiver. Without this, that stock
+    controller idiom - receiver ``$this`` - would not clear the ``$request->all()``
+    read and SAFE907 would false-positive on correctly-validated code.
+
+    Only consulted from the ``member_call_expression`` branch of
+    :func:`_php_is_validation` (the built-in ``validate`` is a member call:
+    ``$request->validate`` / ``$this->validate``). Laravel has no global
+    ``validate()`` helper, so the plain-function-call form is deliberately not a
+    built-in validator - a project that uses its own global validator adds it to
+    ``request_validators_php`` instead.
     """
     args = node.child_by_field_name("arguments")
     if args is None or not args.named_children:
