@@ -235,18 +235,18 @@ def _canonical_path(p: Path) -> Path:
         return p.absolute()
 
 
-def _path_in_changed_set(path: Path, changed: set[str]) -> bool:
-    """Return True if *path* is present in *changed*, comparing RESOLVED forms.
+def _path_in_changed_set(path: Path, changed_resolved: frozenset[Path]) -> bool:
+    """Return True if *path* (canonicalised) is in the pre-resolved *changed_resolved* set.
 
-    The changed-set entries are produced from ``(git_root / rel).resolve()`` in
-    the CLI, so both sides must be resolved (symlinks followed, ``..`` collapsed)
-    to compare equal. ``.absolute()`` alone would leave a file target reached via
-    a symlinked or ``..``-containing path (``check ./symlinked/foo.py``)
-    unresolved, so it would not match its resolved changed entry and SAFE702
-    would silently skip the coupling check (false negative).
+    Both sides must be resolved (symlinks followed, ``..`` collapsed) to compare
+    equal: the CLI builds the changed-set entries from ``(git_root / rel).resolve()``,
+    so a file target reached via a symlinked / ``..`` path (``check ./symlinked/foo.py``)
+    would otherwise not match its resolved changed entry and SAFE702 would silently
+    skip coupling (false negative). *changed_resolved* is canonicalised **once per
+    rule instance** (see :meth:`TestCouplingRule._resolved_changed`), so this is an
+    O(1) membership test rather than an O(K) ``resolve()`` sweep per linted file.
     """
-    target = _canonical_path(path)
-    return any(_canonical_path(Path(f)) == target for f in changed)
+    return _canonical_path(path) in changed_resolved
 
 
 def _paired_test_in_changed_under_test_dirs(src: Path, changed: set[str], test_dirs: list[str], lang_name: str) -> bool:
@@ -351,7 +351,23 @@ class TestCouplingRule(BaseRule):
     code = "SAFE702"
     language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
-    def _coupling_not_applicable(self, filepath: str, tree: tree_sitter.Tree, lang_name: str, changed: set[str], test_dirs: list[str]) -> bool:
+    def _resolved_changed(self) -> frozenset[Path]:
+        """Canonicalised ``_changed_files`` set, memoised once per rule instance.
+
+        The engine injects ``_changed_files`` once and it is identical for every
+        file linted in a run, so resolving it per file - an O(N*K) sweep of
+        filesystem ``resolve()`` calls on the coupling hot path - is wasteful.
+        Cache it, keyed on the injected list's identity so a different set (a
+        fresh engine) recomputes rather than returning a stale result.
+        """
+        changed = self.config["_changed_files"]
+        cached = getattr(self, "_resolved_changed_cache", None)
+        if cached is None or cached[0] is not changed:
+            cached = (changed, frozenset(_canonical_path(Path(f)) for f in changed))
+            self._resolved_changed_cache = cached
+        return cached[1]
+
+    def _coupling_not_applicable(self, filepath: str, tree: tree_sitter.Tree, lang_name: str, changed_resolved: frozenset[Path], test_dirs: list[str]) -> bool:
         """Return True when SAFE702 does not apply to *filepath* (skip it).
 
         Four skip conditions, OR'd:
@@ -371,7 +387,7 @@ class TestCouplingRule(BaseRule):
             return True
         if lang_name == "rust" and _rust_has_test_marker(tree):
             return True
-        if not _path_in_changed_set(Path(filepath), changed):
+        if not _path_in_changed_set(Path(filepath), changed_resolved):
             return True
         return not _find_test_file(Path(filepath), test_dirs, lang_name)
 
@@ -384,7 +400,7 @@ class TestCouplingRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
         test_dirs: list[str] = self.config.get("test_dirs", ["tests"])
         changed: set[str] = set(self.config["_changed_files"])
-        if self._coupling_not_applicable(filepath, tree, lang_name, changed, test_dirs):
+        if self._coupling_not_applicable(filepath, tree, lang_name, self._resolved_changed(), test_dirs):
             return []
         src = Path(filepath)
         if _paired_test_in_changed_under_test_dirs(src, changed, test_dirs, lang_name):
