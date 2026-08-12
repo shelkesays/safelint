@@ -85,6 +85,24 @@ def test_tracker_direct_param_to_sink():
     assert sink == "eval"
 
 
+def test_tracker_tainted_receiver_with_constant_argument_does_not_fire():
+    """A tainted receiver passed only a CONSTANT argument is not injection.
+
+    ``conn.execute("SELECT 1")`` where ``conn`` is tainted but the query is a
+    hard-coded constant conveys no user data into the sink - the payload of an
+    argument-consuming sink is its argument, not the receiver. (The no-argument
+    ``conn.execute()`` receiver-as-payload case still fires; covered elsewhere.)
+    """
+    src = """
+    def process(conn):
+        conn.execute("SELECT 1")
+    """
+    func = _parse_func(src)
+    tracker = make_tracker({"conn"})
+    tracker.visit(func)
+    assert tracker.sink_hits == []
+
+
 def test_tracker_propagation_through_assignment():
     src = """
     def process(data):

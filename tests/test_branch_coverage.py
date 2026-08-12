@@ -28,7 +28,9 @@ from safelint.core import _diagnostics
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import LintResult, SafetyEngine, _nosafe_codes
 from safelint.core.runner import run
+from safelint.languages._node_utils import call_has_named_arguments as _call_has_named_arguments
 from safelint.languages._node_utils import call_name as _call_name
+from safelint.languages._node_utils import walk as _walk
 from safelint.rules.base import Violation
 from safelint.rules.error_handling import _catch_body
 
@@ -224,6 +226,24 @@ def test_call_name_returns_none_for_unresolvable_function() -> None:
             return None
 
     assert _call_name(_FakeNode()) is None  # type: ignore
+
+
+def test_call_has_named_arguments_all_branches() -> None:
+    """``call_has_named_arguments``: args present -> True, empty -> False, no field -> False."""
+    parser = tree_sitter.Parser(tree_sitter.Language(tree_sitter_python.language()))
+
+    def _first_call(src: str) -> tree_sitter.Node:
+        root = parser.parse(src.encode()).root_node
+        return next(n for n in _walk(root) if n.type == "call")
+
+    assert _call_has_named_arguments(_first_call("f(1)\n")) is True
+    assert _call_has_named_arguments(_first_call("f()\n")) is False
+
+    class _NoArgsNode:
+        def child_by_field_name(self, _name: str) -> None:
+            return None  # a node with no ``arguments`` field (e.g. paren-less ``new Foo``)
+
+    assert _call_has_named_arguments(cast("tree_sitter.Node", _NoArgsNode())) is False
 
 
 def test_state_purity_skips_annotated_assignment_with_non_identifier_target(tmp_path: Path) -> None:

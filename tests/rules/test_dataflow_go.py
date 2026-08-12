@@ -193,3 +193,11 @@ def test_go_sink_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> Non
     sample.write_text("package main\nfunc h(req Req) {\n\treq.RunQuery()\n}\n", encoding="utf-8")
     eng = _engine({"rules": {"tainted_sink": {"enabled": True, "sinks_go": ["RunQuery"]}}})
     assert any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
+
+
+def test_go_tainted_receiver_with_constant_argument_does_not_fire(tmp_path: Path) -> None:
+    """A tainted receiver passed only a CONSTANT argument is not injection (``req.RunQuery("x")``)."""
+    sample = tmp_path / "recv_const.go"
+    sample.write_text('package main\nfunc h(req Req) {\n\treq.RunQuery("SELECT 1")\n}\n', encoding="utf-8")
+    eng = _engine({"rules": {"tainted_sink": {"enabled": True, "sinks_go": ["RunQuery"]}}})
+    assert not any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)

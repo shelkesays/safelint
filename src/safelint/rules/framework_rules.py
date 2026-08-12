@@ -577,16 +577,20 @@ class CsrfProtectionDisabledRule(BaseRule):
     def _python_exempts_csrf(decorator: tree_sitter.Node) -> bool:
         """Return True if ``csrf_exempt`` is applied as a decorator.
 
-        It counts as a name, a call, or an argument. An unrelated keyword-argument
-        NAME that happens to be ``csrf_exempt`` (e.g. ``@foo(csrf_exempt=True)``)
-        does not disable CSRF and must not fire.
+        Fires on the bare (``@csrf_exempt``), called (``@csrf_exempt()``), and
+        ``@method_decorator(csrf_exempt)`` (positional-argument) forms. An
+        unrelated **keyword argument** whose NAME or VALUE happens to be
+        ``csrf_exempt`` - ``@foo(csrf_exempt=True)`` (name) or
+        ``@register(handler=csrf_exempt)`` (value) - does not apply the decorator
+        and must not fire; a keyword argument on either side is excluded, while a
+        positional ``csrf_exempt`` argument still counts.
         """
         for node in walk(decorator):
             if node.type != _py.IDENTIFIER or node_text(node) != "csrf_exempt":
                 continue
             parent = node.parent
-            is_kwarg_name = parent is not None and parent.type == _py.KEYWORD_ARGUMENT and parent.child_by_field_name("name") == node
-            if not is_kwarg_name:
+            is_in_kwarg = parent is not None and parent.type == _py.KEYWORD_ARGUMENT
+            if not is_in_kwarg:
                 return True
         return False
 

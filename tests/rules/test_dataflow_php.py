@@ -137,3 +137,15 @@ def test_php_sink_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> No
     sample.write_text("<?php\nfunction f($req) {\n    $req->runQuery();\n}\n", encoding="utf-8")
     eng = _engine({"rules": {"tainted_sink": {"enabled": True, "sinks_php": ["runQuery"]}}})
     assert any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
+
+
+def test_php_tainted_receiver_with_constant_argument_does_not_fire(tmp_path: Path) -> None:
+    """A tainted receiver passed only a CONSTANT argument is not injection (``$req->runQuery("SELECT 1")``).
+
+    The payload of an argument-consuming sink is its argument, not the receiver,
+    so a tainted connection running a hard-coded query must not report.
+    """
+    sample = tmp_path / "recv.php"
+    sample.write_text("<?php\nfunction f($req) {\n    $req->runQuery('SELECT 1');\n}\n", encoding="utf-8")
+    eng = _engine({"rules": {"tainted_sink": {"enabled": True, "sinks_php": ["runQuery"]}}})
+    assert not any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
