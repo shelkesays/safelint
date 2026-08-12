@@ -69,7 +69,80 @@ uv run mkdocs build --strict                   # broken anchors fail the build
 
 ---
 
-## Priority 1 - Taint-tracker core overhaul (do 3a + 3b together)
+## Priority 1 - SAFE801 `tainted_sink`: constant-argument false positive on a tainted receiver
+
+**Type**: correctness bugfix to the dataflow trackers (`analysis/dataflow.py`
+plus the `dataflow_<lang>.py` siblings). **Surfaced by the high-effort code
+review of the 2.12.0 branch (Aug 2026).** Pre-existing since the 2.11.0
+receiver-taint work; not introduced by 2.12.0, so it was deferred out of that
+release PR and filed here at top priority.
+
+### Problem
+
+The 2.11.0 method-receiver taint step makes a **method call on a tainted
+receiver** fire SAFE801 even when **every argument is a constant**, so no
+attacker-controlled data actually reaches the sink. The receiver being tainted
+is not the same as the sink's *payload* being tainted.
+
+Failure case: `conn = request.get_connection(); conn.execute("SELECT 1")` -
+`conn` is tainted (derived from `request`; `_call_tainted` propagates receiver
+taint), `execute` is a sink, so `_visit_call`'s receiver branch records a
+SAFE801 hit on the receiver even though the query argument is a hard-coded
+constant. The same new-hit path exists in `dataflow_go` / `dataflow_rust` /
+`dataflow_javascript` / `dataflow_php` (C excludes the receiver step by design).
+
+### Exact requirement
+
+For a sink whose injected payload is an **argument** (SQL string, shell command,
+etc.), a tainted receiver with **all-constant arguments** must NOT report - the
+receiver alone conveys no user data into the sink. Decide the precise rule:
+either require at least one tainted argument for argument-consuming sinks, or
+restrict the receiver-only hit to sinks where the receiver itself is the
+injected value. Preserve the true positives the 2.11.0 work added
+(`tainted.execute(user_input)`, and receiver-as-payload cases). Per-language
+tests across all six affected trackers; a regression test for the
+constant-argument case.
+
+**Relationship to Priority 3** (taint overhaul): the fix touches the same
+`_call_tainted` / receiver classification the overhaul rewrites; if Priority 3
+is scheduled soon, fold this in as part of 3a/3b, otherwise land it as a
+standalone guard first (it is a live false positive on the opt-in rule).
+
+Bugfix = PATCH (next `2.12.z`).
+
+---
+
+## Priority 2 - SAFE908 `csrf_protection_disabled`: fires on a `csrf_exempt` keyword-argument VALUE
+
+**Type**: correctness bugfix to `csrf_protection_disabled` (SAFE908),
+`framework_rules.py` `_python_exempts_csrf`. **Surfaced by the same 2.12.0
+review.** Pre-existing since the 2.11.0 SAFE908 work (the 2.11.0 fix handled a
+kwarg *named* `csrf_exempt`; this is the kwarg *value* case), so it was out of
+scope for the 2.12.0 PR and filed here.
+
+### Problem
+
+`_python_exempts_csrf` excludes `csrf_exempt` only when it is a keyword-argument
+**name** (`@foo(csrf_exempt=True)`). When `csrf_exempt` appears as a
+keyword-argument **value** - `@register(handler=csrf_exempt)`,
+`@configure(default=csrf_exempt)` - it is treated as an applied `csrf_exempt`
+decorator, so SAFE908 fires a false positive claiming CSRF was disabled even
+though no `@csrf_exempt` decorator was applied.
+
+### Exact requirement
+
+SAFE908 should fire only when `csrf_exempt` is the decorator actually being
+applied - the bare form (`@csrf_exempt`), the called form (`@csrf_exempt()`),
+or `method_decorator(csrf_exempt)`. Exclude `csrf_exempt` when it is a
+keyword-argument value (in addition to the existing kwarg-name exclusion).
+Tests: the three real decorator forms still fire; `@register(handler=csrf_exempt)`
+and `@foo(csrf_exempt=True)` are both clean.
+
+Bugfix = PATCH (next `2.12.z`).
+
+---
+
+## Priority 3 - Taint-tracker core overhaul (do 3a + 3b together)
 
 **Type**: architectural enhancement to the taint trackers. Two sub-items,
 strategically downstream of the shipped 2.11.0 taint-projection parity work:
