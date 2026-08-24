@@ -28,7 +28,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages import javascript as _js
-from safelint.languages._node_utils import call_has_named_arguments, call_name, node_text, walk
+from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
 
 if TYPE_CHECKING:
@@ -242,7 +242,7 @@ class JsTaintTracker:
         # argument-consuming sink's payload is its argument, so a tainted receiver
         # passed only constant arguments (``conn.query("SELECT 1")``) is not injection.
         receiver = self._method_receiver(node)
-        if receiver is not None and self._is_tainted(receiver) and (name in self.receiver_sinks or not call_has_named_arguments(node)):
+        if receiver is not None and self._is_tainted(receiver) and (name in self.receiver_sinks or not call_has_arguments(node)):
             self._record_sink_hit(node, receiver, name)
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:
