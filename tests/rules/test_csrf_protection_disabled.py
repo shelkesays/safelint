@@ -80,6 +80,35 @@ def test_python_method_decorator_keyword_decorator_fires(tmp_path: Path) -> None
     assert _codes(src) == ["SAFE908"]
 
 
+def test_python_method_decorator_keyword_decorator_dotted_fires(tmp_path: Path) -> None:
+    """``@method_decorator(decorator=mod.csrf_exempt)`` (dotted value) also fires.
+
+    The ``decorator=`` kwarg is found by walking ancestors, so an intervening
+    ``attribute`` node between the identifier and the keyword argument does not
+    hide the exemption."""
+    src = _write(tmp_path, "views.py", "@method_decorator(decorator=views.csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == ["SAFE908"]
+
+
+def test_python_csrf_exempt_dotted_kwarg_value_is_clean(tmp_path: Path) -> None:
+    """``csrf_exempt`` as a DOTTED unrelated kwarg value does not fire.
+
+    ``@register(handler=mod.csrf_exempt)`` passes the callable to ``register``;
+    the intervening ``attribute`` node must not defeat the kwarg-name check."""
+    src = _write(tmp_path, "views.py", "@register(handler=mod.csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
+def test_python_csrf_exempt_nested_call_kwarg_value_is_clean(tmp_path: Path) -> None:
+    """``csrf_exempt`` NESTED in a call inside an unrelated kwarg value does not fire.
+
+    ``@register(handler=wrapper(csrf_exempt))`` references the callable but does
+    not apply it as a decorator; the intervening ``call`` node must not defeat
+    the kwarg-name check."""
+    src = _write(tmp_path, "views.py", "@register(handler=wrapper(csrf_exempt))\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
 # ---------------------------------------------------------------------------
 # PHP (Laravel)
 # ---------------------------------------------------------------------------

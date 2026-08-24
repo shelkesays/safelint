@@ -36,7 +36,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages import go as _go
-from safelint.languages._node_utils import call_has_named_arguments, call_name, node_text, walk
+from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
 
 if TYPE_CHECKING:
@@ -180,7 +180,7 @@ class GoTaintTracker:
         function = node.child_by_field_name("function")
         if function is not None and function.type == _go.SELECTOR_EXPRESSION:
             receiver = function.child_by_field_name("operand")
-            if receiver is not None and self._is_tainted(receiver) and (name in self.receiver_sinks or not call_has_named_arguments(node)):
+            if receiver is not None and self._is_tainted(receiver) and (name in self.receiver_sinks or not call_has_arguments(node)):
                 self._record_sink_hit(node, receiver, name)
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:

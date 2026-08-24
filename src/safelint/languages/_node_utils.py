@@ -361,7 +361,7 @@ _CALL_NAME_DISPATCH: dict[str, Callable[[tree_sitter.Node], str | None]] = {
 }
 
 
-def call_has_named_arguments(call_node: tree_sitter.Node) -> bool:
+def call_has_arguments(call_node: tree_sitter.Node) -> bool:
     """Return True if *call_node* passes at least one *semantic* argument.
 
     Reads the ``arguments`` field - present on the call node of every registered

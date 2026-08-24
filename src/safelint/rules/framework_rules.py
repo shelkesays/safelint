@@ -579,28 +579,48 @@ class CsrfProtectionDisabledRule(BaseRule):
 
         Fires on the bare (``@csrf_exempt``), called (``@csrf_exempt()``),
         positional ``@method_decorator(csrf_exempt)``, and keyword
-        ``@method_decorator(decorator=csrf_exempt)`` forms. Does NOT fire when
-        ``csrf_exempt`` is a keyword-argument NAME (``@foo(csrf_exempt=True)``) or
-        an unrelated keyword-argument VALUE (``@register(handler=csrf_exempt)``),
-        neither of which applies the decorator.
+        ``@method_decorator(decorator=csrf_exempt)`` forms (including a dotted
+        ``decorator=mod.csrf_exempt`` value). Does NOT fire when ``csrf_exempt``
+        is a keyword-argument NAME (``@foo(csrf_exempt=True)``) or an unrelated
+        keyword-argument VALUE - whether bare (``@register(handler=csrf_exempt)``),
+        dotted (``handler=mod.csrf_exempt``) or nested in a call
+        (``handler=wrapper(csrf_exempt)``), none of which apply the decorator.
         """
-        return any(node.type == _py.IDENTIFIER and node_text(node) == "csrf_exempt" and CsrfProtectionDisabledRule._csrf_exempt_applied(node) for node in walk(decorator))
+        non_applying = CsrfProtectionDisabledRule._non_applying_csrf_nodes(decorator)
+        return any(node.type == _py.IDENTIFIER and node_text(node) == "csrf_exempt" and node not in non_applying for node in walk(decorator))
 
     @staticmethod
-    def _csrf_exempt_applied(node: tree_sitter.Node) -> bool:
-        """Return True if the ``csrf_exempt`` identifier *node* actually applies the decorator.
+    def _non_applying_csrf_nodes(decorator: tree_sitter.Node) -> set[tree_sitter.Node]:
+        """Return the ``csrf_exempt`` identifier nodes that do NOT apply the decorator.
 
-        Outside a keyword argument (bare / called / positional) it always applies.
-        Inside a keyword argument it applies only as the VALUE of a ``decorator=``
-        keyword (the ``method_decorator(decorator=csrf_exempt)`` form) - a kwarg
-        NAME (``csrf_exempt=True``) or an unrelated kwarg value
-        (``handler=csrf_exempt``) does not.
+        A single top-down walk collects, for every keyword argument, the
+        ``csrf_exempt`` occurrences that are inert: the kwarg NAME itself, and -
+        unless the kwarg is ``decorator=`` (which really applies the decorator) -
+        every ``csrf_exempt`` in the kwarg VALUE subtree (bare, dotted, or nested
+        in a call). Everything the walk does not exclude (positional / bare /
+        called forms, and the ``decorator=`` value) applies.
         """
-        parent = node.parent
-        if parent is None or parent.type != _py.KEYWORD_ARGUMENT:
-            return True
-        name = parent.child_by_field_name("name")
-        return parent.child_by_field_name("value") == node and name is not None and node_text(name) == "decorator"
+        excluded: set[tree_sitter.Node] = set()
+        for node in walk(decorator):
+            if node.type == _py.KEYWORD_ARGUMENT:
+                excluded.update(CsrfProtectionDisabledRule._kwarg_inert_csrf_nodes(node))
+        return excluded
+
+    @staticmethod
+    def _kwarg_inert_csrf_nodes(kwarg: tree_sitter.Node) -> set[tree_sitter.Node]:
+        """Return the inert ``csrf_exempt`` identifier nodes within a keyword argument."""
+        name = kwarg.child_by_field_name("name")
+        if name is None:
+            return set()
+        if node_text(name) == "csrf_exempt":
+            return {name}
+        if node_text(name) == "decorator":
+            return set()
+        value = kwarg.child_by_field_name("value")
+        if value is None:
+            return set()
+        return {inner for inner in walk(value) if inner.type == _py.IDENTIFIER and node_text(inner) == "csrf_exempt"}
+        return None
 
     def _check_php(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         violations: list[Violation] = []
