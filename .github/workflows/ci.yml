@@ -43,7 +43,7 @@ jobs:
         run: uv run ruff format --check src/ tests/ scripts/
 
       - name: Type check (ty)
-        run: uv run ty check src/ scripts/
+        run: uv run ty check src/ scripts/ tests/
 
       - name: Self-lint (safelint must pass itself)
         # CLAUDE.md mandates that ``safelint check src/`` produces zero
