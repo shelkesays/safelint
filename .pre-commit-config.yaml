@@ -171,7 +171,7 @@ repos:
         name: ty (type check)
         language: system
         entry: uv run --extra dev ty check
-        args: [src/, scripts/]
+        args: [src/, scripts/, tests/]
         types: [python]
         pass_filenames: false
         always_run: true

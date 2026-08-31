@@ -245,6 +245,14 @@ partial_branches = [
 python-version = "3.11"
 root = ["src"]
 
+[tool.ty.src]
+# ``tests/fixtures/**`` is deliberately non-compliant source: the files exist
+# to make rules fire in the e2e tests, so they reference undefined names and
+# import framework packages that are not project dependencies. They are never
+# imported or executed, so exclude them from type checking (they are already
+# exempt from safelint's own rules for the same reason).
+exclude = ["tests/fixtures/**"]
+
 [tool.ty.rules]
 # Errors (must fix)
 invalid-argument-type = "error"

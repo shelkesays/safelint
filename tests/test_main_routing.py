@@ -993,7 +993,7 @@ def test_run_check_all_files_silent_pass_not_masked_by_sibling(tmp_path: Path, m
     # Discovery on the frontend target returns only a skipped .ts placeholder.
     real_run = cli.run
 
-    def _run(target: Path, **kwargs: object) -> list:
+    def _run(target: Path, **kwargs: Any) -> list:
         if target == strict:
             return [LintResult(path=str(strict / "app.ts"))]
         return real_run(target, **kwargs)
@@ -1017,7 +1017,7 @@ def test_run_check_mixed_grammar_missing_message_does_not_claim_no_files_linted(
     mocker.patch.object(cli, "unavailable_extensions", return_value={".ts": "pip install 'safelint[typescript]'"})
     real_run = cli.run
 
-    def _run(target: Path, **kwargs: object) -> list:
+    def _run(target: Path, **kwargs: Any) -> list:
         if target == strict:
             return [LintResult(path=str(strict / "app.ts"))]
         return real_run(target, **kwargs)
@@ -1158,7 +1158,7 @@ def test_run_check_empty_sibling_does_not_inherit_missing_grammar(tmp_path: Path
     mocker.patch.object(cli, "unavailable_extensions", return_value={".ts": "pip install 'safelint[typescript]'"})
     real_run = cli.run
 
-    def _run(target: Path, **kwargs: object) -> list:
+    def _run(target: Path, **kwargs: Any) -> list:
         if target == src:
             # src lints app.py for real, app.ts is a skipped placeholder.
             return [LintResult(path=str(src / "app.ts")), *real_run(src, **kwargs)]
