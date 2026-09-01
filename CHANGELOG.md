@@ -15,7 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **CI: bump pinned GitHub Actions** - `astral-sh/setup-uv` 9.0.0 -> 10.0.1 and `anthropics/claude-code-action` 1.0.185 -> 1.0.195 (both SHA-pinned). No workflow behaviour change: setup-uv v10 only alters caching on `pull_request_target` / `workflow_run` / `release` events, none of which trigger the setup-uv-using workflows here.
+- **CI: bump pinned GitHub Actions** - `astral-sh/setup-uv` 9.0.0 -> 10.0.1 and `anthropics/claude-code-action` 1.0.185 -> 1.0.206 (both SHA-pinned). No workflow behaviour change: setup-uv v10 only alters caching on `pull_request_target` / `workflow_run` / `release` events, none of which trigger the setup-uv-using workflows here.
 - **CI: type-check the test tree.** `ty` now runs against `tests/` as well as `src/`/`scripts/` (CI and the pre-commit hook). `tests/fixtures/**` is excluded via `[tool.ty.src]` (those files are deliberately non-compliant rule-triggers - undefined names, non-dependency imports - and are never imported or run), matching the existing safelint self-lint exemption for the same tree. Purely internal; no packaged behaviour change.
 
 ## [2.12.0] - 2026-08-12
