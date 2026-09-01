@@ -715,18 +715,33 @@ class TaintedSinkRule(BaseRule):
             raise TypeError(msg)
         return value
 
+    def _resolve_receiver_sinks(self, lang_name: str) -> frozenset[str]:
+        """Resolve the per-language ``receiver_sinks`` set for *lang_name*.
+
+        ``receiver_sinks`` name the sinks whose injected payload is the *receiver*
+        itself (SSRF-style ``url.openConnection(proxy)``) rather than an argument.
+        A tainted receiver reaching one of these fires regardless of the call's
+        arguments; every other sink reports a tainted receiver only when the call
+        has no arguments (an argument-consuming sink's payload is its argument).
+        Python uses the bare ``receiver_sinks`` key, other languages the
+        ``_<lang>`` suffix. Default (Java) is ``openConnection`` / ``openStream``.
+        """
+        raw, key = resolve_lang_config_lookup(self.config, "receiver_sinks", lang_name, default=[])
+        return frozenset(_validated_string_list(raw, key))
+
     def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run Python taint analysis on every function in *tree*."""
         sinks = frozenset(self.config.get("sinks", self._DEFAULT_SINKS))
         sanitizers = frozenset(self.config.get("sanitizers", self._DEFAULT_SANITIZERS))
         sources = frozenset(self.config.get("sources", self._DEFAULT_SOURCES))
         assume = self._resolve_assume_taint_preserving()
+        receiver_sinks = self._resolve_receiver_sinks("python")
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type not in (_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF):
                 continue
             params = _python_param_names(node)
-            tracker = TaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = TaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
             tracker.visit(node)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
@@ -746,12 +761,13 @@ class TaintedSinkRule(BaseRule):
         sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", lang_name, default=[])
         sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
+        receiver_sinks = self._resolve_receiver_sinks(lang_name)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type not in _js.FUNCTION_TYPES:
                 continue
             params = _javascript_param_names(node)
-            tracker = JsTaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = JsTaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
             tracker.visit(node)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
@@ -793,6 +809,7 @@ class TaintedSinkRule(BaseRule):
         sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", "java", default=[])
         sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
+        receiver_sinks = self._resolve_receiver_sinks("java")
         violations: list[Violation] = []
         # Pass 1: analyse non-lambda functions; cache final tainted set
         # keyed by ``node.id`` (the tree-sitter-stable identifier;
@@ -801,7 +818,7 @@ class TaintedSinkRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type not in _java.FUNCTION_TYPES or node.type == _java.LAMBDA_EXPRESSION:
                 continue
-            tracker = JavaTaintTracker(_java_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = JavaTaintTracker(_java_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
             tracker.visit(node)
             tainted_cache[node.id] = set(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
@@ -810,7 +827,7 @@ class TaintedSinkRule(BaseRule):
             if node.type != _java.LAMBDA_EXPRESSION:
                 continue
             seed = _java_param_names(node) | _java_lambda_enclosing_tainted(node, tainted_cache)
-            tracker = JavaTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = JavaTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
             tracker.visit(node)
             tainted_cache[node.id] = set(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
@@ -841,6 +858,7 @@ class TaintedSinkRule(BaseRule):
         sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", "rust", default=[])
         sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
+        receiver_sinks = self._resolve_receiver_sinks("rust")
         violations: list[Violation] = []
         # Pass 1: ``function_item`` nodes. Cache the final tainted set
         # keyed by ``node.id`` (tree-sitter-stable across wrapper accesses;
@@ -848,7 +866,7 @@ class TaintedSinkRule(BaseRule):
         tainted_cache: dict[int, set[str]] = {}
         for node in walk(tree.root_node):
             if node.type != _rust.CLOSURE_EXPRESSION and node.type in _rust.FUNCTION_TYPES:
-                tracker = RustTaintTracker(_rust_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
+                tracker = RustTaintTracker(_rust_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
                 tracker.visit(node)
                 tainted_cache[node.id] = set(tracker.tainted)
                 violations.extend(self._format_hits(filepath, tracker.sink_hits))
@@ -860,7 +878,7 @@ class TaintedSinkRule(BaseRule):
             if node.type != _rust.CLOSURE_EXPRESSION:
                 continue
             seed = _rust_param_names(node) | _rust_closure_enclosing_tainted(node, tainted_cache)
-            tracker = RustTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = RustTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
             tracker.visit(node)
             tainted_cache[node.id] = set(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
@@ -889,13 +907,14 @@ class TaintedSinkRule(BaseRule):
         sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", "go", default=[])
         sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
+        receiver_sinks = self._resolve_receiver_sinks("go")
         violations: list[Violation] = []
         tainted_cache: dict[int, set[str]] = {}
         # Pass 1: named functions and methods (not closures).
         for node in walk(tree.root_node):
             if node.type not in _go.FUNCTION_TYPES or node.type == _go.FUNC_LITERAL:
                 continue
-            tracker = GoTaintTracker(_go_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = GoTaintTracker(_go_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
             tracker.visit(node)
             tainted_cache[node.id] = set(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
@@ -904,7 +923,7 @@ class TaintedSinkRule(BaseRule):
             if node.type != _go.FUNC_LITERAL:
                 continue
             seed = _go_param_names(node) | _go_closure_enclosing_tainted(node, tainted_cache)
-            tracker = GoTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = GoTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
             tracker.visit(node)
             tainted_cache[node.id] = set(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
@@ -931,16 +950,17 @@ class TaintedSinkRule(BaseRule):
         sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", "php", default=[])
         sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
+        receiver_sinks = self._resolve_receiver_sinks("php")
         violations: list[Violation] = []
         # Top-level (script) scope - ``visit`` prunes function bodies, which
         # are analysed separately below.
-        top = PhpTaintTracker(set(), sinks, sanitizers, sources, assume_taint_preserving=assume)
+        top = PhpTaintTracker(set(), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
         top.visit(tree.root_node)
         violations.extend(self._format_hits(filepath, top.sink_hits))
         for node in walk(tree.root_node):
             if node.type not in _php.FUNCTION_TYPES:
                 continue
-            tracker = PhpTaintTracker(_php_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume)
+            tracker = PhpTaintTracker(_php_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
             tracker.visit(node)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
@@ -987,12 +1007,13 @@ class TaintedSinkRule(BaseRule):
         sources_raw, sources_key = resolve_lang_config_lookup(self.config, "sources", lang_name, default=[])
         sources = frozenset(_validated_string_list(sources_raw, sources_key))
         assume = self._resolve_assume_taint_preserving()
+        receiver_sinks = self._resolve_receiver_sinks(lang_name)
         violations: list[Violation] = []
         seen: set[tuple[int, str, str]] = set()
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
-            tracker = CTaintTracker(param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, is_cpp=(lang_name == "cpp"))
+            tracker = CTaintTracker(param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks, is_cpp=(lang_name == "cpp"))
             tracker.visit(node)
             violations.extend(self._format_hits(filepath, _dedupe_hits(tracker.sink_hits, seen)))
         return violations

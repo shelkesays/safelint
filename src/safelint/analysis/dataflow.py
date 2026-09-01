@@ -19,7 +19,7 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.languages import python as _py
-from safelint.languages._node_utils import call_name, node_text, walk
+from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
 
 if TYPE_CHECKING:
@@ -67,6 +67,7 @@ class TaintTracker:
         sources: frozenset[str],
         *,
         assume_taint_preserving: bool = True,
+        receiver_sinks: frozenset[str] = frozenset(),
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config.
 
@@ -97,6 +98,7 @@ class TaintTracker:
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
+        self.receiver_sinks = receiver_sinks
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -186,12 +188,15 @@ class TaintTracker:
             return
         if self._record_arg_hits(node, name):
             return  # a tainted argument already reached the sink; receiver is redundant
-        # Else, a sink method on a tainted receiver (``request.execute()``) - the
-        # receiver is itself a tainted value reaching the sink with no arguments.
+        # Sink method on a tainted receiver (``request.execute()``) - the receiver
+        # is itself a tainted value reaching the sink. Fires ONLY when the call has
+        # no arguments: an argument-consuming sink's payload is its argument, so a
+        # tainted receiver passed only constant arguments (``conn.execute("SELECT
+        # 1")`` where ``conn`` is a tainted connection) is not injection.
         function = node.child_by_field_name("function")
         if function is not None and function.type == _py.ATTRIBUTE:
             receiver = function.child_by_field_name("object")
-            if receiver is not None and self._is_tainted(receiver):
+            if receiver is not None and self._is_tainted(receiver) and (name in self.receiver_sinks or not call_has_arguments(node)):
                 self._record_sink_hit(node, receiver, name)
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:

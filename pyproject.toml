@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "safelint"
-version = "2.12.0"
+version = "2.12.1rc1"
 description = "Engineering safety lint rules and pre-commit integration for modern Python (with Django/Flask/FastAPI/Pydantic presets), JavaScript, TypeScript, Java (with Spring Boot framework preset), Rust, Go, PHP (with Laravel preset), C, and C++ codebases"
 readme = "README.md"
 requires-python = ">=3.11"
@@ -244,6 +244,14 @@ partial_branches = [
 [tool.ty.environment]
 python-version = "3.11"
 root = ["src"]
+
+[tool.ty.src]
+# ``tests/fixtures/**`` is deliberately non-compliant source: the files exist
+# to make rules fire in the e2e tests, so they reference undefined names and
+# import framework packages that are not project dependencies. They are never
+# imported or executed, so exclude them from type checking (they are already
+# exempt from safelint's own rules for the same reason).
+exclude = ["tests/fixtures/**"]
 
 [tool.ty.rules]
 # Errors (must fix)
