@@ -72,7 +72,7 @@ uv run mkdocs build --strict                   # broken anchors fail the build
   receiver is the payload only when the call has no arguments. Fixed across all
   seven trackers (Python/JS-TS/Java/Rust/Go/PHP + the C++ path in
   `dataflow_c.py`; C stays excluded) via the shared
-  `_node_utils.call_has_named_arguments`; both-direction regression tests per
+  `_node_utils.call_has_arguments`; both-direction regression tests per
   tracker. Also dedups Java's receiver+argument double-report. See CHANGELOG.
 - **SAFE908 `csrf_protection_disabled`: `csrf_exempt` keyword-argument value FP**
   ✅ DONE (2.12.1). `@register(handler=csrf_exempt)` (value) no longer fires;
