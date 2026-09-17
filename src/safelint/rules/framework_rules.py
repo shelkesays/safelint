@@ -614,13 +614,25 @@ class CsrfProtectionDisabledRule(BaseRule):
             return set()
         if node_text(name) == "csrf_exempt":
             return {name}
-        if node_text(name) == "decorator":
-            return set()
         value = kwarg.child_by_field_name("value")
         if value is None:
             return set()
+        # ``decorator=csrf_exempt`` applies the decorator ONLY when the enclosing
+        # call is Django's ``method_decorator`` (whose ``decorator`` argument is
+        # applied to a view). On any other call - ``@register(decorator=csrf_exempt)``
+        # - it is an ordinary keyword-argument value that does not disable CSRF.
+        if node_text(name) == "decorator" and CsrfProtectionDisabledRule._is_method_decorator_call(kwarg):
+            return set()
         return {inner for inner in walk(value) if inner.type == _py.IDENTIFIER and node_text(inner) == "csrf_exempt"}
-        return None
+
+    @staticmethod
+    def _is_method_decorator_call(kwarg: tree_sitter.Node) -> bool:
+        """Return True if *kwarg* is an argument of a ``method_decorator(...)`` call."""
+        arglist = kwarg.parent
+        call = arglist.parent if arglist is not None else None
+        if call is None or call.type != _py.CALL:
+            return False
+        return call_name(call) == "method_decorator"
 
     def _check_php(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         violations: list[Violation] = []

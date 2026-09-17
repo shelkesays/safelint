@@ -400,6 +400,35 @@ def test_receiver_payload_sink_fires_with_auxiliary_argument() -> None:
     assert tracker.sink_hits[0][1] == "url"
 
 
+def test_receiver_payload_sink_with_tainted_receiver_and_argument_reports_once() -> None:
+    """A receiver-payload sink with BOTH receiver and argument tainted reports once.
+
+    ``url.openConnection(proxy)`` where both ``url`` (receiver) and ``proxy``
+    (argument) are tainted must record a single hit for the call, not one per
+    tainted input - the tainted-argument hit already flags the call, so the
+    receiver path is skipped (matching the six other trackers' dedup).
+    """
+    tree = _parse(
+        """
+        class C {
+            void m(Url url, Proxy proxy) {
+                url.openConnection(proxy);
+            }
+        }
+        """
+    )
+    tracker = JavaTaintTracker(
+        params={"url", "proxy"},
+        sinks=frozenset({"openConnection"}),
+        sanitizers=frozenset(),
+        sources=frozenset(),
+        receiver_sinks=frozenset({"openConnection"}),
+    )
+    tracker.visit(_find_method(tree, "m"))
+    assert len(tracker.sink_hits) == 1
+    assert tracker.sink_hits[0][1] == "proxy"
+
+
 def test_single_arg_lambda_seeds_parameter() -> None:
     """Untyped single-arg lambda ``u -> ...`` seeds ``u`` as tainted.
 

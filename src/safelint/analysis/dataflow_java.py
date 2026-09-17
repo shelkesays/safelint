@@ -299,25 +299,31 @@ class JavaTaintTracker:
         name = call_name(node)
         if name not in self.sinks:
             return
-        self._record_tainted_arg_hits(node, name)
-        # Receiver-as-payload hit ONLY when the call has no arguments: an
-        # argument-consuming sink's payload is its argument, so a tainted receiver
-        # passed only constant arguments (``stmt.executeQuery("SELECT 1")``) is
-        # not injection. (This also stops double-reporting a tainted receiver
-        # alongside a tainted argument - the argument hit already fired above.)
+        if self._record_tainted_arg_hits(node, name):
+            return  # a tainted argument already reached the sink; receiver is redundant
+        # Receiver-as-payload hit: fires for a receiver-payload sink (``name in
+        # receiver_sinks`` - e.g. ``url.openConnection(proxy)`` where the URL is the
+        # payload) or a no-argument call (``url.openStream()``). An argument-consuming
+        # sink's payload is its argument, so a tainted receiver passed only constant
+        # arguments (``stmt.executeQuery("SELECT 1")``) is not injection. The early
+        # return above already fired for a tainted argument, so one call is never
+        # double-reported (receiver + argument).
         if node.type == _java.METHOD_INVOCATION and (name in self.receiver_sinks or not call_has_arguments(node)):
             obj = node.child_by_field_name("object")
             if obj is not None and self._is_tainted(obj):
                 self._record_sink_hit(node, obj, name)
 
-    def _record_tainted_arg_hits(self, call_node: tree_sitter.Node, sink_name: str) -> None:
-        """Record one sink hit per tainted argument on *call_node*."""
+    def _record_tainted_arg_hits(self, call_node: tree_sitter.Node, sink_name: str) -> bool:
+        """Record one sink hit per tainted argument on *call_node*; return True if any fired."""
         args_node = call_node.child_by_field_name("arguments")
         if args_node is None:  # pragma: no cover - defensive: method_invocation always carries an arguments node
-            return
+            return False
+        recorded = False
         for arg in args_node.named_children:
             if self._is_tainted(arg):
                 self._record_sink_hit(call_node, arg, sink_name)
+                recorded = True
+        return recorded
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""

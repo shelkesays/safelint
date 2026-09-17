@@ -90,6 +90,16 @@ def test_python_method_decorator_keyword_decorator_dotted_fires(tmp_path: Path) 
     assert _codes(src) == ["SAFE908"]
 
 
+def test_python_unrelated_decorator_keyword_value_is_clean(tmp_path: Path) -> None:
+    """``@register(decorator=csrf_exempt)`` on a non-``method_decorator`` call is clean.
+
+    The ``decorator=`` keyword only applies ``csrf_exempt`` when the enclosing
+    call is Django's ``method_decorator``. An unrelated function that happens to
+    take a ``decorator=`` argument does not disable CSRF, so it must not fire."""
+    src = _write(tmp_path, "views.py", "@register(decorator=csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
 def test_python_csrf_exempt_dotted_kwarg_value_is_clean(tmp_path: Path) -> None:
     """``csrf_exempt`` as a DOTTED unrelated kwarg value does not fire.
 

@@ -1095,7 +1095,11 @@ sanitizers = ["escape", "sanitize", "quote"]
 sources = ["input", "readline"]
 assume_taint_preserving = true   # default; set false for taint-dropping mode
 # Sinks whose payload is the receiver, not an argument (fire on a tainted
-# receiver regardless of arguments). Per-language: receiver_sinks_java, etc.
+# receiver regardless of arguments). Each entry must ALSO appear in the matching
+# per-language sinks list (sinks_java here): receiver_sinks only changes how an
+# already-registered sink treats its receiver, it does not register a new sink.
+# Per-language keys: receiver_sinks_java, receiver_sinks_go, etc.
+sinks_java = ["openConnection", "openStream"]
 receiver_sinks_java = ["openConnection", "openStream"]
 ```
 
