@@ -61,6 +61,117 @@ def test_python_csrf_exempt_kwarg_name_is_clean(tmp_path: Path) -> None:
     assert _codes(src) == []
 
 
+def test_python_csrf_exempt_kwarg_value_is_clean(tmp_path: Path) -> None:
+    """``csrf_exempt`` as a keyword-argument VALUE does not fire -
+    ``@register(handler=csrf_exempt)`` passes the callable to ``register``; it
+    does not apply ``@csrf_exempt``. A positional ``method_decorator(csrf_exempt)``
+    still fires (covered above)."""
+    src = _write(tmp_path, "views.py", "@register(handler=csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
+def test_python_method_decorator_keyword_decorator_fires(tmp_path: Path) -> None:
+    """``@method_decorator(decorator=csrf_exempt)`` DOES apply csrf_exempt and fires.
+
+    Unlike an unrelated ``handler=csrf_exempt`` value, ``decorator=`` is the
+    ``method_decorator`` argument that actually applies the decorator to a
+    class-based view."""
+    src = _write(tmp_path, "views.py", "@method_decorator(decorator=csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == ["SAFE908"]
+
+
+def test_python_method_decorator_keyword_decorator_dotted_fires(tmp_path: Path) -> None:
+    """``@method_decorator(decorator=mod.csrf_exempt)`` (dotted value) also fires.
+
+    The ``decorator=`` kwarg is found by walking ancestors, so an intervening
+    ``attribute`` node between the identifier and the keyword argument does not
+    hide the exemption."""
+    src = _write(tmp_path, "views.py", "@method_decorator(decorator=views.csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == ["SAFE908"]
+
+
+def test_python_unrelated_decorator_keyword_value_is_clean(tmp_path: Path) -> None:
+    """``@register(decorator=csrf_exempt)`` on a non-``method_decorator`` call is clean.
+
+    The ``decorator=`` keyword only applies ``csrf_exempt`` when the enclosing
+    call is Django's ``method_decorator``. An unrelated function that happens to
+    take a ``decorator=`` argument does not disable CSRF, so it must not fire."""
+    src = _write(tmp_path, "views.py", "@register(decorator=csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
+def test_python_csrf_exempt_dotted_kwarg_value_is_clean(tmp_path: Path) -> None:
+    """``csrf_exempt`` as a DOTTED unrelated kwarg value does not fire.
+
+    ``@register(handler=mod.csrf_exempt)`` passes the callable to ``register``;
+    the intervening ``attribute`` node must not defeat the kwarg-name check."""
+    src = _write(tmp_path, "views.py", "@register(handler=mod.csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
+def test_python_csrf_exempt_nested_call_kwarg_value_is_clean(tmp_path: Path) -> None:
+    """``csrf_exempt`` NESTED in a call inside an unrelated kwarg value does not fire.
+
+    ``@register(handler=wrapper(csrf_exempt))`` references the callable but does
+    not apply it as a decorator; the intervening ``call`` node must not defeat
+    the kwarg-name check."""
+    src = _write(tmp_path, "views.py", "@register(handler=wrapper(csrf_exempt))\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
+def test_python_csrf_exempt_kwarg_name_with_csrf_exempt_value_is_clean(tmp_path: Path) -> None:
+    """``@foo(csrf_exempt=csrf_exempt)`` does not fire.
+
+    ``csrf_exempt`` as the kwarg NAME configures ``foo``; a ``csrf_exempt`` in
+    that same kwarg's VALUE is inert too and must not fire (the name-branch must
+    still scan the value)."""
+    src = _write(tmp_path, "views.py", "@foo(csrf_exempt=csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
+def test_python_csrf_exempt_kwarg_name_with_nested_csrf_exempt_value_is_clean(tmp_path: Path) -> None:
+    """``@foo(csrf_exempt=wrapper(csrf_exempt))`` does not fire - the nested value is inert."""
+    src = _write(tmp_path, "views.py", "@foo(csrf_exempt=wrapper(csrf_exempt))\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
+def test_python_method_decorator_alias_keyword_decorator_fires(tmp_path: Path) -> None:
+    """An aliased ``method_decorator`` still applies ``decorator=csrf_exempt`` and fires.
+
+    ``from django.utils.decorators import method_decorator as md`` then
+    ``@md(decorator=csrf_exempt)`` genuinely applies the decorator; the alias is
+    resolved from the import so the exemption is not missed."""
+    src = _write(
+        tmp_path,
+        "views.py",
+        "from django.utils.decorators import method_decorator as md\n@md(decorator=csrf_exempt)\ndef v(request):\n    return None\n",
+    )
+    assert _codes(src) == ["SAFE908"]
+
+
+def test_python_function_local_method_decorator_alias_does_not_leak_scope(tmp_path: Path) -> None:
+    """A function-local ``method_decorator as md`` import must not affect other scopes.
+
+    Only module-level aliases are collected, so an unrelated ``@md(decorator=csrf_exempt)``
+    in a different function (where ``md`` is a locally-defined, non-Django callable) does
+    not fire - the local import in ``a`` does not pollute the file-wide alias set."""
+    body = (
+        "def a():\n"
+        "    from django.utils.decorators import method_decorator as md\n"
+        "    return md\n"
+        "\n"
+        "def make():\n"
+        "    def md(**kw):\n"
+        "        return lambda f: f\n"
+        "    @md(decorator=csrf_exempt)\n"
+        "    def v(request):\n"
+        "        return None\n"
+        "    return v\n"
+    )
+    src = _write(tmp_path, "views.py", body)
+    assert _codes(src) == []
+
+
 # ---------------------------------------------------------------------------
 # PHP (Laravel)
 # ---------------------------------------------------------------------------

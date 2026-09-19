@@ -114,6 +114,7 @@ CONTINUE_STATEMENT = "continue_statement"
 DELETE_STATEMENT = "delete_statement"
 IMPORT_STATEMENT = "import_statement"
 IMPORT_FROM_STATEMENT = "import_from_statement"
+ALIASED_IMPORT = "aliased_import"  # ``import x as y`` / ``from m import x as y`` - ``name`` then ``alias`` fields
 NONLOCAL_STATEMENT = "nonlocal_statement"
 FINALLY_CLAUSE = "finally_clause"
 AS_PATTERN = "as_pattern"

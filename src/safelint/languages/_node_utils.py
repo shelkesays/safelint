@@ -361,6 +361,22 @@ _CALL_NAME_DISPATCH: dict[str, Callable[[tree_sitter.Node], str | None]] = {
 }
 
 
+def call_has_arguments(call_node: tree_sitter.Node) -> bool:
+    """Return True if *call_node* passes at least one *semantic* argument.
+
+    Reads the ``arguments`` field - present on the call node of every registered
+    language (``argument_list`` / ``arguments``) - and checks for named children,
+    **excluding tree-sitter extras** (``is_extra`` - comments, which attach as
+    named children anywhere). So ``conn.execute(/* c */)`` counts as a
+    no-argument call, not a one-argument one. Returns False when the field is
+    absent (e.g. a parenthesis-less ``new Foo``) or holds only extras. Used by
+    the dataflow trackers to distinguish a receiver-as-payload sink call (no
+    arguments) from an argument-consuming sink whose payload is its argument.
+    """
+    args = call_node.child_by_field_name("arguments")
+    return args is not None and any(not child.is_extra for child in args.named_children)
+
+
 def call_name(call_node: tree_sitter.Node) -> str | None:
     r"""Return the bare callable name from a call node, or None if unresolvable.
 

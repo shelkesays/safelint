@@ -660,3 +660,11 @@ def test_rust_sink_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> N
     sample.write_text("fn h(req: Req) {\n    req.run_query();\n}\n", encoding="utf-8")
     eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["run_query"]}}})
     assert any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
+
+
+def test_rust_tainted_receiver_with_constant_argument_does_not_fire(tmp_path: Path) -> None:
+    """A tainted receiver passed only a CONSTANT argument is not injection (``req.run_query("x")``)."""
+    sample = tmp_path / "recv_const.rs"
+    sample.write_text('fn h(req: Req) {\n    req.run_query("SELECT 1");\n}\n', encoding="utf-8")
+    eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["run_query"]}}})
+    assert not any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)

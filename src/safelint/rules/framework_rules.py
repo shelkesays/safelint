@@ -567,28 +567,103 @@ class CsrfProtectionDisabledRule(BaseRule):
 
     def _check_python(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         violations: list[Violation] = []
+        md_names = self._method_decorator_names(tree.root_node)
         for node in walk(tree.root_node):
-            if node.type == _py.DECORATOR and self._python_exempts_csrf(node):
+            if node.type == _py.DECORATOR and self._python_exempts_csrf(node, md_names):
                 message = "@csrf_exempt disables CSRF protection - remove it or scope protection explicitly"
                 violations.append(self._make_violation_for_node(filepath, node, message))
         return violations
 
     @staticmethod
-    def _python_exempts_csrf(decorator: tree_sitter.Node) -> bool:
+    def _method_decorator_names(root: tree_sitter.Node) -> set[str]:
+        """Return ``method_decorator`` plus any module-level ``import ... as`` aliases of it.
+
+        ``@method_decorator(decorator=csrf_exempt)`` genuinely applies the decorator,
+        but matching only the bare name would miss ``from django.utils.decorators
+        import method_decorator as md`` used as ``@md(decorator=csrf_exempt)``. Only
+        **module-level** imports are collected: a module-level alias binds the name
+        for the whole module (standard Python scoping), whereas a function/class-local
+        ``method_decorator as md`` binds ``md`` in that scope only and must not be
+        applied to an unrelated ``@md(...)`` in another scope. Full shadow tracking
+        (a module-level alias rebound locally) is not modelled - a pathological case
+        for a disabled-by-default rule.
+        """
+        names = {"method_decorator"}
+        for node in walk(root):
+            if node.type != _py.ALIASED_IMPORT or not CsrfProtectionDisabledRule._is_module_level(node, root):
+                continue
+            imported = node.child_by_field_name("name")
+            alias = node.child_by_field_name("alias")
+            if imported is not None and alias is not None and node_text(imported).split(".")[-1] == "method_decorator":
+                names.add(node_text(alias))
+        return names
+
+    @staticmethod
+    def _is_module_level(aliased_import: tree_sitter.Node, root: tree_sitter.Node) -> bool:
+        """Return True if *aliased_import*'s import statement is a direct child of the module."""
+        statement = aliased_import.parent
+        return statement is not None and statement.parent == root
+
+    @staticmethod
+    def _python_exempts_csrf(decorator: tree_sitter.Node, md_names: set[str]) -> bool:
         """Return True if ``csrf_exempt`` is applied as a decorator.
 
-        It counts as a name, a call, or an argument. An unrelated keyword-argument
-        NAME that happens to be ``csrf_exempt`` (e.g. ``@foo(csrf_exempt=True)``)
-        does not disable CSRF and must not fire.
+        Fires on the bare (``@csrf_exempt``), called (``@csrf_exempt()``),
+        positional ``@method_decorator(csrf_exempt)``, and keyword
+        ``@method_decorator(decorator=csrf_exempt)`` forms (including a dotted
+        ``decorator=mod.csrf_exempt`` value, and a ``method_decorator`` alias). Does
+        NOT fire when ``csrf_exempt`` is a keyword-argument NAME
+        (``@foo(csrf_exempt=True)``, including any ``csrf_exempt`` in that kwarg's
+        value) or an unrelated keyword-argument VALUE - whether bare
+        (``@register(handler=csrf_exempt)``), dotted (``handler=mod.csrf_exempt``) or
+        nested in a call (``handler=wrapper(csrf_exempt)``); none apply the decorator.
+
+        A single walk of the decorator collects the ``csrf_exempt`` identifiers and,
+        per keyword argument, the inert subset; the decorator applies iff any
+        ``csrf_exempt`` identifier is not inert.
         """
+        csrf_nodes: list[tree_sitter.Node] = []
+        inert: set[tree_sitter.Node] = set()
         for node in walk(decorator):
-            if node.type != _py.IDENTIFIER or node_text(node) != "csrf_exempt":
-                continue
-            parent = node.parent
-            is_kwarg_name = parent is not None and parent.type == _py.KEYWORD_ARGUMENT and parent.child_by_field_name("name") == node
-            if not is_kwarg_name:
-                return True
-        return False
+            if node.type == _py.IDENTIFIER and node_text(node) == "csrf_exempt":
+                csrf_nodes.append(node)
+            elif node.type == _py.KEYWORD_ARGUMENT:
+                inert.update(CsrfProtectionDisabledRule._kwarg_inert_csrf_nodes(node, md_names))
+        return any(node not in inert for node in csrf_nodes)
+
+    @staticmethod
+    def _kwarg_inert_csrf_nodes(kwarg: tree_sitter.Node, md_names: set[str]) -> set[tree_sitter.Node]:
+        """Return the inert ``csrf_exempt`` identifier nodes within a keyword argument."""
+        name = kwarg.child_by_field_name("name")
+        if name is None:
+            return set()
+        value_csrf = CsrfProtectionDisabledRule._csrf_identifiers(kwarg.child_by_field_name("value"))
+        # A kwarg NAMED ``csrf_exempt`` (``@foo(csrf_exempt=...)``) configures ``foo``;
+        # the whole kwarg is inert - the name AND any ``csrf_exempt`` in its value.
+        if node_text(name) == "csrf_exempt":
+            return {name} | value_csrf
+        # ``decorator=csrf_exempt`` applies the decorator ONLY on a ``method_decorator``
+        # call (or a local alias of it, resolved in *md_names*). On any other call -
+        # ``@register(decorator=csrf_exempt)`` - it is an ordinary inert value.
+        if node_text(name) == "decorator" and CsrfProtectionDisabledRule._is_method_decorator_call(kwarg, md_names):
+            return set()
+        return value_csrf
+
+    @staticmethod
+    def _csrf_identifiers(value: tree_sitter.Node | None) -> set[tree_sitter.Node]:
+        """Return every ``csrf_exempt`` identifier node within *value* (empty if None)."""
+        if value is None:
+            return set()
+        return {node for node in walk(value) if node.type == _py.IDENTIFIER and node_text(node) == "csrf_exempt"}
+
+    @staticmethod
+    def _is_method_decorator_call(kwarg: tree_sitter.Node, md_names: set[str]) -> bool:
+        """Return True if *kwarg* is an argument of a ``method_decorator`` (or alias) call."""
+        arglist = kwarg.parent
+        call = arglist.parent if arglist is not None else None
+        if call is None or call.type != _py.CALL:
+            return False
+        return call_name(call) in md_names
 
     def _check_php(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         violations: list[Violation] = []

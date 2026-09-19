@@ -138,6 +138,14 @@ def test_js_method_sink_on_tainted_receiver_fires(tmp_path: Path) -> None:
     assert any(v.code == "SAFE801" for v in engine.check_file(str(sample)).violations)
 
 
+def test_js_tainted_receiver_with_constant_argument_does_not_fire(tmp_path: Path) -> None:
+    """A tainted receiver passed only a CONSTANT argument is not injection (``req.runQuery("x")``)."""
+    sample = tmp_path / "recv_const.js"
+    sample.write_text('function f(req) { req.runQuery("SELECT 1"); }\n', encoding="utf-8")
+    engine = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_javascript": ["runQuery"]}}})
+    assert not any(v.code == "SAFE801" for v in engine.check_file(str(sample)).violations)
+
+
 def test_js_new_on_tainted_receiver_flows_to_sink(tmp_path: Path) -> None:
     """``eval(new req.Factory())`` - a constructor on a tainted receiver keeps the result tainted.
 
