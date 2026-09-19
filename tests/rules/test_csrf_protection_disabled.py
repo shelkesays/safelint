@@ -119,6 +119,36 @@ def test_python_csrf_exempt_nested_call_kwarg_value_is_clean(tmp_path: Path) -> 
     assert _codes(src) == []
 
 
+def test_python_csrf_exempt_kwarg_name_with_csrf_exempt_value_is_clean(tmp_path: Path) -> None:
+    """``@foo(csrf_exempt=csrf_exempt)`` does not fire.
+
+    ``csrf_exempt`` as the kwarg NAME configures ``foo``; a ``csrf_exempt`` in
+    that same kwarg's VALUE is inert too and must not fire (the name-branch must
+    still scan the value)."""
+    src = _write(tmp_path, "views.py", "@foo(csrf_exempt=csrf_exempt)\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
+def test_python_csrf_exempt_kwarg_name_with_nested_csrf_exempt_value_is_clean(tmp_path: Path) -> None:
+    """``@foo(csrf_exempt=wrapper(csrf_exempt))`` does not fire - the nested value is inert."""
+    src = _write(tmp_path, "views.py", "@foo(csrf_exempt=wrapper(csrf_exempt))\ndef v(request):\n    return None\n")
+    assert _codes(src) == []
+
+
+def test_python_method_decorator_alias_keyword_decorator_fires(tmp_path: Path) -> None:
+    """An aliased ``method_decorator`` still applies ``decorator=csrf_exempt`` and fires.
+
+    ``from django.utils.decorators import method_decorator as md`` then
+    ``@md(decorator=csrf_exempt)`` genuinely applies the decorator; the alias is
+    resolved from the import so the exemption is not missed."""
+    src = _write(
+        tmp_path,
+        "views.py",
+        "from django.utils.decorators import method_decorator as md\n@md(decorator=csrf_exempt)\ndef v(request):\n    return None\n",
+    )
+    assert _codes(src) == ["SAFE908"]
+
+
 # ---------------------------------------------------------------------------
 # PHP (Laravel)
 # ---------------------------------------------------------------------------
