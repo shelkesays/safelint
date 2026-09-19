@@ -149,6 +149,29 @@ def test_python_method_decorator_alias_keyword_decorator_fires(tmp_path: Path) -
     assert _codes(src) == ["SAFE908"]
 
 
+def test_python_function_local_method_decorator_alias_does_not_leak_scope(tmp_path: Path) -> None:
+    """A function-local ``method_decorator as md`` import must not affect other scopes.
+
+    Only module-level aliases are collected, so an unrelated ``@md(decorator=csrf_exempt)``
+    in a different function (where ``md`` is a locally-defined, non-Django callable) does
+    not fire - the local import in ``a`` does not pollute the file-wide alias set."""
+    body = (
+        "def a():\n"
+        "    from django.utils.decorators import method_decorator as md\n"
+        "    return md\n"
+        "\n"
+        "def make():\n"
+        "    def md(**kw):\n"
+        "        return lambda f: f\n"
+        "    @md(decorator=csrf_exempt)\n"
+        "    def v(request):\n"
+        "        return None\n"
+        "    return v\n"
+    )
+    src = _write(tmp_path, "views.py", body)
+    assert _codes(src) == []
+
+
 # ---------------------------------------------------------------------------
 # PHP (Laravel)
 # ---------------------------------------------------------------------------
