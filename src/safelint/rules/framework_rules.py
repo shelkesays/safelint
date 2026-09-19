@@ -576,22 +576,33 @@ class CsrfProtectionDisabledRule(BaseRule):
 
     @staticmethod
     def _method_decorator_names(root: tree_sitter.Node) -> set[str]:
-        """Return ``method_decorator`` plus any local ``import ... as`` aliases of it.
+        """Return ``method_decorator`` plus any module-level ``import ... as`` aliases of it.
 
         ``@method_decorator(decorator=csrf_exempt)`` genuinely applies the decorator,
         but matching only the bare name would miss ``from django.utils.decorators
-        import method_decorator as md`` used as ``@md(decorator=csrf_exempt)``. The
-        module's import statements are scanned so an aliased form is still recognised.
+        import method_decorator as md`` used as ``@md(decorator=csrf_exempt)``. Only
+        **module-level** imports are collected: a module-level alias binds the name
+        for the whole module (standard Python scoping), whereas a function/class-local
+        ``method_decorator as md`` binds ``md`` in that scope only and must not be
+        applied to an unrelated ``@md(...)`` in another scope. Full shadow tracking
+        (a module-level alias rebound locally) is not modelled - a pathological case
+        for a disabled-by-default rule.
         """
         names = {"method_decorator"}
         for node in walk(root):
-            if node.type != _py.ALIASED_IMPORT:
+            if node.type != _py.ALIASED_IMPORT or not CsrfProtectionDisabledRule._is_module_level(node, root):
                 continue
             imported = node.child_by_field_name("name")
             alias = node.child_by_field_name("alias")
             if imported is not None and alias is not None and node_text(imported).split(".")[-1] == "method_decorator":
                 names.add(node_text(alias))
         return names
+
+    @staticmethod
+    def _is_module_level(aliased_import: tree_sitter.Node, root: tree_sitter.Node) -> bool:
+        """Return True if *aliased_import*'s import statement is a direct child of the module."""
+        statement = aliased_import.parent
+        return statement is not None and statement.parent == root
 
     @staticmethod
     def _python_exempts_csrf(decorator: tree_sitter.Node, md_names: set[str]) -> bool:
