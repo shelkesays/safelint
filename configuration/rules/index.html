@@ -5688,8 +5688,14 @@
 <td><code>true</code></td>
 <td>How unknown calls (neither sanitizer nor source) propagate taint. <em>Added in 1.8.0.</em></td>
 </tr>
+<tr>
+<td><code>receiver_sinks</code></td>
+<td>Java: <code>openConnection</code>, <code>openStream</code></td>
+<td>Sinks whose payload is the <em>receiver</em>, not an argument (see below). <em>Added in 2.12.1.</em></td>
+</tr>
 </tbody>
 </table>
+<p><strong>Receiver vs argument payload.</strong> When a sink is called as a method on a <strong>tainted receiver</strong> (<code>x.execute(...)</code>), whether that is an injection depends on where the payload is. For most sinks the payload is an <strong>argument</strong> (<code>conn.execute(sql)</code>), so a tainted receiver passed only constant arguments - <code>conn.execute("SELECT 1")</code> where <code>conn</code> merely derives from user input - is <strong>not</strong> flagged (the receiver conveys no user data into the sink). A tainted receiver on such a sink is reported only when the call has <strong>no arguments</strong> (<code>tainted.execute()</code>). Some sinks, though, carry their payload in the <strong>receiver</strong> itself - <code>url.openConnection(proxy)</code> is SSRF even when <code>proxy</code> is clean. List those in <code>receiver_sinks</code> (per-language <code>receiver_sinks_&lt;lang&gt;</code>, bare <code>receiver_sinks</code> for Python) and they fire on a tainted receiver <strong>regardless of arguments</strong>. A <code>receiver_sinks</code> entry must also appear in the matching <code>sinks</code> list. Defaults ship Java's URL SSRF methods (<code>openConnection</code>, <code>openStream</code>).</p>
 <p>Default <code>sinks</code>: <code>eval</code>, <code>exec</code>, <code>compile</code>, <code>system</code>, <code>popen</code>, <code>Popen</code>, <code>run</code>, <code>call</code>, <code>check_output</code>, <code>execute</code></p>
 <p>Default <code>sanitizers</code>: <code>escape</code>, <code>sanitize</code>, <code>clean</code>, <code>validate</code>, <code>quote</code>, <code>encode</code>, <code>bleach</code></p>
 <p>Default <code>sources</code>: <code>input</code>, <code>readline</code>, <code>recv</code>, <code>recvfrom</code>, <code>read</code></p>
@@ -5700,6 +5706,13 @@
 <a id="__codelineno-69-5" name="__codelineno-69-5" href="#__codelineno-69-5"></a><span class="n">sanitizers</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;escape&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sanitize&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;quote&quot;</span><span class="p">]</span>
 <a id="__codelineno-69-6" name="__codelineno-69-6" href="#__codelineno-69-6"></a><span class="n">sources</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;input&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;readline&quot;</span><span class="p">]</span>
 <a id="__codelineno-69-7" name="__codelineno-69-7" href="#__codelineno-69-7"></a><span class="n">assume_taint_preserving</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span><span class="w">   </span><span class="c1"># default; set false for taint-dropping mode</span>
+<a id="__codelineno-69-8" name="__codelineno-69-8" href="#__codelineno-69-8"></a><span class="c1"># Sinks whose payload is the receiver, not an argument (fire on a tainted</span>
+<a id="__codelineno-69-9" name="__codelineno-69-9" href="#__codelineno-69-9"></a><span class="c1"># receiver regardless of arguments). Each entry must ALSO appear in the matching</span>
+<a id="__codelineno-69-10" name="__codelineno-69-10" href="#__codelineno-69-10"></a><span class="c1"># per-language sinks list (sinks_java here): receiver_sinks only changes how an</span>
+<a id="__codelineno-69-11" name="__codelineno-69-11" href="#__codelineno-69-11"></a><span class="c1"># already-registered sink treats its receiver, it does not register a new sink.</span>
+<a id="__codelineno-69-12" name="__codelineno-69-12" href="#__codelineno-69-12"></a><span class="c1"># Per-language keys: receiver_sinks_java, receiver_sinks_go, etc.</span>
+<a id="__codelineno-69-13" name="__codelineno-69-13" href="#__codelineno-69-13"></a><span class="n">sinks_java</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;openConnection&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;openStream&quot;</span><span class="p">]</span>
+<a id="__codelineno-69-14" name="__codelineno-69-14" href="#__codelineno-69-14"></a><span class="n">receiver_sinks_java</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;openConnection&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;openStream&quot;</span><span class="p">]</span>
 </code></pre></div>
 <h4 id="assume_taint_preserving-modes-180"><code>assume_taint_preserving</code> modes (1.8.0)<a class="headerlink" href="#assume_taint_preserving-modes-180" title="Permanent link">#</a></h4>
 <p>Most real codebases pass tainted data through internal helper functions before it reaches a sink. The <code>assume_taint_preserving</code> config flag controls how those <em>unknown</em> calls (i.e. calls whose name isn't in <code>sources</code> or <code>sanitizers</code>) are analysed.</p>
