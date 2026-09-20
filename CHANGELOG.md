@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.12.1] - 2026-09-20
+
 ### Fixed
 
 - **SAFE801 `tainted_sink` no longer false-positives on a tainted receiver passed only constant arguments.** The 2.11.0 method-receiver taint step reported an injection for `conn.execute("SELECT 1")` when `conn` derived from user input, even though the query is a hard-coded constant and no attacker data reaches the sink. The receiver is now treated as the payload **only when the sink call has no arguments** (`tainted.execute()`); when the call takes arguments, the payload is the argument(s), so a tainted receiver with all-constant arguments does not report (a tainted argument still fires via the argument path). Applied consistently across all seven trackers - Python, JavaScript/TypeScript, Java, Rust, Go, PHP, and the C++ path in `dataflow_c.py`; C remains excluded (its receiver step is off by design). In Java this also stops a tainted receiver being double-reported alongside a tainted argument.
@@ -1000,7 +1002,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.12.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.12.1...HEAD
+[2.12.1]: https://github.com/shelkesays/safelint/compare/v2.12.0...v2.12.1
 [2.12.0]: https://github.com/shelkesays/safelint/compare/v2.11.1...v2.12.0
 [2.11.1]: https://github.com/shelkesays/safelint/compare/v2.11.0...v2.11.1
 [2.11.0]: https://github.com/shelkesays/safelint/compare/v2.10.0...v2.11.0
