@@ -2090,7 +2090,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2121-2026-09-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.12.1 - 2026-09-20
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.12.1 - 2026-09-20">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4107,7 +4118,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2121-2026-09-20" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.12.1 - 2026-09-20
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.12.1 - 2026-09-20">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6018,7 +6040,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.12.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.12.1...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="2121-2026-09-20"><a href="https://github.com/shelkesays/safelint/compare/v2.12.0...v2.12.1">2.12.1</a> - 2026-09-20<a class="headerlink" href="#2121-2026-09-20" title="Permanent link">#</a></h2>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>SAFE801 <code>tainted_sink</code> no longer false-positives on a tainted receiver passed only constant arguments.</strong> The 2.11.0 method-receiver taint step reported an injection for <code>conn.execute("SELECT 1")</code> when <code>conn</code> derived from user input, even though the query is a hard-coded constant and no attacker data reaches the sink. The receiver is now treated as the payload <strong>only when the sink call has no arguments</strong> (<code>tainted.execute()</code>); when the call takes arguments, the payload is the argument(s), so a tainted receiver with all-constant arguments does not report (a tainted argument still fires via the argument path). Applied consistently across all seven trackers - Python, JavaScript/TypeScript, Java, Rust, Go, PHP, and the C++ path in <code>dataflow_c.py</code>; C remains excluded (its receiver step is off by design). In Java this also stops a tainted receiver being double-reported alongside a tainted argument.</li>
