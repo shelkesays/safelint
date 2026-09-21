@@ -38,6 +38,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.analysis._taint_contract import PropertyContract
 from safelint.languages import php as _php
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -101,6 +102,7 @@ class PhpTaintTracker:
         *,
         assume_taint_preserving: bool = True,
         receiver_sinks: frozenset[str] = frozenset(),
+        property_contract: PropertyContract | None = None,
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config."""
         self.tainted: set[str] = set(params)
@@ -109,6 +111,7 @@ class PhpTaintTracker:
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
         self.receiver_sinks = receiver_sinks
+        self.contract = property_contract if property_contract is not None else PropertyContract()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -172,7 +175,8 @@ class PhpTaintTracker:
         name = call_name(node)
         if name not in self.sinks:
             return
-        if self._record_arg_hits(node, name):
+        required = self.contract.required_for(name)
+        if self._record_arg_hits(node, name, required):
             return  # a tainted argument already reached the sink; receiver is redundant
         # Else, a sink method on a tainted receiver (``$input->query()``): the
         # ``object`` receiver of a member / nullsafe call is itself a tainted
@@ -182,17 +186,17 @@ class PhpTaintTracker:
         # argument-consuming sink's payload is its argument, so a tainted receiver
         # passed only constant arguments (``$conn->query("SELECT 1")``) is not injection.
         receiver = node.child_by_field_name("object")
-        if receiver is not None and self._is_tainted(receiver) and (name in self.receiver_sinks or not call_has_arguments(node)):
+        if receiver is not None and self._is_tainted(receiver, required) and (name in self.receiver_sinks or not call_has_arguments(node)):
             self._record_sink_hit(node, receiver, name)
 
-    def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:
+    def _record_arg_hits(self, node: tree_sitter.Node, name: str, required: str | None) -> bool:
         """Record one sink hit per tainted positional argument; return True if any fired."""
         args_node = node.child_by_field_name("arguments")
         if args_node is None:
             return False
         fired = False
         for arg in args_node.named_children:
-            if self._is_tainted(arg):
+            if self._is_tainted(arg, required):
                 self._record_sink_hit(node, arg, name)
                 fired = True
         return fired
@@ -230,30 +234,39 @@ class PhpTaintTracker:
         elif not keep_existing:
             self.tainted.discard(name)
 
-    def _is_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* may carry tainted data.
+    def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
+        """Return True if *node* may carry data still tainted for *required_property*.
 
-        Iterative worklist with OR semantics (first tainted node wins).
-        Depth is bounded by the expression's nesting.
+        Single iterative worklist (no recursion): each node is reduced by
+        :meth:`_taint_step` to ``(is_tainted_here, children_to_examine)``; the
+        first tainted node short-circuits. *required_property* is the property the
+        target sink requires (``None`` when it declares none) and decides whether a
+        property-typed sanitiser on the path clears.
         """
         stack = [node]
         while len(stack) > 0:
-            current = stack.pop()
-            if self._node_directly_tainted(current):
+            terminal, children = self._taint_step(stack.pop(), required_property)
+            if terminal:
                 return True
-            stack.extend(self._taint_propagating_children(current))
+            stack.extend(children)
         return False
 
-    def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* is a leaf that itself carries taint."""
+    def _taint_step(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tree_sitter.Node]]:
+        """Reduce *node* to ``(is_tainted_here, children_to_examine)`` for the worklist.
+
+        A superglobal subscript read (``$_GET['x']``) is a source; otherwise a
+        subscript propagates its base (``$tainted['k']``). A call is classified by
+        :meth:`_classify_call`, which returns children rather than re-entering
+        :meth:`_is_tainted`, keeping the check a single worklist.
+        """
         node_type = node.type
         if node_type == _php.VARIABLE_NAME:
-            return node_text(node) in self.tainted
+            return node_text(node) in self.tainted, []
         if node_type == _php.SUBSCRIPT_EXPRESSION:
-            return self._subscript_is_source(node)
+            return self._subscript_is_source(node), self._taint_propagating_children(node)
         if node_type in _PHP_CALL_TYPES:
-            return self._call_tainted(node)
-        return False
+            return self._classify_call(node, required_property)
+        return False, self._taint_propagating_children(node)
 
     def _subscript_is_source(self, node: tree_sitter.Node) -> bool:
         """Return True if *node* reads a key from a superglobal source (``$_GET['x']``).
@@ -286,23 +299,24 @@ class PhpTaintTracker:
             return list(node.named_children)
         return []
 
-    def _call_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if this call produces a tainted value.
+    def _classify_call(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tree_sitter.Node]]:
+        """Classify a call for the worklist: ``(is_tainted_here, children_to_examine)``.
 
-        Sanitizers clear, call-name sources inject, unknowns either preserve
-        or drop based on ``assume_taint_preserving``. When preserving, both
-        the positional arguments and the method receiver (the ``object`` field
-        of a member / nullsafe call - a scoped ``C::m()`` call has a ``scope``,
-        not an ``object``, so it contributes no receiver taint) are inspected,
-        so ``trim($input)`` and ``$input->raw()`` stay tainted.
+        A sanitiser that clears *required_property* short-circuits to
+        ``(False, [])``; a call-name source is ``(True, [])``; the sanitiser check
+        runs first. An unknown call under ``assume_taint_preserving`` returns
+        ``(False, <arg / receiver nodes>)`` so the worklist drains them - the
+        ``object`` receiver of a member / nullsafe call keeps ``trim($input)`` /
+        ``$input->raw()`` tainted (a scoped ``C::m()`` call has a ``scope``, not an
+        ``object``, so it contributes no receiver taint).
         """
         name = call_name(node)
-        if name in self.sanitizers:
-            return False
+        if name in self.sanitizers or self.contract.clears(name, required_property):
+            return False, []
         if name in self.sources:
-            return True
+            return True, []
         if not self.assume_taint_preserving:
-            return False
+            return False, []
         candidates: list[tree_sitter.Node] = []
         args_node = node.child_by_field_name("arguments")
         if args_node is not None:
@@ -310,4 +324,4 @@ class PhpTaintTracker:
         receiver = node.child_by_field_name("object")
         if receiver is not None:
             candidates.append(receiver)
-        return any(self._is_tainted(c) for c in candidates)
+        return False, candidates

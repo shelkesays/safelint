@@ -145,17 +145,33 @@ passed separately - two extra params would push the shared constructor past the
 `max_arguments = 7` limit (SAFE103). All seven trackers share the constructor, so
 the single-param change is uniform.
 
-**Increment status**: 1 (foundation) + 2 (Python tracker, 3a + 3b) are **done**
-on this branch - `PropertyContract`, config keys `sanitizer_properties` /
-`sink_properties` (+ validators `_validated_property_map` /
-`_validated_string_map`), the Python `dataflow.py` rewrite (single worklist +
-property clearing), and the rule wiring in `_python_check`. Pydantic
-(`model_validate` / `model_validate_json` / `parse_obj_as`) ships as a
-`schema_validated` default (inert for injection sinks). Behaviour preserved on
-the existing Python suite; new tracker- and rule-level property tests incl. the
-`escape()`-does-not-clear-`RawSQL` end-to-end case. Remaining: the five worklist
-trackers (js/java/rust/go/php - each adopts the same `property_contract` param +
-worklist), the C tracker (3a only), and the docs/skills/changelog/version fan-out.
+**Increment status**: 1-4 **done** on this branch.
+
+- **1-2** (foundation + Python): `PropertyContract`, config keys
+  `sanitizer_properties` / `sink_properties` (+ validators), the Python
+  `dataflow.py` rewrite (single worklist + property clearing), rule wiring.
+  Pydantic ships as a `schema_validated` default (inert for injection sinks).
+- **3** (five worklist trackers - js/java/rust/go/php): each rewritten to the
+  single-worklist `_taint_step` / `_classify_call` shape, taking the shared
+  `property_contract` param. Java keeps its receiver-as-input; PHP keeps its
+  superglobal-subscript source and `_visit_include`; JS/Go/Rust keep their
+  receiver shapes. All existing per-language suites green (behaviour preserved).
+- **4** (C tracker, 3a only): `_classify_call` consults the contract and threads
+  `required_property`. To stay within `max_arguments = 7`, the C++ `is_cpp` bool
+  was replaced by a one-method `CppTaintTracker(CTaintTracker)` subclass that
+  overrides `_cpp_method_receiver` (base returns None = C); the rule dispatches
+  the class by language.
+
+Rule wiring: every `_<lang>_check` resolves a `PropertyContract` and passes it;
+the repeated sinks/sanitizers/sources resolution was factored into
+`_resolve_core_lists`. Cross-language property behaviour proven end-to-end for
+JavaScript (html-escaper does / doesn't clear per sink property).
+
+**Remaining**: increment 5 - docs (`docs/configuration/rules.md`, both TOML
+forms; the language pages if phrasing changes), the 14 client skill files + the
+shared addenda if rule phrasing changes, the drift tests, the `CHANGELOG.md`
+`[Unreleased]` entry, and the version bump (MINOR; RC on the feature->development
+PR). Retire this spec + close the two PR #133 tracking threads on ship.
 
 ## Per-tracker work (from the map)
 
