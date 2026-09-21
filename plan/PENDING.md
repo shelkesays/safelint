@@ -83,6 +83,14 @@ uv run mkdocs build --strict                   # broken anchors fail the build
 
 ## Priority 1 - Taint-tracker core overhaul (do 3a + 3b together)
 
+> **✅ IMPLEMENTED, pending release** on `feature/taint-tracker-overhaul`
+> (**PR #149**, bumped to `2.13.0rc1`). Both sub-items landed together across all
+> seven trackers; the design + increment record is in
+> [`taint-tracker-overhaul.md`](taint-tracker-overhaul.md). This section moves to
+> **Shipped** (and the spec file is retired, and the two PR #133 tracking threads
+> close) once it reaches production via the RC -> `development` -> `main` flow.
+> The requirement text below is retained until then.
+
 **Type**: architectural enhancement to the taint trackers. Two sub-items,
 strategically downstream of the shipped 2.11.0 taint-projection parity work:
 
