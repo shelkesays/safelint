@@ -18,6 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.analysis._taint_contract import PropertyContract
 from safelint.languages import python as _py
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -68,6 +69,7 @@ class TaintTracker:
         *,
         assume_taint_preserving: bool = True,
         receiver_sinks: frozenset[str] = frozenset(),
+        property_contract: PropertyContract | None = None,
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config.
 
@@ -92,6 +94,15 @@ class TaintTracker:
           functions actually do flow tainted data through to a sink.
           Set this when your codebase uses many internal wrappers and
           you'd rather miss a taint flow than report a false positive.
+
+        *property_contract* carries the opt-in property-typed sanitiser
+        contract (:class:`PropertyContract`): a sanitiser establishes named
+        safety properties (e.g. ``escape -> {html_escaped}``) and a sink
+        requires one (e.g. ``execute -> sql_escaped``). A property-typed
+        sanitiser clears a sink only when it establishes that sink's required
+        property; the flat *sanitizers* list stays universal (clears every
+        sink) for backward compatibility, and a sink with no declared property
+        is cleared by any sanitiser. Defaults to an empty contract (inert).
         """
         self.tainted: set[str] = set(params)
         self.sinks = sinks
@@ -99,6 +110,7 @@ class TaintTracker:
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
         self.receiver_sinks = receiver_sinks
+        self.contract = property_contract if property_contract is not None else PropertyContract()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -186,7 +198,8 @@ class TaintTracker:
         name = call_name(node)
         if name not in self.sinks:
             return
-        if self._record_arg_hits(node, name):
+        required = self.contract.required_for(name)
+        if self._record_arg_hits(node, name, required):
             return  # a tainted argument already reached the sink; receiver is redundant
         # Sink method on a tainted receiver (``request.execute()``) - the receiver
         # is itself a tainted value reaching the sink. Fires ONLY when the call has
@@ -196,17 +209,17 @@ class TaintTracker:
         function = node.child_by_field_name("function")
         if function is not None and function.type == _py.ATTRIBUTE:
             receiver = function.child_by_field_name("object")
-            if receiver is not None and self._is_tainted(receiver) and (name in self.receiver_sinks or not call_has_arguments(node)):
+            if receiver is not None and self._is_tainted(receiver, required) and (name in self.receiver_sinks or not call_has_arguments(node)):
                 self._record_sink_hit(node, receiver, name)
 
-    def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:
+    def _record_arg_hits(self, node: tree_sitter.Node, name: str, required: str | None) -> bool:
         """Record one sink hit per tainted positional argument; return True if any fired."""
         args_node = node.child_by_field_name("arguments")
         if args_node is None:
             return False
         fired = False
         for arg in args_node.named_children:
-            if self._is_tainted(arg):
+            if self._is_tainted(arg, required):
                 self._record_sink_hit(node, arg, name)
                 fired = True
         return fired
@@ -226,33 +239,45 @@ class TaintTracker:
         else:
             self.tainted.discard(name)
 
-    def _is_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* may carry tainted data.
+    def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
+        """Return True if *node* may carry data still tainted for *required_property*.
 
-        Iterative worklist with OR semantics: taint propagates up from any
-        tainted leaf, so the first tainted node short-circuits to ``True``.
-        Per-node classification is split into :meth:`_node_directly_tainted`
-        (leaf check) and :meth:`_taint_propagating_children` (which children to
-        enqueue). Depth is bounded by the expression's nesting.
+        Single iterative worklist (no recursion): each node is reduced by
+        :meth:`_taint_step` to ``(is_tainted_here, children_to_examine)``; the
+        first tainted node short-circuits to ``True``. *required_property* is the
+        safety property the target sink requires (``None`` when the sink declares
+        none); it decides whether a property-typed sanitiser on the path clears.
         """
         stack = [node]
         while len(stack) > 0:
-            current = stack.pop()
-            if self._node_directly_tainted(current):
+            terminal, children = self._taint_step(stack.pop(), required_property)
+            if terminal:
                 return True
-            stack.extend(self._taint_propagating_children(current))
+            stack.extend(children)
         return False
 
-    def _node_directly_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* is a leaf that itself carries taint."""
+    def _taint_step(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tree_sitter.Node]]:
+        """Reduce *node* to ``(is_tainted_here, children_to_examine)`` for the worklist.
+
+        A tainted identifier terminates; a call is classified by
+        :meth:`_classify_call`; an f-string yields its interpolated expressions as
+        children; everything else yields its taint-propagating children. Calls and
+        f-strings return children rather than re-entering :meth:`_is_tainted`, so
+        the whole check stays a single worklist (no mutual recursion).
+        """
         node_type = node.type
         if node_type == _py.IDENTIFIER:
-            return node_text(node) in self.tainted
+            return node_text(node) in self.tainted, []
         if node_type == _py.CALL:
-            return self._call_tainted(node)
+            return self._classify_call(node, required_property)
         if node_type == _py.STRING:
-            return self._fstring_tainted(node)
-        return False
+            return False, self._fstring_children(node)
+        return False, self._taint_propagating_children(node)
+
+    @staticmethod
+    def _fstring_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
+        """Return every interpolated expression node inside an f-string."""
+        return [inner for child in walk(node) if child.type == _py.INTERPOLATION for inner in child.named_children]
 
     @staticmethod
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
@@ -281,26 +306,26 @@ class TaintTracker:
             return list(node.named_children)
         return []
 
-    def _call_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if this call produces a tainted value.
+    def _classify_call(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tree_sitter.Node]]:
+        """Classify a call for the worklist: ``(is_tainted_here, children_to_examine)``.
 
-        Unknown calls (neither sanitizer nor source) consult
-        ``assume_taint_preserving``: when True, the call's result is
-        tainted iff any argument **or the method receiver** is tainted;
-        when False, the result is always clean. Reading the receiver is
-        what makes ``request.GET.get("q")`` / ``tainted.strip()`` stay
-        tainted - those return a value derived from the receiver but take
-        no tainted positional args, so a positional-only check would miss
-        them. Mirrors the Java / Rust / Go / PHP trackers. The sanitizer
-        check runs first, so ``escape(request.data)`` still clears.
+        A sanitiser that clears *required_property* short-circuits to
+        ``(False, [])`` (its arguments are not followed); a source is
+        ``(True, [])``. An unknown call under ``assume_taint_preserving`` returns
+        ``(False, <arg / receiver nodes>)`` so the worklist drains them - taint
+        flows through iff a child is tainted, realised without re-entering
+        :meth:`_is_tainted`. The sanitiser check runs first, so
+        ``escape(request.data)`` still clears (for the property escape covers).
         """
         name = call_name(node)
-        if name in self.sanitizers:
-            return False
+        # Flat ``sanitizers`` are universal (historical behaviour); the contract
+        # adds property-typed sanitisers that clear only their sink's property.
+        if name in self.sanitizers or self.contract.clears(name, required_property):
+            return False, []
         if name in self.sources:
-            return True
+            return True, []
         if not self.assume_taint_preserving:
-            return False
+            return False, []
         candidates: list[tree_sitter.Node] = []
         args_node = node.child_by_field_name("arguments")
         if args_node is not None:
@@ -313,8 +338,4 @@ class TaintTracker:
             receiver = function.child_by_field_name("object")
             if receiver is not None:
                 candidates.append(receiver)
-        return any(self._is_tainted(c) for c in candidates)
-
-    def _fstring_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if any interpolated expression in an f-string is tainted."""
-        return any(self._is_tainted(inner) for child in walk(node) if child.type == _py.INTERPOLATION for inner in child.named_children)
+        return False, candidates

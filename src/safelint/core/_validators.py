@@ -51,6 +51,45 @@ def _validated_string_list(value: object, key_name: str) -> list[str]:
     return [item for item in value if isinstance(item, str)]
 
 
+def _validated_property_map(value: object, key_name: str) -> dict[str, frozenset[str]]:
+    """Validate a table of ``name -> [property, ...]``; return ``name -> frozenset``.
+
+    Used for ``sanitizer_properties`` (a sanitiser name maps to the safety
+    properties it establishes, e.g. ``escape = ["html_escaped"]``). Raises
+    :class:`TypeError` on a non-table, a non-string key, or a value that is not a
+    list of strings (reusing :func:`_validated_string_list` for the value).
+    """
+    if not isinstance(value, dict):
+        msg = f"{key_name} must be a table of name -> [property, ...], got {type(value).__name__}"
+        raise TypeError(msg)
+    result: dict[str, frozenset[str]] = {}
+    for name, props in value.items():
+        if not isinstance(name, str):
+            msg = f"{key_name} keys must be strings - got {type(name).__name__}({name!r})"
+            raise TypeError(msg)
+        result[name] = frozenset(_validated_string_list(props, f"{key_name}.{name}"))
+    return result
+
+
+def _validated_string_map(value: object, key_name: str) -> dict[str, str]:
+    """Validate a table of ``name -> property`` (both strings); return it as a dict.
+
+    Used for ``sink_properties`` (a sink name maps to the single property it
+    requires, e.g. ``execute = "sql_escaped"``). Raises :class:`TypeError` on a
+    non-table or a non-string key or value.
+    """
+    if not isinstance(value, dict):
+        msg = f"{key_name} must be a table of name -> property, got {type(value).__name__}"
+        raise TypeError(msg)
+    result: dict[str, str] = {}
+    for name, prop in value.items():
+        if not isinstance(name, str) or not isinstance(prop, str):
+            msg = f"{key_name} must map string names to string properties - got {name!r}: {prop!r}"
+            raise TypeError(msg)
+        result[name] = prop
+    return result
+
+
 def resolve_lang_config_key(base_key: str, lang_name: str) -> str:
     """Compute the config key name for a per-language rule option.
 
