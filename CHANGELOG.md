@@ -7,7 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.12.1] - 2026-09-20
+### Added
+
+- **SAFE801 `tainted_sink`: property-typed sanitisers (`sanitizer_properties` / `sink_properties`).** A sanitiser can now declare *which* safety property it establishes (e.g. `escape = ["html_escaped"]`) and a sink *which* it requires (e.g. `RawSQL = "sql_escaped"`); a property-typed sanitiser clears a sink only when it establishes that sink's required property. This fixes the class of false negative where an HTML escaper wrongly cleared a SQL sink (`RawSQL(escape(user_input))`). The mechanism is **opt-in and backward compatible** - the flat `sanitizers` list stays universal (clears every sink, as before), and a sink with no declared property is cleared by any sanitiser, so no existing config changes meaning. Both keys are per-language (bare for Python, `_<lang>` suffix otherwise). Pydantic's validating entry points (`model_validate` / `model_validate_json` / `parse_obj_as`) ship as `schema_validated` providers - recognised only for a sink you declare as requiring `schema_validated`, never clearing an injection sink. Config docs (both TOML forms) in `docs/configuration/rules.md`.
+
+### Changed
+
+- **Taint trackers refactored to a single iterative worklist.** The six non-C trackers (Python + JavaScript/TypeScript, Java, Rust, Go, PHP) previously classified calls via an `_is_tainted` ↔ `_call_tainted` mutual recursion; they now reduce each node to `(is_tainted_here, children)` in one worklist, matching `dataflow_c.py`. Behaviour is unchanged (every per-language suite is preserved); the refactor removes the recursion and unifies the trackers. Internal only.
 
 ### Fixed
 

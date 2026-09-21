@@ -1103,6 +1103,40 @@ sinks_java = ["openConnection", "openStream"]
 receiver_sinks_java = ["openConnection", "openStream"]
 ```
 
+#### Property-typed sanitisers (`sanitizer_properties` / `sink_properties`)
+
+By default a sanitiser clears taint for **every** sink - convenient, but imprecise: an HTML escaper does not make a value safe for SQL, yet listing `escape` in `sanitizers` clears it for a `RawSQL` sink too (a false negative). The property-typed contract makes clearing **per sink**:
+
+- `sanitizer_properties` maps a sanitiser to the safety **properties** it establishes (e.g. `escape = ["html_escaped"]`).
+- `sink_properties` maps a sink to the single property it **requires** (e.g. `RawSQL = "sql_escaped"`).
+- A property-typed sanitiser clears a sink only when it establishes that sink's required property. A sink with no declared property is cleared by any sanitiser (unchanged).
+
+The mechanism is **opt-in and backward compatible**: the flat `sanitizers` list stays universal (clears every sink, as before), so no existing config changes meaning. Move a sanitiser into `sanitizer_properties` only when you want the tighter, context-specific behaviour. Both keys are per-language (bare for Python, `_<lang>` suffix otherwise).
+
+Pydantic's validating entry points (`model_validate`, `model_validate_json`, `parse_obj_as`) ship as `schema_validated` providers by default. Since no default sink requires `schema_validated`, they clear nothing for injection sinks (a schema-validated string is still injectable) - they are recognised only for a sink you declare as requiring `schema_validated`.
+
+**pyproject.toml:**
+
+```toml
+[tool.safelint.rules.tainted_sink]
+enabled = true
+sinks = ["RawSQL", "eval"]
+sanitizer_properties = { escape = ["html_escaped"], sqlquote = ["sql_escaped"] }
+sink_properties = { RawSQL = "sql_escaped" }   # eval has no property -> any sanitiser clears it
+```
+
+**safelint.toml:**
+
+```toml
+[rules.tainted_sink]
+enabled = true
+sinks = ["RawSQL", "eval"]
+sanitizer_properties = { escape = ["html_escaped"], sqlquote = ["sql_escaped"] }
+sink_properties = { RawSQL = "sql_escaped" }
+```
+
+With the above, `RawSQL(escape(user_input))` **fires** (HTML escaping does not satisfy `sql_escaped`), while `RawSQL(sqlquote(user_input))` and `eval(escape(user_input))` are cleared.
+
 #### `assume_taint_preserving` modes (1.8.0)
 
 Most real codebases pass tainted data through internal helper functions before it reaches a sink. The `assume_taint_preserving` config flag controls how those *unknown* calls (i.e. calls whose name isn't in `sources` or `sanitizers`) are analysed.
