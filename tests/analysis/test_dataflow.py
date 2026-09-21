@@ -8,6 +8,7 @@ import pytest
 import tree_sitter
 import tree_sitter_python
 
+from safelint.analysis._taint_contract import PropertyContract
 from safelint.analysis.dataflow import TaintTracker
 from safelint.core.config import DEFAULTS
 from safelint.languages._node_utils import call_name, walk
@@ -127,6 +128,89 @@ def test_tracker_sanitizer_clears_taint():
     assert not tracker.sink_hits
 
 
+# ---------------------------------------------------------------------------
+# Property-typed sanitiser contract (3a)
+# ---------------------------------------------------------------------------
+
+
+def _property_tracker(params: set[str]) -> TaintTracker:
+    """Tracker where ``htmlescape`` establishes html_escaped only and the
+    ``run_sql`` sink requires sql_escaped (so an HTML escaper must NOT clear it)."""
+    return TaintTracker(
+        params,
+        frozenset(["eval", "run_sql"]),
+        frozenset(),  # no universal/flat sanitisers
+        SOURCES,
+        property_contract=PropertyContract(
+            sanitizer_properties={"htmlescape": frozenset(["html_escaped"])},
+            sink_properties={"run_sql": "sql_escaped"},
+        ),
+    )
+
+
+def test_property_sanitizer_does_not_clear_mismatched_sink():
+    """An html_escaped sanitiser does not clear a sink that requires sql_escaped."""
+    src = """
+    def process(user_input):
+        run_sql(htmlescape(user_input))
+    """
+    func = _parse_func(src)
+    tracker = _property_tracker({"user_input"})
+    tracker.visit(func)
+    assert any(s == "run_sql" for _, _, s in tracker.sink_hits)
+
+
+def test_property_sanitizer_clears_matching_sink():
+    """The same sanitiser DOES clear a sink whose required property it establishes."""
+    src = """
+    def process(user_input):
+        htmlsink(htmlescape(user_input))
+    """
+    func = _parse_func(src)
+    tracker = TaintTracker(
+        {"user_input"},
+        frozenset(["htmlsink"]),
+        frozenset(),
+        SOURCES,
+        property_contract=PropertyContract(
+            sanitizer_properties={"htmlescape": frozenset(["html_escaped"])},
+            sink_properties={"htmlsink": "html_escaped"},
+        ),
+    )
+    tracker.visit(func)
+    assert not tracker.sink_hits
+
+
+def test_property_sanitizer_clears_sink_with_no_required_property():
+    """A property-typed sanitiser still clears a sink that declares no property."""
+    src = """
+    def process(user_input):
+        eval(htmlescape(user_input))
+    """
+    func = _parse_func(src)
+    tracker = _property_tracker({"user_input"})  # ``eval`` has no required property
+    tracker.visit(func)
+    assert not tracker.sink_hits
+
+
+def test_flat_sanitizer_stays_universal_for_property_sink():
+    """A flat/legacy sanitiser clears even a property-requiring sink (backward compat)."""
+    src = """
+    def process(user_input):
+        run_sql(escape(user_input))
+    """
+    func = _parse_func(src)
+    tracker = TaintTracker(
+        {"user_input"},
+        frozenset(["run_sql"]),
+        frozenset(["escape"]),  # flat list = universal
+        SOURCES,
+        property_contract=PropertyContract(sink_properties={"run_sql": "sql_escaped"}),
+    )
+    tracker.visit(func)
+    assert not tracker.sink_hits
+
+
 def test_tracker_source_call_injects_taint():
     src = """
     def read_and_run():
@@ -229,6 +313,47 @@ def test_tainted_sink_respects_custom_sinks():
     vs = violations(TaintedSinkRule, src, cfg)
     assert len(vs) == 1
     assert "db_execute" in vs[0].message
+
+
+def test_tainted_sink_property_typed_escape_does_not_clear_sql_sink():
+    """End-to-end: an html_escaped sanitiser must not clear a sql_escaped sink.
+
+    This is the ``escape()``-clears-``RawSQL`` false negative: with ``escape``
+    reclassified as establishing ``html_escaped`` only and ``RawSQL`` requiring
+    ``sql_escaped``, ``RawSQL(escape(user_input))`` still reaches the sink."""
+    src = """
+    def query(user_input):
+        RawSQL(escape(user_input))
+    """
+    cfg = {
+        "enabled": True,
+        "severity": "error",
+        "sinks": ["RawSQL"],
+        "sanitizers": [],  # escape is no longer universal
+        "sources": [],
+        "sanitizer_properties": {"escape": ["html_escaped"]},
+        "sink_properties": {"RawSQL": "sql_escaped"},
+    }
+    vs = violations(TaintedSinkRule, src, cfg)
+    assert len(vs) == 1
+    assert "RawSQL" in vs[0].message
+
+
+def test_tainted_sink_flat_sanitizer_still_clears_by_default():
+    """Backward compat: the flat ``sanitizers`` list clears every sink, as before."""
+    src = """
+    def query(user_input):
+        RawSQL(escape(user_input))
+    """
+    cfg = {
+        "enabled": True,
+        "severity": "error",
+        "sinks": ["RawSQL"],
+        "sanitizers": ["escape"],  # universal, as today
+        "sources": [],
+        "sink_properties": {"RawSQL": "sql_escaped"},
+    }
+    assert violations(TaintedSinkRule, src, cfg) == []
 
 
 def test_tainted_sink_self_cls_not_tainted():
