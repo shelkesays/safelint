@@ -28,6 +28,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.analysis._taint_contract import PropertyContract
 from safelint.languages import c as _c
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -100,15 +101,15 @@ class CTaintTracker:
         *,
         assume_taint_preserving: bool = True,
         receiver_sinks: frozenset[str] = frozenset(),
-        is_cpp: bool = False,
+        property_contract: PropertyContract | None = None,
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config.
 
-        *is_cpp* enables method-receiver taint on ``obj.method()`` /
-        ``ptr->method()``. It is C++-only: in C, ``req->callback()`` invokes a
-        function pointer stored on the struct, whose result need not derive from
-        the struct, so treating the receiver as a taint input there would be a
-        false positive. The rule sets it from the file's language.
+        This base class is the **C** tracker: method-receiver taint is off (in C,
+        ``req->callback()`` invokes a function pointer whose result need not derive
+        from the struct, so treating the receiver as a taint input is a false
+        positive). :class:`CppTaintTracker` overrides :meth:`_cpp_method_receiver`
+        to enable receiver taint for C++.
         """
         self.tainted: set[str] = set(params)
         self.sinks = sinks
@@ -116,7 +117,7 @@ class CTaintTracker:
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
         self.receiver_sinks = receiver_sinks
-        self.is_cpp = is_cpp
+        self.contract = property_contract if property_contract is not None else PropertyContract()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -158,24 +159,25 @@ class CTaintTracker:
         name = call_name(node)
         if name not in self.sinks:
             return
-        if self._record_arg_hits(node, name):
+        required = self.contract.required_for(name)
+        if self._record_arg_hits(node, name, required):
             return  # a tainted argument already reached the sink; receiver is redundant
         # Else, a sink C++ method on a tainted receiver (``req->execute()``); None
         # in C. Fires ONLY when the call has no arguments: an argument-consuming
         # sink's payload is its argument, so a tainted receiver passed only constant
         # arguments (``req->execute("SELECT 1")``) is not injection.
         receiver = self._cpp_method_receiver(node)
-        if receiver is not None and self._is_tainted(receiver) and (name in self.receiver_sinks or not call_has_arguments(node)):
+        if receiver is not None and self._is_tainted(receiver, required) and (name in self.receiver_sinks or not call_has_arguments(node)):
             self._record_sink_hit(node, receiver, name)
 
-    def _record_arg_hits(self, node: tree_sitter.Node, name: str) -> bool:
+    def _record_arg_hits(self, node: tree_sitter.Node, name: str, required: str | None) -> bool:
         """Record one sink hit per tainted positional argument; return True if any fired."""
         args_node = node.child_by_field_name("arguments")
         if args_node is None:
             return False
         fired = False
         for arg in args_node.named_children:
-            if self._is_tainted(arg):
+            if self._is_tainted(arg, required):
                 self._record_sink_hit(node, arg, name)
                 fired = True
         return fired
@@ -199,43 +201,46 @@ class CTaintTracker:
         elif not keep_existing:
             self.tainted.discard(name)
 
-    def _is_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return True if *node* may carry tainted data (iterative worklist, OR semantics).
+    def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
+        """Return True if *node* may carry data still tainted for *required_property*.
 
         Fully iterative (no recursion - the analysis-module guideline): each
         worklist node is reduced by ``_taint_step`` to ``(tainted_here, children
         to examine)``. A sanitizer call clears (no children); a source call
         taints; an unknown call under ``assume_taint_preserving`` taints iff one
         of its arguments is tainted, so those arguments stay on the worklist.
+        *required_property* is the property the target sink requires (``None`` when
+        it declares none) and decides whether a property-typed sanitiser clears.
         """
         stack = [node]
         while len(stack) > 0:
-            terminal, children = self._taint_step(stack.pop())
+            terminal, children = self._taint_step(stack.pop(), required_property)
             if terminal:
                 return True
             stack.extend(children)
         return False
 
-    def _taint_step(self, node: tree_sitter.Node) -> tuple[bool, list[tree_sitter.Node]]:
+    def _taint_step(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tree_sitter.Node]]:
         """Reduce one worklist node to ``(is_tainted_here, children_to_examine)``."""
         node_type = node.type
         if node_type == _c.IDENTIFIER:
             return node_text(node) in self.tainted, []
         if node_type == _c.CALL_EXPRESSION:
-            return self._classify_call(node)
+            return self._classify_call(node, required_property)
         return False, self._taint_propagating_children(node)
 
-    def _classify_call(self, node: tree_sitter.Node) -> tuple[bool, list[tree_sitter.Node]]:
+    def _classify_call(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tree_sitter.Node]]:
         """Classify a call: ``(is_source, args_to_descend_into)``.
 
-        A sanitizer clears -> ``(False, [])`` (its arguments are not followed).
-        A source taints -> ``(True, [])``. An unknown call propagates only under
+        A sanitizer that clears *required_property* -> ``(False, [])`` (its
+        arguments are not followed). A source taints -> ``(True, [])``; the
+        sanitiser check runs first. An unknown call propagates only under
         ``assume_taint_preserving``, in which case its argument nodes - plus the
         method receiver for a C++ member call - are returned for the worklist to
         examine; otherwise it clears.
         """
         name = call_name(node)
-        if name in self.sanitizers:
+        if name in self.sanitizers or self.contract.clears(name, required_property):
             return False, []
         if name in self.sources:
             return True, []
@@ -243,29 +248,14 @@ class CTaintTracker:
             return False, []
         args_node = node.child_by_field_name("arguments")
         candidates: list[tree_sitter.Node] = list(args_node.named_children) if args_node is not None else []
-        # C++ method-call shape: ``call.function`` is a ``field_expression``
-        # (``obj.method()`` / ``ptr->method()``) whose ``argument`` is the
-        # receiver, so ``req.body()`` / ``req->param("q")`` stay tainted. Gated
-        # to C++: in C the same shape is a function-POINTER call
-        # (``req->callback()``) whose result need not derive from the struct, so
-        # treating the receiver as a taint input there is a false positive.
         receiver = self._cpp_method_receiver(node)
         if receiver is not None:
             candidates.append(receiver)
         return False, candidates
 
-    def _cpp_method_receiver(self, node: tree_sitter.Node) -> tree_sitter.Node | None:
-        """Return the receiver of a C++ member call (``obj.m()`` / ``p->m()``), or None.
-
-        None in C (``is_cpp`` False) and for plain function calls, so C
-        function-pointer member calls never contribute receiver taint.
-        """
-        if not self.is_cpp:
-            return None
-        function = node.child_by_field_name("function")
-        if function is None or function.type != _c.FIELD_EXPRESSION:
-            return None
-        return function.child_by_field_name("argument")
+    def _cpp_method_receiver(self, node: tree_sitter.Node) -> tree_sitter.Node | None:  # noqa: ARG002 - overridden by CppTaintTracker
+        """Return the method-call receiver, or None. C has none (see class docstring)."""
+        return None
 
     @staticmethod
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
@@ -286,3 +276,22 @@ class CTaintTracker:
         if node_type in _SPREADING_TYPES:
             return list(node.named_children)
         return []
+
+
+class CppTaintTracker(CTaintTracker):
+    """C++ variant of :class:`CTaintTracker` with method-receiver taint enabled.
+
+    tree-sitter-cpp shares C's ``call_expression`` shapes, so the whole tracker is
+    inherited; only the method-call receiver differs. A C++ member call
+    ``obj.method()`` / ``ptr->method()`` is a ``field_expression`` whose
+    ``argument`` is the receiver, so ``req.body()`` / ``req->param("q")`` stay
+    tainted. In C the same shape is a function-POINTER call (``req->callback()``)
+    whose result need not derive from the struct, which is why the C base returns
+    no receiver.
+    """
+
+    def _cpp_method_receiver(self, node: tree_sitter.Node) -> tree_sitter.Node | None:
+        function = node.child_by_field_name("function")
+        if function is None or function.type != _c.FIELD_EXPRESSION:
+            return None
+        return function.child_by_field_name("argument")
