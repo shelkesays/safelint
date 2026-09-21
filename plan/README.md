@@ -100,7 +100,8 @@ one-time cross-language taint-propagation enhancement (attribute / subscript /
 receiver chains) **shipped in v2.11.0** (Priority 1 in [`PENDING.md`](PENDING.md),
 now marked implemented). The remaining taint-core work - the property-typed
 sanitiser framework and the iterative-worklist conversion of the six non-C
-trackers - is **Priority 3** there.
+trackers - is **Priority 1** there, and is **implemented (PR #149, `2.13.0rc1`),
+pending release**.
 
 > **Node-type / operator constants shipped in v2.8.2** (PR #107). Converted the
 > per-language node-type / operator tables in `src/safelint/rules/` from raw
