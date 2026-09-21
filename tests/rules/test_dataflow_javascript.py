@@ -55,6 +55,48 @@ def test_js_taint_through_assignment_fires(tmp_path: Path) -> None:
     assert any(v.code == "SAFE801" for v in result.violations)
 
 
+def test_js_property_typed_sanitizer_does_not_clear_mismatched_sink(tmp_path: Path) -> None:
+    """End-to-end (JS): an html_escaped sanitiser does not clear a sql_escaped sink.
+
+    Proves the property-typed contract is resolved from config and threaded into
+    the JavaScript tracker: ``runSql(esc(userInput))`` still fires when ``esc``
+    only establishes ``html_escaped`` and ``runSql`` requires ``sql_escaped``."""
+    sample = tmp_path / "prop.js"
+    sample.write_text("function f(userInput) { runSql(esc(userInput)); }\n", encoding="utf-8")
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "sinks_javascript": ["runSql"],
+                "sanitizers_javascript": [],
+                "sources_javascript": [],
+                "sanitizer_properties_javascript": {"esc": ["html_escaped"]},
+                "sink_properties_javascript": {"runSql": "sql_escaped"},
+            }
+        }
+    }
+    result = _enabled_engine("tainted_sink", overrides).check_file(str(sample))
+    assert [v.code for v in result.violations if v.code == "SAFE801"] == ["SAFE801"]
+
+
+def test_js_property_typed_sanitizer_clears_matching_sink(tmp_path: Path) -> None:
+    """The same JS sanitiser clears a sink whose required property it establishes."""
+    sample = tmp_path / "prop_ok.js"
+    sample.write_text("function f(userInput) { htmlSink(esc(userInput)); }\n", encoding="utf-8")
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "sinks_javascript": ["htmlSink"],
+                "sanitizers_javascript": [],
+                "sources_javascript": [],
+                "sanitizer_properties_javascript": {"esc": ["html_escaped"]},
+                "sink_properties_javascript": {"htmlSink": "html_escaped"},
+            }
+        }
+    }
+    result = _enabled_engine("tainted_sink", overrides).check_file(str(sample))
+    assert [v.code for v in result.violations if v.code == "SAFE801"] == []
+
+
 def test_js_taint_through_let_assignment_fires(tmp_path: Path) -> None:
     """``let`` assignment also propagates taint."""
     sample = tmp_path / "let.js"
