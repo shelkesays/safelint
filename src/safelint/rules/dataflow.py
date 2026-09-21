@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, ClassVar
 
+from safelint.analysis._taint_contract import PropertyContract
 from safelint.analysis.dataflow import TaintTracker
 from safelint.analysis.dataflow_c import CTaintTracker
 from safelint.analysis.dataflow_go import GoTaintTracker
@@ -11,7 +12,7 @@ from safelint.analysis.dataflow_java import JavaTaintTracker
 from safelint.analysis.dataflow_javascript import JsTaintTracker
 from safelint.analysis.dataflow_php import PhpTaintTracker
 from safelint.analysis.dataflow_rust import RustTaintTracker
-from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
+from safelint.core._validators import _validated_property_map, _validated_string_list, _validated_string_map, resolve_lang_config_lookup
 from safelint.languages import c as _c
 from safelint.languages import cpp as _cpp
 from safelint.languages import go as _go
@@ -729,6 +730,21 @@ class TaintedSinkRule(BaseRule):
         raw, key = resolve_lang_config_lookup(self.config, "receiver_sinks", lang_name, default=[])
         return frozenset(_validated_string_list(raw, key))
 
+    def _resolve_property_contract(self, lang_name: str) -> PropertyContract:
+        """Resolve the per-language property-typed sanitiser contract for *lang_name*.
+
+        ``sanitizer_properties`` maps a sanitiser to the properties it establishes;
+        ``sink_properties`` maps a sink to the property it requires. Python uses the
+        bare keys, other languages the ``_<lang>`` suffix. Both empty when unset, so
+        the contract is inert (every sanitiser clears every sink, as before).
+        """
+        san_raw, san_key = resolve_lang_config_lookup(self.config, "sanitizer_properties", lang_name, default={})
+        sink_raw, sink_key = resolve_lang_config_lookup(self.config, "sink_properties", lang_name, default={})
+        return PropertyContract(
+            sanitizer_properties=_validated_property_map(san_raw, san_key),
+            sink_properties=_validated_string_map(sink_raw, sink_key),
+        )
+
     def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run Python taint analysis on every function in *tree*."""
         sinks = frozenset(self.config.get("sinks", self._DEFAULT_SINKS))
@@ -736,12 +752,21 @@ class TaintedSinkRule(BaseRule):
         sources = frozenset(self.config.get("sources", self._DEFAULT_SOURCES))
         assume = self._resolve_assume_taint_preserving()
         receiver_sinks = self._resolve_receiver_sinks("python")
+        contract = self._resolve_property_contract("python")
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type not in (_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF):
                 continue
             params = _python_param_names(node)
-            tracker = TaintTracker(params, sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks)
+            tracker = TaintTracker(
+                params,
+                sinks,
+                sanitizers,
+                sources,
+                assume_taint_preserving=assume,
+                receiver_sinks=receiver_sinks,
+                property_contract=contract,
+            )
             tracker.visit(node)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations

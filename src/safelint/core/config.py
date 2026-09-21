@@ -901,6 +901,26 @@ DEFAULTS: dict[str, Any] = {
             ],
             "sanitizers": ["escape", "sanitize", "clean", "validate", "quote", "encode", "bleach"],
             "sources": ["input", "readline", "recv", "recvfrom", "read"],
+            # Property-typed sanitiser contract (opt-in). ``sanitizer_properties``
+            # maps a sanitiser to the safety properties it establishes;
+            # ``sink_properties`` maps a sink to the one property it requires. A
+            # property-typed sanitiser clears a sink only when it establishes that
+            # sink's required property, so a value can stay tainted for one sink
+            # while cleared for another (an HTML escaper does not make a value safe
+            # for SQL). The flat ``sanitizers`` list stays universal (clears every
+            # sink) for backward compatibility; a sink with no declared property is
+            # cleared by any sanitiser. Python keys are bare; other languages use
+            # the ``_<lang>`` suffix. Pydantic's validating entry points establish
+            # schema-validation only - shipped so a user who declares a
+            # ``schema_validated``-requiring sink gets them recognised without
+            # adding them to the universal flat list (they never clear an injection
+            # sink, since no default sink requires ``schema_validated``).
+            "sanitizer_properties": {
+                "model_validate": ["schema_validated"],
+                "model_validate_json": ["schema_validated"],
+                "parse_obj_as": ["schema_validated"],
+            },
+            "sink_properties": {},
             # JavaScript source / sanitizer / sink lists. Per-language
             # to avoid false positives - e.g. ``call_name`` returns
             # ``"read"`` for both Python's ``file.read()`` (a tainted
