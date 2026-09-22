@@ -64,7 +64,7 @@ def test_c_function_pointer_member_call_is_not_receiver_taint(tmp_path: Path) ->
 
     Unlike a C++ method, the member is a function pointer whose result need not
     derive from the struct, so ``system(req->handler())`` is not a taint flow -
-    the C++ receiver-taint step is gated off for C (``is_cpp=False``).
+    the C++ receiver-taint step is gated off for C (CTaintTracker; CppTaintTracker enables it).
     """
     src = "int f(Req *req) {\n    return system(req->handler());\n}\n"
     assert "SAFE801" not in _codes(src, tmp_path, "tainted_sink")

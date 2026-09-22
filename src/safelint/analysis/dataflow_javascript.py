@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract
+from safelint.analysis._taint_contract import PropertyContract, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import javascript as _js
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -132,13 +132,14 @@ class JsTaintTracker:
         property_contract: PropertyContract | None = None,
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config."""
-        self.tainted: set[str] = set(params)
+        self.contract = property_contract if property_contract is not None else PropertyContract()
+        self.tainted: dict[str, frozenset[str]] = {p: frozenset() for p in params}
+        self._properties = self.contract.all_properties()
         self.sinks = sinks
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
         self.receiver_sinks = receiver_sinks
-        self.contract = property_contract if property_contract is not None else PropertyContract()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -204,9 +205,9 @@ class JsTaintTracker:
         right = node.child_by_field_name("right")
         if left is None or right is None:  # pragma: no cover - defensive: valid assignments have both sides
             return
-        is_tainted = self._is_tainted(right)
+        status = value_status(self._is_tainted, self._properties, right)
         for ident in self._iter_target_identifiers(left):
-            self._update_name(ident, is_tainted=is_tainted)
+            self._update_name(ident, status)
 
     def _visit_aug_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x += value``."""
@@ -214,8 +215,7 @@ class JsTaintTracker:
         right = node.child_by_field_name("right")
         if left is None or right is None:  # pragma: no cover - defensive: valid aug-assignments have both sides
             return
-        if self._is_tainted(right):
-            self._update_name(left, is_tainted=True)
+        self._update_name(left, value_status(self._is_tainted, self._properties, right), keep_existing=True)
 
     def _visit_var_declarator(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``const x = value`` / ``let`` / ``var``.
@@ -229,9 +229,9 @@ class JsTaintTracker:
         value = node.child_by_field_name("value")
         if name is None or value is None:
             return
-        is_tainted = self._is_tainted(value)
+        status = value_status(self._is_tainted, self._properties, value)
         for ident in self._iter_target_identifiers(name):
-            self._update_name(ident, is_tainted=is_tainted)
+            self._update_name(ident, status)
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink via a tainted argument or method receiver."""
@@ -266,15 +266,14 @@ class JsTaintTracker:
         arg_name = node_text(arg_node) if arg_node.type == _js.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))  # pragma: no branch
 
-    def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool) -> None:
-        """Add or remove *target* from the tainted set if it carries a bare name."""
+    def _update_name(self, target: tree_sitter.Node, status: frozenset[str] | None, *, keep_existing: bool = False) -> None:
+        """Record taint *status* for *target* if it carries a bare name (``None`` clears)."""
         if target.type not in (_js.IDENTIFIER, _js.SHORTHAND_PROPERTY_IDENTIFIER_PATTERN):
             return
         name = node_text(target)
-        if is_tainted:
-            self.tainted.add(name)
-        else:
-            self.tainted.discard(name)
+        if keep_existing:
+            status = combine_status(self.tainted.get(name), status)
+        set_status(self.tainted, name, status)
 
     def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
         """Return True if *node* may carry data still tainted for *required_property*.
@@ -301,7 +300,7 @@ class JsTaintTracker:
         """
         node_type = node.type
         if node_type == _js.IDENTIFIER:
-            return node_text(node) in self.tainted, []
+            return identifier_tainted(self.tainted, node_text(node), required_property), []
         if node_type in (_js.CALL_EXPRESSION, _js.NEW_EXPRESSION):
             return self._classify_call(node, required_property)
         if node_type == _js.TEMPLATE_STRING:
