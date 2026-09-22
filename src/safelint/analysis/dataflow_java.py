@@ -40,7 +40,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract
+from safelint.analysis._taint_contract import PropertyContract, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import java as _java
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -145,13 +145,14 @@ class JavaTaintTracker:
         property_contract: PropertyContract | None = None,
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config."""
-        self.tainted: set[str] = set(params)
+        self.contract = property_contract if property_contract is not None else PropertyContract()
+        self.tainted: dict[str, frozenset[str]] = {p: frozenset() for p in params}
+        self._properties = self.contract.all_properties()
         self.sinks = sinks
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
         self.receiver_sinks = receiver_sinks
-        self.contract = property_contract if property_contract is not None else PropertyContract()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -220,24 +221,18 @@ class JavaTaintTracker:
                 continue
             if left.type != _java.IDENTIFIER:
                 continue
-            rhs_tainted = self._assignment_chain_tainted(right)
-            if _is_compound_assignment(assign) and self._name_is_tainted(left):
-                rhs_tainted = True
-            self._update_name(left, is_tainted=rhs_tainted)
+            rhs_status = self._assignment_chain_status(right)
+            self._update_name(left, rhs_status, keep_existing=_is_compound_assignment(assign))
 
-    def _assignment_chain_tainted(self, node: tree_sitter.Node) -> bool:
-        """Return the innermost-RHS taint state for a (possibly chained) assignment RHS."""
+    def _assignment_chain_status(self, node: tree_sitter.Node) -> frozenset[str] | None:
+        """Return the innermost-RHS taint status for a (possibly chained) assignment RHS."""
         cur = node
         while cur.type == _java.ASSIGNMENT_EXPRESSION:
             inner = cur.child_by_field_name("right")
             if inner is None:  # pragma: no cover - defensive: valid assignment always has right
-                return False
+                return None
             cur = inner
-        return self._is_tainted(cur)
-
-    def _name_is_tainted(self, name_node: tree_sitter.Node) -> bool:
-        """Return True if *name_node* is an identifier that's currently tainted."""
-        return name_node.type == _java.IDENTIFIER and node_text(name_node) in self.tainted
+        return value_status(self._is_tainted, self._properties, cur)
 
     def _visit_enhanced_for(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``for (T x : tainted_iterable) { ... }``.
@@ -260,7 +255,7 @@ class JavaTaintTracker:
             return
         if name_node.type != _java.IDENTIFIER:  # pragma: no cover - defensive: name field is always identifier in valid Java
             return
-        self._update_name(name_node, is_tainted=self._is_tainted(value_node))
+        self._update_name(name_node, value_status(self._is_tainted, self._properties, value_node))
 
     def _visit_var_declarator(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``Type x = value;``.
@@ -284,8 +279,7 @@ class JavaTaintTracker:
             return
         if name.type != _java.IDENTIFIER:  # pragma: no cover - defensive: variable_declarator name is always an identifier in valid Java
             return
-        is_tainted = self._is_tainted(value)
-        self._update_name(name, is_tainted=is_tainted)
+        self._update_name(name, value_status(self._is_tainted, self._properties, value))
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink with tainted inputs.
@@ -295,7 +289,7 @@ class JavaTaintTracker:
         canonical case is ``url.openStream()`` where the URL was built
         from user input - the call has zero arguments but the receiver
         carries the taint. Same posture for the sink check as for the
-        result-taint check in ``_call_tainted``: receiver counts as
+        result-taint check in ``_classify_call``: receiver counts as
         an input for method invocations only (constructor calls via
         ``object_creation_expression`` have no receiver).
         """
@@ -334,13 +328,16 @@ class JavaTaintTracker:
         arg_name = node_text(arg_node) if arg_node.type == _java.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
 
-    def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool) -> None:
-        """Add or remove *target* (an ``identifier``) from the tainted set."""
+    def _update_name(self, target: tree_sitter.Node, status: frozenset[str] | None, *, keep_existing: bool = False) -> None:
+        """Record taint *status* for identifier *target* (``None`` clears).
+
+        With *keep_existing* (a compound read-modify-write assignment) the prior
+        taint is OR-combined with *status* rather than overwritten.
+        """
         name = node_text(target)
-        if is_tainted:
-            self.tainted.add(name)
-        else:
-            self.tainted.discard(name)
+        if keep_existing:
+            status = combine_status(self.tainted.get(name), status)
+        set_status(self.tainted, name, status)
 
     def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
         """Return True if *node* may carry data still tainted for *required_property*.
@@ -368,7 +365,7 @@ class JavaTaintTracker:
         """
         node_type = node.type
         if node_type == _java.IDENTIFIER:
-            return node_text(node) in self.tainted, []
+            return identifier_tainted(self.tainted, node_text(node), required_property), []
         if node_type in _CALL_TYPES:
             return self._classify_call(node, required_property)
         return False, self._taint_propagating_children(node)

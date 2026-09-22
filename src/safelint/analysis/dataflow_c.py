@@ -28,7 +28,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract
+from safelint.analysis._taint_contract import PropertyContract, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import c as _c
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -111,13 +111,14 @@ class CTaintTracker:
         positive). :class:`CppTaintTracker` overrides :meth:`_cpp_method_receiver`
         to enable receiver taint for C++.
         """
-        self.tainted: set[str] = set(params)
+        self.contract = property_contract if property_contract is not None else PropertyContract()
+        self.tainted: dict[str, frozenset[str]] = {p: frozenset() for p in params}
+        self._properties = self.contract.all_properties()
         self.sinks = sinks
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
         self.receiver_sinks = receiver_sinks
-        self.contract = property_contract if property_contract is not None else PropertyContract()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -142,7 +143,7 @@ class CTaintTracker:
             return
         name_node = _declarator_identifier(node.child_by_field_name("declarator"))
         if name_node is not None:
-            self._update_name(name_node, is_tainted=self._is_tainted(value))
+            self._update_name(name_node, value_status(self._is_tainted, self._properties, value))
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x = value`` / ``x += value`` (compound keeps prior taint)."""
@@ -152,7 +153,7 @@ class CTaintTracker:
             return
         operator = node.child_by_field_name("operator")
         keep_existing = operator is not None and node_text(operator) != "="
-        self._update_name(left, is_tainted=self._is_tainted(right), keep_existing=keep_existing)
+        self._update_name(left, value_status(self._is_tainted, self._properties, right), keep_existing=keep_existing)
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink via a tainted argument or (C++) receiver."""
@@ -187,19 +188,20 @@ class CTaintTracker:
         arg_name = node_text(arg_node) if arg_node.type == _c.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
 
-    def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool, keep_existing: bool = False) -> None:
-        """Add or remove *target* from the tainted set if it is a bare name.
+    def _update_name(self, target: tree_sitter.Node, status: frozenset[str] | None, *, keep_existing: bool = False) -> None:
+        """Record taint *status* for identifier *target* (``None`` clears).
 
         No ``_`` blank-identifier skip: unlike Go / Python, C has no blank
         identifier, so a variable legitimately named ``_`` is tracked normally.
+        With *keep_existing* (a compound read-modify-write assignment) the prior
+        taint is OR-combined with *status* rather than overwritten.
         """
         if target.type != _c.IDENTIFIER:  # pragma: no cover - callers pre-filter to identifier nodes
             return
         name = node_text(target)
-        if is_tainted:
-            self.tainted.add(name)
-        elif not keep_existing:
-            self.tainted.discard(name)
+        if keep_existing:
+            status = combine_status(self.tainted.get(name), status)
+        set_status(self.tainted, name, status)
 
     def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
         """Return True if *node* may carry data still tainted for *required_property*.
@@ -224,7 +226,7 @@ class CTaintTracker:
         """Reduce one worklist node to ``(is_tainted_here, children_to_examine)``."""
         node_type = node.type
         if node_type == _c.IDENTIFIER:
-            return node_text(node) in self.tainted, []
+            return identifier_tainted(self.tainted, node_text(node), required_property), []
         if node_type == _c.CALL_EXPRESSION:
             return self._classify_call(node, required_property)
         return False, self._taint_propagating_children(node)

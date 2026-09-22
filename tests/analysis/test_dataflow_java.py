@@ -91,7 +91,7 @@ def test_assume_taint_preserving_false_drops_unknown_calls() -> None:
     """With ``assume_taint_preserving=False``, unknown calls return untainted.
 
     Exercises the ``if not self.assume_taint_preserving: return False``
-    branch in ``_call_tainted``. Setting the knob to False is the
+    branch in ``_classify_call``. Setting the knob to False is the
     less-noisy posture: only explicit sources inject taint, and
     pass-through wrappers stop propagating.
     """
@@ -137,7 +137,7 @@ def test_sanitiser_call_clears_taint() -> None:
     """``escape(input)`` returns untainted regardless of arg taint state.
 
     Exercises the ``if name in self.sanitizers: return False`` branch
-    in ``_call_tainted``.
+    in ``_classify_call``.
     """
     tree = _parse(
         """

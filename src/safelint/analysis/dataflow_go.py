@@ -35,7 +35,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract
+from safelint.analysis._taint_contract import PropertyContract, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import go as _go
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -96,13 +96,14 @@ class GoTaintTracker:
         property_contract: PropertyContract | None = None,
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config."""
-        self.tainted: set[str] = set(params)
+        self.contract = property_contract if property_contract is not None else PropertyContract()
+        self.tainted: dict[str, frozenset[str]] = {p: frozenset() for p in params}
+        self._properties = self.contract.all_properties()
         self.sinks = sinks
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
         self.receiver_sinks = receiver_sinks
-        self.contract = property_contract if property_contract is not None else PropertyContract()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -162,11 +163,13 @@ class GoTaintTracker:
         """
         if len(name_nodes) == len(rhs_exprs):
             for name_node, rhs in zip(name_nodes, rhs_exprs, strict=True):
-                self._update_name(name_node, is_tainted=self._is_tainted(rhs), keep_existing=keep_existing)
+                self._update_name(name_node, value_status(self._is_tainted, self._properties, rhs), keep_existing=keep_existing)
             return
-        any_tainted = any(self._is_tainted(rhs) for rhs in rhs_exprs)
+        combined: frozenset[str] | None = None
+        for rhs in rhs_exprs:
+            combined = combine_status(combined, value_status(self._is_tainted, self._properties, rhs))
         for name_node in name_nodes:
-            self._update_name(name_node, is_tainted=any_tainted, keep_existing=keep_existing)
+            self._update_name(name_node, combined, keep_existing=keep_existing)
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink via a tainted argument or method receiver."""
@@ -204,21 +207,20 @@ class GoTaintTracker:
         arg_name = node_text(arg_node) if arg_node.type == _go.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
 
-    def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool, keep_existing: bool = False) -> None:
-        """Add or remove *target* from the tainted set if it is a non-blank bare name.
+    def _update_name(self, target: tree_sitter.Node, status: frozenset[str] | None, *, keep_existing: bool = False) -> None:
+        """Record taint *status* for a non-blank identifier *target* (``None`` clears).
 
-        With *keep_existing* (a compound read-modify-write assignment) a clean
-        RHS leaves the name's prior taint untouched rather than clearing it.
+        With *keep_existing* (a compound read-modify-write assignment) the prior
+        taint is OR-combined with *status* rather than overwritten.
         """
         if target.type != _go.IDENTIFIER:  # pragma: no cover - defensive: callers pre-filter to identifier nodes
             return
         name = node_text(target)
         if name == "_":
             return
-        if is_tainted:
-            self.tainted.add(name)
-        elif not keep_existing:
-            self.tainted.discard(name)
+        if keep_existing:
+            status = combine_status(self.tainted.get(name), status)
+        set_status(self.tainted, name, status)
 
     def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
         """Return True if *node* may carry data still tainted for *required_property*.
@@ -246,7 +248,7 @@ class GoTaintTracker:
         """
         node_type = node.type
         if node_type == _go.IDENTIFIER:
-            return node_text(node) in self.tainted, []
+            return identifier_tainted(self.tainted, node_text(node), required_property), []
         if node_type == _go.CALL_EXPRESSION:
             return self._classify_call(node, required_property)
         return False, self._taint_propagating_children(node)

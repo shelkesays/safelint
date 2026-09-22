@@ -181,8 +181,13 @@ def test_property_sanitizer_clears_matching_sink():
     assert not tracker.sink_hits
 
 
-def test_property_sanitizer_clears_sink_with_no_required_property():
-    """A property-typed sanitiser still clears a sink that declares no property."""
+def test_property_sanitizer_does_not_clear_sink_with_no_required_property():
+    """A property-typed sanitiser does NOT clear a sink that declares no property.
+
+    ``htmlescape`` establishes ``html_escaped`` only; ``eval`` requires no
+    property, and html-escaping does not make input safe for code evaluation, so
+    ``eval(htmlescape(user_input))`` still fires. Only the flat ``sanitizers``
+    list clears a no-property sink."""
     src = """
     def process(user_input):
         eval(htmlescape(user_input))
@@ -190,7 +195,46 @@ def test_property_sanitizer_clears_sink_with_no_required_property():
     func = _parse_func(src)
     tracker = _property_tracker({"user_input"})  # ``eval`` has no required property
     tracker.visit(func)
-    assert not tracker.sink_hits
+    assert any(s == "eval" for _, _, s in tracker.sink_hits)
+
+
+def test_property_sanitizer_clears_through_assignment_intermediary():
+    """A property-typed clear survives assignment: ``safe = htmlescape(u)`` then a
+    matching sink is clean, while a mismatched sink still fires (path-sensitive)."""
+    clean_src = """
+    def process(user_input):
+        safe = htmlescape(user_input)
+        htmlsink(safe)
+    """
+    fires_src = """
+    def process(user_input):
+        safe = htmlescape(user_input)
+        run_sql(safe)
+    """
+    tracker_clean = TaintTracker(
+        {"user_input"},
+        frozenset(["htmlsink", "run_sql"]),
+        frozenset(),
+        SOURCES,
+        property_contract=PropertyContract(
+            sanitizer_properties={"htmlescape": frozenset(["html_escaped"])},
+            sink_properties={"htmlsink": "html_escaped", "run_sql": "sql_escaped"},
+        ),
+    )
+    tracker_fires = TaintTracker(
+        {"user_input"},
+        frozenset(["htmlsink", "run_sql"]),
+        frozenset(),
+        SOURCES,
+        property_contract=PropertyContract(
+            sanitizer_properties={"htmlescape": frozenset(["html_escaped"])},
+            sink_properties={"htmlsink": "html_escaped", "run_sql": "sql_escaped"},
+        ),
+    )
+    tracker_clean.visit(_parse_func(clean_src))
+    tracker_fires.visit(_parse_func(fires_src))
+    assert not tracker_clean.sink_hits  # html sink cleared through the variable
+    assert any(s == "run_sql" for _, _, s in tracker_fires.sink_hits)  # sql sink still fires
 
 
 def test_flat_sanitizer_stays_universal_for_property_sink():
