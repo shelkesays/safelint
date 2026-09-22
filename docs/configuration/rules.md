@@ -1109,11 +1109,14 @@ By default a sanitiser clears taint for **every** sink - convenient, but impreci
 
 - `sanitizer_properties` maps a sanitiser to the safety **properties** it establishes (e.g. `escape = ["html_escaped"]`).
 - `sink_properties` maps a sink to the single property it **requires** (e.g. `RawSQL = "sql_escaped"`).
-- A property-typed sanitiser clears a sink only when it establishes that sink's required property. A sink with no declared property is cleared by any sanitiser (unchanged).
+- A property-typed sanitiser clears a sink only when it establishes that sink's required property. It is path-sensitive: the clear survives an intermediate variable (`safe = escape(x); html_render(safe)` is clean, while `run_sql(safe)` still fires).
+- Only the flat `sanitizers` list clears a sink with **no** declared property; a property-typed sanitiser never does (establishing `html_escaped` does not make a value safe for `eval`).
 
-The mechanism is **opt-in and backward compatible**: the flat `sanitizers` list stays universal (clears every sink, as before), so no existing config changes meaning. Move a sanitiser into `sanitizer_properties` only when you want the tighter, context-specific behaviour. Both keys are per-language (bare for Python, `_<lang>` suffix otherwise).
+The mechanism is **opt-in and backward compatible**: both tables ship empty, and the flat `sanitizers` list stays universal (clears every sink, as before), so no existing config changes meaning. Move a sanitiser into `sanitizer_properties` only when you want the tighter, context-specific behaviour. Both keys are per-language (bare for Python, `_<lang>` suffix otherwise).
 
-Pydantic's validating entry points (`model_validate`, `model_validate_json`, `parse_obj_as`) ship as `schema_validated` providers by default. Since no default sink requires `schema_validated`, they clear nothing for injection sinks (a schema-validated string is still injectable) - they are recognised only for a sink you declare as requiring `schema_validated`.
+Pydantic's validating entry points (`model_validate`, `model_validate_json`, `parse_obj_as`) are a natural `schema_validated` provider. They are **not** a shipped default (the contract ships empty, so it adds no cost until you opt in); add them yourself when you declare a `schema_validated`-requiring sink. They must NOT go in the flat `sanitizers` list - a schema-validated string is still injectable into a SQL / shell / template sink.
+
+Note the example sets `sanitizers = []` so the escapers are governed only by their declared properties; leaving `escape` in the flat `sanitizers` list would clear every sink universally (the default behaviour).
 
 **pyproject.toml:**
 
@@ -1121,8 +1124,9 @@ Pydantic's validating entry points (`model_validate`, `model_validate_json`, `pa
 [tool.safelint.rules.tainted_sink]
 enabled = true
 sinks = ["RawSQL", "eval"]
+sanitizers = []          # escape / sqlquote are property-typed below, not universal
 sanitizer_properties = { escape = ["html_escaped"], sqlquote = ["sql_escaped"] }
-sink_properties = { RawSQL = "sql_escaped" }   # eval has no property -> any sanitiser clears it
+sink_properties = { RawSQL = "sql_escaped" }   # eval declares no property
 ```
 
 **safelint.toml:**
@@ -1131,11 +1135,12 @@ sink_properties = { RawSQL = "sql_escaped" }   # eval has no property -> any san
 [rules.tainted_sink]
 enabled = true
 sinks = ["RawSQL", "eval"]
+sanitizers = []
 sanitizer_properties = { escape = ["html_escaped"], sqlquote = ["sql_escaped"] }
 sink_properties = { RawSQL = "sql_escaped" }
 ```
 
-With the above, `RawSQL(escape(user_input))` **fires** (HTML escaping does not satisfy `sql_escaped`), while `RawSQL(sqlquote(user_input))` and `eval(escape(user_input))` are cleared.
+With the above, `RawSQL(escape(user_input))` **fires** (HTML escaping does not satisfy `sql_escaped`), `RawSQL(sqlquote(user_input))` is cleared (matching property), and `eval(...)` fires for either escaper because `eval` declares no property and property-typed sanitisers never clear a no-property sink (add a name to the flat `sanitizers` list for that).
 
 #### `assume_taint_preserving` modes (1.8.0)
 

@@ -139,7 +139,7 @@ def test_rust_source_call_to_sink_fires(tmp_path: Path) -> None:
       ``sources_rust`` entry and marks the call's return as tainted.
     * The chained ``.unwrap()`` is a method call whose receiver is the
       tainted ``std::env::var(...)`` call. The receiver-aware taint
-      check in ``_call_tainted`` propagates taint through, so the
+      check in ``_classify_call`` propagates taint through, so the
       ``unwrap()`` result is tainted too.
     * ``Command::new("echo").arg(tainted)`` is the downstream sink.
 
@@ -312,7 +312,7 @@ def test_rust_field_expression_preserves_taint(tmp_path: Path) -> None:
 def test_rust_method_call_on_tainted_receiver_preserves_taint(tmp_path: Path) -> None:
     """``tainted.trim()`` keeps taint; the receiver flows through the call result.
 
-    Pins the receiver-taint path in ``RustTaintTracker._call_tainted``:
+    Pins the receiver-taint path in ``RustTaintTracker._classify_call``:
     method calls with zero positional arguments (``.trim()``, ``.clone()``,
     ``.to_string()``) historically read as "no taint to check" because the
     inspection only looked at positional args. The fix inspects the

@@ -16,7 +16,7 @@ Per-PHP quirks worth calling out:
   ``$_ENV`` (a ``subscript_expression`` whose base ``variable_name`` is one of
   these) yields attacker-controlled data. The source set therefore holds
   variable *names* (a read *shape*), not just call names - but a call name in
-  the source set (e.g. ``getenv``) still injects taint via ``_call_tainted``.
+  the source set (e.g. ``getenv``) still injects taint via ``_classify_call``.
 * **Variables are ``variable_name`` nodes** whose text includes the ``$``
   (``$x``), so the tainted set holds ``"$x"`` strings.
 * **Call shapes** span ``function_call_expression`` (``foo(...)``),
@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract
+from safelint.analysis._taint_contract import PropertyContract, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import php as _php
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -105,13 +105,14 @@ class PhpTaintTracker:
         property_contract: PropertyContract | None = None,
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config."""
-        self.tainted: set[str] = set(params)
+        self.contract = property_contract if property_contract is not None else PropertyContract()
+        self.tainted: dict[str, frozenset[str]] = {p: frozenset() for p in params}
+        self._properties = self.contract.all_properties()
         self.sinks = sinks
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
         self.receiver_sinks = receiver_sinks
-        self.contract = property_contract if property_contract is not None else PropertyContract()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -152,7 +153,7 @@ class PhpTaintTracker:
         if target is None:
             return
         keep_existing = node.type == _php.AUGMENTED_ASSIGNMENT_EXPRESSION
-        self._update_name(target, is_tainted=self._is_tainted(right), keep_existing=keep_existing)
+        self._update_name(target, value_status(self._is_tainted, self._properties, right), keep_existing=keep_existing)
 
     @staticmethod
     def _assignment_target_name(left: tree_sitter.Node) -> str | None:
@@ -204,8 +205,9 @@ class PhpTaintTracker:
     def _visit_include(self, node: tree_sitter.Node) -> None:
         """Flag a tainted path flowing into ``include`` / ``require`` (dynamic file load)."""
         sink = node.type.removesuffix("_expression")
+        required = self.contract.required_for(sink)
         for child in node.named_children:
-            if self._is_tainted(child):
+            if self._is_tainted(child, required):
                 self._record_sink_hit(node, child, sink)
                 return
 
@@ -221,18 +223,17 @@ class PhpTaintTracker:
             target = arg_node.named_children[0]
         return node_text(target) if target.type == _php.VARIABLE_NAME else "<expr>"
 
-    def _update_name(self, name: str, *, is_tainted: bool, keep_existing: bool = False) -> None:
-        """Add or remove *name* from the tainted set.
+    def _update_name(self, name: str, status: frozenset[str] | None, *, keep_existing: bool = False) -> None:
+        """Record taint *status* for *name* (``None`` clears).
 
-        With *keep_existing* (a compound read-modify-write assignment) a clean
-        RHS leaves the name's prior taint untouched rather than clearing it.
+        With *keep_existing* (a compound read-modify-write assignment) the prior
+        taint is OR-combined with *status* rather than overwritten.
         """
         if not name:  # pragma: no cover - defensive: callers pass non-empty names
             return
-        if is_tainted:
-            self.tainted.add(name)
-        elif not keep_existing:
-            self.tainted.discard(name)
+        if keep_existing:
+            status = combine_status(self.tainted.get(name), status)
+        set_status(self.tainted, name, status)
 
     def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
         """Return True if *node* may carry data still tainted for *required_property*.
@@ -261,7 +262,7 @@ class PhpTaintTracker:
         """
         node_type = node.type
         if node_type == _php.VARIABLE_NAME:
-            return node_text(node) in self.tainted, []
+            return identifier_tainted(self.tainted, node_text(node), required_property), []
         if node_type == _php.SUBSCRIPT_EXPRESSION:
             return self._subscript_is_source(node), self._taint_propagating_children(node)
         if node_type in _PHP_CALL_TYPES:

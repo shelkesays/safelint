@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract
+from safelint.analysis._taint_contract import PropertyContract, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import python as _py
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -104,13 +104,17 @@ class TaintTracker:
         sink) for backward compatibility, and a sink with no declared property
         is cleared by any sanitiser. Defaults to an empty contract (inert).
         """
-        self.tainted: set[str] = set(params)
+        self.contract = property_contract if property_contract is not None else PropertyContract()
+        # ``tainted`` maps a tainted variable to the set of safety properties it is
+        # already safe for (cleared by a property-typed sanitiser on its path);
+        # absence = clean. Entry parameters are raw taint (nothing cleared).
+        self.tainted: dict[str, frozenset[str]] = {p: frozenset() for p in params}
+        self._properties = self.contract.all_properties()
         self.sinks = sinks
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
         self.receiver_sinks = receiver_sinks
-        self.contract = property_contract if property_contract is not None else PropertyContract()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -172,17 +176,19 @@ class TaintTracker:
             cursor = cursor.child_by_field_name("right")
         if cursor is None or not targets:
             return
-        is_tainted = self._is_tainted(cursor)
+        status = value_status(self._is_tainted, self._properties, cursor)
         for target in targets:
             for ident in self._iter_target_identifiers(target):
-                self._update_name(ident, is_tainted=is_tainted)
+                set_status(self.tainted, node_text(ident), status)
 
     def _visit_aug_assignment(self, node: tree_sitter.Node) -> None:
-        """Propagate taint through ``x += value``."""
+        """Propagate taint through ``x += value`` (read-modify-write preserves x's taint)."""
         left = node.child_by_field_name("left")
         right = node.child_by_field_name("right")
-        if left and right and self._is_tainted(right):
-            self._update_name(left, is_tainted=True)
+        if left is None or right is None or left.type != _py.IDENTIFIER:
+            return
+        combined = combine_status(self.tainted.get(node_text(left)), value_status(self._is_tainted, self._properties, right))
+        set_status(self.tainted, node_text(left), combined)
 
     def _visit_ann_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x: T = value``."""
@@ -191,7 +197,8 @@ class TaintTracker:
             return
         if node.named_children:
             target = node.named_children[0]
-            self._update_name(target, is_tainted=self._is_tainted(value))
+            if target.type == _py.IDENTIFIER:
+                set_status(self.tainted, node_text(target), value_status(self._is_tainted, self._properties, value))
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink via a tainted argument or method receiver."""
@@ -229,16 +236,6 @@ class TaintTracker:
         arg_name = node_text(arg_node) if arg_node.type == _py.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
 
-    def _update_name(self, target: tree_sitter.Node, *, is_tainted: bool) -> None:
-        """Add or remove *target* from the tainted set if it is a bare identifier."""
-        if target.type != _py.IDENTIFIER:
-            return
-        name = node_text(target)
-        if is_tainted:
-            self.tainted.add(name)
-        else:
-            self.tainted.discard(name)
-
     def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
         """Return True if *node* may carry data still tainted for *required_property*.
 
@@ -267,7 +264,7 @@ class TaintTracker:
         """
         node_type = node.type
         if node_type == _py.IDENTIFIER:
-            return node_text(node) in self.tainted, []
+            return identifier_tainted(self.tainted, node_text(node), required_property), []
         if node_type == _py.CALL:
             return self._classify_call(node, required_property)
         if node_type == _py.STRING:
