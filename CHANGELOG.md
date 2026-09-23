@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.13.0] - 2026-09-23
+
 ### Added
 
 - **SAFE801 `tainted_sink`: property-typed sanitisers (`sanitizer_properties` / `sink_properties`).** A sanitiser can now declare *which* safety property it establishes (e.g. `escape = ["html_escaped"]`) and a sink *which* it requires (e.g. `RawSQL = "sql_escaped"`); a property-typed sanitiser clears a sink only when it establishes that sink's required property. This fixes the class of false negative where an HTML escaper wrongly cleared a SQL sink (`RawSQL(escape(user_input))`). Clearing is **path-sensitive**: taint carries the properties it has been cleared for, so the clear survives an intermediate variable (`safe = escape(x); html_render(safe)` is clean while `run_sql(safe)` still fires). The mechanism is **opt-in and backward compatible** - both tables ship empty, and the flat `sanitizers` list stays universal (clears every sink, as before), so no existing config changes meaning and no cost is added until a project opts in. Only the flat `sanitizers` list clears a sink with no declared property; a property-typed sanitiser never does. Both keys are per-language (bare for Python, `_<lang>` suffix otherwise). Pydantic's validating entry points (`model_validate` / `model_validate_json` / `parse_obj_as`) are documented as a `schema_validated` provider to add when you declare a `schema_validated`-requiring sink (not a shipped default, and never in the flat list - a validated string is still injectable). Config docs (both TOML forms) in `docs/configuration/rules.md`.
@@ -1012,7 +1014,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.12.1...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.13.0...HEAD
+[2.13.0]: https://github.com/shelkesays/safelint/compare/v2.12.1...v2.13.0
 [2.12.1]: https://github.com/shelkesays/safelint/compare/v2.12.0...v2.12.1
 [2.12.0]: https://github.com/shelkesays/safelint/compare/v2.11.1...v2.12.0
 [2.11.1]: https://github.com/shelkesays/safelint/compare/v2.11.0...v2.11.1
