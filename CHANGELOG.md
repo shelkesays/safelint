@@ -27,7 +27,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - **Documentation corrections for the 2.13.0 property-typed sanitisers.** The two new keys were documented only in a prose subsection: they are now rows in the canonical SAFE801 options table, and the Python, C and C++ language pages - which had no mention at all, the C++ page having no SAFE801 section whatsoever - now document them. The bundled AI-client skill addenda for all nine languages gained the same guidance, replacing advice they now supersede (the Java addendum's "SAFE801 has a single shared sanitizer set" and the PHP addendum's "add `htmlspecialchars` via `sanitizers_php`"). Fixed a `docs/languages/java.md` link that pointed `receiver_sinks` at the property-typed section, and stale claims in the `_c_check` / `_cpp_check` docstrings (C++ uses a distinct `CppTaintTracker` subclass, and `scanf` / `read` / `recv` are deliberately *not* default C sources).
-- **Note on 2.13.0:** that release described its tracker refactor as "behaviour unchanged, internal only". That holds for linting results, but the trackers' `tainted` attribute changed type in the same release, from `set[str]` to `dict[str, frozenset[str]]` (variable name to the properties it is already safe for). Anything importing a tracker directly and reading `.tainted` is affected; the rule-level and CLI surfaces are not.
 
 ## [2.13.0] - 2026-09-23
 
@@ -37,7 +36,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Taint trackers refactored to a single iterative worklist.** The six non-C trackers (Python + JavaScript/TypeScript, Java, Rust, Go, PHP) previously classified calls via an `_is_tainted` ↔ `_call_tainted` mutual recursion; they now reduce each node to `(is_tainted_here, children)` in one worklist, matching `dataflow_c.py`. Behaviour is unchanged (every per-language suite is preserved); the refactor removes the recursion and unifies the trackers. Internal only.
+- **Taint trackers refactored to a single iterative worklist.** The six non-C trackers (Python + JavaScript/TypeScript, Java, Rust, Go, PHP) previously classified calls via an `_is_tainted` ↔ `_call_tainted` mutual recursion; they now reduce each node to `(is_tainted_here, children)` in one worklist, matching `dataflow_c.py`. Linting results are unchanged (every per-language suite is preserved); the refactor removes the recursion and unifies the trackers. **Not purely internal, one public attribute changed type:** each tracker's `tainted` attribute is now `dict[str, frozenset[str]]` (variable name to the set of safety properties it is already safe for) where it was `set[str]`; absence from the dict still means clean. This is required by the property-typed sanitisers above, which have to record *what* a value has been cleared for rather than just that it is tainted. Code importing a tracker directly and reading `.tainted` must be updated; the rule-level, CLI and config surfaces are unaffected. *(Noted retrospectively in 2.13.1 - the original entry described this release as "behaviour unchanged, internal only", which was true of linting results but overlooked the attribute.)*
 
 
 ## [2.12.1] - 2026-09-20
