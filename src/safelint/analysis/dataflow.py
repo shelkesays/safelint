@@ -102,7 +102,8 @@ class TaintTracker:
         sanitiser clears a sink only when it establishes that sink's required
         property; the flat *sanitizers* list stays universal (clears every
         sink) for backward compatibility, and a sink with no declared property
-        is cleared by any sanitiser. Defaults to an empty contract (inert).
+        is cleared only by that flat list, never by a property-typed sanitiser.
+        Defaults to an empty contract (inert).
         """
         self.contract = property_contract if property_contract is not None else PropertyContract()
         # ``tainted`` maps a tainted variable to the set of safety properties it is

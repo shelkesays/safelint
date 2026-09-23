@@ -504,6 +504,45 @@ def test_passthrough_unwrap_exercised_by_cast_in_sink_receiver() -> None:
     assert any(v.code == "SAFE801" for v in result.violations), "Tainted receiver wrapped in cast should still reach the sink"
 
 
+def test_property_status_survives_lambda_capture() -> None:
+    """A property-cleared variable keeps its cleared properties when captured by a lambda.
+
+    ``String safe = esc(input);`` establishes ``html_escaped``. Inside a lambda,
+    ``htmlSink(safe)`` must stay clean (the two-pass seed carries the property
+    status, not just the name) while ``runSql(safe)`` still fires - the same as
+    outside the lambda."""
+    src = textwrap.dedent(
+        """
+        class C {
+            void m(String input) {
+                String safe = esc(input);
+                Runnable r = () -> { htmlSink(safe); runSql(safe); };
+            }
+        }
+        """
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                "sinks_java": ["htmlSink", "runSql"],
+                "sanitizers_java": [],
+                "sources_java": [],
+                "sanitizer_properties_java": {"esc": ["html_escaped"]},
+                "sink_properties_java": {"htmlSink": "html_escaped", "runSql": "sql_escaped"},
+            }
+        }
+    }
+    with TemporaryDirectory() as tmp:
+        path = Path(tmp) / "C.java"
+        path.write_text(src)
+        engine = SafetyEngine(deep_merge(DEFAULTS, overrides))
+        result = engine.check_file(str(path))
+    hits = [v for v in result.violations if v.code == "SAFE801"]
+    assert len(hits) == 1  # only runSql (sql_escaped) fires; htmlSink (html_escaped) is cleared through capture
+    assert "runSql" in hits[0].message
+
+
 def test_safe803_unwraps_cast_around_nullable_receiver() -> None:
     """``((Foo) map.get(k)).bar`` exercises ``_peel_java_passthrough`` in SAFE803.
 
