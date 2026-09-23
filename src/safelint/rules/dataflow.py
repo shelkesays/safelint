@@ -1115,24 +1115,35 @@ class TaintedSinkRule(BaseRule):
 
         C executable code lives only inside functions, so there is no top-level
         pass (unlike PHP). ``argv`` and other parameters seed the tainted set;
-        call-based sources (``getenv`` / ``fgets`` / ``scanf`` / ``read`` /
-        ``recv``) inject taint inside the body, and the classic command-exec /
-        unbounded-copy sinks (``system`` / ``strcpy`` / ``sprintf`` / ...) are
-        flagged when reached by a tainted argument.
+        the default call-based sources (``getenv`` / ``fgets`` / ``gets``) inject
+        taint inside the body, and the classic command-exec / unbounded-copy
+        sinks (``system`` / ``strcpy`` / ``sprintf`` / ...) are flagged when
+        reached by a tainted argument. Out-parameter readers (``scanf`` /
+        ``read`` / ``recv``) are deliberately NOT default sources: they return a
+        count, not the data, so treating the call as tainted would mark the wrong
+        value. Add them to ``sources_c`` only alongside a tracker that models the
+        out-parameter.
         """
         return self._c_family_check(filepath, tree, "c", _c_param_names, _c.FUNCTION_TYPES)
 
     def _cpp_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Run C++ taint analysis, reusing the C tracker (the AST is a superset).
+        """Run C++ taint analysis on the shared C-family pass.
 
-        tree-sitter-cpp shares C's ``call_expression`` / ``assignment_expression``
-        shapes, so :class:`CTaintTracker` tracks taint identically; only the
-        parameter seeding differs (C++ reference parameters, seeded via
-        :func:`_cpp_param_names`). The seeding boundary is ``_CPP_FUNCTION_TYPES``
-        (``function_definition`` *and* ``lambda_expression``) so a lambda's own
-        parameters are seeded; the enclosing function's tracker still walks the
-        lambda body (catching captured-variable flows), and :func:`_c_family_check`
-        de-duplicates the overlapping hits by source position.
+        tree-sitter-cpp is a superset of tree-sitter-c, so the ``call_expression``
+        / ``assignment_expression`` shapes carry over and the C-family pass is
+        reused. Two things differ from C:
+
+        * the tracker is :class:`CppTaintTracker`, a subclass that adds the
+          method-receiver step C deliberately omits (``req->param("q")`` stays
+          tainted); :func:`_c_family_check` selects it by language, and
+        * parameter seeding uses :func:`_cpp_param_names`, which also handles
+          reference parameters.
+
+        The seeding boundary is ``_cpp.FUNCTION_TYPES`` (``function_definition``
+        *and* ``lambda_expression``) so a lambda's own parameters are seeded; the
+        enclosing function's tracker still walks the lambda body (catching
+        captured-variable flows), and :func:`_c_family_check` de-duplicates the
+        overlapping hits by source position.
         """
         return self._c_family_check(filepath, tree, "cpp", _cpp_param_names, _cpp.FUNCTION_TYPES)
 

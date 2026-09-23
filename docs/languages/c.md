@@ -150,3 +150,21 @@ sinks_c = ["system", "popen", "execl", "execlp", "execv", "execvp", "sprintf", "
 sources_c = ["getenv", "fgets", "gets"]
 sanitizers_c = ["sanitize", "validate", "escape"]
 ```
+
+Both lists above are **universal**: a name in `sanitizers_c` clears *every* sink. To recognise a
+context-specific escaper precisely - one that makes a value safe for a shell sink but not for a
+format-string sink - declare it with the opt-in [property-typed sanitiser contract](../configuration/rules.md#property-typed-sanitisers-sanitizer_properties-sink_properties)
+instead (2.13.0):
+
+```toml
+# safelint.toml
+[rules.tainted_sink.sanitizer_properties_c]
+shell_quote = ["shell_quoted"]
+
+[rules.tainted_sink.sink_properties_c]
+system = "shell_quoted"
+```
+
+A property-typed sanitiser clears **only** the sinks that declare a property it establishes, so
+`shell_quote` no longer silently vouches for `sprintf`. Keep the name out of the flat
+`sanitizers_c` list, which is checked first and would otherwise clear everything regardless.
