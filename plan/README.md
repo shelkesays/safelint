@@ -3,22 +3,21 @@
 **Audience**: the AI coding agent (or human contributor) implementing the next
 piece of work.
 
-> **All open work now lives in a single prioritised backlog:
-> [`PENDING.md`](PENDING.md).** Start there. This README is retained for the
-> standing references, the non-negotiables, the Go-port pitfalls, and the
-> validation gate that every item in `PENDING.md` still depends on, plus the
-> shipped-history record below. When a new language or framework preset is
-> planned, add its own self-contained spec file here and list it in
-> `PENDING.md`; remove the spec once it ships (the convention followed for Go,
-> PHP, C, C++, and the framework presets).
+> **This is the plan directory's entry point.** The backlog is currently
+> **empty** - everything that was planned has shipped (see the shipped-history
+> record below and `CHANGELOG.md`). This README holds the standing references
+> every change depends on: the non-negotiables, the Tree-sitter probing
+> convention, the Go-port pitfalls, and the validation gate. When a new language
+> or framework preset is planned, add its own self-contained spec file in this
+> directory plus a short entry at the top of this README; remove the spec once it
+> ships (the convention followed for Go, PHP, C, C++, and the framework presets).
 
 **No language addition is currently planned, and no cross-language refactor
 remains open** - the deferred taint-tracker overhaul shipped in v2.13.0 (see the
-section further down and [`PENDING.md`](PENDING.md) Shipped). C++ shipped in
-v2.8.0 (see the blockquote below). `docs/configuration/rules.md` "Planned"
-reflects the same empty near-term roadmap. The blockquotes below record the
-shipped-language history and the convention this plan directory follows: a spec
-file is removed once its language ships.
+section further down). C++ shipped in v2.8.0 (see the blockquote below).
+`docs/configuration/rules.md` "Planned" reflects the same empty near-term roadmap.
+The blockquotes below record the shipped-language history and the convention this
+plan directory follows: a spec file is removed once its language ships.
 
 > **Go (`.go`) shipped in v2.5.0** (6th registered language: 16 cross-language
 > rules + the Go-only SAFE209 `empty_error_check` / SAFE211
@@ -72,7 +71,7 @@ for Go, PHP, C, and C++).
 > The `csrf_protection_disabled` (SAFE908) and `hardcoded_secret` (SAFE909)
 > fast-follows **shipped in v2.11.0**, completing the SAFE905-909 band. The
 > property-typed taint-tracker sanitiser framework **shipped in v2.13.0** (see
-> the taint-tracker overhaul in [`PENDING.md`](PENDING.md) Shipped).
+> the v2.13.0 CHANGELOG).
 
 ## Shipped: release automation (CI/CD, not a code change)
 
@@ -101,7 +100,7 @@ cross-language taint-propagation enhancement (attribute / subscript / receiver
 chains) **shipped in v2.11.0**. The taint-tracker core overhaul - the property-typed
 sanitiser framework (3a) and the iterative-worklist conversion of the six non-C
 trackers (3b) - **shipped in v2.13.0** (its spec `plan/taint-tracker-overhaul.md`
-was removed on completion; see the entry in [`PENDING.md`](PENDING.md) Shipped).
+was removed on completion; see the v2.13.0 CHANGELOG).
 
 > **Node-type / operator constants shipped in v2.8.2** (PR #107). Converted the
 > per-language node-type / operator tables in `src/safelint/rules/` from raw
@@ -125,13 +124,13 @@ was removed on completion; see the entry in [`PENDING.md`](PENDING.md) Shipped).
 > spec, `plan/security-hardening.md`, was removed on completion.
 
 **Taint propagation through attribute / subscript / receiver chains shipped in
-v2.11.0** (see [`PENDING.md`](PENDING.md) Shipped): the
+v2.11.0** (see the v2.11.0 CHANGELOG): the
 intra-procedural taint trackers carry taint through those chains
 (`request.GET["q"]`, `$request->input('x')`), so the framework-preset (and Spring
 / JS-runtime) SAFE801 sink extensions fire on realistic request-driven code, not
 only direct-parameter flows. The method-receiver step rides on the existing
 `assume_taint_preserving` default (no new config knob). See the v2.11.0 CHANGELOG
-entry and PENDING.md P1 for the details, including why the change was narrower
+entry and the v2.13.0 CHANGELOG for the details, including why the change was narrower
 than the original spec (only Python / JS / TS / C++ needed work).
 
 ## How to use these specs
