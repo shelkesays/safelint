@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 from safelint.analysis._taint_contract import PropertyContract
 from safelint.analysis.dataflow import TaintTracker
@@ -12,6 +12,7 @@ from safelint.analysis.dataflow_java import JavaTaintTracker
 from safelint.analysis.dataflow_javascript import JsTaintTracker
 from safelint.analysis.dataflow_php import PhpTaintTracker
 from safelint.analysis.dataflow_rust import RustTaintTracker
+from safelint.core._diagnostics import print_warning
 from safelint.core._validators import _validated_property_map, _validated_string_list, _validated_string_map, resolve_lang_config_lookup
 from safelint.languages import c as _c
 from safelint.languages import cpp as _cpp
@@ -45,6 +46,85 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "c": _c.FUNCTION_TYPES,
     "cpp": _cpp.FUNCTION_TYPES,
 }
+
+
+def _shadowed_by_flat_sanitizers(contract: PropertyContract, sanitizers: frozenset[str], san_key: str) -> list[str]:
+    """Names declared in both the flat list and the property table.
+
+    The flat ``sanitizers`` list is universal and is consulted *first*, so a name
+    in both clears every sink regardless of the properties it declares - the
+    property declaration is dead, and adopting the feature for that name is a
+    silent no-op. Removing the name from the flat list is what activates it.
+    """
+    shadowed = sorted(name for name in contract.sanitizer_properties if name in sanitizers)
+    if not shadowed:
+        return []
+    return [
+        f"{san_key}: the flat sanitizers list also contains {', '.join(shadowed)}; it clears every sink universally "
+        f"and is checked first, so the declared properties have no effect. Remove the name from the flat list to "
+        f"activate the property-typed behaviour."
+    ]
+
+
+def _establishes_nothing(contract: PropertyContract, san_key: str) -> list[str]:
+    """Sanitisers declared with an empty property list.
+
+    A property-typed sanitiser clears a sink only by establishing that sink's
+    required property, so one that establishes nothing can never clear anything.
+    If the name is not also in the flat list it has stopped sanitising entirely -
+    a silent pass-through in the direction that loses findings' worth of safety.
+    """
+    empty = sorted(name for name, props in contract.sanitizer_properties.items() if not props)
+    if not empty:
+        return []
+    return [f"{san_key}: empty property list for {', '.join(empty)} - establishes nothing, so it clears no sink."]
+
+
+def _unknown_property_sinks(contract: PropertyContract, sinks: frozenset[str], sink_key: str) -> list[str]:
+    """``sink_properties`` keys that name no configured sink (typo guard).
+
+    A property can only be *required* by a call the rule already treats as a
+    sink, so an entry whose key is not in the resolved sinks list is inert -
+    almost always a typo or a sink the user forgot to add.
+    """
+    unknown = sorted(name for name in contract.sink_properties if name not in sinks)
+    if not unknown:
+        return []
+    return [f"{sink_key}: no configured sink named {', '.join(unknown)}, so the required property is never consulted."]
+
+
+def _no_sinks_require_properties(contract: PropertyContract, san_key: str) -> list[str]:
+    """Properties are declared on sanitisers but no sink requires any of them.
+
+    ``required_property`` reaches the trackers only through ``sink_properties``,
+    so with that table empty (or naming only properties nothing establishes) no
+    property-typed sanitiser can ever clear a sink. Worse, a name listed *only*
+    here is no longer in the flat list, so it has stopped sanitising at all.
+    """
+    established = {prop for props in contract.sanitizer_properties.values() for prop in props}
+    # An empty-property sanitiser is already reported by ``_establishes_nothing``;
+    # only warn here when properties ARE established but no sink asks for them.
+    if not established or contract.all_properties():
+        return []
+    return [
+        f"{san_key}: no sink requires any of the declared properties, so no property-typed sanitiser can clear a sink. "
+        f"Declare the matching sink_properties entries (or use the flat sanitizers list for a universal clear)."
+    ]
+
+
+def _inert_contract_messages(contract: PropertyContract, sinks: frozenset[str], sanitizers: frozenset[str], san_key: str, sink_key: str) -> list[str]:
+    """Return every "this declaration cannot take effect" warning for *contract*.
+
+    The property tables fail *open* - a declaration that does not line up with
+    the rest of the config simply never fires, which is indistinguishable from
+    the feature not working. Each check below names a concrete way that happens.
+    """
+    return [
+        *_shadowed_by_flat_sanitizers(contract, sanitizers, san_key),
+        *_establishes_nothing(contract, san_key),
+        *_unknown_property_sinks(contract, sinks, sink_key),
+        *_no_sinks_require_properties(contract, san_key),
+    ]
 
 
 def _c_function_declarator(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
@@ -702,6 +782,14 @@ class TaintedSinkRule(BaseRule):
         "read",
     ]
 
+    def __init__(self, config: dict[str, Any]) -> None:
+        """Initialise the rule and the per-run property-warning ledger."""
+        super().__init__(config)
+        #: Languages already warned about inert property declarations. The rule
+        #: instance is built once per engine and reused across every file, so
+        #: this keeps each adoption warning to one line per run, not one per file.
+        self._contract_warned: set[str] = set()
+
     def _resolve_assume_taint_preserving(self) -> bool:
         """Read and validate the ``assume_taint_preserving`` config knob.
 
@@ -748,20 +836,50 @@ class TaintedSinkRule(BaseRule):
             resolved.append(frozenset(_validated_string_list(raw, key)))
         return resolved[0], resolved[1], resolved[2]
 
-    def _resolve_property_contract(self, lang_name: str) -> PropertyContract:
+    def _resolve_property_contract(self, lang_name: str, sinks: frozenset[str], sanitizers: frozenset[str]) -> PropertyContract:
         """Resolve the per-language property-typed sanitiser contract for *lang_name*.
 
         ``sanitizer_properties`` maps a sanitiser to the properties it establishes;
         ``sink_properties`` maps a sink to the property it requires. Python uses the
         bare keys, other languages the ``_<lang>`` suffix. Both empty when unset, so
         the contract is inert (every sanitiser clears every sink, as before).
+
+        *sinks* / *sanitizers* are the already-resolved flat lists, used only by
+        :meth:`_warn_inert_contract_entries` to tell the user when a declaration
+        they wrote can never take effect.
         """
         san_raw, san_key = resolve_lang_config_lookup(self.config, "sanitizer_properties", lang_name, default={})
         sink_raw, sink_key = resolve_lang_config_lookup(self.config, "sink_properties", lang_name, default={})
-        return PropertyContract(
+        contract = PropertyContract(
             sanitizer_properties=_validated_property_map(san_raw, san_key),
             sink_properties=_validated_string_map(sink_raw, sink_key),
         )
+        self._warn_inert_contract_entries(lang_name, contract, sinks, sanitizers, san_key, sink_key)
+        return contract
+
+    def _warn_inert_contract_entries(
+        self,
+        lang_name: str,
+        contract: PropertyContract,
+        sinks: frozenset[str],
+        sanitizers: frozenset[str],
+        san_key: str,
+        sink_key: str,
+    ) -> None:
+        """Warn once per language about property declarations that cannot take effect.
+
+        The property tables are opt-in and fail *open*: a declaration that does
+        not line up with the rest of the config simply never fires, which reads
+        exactly like "the feature does not work". These warnings make each such
+        case visible instead, following the project's typo-guard convention
+        (stderr ``safelint: warning:``, never a failed run). Emitted once per
+        language per run - the rule instance outlives the per-file loop.
+        """
+        if lang_name in self._contract_warned:
+            return
+        self._contract_warned.add(lang_name)
+        for msg in _inert_contract_messages(contract, sinks, sanitizers, san_key, sink_key):
+            print_warning(msg)
 
     def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run Python taint analysis on every function in *tree*."""
@@ -771,7 +889,7 @@ class TaintedSinkRule(BaseRule):
         )
         assume = self._resolve_assume_taint_preserving()
         receiver_sinks = self._resolve_receiver_sinks("python")
-        contract = self._resolve_property_contract("python")
+        contract = self._resolve_property_contract("python", sinks, sanitizers)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type not in (_py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF):
@@ -801,7 +919,7 @@ class TaintedSinkRule(BaseRule):
         sinks, sanitizers, sources = self._resolve_core_lists(lang_name)
         assume = self._resolve_assume_taint_preserving()
         receiver_sinks = self._resolve_receiver_sinks(lang_name)
-        contract = self._resolve_property_contract(lang_name)
+        contract = self._resolve_property_contract(lang_name, sinks, sanitizers)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type not in _js.FUNCTION_TYPES:
@@ -845,7 +963,7 @@ class TaintedSinkRule(BaseRule):
         sinks, sanitizers, sources = self._resolve_core_lists("java")
         assume = self._resolve_assume_taint_preserving()
         receiver_sinks = self._resolve_receiver_sinks("java")
-        contract = self._resolve_property_contract("java")
+        contract = self._resolve_property_contract("java", sinks, sanitizers)
         violations: list[Violation] = []
         # Pass 1: analyse non-lambda functions; cache final tainted set
         # keyed by ``node.id`` (the tree-sitter-stable identifier;
@@ -891,7 +1009,7 @@ class TaintedSinkRule(BaseRule):
         sinks, sanitizers, sources = self._resolve_core_lists("rust")
         assume = self._resolve_assume_taint_preserving()
         receiver_sinks = self._resolve_receiver_sinks("rust")
-        contract = self._resolve_property_contract("rust")
+        contract = self._resolve_property_contract("rust", sinks, sanitizers)
         violations: list[Violation] = []
         # Pass 1: ``function_item`` nodes. Cache the final tainted set
         # keyed by ``node.id`` (tree-sitter-stable across wrapper accesses;
@@ -937,7 +1055,7 @@ class TaintedSinkRule(BaseRule):
         sinks, sanitizers, sources = self._resolve_core_lists("go")
         assume = self._resolve_assume_taint_preserving()
         receiver_sinks = self._resolve_receiver_sinks("go")
-        contract = self._resolve_property_contract("go")
+        contract = self._resolve_property_contract("go", sinks, sanitizers)
         violations: list[Violation] = []
         tainted_cache: dict[int, dict[str, frozenset[str]]] = {}
         # Pass 1: named functions and methods (not closures).
@@ -977,7 +1095,7 @@ class TaintedSinkRule(BaseRule):
         sinks, sanitizers, sources = self._resolve_core_lists("php")
         assume = self._resolve_assume_taint_preserving()
         receiver_sinks = self._resolve_receiver_sinks("php")
-        contract = self._resolve_property_contract("php")
+        contract = self._resolve_property_contract("php", sinks, sanitizers)
         violations: list[Violation] = []
         # Top-level (script) scope - ``visit`` prunes function bodies, which
         # are analysed separately below.
@@ -1030,7 +1148,7 @@ class TaintedSinkRule(BaseRule):
         sinks, sanitizers, sources = self._resolve_core_lists(lang_name)
         assume = self._resolve_assume_taint_preserving()
         receiver_sinks = self._resolve_receiver_sinks(lang_name)
-        contract = self._resolve_property_contract(lang_name)
+        contract = self._resolve_property_contract(lang_name, sinks, sanitizers)
         tracker_cls = CppTaintTracker if lang_name == "cpp" else CTaintTracker
         violations: list[Violation] = []
         seen: set[tuple[int, str, str]] = set()
