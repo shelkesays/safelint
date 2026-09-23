@@ -225,14 +225,31 @@ class JavaTaintTracker:
             self._update_name(left, rhs_status, keep_existing=_is_compound_assignment(assign))
 
     def _assignment_chain_status(self, node: tree_sitter.Node) -> frozenset[str] | None:
-        """Return the innermost-RHS taint status for a (possibly chained) assignment RHS."""
+        """Return the taint status of a (possibly chained) assignment RHS *value*.
+
+        A plain chain ``a = b = expr`` yields ``expr``'s status. If the chain hits
+        a **compound** assignment (``a = b += clean``), that inner assignment's
+        *value* is its LHS after the op - which, because the chain is applied
+        innermost-first, is already recorded in :attr:`tainted`; so return the
+        LHS's stored status rather than walking into the (possibly clean) RHS and
+        dropping the accumulated taint.
+        """
         cur = node
         while cur.type == _java.ASSIGNMENT_EXPRESSION:
+            if _is_compound_assignment(cur):
+                return self._compound_value_status(cur)
             inner = cur.child_by_field_name("right")
             if inner is None:  # pragma: no cover - defensive: valid assignment always has right
                 return None
             cur = inner
         return value_status(self._is_tainted, self._properties, cur)
+
+    def _compound_value_status(self, compound: tree_sitter.Node) -> frozenset[str] | None:
+        """Return the taint status of a compound assignment's *value* (its updated LHS)."""
+        left = compound.child_by_field_name("left")
+        if left is None or left.type != _java.IDENTIFIER:
+            return None
+        return self.tainted.get(node_text(left))
 
     def _visit_enhanced_for(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``for (T x : tainted_iterable) { ... }``.
