@@ -237,6 +237,70 @@ def test_property_sanitizer_clears_through_assignment_intermediary():
     assert any(s == "run_sql" for _, _, s in tracker_fires.sink_hits)  # sql sink still fires
 
 
+def test_tracker_deeply_nested_fstring_propagates_taint():
+    """Taint is still found through nested f-strings after the traversal prune.
+
+    ``_fstring_children`` prunes nested strings so each level is enumerated
+    once (the outer levels used to re-collect every deeper level, costing
+    2**N visits). The nested string is handed to the worklist as a child
+    instead, so the taint must still reach the sink at every depth."""
+    for depth in (1, 2, 3, 5):
+        expr = "user_input"
+        for _ in range(depth):
+            expr = 'f"{' + expr + '}"'
+        tracker = make_tracker({"user_input"})
+        tracker.visit(
+            _parse_func(f"""
+    def process(user_input):
+        eval({expr})
+    """)
+        )
+        assert any(s == "eval" for _, _, s in tracker.sink_hits), f"lost taint at nesting depth {depth}"
+
+
+def test_tracker_deeply_nested_clean_fstring_stays_clean():
+    """The same nesting with no tainted name reports nothing (and terminates fast)."""
+    expr = '"x"'
+    for _ in range(12):
+        expr = 'f"{' + expr + '}"'
+    tracker = make_tracker({"user_input"})
+    tracker.visit(
+        _parse_func(f"""
+    def process(user_input):
+        eval({expr})
+    """)
+    )
+    assert not tracker.sink_hits
+
+
+def test_tracker_tuple_unpack_from_expression_list_propagates_taint():
+    """``x, y = user_input, "k"`` taints the targets.
+
+    The bare RHS tuple parses as ``expression_list`` (not ``tuple``); before it
+    joined the container set the whole RHS reduced to no propagating children
+    and both targets read clean."""
+    src = """
+    def process(user_input):
+        x, y = user_input, "k"
+        eval(x)
+    """
+    tracker = make_tracker({"user_input"})
+    tracker.visit(_parse_func(src))
+    assert any(s == "eval" for _, _, s in tracker.sink_hits)
+
+
+def test_tracker_tuple_unpack_from_clean_expression_list_stays_clean():
+    """The same shape with no tainted element leaves the targets clean."""
+    src = """
+    def process(user_input):
+        x, y = "a", "k"
+        eval(x)
+    """
+    tracker = make_tracker({"user_input"})
+    tracker.visit(_parse_func(src))
+    assert not tracker.sink_hits
+
+
 def test_unknown_call_does_not_preserve_a_cleared_property():
     """An unknown call wrapping a sanitiser drops the property it established.
 

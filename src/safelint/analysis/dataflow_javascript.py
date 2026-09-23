@@ -369,5 +369,13 @@ class JsTaintTracker:
 
     @staticmethod
     def _template_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
-        """Return every ``${expr}`` substitution expression inside a template string."""
-        return [inner for child in walk(node) if child.type == _js.TEMPLATE_SUBSTITUTION for inner in child.named_children]
+        """Return the ``${expr}`` substitutions of *this* template string only.
+
+        ``skip_types`` prunes nested template strings: an inner template is
+        returned as a child (the worklist pops it and enumerates its own
+        substitutions next) rather than having them re-collected here. Without
+        the prune each nesting level re-enumerated every deeper level, so N
+        nested templates cost 2**N node visits on the exhaustive (untainted)
+        path. Same fix as the Python tracker's ``_fstring_children``.
+        """
+        return [inner for child in walk(node, skip_types=(_js.TEMPLATE_STRING,)) if child.type == _js.TEMPLATE_SUBSTITUTION for inner in child.named_children]
