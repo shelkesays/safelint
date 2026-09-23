@@ -135,7 +135,7 @@ All JS config keys also work as `_typescript`-suffixed variants when you want TS
 - `[tool.safelint.rules.global_mutation]`, `global_namespaces_typescript`
 - `[tool.safelint.rules.resource_lifecycle]`, `tracked_functions_typescript`
 - `[tool.safelint.rules.missing_assertions]`, `min_assertions` (default 1; set 2 for the paper's density), `assertion_calls_typescript`
-- `[tool.safelint.rules.tainted_sink]`, `sinks_typescript`, `sanitizers_typescript`, `sources_typescript`
+- `[tool.safelint.rules.tainted_sink]`, `sinks_typescript`, `sanitizers_typescript`, `sources_typescript` (plus the opt-in `receiver_sinks_typescript`, `sanitizer_properties_typescript`, `sink_properties_typescript` - see [property-typed sanitisers](../configuration/rules.md#property-typed-sanitisers-sanitizer_properties-sink_properties))
 - `[tool.safelint.rules.return_value_ignored]`, `flagged_calls_typescript`
 - `[tool.safelint.rules.null_dereference]`, `nullable_methods_typescript`
 

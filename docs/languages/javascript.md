@@ -154,7 +154,7 @@ Each rule that runs on JS has a `_javascript`-suffixed config key parallel to it
 - **`[tool.safelint.rules.global_mutation]`**, `global_namespaces_javascript` (default depends on preset)
 - **`[tool.safelint.rules.resource_lifecycle]`**, `tracked_functions_javascript`
 - **`[tool.safelint.rules.missing_assertions]`**, `min_assertions` (default 1; set 2 for the paper's density), `assertion_calls_javascript`
-- **`[tool.safelint.rules.tainted_sink]`**, `sinks_javascript`, `sanitizers_javascript`, `sources_javascript`
+- **`[tool.safelint.rules.tainted_sink]`**, `sinks_javascript`, `sanitizers_javascript`, `sources_javascript` (plus the opt-in `receiver_sinks_javascript`, `sanitizer_properties_javascript`, `sink_properties_javascript` - see [property-typed sanitisers](../configuration/rules.md#property-typed-sanitisers-sanitizer_properties-sink_properties))
 - **`[tool.safelint.rules.return_value_ignored]`**, `flagged_calls_javascript`
 - **`[tool.safelint.rules.null_dereference]`**, `nullable_methods_javascript`
 
