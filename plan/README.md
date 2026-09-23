@@ -12,12 +12,13 @@ piece of work.
 > `PENDING.md`; remove the spec once it ships (the convention followed for Go,
 > PHP, C, C++, and the framework presets).
 
-**No language addition is currently planned.** C++ shipped in v2.8.0 (see the
-blockquote below); the remaining work in this directory is the deferred
-cross-language refactors listed further down. `docs/configuration/rules.md`
-"Planned" reflects the same empty near-term roadmap. The blockquotes below
-record the shipped-language history and the convention this plan directory
-follows: a spec file is removed once its language ships.
+**No language addition is currently planned, and no cross-language refactor
+remains open** - the deferred taint-tracker overhaul shipped in v2.13.0 (see the
+section further down and [`PENDING.md`](PENDING.md) Shipped). C++ shipped in
+v2.8.0 (see the blockquote below). `docs/configuration/rules.md` "Planned"
+reflects the same empty near-term roadmap. The blockquotes below record the
+shipped-language history and the convention this plan directory follows: a spec
+file is removed once its language ships.
 
 > **Go (`.go`) shipped in v2.5.0** (6th registered language: 16 cross-language
 > rules + the Go-only SAFE209 `empty_error_check` / SAFE211
@@ -70,8 +71,8 @@ for Go, PHP, C, and C++).
 > `docs/configuration/toml.md`, the skill-file addenda, and the shipped code.
 > The `csrf_protection_disabled` (SAFE908) and `hardcoded_secret` (SAFE909)
 > fast-follows **shipped in v2.11.0**, completing the SAFE905-909 band. The
-> taint-tracker sanitiser framework remains deferred (Priority 3 in
-> [`PENDING.md`](PENDING.md)).
+> property-typed taint-tracker sanitiser framework **shipped in v2.13.0** (see
+> the taint-tracker overhaul in [`PENDING.md`](PENDING.md) Shipped).
 
 ## Shipped: release automation (CI/CD, not a code change)
 
@@ -92,16 +93,15 @@ release process.
 ## Deferred cross-language refactors (run AFTER the languages above)
 
 These were not language additions; they were codebase-wide sweeps best done once
-the language set is stable, so they didn't have to be redone per language. The
-three below have **shipped**, so - following the same convention as the shipped
-languages above - their spec files were removed on completion (the design
-decisions now live in the referenced CHANGELOG entries and the shipped code). The
-one-time cross-language taint-propagation enhancement (attribute / subscript /
-receiver chains) **shipped in v2.11.0** (Priority 1 in [`PENDING.md`](PENDING.md),
-now marked implemented). The remaining taint-core work - the property-typed
-sanitiser framework and the iterative-worklist conversion of the six non-C
-trackers - is **Priority 1** there, and is **implemented (PR #149, `2.13.0rc1`),
-pending release**.
+the language set is stable, so they didn't have to be redone per language. They
+have all **shipped**, so - following the same convention as the shipped languages
+above - their spec files were removed on completion (the design decisions now live
+in the referenced CHANGELOG entries and the shipped code). The one-time
+cross-language taint-propagation enhancement (attribute / subscript / receiver
+chains) **shipped in v2.11.0**. The taint-tracker core overhaul - the property-typed
+sanitiser framework (3a) and the iterative-worklist conversion of the six non-C
+trackers (3b) - **shipped in v2.13.0** (its spec `plan/taint-tracker-overhaul.md`
+was removed on completion; see the entry in [`PENDING.md`](PENDING.md) Shipped).
 
 > **Node-type / operator constants shipped in v2.8.2** (PR #107). Converted the
 > per-language node-type / operator tables in `src/safelint/rules/` from raw
@@ -125,7 +125,7 @@ pending release**.
 > spec, `plan/security-hardening.md`, was removed on completion.
 
 **Taint propagation through attribute / subscript / receiver chains shipped in
-v2.11.0** (Priority 1 in [`PENDING.md`](PENDING.md), now marked implemented): the
+v2.11.0** (see [`PENDING.md`](PENDING.md) Shipped): the
 intra-procedural taint trackers carry taint through those chains
 (`request.GET["q"]`, `$request->input('x')`), so the framework-preset (and Spring
 / JS-runtime) SAFE801 sink extensions fire on realistic request-driven code, not
