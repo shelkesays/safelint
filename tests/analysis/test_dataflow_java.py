@@ -526,6 +526,42 @@ def test_chained_assignment_through_compound_preserves_taint() -> None:
     assert any(hit[2] == "exec" and hit[1] == "a" for hit in tracker.sink_hits)
 
 
+def test_chained_assignment_through_untracked_compound_target_keeps_rhs_taint() -> None:
+    """``a = <field/array> += tainted`` keeps the RHS taint on ``a``.
+
+    Field (``this.prefix``) and array (``parts[0]``) writes are deliberately not
+    bound by the tracker, so a compound on one has no stored status to read. The
+    chain walk must continue into the RHS rather than short-circuiting to clean -
+    the assigned value still carries whatever taint the RHS contributes."""
+    field_src = textwrap.dedent(
+        """
+        class C {
+            String prefix;
+            void m(String userInput) {
+                String sql;
+                sql = this.prefix += userInput;
+                exec(sql);
+            }
+        }
+        """
+    )
+    array_src = textwrap.dedent(
+        """
+        class C {
+            void m(String userInput, String[] parts) {
+                String other;
+                other = parts[0] += userInput;
+                exec(other);
+            }
+        }
+        """
+    )
+    for src, bound in ((field_src, "sql"), (array_src, "other")):
+        tracker = JavaTaintTracker(params={"userInput"}, sinks=frozenset({"exec"}), sanitizers=frozenset(), sources=frozenset())
+        tracker.visit(_find_method(_parse(src), "m"))
+        assert any(hit[2] == "exec" and hit[1] == bound for hit in tracker.sink_hits), f"taint lost through untracked compound target for {bound}"
+
+
 def test_property_status_survives_lambda_capture() -> None:
     """A property-cleared variable keeps its cleared properties when captured by a lambda.
 
