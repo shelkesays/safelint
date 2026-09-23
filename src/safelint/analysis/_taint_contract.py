@@ -9,6 +9,7 @@ with both tables empty, a sanitiser clears every sink exactly as before.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from types import MappingProxyType
 from typing import TYPE_CHECKING
 
 
@@ -88,6 +89,29 @@ class PropertyContract:
 
     sanitizer_properties: Mapping[str, frozenset[str]] = field(default_factory=dict)
     sink_properties: Mapping[str, str] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Make the two tables genuinely read-only.
+
+        ``frozen=True`` only stops the *fields* being rebound - it says nothing
+        about the mappings they point at, so a caller who kept a reference to
+        the dict it passed in could still mutate a "frozen" contract and change
+        the verdict of every tracker holding it. Copy into a
+        :class:`~types.MappingProxyType` so the contract owns immutable tables.
+        """
+        object.__setattr__(self, "sanitizer_properties", MappingProxyType(dict(self.sanitizer_properties)))
+        object.__setattr__(self, "sink_properties", MappingProxyType(dict(self.sink_properties)))
+
+    def __hash__(self) -> int:
+        """Hash by content.
+
+        ``frozen=True`` auto-generates a ``__hash__`` that hashes the field
+        tuple, and a mapping is unhashable - so the generated one raised
+        ``TypeError`` for every contract, making an apparently-hashable value
+        object unusable as a dict key or cache key. Hash the table *contents*
+        instead (property values are ``frozenset`` / ``str``, both hashable).
+        """
+        return hash((frozenset(self.sanitizer_properties.items()), frozenset(self.sink_properties.items())))
 
     def clears(self, name: str | None, required_property: str | None) -> bool:
         """Return True if property-typed sanitiser *name* clears *required_property*.
