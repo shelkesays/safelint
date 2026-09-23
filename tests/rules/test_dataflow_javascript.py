@@ -147,6 +147,21 @@ def test_js_taint_through_template_string_fires(tmp_path: Path) -> None:
     assert any(v.code == "SAFE801" for v in result.violations)
 
 
+def test_js_taint_through_nested_template_strings_fires(tmp_path: Path) -> None:
+    """Taint survives nested ``${`...${x}...`}`` after the traversal prune.
+
+    ``_template_children`` now prunes nested templates so each level is
+    enumerated once; the nested template reaches the worklist as a child, so
+    the taint must still be found."""
+    sample = tmp_path / "nested_template.js"
+    sample.write_text(
+        "function f(userInput) {\n  const y = `a ${`b ${`c ${userInput}`}`}`;\n  eval(y);\n}\n",
+        encoding="utf-8",
+    )
+    result = _enabled_engine("tainted_sink").check_file(str(sample))
+    assert any(v.code == "SAFE801" for v in result.violations)
+
+
 def test_js_destructured_param_is_tainted(tmp_path: Path) -> None:
     """``function f({userInput}) { eval(userInput); }`` - destructured params are taint sources."""
     sample = tmp_path / "destruct.js"

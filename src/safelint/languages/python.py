@@ -134,6 +134,7 @@ INTERPOLATION = "interpolation"
 LIST = "list"
 TUPLE = "tuple"
 SET = "set"
+EXPRESSION_LIST = "expression_list"  # bare RHS tuple: the ``u, 'k'`` in ``x, y = u, 'k'``
 
 TRUE = "true"
 FALSE = "false"
