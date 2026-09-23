@@ -68,6 +68,23 @@ def _assignment_propagating_children(node: tree_sitter.Node) -> list[tree_sitter
     return children
 
 
+#: Node kinds the declarator descent can step into: the name itself, or a
+#: wrapper that nests another declarator inside it. Used only for
+#: ``reference_declarator``, which carries no ``declarator`` field to follow.
+_DESCENDABLE_DECLARATORS = frozenset(
+    {
+        _c.IDENTIFIER,
+        _c.POINTER_DECLARATOR,
+        _c.ARRAY_DECLARATOR,
+        _c.FUNCTION_DECLARATOR,
+        _c.PARENTHESIZED_DECLARATOR,
+        _cpp.REFERENCE_DECLARATOR,
+        _cpp.QUALIFIED_IDENTIFIER,
+        _cpp.FIELD_IDENTIFIER,
+    }
+)
+
+
 def _declarator_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
     """Return the name ``identifier`` from a declarator, unwrapping pointer / array layers.
 
@@ -87,7 +104,12 @@ def _declarator_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | 
             # plain named child. Without this the descent bottomed out at None
             # and ``const std::string& r = tainted;`` bound no name at all, so
             # the reference silently read clean at every later sink.
-            nxt = cur.named_child(0)
+            #
+            # Pick the first child that can actually continue the descent
+            # rather than child 0 blindly: every shape observed today puts the
+            # identifier first, but an attribute or type child appearing ahead
+            # of it would otherwise end the walk on a node with no name.
+            nxt = next((child for child in cur.named_children if child.type in _DESCENDABLE_DECLARATORS), None)
         cur = nxt
     return None  # pragma: no cover - defensive: 16-deep declarator nesting does not occur
 
