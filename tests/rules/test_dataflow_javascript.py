@@ -97,6 +97,30 @@ def test_js_property_typed_sanitizer_clears_matching_sink(tmp_path: Path) -> Non
     assert [v.code for v in result.violations if v.code == "SAFE801"] == []
 
 
+def test_js_unknown_call_does_not_preserve_a_cleared_property(tmp_path: Path) -> None:
+    """An unknown call wrapping a sanitiser drops the established property.
+
+    ``unesc(esc(userInput))`` must still fire ``htmlSink``: an unknown call can
+    transform or DECODE its input, so it cannot be trusted to preserve the
+    safety property ``esc`` established. Raw taint already propagated through
+    unknown calls; this pins the property half of that posture."""
+    sample = tmp_path / "unesc.js"
+    sample.write_text("function f(userInput) { htmlSink(unesc(esc(userInput))); }\n", encoding="utf-8")
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "sinks_javascript": ["htmlSink"],
+                "sanitizers_javascript": [],
+                "sources_javascript": [],
+                "sanitizer_properties_javascript": {"esc": ["html_escaped"]},
+                "sink_properties_javascript": {"htmlSink": "html_escaped"},
+            }
+        }
+    }
+    result = _enabled_engine("tainted_sink", overrides).check_file(str(sample))
+    assert [v.code for v in result.violations if v.code == "SAFE801"] == ["SAFE801"]
+
+
 def test_js_taint_through_let_assignment_fires(tmp_path: Path) -> None:
     """``let`` assignment also propagates taint."""
     sample = tmp_path / "let.js"
