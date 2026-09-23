@@ -237,6 +237,41 @@ def test_property_sanitizer_clears_through_assignment_intermediary():
     assert any(s == "run_sql" for _, _, s in tracker_fires.sink_hits)  # sql sink still fires
 
 
+def test_unknown_call_does_not_preserve_a_cleared_property():
+    """An unknown call wrapping a sanitiser drops the property it established.
+
+    ``htmlsink(unescape(htmlescape(u)))`` must fire: an unknown call may
+    transform or DECODE its input, so it cannot be trusted to carry a safety
+    property through. The direct ``htmlsink(htmlescape(u))`` stays clean, so
+    this is the unknown call being distrusted, not the clear being broken."""
+    contract = PropertyContract(
+        sanitizer_properties={"htmlescape": frozenset(["html_escaped"])},
+        sink_properties={"htmlsink": "html_escaped"},
+    )
+
+    def tracker_for(src: str) -> TaintTracker:
+        tracker = TaintTracker(
+            {"user_input"},
+            frozenset(["htmlsink"]),
+            frozenset(),
+            SOURCES,
+            property_contract=contract,
+        )
+        tracker.visit(_parse_func(src))
+        return tracker
+
+    decoded = tracker_for("""
+    def process(user_input):
+        htmlsink(unescape(htmlescape(user_input)))
+    """)
+    direct = tracker_for("""
+    def process(user_input):
+        htmlsink(htmlescape(user_input))
+    """)
+    assert any(s == "htmlsink" for _, _, s in decoded.sink_hits)
+    assert not direct.sink_hits
+
+
 def test_flat_sanitizer_stays_universal_for_property_sink():
     """A flat/legacy sanitiser clears even a property-requiring sink (backward compat)."""
     src = """

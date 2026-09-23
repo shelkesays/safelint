@@ -132,8 +132,6 @@ class TaintTracker:
                 self._visit_assignment(node)
             elif node.type == _py.AUGMENTED_ASSIGNMENT:
                 self._visit_aug_assignment(node)
-            elif node.type == _py.ANNOTATED_ASSIGNMENT:
-                self._visit_ann_assignment(node)
             elif node.type == _py.CALL:
                 self._visit_call(node)
 
@@ -191,16 +189,6 @@ class TaintTracker:
         combined = combine_status(self.tainted.get(node_text(left)), value_status(self._is_tainted, self._properties, right))
         set_status(self.tainted, node_text(left), combined)
 
-    def _visit_ann_assignment(self, node: tree_sitter.Node) -> None:
-        """Propagate taint through ``x: T = value``."""
-        value = node.child_by_field_name("right")
-        if not value:
-            return
-        if node.named_children:
-            target = node.named_children[0]
-            if target.type == _py.IDENTIFIER:
-                set_status(self.tainted, node_text(target), value_status(self._is_tainted, self._properties, value))
-
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink via a tainted argument or method receiver."""
         name = call_name(node)
@@ -246,15 +234,16 @@ class TaintTracker:
         safety property the target sink requires (``None`` when the sink declares
         none); it decides whether a property-typed sanitiser on the path clears.
         """
-        stack = [node]
+        stack: list[tuple[tree_sitter.Node, str | None]] = [(node, required_property)]
         while len(stack) > 0:
-            terminal, children = self._taint_step(stack.pop(), required_property)
+            current, prop = stack.pop()
+            terminal, children = self._taint_step(current, prop)
             if terminal:
                 return True
             stack.extend(children)
         return False
 
-    def _taint_step(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tree_sitter.Node]]:
+    def _taint_step(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tuple[tree_sitter.Node, str | None]]]:
         """Reduce *node* to ``(is_tainted_here, children_to_examine)`` for the worklist.
 
         A tainted identifier terminates; a call is classified by
@@ -269,8 +258,8 @@ class TaintTracker:
         if node_type == _py.CALL:
             return self._classify_call(node, required_property)
         if node_type == _py.STRING:
-            return False, self._fstring_children(node)
-        return False, self._taint_propagating_children(node)
+            return False, [(child, required_property) for child in self._fstring_children(node)]
+        return False, [(child, required_property) for child in self._taint_propagating_children(node)]
 
     @staticmethod
     def _fstring_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
@@ -304,7 +293,7 @@ class TaintTracker:
             return list(node.named_children)
         return []
 
-    def _classify_call(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tree_sitter.Node]]:
+    def _classify_call(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tuple[tree_sitter.Node, str | None]]]:
         """Classify a call for the worklist: ``(is_tainted_here, children_to_examine)``.
 
         A sanitiser that clears *required_property* short-circuits to
@@ -336,4 +325,9 @@ class TaintTracker:
             receiver = function.child_by_field_name("object")
             if receiver is not None:
                 candidates.append(receiver)
-        return False, candidates
+        # An unknown call may transform or DECODE its inputs, so it cannot be
+        # trusted to preserve a safety property a sanitiser established earlier
+        # (``html_unescape(escape(u))`` is not html-safe). Drop the property for
+        # the children: any taint reaching them re-taints the result for every
+        # property. Raw taint still propagates as before.
+        return False, [(child, None) for child in candidates]

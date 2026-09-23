@@ -730,16 +730,21 @@ class TaintedSinkRule(BaseRule):
         raw, key = resolve_lang_config_lookup(self.config, "receiver_sinks", lang_name, default=[])
         return frozenset(_validated_string_list(raw, key))
 
-    def _resolve_core_lists(self, lang_name: str) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
+    def _resolve_core_lists(self, lang_name: str, defaults: dict[str, list[str]] | None = None) -> tuple[frozenset[str], frozenset[str], frozenset[str]]:
         """Resolve the ``(sinks, sanitizers, sources)`` name sets for *lang_name*.
 
         Each is looked up per-language (``sinks_<lang>`` etc., with the bare key
-        for Python) and validated as a list of strings. Shared by the non-Python
-        checkers so the three-list boilerplate lives in one place.
+        for Python) and **validated** as a list of strings, so a mistyped scalar
+        (``sinks = "RawSQL"``) fails loud instead of silently becoming a set of
+        single characters. *defaults* supplies the per-key fallback used when the
+        key is absent (Python passes its built-in lists; the other languages rely
+        on the engine having merged ``DEFAULTS``). Shared by every checker so the
+        three-list boilerplate and its validation live in one place.
         """
+        defaults = defaults or {}
         resolved: list[frozenset[str]] = []
         for base_key in ("sinks", "sanitizers", "sources"):
-            raw, key = resolve_lang_config_lookup(self.config, base_key, lang_name, default=[])
+            raw, key = resolve_lang_config_lookup(self.config, base_key, lang_name, default=defaults.get(base_key, []))
             resolved.append(frozenset(_validated_string_list(raw, key)))
         return resolved[0], resolved[1], resolved[2]
 
@@ -760,9 +765,10 @@ class TaintedSinkRule(BaseRule):
 
     def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run Python taint analysis on every function in *tree*."""
-        sinks = frozenset(self.config.get("sinks", self._DEFAULT_SINKS))
-        sanitizers = frozenset(self.config.get("sanitizers", self._DEFAULT_SANITIZERS))
-        sources = frozenset(self.config.get("sources", self._DEFAULT_SOURCES))
+        sinks, sanitizers, sources = self._resolve_core_lists(
+            "python",
+            {"sinks": self._DEFAULT_SINKS, "sanitizers": self._DEFAULT_SANITIZERS, "sources": self._DEFAULT_SOURCES},
+        )
         assume = self._resolve_assume_taint_preserving()
         receiver_sinks = self._resolve_receiver_sinks("python")
         contract = self._resolve_property_contract("python")

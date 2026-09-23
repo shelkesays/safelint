@@ -365,15 +365,16 @@ class JavaTaintTracker:
         target sink requires (``None`` when it declares none) and decides whether a
         property-typed sanitiser on the path clears.
         """
-        stack = [node]
+        stack: list[tuple[tree_sitter.Node, str | None]] = [(node, required_property)]
         while len(stack) > 0:
-            terminal, children = self._taint_step(stack.pop(), required_property)
+            current, prop = stack.pop()
+            terminal, children = self._taint_step(current, prop)
             if terminal:
                 return True
             stack.extend(children)
         return False
 
-    def _taint_step(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tree_sitter.Node]]:
+    def _taint_step(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tuple[tree_sitter.Node, str | None]]]:
         """Reduce *node* to ``(is_tainted_here, children_to_examine)`` for the worklist.
 
         A call is classified by :meth:`_classify_call`, which returns children
@@ -385,7 +386,7 @@ class JavaTaintTracker:
             return identifier_tainted(self.tainted, node_text(node), required_property), []
         if node_type in _CALL_TYPES:
             return self._classify_call(node, required_property)
-        return False, self._taint_propagating_children(node)
+        return False, [(child, required_property) for child in self._taint_propagating_children(node)]
 
     @staticmethod
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
@@ -403,7 +404,7 @@ class JavaTaintTracker:
             return list(node.named_children)
         return []
 
-    def _classify_call(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tree_sitter.Node]]:
+    def _classify_call(self, node: tree_sitter.Node, required_property: str | None) -> tuple[bool, list[tuple[tree_sitter.Node, str | None]]]:
         """Classify a call for the worklist: ``(is_tainted_here, children_to_examine)``.
 
         Mirrors the Python / JS classifiers with one Java-specific extension: for
@@ -430,4 +431,9 @@ class JavaTaintTracker:
             obj = node.child_by_field_name("object")
             if obj is not None:
                 candidates.append(obj)
-        return False, candidates
+        # An unknown call may transform or DECODE its inputs, so it cannot be
+        # trusted to preserve a safety property a sanitiser established earlier
+        # (``html_unescape(escape(u))`` is not html-safe). Drop the property for
+        # the children: any taint reaching them re-taints the result for every
+        # property. Raw taint still propagates as before.
+        return False, [(child, None) for child in candidates]
