@@ -53,7 +53,7 @@ lints some files keeps the warning as context.)
 - **`.tsx`**, TypeScript with JSX (React, etc.). Parsed by the separate
   `tsx` grammar inside tree-sitter-typescript. From safelint's
   perspective both grammars share one logical language name
-  (`"typescript"`), so the same 18 rules apply uniformly.
+  (`"typescript"`), so the same 21 rules apply uniformly.
 - **`.as`**, AssemblyScript (TS-syntax compiled to WebAssembly). Parses
   with the standard TypeScript grammar; safelint treats `.as` as
   TypeScript without special-casing.
