@@ -504,6 +504,28 @@ def test_passthrough_unwrap_exercised_by_cast_in_sink_receiver() -> None:
     assert any(v.code == "SAFE801" for v in result.violations), "Tainted receiver wrapped in cast should still reach the sink"
 
 
+def test_chained_assignment_through_compound_preserves_taint() -> None:
+    """``a = b += "x"`` propagates ``b``'s taint to ``a`` (the chain value is b's post-op value).
+
+    The compound step keeps ``b`` tainted (read-modify-write), and its *value* -
+    which flows to ``a`` - is that tainted ``b``, not the clean literal RHS. The
+    chain walk must not skip past the compound to the literal and drop the taint."""
+    src = textwrap.dedent(
+        """
+        class C {
+            void m(String b) {
+                String a;
+                a = b += "x";
+                exec(a);
+            }
+        }
+        """
+    )
+    tracker = JavaTaintTracker(params={"b"}, sinks=frozenset({"exec"}), sanitizers=frozenset(), sources=frozenset())
+    tracker.visit(_find_method(_parse(src), "m"))
+    assert any(hit[2] == "exec" and hit[1] == "a" for hit in tracker.sink_hits)
+
+
 def test_property_status_survives_lambda_capture() -> None:
     """A property-cleared variable keeps its cleared properties when captured by a lambda.
 
