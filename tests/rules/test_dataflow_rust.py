@@ -436,14 +436,7 @@ def test_rust_property_status_survives_closure_capture(tmp_path: Path) -> None:
     behaviour outside the closure."""
     sample = tmp_path / "closure_property.rs"
     sample.write_text(
-        "fn run(user_input: String) {\n"
-        "    let safe = esc(user_input);\n"
-        "    let c = || {\n"
-        "        html_sink(safe);\n"
-        "        run_sql(safe);\n"
-        "    };\n"
-        "    c();\n"
-        "}\n",
+        "fn run(user_input: String) {\n    let safe = esc(user_input);\n    let c = || {\n        html_sink(safe);\n        run_sql(safe);\n    };\n    c();\n}\n",
         encoding="utf-8",
     )
     overrides = {
