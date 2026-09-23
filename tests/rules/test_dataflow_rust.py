@@ -427,6 +427,41 @@ def test_rust_nested_closure_isolated(tmp_path: Path) -> None:
     assert len(safe801) >= 1
 
 
+def test_rust_property_status_survives_closure_capture(tmp_path: Path) -> None:
+    """A property-cleared local keeps its cleared properties when captured by a closure.
+
+    ``let safe = esc(user_input);`` establishes ``html_escaped``. Captured in a
+    closure, ``html_sink(safe)`` stays clean (the two-pass seed carries the property
+    status, not just the name) while ``run_sql(safe)`` still fires - matching the
+    behaviour outside the closure."""
+    sample = tmp_path / "closure_property.rs"
+    sample.write_text(
+        "fn run(user_input: String) {\n"
+        "    let safe = esc(user_input);\n"
+        "    let c = || {\n"
+        "        html_sink(safe);\n"
+        "        run_sql(safe);\n"
+        "    };\n"
+        "    c();\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "sinks_rust": ["html_sink", "run_sql"],
+                "sanitizers_rust": [],
+                "sources_rust": [],
+                "sanitizer_properties_rust": {"esc": ["html_escaped"]},
+                "sink_properties_rust": {"html_sink": "html_escaped", "run_sql": "sql_escaped"},
+            }
+        }
+    }
+    hits = [v for v in _enabled_engine("tainted_sink", overrides).check_file(str(sample)).violations if v.code == "SAFE801"]
+    assert len(hits) == 1  # only run_sql (sql_escaped) fires; html_sink is cleared through the capture
+    assert "run_sql" in hits[0].message
+
+
 def test_rust_closure_captures_enclosing_tainted_local(tmp_path: Path) -> None:
     """A closure body referencing an enclosing-scope tainted local fires SAFE801.
 
