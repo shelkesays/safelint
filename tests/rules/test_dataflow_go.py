@@ -61,6 +61,34 @@ def test_go_tainted_capture_in_closure_fires_safe801(tmp_path: Path) -> None:
     assert any(v.code == "SAFE801" for v in _engine(_SAFE801).check_file(str(sample)).violations)
 
 
+def test_go_property_status_survives_closure_capture(tmp_path: Path) -> None:
+    """A property-cleared local keeps its cleared properties when captured by a closure.
+
+    ``safe := esc(userInput)`` establishes ``html_escaped``. Captured in a
+    ``func`` literal, ``htmlSink(safe)`` stays clean (the two-pass seed carries the
+    property status, not just the name) while ``runSql(safe)`` still fires."""
+    sample = tmp_path / "closure_property.go"
+    sample.write_text(
+        "package main\nfunc h(userInput string) {\n\tsafe := esc(userInput)\n\tgo func() {\n\t\thtmlSink(safe)\n\t\trunSql(safe)\n\t}()\n}\n",
+        encoding="utf-8",
+    )
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "enabled": True,
+                "sinks_go": ["htmlSink", "runSql"],
+                "sanitizers_go": [],
+                "sources_go": [],
+                "sanitizer_properties_go": {"esc": ["html_escaped"]},
+                "sink_properties_go": {"htmlSink": "html_escaped", "runSql": "sql_escaped"},
+            }
+        }
+    }
+    hits = [v for v in _engine(overrides).check_file(str(sample)).violations if v.code == "SAFE801"]
+    assert len(hits) == 1  # only runSql (sql_escaped) fires; htmlSink is cleared through the capture
+    assert "runSql" in hits[0].message
+
+
 def test_go_var_form_source_propagates_taint(tmp_path: Path) -> None:
     """``var name = r.FormValue(...)`` taints ``name`` (var_spec propagation path)."""
     sample = tmp_path / "varform.go"
