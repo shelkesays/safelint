@@ -195,6 +195,8 @@ framework = "fastapi"
 
 Framework and pydantic presets merge *before* your explicit TOML, so per-rule keys (e.g. `[tool.safelint.rules.tainted_sink] sinks = [...]`) always win. Unknown framework names warn on stderr and fall back to `vanilla`.
 
+**Property-typed sanitisers (2.13.0).** The flat `sanitizers` list is universal - a name there clears *every* sink, so listing `html.escape` in it also vouches for `RawSQL`. To recognise a context-specific escaper precisely, declare what it establishes in `[tool.safelint.rules.tainted_sink.sanitizer_properties]` (name -> list of properties) and what each sink requires in `...sink_properties` (sink -> one property); it then clears only the sinks whose required property it establishes. Python uses the **bare** key names (not `_python`-suffixed). Keep such a name OUT of the flat list, which is checked first. Opt-in - both tables ship empty, so existing config is unaffected.
+
 The preset enables the `SAFE905-909` structural rules directly (which subset depends on the framework - see the table above), but the dataflow additions (extra SAFE801 sinks, `.first()` nullable, pydantic constructors) only extend the *lists* - the multi-language dataflow rules stay opt-in (enable `tainted_sink` explicitly), so a Python framework choice never turns dataflow on for other languages in a polyglot repo. The intra-procedural tracker follows taint through `request.<attr>` attribute / subscript / method-receiver chains (`request.GET["q"]`), so the framework sinks fire on idiomatic request-driven code, not only direct-parameter flows.
 
 ## Stdin mode for editor / Claude Code unsaved buffers

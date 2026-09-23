@@ -152,7 +152,7 @@ Most rule options work uniformly across languages, but a few are Python-only:
 - **`[tool.safelint.rules.global_mutation]`**, `strict = true` (fire on every `global` declaration regardless of write) is Python-only.
 - **`[tool.safelint.rules.side_effects_hidden]`**, `pure_prefixes` defaults match Python `snake_case` (`calculate_`, `get_`, `is_`, `has_`, `find_`). For mixed-language repos the same list applies to both, the substring check is case-insensitive.
 - **`[tool.safelint.rules.resource_lifecycle]`**, `tracked_functions`, `extend_tracked_functions`, and `cleanup_patterns` are Python-only keys. The JavaScript equivalent is `tracked_functions_javascript`.
-- **`[tool.safelint.rules.tainted_sink]`**, `sinks`, `sanitizers`, `sources` default to Python's threat surface (`eval`, `exec`, `subprocess`, …). The `_javascript`-suffixed equivalents are independent lists.
+- **`[tool.safelint.rules.tainted_sink]`**, `sinks`, `sanitizers`, `sources` default to Python's threat surface (`eval`, `exec`, `subprocess`, …). The `_javascript`-suffixed equivalents are independent lists. Python uses the **bare** key names for the opt-in [property-typed sanitiser contract](../configuration/rules.md#property-typed-sanitisers-sanitizer_properties-sink_properties) too - `sanitizer_properties` / `sink_properties` (2.13.0), not `_python`-suffixed. Use them to recognise a context-specific escaper precisely: `html.escape` clears an HTML sink without also clearing `RawSQL`, which listing it in the universal flat `sanitizers` list would do.
 
 ## Contributing
 
