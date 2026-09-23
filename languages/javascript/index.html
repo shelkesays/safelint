@@ -2673,7 +2673,7 @@
 <li><strong><code>[tool.safelint.rules.global_mutation]</code></strong>, <code>global_namespaces_javascript</code> (default depends on preset)</li>
 <li><strong><code>[tool.safelint.rules.resource_lifecycle]</code></strong>, <code>tracked_functions_javascript</code></li>
 <li><strong><code>[tool.safelint.rules.missing_assertions]</code></strong>, <code>min_assertions</code> (default 1; set 2 for the paper's density), <code>assertion_calls_javascript</code></li>
-<li><strong><code>[tool.safelint.rules.tainted_sink]</code></strong>, <code>sinks_javascript</code>, <code>sanitizers_javascript</code>, <code>sources_javascript</code></li>
+<li><strong><code>[tool.safelint.rules.tainted_sink]</code></strong>, <code>sinks_javascript</code>, <code>sanitizers_javascript</code>, <code>sources_javascript</code> (plus the opt-in <code>receiver_sinks_javascript</code>, <code>sanitizer_properties_javascript</code>, <code>sink_properties_javascript</code> - see <a href="../../configuration/rules/#property-typed-sanitisers-sanitizer_properties-sink_properties">property-typed sanitisers</a>)</li>
 <li><strong><code>[tool.safelint.rules.return_value_ignored]</code></strong>, <code>flagged_calls_javascript</code></li>
 <li><strong><code>[tool.safelint.rules.null_dereference]</code></strong>, <code>nullable_methods_javascript</code></li>
 </ul>
