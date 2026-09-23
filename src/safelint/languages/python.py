@@ -89,7 +89,6 @@ ELSE_CLAUSE = "else_clause"
 
 ASSIGNMENT = "assignment"
 AUGMENTED_ASSIGNMENT = "augmented_assignment"
-ANNOTATED_ASSIGNMENT = "annotated_assignment"
 
 # LHS destructure shapes: ``a, b``, ``(a, b)``, ``[a, b]``, ``a, *rest``.
 PATTERN_LIST = "pattern_list"

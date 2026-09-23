@@ -117,5 +117,10 @@ class PropertyContract:
         for it, so a later sink requiring that property clears correctly through
         the variable.
         """
-        established: frozenset[str] = frozenset().union(*self.sanitizer_properties.values()) if self.sanitizer_properties else frozenset()
-        return established | frozenset(self.sink_properties.values())
+        established: frozenset[str] = frozenset().union(*self.sanitizer_properties.values())
+        # Only a property that some sanitiser establishes AND some sink requires can
+        # ever change a verdict: ``required_property`` reaches the trackers solely via
+        # ``required_for`` (sink_properties), and a property no sanitiser establishes
+        # can never enter a cleared set. Anything else would cost a provably dead
+        # worklist traversal per assignment, so intersect rather than union.
+        return established & frozenset(self.sink_properties.values())
