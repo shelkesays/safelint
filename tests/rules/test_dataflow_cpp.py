@@ -132,3 +132,50 @@ def test_cpp_dataflow_rules_silent_by_default(tmp_path: Path) -> None:
     codes = _codes(src, tmp_path)
     assert "SAFE801" not in codes
     assert "SAFE802" not in codes
+
+
+def test_cpp_reference_declaration_propagates_taint(tmp_path: Path) -> None:
+    """``const std::string& r = tainted;`` binds the reference as tainted.
+
+    tree-sitter-cpp gives ``reference_declarator`` no ``declarator`` field (the
+    name is a plain named child), so the declarator descent used to bottom out
+    at ``None`` and bind nothing - the reference then read clean at every later
+    sink, a silent C++-only false negative.
+    """
+    src = "void run(const char* in) {\n    const std::string& r = in;\n    system(r.c_str());\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, enable=["tainted_sink"])
+
+
+def test_cpp_rvalue_reference_declaration_propagates_taint(tmp_path: Path) -> None:
+    """The ``T&&`` form parses as the same ``reference_declarator``."""
+    src = "void run(const char* in) {\n    std::string&& m = in;\n    system(m.c_str());\n}\n"
+    assert "SAFE801" in _codes(src, tmp_path, enable=["tainted_sink"])
+
+
+def test_cpp_clean_reference_declaration_stays_clean(tmp_path: Path) -> None:
+    """A reference bound to a constant does not fire (the fix binds status, not taint)."""
+    src = 'void run(const char* in) {\n    const std::string& r = "safe";\n    system(r.c_str());\n}\n'
+    assert "SAFE801" not in _codes(src, tmp_path, enable=["tainted_sink"])
+
+
+def test_cpp_templated_call_matches_configured_sink(tmp_path: Path) -> None:
+    """``execute<int>(tainted)`` matches a sink configured as ``execute``.
+
+    An explicitly-instantiated template call parses its callee as
+    ``template_function``, which resolved to no bareword at all - so the call
+    never matched a name-filtered sink.
+    """
+    src = "void run(const char* in) {\n    execute<int>(in);\n}\n"
+    config = {"tainted_sink": {"enabled": True, "sinks_cpp": ["execute"]}}
+    assert "SAFE801" in _codes(src, tmp_path, config=config)
+
+
+def test_cpp_templated_method_call_matches_configured_sink(tmp_path: Path) -> None:
+    """``db.query<Row>(tainted)`` matches a sink configured as ``query``.
+
+    The member form parses its callee's ``field`` as ``template_method``, which
+    resolved to the literal text ``"query<Row>"`` - never a configured name.
+    """
+    src = "void run(const char* in) {\n    db.query<Row>(in);\n}\n"
+    config = {"tainted_sink": {"enabled": True, "sinks_cpp": ["query"]}}
+    assert "SAFE801" in _codes(src, tmp_path, config=config)
