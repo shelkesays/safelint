@@ -38,6 +38,7 @@ from typing import TYPE_CHECKING
 
 from safelint.core import _diagnostics
 from safelint.core._cache import LintCache
+from safelint.core._validators import ConfigValueError
 from safelint.core.config import MODE_FAIL_ON, SEVERITY_ORDER, load_config
 from safelint.core.engine import SafetyEngine
 from safelint.core.runner import resolve_cache_dir, run
@@ -2161,8 +2162,8 @@ def _dispatch_subcommand(rest: list[str], idx: int) -> int | None:
     return None
 
 
-def main() -> None:
-    """Entry point for direct CLI invocation, pre-commit hook, and stdin mode.
+def _dispatch_main() -> None:
+    """Route argv to the right subcommand and exit with its status.
 
     Routing logic (in order):
     - ``-h`` / ``--help`` / ``help`` (with optional subcommand) → print help.
@@ -2205,6 +2206,29 @@ def main() -> None:
         if rc is not None:
             sys.exit(rc)
     sys.exit(_dispatch_hook_mode())
+
+
+def main() -> None:
+    """Entry point for direct CLI invocation, pre-commit hook, and stdin mode.
+
+    Thin wrapper around :func:`_dispatch_main` (which holds the routing logic)
+    that turns a bad config VALUE into the same one-line
+    ``safelint: error: <key> must be ...`` the other config problems produce.
+    Without it a one-character TOML typo (``sinks = "eval"`` instead of
+    ``sinks = ["eval"]``) surfaced as a full Python traceback ending in
+    ``TypeError``, which reads like a crash in safelint rather than a mistake
+    in the user's config - and buries the message that actually says what to
+    fix. Exit code 2 matches the other "could not run" paths (a plain lint
+    failure is 1).
+
+    Only :class:`ConfigValueError` is caught, so a genuine ``TypeError`` from a
+    bug in safelint still raises with its traceback intact.
+    """
+    try:
+        _dispatch_main()
+    except ConfigValueError as exc:  # nosafe: SAFE203
+        _diagnostics.print_error(str(exc))
+        sys.exit(2)
 
 
 def _dispatch_hook_mode() -> int:
