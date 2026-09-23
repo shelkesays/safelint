@@ -15,6 +15,17 @@ from __future__ import annotations
 from typing import Any
 
 
+class ConfigValueError(TypeError):
+    """A config key holds a value of the wrong shape.
+
+    Subclasses :class:`TypeError` so every existing caller, test and library
+    consumer that catches ``TypeError`` keeps working unchanged. The distinct
+    type exists so the CLI can render a mistyped TOML key as a one-line
+    ``safelint: error:`` instead of a Python traceback, without swallowing a
+    genuine ``TypeError`` from a bug in safelint itself.
+    """
+
+
 def _validated_string_list(value: object, key_name: str) -> list[str]:
     """Validate that *value* is a list/tuple of strings, return it as a list.
 
@@ -40,12 +51,12 @@ def _validated_string_list(value: object, key_name: str) -> list[str]:
     """
     if not isinstance(value, (list, tuple)):
         msg = f"{key_name} must be a list of strings, got {type(value).__name__}"
-        raise TypeError(msg)
+        raise ConfigValueError(msg)
     non_strings = [item for item in value if not isinstance(item, str)]
     if non_strings:
         bad = ", ".join(f"{type(item).__name__}({item!r})" for item in non_strings)
         msg = f"{key_name} must contain only strings - got: {bad}"
-        raise TypeError(msg)
+        raise ConfigValueError(msg)
     # Both checks above guarantee every element is a str; the list
     # comprehension is a typing-only re-narrowing for ty/mypy.
     return [item for item in value if isinstance(item, str)]
@@ -61,12 +72,12 @@ def _validated_property_map(value: object, key_name: str) -> dict[str, frozenset
     """
     if not isinstance(value, dict):
         msg = f"{key_name} must be a table of name -> [property, ...], got {type(value).__name__}"
-        raise TypeError(msg)
+        raise ConfigValueError(msg)
     result: dict[str, frozenset[str]] = {}
     for name, props in value.items():
         if not isinstance(name, str):
             msg = f"{key_name} keys must be strings - got {type(name).__name__}({name!r})"
-            raise TypeError(msg)
+            raise ConfigValueError(msg)
         result[name] = frozenset(_validated_string_list(props, f"{key_name}.{name}"))
     return result
 
@@ -80,12 +91,12 @@ def _validated_string_map(value: object, key_name: str) -> dict[str, str]:
     """
     if not isinstance(value, dict):
         msg = f"{key_name} must be a table of name -> property, got {type(value).__name__}"
-        raise TypeError(msg)
+        raise ConfigValueError(msg)
     result: dict[str, str] = {}
     for name, prop in value.items():
         if not isinstance(name, str) or not isinstance(prop, str):
             msg = f"{key_name} must map string names to string properties - got {name!r}: {prop!r}"
-            raise TypeError(msg)
+            raise ConfigValueError(msg)
         result[name] = prop
     return result
 

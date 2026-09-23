@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import sys
+
 import pytest
 
-from safelint.core._validators import _validated_property_map, _validated_string_map
+from safelint.cli import main
+from safelint.core._validators import ConfigValueError, _validated_property_map, _validated_string_list, _validated_string_map
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
 
@@ -127,3 +130,43 @@ def test_property_adoption_warning_emitted_once_per_run(tmp_path, capsys) -> Non
         sample.write_text("def g(u):\n    eval(u)\n", encoding="utf-8")
         engine.check_file(str(sample))
     assert capsys.readouterr().err.count("safelint: warning:") == 1
+
+
+# ---------------------------------------------------------------------------
+# ConfigValueError: a mistyped config value is an error message, not a traceback
+# ---------------------------------------------------------------------------
+
+
+def test_config_value_error_is_a_type_error() -> None:
+    """Subclassing TypeError keeps every existing caller and test working."""
+    assert issubclass(ConfigValueError, TypeError)
+
+
+def test_validators_raise_config_value_error() -> None:
+    """All three validators raise the catchable subtype, not a bare TypeError."""
+    with pytest.raises(ConfigValueError):
+        _validated_string_list("eval", "sinks")
+    with pytest.raises(ConfigValueError):
+        _validated_property_map(["escape"], "sanitizer_properties")
+    with pytest.raises(ConfigValueError):
+        _validated_string_map(["eval"], "sink_properties")
+
+
+def test_cli_renders_mistyped_config_as_one_line_error(tmp_path, monkeypatch, capsys) -> None:
+    """``sinks = "eval"`` (missing brackets) prints one error line and exits 2.
+
+    It used to escape the CLI as an uncaught TypeError, dumping a traceback
+    that read like a crash in safelint and buried the message saying what to
+    fix."""
+    (tmp_path / "safelint.toml").write_text('[rules.tainted_sink]\nenabled = true\nsinks = "eval"\n', encoding="utf-8")
+    sample = tmp_path / "sample.py"
+    sample.write_text("def g(u):\n    eval(u)\n", encoding="utf-8")
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(sys, "argv", ["safelint", "check", str(sample)])
+
+    with pytest.raises(SystemExit) as exc:
+        main()
+    assert exc.value.code == 2
+    err = capsys.readouterr().err
+    assert err.strip() == "safelint: error: sinks must be a list of strings, got str"
+    assert "Traceback" not in err
