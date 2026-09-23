@@ -30,6 +30,7 @@ from typing import TYPE_CHECKING
 
 from safelint.analysis._taint_contract import PropertyContract, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import c as _c
+from safelint.languages import cpp as _cpp
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
 
@@ -79,7 +80,15 @@ def _declarator_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | 
             return None
         if cur.type == _c.IDENTIFIER:
             return cur
-        cur = cur.child_by_field_name("declarator")
+        nxt = cur.child_by_field_name("declarator")
+        if nxt is None and cur.type == _cpp.REFERENCE_DECLARATOR:
+            # C++ ``T& r`` / ``T&& r``: tree-sitter-cpp gives
+            # ``reference_declarator`` NO ``declarator`` field - the name is a
+            # plain named child. Without this the descent bottomed out at None
+            # and ``const std::string& r = tainted;`` bound no name at all, so
+            # the reference silently read clean at every later sink.
+            nxt = cur.named_child(0)
+        cur = nxt
     return None  # pragma: no cover - defensive: 16-deep declarator nesting does not occur
 
 
