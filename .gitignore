@@ -234,3 +234,8 @@ __marimo__/
 # Installed copy of the bundled safelint skill - refresh via
 # `safelint skill install --client claude --project --force`, never commit.
 .claude/skills/safelint/
+
+# macOS + local build artifacts
+.DS_Store
+**/.DS_Store
+src/safelint/skill_files.zip
