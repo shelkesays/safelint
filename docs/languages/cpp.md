@@ -46,12 +46,53 @@ Each reads a `_cpp`-suffixed config list (`nonlocal_jump_calls_cpp`, `allocation
 
 C++ is the first non-Python home for **SAFE201 `bare_except`**: it flags the `catch (...)` catch-all, which swallows every exception with no binding to inspect or re-raise - the same hazard as Python's bare `except:`. A typed `catch (const E& e)` is clean. **SAFE202** fires on empty / comment-only / literal-only catch bodies; **SAFE203** requires a swallowing catch to log. A `std::cerr << ...` stream insertion counts as logging (it is a `<<` operator, not a call, so it is recognised specially), as does an `spdlog::error(...)`-style call; a bare `throw;` or `throw e;` counts as a re-raise.
 
+## Configuration
+
+Every C++ rule reads `_cpp`-suffixed config keys, independent of the C ones. The dataflow rule is the one with the widest surface:
+
+### SAFE801 taint sinks / sources / sanitizers
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.tainted_sink]
+enabled = true
+sinks_cpp = ["system", "popen", "execl", "execv", "sprintf", "strcpy", "strcat", "memcpy"]
+sources_cpp = ["getenv", "fgets"]
+sanitizers_cpp = ["sanitize", "validate", "escape"]
+```
+
+```toml
+# safelint.toml
+[rules.tainted_sink]
+enabled = true
+sinks_cpp = ["system", "popen", "execl", "execv", "sprintf", "strcpy", "strcat", "memcpy"]
+sources_cpp = ["getenv", "fgets"]
+sanitizers_cpp = ["sanitize", "validate", "escape"]
+```
+
+C++ reuses the C taint tracker's node handling and adds a **method-receiver step** that plain C does not have, so `req->param("q")` stays tainted into a sink.
+
+`sanitizers_cpp` is **universal**: a name there clears *every* sink. To recognise a context-specific escaper precisely, declare it with the opt-in [property-typed sanitiser contract](../configuration/rules.md#property-typed-sanitisers-sanitizer_properties-sink_properties) instead (2.13.0):
+
+```toml
+# safelint.toml
+[rules.tainted_sink.sanitizer_properties_cpp]
+shell_quote = ["shell_quoted"]
+
+[rules.tainted_sink.sink_properties_cpp]
+system = "shell_quoted"
+```
+
+A property-typed sanitiser clears **only** the sinks that declare a property it establishes, so `shell_quote` no longer silently vouches for `sprintf`. Keep such a name out of the flat `sanitizers_cpp` list, which is checked first and would otherwise clear everything regardless.
+
 ## C++ shapes worth knowing
 
 - `function_definition` covers both free functions AND methods; `lambda_expression` is a separate function node. A method name is a `field_identifier` (in-class) or a `qualified_identifier` (`S::m`, out-of-line); a free function's name nests under `declarator.declarator` as in C.
 - SAFE105 detects a `this->m()` self-call in addition to a bare recursive call.
 - SAFE302 descends into `namespace_definition` bodies, so a namespace-scoped mutable global fires, not just a translation-unit-scope one.
 - The named casts (`reinterpret_cast<T>(x)`) are **not** dedicated cast nodes: they parse as a `call_expression` whose `function` is a `template_function`. SAFE316 detects them by that template callee name.
+- An **explicitly instantiated template call** carries its `<...>` in the callee node: `execute<int>(x)` is a `template_function` and `db.query<Row>(x)` a `template_method`. Both are unwrapped to the bare name, so a sink configured as `execute` / `query` matches either form. (Before 2.13.1 they resolved to nothing and to the literal `query<Row>`, so templated calls escaped every name-filtered rule.)
+- A reference declaration (`const std::string& r = x;`) is a `reference_declarator`, which - unlike `pointer_declarator` - has no `declarator` field; its name is a plain child. Taint binds through it, so `r` carries `x`'s taint.
 
 ## Deliberately not registered for C++
 

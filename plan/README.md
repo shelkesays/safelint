@@ -130,8 +130,8 @@ intra-procedural taint trackers carry taint through those chains
 / JS-runtime) SAFE801 sink extensions fire on realistic request-driven code, not
 only direct-parameter flows. The method-receiver step rides on the existing
 `assume_taint_preserving` default (no new config knob). See the v2.11.0 CHANGELOG
-entry and the v2.13.0 CHANGELOG for the details, including why the change was narrower
-than the original spec (only Python / JS / TS / C++ needed work).
+entry for the details, including why the change was narrower than the original
+spec (only Python / JS / TS / C++ needed work).
 
 ## How to use these specs
 
