@@ -13,7 +13,7 @@ from safelint.analysis.dataflow_javascript import JsTaintTracker
 from safelint.analysis.dataflow_php import PhpTaintTracker
 from safelint.analysis.dataflow_rust import RustTaintTracker
 from safelint.core._diagnostics import print_warning
-from safelint.core._validators import _validated_property_map, _validated_string_list, _validated_string_map, resolve_lang_config_lookup
+from safelint.core._validators import ConfigValueError, _validated_property_map, _validated_string_list, _validated_string_map, resolve_lang_config_lookup
 from safelint.languages import c as _c
 from safelint.languages import cpp as _cpp
 from safelint.languages import go as _go
@@ -801,7 +801,7 @@ class TaintedSinkRule(BaseRule):
         value = self.config.get("assume_taint_preserving", True)
         if not isinstance(value, bool):
             msg = f"tainted_sink.assume_taint_preserving must be a bool, got {type(value).__name__}"
-            raise TypeError(msg)
+            raise ConfigValueError(msg)
         return value
 
     def _resolve_receiver_sinks(self, lang_name: str) -> frozenset[str]:
