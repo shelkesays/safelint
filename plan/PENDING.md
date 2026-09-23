@@ -78,111 +78,32 @@ uv run mkdocs build --strict                   # broken anchors fail the build
   ✅ DONE (2.12.1). `@register(handler=csrf_exempt)` (value) no longer fires;
   the guard now excludes a keyword argument on either side, while the real
   decorator forms still fire. See CHANGELOG.
+- **Taint-tracker core overhaul (3a property-typed sanitisers + 3b single
+  worklist)**  ✅ DONE (2.13.0). Was Priority 1. **3a**: SAFE801 sanitisers now
+  declare which safety property they establish (`sanitizer_properties`) and sinks
+  which they require (`sink_properties`); a property-typed sanitiser clears a sink
+  only when it satisfies that sink's required property, and the clear is
+  path-sensitive (survives an intermediate variable and closure capture) via
+  property-labelled taint (`tainted` maps each variable to the properties it is
+  safe for). Opt-in and backward compatible - both tables ship empty and the flat
+  `sanitizers` list stays universal. Fixes the `escape()`-clears-`RawSQL` false
+  negative CodeRabbit re-flagged on PR #133. **3b**: the six non-C trackers were
+  converted from the `_is_tainted` ↔ `_call_tainted` mutual recursion to the
+  single-worklist `_taint_step` / `_classify_call` shape (matching `dataflow_c.py`);
+  behaviour-preserving. Property-labelled helpers live in
+  `analysis/_taint_contract.py`. Per-language regression tests (assignment + closure
+  capture), config docs in both TOML forms. The two PR #133 tracking threads
+  (sanitiser-property, recursive-descent) are the anchors for this item. See
+  CHANGELOG `[Unreleased]` (Added / Changed).
 
 ---
 
-## Priority 1 - Taint-tracker core overhaul (do 3a + 3b together)
+## Open work
 
-> **✅ IMPLEMENTED, pending release** on `feature/taint-tracker-overhaul`
-> (**PR #149**, bumped to `2.13.0rc1`). Both sub-items landed together across all
-> seven trackers; the design + increment record is in
-> [`taint-tracker-overhaul.md`](taint-tracker-overhaul.md). This section moves to
-> **Shipped** (and the spec file is retired, and the two PR #133 tracking threads
-> close) once it reaches production via the RC -> `development` -> `main` flow.
-> The requirement text below is retained until then.
+**None currently.** The taint-tracker core overhaul - the last open backlog item -
+shipped in 2.13.0 (see Shipped above). No language addition is planned (see
+[`README.md`](README.md)). When new work is scoped, add a prioritised section here
+(and a self-contained spec file for anything large, per the convention).
 
-**Type**: architectural enhancement to the taint trackers. Two sub-items,
-strategically downstream of the shipped 2.11.0 taint-projection parity work:
-
-- **3a - Property-typed sanitiser framework** (Pydantic as first sanitiser).
-  A v3.x-roadmap item the framework-presets work explicitly deferred.
-  **Independently re-flagged by CodeRabbit on PR #133** (the `escape()`-clears-
-  `RawSQL` false negative), which corroborates the need.
-- **3b - Convert the trackers to a single iterative worklist** (eliminate the
-  `_is_tainted` -> `_call_tainted` -> `_is_tainted` mutual recursion). Raised by
-  CodeRabbit on PR #133 (`dataflow_javascript.py`). See "3b" below.
-
-**Which trackers each item touches** - there are **seven** trackers: `dataflow.py`
-(Python) plus the **six** `dataflow_<lang>.py` siblings (c, go, java, javascript,
-php, rust):
-
-- **3a** rewrites the sanitiser-clearing logic in **all seven** - the
-  `_call_tainted` classification in the six non-C trackers, and the
-  `_classify_call` step in `dataflow_c.py`.
-- **3b** rewrites only the **six non-C trackers** (Python + go/java/javascript/
-  php/rust) to remove the mutual recursion. `dataflow_c.py` is **excluded**: it is
-  **already** in the target shape - its `_taint_step` reduces each worklist node
-  to `(is_tainted_here, children)` and its `_classify_call` returns argument /
-  receiver nodes as children rather than re-entering `_is_tainted` - so it is the
-  **reference exemplar** for 3b, not something 3b changes.
-
-So the **single-pass requirement applies to the six non-C trackers**, which both
-items rewrite; `dataflow_c.py` is touched by **3a only** (its `_classify_call`
-sanitiser step). Largest item in this backlog. The two PR #133 review threads
-(sanitiser-property, recursive-descent) are left **open** as the tracking anchors
-for 3a / 3b.
-
-### 3a - Exact requirement
-
-The trackers have **no sanitiser-clears-taint framework** beyond the flat
-`sanitizers` name list, which clears taint unconditionally for every sink.
-
-**Do not model validation as universal sanitisation.** Passing attacker-
-controlled data through a validating boundary establishes only the *specific*
-safety property that validation enforces - it does **not** make the value safe
-for every sink. Pydantic is the clearest example: `Model(...)` /
-`model_validate()` enforce **type / schema** (so they legitimately clear the
-mass-assignment and type-confusion concerns), but a Pydantic-validated `str` is
-still fully injectable into a SQL / shell / template sink. Treating "went through
-`Model(...)`" as blanket taint-clearing would therefore create **false
-negatives**, silently suppressing real injection findings.
-
-The requirement is a **property-typed sanitiser mechanism**, not a flat clear:
-
-- A sanitiser declares **which safety property it establishes** (e.g.
-  `sql_escaped`, `html_escaped`, `shell_quoted`, `schema_validated`), and each
-  sink declares **which property it requires**. Taint is cleared for a given sink
-  only when a sanitiser on the path satisfies **that sink's** required property;
-  otherwise the flow stays tainted. Contracts are **per sink / context**, never
-  global.
-- Register Pydantic's validating constructors (`Model(...)` /
-  `model_validate()` / `parse_obj_as` / `TypeAdapter`) as providers of the
-  **schema-validation** property only - so they clear taint for schema-shaped
-  concerns but leave string-injection sinks tainted.
-- `model_construct` / `construct` stay **SAFE801 sinks** (they skip validation
-  and establish no property); a sanitiser must never be inferred from them.
-- Preserve **sanitiser-before-receiver-taint ordering**: the sanitiser check must
-  run *before* the shipped 2.11.0 receiver-taint step, so an explicit sanitiser
-  on a tainted receiver still clears (for the properties it covers) rather than
-  being re-tainted.
-- Migrate the existing flat `sanitizers` list into this model as a compatibility
-  default (a bare name clears the sink's required property for backward
-  compatibility) so no current config silently changes meaning.
-
-### 3b - Convert the trackers to a single iterative worklist
-
-**Problem**: in `dataflow.py` and the `dataflow_<lang>.py` siblings (all except
-`dataflow_c.py`), `_is_tainted` is an iterative worklist, but it calls
-`_node_directly_tainted` -> `_call_tainted`, and `_call_tainted` re-enters
-`_is_tainted` for every argument **and** (since the v2.11.0 receiver work) every
-method receiver. That is a mutual recursion whose depth grows with call /
-method-chain nesting (`f(g(h(...)))`, `a().b().c()...`). It is pre-existing (the
-argument path always did this) and stays within safelint's own SAFE105 (which
-polices *direct* self-recursion; this is mutual), but it violates the project
-guideline that **all tree-walking in the analysis modules must be iterative
-worklists, never recursive**, and a pathologically deep input could grow the
-Python stack.
-
-**Exact requirement**: `dataflow_c.py` already models the correct shape - its
-`_taint_step(node) -> (is_tainted_here, children_to_examine)` reduces each
-worklist node without re-entering `_is_tainted`; sources return `(True, [])`,
-sanitisers `(False, [])`, and unknown calls return their argument / receiver
-nodes as children for the *same* worklist to drain. Refactor the other six
-trackers to that single-worklist model: fold the `_call_tainted` classification
-into the worklist step so a call's arguments and receiver are pushed as children
-rather than recursed into. Behaviour must be preserved exactly (same sink hits on
-the existing per-language test suites); this is a structural refactor, not a
-detection change. Do it in the **same pass** as 3a, since 3a also rewrites the
-sanitiser handling inside these same methods (a sanitiser must short-circuit the
-worklist step with `(False, [])`, matching `dataflow_c.py`).
-
+<!-- Retired specs whose work has shipped are removed on completion; their design
+decisions live in the referenced CHANGELOG entries and the shipped code. -->
