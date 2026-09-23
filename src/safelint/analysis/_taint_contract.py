@@ -81,9 +81,9 @@ class PropertyContract:
     establishes (e.g. ``escape -> {html_escaped}``); ``sink_properties`` maps a
     sink name to the single property it requires (e.g. ``execute -> sql_escaped``).
     A property-typed sanitiser clears a sink only when it establishes that sink's
-    required property; a sink with no declared property is cleared by any
-    sanitiser. Both default empty, so the shipped behaviour is unchanged until a
-    user opts in.
+    required property; a sink with no declared property is cleared only by the flat
+    (universal) ``sanitizers`` list, never by a property-typed sanitiser. Both
+    default empty, so the shipped behaviour is unchanged until a user opts in.
     """
 
     sanitizer_properties: Mapping[str, frozenset[str]] = field(default_factory=dict)

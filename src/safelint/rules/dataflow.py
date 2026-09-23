@@ -513,7 +513,7 @@ def _rust_field_pattern_names(node: tree_sitter.Node) -> set[str]:
     return {node_text(shorthand)} if shorthand is not None else set()
 
 
-def _java_lambda_enclosing_tainted(lambda_node: tree_sitter.Node, cache: dict[int, set[str]]) -> set[str]:
+def _java_lambda_enclosing_tainted(lambda_node: tree_sitter.Node, cache: dict[int, dict[str, frozenset[str]]]) -> dict[str, frozenset[str]]:
     """Return the enclosing function's final tainted set for *lambda_node*.
 
     Walks the parent chain looking for the nearest function-defining
@@ -532,12 +532,12 @@ def _java_lambda_enclosing_tainted(lambda_node: tree_sitter.Node, cache: dict[in
     cur = lambda_node.parent
     while cur is not None:
         if cur.type in _java.FUNCTION_TYPES:
-            return cache.get(cur.id, set())
+            return cache.get(cur.id, {})
         cur = cur.parent
-    return set()  # pragma: no cover - defensive: a lambda in valid Java always has an enclosing function
+    return {}  # pragma: no cover - defensive: a lambda in valid Java always has an enclosing function
 
 
-def _rust_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[int, set[str]]) -> set[str]:
+def _rust_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[int, dict[str, frozenset[str]]]) -> dict[str, frozenset[str]]:
     """Return the enclosing function / closure's final tainted set for *closure_node*.
 
     Rust closures capture by reference / value from the enclosing scope,
@@ -559,9 +559,9 @@ def _rust_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[
     cur = closure_node.parent
     while cur is not None:
         if cur.type in _rust.FUNCTION_TYPES:
-            return cache.get(cur.id, set())
+            return cache.get(cur.id, {})
         cur = cur.parent
-    return set()  # pragma: no cover - defensive: a closure in valid Rust always has an enclosing function
+    return {}  # pragma: no cover - defensive: a closure in valid Rust always has an enclosing function
 
 
 def _go_param_names(func_node: tree_sitter.Node) -> set[str]:
@@ -585,7 +585,7 @@ def _go_param_names(func_node: tree_sitter.Node) -> set[str]:
     return names
 
 
-def _go_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[int, set[str]]) -> set[str]:
+def _go_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[int, dict[str, frozenset[str]]]) -> dict[str, frozenset[str]]:
     """Return the enclosing function / closure's final tainted set for *closure_node*.
 
     Go ``func_literal`` closures capture variables from the enclosing
@@ -599,9 +599,9 @@ def _go_closure_enclosing_tainted(closure_node: tree_sitter.Node, cache: dict[in
     cur = closure_node.parent
     while cur is not None:
         if cur.type in _go.FUNCTION_TYPES:
-            return cache.get(cur.id, set())
+            return cache.get(cur.id, {})
         cur = cur.parent
-    return set()  # pragma: no cover - defensive: a closure in valid Go always has an enclosing function
+    return {}  # pragma: no cover - defensive: a closure in valid Go always has an enclosing function
 
 
 def _java_param_names(func_node: tree_sitter.Node) -> set[str]:
@@ -844,22 +844,23 @@ class TaintedSinkRule(BaseRule):
         # Pass 1: analyse non-lambda functions; cache final tainted set
         # keyed by ``node.id`` (the tree-sitter-stable identifier;
         # ``id(wrapper)`` differs across wrapper accesses).
-        tainted_cache: dict[int, set[str]] = {}
+        tainted_cache: dict[int, dict[str, frozenset[str]]] = {}
         for node in walk(tree.root_node):
             if node.type not in _java.FUNCTION_TYPES or node.type == _java.LAMBDA_EXPRESSION:
                 continue
             tracker = JavaTaintTracker(_java_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks, property_contract=contract)
             tracker.visit(node)
-            tainted_cache[node.id] = set(tracker.tainted)
+            tainted_cache[node.id] = dict(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         # Pass 2: lambdas, seeded with enclosing function's final tainted.
         for node in walk(tree.root_node):
             if node.type != _java.LAMBDA_EXPRESSION:
                 continue
-            seed = _java_param_names(node) | _java_lambda_enclosing_tainted(node, tainted_cache)
-            tracker = JavaTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks, property_contract=contract)
+            tracker = JavaTaintTracker(_java_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks, property_contract=contract)
+            for captured, status in _java_lambda_enclosing_tainted(node, tainted_cache).items():
+                tracker.tainted.setdefault(captured, status)  # own params stay raw taint
             tracker.visit(node)
-            tainted_cache[node.id] = set(tracker.tainted)
+            tainted_cache[node.id] = dict(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 
@@ -889,12 +890,12 @@ class TaintedSinkRule(BaseRule):
         # Pass 1: ``function_item`` nodes. Cache the final tainted set
         # keyed by ``node.id`` (tree-sitter-stable across wrapper accesses;
         # ``id(wrapper)`` is not).
-        tainted_cache: dict[int, set[str]] = {}
+        tainted_cache: dict[int, dict[str, frozenset[str]]] = {}
         for node in walk(tree.root_node):
             if node.type != _rust.CLOSURE_EXPRESSION and node.type in _rust.FUNCTION_TYPES:
                 tracker = RustTaintTracker(_rust_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks, property_contract=contract)
                 tracker.visit(node)
-                tainted_cache[node.id] = set(tracker.tainted)
+                tainted_cache[node.id] = dict(tracker.tainted)
                 violations.extend(self._format_hits(filepath, tracker.sink_hits))
         # Pass 2: ``closure_expression`` nodes, seeded with the
         # enclosing scope's final tainted set so captures are visible.
@@ -903,10 +904,11 @@ class TaintedSinkRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type != _rust.CLOSURE_EXPRESSION:
                 continue
-            seed = _rust_param_names(node) | _rust_closure_enclosing_tainted(node, tainted_cache)
-            tracker = RustTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks, property_contract=contract)
+            tracker = RustTaintTracker(_rust_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks, property_contract=contract)
+            for captured, status in _rust_closure_enclosing_tainted(node, tainted_cache).items():
+                tracker.tainted.setdefault(captured, status)  # own params stay raw taint
             tracker.visit(node)
-            tainted_cache[node.id] = set(tracker.tainted)
+            tainted_cache[node.id] = dict(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 
@@ -931,23 +933,24 @@ class TaintedSinkRule(BaseRule):
         receiver_sinks = self._resolve_receiver_sinks("go")
         contract = self._resolve_property_contract("go")
         violations: list[Violation] = []
-        tainted_cache: dict[int, set[str]] = {}
+        tainted_cache: dict[int, dict[str, frozenset[str]]] = {}
         # Pass 1: named functions and methods (not closures).
         for node in walk(tree.root_node):
             if node.type not in _go.FUNCTION_TYPES or node.type == _go.FUNC_LITERAL:
                 continue
             tracker = GoTaintTracker(_go_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks, property_contract=contract)
             tracker.visit(node)
-            tainted_cache[node.id] = set(tracker.tainted)
+            tainted_cache[node.id] = dict(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         # Pass 2: closures, seeded with the enclosing scope's tainted set.
         for node in walk(tree.root_node):
             if node.type != _go.FUNC_LITERAL:
                 continue
-            seed = _go_param_names(node) | _go_closure_enclosing_tainted(node, tainted_cache)
-            tracker = GoTaintTracker(seed, sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks, property_contract=contract)
+            tracker = GoTaintTracker(_go_param_names(node), sinks, sanitizers, sources, assume_taint_preserving=assume, receiver_sinks=receiver_sinks, property_contract=contract)
+            for captured, status in _go_closure_enclosing_tainted(node, tainted_cache).items():
+                tracker.tainted.setdefault(captured, status)  # own params stay raw taint
             tracker.visit(node)
-            tainted_cache[node.id] = set(tracker.tainted)
+            tainted_cache[node.id] = dict(tracker.tainted)
             violations.extend(self._format_hits(filepath, tracker.sink_hits))
         return violations
 
