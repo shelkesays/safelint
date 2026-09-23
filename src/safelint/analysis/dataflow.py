@@ -39,7 +39,16 @@ _SPREADING_TYPES = frozenset(
     }
 )
 
-_CONTAINER_TYPES = frozenset({_py.LIST, _py.TUPLE, _py.SET})
+# Aggregate literals that carry taint when any element is tainted.
+# ``expression_list`` is the *unparenthesised* tuple on the RHS of a
+# destructuring assignment (``x, y = user_input, "k"`` parses its RHS as
+# ``expression_list``, not ``tuple``). Without it that RHS reduced to
+# "no propagating children" and both targets read clean - a false negative
+# on the very common ``value, err = tainted, None`` shape. Like every other
+# container here the whole RHS status is applied to every target, which
+# over-approximates (``y`` is marked tainted too) in the conservative
+# direction.
+_CONTAINER_TYPES = frozenset({_py.LIST, _py.TUPLE, _py.SET, _py.EXPRESSION_LIST})
 
 # Splat operators in call argument lists - ``foo(*args, **kwargs)``.
 # Tree-sitter parses these as single-child wrapper nodes whose only
@@ -263,8 +272,16 @@ class TaintTracker:
 
     @staticmethod
     def _fstring_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
-        """Return every interpolated expression node inside an f-string."""
-        return [inner for child in walk(node) if child.type == _py.INTERPOLATION for inner in child.named_children]
+        """Return the interpolated expression nodes of *this* f-string only.
+
+        ``skip_types`` prunes nested f-strings: an inner ``string`` is returned
+        as a child (so the worklist pops it and enumerates its own
+        interpolations next) rather than having its interpolations re-collected
+        here. Without the prune each nesting level re-enumerated every deeper
+        level, so a chain of N nested f-strings cost 2**N node visits on the
+        exhaustive (untainted) path - measurably 1.3s at N=20.
+        """
+        return [inner for child in walk(node, skip_types=(_py.STRING,)) if child.type == _py.INTERPOLATION for inner in child.named_children]
 
     @staticmethod
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
