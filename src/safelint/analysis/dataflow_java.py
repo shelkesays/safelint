@@ -228,28 +228,28 @@ class JavaTaintTracker:
         """Return the taint status of a (possibly chained) assignment RHS *value*.
 
         A plain chain ``a = b = expr`` yields ``expr``'s status. If the chain hits
-        a **compound** assignment (``a = b += clean``), that inner assignment's
-        *value* is its LHS after the op - which, because the chain is applied
-        innermost-first, is already recorded in :attr:`tainted`; so return the
-        LHS's stored status rather than walking into the (possibly clean) RHS and
-        dropping the accumulated taint.
+        a **compound** assignment whose target is a *tracked* name
+        (``a = b += clean``), that inner assignment's value is its LHS after the
+        op - which, because the chain is applied innermost-first, is already
+        recorded in :attr:`tainted`; so return the LHS's stored status rather than
+        walking into the (possibly clean) RHS and dropping the accumulated taint.
+
+        A compound whose target is **not** a tracked name (``a = this.prefix +=
+        tainted``, ``a = parts[0] += tainted`` - field / array writes the tracker
+        deliberately does not bind) has no stored status to read, so the walk
+        continues into the RHS: the value still carries whatever taint the RHS
+        contributes. Short-circuiting to ``None`` there would silently drop it.
         """
         cur = node
         while cur.type == _java.ASSIGNMENT_EXPRESSION:
-            if _is_compound_assignment(cur):
-                return self._compound_value_status(cur)
+            left = cur.child_by_field_name("left")
+            if _is_compound_assignment(cur) and left is not None and left.type == _java.IDENTIFIER:
+                return self.tainted.get(node_text(left))
             inner = cur.child_by_field_name("right")
             if inner is None:  # pragma: no cover - defensive: valid assignment always has right
                 return None
             cur = inner
         return value_status(self._is_tainted, self._properties, cur)
-
-    def _compound_value_status(self, compound: tree_sitter.Node) -> frozenset[str] | None:
-        """Return the taint status of a compound assignment's *value* (its updated LHS)."""
-        left = compound.child_by_field_name("left")
-        if left is None or left.type != _java.IDENTIFIER:
-            return None
-        return self.tainted.get(node_text(left))
 
     def _visit_enhanced_for(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``for (T x : tainted_iterable) { ... }``.
