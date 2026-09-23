@@ -2090,7 +2090,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2130-2026-09-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.13.0 - 2026-09-23
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.13.0 - 2026-09-23">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4146,7 +4157,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2130-2026-09-23" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.13.0 - 2026-09-23
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.13.0 - 2026-09-23">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6096,7 +6118,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.12.1...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.13.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="2130-2026-09-23"><a href="https://github.com/shelkesays/safelint/compare/v2.12.1...v2.13.0">2.13.0</a> - 2026-09-23<a class="headerlink" href="#2130-2026-09-23" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>SAFE801 <code>tainted_sink</code>: property-typed sanitisers (<code>sanitizer_properties</code> / <code>sink_properties</code>).</strong> A sanitiser can now declare <em>which</em> safety property it establishes (e.g. <code>escape = ["html_escaped"]</code>) and a sink <em>which</em> it requires (e.g. <code>RawSQL = "sql_escaped"</code>); a property-typed sanitiser clears a sink only when it establishes that sink's required property. This fixes the class of false negative where an HTML escaper wrongly cleared a SQL sink (<code>RawSQL(escape(user_input))</code>). Clearing is <strong>path-sensitive</strong>: taint carries the properties it has been cleared for, so the clear survives an intermediate variable (<code>safe = escape(x); html_render(safe)</code> is clean while <code>run_sql(safe)</code> still fires). The mechanism is <strong>opt-in and backward compatible</strong> - both tables ship empty, and the flat <code>sanitizers</code> list stays universal (clears every sink, as before), so no existing config changes meaning and no cost is added until a project opts in. Only the flat <code>sanitizers</code> list clears a sink with no declared property; a property-typed sanitiser never does. Both keys are per-language (bare for Python, <code>_&lt;lang&gt;</code> suffix otherwise). Pydantic's validating entry points (<code>model_validate</code> / <code>model_validate_json</code> / <code>parse_obj_as</code>) are documented as a <code>schema_validated</code> provider to add when you declare a <code>schema_validated</code>-requiring sink (not a shipped default, and never in the flat list - a validated string is still injectable). Config docs (both TOML forms) in <code>docs/configuration/rules.md</code>.</li>
