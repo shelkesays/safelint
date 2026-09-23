@@ -281,6 +281,34 @@ _CALLEE_BAREWORD_FIELD: dict[str, str] = {
 }
 
 
+#: C++ callee wrappers that carry an explicit template-argument list.
+#: ``execute<int>(...)`` parses its callee as ``template_function`` and
+#: ``obj.query<Row>(...)`` as ``template_method``; both keep the bareword on
+#: their ``name`` field, with ``<...>`` in a sibling ``template_argument_list``.
+_TEMPLATE_CALLEE_TYPES = frozenset({_cpp.TEMPLATE_FUNCTION, _cpp.TEMPLATE_METHOD})
+
+
+def _strip_template_arguments(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Unwrap a C++ template callee to its bareword name node.
+
+    Without this, ``execute<int>(u)`` resolved to ``None`` (the callee is a
+    ``template_function``, not an ``identifier``) and ``db.query<Row>(u)``
+    resolved to the literal text ``"query<Row>"``. Neither ever matched a
+    configured ``execute`` / ``query`` sink, so explicitly-instantiated
+    template calls silently escaped every name-filtered rule.
+
+    Bounded loop, never recursion - SAFE105 polices this codebase. Two layers
+    is the real maximum (``ns::run<T>`` nests one wrapper inside a
+    ``qualified_identifier``); the extra headroom is defensive.
+    """
+    cur = node
+    for _ in range(4):
+        if cur is None or cur.type not in _TEMPLATE_CALLEE_TYPES:
+            return cur
+        cur = cur.child_by_field_name("name")
+    return cur  # pragma: no cover - defensive: template callees do not nest 4 deep
+
+
 def _python_js_call_name(call_node: tree_sitter.Node) -> str | None:
     """Return the bareword for a Python ``call``, JS ``call_expression`` / ``new_expression``, or Rust ``call_expression``.
 
@@ -291,7 +319,7 @@ def _python_js_call_name(call_node: tree_sitter.Node) -> str | None:
     """
     # ``call`` (Python), ``call_expression`` (JS / Rust) expose the callee
     # via the ``function`` field; JS ``new_expression`` uses ``constructor``.
-    func_node = call_node.child_by_field_name("function") or call_node.child_by_field_name("constructor")
+    func_node = _strip_template_arguments(call_node.child_by_field_name("function") or call_node.child_by_field_name("constructor"))
     if func_node is None:
         return None
     if func_node.type == _js.IDENTIFIER:
@@ -299,7 +327,7 @@ def _python_js_call_name(call_node: tree_sitter.Node) -> str | None:
     field = _CALLEE_BAREWORD_FIELD.get(func_node.type)
     if field is None:
         return None
-    target = func_node.child_by_field_name(field)
+    target = _strip_template_arguments(func_node.child_by_field_name(field))
     return node_text(target) if target else None
 
 

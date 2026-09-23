@@ -144,7 +144,8 @@ ARGUMENT_LIST = "argument_list"
 FIELD_EXPRESSION = "field_expression"  # ``s.m`` / ``p->m`` / ``this->m``
 NEW_EXPRESSION = "new_expression"  # SAFE310 (widened) + SAFE315
 DELETE_EXPRESSION = "delete_expression"  # SAFE310 (widened) + SAFE315
-TEMPLATE_FUNCTION = "template_function"  # ``reinterpret_cast<T>`` callee shape (SAFE316)
+TEMPLATE_FUNCTION = "template_function"  # ``reinterpret_cast<T>`` callee shape (SAFE316); also ``execute<int>(...)``
+TEMPLATE_METHOD = "template_method"  # ``obj.query<Row>(...)`` - the ``field`` of a ``field_expression`` callee
 QUALIFIED_IDENTIFIER = "qualified_identifier"  # ``std::cerr`` (SAFE203 stream logging)
 
 # Qualifiers / specifiers (SAFE302: ``const`` / ``constexpr`` exempt).
