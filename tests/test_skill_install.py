@@ -3900,3 +3900,24 @@ def test_skill_addendum_lists_every_shipped_default(language: str, suffix: str, 
         configured = DEFAULTS["rules"]["tainted_sink"][f"{kind}{suffix}"]
         missing = [name for name in configured if f"`{name}`" not in row]
         assert not missing, f"{language}.md SAFE801 row omits {kind}{suffix} entries: {missing}"
+
+
+_ADDENDUM_LANGUAGES = ["python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp"]
+
+
+@pytest.mark.parametrize("language", _ADDENDUM_LANGUAGES)
+def test_skill_addendum_has_no_duplicated_sentences(language: str) -> None:
+    """No addendum repeats a sentence verbatim.
+
+    A botched restore during editing once left two copies of the same
+    property-sanitiser paragraph in the JavaScript row, which the
+    default-list drift test could not see (it only checks that names are
+    present). Duplicated guidance is how a row quietly ends up contradicting
+    itself after an edit, so pin it directly.
+    """
+    addendum = Path(__file__).parent.parent / "src" / "safelint" / "skill_files" / "languages" / f"{language}.md"
+    sentences = [part.strip() for part in addendum.read_text(encoding="utf-8").replace("\n", " ").split(". ")]
+    # Short fragments repeat legitimately (list items, "Disabled by default").
+    meaningful = [s for s in sentences if len(s) > 80]
+    duplicates = sorted({s[:70] for s in meaningful if meaningful.count(s) > 1})
+    assert not duplicates, f"{language}.md repeats: {duplicates}"

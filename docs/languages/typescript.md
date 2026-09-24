@@ -81,6 +81,7 @@ sinks_javascript = ["eval", "Function", "myCustomDangerousFunction"]
 [rules.tainted_sink]
 sinks_javascript = ["eval", "Function"]                                # legacy JS
 sinks_typescript = ["eval", "Function", "Object.assign", "innerHTML"]  # stricter for TS
+# note: `innerHTML` matches only a CALL - `el.innerHTML = tainted` is an assignment and is not detected
 ```
 
 ### Runtime presets apply to TypeScript too
