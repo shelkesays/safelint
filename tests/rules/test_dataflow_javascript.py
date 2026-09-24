@@ -797,3 +797,28 @@ def test_js_innerhtml_assignment_honours_property_contract(tmp_path: Path) -> No
     fires = tmp_path / "bad.js"
     fires.write_text("function f(userInput) {\n  el.innerHTML = sqlEsc(userInput);\n}\n", encoding="utf-8")
     assert any(v.code == "SAFE801" for v in _enabled_engine("tainted_sink", overrides).check_file(str(fires)).violations)
+
+
+def test_js_parenthesized_assignment_target_fires(tmp_path: Path) -> None:
+    """`(el.innerHTML) = tainted` - JavaScript permits a parenthesised target."""
+    sample = tmp_path / "paren.js"
+    sample.write_text("function f(userInput) {\n  (el.innerHTML) = userInput;\n}\n", encoding="utf-8")
+    assert any(v.code == "SAFE801" for v in _enabled_engine("tainted_sink").check_file(str(sample)).violations)
+
+
+def test_js_chained_assignment_to_sink_fires(tmp_path: Path) -> None:
+    """`el.innerHTML = x = tainted` writes the terminal value, not the inner assignment."""
+    sample = tmp_path / "chain.js"
+    sample.write_text("function f(userInput) {\n  el.innerHTML = x = userInput;\n}\n", encoding="utf-8")
+    assert any(v.code == "SAFE801" for v in _enabled_engine("tainted_sink").check_file(str(sample)).violations)
+
+
+def test_js_destructured_sink_target_pairs_positionally(tmp_path: Path) -> None:
+    """A sink inside a destructuring target fires only for the value it receives."""
+    fires = tmp_path / "d1.js"
+    fires.write_text("function f(userInput) {\n  [el.innerHTML, y] = [userInput, 1];\n}\n", encoding="utf-8")
+    assert any(v.code == "SAFE801" for v in _enabled_engine("tainted_sink").check_file(str(fires)).violations)
+
+    clean = tmp_path / "d2.js"
+    clean.write_text("function f(userInput) {\n  [y, el.innerHTML] = [userInput, 1];\n}\n", encoding="utf-8")
+    assert not [v for v in _enabled_engine("tainted_sink").check_file(str(clean)).violations if v.code == "SAFE801"]

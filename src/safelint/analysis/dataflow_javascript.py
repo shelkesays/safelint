@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract, SinkKinds, combine_status, identifier_tainted, set_status, value_status
+from safelint.analysis._taint_contract import AssignmentShapes, PropertyContract, SinkKinds, combine_status, identifier_tainted, iter_assignment_writes, set_status, value_status
 from safelint.languages import javascript as _js
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -110,21 +110,14 @@ def _destructure_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
     return [inner] if inner is not None else []
 
 
-def _assignment_sink_name(target: tree_sitter.Node) -> str | None:
-    """Return the property name an assignment writes to, or None.
-
-    ``el.innerHTML = x`` exposes it on the ``property`` field; the equivalent
-    ``el["innerHTML"] = x`` puts it in the ``index`` string, whose quotes are
-    stripped so both spellings resolve to the same configurable name.
-    """
-    if target.type == _js.MEMBER_EXPRESSION:
-        prop = target.child_by_field_name("property")
-        return node_text(prop) if prop is not None and prop.type == _js.PROPERTY_IDENTIFIER else None
-    if target.type == _js.SUBSCRIPT_EXPRESSION:
-        index = target.child_by_field_name("index")
-        if index is not None and index.type == _js.STRING:
-            return node_text(index).strip("\"'`")
-    return None
+#: Node types this language uses for assignment targets. The traversal that
+#: consumes them lives in ``_taint_contract`` and is shared by every tracker.
+_ASSIGNMENT_SHAPES = AssignmentShapes(
+    fields={_js.MEMBER_EXPRESSION: ("property", False), _js.SUBSCRIPT_EXPRESSION: ("index", True)},
+    unwrap=frozenset({_js.PARENTHESIZED_EXPRESSION}),
+    patterns=frozenset({_js.ARRAY_PATTERN}),
+    chains=frozenset({_js.ASSIGNMENT_EXPRESSION}),
+)
 
 
 class JsTaintTracker:
@@ -230,19 +223,14 @@ class JsTaintTracker:
     def _check_assignment_sink(self, node: tree_sitter.Node, left: tree_sitter.Node, right: tree_sitter.Node) -> None:
         """Record a hit when a tainted value is WRITTEN to a sink-named property.
 
-        Some JavaScript sinks are assigned to rather than called - ``innerHTML``
-        is the canonical one, and it ships in the default ``sinks_javascript``.
-        The call-based hit recorder never saw ``element.innerHTML = tainted``,
-        so the shipped default could only ever fire on an ``innerHTML(...)``
-        call, a shape that does not occur in real code. Writing to the property
-        IS the injection, so the assignment target is checked against the same
-        sink list, honouring the same property-typed contract as a call.
+        ``element.innerHTML = tainted`` is the canonical case: writing the
+        property IS the injection, and the call-based recorder never saw it. The
+        traversal (parenthesised targets, destructuring, chained right-hand
+        sides) is shared - only ``_ASSIGNMENT_SHAPES`` differs here.
         """
-        sink = _assignment_sink_name(left)
-        if sink is None or sink not in self.sink_kinds.assignment:
-            return
-        if self._is_tainted(right, self.contract.required_for(sink)):
-            self._record_sink_hit(node, right, sink)
+        for sink, value in iter_assignment_writes(left, right, _ASSIGNMENT_SHAPES):
+            if sink in self.sink_kinds.assignment and self._is_tainted(value, self.contract.required_for(sink)):
+                self._record_sink_hit(node, value, sink)
 
     def _visit_aug_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x += value``."""

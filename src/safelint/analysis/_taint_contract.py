@@ -107,6 +107,84 @@ def assignment_sink_name(target: tree_sitter.Node, member_fields: Mapping[str, t
 
 
 @dataclass(frozen=True)
+class AssignmentShapes:
+    """Per-language node types for finding sink-named assignment targets.
+
+    Only this table differs between languages; the traversal that uses it is
+    shared, so a semantic fix lands once rather than in seven trackers.
+
+    * ``fields`` - target type -> ``(field, keyed)``. ``keyed`` marks a
+      SUBSCRIPT key rather than a written-out property: ``o[k]`` names whatever
+      ``k`` holds, so its spelling is only a property name when it is a quoted
+      literal.
+    * ``unwrap`` - transparent wrappers around a target, e.g. the parentheses
+      in ``(el.innerHTML) = x``, which JavaScript and Python both permit.
+    * ``patterns`` - unpack targets (``[a, obj.sink] = ...``), whose elements
+      are themselves targets and pair positionally with the value list.
+    * ``chains`` - assignment node types, so a chained ``a.sink = b = tainted``
+      resolves to the value actually written rather than the inner assignment.
+    """
+
+    fields: Mapping[str, tuple[str, bool]]
+    unwrap: frozenset[str] = frozenset()
+    patterns: frozenset[str] = frozenset()
+    chains: frozenset[str] = frozenset()
+
+
+def _peel(node: tree_sitter.Node, wrappers: frozenset[str]) -> tree_sitter.Node:
+    """Strip transparent wrapper nodes (parentheses) from *node*."""
+    cur = node
+    for _ in range(8):
+        if cur.type not in wrappers:
+            return cur
+        inner = cur.named_child(0)
+        if inner is None:
+            return cur
+        cur = inner
+    return cur  # pragma: no cover - defensive: parens do not nest 8 deep in practice
+
+
+def terminal_assigned_value(right: tree_sitter.Node, shapes: AssignmentShapes) -> tree_sitter.Node:
+    """Resolve a chained assignment RHS to the value actually written.
+
+    ``el.innerHTML = x = tainted`` stores *tainted*, not the inner assignment,
+    so the sink check has to look through the chain or it sees a node that
+    carries no taint of its own.
+    """
+    cur = right
+    for _ in range(16):
+        if cur.type not in shapes.chains:
+            return cur
+        inner = cur.child_by_field_name("right")
+        if inner is None:
+            return cur
+        cur = inner
+    return cur  # pragma: no cover - defensive: assignment chains are not 16 deep
+
+
+def iter_assignment_writes(left: tree_sitter.Node, right: tree_sitter.Node, shapes: AssignmentShapes) -> list[tuple[str, tree_sitter.Node]]:
+    """Return ``(sink_name, written_value)`` for every sink-named target in *left*.
+
+    Handles the three shapes a naive ``left`` lookup misses: a parenthesised
+    target, an unpack target (paired positionally with the value list, falling
+    back to the whole RHS when the shapes do not line up), and a chained RHS.
+    """
+    value = terminal_assigned_value(right, shapes)
+    target = _peel(left, shapes.unwrap)
+    if target.type not in shapes.patterns:
+        name = assignment_sink_name(target, shapes.fields)
+        return [(name, value)] if name is not None else []
+    elements = list(target.named_children)
+    values = list(value.named_children) if value.type in shapes.patterns or len(elements) == len(value.named_children) else []
+    writes: list[tuple[str, tree_sitter.Node]] = []
+    for index, element in enumerate(elements):
+        name = assignment_sink_name(_peel(element, shapes.unwrap), shapes.fields)
+        if name is not None:
+            writes.append((name, values[index] if index < len(values) else value))
+    return writes
+
+
+@dataclass(frozen=True)
 class SinkKinds:
     """How a sink receives its attacker-controlled payload.
 
