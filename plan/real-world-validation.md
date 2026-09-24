@@ -60,11 +60,72 @@ enable a rule and trust what it tells them.
    intended one. This caught us on the first pass.
 4. Filter results by file extension - `--all-files` on a polyglot repo lints
    every supported language it finds, not just the one under test.
-5. Read the reported line for each sampled finding and classify it. Quote the
+5. Exclude vendored and generated trees before counting anything - see below.
+6. Run **twice**: once with every rule enabled, and once with **stock defaults**.
+7. Read the reported line for each sampled finding and classify it. Quote the
    code. No verdict without reading the source.
-6. For each defect, open a GitHub issue stating **why** it happens (root cause
+8. For each defect, open a GitHub issue stating **why** it happens (root cause
    in safelint's own source), **what** the fix is, and **how** to verify it.
-7. Fix later, in batches, then re-run against *every* project for that language.
+9. Fix later, in batches, then re-run against *every* project for that language.
+
+### Run stock defaults too, not just every rule
+
+The all-rules run finds the most defects, but it is not what anyone
+experiences. Most users run defaults, and the two worst findings of the first
+pass - `SAFE105` on Java overloads and `SAFE102` on JavaScript `else if` - fire
+on **default config**. Those matter more than anything only visible at maximum
+verbosity, and the default-config output is small enough to read in full rather
+than sample.
+
+Record both numbers per project. A rule that is noisy only when explicitly
+enabled is a tuning problem; a rule that is noisy by default is a bug.
+
+### Exclude vendored and generated code
+
+The first pass wasted a run on this: the candidate Go and C++ "projects" turned
+out to be dependency source inside `.venv` directories, so the numbers described
+third-party code that no one in the project wrote. Before counting, exclude at
+least `node_modules/`, `.venv/`, `venv/`, `vendor/`, `target/`, `dist/`,
+`build/`, `third_party/`, `site-packages/` and any generated output the project
+declares.
+
+Check the file count against what the project actually ships. If the count looks
+too high for the repository, something vendored is being linted.
+
+### Pin the revision
+
+Record the commit SHA cloned for each project. Without it, "we fixed the rule
+and re-ran clean" cannot be reproduced - the project moved, and it is impossible
+to tell a real fix from upstream churn. Clone with `--depth 1` for speed, but
+capture `git rev-parse HEAD` into the results.
+
+### Classification, and how much to sample
+
+- **True positive** - the code genuinely has the property the rule describes,
+  whether or not the author cares. `assert`-free production function: true.
+- **False positive** - the rule's claim is not true of the code. A `no_recursion`
+  hit on an overload; a `null_dereference` hit on `d.get(k, default)`.
+- **Debatable** - the claim holds literally but the finding is not actionable,
+  usually because the fix is worse than the finding. `with session:` counted as
+  nesting; `List.add()`'s discarded boolean.
+
+Debatable is not a way to avoid deciding. If a rule's findings are mostly
+debatable, the rule has a tuning problem and that is worth recording as such.
+
+Sample **3-5 findings per rule code**, spread across different files - one file
+can have one unusual pattern. Validate **all** findings for any rule with fewer
+than ten, and **all** findings from security rules (SAFE8xx, SAFE9xx) regardless
+of count: a security rule that is wrong is worse than one that is silent.
+
+### Definition of done, per language
+
+A language row is `triaged` when every rule code in its output has been sampled
+and classified, every defect has an issue, and both projects have been run. It
+is **not** done when the findings have merely been counted.
+
+A defect issue is closable when the fix is in, the minimal repro is clean, and
+**every** project for that language has been re-run - not just the one that
+surfaced it. That is the whole point of having two.
 
 ## Project matrix
 
@@ -136,6 +197,30 @@ Already run against private codebases in the first pass. These are not
 reproducible by anyone else, so they do not count toward the bar, but their
 findings are recorded below: `salessync` (Python), `v4` (JavaScript),
 `arkstore` (Rust), `superset-frontend` (TypeScript), `freescout` (PHP).
+
+## Known gaps in this programme
+
+Recorded rather than left implicit, because each is a way the results could
+mislead:
+
+- **The harness is not in the repository.** The first pass used throwaway
+  scripts in `/tmp` to generate the all-rules config, run each project and
+  filter results by extension. They are gone. Until they live in `scripts/`,
+  this document describes a method nobody can re-run identically, and the
+  per-project numbers cannot be regenerated. This is the largest gap and should
+  be closed before the next batch.
+- **Results are not stored.** There is nowhere to put run output, so trends
+  across safelint versions cannot be compared and a regression between releases
+  would be invisible. Needs a decision on format and location, ideally a
+  committed summary per run rather than raw JSON.
+- **No performance record.** The 2^N nested-f-string blowup was found by a
+  benchmark, not by this programme, but a real-world run is exactly where a
+  pathological file would surface. Wall time and peak memory per project are
+  worth capturing; a run that suddenly takes minutes is a finding.
+- **True positives in third-party code are not acted on.** If safelint finds a
+  genuine defect in a cloned project, this programme records it as evidence the
+  rule works and stops there. Reporting upstream is out of scope - worth
+  restating if that ever changes.
 
 ## Findings register
 
