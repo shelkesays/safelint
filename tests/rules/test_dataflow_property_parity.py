@@ -88,10 +88,15 @@ _ASSIGNMENT_SINKS = [
 
 
 def _assignment_fires(ext: str, suffix: str, src: str, tmp_path: Path) -> bool:
-    """Return True if SAFE801 fires for *src* with ``danger`` configured as a sink."""
+    """Return True if SAFE801 fires for *src* with ``danger`` an assignment sink.
+
+    Declared via ``assignment_sinks*``, NOT the flat ``sinks*`` list: outside
+    JavaScript those hold function names, so treating them as write-sinks
+    reported every field named ``query`` / ``args`` / ``load`` as an injection.
+    """
     sample = tmp_path / f"assign.{ext}"
     sample.write_text(src, encoding="utf-8")
-    rule_cfg = {"enabled": True, f"sinks{suffix}": ["danger"], f"sanitizers{suffix}": ["escape"]}
+    rule_cfg = {"enabled": True, f"assignment_sinks{suffix}": ["danger"], f"sanitizers{suffix}": ["escape"]}
     engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": rule_cfg}}))
     return any(v.code == "SAFE801" for v in engine.check_file(str(sample)).violations)
 
@@ -111,3 +116,24 @@ def test_assignment_side_sinks_in_every_language(ext: str, suffix: str, tainted:
     assert _assignment_fires(ext, suffix, tainted, tmp_path), f"{ext}: tainted write to a sink did not fire"
     assert not _assignment_fires(ext, suffix, non_sink, tmp_path), f"{ext}: write to a non-sink property fired"
     assert not _assignment_fires(ext, suffix, sanitised, tmp_path), f"{ext}: sanitised write was not cleared"
+
+
+@pytest.mark.parametrize(
+    ["ext", "suffix", "tainted", "non_sink", "sanitised"],
+    _ASSIGNMENT_SINKS,
+    ids=[case[0] for case in _ASSIGNMENT_SINKS],
+)
+def test_call_sink_list_does_not_make_field_writes_fire(ext: str, suffix: str, tainted: str, non_sink: str, sanitised: str, tmp_path: Path) -> None:
+    """A name in the CALL sink list is not treated as a write-sink.
+
+    Outside JavaScript the `sinks_*` lists hold function names, so reusing them
+    for assignment targets reported ordinary field writes - `c.args = u` in
+    Rust, `p.Query = q` in Go, `$this->query = ...` in PHP - as injections with
+    the shipped defaults. A write-sink must be declared in `assignment_sinks_*`.
+    """
+    del non_sink, sanitised
+    sample = tmp_path / f"call_only.{ext}"
+    sample.write_text(tainted, encoding="utf-8")
+    rule_cfg = {"enabled": True, f"sinks{suffix}": ["danger"]}
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": rule_cfg}}))
+    assert not [v for v in engine.check_file(str(sample)).violations if v.code == "SAFE801"], f"{ext}: a call-sink name fired on a field write"

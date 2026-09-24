@@ -934,7 +934,6 @@ DEFAULTS: dict[str, Any] = {
                 "execFileSync",
                 "setTimeout",  # only with string arg, but rule can't tell at this level
                 "setInterval",  # same
-                "innerHTML",  # via ``el.innerHTML = tainted`` - assignment-side, not call; documented limitation
             ],
             "sanitizers_javascript": [
                 "escape",
@@ -1046,6 +1045,15 @@ DEFAULTS: dict[str, Any] = {
             # add ``receiver_sinks_<lang>`` (bare ``receiver_sinks`` for Python)
             # for a project's own receiver-payload sinks. Must also appear in the
             # matching ``sinks_<lang>`` list to be a sink at all.
+            # Sinks that are WRITTEN TO rather than called. Deliberately a
+            # separate list from ``sinks_*``: those are function names, so
+            # reusing them would report every field write called ``query`` /
+            # ``args`` / ``load`` as an injection. Only JavaScript ships one -
+            # ``el.innerHTML = tainted`` is the canonical DOM-XSS shape.
+            # TypeScript inherits it through the usual _javascript fallback.
+            "assignment_sinks_javascript": [
+                "innerHTML",
+            ],
             "receiver_sinks_java": [
                 "openConnection",  # URL.openConnection([proxy]) - SSRF, receiver URL is the payload
                 "openStream",  # URL.openStream() - SSRF

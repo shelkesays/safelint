@@ -14,6 +14,7 @@ from tempfile import TemporaryDirectory
 import textwrap
 from typing import TYPE_CHECKING
 
+from safelint.analysis._taint_contract import SinkKinds
 from safelint.analysis.dataflow_java import JavaTaintTracker
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
@@ -393,7 +394,7 @@ def test_receiver_payload_sink_fires_with_auxiliary_argument() -> None:
         sinks=frozenset({"openConnection"}),
         sanitizers=frozenset(),
         sources=frozenset(),
-        receiver_sinks=frozenset({"openConnection"}),
+        sink_kinds=SinkKinds(receiver=frozenset({"openConnection"})),
     )
     tracker.visit(_find_method(tree, "m"))
     assert len(tracker.sink_hits) == 1
@@ -422,7 +423,7 @@ def test_receiver_payload_sink_with_tainted_receiver_and_argument_reports_once()
         sinks=frozenset({"openConnection"}),
         sanitizers=frozenset(),
         sources=frozenset(),
-        receiver_sinks=frozenset({"openConnection"}),
+        sink_kinds=SinkKinds(receiver=frozenset({"openConnection"})),
     )
     tracker.visit(_find_method(tree, "m"))
     assert len(tracker.sink_hits) == 1

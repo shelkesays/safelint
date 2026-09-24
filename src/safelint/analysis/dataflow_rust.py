@@ -34,7 +34,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract, assignment_sink_name, combine_status, identifier_tainted, set_status, value_status
+from safelint.analysis._taint_contract import PropertyContract, SinkKinds, assignment_sink_name, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import rust as _rust
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -80,7 +80,7 @@ _CONTAINER_TYPES = frozenset(
 
 #: Assignment-target node types whose property name can name a sink, mapped to
 #: the field holding that name.
-_ASSIGNMENT_SINK_FIELDS: dict[str, str] = {_rust.FIELD_EXPRESSION: "field"}
+_ASSIGNMENT_SINK_FIELDS: dict[str, tuple[str, bool]] = {_rust.FIELD_EXPRESSION: ("field", False)}
 
 
 class RustTaintTracker:
@@ -101,7 +101,7 @@ class RustTaintTracker:
         sources: frozenset[str],
         *,
         assume_taint_preserving: bool = True,
-        receiver_sinks: frozenset[str] = frozenset(),
+        sink_kinds: SinkKinds | None = None,
         property_contract: PropertyContract | None = None,
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config."""
@@ -112,7 +112,7 @@ class RustTaintTracker:
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
-        self.receiver_sinks = receiver_sinks
+        self.sink_kinds = sink_kinds if sink_kinds is not None else SinkKinds()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -258,7 +258,7 @@ class RustTaintTracker:
         function = node.child_by_field_name("function")
         if function is not None and function.type == _rust.FIELD_EXPRESSION:
             receiver = function.child_by_field_name("value")
-            if receiver is not None and self._is_tainted(receiver, required) and (name in self.receiver_sinks or not call_has_arguments(node)):
+            if receiver is not None and self._is_tainted(receiver, required) and (name in self.sink_kinds.receiver or not call_has_arguments(node)):
                 self._record_sink_hit(node, receiver, name)
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str, required: str | None) -> bool:
@@ -287,7 +287,7 @@ class RustTaintTracker:
             return
         for target in self._sink_assignment_targets(left):
             sink = assignment_sink_name(target, _ASSIGNMENT_SINK_FIELDS)
-            if sink is not None and sink in self.sinks and self._is_tainted(right, self.contract.required_for(sink)):
+            if sink is not None and sink in self.sink_kinds.assignment and self._is_tainted(right, self.contract.required_for(sink)):
                 self._record_sink_hit(node, right, sink)
 
     @staticmethod

@@ -76,27 +76,60 @@ def set_status(tainted: dict[str, frozenset[str]], name: str, status: frozenset[
         tainted[name] = status
 
 
-def assignment_sink_name(target: tree_sitter.Node, member_fields: Mapping[str, str]) -> str | None:
+def assignment_sink_name(target: tree_sitter.Node, member_fields: Mapping[str, tuple[str, bool]]) -> str | None:
     """Return the property name an assignment WRITES to, or None.
 
     Some sinks are assigned to rather than called - ``element.innerHTML =
     tainted`` is the canonical one - and writing the property *is* the
     injection, so the target has to be matched against the sink list just as a
-    callee is. *member_fields* maps each target node type to the field holding
-    its property name (``field_access`` -> ``field``), which is the only part
-    that differs between languages.
+    callee is. *member_fields* maps each target node type to ``(field, keyed)``:
+    the field holding the name, and whether that field is a SUBSCRIPT KEY
+    rather than a written-out property.
 
-    A quoted index is unwrapped so the subscript spelling (``o["danger"]``)
-    resolves to the same configurable name as ``o.danger``.
+    The distinction matters. ``o.danger`` names the property ``danger``, but
+    ``o[key]`` names whatever ``key`` holds at runtime - its *spelling* is not
+    the property. Matching a computed key against the sink list turns every
+    local variable called ``run`` / ``load`` / ``query`` into a false positive,
+    so a keyed field is accepted only when it is a quoted literal, which does
+    name the property (``o["danger"]`` is ``o.danger``).
     """
-    field = member_fields.get(target.type)
-    if field is None:
+    entry = member_fields.get(target.type)
+    if entry is None:
         return None
+    field, keyed = entry
     name_node = target.child_by_field_name(field)
     if name_node is None:
         return None
     text = node_text(name_node)
-    return text.strip("\"'`") if text[:1] in "\"'`" else text
+    if text.startswith(('"', "'", "`")):
+        return text.strip("\"'`") or None
+    return None if keyed else (text or None)
+
+
+@dataclass(frozen=True)
+class SinkKinds:
+    """How a sink receives its attacker-controlled payload.
+
+    Most sinks take it as an **argument** (``exec(tainted)``) and need no entry
+    here. Two shapes do not:
+
+    * ``receiver`` - the payload is the receiver itself, so the call fires
+      regardless of its arguments (``url.openConnection(proxy)`` is SSRF even
+      when ``proxy`` is clean).
+    * ``assignment`` - the sink is *written to* rather than called, so the
+      injection is the write (``element.innerHTML = tainted``).
+
+    ``assignment`` is deliberately its own list rather than being read from the
+    flat ``sinks`` list: outside JavaScript those are FUNCTION names, so reusing
+    them would report every field write called ``query`` / ``args`` / ``load``
+    as an injection. A name must be declared here to be treated as a write-sink.
+
+    Bundled into one value object so each tracker constructor stays within the
+    project's ``max_arguments`` limit, exactly as :class:`PropertyContract` is.
+    """
+
+    receiver: frozenset[str] = frozenset()
+    assignment: frozenset[str] = frozenset()
 
 
 @dataclass(frozen=True)
