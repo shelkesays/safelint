@@ -5647,6 +5647,7 @@
 <li><strong>Attribute / member access</strong> - <code>request.data</code>, <code>req.body</code>, <code>$request-&gt;input</code> stays tainted (the receiver's taint dominates; the attribute name itself is a lookup, not data).</li>
 <li><strong>Subscript / index</strong> - <code>request.GET["q"]</code>, <code>req.query['q']</code>, <code>argv[1]</code> stays tainted (the base carries the taint, not the index).</li>
 <li><strong>Method call on a tainted receiver</strong> - <code>request.GET.get("q")</code>, <code>input.trim()</code>, <code>req-&gt;param("q")</code> stays tainted even with no tainted positional arguments. This receiver step is part of the conservative <code>assume_taint_preserving = true</code> posture (see below), so it is off when that flag is <code>false</code>. The sanitizer check runs first, so <code>escape(request.data)</code> still clears.</li>
+<li><strong>Assignment to a sink-named property</strong> - <code>element.innerHTML = tainted</code> is reported, as are the <code>element["innerHTML"] = tainted</code> subscript spelling and <code>element.innerHTML += tainted</code>. Writing the property <em>is</em> the injection, so the target is matched with the same sanitizer and property-typed semantics as a call. Write-sinks live in their own <strong><code>assignment_sinks</code></strong> list (<code>assignment_sinks_&lt;lang&gt;</code>, bare for Python), NOT the flat <code>sinks</code> list: outside JavaScript those hold function names, so reusing them would report every field called <code>query</code> / <code>args</code> / <code>load</code> as an injection. Only <code>innerHTML</code> ships as a default (JavaScript, inherited by TypeScript); add <code>outerHTML</code> / <code>srcdoc</code> or a project-specific setter yourself. Supported in all nine languages on their native member shapes. A <strong>computed</strong> subscript key (<code>results[key] = tainted</code>) is not matched - its spelling names no property - while a quoted one (<code>o["danger"]</code>) is. <em>Added in 2.14.0.</em></li>
 </ul>
 <p>So under a framework preset (which adds request-injection sinks like Django <code>RawSQL</code> / <code>mark_safe</code>, Flask <code>render_template_string</code>, Laravel <code>whereRaw</code>), an idiomatic <code>RawSQL(request.GET["q"])</code> is detected, not just the rare direct-parameter <code>RawSQL(request)</code>.</p>
 <table>
@@ -5693,6 +5694,21 @@
 <td>Java: <code>openConnection</code>, <code>openStream</code></td>
 <td>Sinks whose payload is the <em>receiver</em>, not an argument (see below). <em>Added in 2.12.1.</em></td>
 </tr>
+<tr>
+<td><code>assignment_sinks</code></td>
+<td>JavaScript: <code>innerHTML</code></td>
+<td>Sinks that are <strong>written to</strong> rather than called (<code>el.innerHTML = tainted</code>). Separate from <code>sinks</code> because those are function names. <em>Added in 2.14.0.</em></td>
+</tr>
+<tr>
+<td><code>sanitizer_properties</code></td>
+<td><code>{}</code></td>
+<td>Table of sanitiser name -&gt; the safety properties it establishes (e.g. <code>escape = ["html_escaped"]</code>). Opt-in; see <a href="#property-typed-sanitisers-sanitizer_properties-sink_properties">Property-typed sanitisers</a>. <em>Added in 2.13.0.</em></td>
+</tr>
+<tr>
+<td><code>sink_properties</code></td>
+<td><code>{}</code></td>
+<td>Table of sink name -&gt; the single safety property it requires (e.g. <code>RawSQL = "sql_escaped"</code>). Opt-in; see <a href="#property-typed-sanitisers-sanitizer_properties-sink_properties">Property-typed sanitisers</a>. <em>Added in 2.13.0.</em></td>
+</tr>
 </tbody>
 </table>
 <p><strong>Receiver vs argument payload.</strong> When a sink is called as a method on a <strong>tainted receiver</strong> (<code>x.execute(...)</code>), whether that is an injection depends on where the payload is. For most sinks the payload is an <strong>argument</strong> (<code>conn.execute(sql)</code>), so a tainted receiver passed only constant arguments - <code>conn.execute("SELECT 1")</code> where <code>conn</code> merely derives from user input - is <strong>not</strong> flagged (the receiver conveys no user data into the sink). A tainted receiver on such a sink is reported only when the call has <strong>no arguments</strong> (<code>tainted.execute()</code>). Some sinks, though, carry their payload in the <strong>receiver</strong> itself - <code>url.openConnection(proxy)</code> is SSRF even when <code>proxy</code> is clean. List those in <code>receiver_sinks</code> (per-language <code>receiver_sinks_&lt;lang&gt;</code>, bare <code>receiver_sinks</code> for Python) and they fire on a tainted receiver <strong>regardless of arguments</strong>. A <code>receiver_sinks</code> entry must also appear in the matching <code>sinks</code> list. Defaults ship Java's URL SSRF methods (<code>openConnection</code>, <code>openStream</code>).</p>
@@ -5722,6 +5738,7 @@
 <li>A property-typed sanitiser clears a sink only when it establishes that sink's required property. It is path-sensitive: the clear survives an intermediate variable (<code>safe = escape(x); html_render(safe)</code> is clean, while <code>run_sql(safe)</code> still fires).</li>
 <li>Only the flat <code>sanitizers</code> list clears a sink with <strong>no</strong> declared property; a property-typed sanitiser never does (establishing <code>html_escaped</code> does not make a value safe for <code>eval</code>).</li>
 </ul>
+<p>A property-typed sanitiser's clear does <strong>not</strong> survive an intervening unknown call, including a benign-looking wrapper: <code>html_sink(str(escape(u)))</code> and <code>html_sink(escape(u).strip())</code> both report, because an unknown call may equally well decode its input. The flat <code>sanitizers</code> list does not behave this way - it short-circuits before descending - so the precise form is deliberately the stricter one. Wrap-then-sanitise (<code>escape(str(u))</code>) avoids it.</p>
 <p>The mechanism is <strong>opt-in and backward compatible</strong>: both tables ship empty, and the flat <code>sanitizers</code> list stays universal (clears every sink, as before), so no existing config changes meaning. Move a sanitiser into <code>sanitizer_properties</code> only when you want the tighter, context-specific behaviour. Both keys are per-language (bare for Python, <code>_&lt;lang&gt;</code> suffix otherwise).</p>
 <p>Pydantic's validating entry points (<code>model_validate</code>, <code>model_validate_json</code>, <code>parse_obj_as</code>) are a natural <code>schema_validated</code> provider. They are <strong>not</strong> a shipped default (the contract ships empty, so it adds no cost until you opt in); add them yourself when you declare a <code>schema_validated</code>-requiring sink. They must NOT go in the flat <code>sanitizers</code> list - a schema-validated string is still injectable into a SQL / shell / template sink.</p>
 <p>Note the example sets <code>sanitizers = []</code> so the escapers are governed only by their declared properties; leaving <code>escape</code> in the flat <code>sanitizers</code> list would clear every sink universally (the default behaviour).</p>

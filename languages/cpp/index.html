@@ -981,6 +981,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#safe801-taint-sinks-sources-sanitizers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE801 taint sinks / sources / sanitizers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#c-shapes-worth-knowing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2396,6 +2424,34 @@
 </li>
       
         <li class="md-nav__item">
+  <a href="#configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Configuration">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#safe801-taint-sinks-sources-sanitizers" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        SAFE801 taint sinks / sources / sanitizers
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#c-shapes-worth-knowing" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2470,15 +2526,44 @@
 <li><strong>SAFE310</strong> additionally flags C++ <code>new</code> / <code>delete</code> expressions as dynamic allocation (alongside the configured <code>malloc</code>-family calls).</li>
 <li><strong>SAFE313</strong> naturally exempts smart pointers: <code>std::unique_ptr&lt;T&gt;</code> is a class template, not a <code>pointer_declarator</code>, so it never trips the raw multi-level-pointer check.</li>
 </ul>
-<p>Each reads a <code>_cpp</code>-suffixed config list (<code>nonlocal_jump_calls_cpp</code>, <code>allocation_calls_cpp</code>, ...) so a project can diverge its C and C++ knobs.</p>
+<p>Two of them take <code>_cpp</code>-suffixed config lists so a project can diverge its C and C++ knobs: SAFE106 (<code>nonlocal_jump_calls_cpp</code>) and SAFE310 (<code>allocation_calls_cpp</code>). SAFE311, SAFE312 and SAFE313 have no configurable name list - they match on syntax alone. The try/catch rules below (SAFE201-SAFE203) share the cross-language error-handling options rather than taking <code>_cpp</code> keys.</p>
 <h3 id="error-handling-try-catch-throw">Error handling (<code>try</code> / <code>catch</code> / <code>throw</code>)<a class="headerlink" href="#error-handling-try-catch-throw" title="Permanent link">#</a></h3>
 <p>C++ is the first non-Python home for <strong>SAFE201 <code>bare_except</code></strong>: it flags the <code>catch (...)</code> catch-all, which swallows every exception with no binding to inspect or re-raise - the same hazard as Python's bare <code>except:</code>. A typed <code>catch (const E&amp; e)</code> is clean. <strong>SAFE202</strong> fires on empty / comment-only / literal-only catch bodies; <strong>SAFE203</strong> requires a swallowing catch to log. A <code>std::cerr &lt;&lt; ...</code> stream insertion counts as logging (it is a <code>&lt;&lt;</code> operator, not a call, so it is recognised specially), as does an <code>spdlog::error(...)</code>-style call; a bare <code>throw;</code> or <code>throw e;</code> counts as a re-raise.</p>
+<h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>
+<p>Every C++ rule reads <code>_cpp</code>-suffixed config keys, independent of the C ones. The dataflow rule is the one with the widest surface:</p>
+<h3 id="safe801-taint-sinks-sources-sanitizers">SAFE801 taint sinks / sources / sanitizers<a class="headerlink" href="#safe801-taint-sinks-sources-sanitizers" title="Permanent link">#</a></h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a><span class="c1"># pyproject.toml</span>
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a><span class="k">[tool.safelint.rules.tainted_sink]</span>
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a><span class="n">sinks_cpp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;system&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;popen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execl&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sprintf&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strcpy&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strcat&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;memcpy&quot;</span><span class="p">]</span>
+<a id="__codelineno-1-5" name="__codelineno-1-5" href="#__codelineno-1-5"></a><span class="n">sources_cpp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;getenv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fgets&quot;</span><span class="p">]</span>
+<a id="__codelineno-1-6" name="__codelineno-1-6" href="#__codelineno-1-6"></a><span class="n">sanitizers_cpp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sanitize&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;validate&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escape&quot;</span><span class="p">]</span>
+</code></pre></div>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a><span class="k">[rules.tainted_sink]</span>
+<a id="__codelineno-2-3" name="__codelineno-2-3" href="#__codelineno-2-3"></a><span class="n">enabled</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="kc">true</span>
+<a id="__codelineno-2-4" name="__codelineno-2-4" href="#__codelineno-2-4"></a><span class="n">sinks_cpp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;system&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;popen&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execl&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;execv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;sprintf&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strcpy&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;strcat&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;memcpy&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-5" name="__codelineno-2-5" href="#__codelineno-2-5"></a><span class="n">sources_cpp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;getenv&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;fgets&quot;</span><span class="p">]</span>
+<a id="__codelineno-2-6" name="__codelineno-2-6" href="#__codelineno-2-6"></a><span class="n">sanitizers_cpp</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;sanitize&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;validate&quot;</span><span class="p">,</span><span class="w"> </span><span class="s2">&quot;escape&quot;</span><span class="p">]</span>
+</code></pre></div>
+<p>C++ reuses the C taint tracker's node handling and adds a <strong>method-receiver step</strong> that plain C does not have, so <code>req-&gt;param("q")</code> stays tainted into a sink.</p>
+<p><code>sanitizers_cpp</code> is <strong>universal</strong>: a name there clears <em>every</em> sink. To recognise a context-specific escaper precisely, declare it with the opt-in <a href="../../configuration/rules/#property-typed-sanitisers-sanitizer_properties-sink_properties">property-typed sanitiser contract</a> instead (2.13.0):</p>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># safelint.toml</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a><span class="k">[rules.tainted_sink.sanitizer_properties_cpp]</span>
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a><span class="n">shell_quote</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="p">[</span><span class="s2">&quot;shell_quoted&quot;</span><span class="p">]</span>
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>
+<a id="__codelineno-3-5" name="__codelineno-3-5" href="#__codelineno-3-5"></a><span class="k">[rules.tainted_sink.sink_properties_cpp]</span>
+<a id="__codelineno-3-6" name="__codelineno-3-6" href="#__codelineno-3-6"></a><span class="n">system</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;shell_quoted&quot;</span>
+</code></pre></div>
+<p>A property-typed sanitiser clears <strong>only</strong> the sinks that declare a property it establishes, so <code>shell_quote</code> no longer silently vouches for <code>sprintf</code>. Keep such a name out of the flat <code>sanitizers_cpp</code> list, which is checked first and would otherwise clear everything regardless.</p>
 <h2 id="c-shapes-worth-knowing">C++ shapes worth knowing<a class="headerlink" href="#c-shapes-worth-knowing" title="Permanent link">#</a></h2>
 <ul>
 <li><code>function_definition</code> covers both free functions AND methods; <code>lambda_expression</code> is a separate function node. A method name is a <code>field_identifier</code> (in-class) or a <code>qualified_identifier</code> (<code>S::m</code>, out-of-line); a free function's name nests under <code>declarator.declarator</code> as in C.</li>
 <li>SAFE105 detects a <code>this-&gt;m()</code> self-call in addition to a bare recursive call.</li>
 <li>SAFE302 descends into <code>namespace_definition</code> bodies, so a namespace-scoped mutable global fires, not just a translation-unit-scope one.</li>
 <li>The named casts (<code>reinterpret_cast&lt;T&gt;(x)</code>) are <strong>not</strong> dedicated cast nodes: they parse as a <code>call_expression</code> whose <code>function</code> is a <code>template_function</code>. SAFE316 detects them by that template callee name.</li>
+<li>An <strong>explicitly instantiated template call</strong> carries its <code>&lt;...&gt;</code> in the callee node: <code>execute&lt;int&gt;(x)</code> is a <code>template_function</code> and <code>db.query&lt;Row&gt;(x)</code> a <code>template_method</code>. Both are unwrapped to the bare name, so a sink configured as <code>execute</code> / <code>query</code> matches either form. (Before 2.14.0 they resolved to nothing and to the literal <code>query&lt;Row&gt;</code>, so templated calls escaped every name-filtered rule.)</li>
+<li>A reference declaration (<code>const std::string&amp; r = x;</code>) is a <code>reference_declarator</code>, which - unlike <code>pointer_declarator</code> - has no <code>declarator</code> field; its name is a plain child. Taint binds through it, so <code>r</code> carries <code>x</code>'s taint.</li>
 </ul>
 <h2 id="deliberately-not-registered-for-c">Deliberately not registered for C++<a class="headerlink" href="#deliberately-not-registered-for-c" title="Permanent link">#</a></h2>
 <table>

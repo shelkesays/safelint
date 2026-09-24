@@ -2401,7 +2401,7 @@
 <h1 id="security-policy">Security policy<a class="headerlink" href="#security-policy" title="Permanent link">#</a></h1>
 <p>SafeLint is a static-analysis CLI that parses source code via Tree-sitter and walks the resulting trees. It does not execute the code it lints, make network requests, or open sockets. The threat surface is therefore narrow but not zero - see the <a href="#in-scope">in-scope</a> section below for what counts as a vulnerability.</p>
 <h2 id="supported-versions">Supported versions<a class="headerlink" href="#supported-versions" title="Permanent link">#</a></h2>
-<p>Security fixes ship to the supported lines below. Lines marked ❌ receive no security backports; the recommended action is to upgrade. C++ (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>) is the most recent language addition (2.8.x); the current 2.13.x line adds property-typed sanitisers to SAFE801 <code>tainted_sink</code> (<code>sanitizer_properties</code> / <code>sink_properties</code>, path-sensitive, opt-in), building on the 2.12.x precision work (SAFE601 <code>assertion_calls</code> + <code>test_functions_only</code>, SAFE907 <code>request_validators</code>, SAFE801 <code>receiver_sinks</code>) and the 2.11.x framework presets (SAFE908/909) and cross-language taint-projection parity.</p>
+<p>Security fixes ship to the supported lines below. Lines marked ❌ receive no security backports; the recommended action is to upgrade. C++ (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>) is the most recent language addition (2.8.x); the current 2.14.x line makes SAFE801 <code>tainted_sink</code> report <strong>assignment-side sinks</strong> in every supported language (<code>element.innerHTML = tainted</code>, the canonical DOM-XSS shape, which the shipped <code>innerHTML</code> default previously never matched, plus the equivalent member-write in Python, Java, Rust, Go, PHP, C and C++), building on the 2.13.x property-typed sanitisers (<code>sanitizer_properties</code> / <code>sink_properties</code>, path-sensitive, opt-in), the 2.12.x precision work (SAFE601 <code>assertion_calls</code> + <code>test_functions_only</code>, SAFE907 <code>request_validators</code>, SAFE801 <code>receiver_sinks</code>) and the 2.11.x framework presets (SAFE908/909) and cross-language taint-projection parity.</p>
 <table>
 <thead>
 <tr>
@@ -2411,7 +2411,11 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>2.13.x</strong> (current; SAFE801 property-typed sanitisers)</td>
+<td><strong>2.14.x</strong> (current; SAFE801 assignment-side sinks, all nine languages)</td>
+<td>✅ Security fixes</td>
+</tr>
+<tr>
+<td><strong>2.13.x</strong> (SAFE801 property-typed sanitisers)</td>
 <td>✅ Security fixes</td>
 </tr>
 <tr>
