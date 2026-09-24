@@ -2090,7 +2090,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2140-2026-09-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.14.0 - 2026-09-24
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.14.0 - 2026-09-24">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4196,7 +4207,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2140-2026-09-24" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.14.0 - 2026-09-24
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.14.0 - 2026-09-24">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6196,7 +6218,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.13.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.14.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="2140-2026-09-24"><a href="https://github.com/shelkesays/safelint/compare/v2.13.0...v2.14.0">2.14.0</a> - 2026-09-24<a class="headerlink" href="#2140-2026-09-24" title="Permanent link">#</a></h2>
 <h3 id="fixed">Fixed<a class="headerlink" href="#fixed" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>SAFE801: assignment-side sinks now cover parenthesised, chained and destructured targets.</strong> <code>(el.innerHTML) = tainted</code> (a target JavaScript permits), <code>el.innerHTML = x = tainted</code> (the chain writes the terminal value, not the inner assignment) and <code>[el.innerHTML, y] = [tainted, 1]</code> were all missed. Destructured targets pair positionally, so <code>[y, el.innerHTML] = [tainted, 1]</code> stays clean. The same applies to Python's <code>(o.sink) = t</code>, <code>o.sink = x = t</code> and <code>o.sink, other = t, 0</code>. The traversal is now shared across every tracker rather than copied into each, so a fix lands once.</li>
