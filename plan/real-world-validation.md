@@ -110,8 +110,27 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | javascript / `node` | Express | `expressjs/express` | todo |
 | javascript / `browser` | Chart.js | `chartjs/Chart.js` | todo |
 | javascript / `deno` | Deno std | `denoland/std` | todo |
-| javascript / `bun` | - | needs a candidate | todo |
-| javascript / `cloudflare-workers` | workers-sdk | `cloudflare/workers-sdk` | todo |
+| javascript / `bun` | Elysia | `elysiajs/elysia` | todo |
+| javascript / `cloudflare-workers` | Workers templates | `cloudflare/templates` | todo |
+
+Notes on the runtime rows:
+
+* **Elysia** over Hono, Brisa and the rest for `bun`. It is Bun-first by design
+  (`Bun.serve`, `Bun.file`), which is what the preset is about. Hono is
+  deliberately runtime-agnostic Web Standards code and would barely exercise
+  the preset at all - it is the wrong test even though it is the bigger project.
+* **`cloudflare/templates`** replaces the earlier `cloudflare/workers-sdk`
+  choice. workers-sdk is Wrangler: CLI tooling *about* Workers, written as Node
+  code, in a 160MB monorepo. It would have validated the `node` preset while
+  claiming to validate `cloudflare-workers`. The templates repo is actual
+  worker code - `fetch` handlers, `env` bindings - which is what the preset
+  models.
+* **Every runtime row except `node` and `browser` will be TypeScript**, because
+  the Deno, Bun and Workers ecosystems are TS-dominant. That is fine (the
+  runtime preset is set under `[javascript] runtime`, and TS inherits the
+  `_javascript` config keys), but it means those rows exercise the TS grammar
+  path, not the JS one. The `node` and `browser` rows carry the plain-JavaScript
+  coverage.
 
 Already run against private codebases in the first pass. These are not
 reproducible by anyone else, so they do not count toward the bar, but their
