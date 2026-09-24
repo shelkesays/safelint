@@ -70,3 +70,44 @@ def test_unknown_call_drops_property_in_every_language(ext: str, suffix: str, de
     """An unknown call defeats a property clear; the direct clear still works."""
     assert _fires(ext, suffix, decoded, tmp_path), f"{ext}: unknown call preserved the cleared property"
     assert not _fires(ext, suffix, direct, tmp_path), f"{ext}: direct property clear did not clear the sink"
+
+
+#: ``(extension, config suffix, tainted write, non-sink write, sanitised write)``.
+#: Property-assignment sinks per language; the JS row is covered in depth by
+#: ``tests/rules/test_dataflow_javascript.py``.
+_ASSIGNMENT_SINKS = [
+    ("py", "", "def f(u):\n    o.danger = u\n", "def f(u):\n    o.safe = u\n", "def f(u):\n    o.danger = escape(u)\n"),
+    ("js", "_javascript", "function f(u){ o.danger = u; }\n", "function f(u){ o.safe = u; }\n", "function f(u){ o.danger = escape(u); }\n"),
+    ("java", "_java", "class A { void f(String u){ o.danger = u; } }\n", "class A { void f(String u){ o.safe = u; } }\n", "class A { void f(String u){ o.danger = escape(u); } }\n"),
+    ("rs", "_rust", "fn f(u: &str) { o.danger = u; }\n", "fn f(u: &str) { o.safe = u; }\n", "fn f(u: &str) { o.danger = escape(u); }\n"),
+    ("go", "_go", "package m\nfunc f(u string) { o.danger = u }\n", "package m\nfunc f(u string) { o.safe = u }\n", "package m\nfunc f(u string) { o.danger = escape(u) }\n"),
+    ("php", "_php", "<?php function f($u){ $o->danger = $u; }\n", "<?php function f($u){ $o->safe = $u; }\n", "<?php function f($u){ $o->danger = escape($u); }\n"),
+    ("c", "_c", "void f(char* u){ o.danger = u; }\n", "void f(char* u){ o.safe = u; }\n", "void f(char* u){ o.danger = escape(u); }\n"),
+    ("cpp", "_cpp", "void f(char* u){ o.danger = u; }\n", "void f(char* u){ o.safe = u; }\n", "void f(char* u){ o.danger = escape(u); }\n"),
+]
+
+
+def _assignment_fires(ext: str, suffix: str, src: str, tmp_path: Path) -> bool:
+    """Return True if SAFE801 fires for *src* with ``danger`` configured as a sink."""
+    sample = tmp_path / f"assign.{ext}"
+    sample.write_text(src, encoding="utf-8")
+    rule_cfg = {"enabled": True, f"sinks{suffix}": ["danger"], f"sanitizers{suffix}": ["escape"]}
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": rule_cfg}}))
+    return any(v.code == "SAFE801" for v in engine.check_file(str(sample)).violations)
+
+
+@pytest.mark.parametrize(
+    ["ext", "suffix", "tainted", "non_sink", "sanitised"],
+    _ASSIGNMENT_SINKS,
+    ids=[case[0] for case in _ASSIGNMENT_SINKS],
+)
+def test_assignment_side_sinks_in_every_language(ext: str, suffix: str, tainted: str, non_sink: str, sanitised: str, tmp_path: Path) -> None:
+    """Writing a tainted value to a sink-named property fires, in every language.
+
+    `innerHTML` shipped as a JavaScript default for years without ever firing on
+    the assignment that actually causes the injection. The capability is now
+    uniform, so pin all three halves per language: the write fires, a write to a
+    non-sink property does not, and a sanitised write clears."""
+    assert _assignment_fires(ext, suffix, tainted, tmp_path), f"{ext}: tainted write to a sink did not fire"
+    assert not _assignment_fires(ext, suffix, non_sink, tmp_path), f"{ext}: write to a non-sink property fired"
+    assert not _assignment_fires(ext, suffix, sanitised, tmp_path), f"{ext}: sanitised write was not cleared"

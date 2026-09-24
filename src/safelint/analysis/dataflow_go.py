@@ -35,7 +35,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract, combine_status, identifier_tainted, set_status, value_status
+from safelint.analysis._taint_contract import PropertyContract, assignment_sink_name, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import go as _go
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -72,6 +72,11 @@ def _is_compound_assignment(node: tree_sitter.Node) -> bool:
     """
     operator = next((c for c in node.children if not c.is_named), None)
     return operator is not None and node_text(operator) != "="
+
+
+#: Assignment-target node types whose property name can name a sink, mapped to
+#: the field holding that name.
+_ASSIGNMENT_SINK_FIELDS: dict[str, str] = {_go.SELECTOR_EXPRESSION: "field"}
 
 
 class GoTaintTracker:
@@ -120,6 +125,7 @@ class GoTaintTracker:
         """Dispatch *node* to the right per-shape handler."""
         node_type = node.type
         if node_type in (_go.SHORT_VAR_DECLARATION, _go.ASSIGNMENT_STATEMENT):
+            self._check_assignment_sink(node)
             self._visit_assignment(node)
         elif node_type == _go.VAR_SPEC:
             self._visit_var_spec(node)
@@ -203,6 +209,29 @@ class GoTaintTracker:
                 self._record_sink_hit(node, arg, name)
                 fired = True
         return fired
+
+    def _check_assignment_sink(self, node: tree_sitter.Node) -> None:
+        """Record a hit when a tainted value is WRITTEN to a sink-named field.
+
+        Writing the field is the injection, so the assignment target is matched
+        against the same sink list as a callee, honouring the same sanitiser and
+        property-typed contract. Go pairs its sides positionally: ``left`` and
+        ``right`` are both ``expression_list`` nodes, so target *i* takes value
+        *i* (a lone RHS - a multi-value call - applies to every target).
+        """
+        left = node.child_by_field_name("left")
+        right = node.child_by_field_name("right")
+        if left is None or right is None:
+            return
+        targets = list(left.named_children) if left.type == _go.EXPRESSION_LIST else [left]
+        values = list(right.named_children) if right.type == _go.EXPRESSION_LIST else [right]
+        for index, target in enumerate(targets):
+            sink = assignment_sink_name(target, _ASSIGNMENT_SINK_FIELDS)
+            if sink is None or sink not in self.sinks:
+                continue
+            value = values[index] if index < len(values) else values[-1]
+            if self._is_tainted(value, self.contract.required_for(sink)):
+                self._record_sink_hit(node, value, sink)
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
