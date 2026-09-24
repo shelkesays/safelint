@@ -54,8 +54,14 @@ enable a rule and trust what it tells them.
 
 ## Method
 
+0. The harness is `scripts/validate_real_world.py`. One invocation does steps
+   2-6 below for one project and one language, and writes the summary that
+   step 7 is done against. Run it with `--help` for the flags; the module
+   docstring records the reasoning behind each design choice.
 1. Install the published artefact (not the working tree) into an isolated venv,
-   so what is validated is what a user would get.
+   so what is validated is what a user would get:
+   `uv venv v && uv pip install --python v/bin/python 'safelint[all]==X.Y.Z'`,
+   then pass `--safelint v/bin/safelint`.
 2. Generate a config enabling every rule that applies to the language, plus the
    preset for framework rows.
 3. Run with `--config <dir>` pointing at that config. This matters: config is
@@ -169,7 +175,7 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | python / `django` | Django | `django/django` | todo |
 | python / `flask` | Flask | `pallets/flask` | todo |
 | python / `fastapi` + `pydantic = true` | FastAPI | `fastapi/fastapi` | todo |
-| java / `spring-boot` | Spring PetClinic | `spring-projects/spring-petclinic` | run |
+| java / `spring-boot` | Spring PetClinic | `spring-projects/spring-petclinic` | run (`plan/real-world-results/java-spring-petclinic-2.14.0-c7ee170.md`) |
 | php / `laravel` | Laravel framework | `laravel/framework` | todo |
 | php / `laravel` | FreeScout (application, not framework) | `freescout-help-desk/freescout` | run |
 | javascript / `browser` | Chart.js | `chartjs/Chart.js` | todo |
@@ -232,20 +238,19 @@ came from so it can be re-checked against a public one.
 Recorded rather than left implicit, because each is a way the results could
 mislead:
 
-- **The harness is not in the repository.** The first pass used throwaway
-  scripts in `/tmp` to generate the all-rules config, run each project and
-  filter results by extension. They are gone. Until they live in `scripts/`,
-  this document describes a method nobody can re-run identically, and the
-  per-project numbers cannot be regenerated. This is the largest gap and should
-  be closed before the next batch.
-- **Results are not stored.** There is nowhere to put run output, so trends
-  across safelint versions cannot be compared and a regression between releases
-  would be invisible. Needs a decision on format and location, ideally a
-  committed summary per run rather than raw JSON.
-- **No performance record.** The 2^N nested-f-string blowup was found by a
-  benchmark, not by this programme, but a real-world run is exactly where a
-  pathological file would surface. Wall time and peak memory per project are
-  worth capturing; a run that suddenly takes minutes is a finding.
+- ~~The harness is not in the repository.~~ Closed: `scripts/validate_real_world.py`,
+  with a smoke test in `tests/test_validate_real_world.py`. It asks the binary
+  under test for its rule registry, so config generation cannot drift from the
+  version being validated - the `/tmp` scripts imported from whatever was on
+  `sys.path`.
+- ~~Results are not stored.~~ Closed: one markdown summary per run is committed
+  to `plan/real-world-results/` named `<lang>-<project>-<version>-<sha7>.md`;
+  raw JSON sits beside it in `.raw/`, which is ignored. Comparing two summaries
+  for the same project across versions is how a regression between releases
+  becomes visible.
+- ~~No performance record.~~ Closed: every run records wall time and the child
+  process's peak RSS. A run that suddenly takes minutes, or a peak RSS that
+  jumps, is a finding in its own right.
 - **True positives in third-party code are not acted on.** If safelint finds a
   genuine defect in a cloned project, this programme records it as evidence the
   rule works and stops there. Reporting upstream is out of scope - worth

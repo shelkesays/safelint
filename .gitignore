@@ -239,3 +239,6 @@ __marimo__/
 .DS_Store
 **/.DS_Store
 src/safelint/skill_files.zip
+
+# Raw JSON from scripts/validate_real_world.py; the .md summaries beside it are committed
+plan/real-world-results/.raw/
