@@ -170,3 +170,79 @@ def test_cli_renders_mistyped_config_as_one_line_error(tmp_path, monkeypatch, ca
     err = capsys.readouterr().err
     assert err.strip() == "safelint: error: sinks must be a list of strings, got str"
     assert "Traceback" not in err
+
+
+def test_property_audit_runs_without_checking_any_file(tmp_path, capsys) -> None:
+    """The audit happens at construction, so a cache hit cannot skip it.
+
+    The engine returns cached results *before* rules run, so while the audit
+    lived on the per-file path a warm cache silently dropped these warnings -
+    a user re-running to re-read one would find it gone. Constructing the
+    engine and checking nothing must still warn."""
+    rule_cfg = {
+        "enabled": True,
+        "sinks": ["eval"],
+        "sanitizers": [],
+        "sanitizer_properties": {"escape": ["html"]},
+        "sink_properties": {},
+    }
+    SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": rule_cfg}}))
+    assert "no sink requires any of the declared properties" in capsys.readouterr().err
+
+
+def test_php_expression_sinks_are_not_reported_as_unknown(capsys) -> None:
+    """`include` / `require` are valid `sink_properties_php` keys.
+
+    PHP's expression sinks are recognised by node type (`include_expression`),
+    never by a lookup in the flat `sinks_php` list, and
+    `PhpTaintTracker._visit_include` consults their required property directly.
+    Declaring one must not trip the unknown-sink typo guard."""
+    rule_cfg = {
+        "enabled": True,
+        "sinks_php": ["eval"],
+        "sanitizers_php": [],
+        "sanitizer_properties_php": {"realpath": ["path_safe"]},
+        "sink_properties_php": {"include": "path_safe", "require_once": "path_safe"},
+    }
+    SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": rule_cfg}}))
+    assert "safelint: warning:" not in capsys.readouterr().err
+
+
+def test_unknown_sink_typo_still_warns_for_php(capsys) -> None:
+    """The exemption is exact - a misspelt expression sink still warns."""
+    rule_cfg = {
+        "enabled": True,
+        "sinks_php": ["eval"],
+        "sanitizers_php": [],
+        "sanitizer_properties_php": {"realpath": ["path_safe"]},
+        "sink_properties_php": {"inclde": "path_safe"},
+    }
+    SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": rule_cfg}}))
+    assert "no configured sink named inclde" in capsys.readouterr().err
+
+
+def test_typescript_javascript_shared_keys_warn_once(capsys) -> None:
+    """One JS declaration warns once, not once per language that resolves it.
+
+    TypeScript falls back to the `_javascript` keys when it declares none of
+    its own, so auditing per language would emit the identical warning twice."""
+    rule_cfg = {
+        "enabled": True,
+        "sanitizer_properties_javascript": {"encodeURI": ["url_safe"]},
+        "sink_properties_javascript": {"eval": "url_safe"},
+    }
+    SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": rule_cfg}}))
+    assert capsys.readouterr().err.count("safelint: warning:") == 1
+
+
+def test_typescript_own_keys_warn_separately(capsys) -> None:
+    """A TypeScript-specific declaration is its own config and warns on its own."""
+    rule_cfg = {
+        "enabled": True,
+        "sanitizer_properties_javascript": {"encodeURI": ["url_safe"]},
+        "sink_properties_javascript": {"eval": "url_safe"},
+        "sanitizer_properties_typescript": {"encodeURI": ["url_safe"]},
+        "sink_properties_typescript": {"eval": "url_safe"},
+    }
+    SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": rule_cfg}}))
+    assert capsys.readouterr().err.count("safelint: warning:") == 2
