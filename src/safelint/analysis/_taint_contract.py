@@ -12,6 +12,8 @@ from dataclasses import dataclass, field
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
+from safelint.languages._node_utils import node_text
+
 
 if TYPE_CHECKING:
     from collections.abc import Callable, Mapping
@@ -72,6 +74,29 @@ def set_status(tainted: dict[str, frozenset[str]], name: str, status: frozenset[
         tainted.pop(name, None)
     else:
         tainted[name] = status
+
+
+def assignment_sink_name(target: tree_sitter.Node, member_fields: Mapping[str, str]) -> str | None:
+    """Return the property name an assignment WRITES to, or None.
+
+    Some sinks are assigned to rather than called - ``element.innerHTML =
+    tainted`` is the canonical one - and writing the property *is* the
+    injection, so the target has to be matched against the sink list just as a
+    callee is. *member_fields* maps each target node type to the field holding
+    its property name (``field_access`` -> ``field``), which is the only part
+    that differs between languages.
+
+    A quoted index is unwrapped so the subscript spelling (``o["danger"]``)
+    resolves to the same configurable name as ``o.danger``.
+    """
+    field = member_fields.get(target.type)
+    if field is None:
+        return None
+    name_node = target.child_by_field_name(field)
+    if name_node is None:
+        return None
+    text = node_text(name_node)
+    return text.strip("\"'`") if text[:1] in "\"'`" else text
 
 
 @dataclass(frozen=True)

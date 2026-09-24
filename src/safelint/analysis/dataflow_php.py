@@ -38,7 +38,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract, combine_status, identifier_tainted, set_status, value_status
+from safelint.analysis._taint_contract import PropertyContract, assignment_sink_name, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import php as _php
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -82,6 +82,11 @@ _SPREADING_TYPES = frozenset(
 
 # Array literals carry taint when any element is tainted.
 _CONTAINER_TYPES = frozenset({_php.ARRAY_CREATION_EXPRESSION})
+
+
+#: Assignment-target node types whose property name can name a sink, mapped to
+#: the field holding that name.
+_ASSIGNMENT_SINK_FIELDS: dict[str, str] = {_php.MEMBER_ACCESS_EXPRESSION: "name"}
 
 
 class PhpTaintTracker:
@@ -130,6 +135,7 @@ class PhpTaintTracker:
         """Dispatch *node* to the right per-shape handler."""
         node_type = node.type
         if node_type in (_php.ASSIGNMENT_EXPRESSION, _php.AUGMENTED_ASSIGNMENT_EXPRESSION):
+            self._check_assignment_sink(node)
             self._visit_assignment(node)
         elif node_type in _PHP_CALL_TYPES:
             self._visit_call(node)
@@ -210,6 +216,28 @@ class PhpTaintTracker:
             if self._is_tainted(child, required):
                 self._record_sink_hit(node, child, sink)
                 return
+
+    def _check_assignment_sink(self, node: tree_sitter.Node) -> None:
+        """Record a hit when a tainted value is WRITTEN to a sink-named property.
+
+        Writing the property is the injection, so the assignment target is
+        matched against the same sink list as a callee, honouring the same
+        sanitiser and property-typed contract. Non-sink targets are ignored, so
+        ordinary property writes are unaffected.
+        """
+        left = node.child_by_field_name("left")
+        right = node.child_by_field_name("right")
+        if left is None or right is None:
+            return
+        for target in self._sink_assignment_targets(left):
+            sink = assignment_sink_name(target, _ASSIGNMENT_SINK_FIELDS)
+            if sink is not None and sink in self.sinks and self._is_tainted(right, self.contract.required_for(sink)):
+                self._record_sink_hit(node, right, sink)
+
+    @staticmethod
+    def _sink_assignment_targets(left: tree_sitter.Node) -> list[tree_sitter.Node]:
+        """Return the assignment targets to test against the sink list."""
+        return [left]
 
     def _record_sink_hit(self, call_node: tree_sitter.Node, arg_node: tree_sitter.Node, sink: str) -> None:
         """Append a hit record for a tainted argument reaching *sink*."""
