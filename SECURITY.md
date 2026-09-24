@@ -4,11 +4,12 @@ SafeLint is a static-analysis CLI that parses source code via Tree-sitter and wa
 
 ## Supported versions
 
-Security fixes ship to the supported lines below. Lines marked ❌ receive no security backports; the recommended action is to upgrade. C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) is the most recent language addition (2.8.x); the current 2.13.x line adds property-typed sanitisers to SAFE801 `tainted_sink` (`sanitizer_properties` / `sink_properties`, path-sensitive, opt-in), building on the 2.12.x precision work (SAFE601 `assertion_calls` + `test_functions_only`, SAFE907 `request_validators`, SAFE801 `receiver_sinks`) and the 2.11.x framework presets (SAFE908/909) and cross-language taint-projection parity.
+Security fixes ship to the supported lines below. Lines marked ❌ receive no security backports; the recommended action is to upgrade. C++ (`.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`) is the most recent language addition (2.8.x); the current 2.14.x line makes SAFE801 `tainted_sink` report **assignment-side sinks** (`element.innerHTML = tainted`, the canonical DOM-XSS shape, which the shipped `innerHTML` default previously never matched), building on the 2.13.x property-typed sanitisers (`sanitizer_properties` / `sink_properties`, path-sensitive, opt-in), the 2.12.x precision work (SAFE601 `assertion_calls` + `test_functions_only`, SAFE907 `request_validators`, SAFE801 `receiver_sinks`) and the 2.11.x framework presets (SAFE908/909) and cross-language taint-projection parity.
 
 | Version(s) | Status |
 |---|---|
-| **2.13.x** (current; SAFE801 property-typed sanitisers) | ✅ Security fixes |
+| **2.14.x** (current; SAFE801 assignment-side sinks) | ✅ Security fixes |
+| **2.13.x** (SAFE801 property-typed sanitisers) | ✅ Security fixes |
 | **2.2.x - 2.12.x** (Rust in 2.2.x-2.4.x; Go in 2.5.x; PHP in 2.6.x; C in 2.7.x; C++ in 2.8.x; framework presets in 2.9.x; multi-path `check` in 2.10.x; framework-rule fast-follows in 2.11.x; SAFE601/907 precision in 2.12.x) | ✅ Security fixes through ~6 months after the next minor lands |
 | **2.1.x** (Java + Spring Boot) | ❌ Upgrade to a current 2.x line |
 | **2.0.x** (multi-language refactor) | ❌ Upgrade to a current 2.x line |
