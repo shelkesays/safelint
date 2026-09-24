@@ -91,7 +91,7 @@ A property-typed sanitiser clears **only** the sinks that declare a property it 
 - SAFE105 detects a `this->m()` self-call in addition to a bare recursive call.
 - SAFE302 descends into `namespace_definition` bodies, so a namespace-scoped mutable global fires, not just a translation-unit-scope one.
 - The named casts (`reinterpret_cast<T>(x)`) are **not** dedicated cast nodes: they parse as a `call_expression` whose `function` is a `template_function`. SAFE316 detects them by that template callee name.
-- An **explicitly instantiated template call** carries its `<...>` in the callee node: `execute<int>(x)` is a `template_function` and `db.query<Row>(x)` a `template_method`. Both are unwrapped to the bare name, so a sink configured as `execute` / `query` matches either form. (Before 2.13.1 they resolved to nothing and to the literal `query<Row>`, so templated calls escaped every name-filtered rule.)
+- An **explicitly instantiated template call** carries its `<...>` in the callee node: `execute<int>(x)` is a `template_function` and `db.query<Row>(x)` a `template_method`. Both are unwrapped to the bare name, so a sink configured as `execute` / `query` matches either form. (Before 2.14.0 they resolved to nothing and to the literal `query<Row>`, so templated calls escaped every name-filtered rule.)
 - A reference declaration (`const std::string& r = x;`) is a `reference_declarator`, which - unlike `pointer_declarator` - has no `declarator` field; its name is a plain child. Taint binds through it, so `r` carries `x`'s taint.
 
 ## Deliberately not registered for C++

@@ -18,7 +18,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract, assignment_sink_name, combine_status, identifier_tainted, set_status, value_status
+from safelint.analysis._taint_contract import PropertyContract, SinkKinds, assignment_sink_name, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import python as _py
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -56,12 +56,15 @@ _CONTAINER_TYPES = frozenset({_py.LIST, _py.TUPLE, _py.SET, _py.EXPRESSION_LIST}
 _SPLAT_TYPES = frozenset({"list_splat", "dictionary_splat"})
 
 # Destructure shapes recognised on the LHS of an assignment.
+#: RHS shapes whose elements can be paired positionally with an unpack target.
+_PAIRABLE_RHS_TYPES = frozenset({_py.EXPRESSION_LIST, _py.TUPLE, _py.LIST})
+
 _PATTERN_TYPES = frozenset({_py.PATTERN_LIST, _py.TUPLE_PATTERN, _py.LIST_PATTERN, _py.LIST_SPLAT_PATTERN})
 
 
 #: Assignment-target node types whose property name can name a sink, mapped to
 #: the field holding that name.
-_ASSIGNMENT_SINK_FIELDS: dict[str, str] = {_py.ATTRIBUTE: "attribute", _py.SUBSCRIPT: "subscript"}
+_ASSIGNMENT_SINK_FIELDS: dict[str, tuple[str, bool]] = {_py.ATTRIBUTE: ("attribute", False), _py.SUBSCRIPT: ("subscript", True)}
 
 
 class TaintTracker:
@@ -82,7 +85,7 @@ class TaintTracker:
         sources: frozenset[str],
         *,
         assume_taint_preserving: bool = True,
-        receiver_sinks: frozenset[str] = frozenset(),
+        sink_kinds: SinkKinds | None = None,
         property_contract: PropertyContract | None = None,
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config.
@@ -129,7 +132,7 @@ class TaintTracker:
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
-        self.receiver_sinks = receiver_sinks
+        self.sink_kinds = sink_kinds if sink_kinds is not None else SinkKinds()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -191,10 +194,29 @@ class TaintTracker:
             cursor = cursor.child_by_field_name("right")
         if cursor is None or not targets:
             return
-        status = value_status(self._is_tainted, self._properties, cursor)
         for target in targets:
-            for ident in self._iter_target_identifiers(target):
-                set_status(self.tainted, node_text(ident), status)
+            self._bind_targets(target, cursor)
+
+    def _bind_targets(self, target: tree_sitter.Node, value: tree_sitter.Node) -> None:
+        """Bind *target* to *value*'s taint, pairing an unpack positionally.
+
+        ``x, y = tainted, "k"`` pairs target *i* with value *i*, so ``y`` stays
+        clean. Applying the whole RHS status to every target (the container
+        treatment) over-approximates in a way that reads as a false positive on
+        the very common ``value, err = tainted, None`` shape. Falls back to the
+        whole-RHS status whenever the shapes do not line up - an unpack from a
+        single call, a starred target, or mismatched arity - which keeps the
+        conservative direction.
+        """
+        names = list(self._iter_target_identifiers(target))
+        values = list(value.named_children) if value.type in _PAIRABLE_RHS_TYPES else []
+        if len(values) == len(names) and target.type in _PATTERN_TYPES:
+            for ident, item in zip(names, values, strict=True):
+                set_status(self.tainted, node_text(ident), value_status(self._is_tainted, self._properties, item))
+            return
+        status = value_status(self._is_tainted, self._properties, value)
+        for ident in names:
+            set_status(self.tainted, node_text(ident), status)
 
     def _visit_aug_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x += value`` (read-modify-write preserves x's taint)."""
@@ -221,7 +243,7 @@ class TaintTracker:
         function = node.child_by_field_name("function")
         if function is not None and function.type == _py.ATTRIBUTE:
             receiver = function.child_by_field_name("object")
-            if receiver is not None and self._is_tainted(receiver, required) and (name in self.receiver_sinks or not call_has_arguments(node)):
+            if receiver is not None and self._is_tainted(receiver, required) and (name in self.sink_kinds.receiver or not call_has_arguments(node)):
                 self._record_sink_hit(node, receiver, name)
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str, required: str | None) -> bool:
@@ -250,7 +272,7 @@ class TaintTracker:
             return
         for target in self._sink_assignment_targets(left):
             sink = assignment_sink_name(target, _ASSIGNMENT_SINK_FIELDS)
-            if sink is not None and sink in self.sinks and self._is_tainted(right, self.contract.required_for(sink)):
+            if sink is not None and sink in self.sink_kinds.assignment and self._is_tainted(right, self.contract.required_for(sink)):
                 self._record_sink_hit(node, right, sink)
 
     @staticmethod
@@ -273,8 +295,20 @@ class TaintTracker:
         none); it decides whether a property-typed sanitiser on the path clears.
         """
         stack: list[tuple[tree_sitter.Node, str | None]] = [(node, required_property)]
+        # Visited set, keyed by (node, property): a nested interpolation is
+        # reachable by more than one path, and without this each nesting level
+        # re-enumerated every deeper one - 2**N node visits, and 2**N live
+        # references in the stack, for N nested f-strings / template literals
+        # (OOM-killed at depth 64). Bounding re-entry here fixes both, and
+        # unlike pruning the interpolation walk it cannot make a nested string
+        # unreachable when its parent is a taint dead-end.
+        seen: set[tuple[int, str | None]] = set()
         while len(stack) > 0:
             current, prop = stack.pop()
+            key = (current.id, prop)
+            if key in seen:
+                continue
+            seen.add(key)
             terminal, children = self._taint_step(current, prop)
             if terminal:
                 return True
@@ -310,7 +344,7 @@ class TaintTracker:
         level, so a chain of N nested f-strings cost 2**N node visits on the
         exhaustive (untainted) path - measurably 1.3s at N=20.
         """
-        return [inner for child in walk(node, skip_types=(_py.STRING,)) if child.type == _py.INTERPOLATION for inner in child.named_children]
+        return [inner for child in walk(node) if child.type == _py.INTERPOLATION for inner in child.named_children]
 
     @staticmethod
     def _taint_propagating_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:

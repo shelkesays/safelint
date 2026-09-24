@@ -27,7 +27,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import PropertyContract, combine_status, identifier_tainted, set_status, value_status
+from safelint.analysis._taint_contract import PropertyContract, SinkKinds, combine_status, identifier_tainted, set_status, value_status
 from safelint.languages import javascript as _js
 from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
 
@@ -145,7 +145,7 @@ class JsTaintTracker:
         sources: frozenset[str],
         *,
         assume_taint_preserving: bool = True,
-        receiver_sinks: frozenset[str] = frozenset(),
+        sink_kinds: SinkKinds | None = None,
         property_contract: PropertyContract | None = None,
     ) -> None:
         """Initialise tracker with tainted entry parameters and rule config."""
@@ -156,7 +156,7 @@ class JsTaintTracker:
         self.sanitizers = sanitizers
         self.sources = sources
         self.assume_taint_preserving = assume_taint_preserving
-        self.receiver_sinks = receiver_sinks
+        self.sink_kinds = sink_kinds if sink_kinds is not None else SinkKinds()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
 
     def visit(self, root: tree_sitter.Node) -> None:
@@ -239,7 +239,7 @@ class JsTaintTracker:
         sink list, honouring the same property-typed contract as a call.
         """
         sink = _assignment_sink_name(left)
-        if sink is None or sink not in self.sinks:
+        if sink is None or sink not in self.sink_kinds.assignment:
             return
         if self._is_tainted(right, self.contract.required_for(sink)):
             self._record_sink_hit(node, right, sink)
@@ -285,7 +285,7 @@ class JsTaintTracker:
         # argument-consuming sink's payload is its argument, so a tainted receiver
         # passed only constant arguments (``conn.query("SELECT 1")``) is not injection.
         receiver = self._method_receiver(node)
-        if receiver is not None and self._is_tainted(receiver, required) and (name in self.receiver_sinks or not call_has_arguments(node)):
+        if receiver is not None and self._is_tainted(receiver, required) and (name in self.sink_kinds.receiver or not call_has_arguments(node)):
             self._record_sink_hit(node, receiver, name)
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str, required: str | None) -> bool:
@@ -324,8 +324,20 @@ class JsTaintTracker:
         property-typed sanitiser on the path clears.
         """
         stack: list[tuple[tree_sitter.Node, str | None]] = [(node, required_property)]
+        # Visited set, keyed by (node, property): a nested interpolation is
+        # reachable by more than one path, and without this each nesting level
+        # re-enumerated every deeper one - 2**N node visits, and 2**N live
+        # references in the stack, for N nested f-strings / template literals
+        # (OOM-killed at depth 64). Bounding re-entry here fixes both, and
+        # unlike pruning the interpolation walk it cannot make a nested string
+        # unreachable when its parent is a taint dead-end.
+        seen: set[tuple[int, str | None]] = set()
         while len(stack) > 0:
             current, prop = stack.pop()
+            key = (current.id, prop)
+            if key in seen:
+                continue
+            seen.add(key)
             terminal, children = self._taint_step(current, prop)
             if terminal:
                 return True
@@ -417,4 +429,4 @@ class JsTaintTracker:
         nested templates cost 2**N node visits on the exhaustive (untainted)
         path. Same fix as the Python tracker's ``_fstring_children``.
         """
-        return [inner for child in walk(node, skip_types=(_js.TEMPLATE_STRING,)) if child.type == _js.TEMPLATE_SUBSTITUTION for inner in child.named_children]
+        return [inner for child in walk(node) if child.type == _js.TEMPLATE_SUBSTITUTION for inner in child.named_children]
