@@ -3880,7 +3880,7 @@ def test_cli_routes_skill_remove(monkeypatch: pytest.MonkeyPatch, mocker: Mocker
 #: C / C++ sanitizer and source rows summarise in prose ("narrow generic set",
 #: "mirror C"), so those pairs are excluded rather than forced to enumerate.
 _ENUMERATED_ADDENDA = [
-    ("javascript", "_javascript", ("sinks", "sanitizers", "sources")),
+    ("javascript", "_javascript", ("sinks", "sanitizers", "sources", "assignment_sinks")),
     ("java", "_java", ("sinks", "sanitizers", "sources")),
     ("rust", "_rust", ("sinks", "sanitizers", "sources")),
     ("go", "_go", ("sinks", "sanitizers", "sources")),

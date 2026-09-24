@@ -80,7 +80,9 @@ sinks_javascript = ["eval", "Function", "myCustomDangerousFunction"]
 # Rare: stricter TS sinks (legacy JS keeps the JS list)
 [rules.tainted_sink]
 sinks_javascript = ["eval", "Function"]                                # legacy JS
-sinks_typescript = ["eval", "Function", "Object.assign", "innerHTML"]  # stricter for TS
+sinks_typescript = ["eval", "Function", "Object.assign"]      # stricter for TS
+# `innerHTML` is written to, not called - declare write-sinks separately:
+assignment_sinks_typescript = ["innerHTML", "outerHTML"]
 ```
 
 ### Runtime presets apply to TypeScript too
