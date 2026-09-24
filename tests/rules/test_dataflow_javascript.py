@@ -719,3 +719,81 @@ def test_js_member_expression_destructure_target_is_ignored(tmp_path: Path) -> N
     result = _enabled_engine("tainted_sink").check_file(str(sample))
     # ``a`` is rebound from the tainted ``src`` and flows into eval -> SAFE801.
     assert any(v.code == "SAFE801" for v in result.violations)
+
+
+# ---------------------------------------------------------------------------
+# Assignment-side sinks (innerHTML and friends)
+#
+# `innerHTML` shipped in the default `sinks_javascript` from the start, but
+# hits were only ever recorded at a CALL - so the idiomatic
+# `element.innerHTML = tainted` was never reported and the default could fire
+# only on an `innerHTML(...)` call, a shape that does not occur in real code.
+# Writing to the property IS the injection.
+# ---------------------------------------------------------------------------
+
+
+def test_js_innerhtml_assignment_fires(tmp_path: Path) -> None:
+    """`element.innerHTML = tainted` is reported (the DOM-XSS shape)."""
+    sample = tmp_path / "dom.js"
+    sample.write_text("function f(userInput) {\n  el.innerHTML = userInput;\n}\n", encoding="utf-8")
+    assert any(v.code == "SAFE801" for v in _enabled_engine("tainted_sink").check_file(str(sample)).violations)
+
+
+def test_js_innerhtml_subscript_assignment_fires(tmp_path: Path) -> None:
+    """The `el["innerHTML"] = tainted` spelling resolves to the same sink name."""
+    sample = tmp_path / "dom_sub.js"
+    sample.write_text('function f(userInput) {\n  el["innerHTML"] = userInput;\n}\n', encoding="utf-8")
+    assert any(v.code == "SAFE801" for v in _enabled_engine("tainted_sink").check_file(str(sample)).violations)
+
+
+def test_js_innerhtml_augmented_assignment_fires(tmp_path: Path) -> None:
+    """`+=` appends attacker data to the sink just as surely as `=` does."""
+    sample = tmp_path / "dom_aug.js"
+    sample.write_text("function f(userInput) {\n  el.innerHTML += userInput;\n}\n", encoding="utf-8")
+    assert any(v.code == "SAFE801" for v in _enabled_engine("tainted_sink").check_file(str(sample)).violations)
+
+
+def test_js_innerhtml_assignment_of_constant_is_clean(tmp_path: Path) -> None:
+    """A constant written to the sink is not injection."""
+    sample = tmp_path / "dom_const.js"
+    sample.write_text('function f(userInput) {\n  el.innerHTML = "<b>safe</b>";\n}\n', encoding="utf-8")
+    assert not [v for v in _enabled_engine("tainted_sink").check_file(str(sample)).violations if v.code == "SAFE801"]
+
+
+def test_js_non_sink_property_assignment_is_clean(tmp_path: Path) -> None:
+    """Only configured sink names fire - `textContent` is the safe DOM API."""
+    sample = tmp_path / "dom_text.js"
+    sample.write_text("function f(userInput) {\n  el.textContent = userInput;\n}\n", encoding="utf-8")
+    assert not [v for v in _enabled_engine("tainted_sink").check_file(str(sample)).violations if v.code == "SAFE801"]
+
+
+def test_js_innerhtml_assignment_cleared_by_sanitizer(tmp_path: Path) -> None:
+    """A flat sanitiser on the written value clears the assignment sink."""
+    sample = tmp_path / "dom_san.js"
+    sample.write_text("function f(userInput) {\n  el.innerHTML = escape(userInput);\n}\n", encoding="utf-8")
+    assert not [v for v in _enabled_engine("tainted_sink").check_file(str(sample)).violations if v.code == "SAFE801"]
+
+
+def test_js_innerhtml_assignment_honours_property_contract(tmp_path: Path) -> None:
+    """The assignment path uses the same property-typed contract as a call.
+
+    A sanitiser establishing the sink's required property clears it; one
+    establishing a different property does not."""
+    overrides = {
+        "rules": {
+            "tainted_sink": {
+                "sinks_javascript": ["innerHTML"],
+                "sanitizers_javascript": [],
+                "sources_javascript": [],
+                "sanitizer_properties_javascript": {"esc": ["html_escaped"]},
+                "sink_properties_javascript": {"innerHTML": "html_escaped"},
+            }
+        }
+    }
+    clean = tmp_path / "ok.js"
+    clean.write_text("function f(userInput) {\n  el.innerHTML = esc(userInput);\n}\n", encoding="utf-8")
+    assert not [v for v in _enabled_engine("tainted_sink", overrides).check_file(str(clean)).violations if v.code == "SAFE801"]
+
+    fires = tmp_path / "bad.js"
+    fires.write_text("function f(userInput) {\n  el.innerHTML = sqlEsc(userInput);\n}\n", encoding="utf-8")
+    assert any(v.code == "SAFE801" for v in _enabled_engine("tainted_sink", overrides).check_file(str(fires)).violations)
