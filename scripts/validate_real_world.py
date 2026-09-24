@@ -45,7 +45,7 @@ import argparse
 from dataclasses import dataclass, field
 import json
 from pathlib import Path
-import resource
+import re
 import subprocess
 import sys
 import tempfile
@@ -72,6 +72,21 @@ EXTENSIONS: dict[str, tuple[str, ...]] = {
 #: defaults already cover ``.venv``, ``node_modules``, ``site-packages``,
 #: ``build`` and ``dist``.
 EXTRA_EXCLUDES: tuple[str, ...] = ("vendor/**", "**/vendor/**", "target/**", "**/target/**", "third_party/**", "**/third_party/**")
+
+#: ``--preset`` and ``--label`` are interpolated into a TOML file and a
+#: filename respectively. Restricting both to this shape means a quote or
+#: newline cannot alter the generated config, and a path separator cannot
+#: escape the output directory.
+_IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
+
+
+class HarnessError(RuntimeError):
+    """A run could not be measured - the binary crashed or produced no report.
+
+    Raised rather than recorded as zero findings: a crash logged as a clean
+    validation is the one outcome this harness must never produce.
+    """
+
 
 #: Which TOML table and key a preset is set through. TypeScript inherits the
 #: JavaScript runtime.
@@ -107,6 +122,7 @@ class RunResult:
     wall_seconds: float
     peak_rss_mb: float
     stderr: str = ""
+    exit_code: int = 0
     counts: dict[str, int] = field(default_factory=dict)
 
 
@@ -131,8 +147,8 @@ def rules_for(binary: Path, lang: str) -> list[str]:
     """Return every rule name the binary registers for *lang*, from the binary itself."""
     proc = _run([str(binary), "list-rules", "--format", "json"])
     if proc.returncode != 0:
-        msg = f"list-rules failed: {proc.stderr.strip()}"
-        raise SystemExit(msg)
+        msg = f"list-rules failed (is --safelint a safelint binary?): {proc.stderr.strip()[:500]}"
+        raise HarnessError(msg)
     rules = json.loads(proc.stdout)["rules"]
     return [r["name"] for r in rules if lang in r["languages"]]
 
@@ -160,28 +176,49 @@ def write_config(directory: Path, target: Target, rule_names: list[str]) -> None
     (directory / "safelint.toml").write_text("\n\n".join(p for p in parts if p) + "\n", encoding="utf-8")
 
 
-def _peak_rss_mb() -> float:
-    """Peak RSS of finished child processes, in MB. macOS reports bytes, Linux KB."""
-    raw = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
-    return raw / (1024 * 1024) if sys.platform == "darwin" else raw / 1024
+#: Runs one command as its only child and reports that child's exit status,
+#: output and peak RSS. ``ru_maxrss`` for ``RUSAGE_CHILDREN`` is the maximum
+#: over every child the calling process has ever reaped, so measuring in the
+#: harness process would report the larger of the two runs for both. A fresh
+#: wrapper per run has exactly one child.
+_MEASURED_RUNNER = """
+import json, resource, subprocess, sys, time
+t0 = time.perf_counter()
+p = subprocess.run(sys.argv[1:], capture_output=True, text=True, check=False)
+raw = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
+mb = raw / (1024 * 1024) if sys.platform == "darwin" else raw / 1024
+print(json.dumps({"rc": p.returncode, "out": p.stdout, "err": p.stderr, "wall": time.perf_counter() - t0, "rss_mb": mb}))
+"""
+
+
+def _measured(cmd: list[str]) -> dict[str, Any]:
+    """Run *cmd* under the one-child wrapper; return its envelope."""
+    proc = subprocess.run([sys.executable, "-c", _MEASURED_RUNNER, *cmd], capture_output=True, text=True, check=False)  # noqa: S603 - argv list, no shell
+    if proc.returncode != 0:
+        msg = f"measurement wrapper failed: {proc.stderr.strip()[:500]}"
+        raise HarnessError(msg)
+    return json.loads(proc.stdout)
 
 
 def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
     """Run one safelint pass over the project and filter it to the language."""
     cmd = [str(target.safelint), "check", str(target.project), "--all-files", "--config", str(config_dir), "--format", "json"]
-    started = time.perf_counter()
-    proc = _run(cmd)
-    wall = time.perf_counter() - started
-    payload: dict[str, Any]
+    env = _measured(cmd)
+    # safelint exits 1 when it finds blocking violations, which is a successful
+    # run for our purposes; anything else, or a report we cannot parse, is not.
     try:
-        payload = json.loads(proc.stdout)
-    except json.JSONDecodeError:
-        payload = {"summary": {"files_checked": 0}, "violations": []}
+        payload: dict[str, Any] = json.loads(env["out"])
+    except json.JSONDecodeError as exc:
+        msg = f"{mode}: safelint exited {env['rc']} without a JSON report - stderr:\n{env['err'].strip()[:1500]}"
+        raise HarnessError(msg) from exc
+    if env["rc"] not in (0, 1):
+        msg = f"{mode}: safelint exited {env['rc']} - stderr:\n{env['err'].strip()[:1500]}"
+        raise HarnessError(msg)
     exts = EXTENSIONS[target.lang]
     raw: list[dict[str, Any]] = payload.get("violations", [])
     violations = [v for v in raw if str(v["filepath"]).endswith(exts)]
     files_checked = int(payload.get("summary", {}).get("files_checked", 0))
-    result = RunResult(mode, files_checked, violations, wall, _peak_rss_mb(), proc.stderr)
+    result = RunResult(mode, files_checked, violations, float(env["wall"]), float(env["rss_mb"]), env["err"], env["rc"])
     for v in violations:
         code = str(v["code"])
         result.counts[code] = result.counts.get(code, 0) + 1
@@ -228,7 +265,7 @@ def summary_markdown(target: Target, version: str, sha: str, results: list[RunRe
             "",
             f"- files checked: {r.files_checked}",
             f"- findings ({target.lang} files only): **{len(r.violations)}**",
-            f"- wall time: {r.wall_seconds:.1f}s, peak RSS: {r.peak_rss_mb:.0f} MB",
+            f"- wall time: {r.wall_seconds:.1f}s, peak RSS: {r.peak_rss_mb:.0f} MB, exit code: {r.exit_code}",
             "",
             _counts_table(r),
             "",
@@ -252,14 +289,22 @@ def write_outputs(target: Target, version: str, sha: str, results: list[RunResul
     return summary
 
 
+def _identifier(value: str) -> str:
+    """Argparse type: a safe identifier for interpolation into TOML and filenames."""
+    if not _IDENTIFIER.fullmatch(value):
+        msg = f"must match {_IDENTIFIER.pattern!r} (letters, digits, . _ -), got {value!r}"
+        raise argparse.ArgumentTypeError(msg)
+    return value
+
+
 def parse_args(argv: list[str] | None = None) -> Target:
     """Parse the command line into a :class:`Target`."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0], formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--safelint", type=Path, default=Path("safelint"), help="safelint binary to validate (an isolated install of the PUBLISHED version)")
     parser.add_argument("--lang", required=True, choices=sorted(EXTENSIONS), help="language under test; results are filtered to its extensions")
     parser.add_argument("--project", required=True, type=Path, help="root of the cloned project")
-    parser.add_argument("--label", required=True, help="short project name used in the output filename, e.g. spring-petclinic")
-    parser.add_argument("--preset", help="framework or runtime preset to enable, e.g. django, spring-boot, bun")
+    parser.add_argument("--label", required=True, type=_identifier, help="short project name used in the output filename, e.g. spring-petclinic")
+    parser.add_argument("--preset", type=_identifier, help="framework or runtime preset to enable, e.g. django, spring-boot, bun")
     parser.add_argument("--pydantic", action="store_true", help="also set [python] pydantic = true")
     parser.add_argument("--out", type=Path, default=Path("plan/real-world-results"), help="directory for the summary (default: plan/real-world-results)")
     ns = parser.parse_args(argv)
@@ -269,12 +314,16 @@ def parse_args(argv: list[str] | None = None) -> Target:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Entry point."""
+    """Entry point. A run that cannot be measured exits 2 with the reason on stderr."""
     target = parse_args(argv)
     version = safelint_version(target.safelint)
     sha = project_sha(target.project)
     print(f"safelint {version} ({target.safelint}) vs {target.label} @ {sha[:7]} [{target.lang}, preset={target.preset or 'none'}]")
-    results = validate(target)
+    try:
+        results = validate(target)
+    except HarnessError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        return 2
     summary = write_outputs(target, version, sha, results)
     for r in results:
         top = ", ".join(f"{c}:{n}" for c, n in sorted(r.counts.items(), key=lambda kv: -kv[1])[:6])
