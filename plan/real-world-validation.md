@@ -1,14 +1,15 @@
 # Real-world validation programme
 
-Running safelint against well-known open-source projects, with **every rule for
-that language enabled**, and manually validating each finding as a true
-positive, a false positive, or noise.
+Running safelint against well-known open-source projects - once with **every
+rule for that language enabled**, once with **stock defaults** - and manually
+classifying each finding as a true positive, a false positive, or debatable.
 
 ## Why this exists
 
 safelint's own test suite proves rules fire on code written to make them fire.
 It cannot prove they *stay quiet* on idiomatic code someone else wrote. The
-first pass of this programme (2026-09-24, against private codebases) found ten
+first pass of this programme (2026-09-24, against a mix of private and public
+codebases) found fifteen
 defects that the full suite - 2228 tests, 97% coverage - does not catch, because
 every one of them is a rule being wrong about a language idiom rather than wrong
 about its own logic.
@@ -36,6 +37,9 @@ Presets that exist today, each of which needs its own row:
 | JavaScript | `node`, `browser`, `deno`, `bun`, `cloudflare-workers` |
 | Java | `spring-boot` |
 | PHP | `laravel` |
+
+TypeScript, Rust, Go, C and C++ have no presets, so they have language rows only.
+That is not an omission in the matrix.
 
 ### Not just one project each
 
@@ -144,6 +148,7 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | JavaScript | Axios | `axios/axios` | Promise/async idioms, dual browser+node target | todo |
 | TypeScript | Vue core | `vuejs/core` | Large idiomatic TS without styled-components | todo |
 | TypeScript | Zod | `colinhacks/zod` | Type-level heavy TS; very different shape from Vue | todo |
+| TypeScript | Superset frontend | `apache/superset` (`superset-frontend/`) | Large React/TS app; already run, and the source of the styled-components finding | run |
 | Java | Commons Lang | `apache/commons-lang` | Vanilla Java, no framework; pure library idioms | todo |
 | Java | Guava | `google/guava` | Large, heavily reviewed, different house style | todo |
 | Rust | Ruff | `astral-sh/ruff` | Large modern idiomatic Rust; a linter itself | todo |
@@ -163,12 +168,10 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 |---|---|---|---|
 | python / `django` | Django | `django/django` | todo |
 | python / `flask` | Flask | `pallets/flask` | todo |
-| python / `fastapi` | FastAPI | `tiangolo/fastapi` | todo |
-| python / `pydantic` | Pydantic | `pydantic/pydantic` | todo |
+| python / `fastapi` + `pydantic = true` | FastAPI | `fastapi/fastapi` | todo |
 | java / `spring-boot` | Spring PetClinic | `spring-projects/spring-petclinic` | run |
 | php / `laravel` | Laravel framework | `laravel/framework` | todo |
 | php / `laravel` | FreeScout (application, not framework) | `freescout-help-desk/freescout` | run |
-| javascript / `node` | Express | `expressjs/express` | todo |
 | javascript / `browser` | Chart.js | `chartjs/Chart.js` | todo |
 | javascript / `deno` | Deno std | `denoland/std` | todo |
 | javascript / `bun` | Elysia | `elysiajs/elysia` | todo |
@@ -176,6 +179,18 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 
 Notes on the runtime rows:
 
+* **`pydantic` rides on the FastAPI row**, as `[python] pydantic = true`
+  alongside `framework = "fastapi"`. It is a switch, not a preset - it adds
+  `model_construct` / `construct` as SAFE801 sinks and enables SAFE906 - and it
+  can be combined with any framework. Running it against `pydantic/pydantic`
+  itself would be circular: that is the codebase that *defines* the methods the
+  switch treats as sinks. FastAPI is a large, idiomatic *consumer* of pydantic,
+  which is what the switch is for.
+* **There is no `node` row on purpose.** `node` is the *default* runtime - its
+  preset is empty - so a run with `runtime = "node"` is byte-for-byte the same
+  as a run with no preset. The JavaScript language rows (Express, Axios) already
+  cover it. Listing it here would have counted one run twice and blurred the
+  language/framework split this document exists to keep.
 * **Elysia** over Hono, Brisa and the rest for `bun`. It is Bun-first by design
   (`Bun.serve`, `Bun.file`), which is what the preset is about. Hono is
   deliberately runtime-agnostic Web Standards code and would barely exercise
@@ -193,10 +208,24 @@ Notes on the runtime rows:
   path, not the JS one. The `node` and `browser` rows carry the plain-JavaScript
   coverage.
 
-Already run against private codebases in the first pass. These are not
-reproducible by anyone else, so they do not count toward the bar, but their
-findings are recorded below: `salessync` (Python), `v4` (JavaScript),
-`arkstore` (Rust), `superset-frontend` (TypeScript), `freescout` (PHP).
+### What the first pass already covered
+
+Run on 2026-09-24 against safelint **2.14.0rc3**. Three of the five were
+public repositories and count toward the bar; the two `run` rows above are the
+same clones.
+
+| Project | Language | Public? | Counts? |
+|---|---|---|---|
+| `spring-projects/spring-petclinic` | Java (`spring-boot`) | yes | yes |
+| `freescout-help-desk/freescout` | PHP (`laravel`) | yes | yes |
+| `apache/superset` (`superset-frontend/`) | TypeScript | yes | yes - listed as a language row |
+| `salessync` | Python | private | no |
+| `v4` | JavaScript | private | no |
+| `arkstore` | Rust | private | no |
+
+The private three are not reproducible by anyone else, so their findings are
+evidence but their runs do not count. Every finding below names the project it
+came from so it can be re-checked against a public one.
 
 ## Known gaps in this programme
 
@@ -224,26 +253,29 @@ mislead:
 
 ## Findings register
 
-Every defect found gets a GitHub issue. `Verified` means reproduced from a
-minimal case, not just observed in a large codebase.
+Every defect found gets a GitHub issue. All fifteen were found against safelint
+**2.14.0rc3**. `Verified` means reproduced from a minimal case, not just
+observed in a large codebase. `Found in` is where it first surfaced, so the
+claim can be re-checked; a private project there means the finding still needs
+confirming on a public one before the issue is worked.
 
-| # | Rule | Defect | Severity | Default-on? | Verified | Issue |
-|---|---|---|---|---|---|---|
-| 1 | SAFE105 | Java method overload counted as recursion | High | **yes** | yes | #153 |
-| 2 | SAFE102 | JS/TS `else if` counted as nesting (fix exists for Python/PHP) | High | **yes** | yes | #154 |
-| 3 | SAFE803 | Python `dict.get(k, default)` cannot return None but is flagged | High | no | yes | #155 |
-| 4 | SAFE802 | Python `flagged_calls` defaults are C/POSIX; `mkdir`/`unlink`/etc. return None | High | no | yes | #156 |
-| 5 | SAFE907 | `Validator::make()` unrecognised, so the validation call is flagged as unvalidated | High | preset | yes | #157 |
-| 6 | SAFE801 | PHP `query` sink collides with Eloquent / php-imap; zero-arg receiver branch fires | High | no | agent | #158 |
-| 7 | SAFE203 | Fires on handlers that re-raise; message says "swallowed" | Medium | no | yes | #159 |
-| 8 | SAFE203 | PHP log-method set is hard-coded, misses project logging wrappers | Medium | no | agent | #159 |
-| 9 | SAFE105 | Rust: bare call inside an `impl` method is not a self-call | Medium | **yes** | agent | #160 |
-| 10 | SAFE207 | Rust: blind to logging one call hop away in a helper | Medium | no | agent | #161 |
-| 11 | SAFE908 | Fires on stock Laravel `TrimStrings` / `EncryptCookies` | Medium | preset | agent | #162 |
-| 12 | SAFE601 | `test_functions_only=false` default makes it 56-92% of all output | Tuning | no | yes | #163 |
-| 13 | SAFE102 | Python counts `with` / `try` as nesting levels | Tuning | yes | agent | #166 |
-| 14 | SAFE101 | JS reports `<anonymous>` for `const Foo = () => {}` | Low | yes | agent | #165 |
-| 15 | - | `styled.div<T>` template literals fail to parse (tree-sitter-typescript) | Medium | n/a | yes | #164 |
+| # | Rule | Defect | Severity | Default-on? | Verified | Found in | Issue |
+|---|---|---|---|---|---|---|---|
+| 1 | SAFE105 | Java method overload counted as recursion | High | **yes** | yes | spring-petclinic | #153 |
+| 2 | SAFE102 | JS/TS `else if` counted as nesting (fix exists for Python/PHP) | High | **yes** | yes | v4 (private) | #154 |
+| 3 | SAFE803 | Python `dict.get(k, default)` cannot return None but is flagged | High | no | yes | salessync (private) | #155 |
+| 4 | SAFE802 | Python `flagged_calls` defaults are C/POSIX; `mkdir`/`unlink`/etc. return None | High | no | yes | salessync (private) | #156 |
+| 5 | SAFE907 | `Validator::make()` unrecognised, so the validation call is flagged as unvalidated | High | preset | yes | freescout | #157 |
+| 6 | SAFE801 | PHP `query` sink collides with Eloquent / php-imap; zero-arg receiver branch fires | High | no | agent | freescout | #158 |
+| 7 | SAFE203 | Fires on handlers that re-raise; message says "swallowed" | Medium | no | yes | salessync (private) | #159 |
+| 8 | SAFE203 | PHP log-method set is hard-coded, misses project logging wrappers | Medium | no | agent | freescout | #159 |
+| 9 | SAFE105 | Rust: bare call inside an `impl` method is not a self-call | Medium | **yes** | agent | arkstore (private) | #160 |
+| 10 | SAFE207 | Rust: blind to logging one call hop away in a helper | Medium | no | agent | arkstore (private) | #161 |
+| 11 | SAFE908 | Fires on stock Laravel `TrimStrings` / `EncryptCookies` | Medium | preset | agent | freescout | #162 |
+| 12 | SAFE601 | `test_functions_only=false` default makes it 56-92% of all output | Tuning | no | yes | all four | #163 |
+| 13 | SAFE102 | Python counts `with` / `try` as nesting levels | Tuning | **yes** | agent | salessync (private) | #166 |
+| 14 | SAFE101 | JS reports `<anonymous>` for `const Foo = () => {}` | Low | **yes** | agent | v4 (private) | #165 |
+| 15 | - | `styled.div<T>` template literals fail to parse (tree-sitter-typescript) | Medium | n/a | yes | superset-frontend | #164 |
 
 ## Cross-cutting root cause
 
