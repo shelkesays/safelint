@@ -110,6 +110,23 @@ def _destructure_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
     return [inner] if inner is not None else []
 
 
+def _assignment_sink_name(target: tree_sitter.Node) -> str | None:
+    """Return the property name an assignment writes to, or None.
+
+    ``el.innerHTML = x`` exposes it on the ``property`` field; the equivalent
+    ``el["innerHTML"] = x`` puts it in the ``index`` string, whose quotes are
+    stripped so both spellings resolve to the same configurable name.
+    """
+    if target.type == _js.MEMBER_EXPRESSION:
+        prop = target.child_by_field_name("property")
+        return node_text(prop) if prop is not None and prop.type == _js.PROPERTY_IDENTIFIER else None
+    if target.type == _js.SUBSCRIPT_EXPRESSION:
+        index = target.child_by_field_name("index")
+        if index is not None and index.type == _js.STRING:
+            return node_text(index).strip("\"'`")
+    return None
+
+
 class JsTaintTracker:
     """Track tainted variable flow through a JavaScript function body.
 
@@ -205,14 +222,36 @@ class JsTaintTracker:
         right = node.child_by_field_name("right")
         if left is None or right is None:  # pragma: no cover - defensive: valid assignments have both sides
             return
+        self._check_assignment_sink(node, left, right)
         status = value_status(self._is_tainted, self._properties, right)
         for ident in self._iter_target_identifiers(left):
             self._update_name(ident, status)
+
+    def _check_assignment_sink(self, node: tree_sitter.Node, left: tree_sitter.Node, right: tree_sitter.Node) -> None:
+        """Record a hit when a tainted value is WRITTEN to a sink-named property.
+
+        Some JavaScript sinks are assigned to rather than called - ``innerHTML``
+        is the canonical one, and it ships in the default ``sinks_javascript``.
+        The call-based hit recorder never saw ``element.innerHTML = tainted``,
+        so the shipped default could only ever fire on an ``innerHTML(...)``
+        call, a shape that does not occur in real code. Writing to the property
+        IS the injection, so the assignment target is checked against the same
+        sink list, honouring the same property-typed contract as a call.
+        """
+        sink = _assignment_sink_name(left)
+        if sink is None or sink not in self.sinks:
+            return
+        if self._is_tainted(right, self.contract.required_for(sink)):
+            self._record_sink_hit(node, right, sink)
 
     def _visit_aug_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x += value``."""
         left = node.child_by_field_name("left")
         right = node.child_by_field_name("right")
+        if left is not None and right is not None:
+            # ``el.innerHTML += tainted`` appends attacker data to the sink just
+            # as surely as a plain assignment does.
+            self._check_assignment_sink(node, left, right)
         if left is None or right is None:  # pragma: no cover - defensive: valid aug-assignments have both sides
             return
         self._update_name(left, value_status(self._is_tainted, self._properties, right), keep_existing=True)
