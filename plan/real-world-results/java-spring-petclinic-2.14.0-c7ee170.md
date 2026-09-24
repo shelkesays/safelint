@@ -3,13 +3,13 @@
 - safelint: **2.14.0** (`/tmp/pipchk/bin/safelint`)
 - project: `/Users/rahulshelke/sources/personal/spring-petclinic` @ `c7ee170434ec3e369fdc9201290ba2ea4c92b557`
 - preset: `spring-boot`
-- run: 2026-09-24 19:28 UTC
+- run: 2026-09-24 19:38 UTC
 
 ## all-rules
 
 - files checked: 48
 - findings (java files only): **233**
-- wall time: 0.3s, peak RSS: 32 MB
+- wall time: 0.3s, peak RSS: 33 MB, exit code: 1
 
 | Code | Findings | Share |
 |---|---|---|
@@ -30,7 +30,7 @@
 
 - files checked: 48
 - findings (java files only): **24**
-- wall time: 0.2s, peak RSS: 32 MB
+- wall time: 0.2s, peak RSS: 32 MB, exit code: 1
 
 | Code | Findings | Share |
 |---|---|---|

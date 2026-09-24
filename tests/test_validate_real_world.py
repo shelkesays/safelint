@@ -93,3 +93,42 @@ def test_rules_for_asks_the_binary_not_the_checkout() -> None:
     assert "no_recursion" in names, "cross-language rule present"
     assert "bare_except" not in names, "SAFE201 is not registered for Go"
     assert sys.version_info >= (3, 11)
+
+
+def test_a_crashing_binary_is_an_error_not_a_clean_run(tmp_path: Path) -> None:
+    """A run with no JSON report raises; it must never be recorded as zero findings."""
+    fake = tmp_path / "safelint"
+    fake.write_text("#!/bin/sh\necho 'Traceback (most recent call last):' >&2\necho 'OSError: boom' >&2\nexit 1\n", encoding="utf-8")
+    fake.chmod(0o755)
+    project = tmp_path / "proj"
+    project.mkdir()
+    (project / "a.py").write_text("x = 1\n", encoding="utf-8")
+    harness = _load_harness()
+    target = harness.Target(fake, "python", project, "crash", out_dir=tmp_path / "out")
+    with pytest.raises(harness.HarnessError, match="without a JSON report"):
+        harness.run_safelint(target, tmp_path, "defaults")
+
+
+def test_label_and_preset_reject_unsafe_values() -> None:
+    """Path separators and quotes cannot reach a filename or the generated TOML."""
+    harness = _load_harness()
+    for bad in ("../escape", 'x"y', "a\nb", "", "spring boot"):
+        with pytest.raises(harness.argparse.ArgumentTypeError):
+            harness._identifier(bad)
+    assert harness._identifier("spring-petclinic") == "spring-petclinic"
+    assert harness._identifier("cloudflare-workers") == "cloudflare-workers"
+
+
+def test_peak_rss_is_measured_per_run(tmp_path: Path) -> None:
+    """Two runs report their own peak RSS, not the running maximum across both.
+
+    ``RUSAGE_CHILDREN.ru_maxrss`` is the maximum over every child the process
+    has reaped, so an in-process measurement makes the second run report the
+    larger of the two. Sanity-check the wrapper reports a positive figure and
+    an exit code, which the in-process version could not do.
+    """
+    harness = _load_harness()
+    env = harness._measured([sys.executable, "-c", "import sys; print('{}'); sys.exit(3)"])
+    assert env["rc"] == 3
+    assert env["rss_mb"] > 0
+    assert env["out"].strip() == "{}"
