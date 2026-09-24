@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.14.0] - 2026-09-24
+
 ### Fixed
 
 - **SAFE801: assignment-side sinks now cover parenthesised, chained and destructured targets.** `(el.innerHTML) = tainted` (a target JavaScript permits), `el.innerHTML = x = tainted` (the chain writes the terminal value, not the inner assignment) and `[el.innerHTML, y] = [tainted, 1]` were all missed. Destructured targets pair positionally, so `[y, el.innerHTML] = [tainted, 1]` stays clean. The same applies to Python's `(o.sink) = t`, `o.sink = x = t` and `o.sink, other = t, 0`. The traversal is now shared across every tracker rather than copied into each, so a fix lands once.
@@ -1041,7 +1043,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.13.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.14.0...HEAD
+[2.14.0]: https://github.com/shelkesays/safelint/compare/v2.13.0...v2.14.0
 [2.13.0]: https://github.com/shelkesays/safelint/compare/v2.12.1...v2.13.0
 [2.12.1]: https://github.com/shelkesays/safelint/compare/v2.12.0...v2.12.1
 [2.12.0]: https://github.com/shelkesays/safelint/compare/v2.11.1...v2.12.0
