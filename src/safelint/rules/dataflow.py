@@ -80,14 +80,25 @@ def _establishes_nothing(contract: PropertyContract, san_key: str) -> list[str]:
     return [f"{san_key}: empty property list for {', '.join(empty)} - establishes nothing, so it clears no sink."]
 
 
+#: PHP sinks that are language *expressions*, not calls, so they never appear in
+#: the flat ``sinks_php`` list. ``PhpTaintTracker._visit_include`` derives these
+#: names from the node type (``include_expression`` -> ``include``) and consults
+#: their required property directly, so a ``sink_properties_php`` entry naming
+#: one is live config, not a typo.
+_EXPRESSION_SINKS = frozenset({"include", "include_once", "require", "require_once"})
+
+
 def _unknown_property_sinks(contract: PropertyContract, sinks: frozenset[str], sink_key: str) -> list[str]:
     """``sink_properties`` keys that name no configured sink (typo guard).
 
     A property can only be *required* by a call the rule already treats as a
     sink, so an entry whose key is not in the resolved sinks list is inert -
-    almost always a typo or a sink the user forgot to add.
+    almost always a typo or a sink the user forgot to add. PHP's expression
+    sinks are the exception: they are recognised by node type rather than by
+    name lookup, so they are never in the flat list yet their property IS
+    consulted.
     """
-    unknown = sorted(name for name in contract.sink_properties if name not in sinks)
+    unknown = sorted(name for name in contract.sink_properties if name not in sinks and name not in _EXPRESSION_SINKS)
     if not unknown:
         return []
     return [f"{sink_key}: no configured sink named {', '.join(unknown)}, so the required property is never consulted."]
@@ -782,13 +793,67 @@ class TaintedSinkRule(BaseRule):
         "read",
     ]
 
+    #: Python's built-in fallback lists, keyed as ``_resolve_core_lists`` expects.
+    #: Python is the one language whose defaults live here rather than in
+    #: ``DEFAULTS`` (it predates the per-language keys), so both the construction
+    #: audit and ``_python_check`` need the same mapping.
+    _PYTHON_DEFAULTS: ClassVar[dict[str, list[str]]] = {
+        "sinks": _DEFAULT_SINKS,
+        "sanitizers": _DEFAULT_SANITIZERS,
+        "sources": _DEFAULT_SOURCES,
+    }
+
     def __init__(self, config: dict[str, Any]) -> None:
-        """Initialise the rule and the per-run property-warning ledger."""
+        """Initialise the rule and audit the property tables once, up front.
+
+        The audit runs at construction rather than on the per-file path because
+        the engine returns cached results *before* rules run: with a warm cache
+        the rule was never invoked, so the warnings vanished on the second run
+        of an unchanged project. A user who re-ran to read the warning again
+        would conclude it had been transient. Construction happens once per
+        engine regardless of cache state, which also makes the once-per-run
+        de-duplication fall out for free.
+
+        Only languages for which the user actually declared a property table are
+        audited, so a project that never opted in pays nothing and no
+        previously-unvalidated config list starts raising here.
+        """
         super().__init__(config)
-        #: Languages already warned about inert property declarations. The rule
-        #: instance is built once per engine and reused across every file, so
-        #: this keeps each adoption warning to one line per run, not one per file.
-        self._contract_warned: set[str] = set()
+        self._audit_property_contracts()
+
+    def _audit_property_contracts(self) -> None:
+        """Warn about property declarations that cannot take effect, for every configured language.
+
+        De-duplicated by the *resolved config keys* rather than by language:
+        TypeScript falls back to the ``_javascript`` keys when it has none of
+        its own, so auditing per language would emit the identical warning
+        twice for one JS declaration.
+        """
+        audited: set[tuple[str, str]] = set()
+        for lang_name in self.language:
+            if not self._has_property_config(lang_name):
+                continue
+            keys = self._property_key_pair(lang_name)
+            if keys in audited:
+                continue
+            audited.add(keys)
+            defaults = self._PYTHON_DEFAULTS if lang_name == "python" else None
+            sinks, sanitizers, _sources = self._resolve_core_lists(lang_name, defaults)
+            self._resolve_property_contract(lang_name, sinks, sanitizers, warn=True)
+
+    def _property_key_pair(self, lang_name: str) -> tuple[str, str]:
+        """Return the config keys *lang_name* actually resolves its property tables from."""
+        _san, san_key = resolve_lang_config_lookup(self.config, "sanitizer_properties", lang_name, default={})
+        _sink, sink_key = resolve_lang_config_lookup(self.config, "sink_properties", lang_name, default={})
+        return (san_key, sink_key)
+
+    def _has_property_config(self, lang_name: str) -> bool:
+        """Return True if *lang_name* declares either property table."""
+        for base_key in ("sanitizer_properties", "sink_properties"):
+            raw, _key = resolve_lang_config_lookup(self.config, base_key, lang_name, default={})
+            if raw:
+                return True
+        return False
 
     def _resolve_assume_taint_preserving(self) -> bool:
         """Read and validate the ``assume_taint_preserving`` config knob.
@@ -836,7 +901,7 @@ class TaintedSinkRule(BaseRule):
             resolved.append(frozenset(_validated_string_list(raw, key)))
         return resolved[0], resolved[1], resolved[2]
 
-    def _resolve_property_contract(self, lang_name: str, sinks: frozenset[str], sanitizers: frozenset[str]) -> PropertyContract:
+    def _resolve_property_contract(self, lang_name: str, sinks: frozenset[str], sanitizers: frozenset[str], *, warn: bool = False) -> PropertyContract:
         """Resolve the per-language property-typed sanitiser contract for *lang_name*.
 
         ``sanitizer_properties`` maps a sanitiser to the properties it establishes;
@@ -844,9 +909,16 @@ class TaintedSinkRule(BaseRule):
         bare keys, other languages the ``_<lang>`` suffix. Both empty when unset, so
         the contract is inert (every sanitiser clears every sink, as before).
 
-        *sinks* / *sanitizers* are the already-resolved flat lists, used only by
-        :meth:`_warn_inert_contract_entries` to tell the user when a declaration
-        they wrote can never take effect.
+        *sinks* / *sanitizers* are the already-resolved flat lists, consulted only
+        to tell the user when a declaration they wrote can never take effect.
+
+        The property tables are opt-in and fail *open*: a declaration that does
+        not line up with the rest of the config simply never fires, which reads
+        exactly like "the feature does not work". The warnings below make each
+        such case visible, following the project's typo-guard convention (stderr
+        ``safelint: warning:``, never a failed run). They are emitted from
+        :meth:`_audit_property_contracts` at construction, so exactly once per
+        run per language and never skipped by a cache hit.
         """
         san_raw, san_key = resolve_lang_config_lookup(self.config, "sanitizer_properties", lang_name, default={})
         sink_raw, sink_key = resolve_lang_config_lookup(self.config, "sink_properties", lang_name, default={})
@@ -854,39 +926,14 @@ class TaintedSinkRule(BaseRule):
             sanitizer_properties=_validated_property_map(san_raw, san_key),
             sink_properties=_validated_string_map(sink_raw, sink_key),
         )
-        self._warn_inert_contract_entries(lang_name, contract, sinks, sanitizers, san_key, sink_key)
+        if warn:
+            for msg in _inert_contract_messages(contract, sinks, sanitizers, san_key, sink_key):
+                print_warning(msg)
         return contract
-
-    def _warn_inert_contract_entries(
-        self,
-        lang_name: str,
-        contract: PropertyContract,
-        sinks: frozenset[str],
-        sanitizers: frozenset[str],
-        san_key: str,
-        sink_key: str,
-    ) -> None:
-        """Warn once per language about property declarations that cannot take effect.
-
-        The property tables are opt-in and fail *open*: a declaration that does
-        not line up with the rest of the config simply never fires, which reads
-        exactly like "the feature does not work". These warnings make each such
-        case visible instead, following the project's typo-guard convention
-        (stderr ``safelint: warning:``, never a failed run). Emitted once per
-        language per run - the rule instance outlives the per-file loop.
-        """
-        if lang_name in self._contract_warned:
-            return
-        self._contract_warned.add(lang_name)
-        for msg in _inert_contract_messages(contract, sinks, sanitizers, san_key, sink_key):
-            print_warning(msg)
 
     def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run Python taint analysis on every function in *tree*."""
-        sinks, sanitizers, sources = self._resolve_core_lists(
-            "python",
-            {"sinks": self._DEFAULT_SINKS, "sanitizers": self._DEFAULT_SANITIZERS, "sources": self._DEFAULT_SOURCES},
-        )
+        sinks, sanitizers, sources = self._resolve_core_lists("python", self._PYTHON_DEFAULTS)
         assume = self._resolve_assume_taint_preserving()
         receiver_sinks = self._resolve_receiver_sinks("python")
         contract = self._resolve_property_contract("python", sinks, sanitizers)
