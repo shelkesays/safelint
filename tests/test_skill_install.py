@@ -17,6 +17,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from safelint import _skill_install, cli
+from safelint.core.config import DEFAULTS
 
 
 if TYPE_CHECKING:
@@ -3859,3 +3860,43 @@ def test_cli_routes_skill_remove(monkeypatch: pytest.MonkeyPatch, mocker: Mocker
         cli.main()
     assert exc.value.code == 0
     spy.assert_called_once()
+
+
+# ---------------------------------------------------------------------------
+# SAFE801 default-list drift in the bundled language addenda
+#
+# The existing drift tests assert every rule CODE and NAME appears in each
+# client file. They say nothing about the per-language SAFE801 rows, which
+# enumerate the shipped sink / sanitizer / source defaults - and those rows
+# have silently fallen behind DEFAULTS three times (Java, PHP, JavaScript).
+# An out-of-date list here is not cosmetic: a reader concludes they have
+# coverage they do not have, or that a name is safe to declare properties for
+# when the flat list will shadow it.
+# ---------------------------------------------------------------------------
+
+#: ``(language, config suffix)`` for the addenda whose SAFE801 row enumerates
+#: its defaults exhaustively. C's sink row deliberately writes "``execl``
+#: family" rather than listing ``execlp`` / ``execv`` / ``execvp``, and the
+#: C / C++ sanitizer and source rows summarise in prose ("narrow generic set",
+#: "mirror C"), so those pairs are excluded rather than forced to enumerate.
+_ENUMERATED_ADDENDA = [
+    ("javascript", "_javascript", ("sinks", "sanitizers", "sources")),
+    ("java", "_java", ("sinks", "sanitizers", "sources")),
+    ("rust", "_rust", ("sinks", "sanitizers", "sources")),
+    ("go", "_go", ("sinks", "sanitizers", "sources")),
+    ("php", "_php", ("sinks", "sanitizers", "sources")),
+    ("c", "_c", ("sources",)),
+]
+
+
+@pytest.mark.parametrize(["language", "suffix", "kinds"], _ENUMERATED_ADDENDA, ids=[case[0] for case in _ENUMERATED_ADDENDA])
+def test_skill_addendum_lists_every_shipped_default(language: str, suffix: str, kinds: tuple[str, ...]) -> None:
+    """Every configured default appears in the addendum's SAFE801 row."""
+    addendum = Path(__file__).parent.parent / "src" / "safelint" / "skill_files" / "languages" / f"{language}.md"
+    row = next((line for line in addendum.read_text(encoding="utf-8").split("\n") if "SAFE801 | tainted_sink" in line), None)
+    assert row is not None, f"{language}.md has no SAFE801 row"
+
+    for kind in kinds:
+        configured = DEFAULTS["rules"]["tainted_sink"][f"{kind}{suffix}"]
+        missing = [name for name in configured if f"`{name}`" not in row]
+        assert not missing, f"{language}.md SAFE801 row omits {kind}{suffix} entries: {missing}"
