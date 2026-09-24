@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Real-world validation harness** (`scripts/validate_real_world.py`). Runs one open-source project for one language against a given safelint binary - twice, with every rule enabled and then with stock defaults - and writes a committed summary to `plan/real-world-results/` with per-rule counts, the project's commit SHA, the safelint version, wall time and peak memory. It asks the binary under test for its rule registry (`list-rules --format json`) so config generation cannot drift from the version being validated, passes config via `--config` so a `safelint.toml` inside the cloned project cannot silently override it, filters results to the language's extensions, and excludes `vendor/` / `target/` / `third_party/` on top of the built-in exclusions. Dev tooling only - nothing in the wheel changes. The programme it serves, and the fifteen rule defects its first pass found (#153-#166), are in `plan/real-world-validation.md`; the first committed result is the published 2.14.0 against Spring PetClinic.
+
 ## [2.14.0] - 2026-09-24
 
 ### Fixed

@@ -19,6 +19,19 @@ import pytest
 _HARNESS = Path(__file__).parent.parent / "scripts" / "validate_real_world.py"
 
 
+def _safelint_on_path() -> Path:
+    """The ``safelint`` entry point ``uv run`` puts on PATH, as a Path.
+
+    ``shutil.which`` returns ``str | None``; the tests that call this are
+    skipped when it is ``None``, but the type checker cannot see the skip, so
+    narrow here rather than at each call site.
+    """
+    found = shutil.which("safelint")
+    if found is None:
+        pytest.skip("safelint entry point not on PATH")
+    return Path(found)
+
+
 def _load_harness():
     """Import the script as a module without it being a package."""
     spec = importlib.util.spec_from_file_location("validate_real_world", _HARNESS)
@@ -45,7 +58,7 @@ def test_harness_end_to_end(tmp_path: Path) -> None:
     out = tmp_path / "results"
 
     harness = _load_harness()
-    target = harness.Target(Path(shutil.which("safelint")), "python", project, "smoke", out_dir=out)
+    target = harness.Target(_safelint_on_path(), "python", project, "smoke", out_dir=out)
     results = harness.validate(target)
 
     assert [r.mode for r in results] == ["all-rules", "defaults"]
@@ -75,10 +88,8 @@ def test_config_generation_puts_preset_in_the_right_table() -> None:
 
 def test_rules_for_asks_the_binary_not_the_checkout() -> None:
     """The rule list comes from the binary under test, filtered by language."""
-    if shutil.which("safelint") is None:
-        pytest.skip("safelint entry point not on PATH")
     harness = _load_harness()
-    names = harness.rules_for(Path(shutil.which("safelint")), "go")
+    names = harness.rules_for(_safelint_on_path(), "go")
     assert "no_recursion" in names, "cross-language rule present"
     assert "bare_except" not in names, "SAFE201 is not registered for Go"
     assert sys.version_info >= (3, 11)
