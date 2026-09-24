@@ -40,7 +40,7 @@ SAFE106 (`nonlocal_jumps`), SAFE310 (`dynamic_allocation`), SAFE311 (`complex_ma
 - **SAFE310** additionally flags C++ `new` / `delete` expressions as dynamic allocation (alongside the configured `malloc`-family calls).
 - **SAFE313** naturally exempts smart pointers: `std::unique_ptr<T>` is a class template, not a `pointer_declarator`, so it never trips the raw multi-level-pointer check.
 
-Each reads a `_cpp`-suffixed config list (`nonlocal_jump_calls_cpp`, `allocation_calls_cpp`, ...) so a project can diverge its C and C++ knobs.
+Two of them take `_cpp`-suffixed config lists so a project can diverge its C and C++ knobs: SAFE106 (`nonlocal_jump_calls_cpp`) and SAFE310 (`allocation_calls_cpp`). SAFE311, SAFE312 and SAFE313 have no configurable name list - they match on syntax alone. The try/catch rules below (SAFE201-SAFE203) share the cross-language error-handling options rather than taking `_cpp` keys.
 
 ### Error handling (`try` / `catch` / `throw`)
 
