@@ -117,13 +117,25 @@ class RunResult:
     """One safelint run, already filtered to the language under test."""
 
     mode: str
-    files_checked: int
+    files_checked: int  # every supported file safelint scanned, ALL languages
     violations: list[dict[str, Any]]
     wall_seconds: float
     peak_rss_mb: float
     stderr: str = ""
     exit_code: int = 0
     counts: dict[str, int] = field(default_factory=dict)
+
+    @property
+    def files_with_findings(self) -> int:
+        """Distinct files of the language under test that carry at least one finding.
+
+        ``files_checked`` is safelint's own count and includes every language it
+        scanned - Ruff's repository holds thousands of Python test fixtures, so
+        a Rust run reports 5037 files for 2006 Rust sources. safelint does not
+        report per-language scan counts, so this is the honest per-language
+        number that CAN be derived from the filtered findings.
+        """
+        return len({str(v["filepath"]) for v in self.violations})
 
 
 def _run(cmd: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
@@ -263,7 +275,8 @@ def summary_markdown(target: Target, version: str, sha: str, results: list[RunRe
         head += [
             f"## {r.mode}",
             "",
-            f"- files checked: {r.files_checked}",
+            f"- files scanned (all languages): {r.files_checked}",
+            f"- {target.lang} files with findings: {r.files_with_findings}",
             f"- findings ({target.lang} files only): **{len(r.violations)}**",
             f"- wall time: {r.wall_seconds:.1f}s, peak RSS: {r.peak_rss_mb:.0f} MB, exit code: {r.exit_code}",
             "",
@@ -327,7 +340,7 @@ def main(argv: list[str] | None = None) -> int:
     summary = write_outputs(target, version, sha, results)
     for r in results:
         top = ", ".join(f"{c}:{n}" for c, n in sorted(r.counts.items(), key=lambda kv: -kv[1])[:6])
-        print(f"  {r.mode:<10} files={r.files_checked:<5} findings={len(r.violations):<6} {r.wall_seconds:5.1f}s {r.peak_rss_mb:5.0f}MB  {top}")
+        print(f"  {r.mode:<10} scanned={r.files_checked:<5} {target.lang}-files-hit={r.files_with_findings:<5} findings={len(r.violations):<6} {r.wall_seconds:5.1f}s {r.peak_rss_mb:5.0f}MB  {top}")
     print(f"summary: {summary}")
     return 0
 

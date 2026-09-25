@@ -157,8 +157,8 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | TypeScript | Superset frontend | `apache/superset` (`superset-frontend/`) | Large React/TS app; already run, and the source of the styled-components finding | run |
 | Java | Commons Lang | `apache/commons-lang` | Vanilla Java, no framework; pure library idioms | todo |
 | Java | Guava | `google/guava` | Large, heavily reviewed, different house style | todo |
-| Rust | Ruff | `astral-sh/ruff` | Large modern idiomatic Rust; a linter itself | todo |
-| Rust | ty | `astral-sh/ty` | Same authors, different shape; type checker | todo |
+| Rust | Ruff | `astral-sh/ruff` | Large modern idiomatic Rust; a linter itself. **Includes ty**: the type checker's source is `crates/ty_*` in this monorepo | run (`plan/real-world-results/rust-ruff-2.14.0-0be08a2.md`) |
+| Rust | ripgrep | `BurntSushi/ripgrep` | Single author, different domain, classic idiomatic Rust - the unrelated second project the two-project rule requires | run (`plan/real-world-results/rust-ripgrep-2.14.0-3fce3b5.md`) |
 | Go | Cobra | `spf13/cobra` | CLI library; no web framework involved | todo |
 | Go | fzf | `junegunn/fzf` | Application rather than library; concurrency-heavy | todo |
 | PHP | Guzzle | `guzzle/guzzle` | Widely used PHP with no framework preset | todo |
@@ -182,6 +182,15 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | javascript / `deno` | Deno std | `denoland/std` | todo |
 | javascript / `bun` | Elysia | `elysiajs/elysia` | todo |
 | javascript / `cloudflare-workers` | Workers templates | `cloudflare/templates` | todo |
+
+Notes on the Rust rows:
+
+* **`astral-sh/ty` was dropped as a row.** The clone has 96 files and zero
+  Rust: it is a docs-and-releases stub, and ty's 404 `.rs` files live in the
+  Ruff monorepo under `crates/ty_*`. So "Ruff and ty" was one repository,
+  one set of authors, one house style - exactly what the two-project rule is
+  meant to rule out. Running Ruff already covers ty's code; ripgrep supplies
+  the genuinely unrelated second project.
 
 Notes on the runtime rows:
 
@@ -267,20 +276,24 @@ confirming on a public one before the issue is worked.
 | # | Rule | Defect | Severity | Default-on? | Verified | Found in | Issue |
 |---|---|---|---|---|---|---|---|
 | 1 | SAFE105 | Java method overload counted as recursion | High | **yes** | yes | spring-petclinic | #153 |
-| 2 | SAFE102 | JS/TS `else if` counted as nesting (fix exists for Python/PHP) | High | **yes** | yes | v4 (private) | #154 |
+| 2 | SAFE102 | `else if` counted as nesting in JS/TS **and Rust** (fix exists for Python/PHP) | High | **yes** | yes | v4 (private), ripgrep | #154 |
 | 3 | SAFE803 | Python `dict.get(k, default)` cannot return None but is flagged | High | no | yes | salessync (private) | #155 |
 | 4 | SAFE802 | Python `flagged_calls` defaults are C/POSIX; `mkdir`/`unlink`/etc. return None | High | no | yes | salessync (private) | #156 |
 | 5 | SAFE907 | `Validator::make()` unrecognised, so the validation call is flagged as unvalidated | High | preset | yes | freescout | #157 |
 | 6 | SAFE801 | PHP `query` sink collides with Eloquent / php-imap; zero-arg receiver branch fires | High | no | agent | freescout | #158 |
 | 7 | SAFE203 | Fires on handlers that re-raise; message says "swallowed" | Medium | no | yes | salessync (private) | #159 |
 | 8 | SAFE203 | PHP log-method set is hard-coded, misses project logging wrappers | Medium | no | agent | freescout | #159 |
-| 9 | SAFE105 | Rust: bare call inside an `impl` method is not a self-call | Medium | **yes** | agent | arkstore (private) | #160 |
+| 9 | SAFE105 | Rust: bare call inside an `impl` method is not a self-call | **High** | **yes** | yes | arkstore (private), ripgrep 8/32 | #160 |
 | 10 | SAFE207 | Rust: blind to logging one call hop away in a helper | Medium | no | agent | arkstore (private) | #161 |
 | 11 | SAFE908 | Fires on stock Laravel `TrimStrings` / `EncryptCookies` | Medium | preset | agent | freescout | #162 |
 | 12 | SAFE601 | `test_functions_only=false` default makes it 56-92% of all output | Tuning | no | yes | all four | #163 |
 | 13 | SAFE102 | Python counts `with` / `try` as nesting levels | Tuning | **yes** | agent | salessync (private) | #166 |
 | 14 | SAFE101 | JS reports `<anonymous>` for `const Foo = () => {}` | Low | **yes** | agent | v4 (private) | #165 |
 | 15 | - | `styled.div<T>` template literals fail to parse (tree-sitter-typescript) | Medium | n/a | yes | superset-frontend | #164 |
+| 16 | SAFE501 | Rust `loop {}` exiting via `return` called an infinite loop - 7/7 FP | High | **yes** | yes | ripgrep | #170 |
+| 17 | SAFE304 | Rust `write!`/`writeln!` to a `Formatter` or `String` counted as I/O | High | **yes** | yes | ripgrep | #171 |
+| 18 | SAFE208 | Rust test context misses cargo `tests/` and parent-file `#[cfg(test)] mod x;` | Medium | no | yes | ripgrep | #172 |
+| 19 | SAFE105 | Rust function-local `use` shadowing the enclosing fn name | Medium | **yes** | yes | ripgrep | #173 |
 
 ## Cross-cutting root cause
 

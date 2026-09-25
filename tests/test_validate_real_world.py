@@ -65,6 +65,7 @@ def test_harness_end_to_end(tmp_path: Path) -> None:
     for r in results:
         assert r.files_checked == 2, "both files are scanned; filtering happens on results"
         assert all(v["filepath"].endswith(".py") for v in r.violations), "JS findings must be filtered out"
+        assert r.files_with_findings <= 1, "only the .py file can carry findings after filtering"
         assert r.wall_seconds > 0
     assert any(code.startswith("SAFE1") for code in results[1].counts), "defaults run should report the arity violation"
 
