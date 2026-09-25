@@ -157,9 +157,9 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | TypeScript | Superset frontend | `apache/superset` (`superset-frontend/`) | Large React/TS app; already run, and the source of the styled-components finding | run |
 | Java | Commons Lang | `apache/commons-lang` | Vanilla Java, no framework; pure library idioms | todo |
 | Java | Guava | `google/guava` | Large, heavily reviewed, different house style | todo |
-| Rust | Ruff | `astral-sh/ruff` | Large modern idiomatic Rust; a linter itself. **Includes ty**: the type checker's source is `crates/ty_*` in this monorepo | run (`plan/real-world-results/rust-ruff-2.14.0-0be08a2.md`) |
-| Rust | ty | `astral-sh/ruff` subtree `crates/ty_` | The type checker: a recursion-heavy subsystem by partly different authors. Validated with `--include` rather than its own clone - see the note below | run (`plan/real-world-results/rust-ty-2.14.0-0be08a2.md`) |
-| Rust | ripgrep | `BurntSushi/ripgrep` | Single author, different domain, classic idiomatic Rust - the unrelated second project the two-project rule requires | run (`plan/real-world-results/rust-ripgrep-2.14.0-3fce3b5.md`) |
+| Rust | Ruff | `astral-sh/ruff` | Large modern idiomatic Rust; a linter itself. **Includes ty**: the type checker's source is `crates/ty_*` in this monorepo | **triaged** (`plan/real-world-results/rust-ruff-2.14.0-0be08a2.md`) |
+| Rust | ty | `astral-sh/ruff` subtree `crates/ty_` | The type checker: a recursion-heavy subsystem by partly different authors. Validated with `--include` rather than its own clone - see the note below | **triaged** (`plan/real-world-results/rust-ty-2.14.0-0be08a2.md`) |
+| Rust | ripgrep | `BurntSushi/ripgrep` | Single author, different domain, classic idiomatic Rust - the unrelated second project the two-project rule requires | **triaged** (`plan/real-world-results/rust-ripgrep-2.14.0-3fce3b5.md`) |
 | Go | Cobra | `spf13/cobra` | CLI library; no web framework involved | todo |
 | Go | fzf | `junegunn/fzf` | Application rather than library; concurrency-heavy | todo |
 | PHP | Guzzle | `guzzle/guzzle` | Widely used PHP with no framework preset | todo |
@@ -299,6 +299,48 @@ confirming on a public one before the issue is worked.
 | 17 | SAFE304 | Rust `write!`/`writeln!` to a `Formatter` or `String` counted as I/O | High | **yes** | yes | ripgrep | #171 |
 | 18 | SAFE208 | Rust test context misses cargo `tests/` and parent-file `#[cfg(test)] mod x;` | Medium | no | yes | ripgrep | #172 |
 | 19 | SAFE105 | Rust function-local `use` shadowing the enclosing fn name | Medium | **yes** | yes | ripgrep | #173 |
+| 20 | SAFE110 | Rust `mut` reassigned inside a closure called needless - **the fix does not compile (E0594)** | **High** | no | yes | ty 82/285, ruff 77% | #176 |
+| 21 | SAFE000 | Rust macro named after a primitive type (`str!`) fails to parse; file silently skipped | Medium | n/a | yes | ruff | #174 |
+| 22 | - | A parse failure removes a file from analysis with no summary signal | Medium | n/a | yes | ruff, superset | #175 |
+| 23 | SAFE601 | `assertion_calls_rust` omits the insta snapshot macros - 557 real tests read as assertion-free | High | no | yes | ruff | #177 |
+| 24 | SAFE304/303 | Rust I/O primitives matched by bare method name, receiver ignored | High | **yes** | yes | ruff | #178 |
+| 25 | SAFE501 | Blind inside Rust macro token trees - three literal `break;` unseen | High | **yes** | yes | ty | #179 |
+| 26 | SAFE801 | Rust sinks matched by bare callee - a closure parameter named `query` fires | High | no | yes | ty 3/4, ruff 5/5 | #180 |
+| 27 | SAFE104 | Rust exhaustive `match` arms dominate the complexity score | Tuning | **yes** | yes | ruff 54%, ty 24% | #181 |
+
+## What three Rust projects showed together
+
+The Rust sweep ran against ripgrep (110 files, one author, search tool), ty
+(404 files, type checker) and Ruff (2006 files, linter and formatter). Cross-
+comparing them is what separated rule defects from codebase style.
+
+**Rates for every defect, measured rather than anecdotal:**
+
+| Defect | ripgrep | ty | Ruff |
+|---|---|---|---|
+| #170 SAFE501 `return`-only exit | 7/7 (100%) | 19/19 (100%) | 10/11 (91%) |
+| #171 SAFE304 `write!` to a Formatter | 41% | 66% | 69% |
+| #154 SAFE102 `else if` tax | present | 11.7% | 9.5% |
+| #172 SAFE208 cargo `tests/` | 21% | 17% | 11% |
+| #160 SAFE105 bare call in `impl` | 25% | 9.3% | 5.1% |
+| #163 SAFE601 share of output | 79% | 81.5% | 74.2% |
+
+**SAFE501 produced one true positive in 37 findings across three projects.** A
+rule that is wrong 97% of the time on its own subject language is not mistuned.
+
+**What each project contributed that the others could not.** ripgrep, being
+small and single-author, gave a clean baseline - every pattern in it is
+rule-inherent, not house style. ty, recursion-heavy, made SAFE105 look *better*
+(90% genuine vs 72%) while making SAFE104 and SAFE601 look far worse, and
+exposed macro-token-tree blindness via `crossbeam::select!`. Ruff, at library
+scale, exposed mechanisms that need many authors and many crates to surface at
+all: trait-impl delegation, receiver-blind I/O matching, and the insta gap.
+
+**A pattern found in only one project was treated as unproven** until checked
+in the others. That is what the two-project rule buys, and it earned its keep:
+#173's `use`-shadow appeared once in ripgrep and never in ty, but two *other*
+binding forms of the same bug appeared in Ruff and ty - so the fix had to widen
+rather than being dismissed as a one-off.
 
 ## Cross-cutting root cause
 
