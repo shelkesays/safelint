@@ -158,6 +158,7 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | Java | Commons Lang | `apache/commons-lang` | Vanilla Java, no framework; pure library idioms | todo |
 | Java | Guava | `google/guava` | Large, heavily reviewed, different house style | todo |
 | Rust | Ruff | `astral-sh/ruff` | Large modern idiomatic Rust; a linter itself. **Includes ty**: the type checker's source is `crates/ty_*` in this monorepo | run (`plan/real-world-results/rust-ruff-2.14.0-0be08a2.md`) |
+| Rust | ty | `astral-sh/ruff` subtree `crates/ty_` | The type checker: a recursion-heavy subsystem by partly different authors. Validated with `--include` rather than its own clone - see the note below | run (`plan/real-world-results/rust-ty-2.14.0-0be08a2.md`) |
 | Rust | ripgrep | `BurntSushi/ripgrep` | Single author, different domain, classic idiomatic Rust - the unrelated second project the two-project rule requires | run (`plan/real-world-results/rust-ripgrep-2.14.0-3fce3b5.md`) |
 | Go | Cobra | `spf13/cobra` | CLI library; no web framework involved | todo |
 | Go | fzf | `junegunn/fzf` | Application rather than library; concurrency-heavy | todo |
@@ -185,12 +186,16 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 
 Notes on the Rust rows:
 
-* **`astral-sh/ty` was dropped as a row.** The clone has 96 files and zero
-  Rust: it is a docs-and-releases stub, and ty's 404 `.rs` files live in the
-  Ruff monorepo under `crates/ty_*`. So "Ruff and ty" was one repository,
-  one set of authors, one house style - exactly what the two-project rule is
-  meant to rule out. Running Ruff already covers ty's code; ripgrep supplies
-  the genuinely unrelated second project.
+* **`astral-sh/ty` has no Rust in it.** The clone is 96 files of docs and
+  release config; the type checker's 404 `.rs` files live in the Ruff monorepo
+  under `crates/ty_*`. It is validated as a **subtree** of the Ruff clone via
+  `--include crates/ty_`, which is why the harness grew that flag.
+* **ty is a subset of Ruff, so their numbers overlap.** Ruff's row counts the
+  whole monorepo including ty. When triaging, the linter crates and the ty
+  crates are sampled separately so nothing is counted twice, and the two are
+  treated as one project for the purposes of the two-project rule - same
+  repository, same house style. **ripgrep is the genuinely unrelated second
+  Rust project**, which is what makes a pattern appearing in both meaningful.
 
 Notes on the runtime rows:
 
