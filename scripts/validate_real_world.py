@@ -37,6 +37,10 @@ Design points, each the fix for something the first pass got wrong:
   source inside ``.venv`` directories and called it Go.
 * The project's ``HEAD`` SHA is recorded, so a later "fixed and re-ran clean"
   can be reproduced against the same code.
+* ``--include`` narrows results to a subtree, for monorepos that hold several
+  distinct projects. ``astral-sh/ty`` is the motivating case: its repository is
+  a docs stub, and the type checker's real source is ``crates/ty_*`` inside the
+  Ruff monorepo, so it can only be validated as a subtree of that clone.
 """
 
 from __future__ import annotations
@@ -109,6 +113,7 @@ class Target:
     label: str
     preset: str | None = None
     pydantic: bool = False
+    include: str | None = None  # keep only findings whose path contains this
     out_dir: Path = Path("plan/real-world-results")
 
 
@@ -229,6 +234,8 @@ def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
     exts = EXTENSIONS[target.lang]
     raw: list[dict[str, Any]] = payload.get("violations", [])
     violations = [v for v in raw if str(v["filepath"]).endswith(exts)]
+    if target.include:
+        violations = [v for v in violations if target.include in str(v["filepath"])]
     files_checked = int(payload.get("summary", {}).get("files_checked", 0))
     result = RunResult(mode, files_checked, violations, float(env["wall"]), float(env["rss_mb"]), env["err"], env["rc"])
     for v in violations:
@@ -266,7 +273,7 @@ def summary_markdown(target: Target, version: str, sha: str, results: list[RunRe
         f"# {target.label} - {target.lang}" + (f" / `{target.preset}`" if target.preset else ""),
         "",
         f"- safelint: **{version}** (`{target.safelint}`)",
-        f"- project: `{target.project}` @ `{sha}`",
+        f"- project: `{target.project}` @ `{sha}`" + (f", subtree `{target.include}`" if target.include else ""),
         f"- preset: `{target.preset or 'none'}`" + (" + `pydantic = true`" if target.pydantic else ""),
         f"- run: {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}",
         "",
@@ -319,11 +326,12 @@ def parse_args(argv: list[str] | None = None) -> Target:
     parser.add_argument("--label", required=True, type=_identifier, help="short project name used in the output filename, e.g. spring-petclinic")
     parser.add_argument("--preset", type=_identifier, help="framework or runtime preset to enable, e.g. django, spring-boot, bun")
     parser.add_argument("--pydantic", action="store_true", help="also set [python] pydantic = true")
+    parser.add_argument("--include", help="keep only findings whose path contains this substring, e.g. crates/ty_ (for a project inside a monorepo)")
     parser.add_argument("--out", type=Path, default=Path("plan/real-world-results"), help="directory for the summary (default: plan/real-world-results)")
     ns = parser.parse_args(argv)
     if not ns.project.is_dir():
         parser.error(f"--project is not a directory: {ns.project}")
-    return Target(ns.safelint, ns.lang, ns.project.resolve(), ns.label, ns.preset, ns.pydantic, ns.out)
+    return Target(ns.safelint, ns.lang, ns.project.resolve(), ns.label, ns.preset, ns.pydantic, ns.include, ns.out)
 
 
 def main(argv: list[str] | None = None) -> int:

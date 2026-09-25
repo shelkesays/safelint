@@ -133,3 +133,34 @@ def test_peak_rss_is_measured_per_run(tmp_path: Path) -> None:
     assert env["rc"] == 3
     assert env["rss_mb"] > 0
     assert env["out"].strip() == "{}"
+
+
+def test_include_narrows_results_to_a_subtree(tmp_path: Path) -> None:
+    """`--include` keeps only findings under a subtree of a monorepo.
+
+    The motivating case is astral-sh/ty, whose own repository is a docs stub -
+    the type checker's source lives in `crates/ty_*` inside the Ruff monorepo,
+    so it can only be validated as a subtree of that clone.
+    """
+    project = tmp_path / "mono"
+    (project / "crates" / "ty_core").mkdir(parents=True)
+    (project / "crates" / "linter").mkdir(parents=True)
+    bad = "def f(a, b, c, d, e, f, g, h):\n    return a\n"
+    (project / "crates" / "ty_core" / "a.py").write_text(bad, encoding="utf-8")
+    (project / "crates" / "linter" / "b.py").write_text(bad, encoding="utf-8")
+
+    harness = _load_harness()
+    whole = harness.Target(_safelint_on_path(), "python", project, "mono", out_dir=tmp_path / "o1")
+    subtree = harness.Target(_safelint_on_path(), "python", project, "ty", include="crates/ty_", out_dir=tmp_path / "o2")
+
+    whole_files = {v["filepath"] for v in harness.validate(whole)[1].violations}
+    subtree_results = harness.validate(subtree)[1]
+    subtree_files = {v["filepath"] for v in subtree_results.violations}
+
+    assert len(whole_files) == 2, "both crates report without --include"
+    assert len(subtree_files) == 1, "--include keeps only the subtree"
+    assert all("crates/ty_" in f for f in subtree_files)
+    assert subtree_results.files_with_findings == 1
+
+    summary = harness.write_outputs(subtree, "0.0.0-test", "abc1234567", subtree_results and harness.validate(subtree))
+    assert "subtree `crates/ty_`" in summary.read_text(encoding="utf-8"), "provenance records the subtree"
