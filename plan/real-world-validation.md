@@ -8,9 +8,9 @@ classifying each finding as a true positive, a false positive, or debatable.
 
 safelint's own test suite proves rules fire on code written to make them fire.
 It cannot prove they *stay quiet* on idiomatic code someone else wrote. The
-first pass of this programme (2026-09-24, against a mix of private and public
-codebases) found fifteen
-defects that the full suite - 2228 tests, 97% coverage - does not catch, because
+programme has so far found **27** defects across Python, JavaScript, TypeScript,
+Java, PHP and Rust - none of which the full suite - 2237 tests, 97% coverage -
+catches, because
 every one of them is a rule being wrong about a language idiom rather than wrong
 about its own logic.
 
@@ -272,8 +272,8 @@ mislead:
 
 ## Findings register
 
-Every defect found gets a GitHub issue. All fifteen were found against safelint
-**2.14.0rc3**. `Verified` means reproduced from a minimal case, not just
+Every defect found gets a GitHub issue. Findings 1-15 were found against safelint
+**2.14.0rc3**, findings 16-27 against the released **2.14.0**. `Verified` means reproduced from a minimal case, not just
 observed in a large codebase. `Found in` is where it first surfaced, so the
 claim can be re-checked; a private project there means the finding still needs
 confirming on a public one before the issue is worked.
