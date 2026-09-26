@@ -1141,3 +1141,31 @@ def test_rust_destructuring_let_in_a_closure_does_not_shadow(tmp_path: Path) -> 
     """
     src = "fn outer(items: Vec<(bool, u32)>) -> bool {\n    let mut failed = false;\n    items.iter().for_each(|p| { let (mut failed, _n) = *p; failed = true; let _ = failed; });\n    failed\n}\n"
     assert _safe110(src, tmp_path, "tuple.rs") == []
+
+
+def test_rust_mut_borrowed_in_the_shadowing_lets_initializer_is_not_needless(tmp_path: Path) -> None:
+    """A shadowing ``let``'s INITIALIZER runs in the enclosing scope.
+
+    ``let failed = &mut failed;`` mutably borrows the outer binding: the new one
+    does not exist until the statement completes. Cutting the scan off at the
+    ``let``'s start hid that borrow and reported the outer ``mut`` as needless,
+    which rustc rejects with E0594 - the same defect as the mutation-before-shadow
+    case, one line later. The cutoff is the ``let``'s end for this reason.
+    """
+    src = "fn outer() -> bool {\n    let mut failed = false;\n    let mut cb = || { let failed = &mut failed; *failed = true; };\n    cb();\n    failed\n}\n"
+    # Line 3's own ``mut cb`` is a separate, pre-existing matter (calling a FnMut
+    # closure needs ``mut``, which the rule does not yet recognise), so assert on
+    # the outer binding specifically rather than on an empty result.
+    assert 2 not in [v.lineno for v in _safe110(src, tmp_path, "init.rs")], "the outer binding is mutably borrowed"
+
+
+def test_rust_needless_mut_fires_when_a_typed_closure_parameter_shadows(tmp_path: Path) -> None:
+    """A TYPED closure parameter shadows too (``|mut failed: bool|``).
+
+    An annotated parameter is wrapped in a ``parameter`` node rather than being a
+    bare identifier child, so matching only bare identifiers missed every typed
+    parameter and attributed its assignment to the outer binding.
+    """
+    inner = "let c = |mut failed: bool| { failed = true; }; c(true);"
+    src = f"fn outer(items: Vec<bool>) -> bool {{\n    let mut failed = false;\n    items.iter().for_each(|_x| {{ {inner} }});\n    failed\n}}\n"
+    assert [v.lineno for v in _safe110(src, tmp_path, "typed.rs")] == [2]

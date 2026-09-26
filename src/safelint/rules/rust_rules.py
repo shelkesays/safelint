@@ -1220,7 +1220,11 @@ def _closure_shadows_from(name: str, closure: tree_sitter.Node) -> int | None:
     * a **parameter** (``|failed| ...``) shadows the entire closure, so the
       offset is the closure's own start;
     * a ``let`` that is a **direct statement of the closure's body block**
-      shadows everything after it in that block, so the offset is the ``let``'s.
+      shadows everything after it in that block, so the offset is the ``let``'s
+      END - its initializer is evaluated in the enclosing scope, so
+      ``let failed = &mut failed;`` mutably borrows the OUTER binding and has to
+      stay visible. Taking the start offset instead hid that borrow and reported
+      the outer ``mut`` as needless, i.e. the same E0594 defect one line earlier.
 
     Anything less clear-cut - a tuple-pattern parameter, a ``let`` nested in an
     inner block - returns None, which makes the caller treat the usage as the
@@ -1241,27 +1245,46 @@ def _closure_shadows_from(name: str, closure: tree_sitter.Node) -> int | None:
     outer binding and report it as needless.
     """
     params = closure.child_by_field_name("parameters")
-    if params is not None and any(c.type == _rust.IDENTIFIER and node_text(c) == name for c in params.named_children):
+    if params is not None and _params_bind_name(params, name):
         return closure.start_byte
     body = closure.child_by_field_name("body")
     if body is None or body.type != _rust.BLOCK:
         return None
     for statement in body.named_children:
-        if statement.type == _rust.LET_DECLARATION and _let_binds_plain_name(statement, name):
-            return statement.start_byte
+        if statement.type == _rust.LET_DECLARATION and _binds_plain_name(statement, name):
+            return statement.end_byte
     return None
 
 
-def _let_binds_plain_name(let_decl: tree_sitter.Node, name: str) -> bool:
-    """Return True if *let_decl* binds exactly the identifier *name*.
+def _params_bind_name(params: tree_sitter.Node, name: str) -> bool:
+    """Return True if a parameter of *params* is plainly the identifier *name*.
 
-    The ``pattern`` field is the identifier for both ``let x`` and ``let mut x``
-    (the ``mutable_specifier`` is a sibling, not part of the pattern), so one
-    check covers both. A destructuring pattern lands here as ``tuple_pattern``
-    and correctly does not match: the caller then treats the name as the outer
-    binding's and stays quiet, which is the safe direction.
+    Closure parameters come in two shapes: bare (``|failed|``, the identifier is
+    a direct child) and typed (``|mut failed: bool|``, wrapped in a ``parameter``
+    node). Checking only the first missed every annotated parameter, so an
+    assignment to it was attributed to a same-named outer binding.
     """
-    pattern = let_decl.child_by_field_name("pattern")
+    for param in params.named_children:
+        if param.type == _rust.IDENTIFIER and node_text(param) == name:
+            return True
+        if param.type == _rust.PARAMETER and _binds_plain_name(param, name):
+            return True
+    return False
+
+
+def _binds_plain_name(node: tree_sitter.Node, name: str) -> bool:
+    """Return True if *node*'s ``pattern`` field is exactly the identifier *name*.
+
+    Works for both a ``let_declaration`` and a closure ``parameter``: each puts
+    the bound name on that field, and for ``let mut x`` / ``mut x: T`` the
+    ``mutable_specifier`` is a sibling rather than part of the pattern, so one
+    check covers the ``mut`` and non-``mut`` spellings alike.
+
+    A destructuring pattern arrives as ``tuple_pattern`` and correctly does not
+    match: the caller then treats the name as the outer binding's and stays
+    quiet, which is the safe direction.
+    """
+    pattern = node.child_by_field_name("pattern")
     return pattern is not None and pattern.type == _rust.IDENTIFIER and node_text(pattern) == name
 
 

@@ -273,3 +273,32 @@ def test_a_missing_binary_exits_two_without_a_traceback(tmp_path: Path, capsys: 
     rc = harness.main(["--safelint", str(missing), "--lang", "python", "--project", str(tmp_path), "--label", "x"])
     assert rc == 2
     assert "error:" in capsys.readouterr().err
+
+
+def test_a_directory_named_like_a_source_file_is_not_eligible(tmp_path: Path) -> None:
+    """Eligibility counts FILES: a directory named `generated.py` is not one.
+
+    Without an is_file() test the extension match alone let an otherwise empty
+    subtree pass, which is the case the check exists to reject.
+    """
+    project = tmp_path / "mono"
+    (project / "crates" / "ty_a" / "generated.py").mkdir(parents=True)
+
+    harness = _load_harness()
+    target = harness.Target(_safelint_on_path(), "python", project, "m", include="crates/ty_", out_dir=tmp_path / "o")
+    with pytest.raises(harness.HarnessError, match="selects no python file"):
+        harness.validate(target)
+
+
+def test_unparseable_list_rules_output_is_a_harness_error(tmp_path: Path) -> None:
+    """A binary that exits 0 with non-JSON output must not raise JSONDecodeError.
+
+    It is the same user error as a non-zero exit - `--safelint` does not point at
+    a safelint - so it takes the documented `error:` path, not a traceback.
+    """
+    fake = tmp_path / "safelint"
+    fake.write_text("#!/bin/sh\necho 'safelint: not json at all'\n", encoding="utf-8")
+    fake.chmod(0o755)
+    harness = _load_harness()
+    with pytest.raises(harness.HarnessError, match="did not return the expected JSON"):
+        harness.rules_for(fake, "python")
