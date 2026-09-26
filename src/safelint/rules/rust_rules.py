@@ -754,6 +754,20 @@ def _block_is_noop(block: tree_sitter.Node) -> bool:
 
 _RUST_FUNCTION_TYPES_FOR_SKIP: tuple[str, ...] = (_rust.FUNCTION_ITEM, _rust.CLOSURE_EXPRESSION)
 
+#: Skip set for scans that ask "what happens to this VARIABLE", as opposed to
+#: the per-function metric scans above.
+#:
+#: A nested ``fn`` cannot touch a binding in its enclosing scope - Rust has no
+#: capture for ``fn`` items - so descending into one would attribute an
+#: unrelated same-named local to the outer binding. A **closure** is the
+#: opposite: it captures the enclosing scope, so an assignment inside it is an
+#: assignment to the outer binding and must be seen.
+#:
+#: Reusing the metric skip set here made ``needless_mut`` advise dropping a
+#: ``mut`` that a closure reassigns, which rustc then rejects with E0594 - the
+#: rule's own suggestion did not compile.
+_RUST_LIVENESS_SKIP: tuple[str, ...] = (_rust.FUNCTION_ITEM,)
+
 
 def _node_resolves_to_log_call(node: tree_sitter.Node) -> bool:
     """Return True if *node* is a macro or call resolving to a log-call name."""
@@ -1145,8 +1159,18 @@ def _name_needs_mut_usage(name: str, body: tree_sitter.Node) -> bool:
       conservative: same reasoning).
 
     Index expressions are also ambiguous; treated the same way.
+
+    Descends into **closures**, which capture the enclosing scope, so
+    ``let mut found = false; xs.iter().for_each(|x| { found = true; });`` is
+    correctly seen as needing ``mut``. It does not descend into a nested
+    ``fn``, which cannot reach the binding at all.
+
+    A closure that declares its own binding of the same name shadows the outer
+    one, so its assignment is counted against the outer binding and the rule
+    stays quiet. That direction is deliberate: a missed needless ``mut`` costs
+    nothing, while a wrong suggestion breaks the build.
     """
-    return any(_node_is_mut_use_of(name, n) for n in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP))
+    return any(_node_is_mut_use_of(name, n) for n in walk(body, skip_types=_RUST_LIVENESS_SKIP))
 
 
 def _node_is_mut_use_of(name: str, node: tree_sitter.Node) -> bool:

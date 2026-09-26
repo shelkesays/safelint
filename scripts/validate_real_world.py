@@ -202,7 +202,11 @@ def _measured(cmd: list[str]) -> dict[str, Any]:
 
 def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
     """Run one safelint pass over the project and filter it to the language."""
-    cmd = [str(target.safelint), "check", str(target.project), "--all-files", "--config", str(config_dir), "--format", "json"]
+    # --no-cache: a warm result cache would make a re-run's wall time and memory
+    # meaningless, and this harness reports both. The cache key does include the
+    # safelint version, so it is correct in production - it is re-runs of the
+    # SAME version that would be measured wrong.
+    cmd = [str(target.safelint), "check", str(target.project), "--all-files", "--no-cache", "--config", str(config_dir), "--format", "json"]
     env = _measured(cmd)
     # safelint exits 1 when it finds blocking violations, which is a successful
     # run for our purposes; anything else, or a report we cannot parse, is not.

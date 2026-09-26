@@ -1047,3 +1047,40 @@ def test_rust_non_rust_file_skipped(tmp_path: Path) -> None:
     sample.write_text("def foo():\n    pass\n", encoding="utf-8")
     result = _enabled_engine("undocumented_unsafe").check_file(str(sample))
     assert _violations(result, "SAFE602") == []
+
+
+def _safe110(src: str, tmp_path: Path, name: str = "mut.rs") -> list:
+    """Return SAFE110 violations for *src*."""
+    sample = tmp_path / name
+    sample.write_text(src, encoding="utf-8")
+    return _violations(_enabled_engine("needless_mut").check_file(str(sample)), "SAFE110")
+
+
+def test_rust_let_mut_reassigned_inside_a_closure_is_not_needless(tmp_path: Path) -> None:
+    """A ``mut`` reassigned inside a closure must NOT be reported.
+
+    Rust closures capture the enclosing scope, so the assignment is to the outer
+    binding. The scan used to reuse the per-function metric skip set, which skips
+    closures, and so advised dropping a ``mut`` that rustc requires:
+    ``error[E0594]: cannot assign to `failed`, as it is not declared as mutable``.
+    A wrong suggestion here breaks the build, so the scan errs toward silence.
+    """
+    src = "fn closure_mutates(items: Vec<u32>) -> bool {\n    let mut failed = false;\n    items.iter().for_each(|x| { if *x > 2 { failed = true; } });\n    failed\n}\n"
+    assert _safe110(src, tmp_path) == []
+
+
+def test_rust_mut_borrowed_inside_a_closure_is_not_needless(tmp_path: Path) -> None:
+    """``&mut name`` inside a closure also keeps the binding's ``mut``."""
+    src = "fn closure_borrows(items: Vec<u32>) -> Vec<u32> {\n    let mut out = Vec::new();\n    items.iter().for_each(|x| { push_into(&mut out, *x); });\n    out\n}\n"
+    assert _safe110(src, tmp_path, "borrow.rs") == []
+
+
+def test_rust_needless_mut_still_fires_when_a_nested_fn_shadows_the_name(tmp_path: Path) -> None:
+    """A nested ``fn`` cannot reach the outer binding, so its assignment is unrelated.
+
+    Rust has no capture for ``fn`` items - the inner ``failed`` is a different
+    variable - so the outer ``mut`` really is needless and must still report.
+    """
+    src = "fn outer() -> bool {\n    let mut failed = false;\n    fn inner() -> bool { let mut inner_flag = false; inner_flag = true; inner_flag }\n    failed\n}\n"
+    fired = _safe110(src, tmp_path, "nested.rs")
+    assert [v.lineno for v in fired] == [2], "only the outer binding is needless"
