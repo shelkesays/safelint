@@ -1090,3 +1090,54 @@ def test_rust_needless_mut_still_fires_when_a_nested_fn_shadows_the_name(tmp_pat
     src = "fn outer() -> bool {\n    let mut failed = false;\n    fn inner() -> bool { let mut failed = false; failed = true; failed }\n    failed\n}\n"
     fired = _safe110(src, tmp_path, "nested.rs")
     assert [v.lineno for v in fired] == [2], "only the outer binding is needless"
+
+
+def test_rust_needless_mut_fires_when_a_closure_shadows_the_name(tmp_path: Path) -> None:
+    """A closure's OWN ``let mut`` of the same name is not a usage of the outer binding."""
+    src = "fn outer(items: Vec<u32>) -> bool {\n    let mut failed = false;\n    items.iter().for_each(|x| { let mut failed = false; failed = *x > 2; let _ = failed; });\n    failed\n}\n"
+    assert [v.lineno for v in _safe110(src, tmp_path, "shadow.rs")] == [2]
+
+
+def test_rust_needless_mut_fires_when_a_closure_parameter_shadows_the_name(tmp_path: Path) -> None:
+    """A closure parameter shadows the whole closure body, so nothing in it counts."""
+    src = "fn outer(items: Vec<u32>) -> bool {\n    let mut failed = false;\n    items.iter().for_each(|failed| { let _ = failed; });\n    failed\n}\n"
+    assert [v.lineno for v in _safe110(src, tmp_path, "param.rs")] == [2]
+
+
+def test_rust_mut_used_before_a_closure_shadows_it_is_not_needless(tmp_path: Path) -> None:
+    """Shadowing starts at the ``let``: a mutation BEFORE it is the outer binding's.
+
+    This is the case a whole-closure skip would get wrong. Dropping the ``mut``
+    here makes rustc fail with E0594, so the rule must stay quiet - the reason
+    the shadow cutoff is a byte offset rather than a boolean.
+    """
+    src = (
+        "fn outer(items: Vec<u32>) -> bool {\n    let mut failed = false;\n    items.iter().for_each(|x| { failed = true; let mut failed = false; failed = *x > 2; let _ = failed; });\n    failed\n}\n"
+    )
+    assert _safe110(src, tmp_path, "before.rs") == []
+
+
+def test_rust_a_shadowing_let_in_a_nested_block_is_not_treated_as_shadowing(tmp_path: Path) -> None:
+    """Only a ``let`` directly in the closure's body block shadows; deeper ones do not.
+
+    A ``let`` inside an inner block stops shadowing when that block ends, so a
+    later mutation in the closure body is still the outer binding's. Rather than
+    model block scopes, the rule declines to treat it as shadowing at all, which
+    keeps it quiet instead of risking a wrong suggestion.
+    """
+    inner_block = "{ let mut failed = false; failed = true; let _ = failed; }"
+    src = f"fn outer(items: Vec<u32>) -> bool {{\n    let mut failed = false;\n    items.iter().for_each(|x| {{ {inner_block} failed = true; }});\n    failed\n}}\n"
+    assert _safe110(src, tmp_path, "block.rs") == []
+
+
+def test_rust_destructuring_let_in_a_closure_does_not_shadow(tmp_path: Path) -> None:
+    """A tuple pattern is not matched as a shadow, so the rule errs toward silence.
+
+    ``let (mut failed, _n) = *p;`` does shadow in Rust, but the pattern is a
+    ``tuple_pattern`` rather than a plain identifier and the rule declines to
+    claim a shadow it cannot read unambiguously. The assignment that follows is
+    therefore attributed to the outer binding and nothing is reported - a missed
+    finding, which is the harmless direction.
+    """
+    src = "fn outer(items: Vec<(bool, u32)>) -> bool {\n    let mut failed = false;\n    items.iter().for_each(|p| { let (mut failed, _n) = *p; failed = true; let _ = failed; });\n    failed\n}\n"
+    assert _safe110(src, tmp_path, "tuple.rs") == []

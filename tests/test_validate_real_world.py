@@ -9,9 +9,11 @@ to the language, records provenance, and writes a summary someone can read.
 from __future__ import annotations
 
 import importlib.util
+import itertools
 from pathlib import Path
 import shutil
 import sys
+import tomllib
 
 import pytest
 
@@ -188,3 +190,86 @@ def test_include_is_anchored_at_a_path_boundary() -> None:
     assert not under("/r/vendor/xcrates/ty_x/a.rs", "crates/ty_"), "must not match mid-segment"
     assert not under("/r/crates/typescript/a.rs", "crates/ty_"), "underscore boundary respected"
     assert not under("/r/crates/ty_ide/a.rs", ""), "an empty include matches nothing"
+
+
+def test_python_preset_and_pydantic_share_one_table() -> None:
+    """`--preset django --pydantic` must emit ONE [python] table, not two.
+
+    TOML forbids declaring a table twice, so a header per key made the generated
+    config unparseable and killed the run - and that combination is exactly what
+    the Django / Flask / FastAPI rows of the validation matrix ask for.
+    """
+    harness = _load_harness()
+    target = harness.Target(Path("safelint"), "python", Path(), "x", preset="django", pydantic=True)
+    toml = harness.preset_toml(target)
+    assert toml.count("[python]") == 1, toml
+    assert tomllib.loads(toml) == {"python": {"framework": "django", "pydantic": True}}
+
+
+def test_every_preset_combination_generates_valid_toml() -> None:
+    """No combination of --preset / --pydantic may produce unparseable config."""
+    harness = _load_harness()
+    combinations = itertools.product(sorted(harness.EXTENSIONS), (None, "somepreset"), (False, True))
+    for lang, preset, pydantic in combinations:
+        target = harness.Target(Path("safelint"), lang, Path(), "x", preset=preset, pydantic=pydantic)
+        tomllib.loads(harness.preset_toml(target))  # raises on a duplicate table
+
+
+def test_extra_excludes_stay_in_step_with_the_directory_names() -> None:
+    """The generated glob list is derived from the names the eligibility check uses."""
+    harness = _load_harness()
+    for name in harness.EXCLUDED_DIR_NAMES:
+        assert f"{name}/**" in harness.EXTRA_EXCLUDES
+        assert f"**/{name}/**" in harness.EXTRA_EXCLUDES
+
+
+def test_an_include_matching_no_source_file_is_an_error(tmp_path: Path) -> None:
+    """A mistyped --include must fail loudly, not report zero findings.
+
+    `files_checked` counts the whole project, so the include filter emptying the
+    findings looks identical to a clean subtree - and that report gets committed.
+    """
+    project = tmp_path / "mono"
+    (project / "crates" / "ty_a").mkdir(parents=True)
+    (project / "crates" / "ty_a" / "a.py").write_text("x = 1\n", encoding="utf-8")
+
+    harness = _load_harness()
+    typo = harness.Target(_safelint_on_path(), "python", project, "m", include="crates/typo_", out_dir=tmp_path / "o")
+    with pytest.raises(harness.HarnessError, match="selects no python file"):
+        harness.validate(typo)
+
+
+def test_an_include_matching_only_vendored_files_is_an_error(tmp_path: Path) -> None:
+    """Eligibility ignores vendored trees, which the run would have excluded anyway."""
+    project = tmp_path / "mono"
+    (project / "vendor" / "dep").mkdir(parents=True)
+    (project / "vendor" / "dep" / "a.py").write_text("x = 1\n", encoding="utf-8")
+
+    harness = _load_harness()
+    target = harness.Target(_safelint_on_path(), "python", project, "m", include="vendor", out_dir=tmp_path / "o")
+    with pytest.raises(harness.HarnessError, match="selects no python file"):
+        harness.validate(target)
+
+
+def test_an_include_with_eligible_but_clean_files_is_accepted(tmp_path: Path) -> None:
+    """Zero findings stays valid when the subtree really does contain source files."""
+    project = tmp_path / "mono"
+    (project / "crates" / "ty_a").mkdir(parents=True)
+    (project / "crates" / "ty_a" / "clean.py").write_text('"""Clean."""\n\nNAME = "x"\n', encoding="utf-8")
+
+    harness = _load_harness()
+    target = harness.Target(_safelint_on_path(), "python", project, "m", include="crates/ty_", out_dir=tmp_path / "o")
+    assert harness.validate(target)[1].violations == []
+
+
+def test_a_missing_binary_exits_two_without_a_traceback(tmp_path: Path, capsys: pytest.CaptureFixture[str]) -> None:
+    """Naming a nonexistent --safelint is a user error, not a harness crash.
+
+    Version discovery ran before the error guard, so the likeliest way to invoke
+    the harness wrongly surfaced as a FileNotFoundError traceback.
+    """
+    harness = _load_harness()
+    missing = tmp_path / "not-a-binary"
+    rc = harness.main(["--safelint", str(missing), "--lang", "python", "--project", str(tmp_path), "--label", "x"])
+    assert rc == 2
+    assert "error:" in capsys.readouterr().err
