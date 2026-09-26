@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CI: bump `astral-sh/setup-uv` to v10.2.0 and `anthropics/claude-code-action` to v1.0.231** (folded in from the Dependabot PR). Both remain SHA-pinned; each new SHA was verified against its dereferenced tag object before applying. No packaged behaviour change.
+
 ### Fixed
 
 - **SAFE110 `needless_mut` no longer advises dropping a `mut` that a closure reassigns (Rust).** The scan for "is this binding ever mutated" reused the per-function metric skip set, which skips closure bodies. A Rust closure captures its enclosing scope, so `let mut failed = false; xs.iter().for_each(|x| { failed = true; });` was reported as needless - and dropping the `mut` as advised makes rustc fail with `error[E0594]: cannot assign to 'failed', as it is not declared as mutable`. The liveness scan now has its own skip set that excludes only `function_item`: a nested `fn` genuinely cannot reach the binding (Rust has no capture for `fn` items), while a closure can and routinely does. Measured against the Ruff monorepo, this removes **209 of 519** findings (40%; 126 of 285 inside the ty crates), every sampled one of which required `mut` - including method-receiver uses such as `iter.next()` inside a closure, where `Iterator::next` takes `&mut self`. Found by the real-world validation programme; see `plan/real-world-validation.md`.
