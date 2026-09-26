@@ -72,10 +72,15 @@ EXTENSIONS: dict[str, tuple[str, ...]] = {
     "cpp": (".cpp", ".cxx", ".cc", ".hpp", ".hxx", ".hh"),
 }
 
-#: Vendored / generated trees safelint does not exclude by default. Its own
-#: defaults already cover ``.venv``, ``node_modules``, ``site-packages``,
-#: ``build`` and ``dist``.
-EXTRA_EXCLUDES: tuple[str, ...] = ("vendor/**", "**/vendor/**", "target/**", "**/target/**", "third_party/**", "**/third_party/**")
+#: Directory names holding vendored / generated code, at any depth. safelint's
+#: own defaults already cover ``.venv``, ``node_modules``, ``site-packages``,
+#: ``build`` and ``dist``; these are the ones it does not exclude.
+EXCLUDED_DIR_NAMES: tuple[str, ...] = ("vendor", "target", "third_party")
+
+#: The same trees as the glob patterns safelint's ``extend_exclude_paths`` wants.
+#: Derived from the names above so the generated config and the harness's own
+#: eligibility check cannot drift apart.
+EXTRA_EXCLUDES: tuple[str, ...] = tuple(pattern for name in EXCLUDED_DIR_NAMES for pattern in (f"{name}/**", f"**/{name}/**"))
 
 #: ``--preset`` and ``--label`` are interpolated into a TOML file and a
 #: filename respectively. Restricting both to this shape means a quote or
@@ -171,15 +176,23 @@ def rules_for(binary: Path, lang: str) -> list[str]:
 
 
 def preset_toml(target: Target) -> str:
-    """Return the TOML lines that select the framework / runtime preset, if any."""
-    lines: list[str] = []
+    """Return the TOML lines that select the framework / runtime preset, if any.
+
+    Keys are grouped by table, because TOML forbids declaring the same table
+    twice. ``--lang python --preset django --pydantic`` wants ``framework`` and
+    ``pydantic`` in one ``[python]`` table; emitting a header per key produced
+    ``Cannot declare ('python',) twice`` and the whole run died on its generated
+    config. That combination is exactly what the Django / Flask / FastAPI rows of
+    the validation matrix call for.
+    """
+    tables: dict[str, list[str]] = {}
     section_key = PRESET_KEYS.get(target.lang)
     if target.preset and section_key is not None:
         section, key = section_key
-        lines.append(f'[{section}]\n{key} = "{target.preset}"')
+        tables.setdefault(section, []).append(f'{key} = "{target.preset}"')
     if target.pydantic:
-        lines.append("[python]\npydantic = true")
-    return "\n\n".join(lines)
+        tables.setdefault("python", []).append("pydantic = true")
+    return "\n\n".join(f"[{section}]\n" + "\n".join(keys) for section, keys in tables.items())
 
 
 def write_config(directory: Path, target: Target, rule_names: list[str]) -> None:
@@ -264,8 +277,35 @@ def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
     return result
 
 
+def _check_include_selects_files(target: Target) -> None:
+    """Fail if ``--include`` selects no file of the target language.
+
+    Without this a typo is indistinguishable from a clean subtree: the include
+    filter empties the findings while ``files_checked`` stays positive (it counts
+    the whole project), so the harness would write a confident zero-findings
+    report for a subtree it never actually validated, and that report gets
+    committed. A subtree that genuinely contains eligible files and no findings
+    still passes - only "nothing was ever eligible" is rejected.
+    """
+    if not target.include:
+        return
+    exts = EXTENSIONS[target.lang]
+    for path in target.project.rglob("*"):
+        rel = path.relative_to(target.project)
+        if path.name.endswith(exts) and _path_under(str(rel), target.include) and not _is_excluded(rel):
+            return
+    msg = f"--include {target.include!r} selects no {target.lang} file under {target.project} - check the path (it is matched against paths relative to --project)"
+    raise HarnessError(msg)
+
+
+def _is_excluded(rel: Path) -> bool:
+    """Return True if any component of *rel* is a vendored / generated directory."""
+    return any(part in EXCLUDED_DIR_NAMES for part in rel.parts)
+
+
 def validate(target: Target) -> list[RunResult]:
     """Run the all-rules pass and the stock-defaults pass; return both."""
+    _check_include_selects_files(target)
     names = rules_for(target.safelint, target.lang)
     results: list[RunResult] = []
     with tempfile.TemporaryDirectory(prefix="safelint-validate-") as tmp:
@@ -355,14 +395,20 @@ def parse_args(argv: list[str] | None = None) -> Target:
 
 
 def main(argv: list[str] | None = None) -> int:
-    """Entry point. A run that cannot be measured exits 2 with the reason on stderr."""
+    """Entry point. A run that cannot be measured exits 2 with the reason on stderr.
+
+    Version discovery is inside the guard, not ahead of it: naming a binary that
+    does not exist (or is not executable) is the single likeliest way to invoke
+    this wrongly, and it used to surface as a ``FileNotFoundError`` traceback -
+    which reads like a bug in the harness rather than a typo in the command.
+    """
     target = parse_args(argv)
-    version = safelint_version(target.safelint)
-    sha = project_sha(target.project)
-    print(f"safelint {version} ({target.safelint}) vs {target.label} @ {sha[:7]} [{target.lang}, preset={target.preset or 'none'}]")
     try:
+        version = safelint_version(target.safelint)
+        sha = project_sha(target.project)
+        print(f"safelint {version} ({target.safelint}) vs {target.label} @ {sha[:7]} [{target.lang}, preset={target.preset or 'none'}]")
         results = validate(target)
-    except HarnessError as exc:
+    except (HarnessError, OSError) as exc:
         print(f"error: {exc}", file=sys.stderr)
         return 2
     summary = write_outputs(target, version, sha, results)
