@@ -1078,9 +1078,15 @@ def test_rust_mut_borrowed_inside_a_closure_is_not_needless(tmp_path: Path) -> N
 def test_rust_needless_mut_still_fires_when_a_nested_fn_shadows_the_name(tmp_path: Path) -> None:
     """A nested ``fn`` cannot reach the outer binding, so its assignment is unrelated.
 
-    Rust has no capture for ``fn`` items - the inner ``failed`` is a different
-    variable - so the outer ``mut`` really is needless and must still report.
+    Rust has no capture for ``fn`` items, so the inner ``failed`` is a different
+    variable and the outer ``mut`` really is needless and must still report.
+
+    The two bindings deliberately share the name ``failed``: that is what makes
+    this the counterpart to the closure tests above rather than a restatement of
+    them. Were ``FUNCTION_ITEM`` dropped from ``_RUST_LIVENESS_SKIP``, the outer
+    scan would see the inner ``failed = true`` and silently suppress a genuine
+    finding. With distinct names the assertion would pass either way.
     """
-    src = "fn outer() -> bool {\n    let mut failed = false;\n    fn inner() -> bool { let mut inner_flag = false; inner_flag = true; inner_flag }\n    failed\n}\n"
+    src = "fn outer() -> bool {\n    let mut failed = false;\n    fn inner() -> bool { let mut failed = false; failed = true; failed }\n    failed\n}\n"
     fired = _safe110(src, tmp_path, "nested.rs")
     assert [v.lineno for v in fired] == [2], "only the outer binding is needless"
