@@ -754,6 +754,20 @@ def _block_is_noop(block: tree_sitter.Node) -> bool:
 
 _RUST_FUNCTION_TYPES_FOR_SKIP: tuple[str, ...] = (_rust.FUNCTION_ITEM, _rust.CLOSURE_EXPRESSION)
 
+#: Skip set for scans that ask "what happens to this VARIABLE", as opposed to
+#: the per-function metric scans above.
+#:
+#: A nested ``fn`` cannot touch a binding in its enclosing scope - Rust has no
+#: capture for ``fn`` items - so descending into one would attribute an
+#: unrelated same-named local to the outer binding. A **closure** is the
+#: opposite: it captures the enclosing scope, so an assignment inside it is an
+#: assignment to the outer binding and must be seen.
+#:
+#: Reusing the metric skip set here made ``needless_mut`` advise dropping a
+#: ``mut`` that a closure reassigns, which rustc then rejects with E0594 - the
+#: rule's own suggestion did not compile.
+_RUST_LIVENESS_SKIP: tuple[str, ...] = (_rust.FUNCTION_ITEM,)
+
 
 def _node_resolves_to_log_call(node: tree_sitter.Node) -> bool:
     """Return True if *node* is a macro or call resolving to a log-call name."""
@@ -1145,8 +1159,133 @@ def _name_needs_mut_usage(name: str, body: tree_sitter.Node) -> bool:
       conservative: same reasoning).
 
     Index expressions are also ambiguous; treated the same way.
+
+    Descends into **closures**, which capture the enclosing scope, so
+    ``let mut found = false; xs.iter().for_each(|x| { found = true; });`` is
+    correctly seen as needing ``mut``. It does not descend into a nested
+    ``fn``, which cannot reach the binding at all.
+
+    A closure that binds *name* itself shadows the outer binding from the point
+    of that binding onwards, so usages after it are NOT usages of the outer one
+    (see :func:`_closure_shadows_from`). Usages *before* it still are.
     """
-    return any(_node_is_mut_use_of(name, n) for n in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP))
+    # Iterative DFS carrying the byte offset from which *name* is shadowed by a
+    # closure-local binding (None = not shadowed). Recursion is not an option:
+    # SAFE105 polices this file, and the recursive shape overflowed the stack on
+    # real input (Ruff nests closures deeply enough to exceed the limit).
+    stack: list[tuple[tree_sitter.Node, int | None]] = [(body, None)]
+    while len(stack) > 0:
+        node, cutoff = stack.pop()
+        if _is_out_of_reach(node, cutoff):
+            continue
+        if _node_is_mut_use_of(name, node):
+            return True
+        cutoff = _closure_scope_cutoff(name, node, cutoff)
+        if cutoff != node.start_byte:  # equal only when a parameter shadows this whole closure
+            stack.extend((child, cutoff) for child in node.named_children)
+    return False
+
+
+def _is_out_of_reach(node: tree_sitter.Node, cutoff: int | None) -> bool:
+    """Return True if *node* cannot be a usage of the binding under consideration.
+
+    Either it is a nested ``fn`` (no capture, so a different variable entirely),
+    or it sits at/after the byte offset from which a closure-local binding of the
+    same name has taken over.
+    """
+    if node.type in _RUST_LIVENESS_SKIP:
+        return True
+    return cutoff is not None and node.start_byte >= cutoff
+
+
+def _closure_scope_cutoff(name: str, node: tree_sitter.Node, inherited: int | None) -> int | None:
+    """Narrow *inherited* by any shadowing of *name* that *node* introduces.
+
+    A no-op for everything that is not a closure; the nearest (smallest) cutoff
+    wins, so an inner shadow cannot widen an outer one's reach.
+    """
+    if node.type != _rust.CLOSURE_EXPRESSION:
+        return inherited
+    own = _closure_shadows_from(name, node)
+    if own is None:
+        return inherited
+    return own if inherited is None else min(own, inherited)
+
+
+def _closure_shadows_from(name: str, closure: tree_sitter.Node) -> int | None:
+    """Byte offset from which *name* refers to a binding of *closure*'s own, else None.
+
+    Two shapes shadow, and both are matched only in their unambiguous form:
+
+    * a **parameter** (``|failed| ...``) shadows the entire closure, so the
+      offset is the closure's own start;
+    * a ``let`` that is a **direct statement of the closure's body block**
+      shadows everything after it in that block, so the offset is the ``let``'s
+      END - its initializer is evaluated in the enclosing scope, so
+      ``let failed = &mut failed;`` mutably borrows the OUTER binding and has to
+      stay visible. Taking the start offset instead hid that borrow and reported
+      the outer ``mut`` as needless, i.e. the same E0594 defect one line earlier.
+
+    Anything less clear-cut - a tuple-pattern parameter, a ``let`` nested in an
+    inner block - returns None, which makes the caller treat the usage as the
+    outer binding's and stay quiet. That asymmetry is the whole point: failing to
+    spot a shadow costs a missed finding, whereas claiming one that is not there
+    drops a ``mut`` that rustc requires (E0594) and the advice breaks the build.
+
+    Position matters for the same reason. In::
+
+        let mut failed = false;
+        xs.iter().for_each(|x| {
+            failed = true;             // the OUTER binding
+            let mut failed = false;    // shadows from here on
+            failed = *x > 2;           // the closure's own
+        });
+
+    treating the whole closure as shadowed would miss a genuine mutation of the
+    outer binding and report it as needless.
+    """
+    params = closure.child_by_field_name("parameters")
+    if params is not None and _params_bind_name(params, name):
+        return closure.start_byte
+    body = closure.child_by_field_name("body")
+    if body is None or body.type != _rust.BLOCK:
+        return None
+    for statement in body.named_children:
+        if statement.type == _rust.LET_DECLARATION and _binds_plain_name(statement, name):
+            return statement.end_byte
+    return None
+
+
+def _params_bind_name(params: tree_sitter.Node, name: str) -> bool:
+    """Return True if a parameter of *params* is plainly the identifier *name*.
+
+    Closure parameters come in two shapes: bare (``|failed|``, the identifier is
+    a direct child) and typed (``|mut failed: bool|``, wrapped in a ``parameter``
+    node). Checking only the first missed every annotated parameter, so an
+    assignment to it was attributed to a same-named outer binding.
+    """
+    for param in params.named_children:
+        if param.type == _rust.IDENTIFIER and node_text(param) == name:
+            return True
+        if param.type == _rust.PARAMETER and _binds_plain_name(param, name):
+            return True
+    return False
+
+
+def _binds_plain_name(node: tree_sitter.Node, name: str) -> bool:
+    """Return True if *node*'s ``pattern`` field is exactly the identifier *name*.
+
+    Works for both a ``let_declaration`` and a closure ``parameter``: each puts
+    the bound name on that field, and for ``let mut x`` / ``mut x: T`` the
+    ``mutable_specifier`` is a sibling rather than part of the pattern, so one
+    check covers the ``mut`` and non-``mut`` spellings alike.
+
+    A destructuring pattern arrives as ``tuple_pattern`` and correctly does not
+    match: the caller then treats the name as the outer binding's and stays
+    quiet, which is the safe direction.
+    """
+    pattern = node.child_by_field_name("pattern")
+    return pattern is not None and pattern.type == _rust.IDENTIFIER and node_text(pattern) == name
 
 
 def _node_is_mut_use_of(name: str, node: tree_sitter.Node) -> bool:
