@@ -171,7 +171,15 @@ def rules_for(binary: Path, lang: str) -> list[str]:
     if proc.returncode != 0:
         msg = f"list-rules failed (is --safelint a safelint binary?): {proc.stderr.strip()[:500]}"
         raise HarnessError(msg)
-    rules = json.loads(proc.stdout)["rules"]
+    # A zero exit with output that is not the expected JSON means the binary is
+    # not the safelint we think it is (a wrapper script, a shim printing a
+    # banner). That is the same user error as a non-zero exit, so it takes the
+    # same documented path rather than a JSONDecodeError / KeyError traceback.
+    try:
+        rules = json.loads(proc.stdout)["rules"]
+    except (json.JSONDecodeError, KeyError, TypeError) as exc:
+        msg = f"list-rules did not return the expected JSON (is --safelint a safelint binary?): {proc.stdout.strip()[:300]!r}"
+        raise HarnessError(msg) from exc
     return [r["name"] for r in rules if lang in r["languages"]]
 
 
@@ -292,7 +300,10 @@ def _check_include_selects_files(target: Target) -> None:
     exts = EXTENSIONS[target.lang]
     for path in target.project.rglob("*"):
         rel = path.relative_to(target.project)
-        if path.name.endswith(exts) and _path_under(str(rel), target.include) and not _is_excluded(rel):
+        # is_file() is load-bearing: a DIRECTORY named e.g. ``generated.py``
+        # matches the extension test but is not something safelint can scan, so
+        # without it an empty subtree could still pass this check.
+        if path.is_file() and path.name.endswith(exts) and _path_under(str(rel), target.include) and not _is_excluded(rel):
             return
     msg = f"--include {target.include!r} selects no {target.lang} file under {target.project} - check the path (it is matched against paths relative to --project)"
     raise HarnessError(msg)
