@@ -208,6 +208,22 @@ print(json.dumps({"rc": p.returncode, "out": p.stdout, "err": p.stderr, "wall": 
 """
 
 
+def _path_under(path: str, include: str) -> bool:
+    """Return True if *path* lies under the *include* subtree.
+
+    Anchored at a path-segment boundary rather than a raw substring, so
+    ``--include crates/ty_`` cannot be satisfied by ``vendor/xcrates/ty_x``, and
+    separators are normalised so a Windows-style path is matched the same way.
+
+    Prefix semantics inside the final segment are deliberate: ``crates/ty_`` has
+    to match the sibling crates ``ty_python_semantic``, ``ty_ide`` and the rest,
+    which a strict whole-segment match would reject.
+    """
+    haystack = path.replace("\\", "/")
+    needle = include.replace("\\", "/").strip("/")
+    return bool(needle) and (haystack.startswith(needle) or f"/{needle}" in haystack)
+
+
 def _measured(cmd: list[str]) -> dict[str, Any]:
     """Run *cmd* under the one-child wrapper; return its envelope."""
     proc = subprocess.run([sys.executable, "-c", _MEASURED_RUNNER, *cmd], capture_output=True, text=True, check=False)  # noqa: S603 - argv list, no shell
@@ -235,7 +251,7 @@ def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
     raw: list[dict[str, Any]] = payload.get("violations", [])
     violations = [v for v in raw if str(v["filepath"]).endswith(exts)]
     if target.include:
-        violations = [v for v in violations if target.include in str(v["filepath"])]
+        violations = [v for v in violations if _path_under(str(v["filepath"]), target.include)]
     files_checked = int(payload.get("summary", {}).get("files_checked", 0))
     result = RunResult(mode, files_checked, violations, float(env["wall"]), float(env["rss_mb"]), env["err"], env["rc"])
     for v in violations:

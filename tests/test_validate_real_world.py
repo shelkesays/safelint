@@ -154,13 +154,37 @@ def test_include_narrows_results_to_a_subtree(tmp_path: Path) -> None:
     subtree = harness.Target(_safelint_on_path(), "python", project, "ty", include="crates/ty_", out_dir=tmp_path / "o2")
 
     whole_files = {v["filepath"] for v in harness.validate(whole)[1].violations}
-    subtree_results = harness.validate(subtree)[1]
-    subtree_files = {v["filepath"] for v in subtree_results.violations}
+    # One validate() per target: each call runs safelint twice as subprocesses,
+    # so reusing the result rather than re-deriving it matters for suite runtime.
+    subtree_runs = harness.validate(subtree)
+    subtree_defaults = subtree_runs[1]
+    subtree_files = {v["filepath"] for v in subtree_defaults.violations}
 
     assert len(whole_files) == 2, "both crates report without --include"
     assert len(subtree_files) == 1, "--include keeps only the subtree"
     assert all("crates/ty_" in f for f in subtree_files)
-    assert subtree_results.files_with_findings == 1
+    assert subtree_defaults.files_with_findings == 1
 
-    summary = harness.write_outputs(subtree, "0.0.0-test", "abc1234567", subtree_results and harness.validate(subtree))
+    summary = harness.write_outputs(subtree, "0.0.0-test", "abc1234567", subtree_runs)
     assert "subtree `crates/ty_`" in summary.read_text(encoding="utf-8"), "provenance records the subtree"
+
+
+def test_include_is_anchored_at_a_path_boundary() -> None:
+    """`--include` matches a subtree, not a raw substring.
+
+    A raw `in` test would let `vendor/xcrates/ty_x` satisfy `crates/ty_`, and
+    would miss Windows-style separators entirely. Prefix semantics *inside* the
+    final segment are deliberate: `crates/ty_` has to match the sibling crates
+    `ty_ide`, `ty_python_semantic` and the rest.
+    """
+    harness = _load_harness()
+    under = harness._path_under
+
+    assert under("/r/crates/ty_ide/a.rs", "crates/ty_")
+    assert under("crates/ty_ide/a.rs", "crates/ty_"), "relative paths anchor at the start"
+    assert under("C:\\r\\crates\\ty_ide\\a.rs", "crates/ty_"), "separators are normalised"
+    assert under("/r/crates/ty_ide/a.rs", "crates/ty"), "prefix within the segment is intended"
+
+    assert not under("/r/vendor/xcrates/ty_x/a.rs", "crates/ty_"), "must not match mid-segment"
+    assert not under("/r/crates/typescript/a.rs", "crates/ty_"), "underscore boundary respected"
+    assert not under("/r/crates/ty_ide/a.rs", ""), "an empty include matches nothing"
