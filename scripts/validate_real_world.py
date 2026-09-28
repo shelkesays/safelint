@@ -72,15 +72,44 @@ EXTENSIONS: dict[str, tuple[str, ...]] = {
     "cpp": (".cpp", ".cxx", ".cc", ".hpp", ".hxx", ".hh"),
 }
 
-#: Directory names holding vendored / generated code, at any depth. safelint's
-#: own defaults already cover ``.venv``, ``node_modules``, ``site-packages``,
-#: ``build`` and ``dist``; these are the ones it does not exclude.
-EXCLUDED_DIR_NAMES: tuple[str, ...] = ("vendor", "target", "third_party")
+#: Directory names holding vendored / generated code that safelint does NOT
+#: exclude by default. These are what the harness adds.
+HARNESS_EXCLUDED_DIR_NAMES: tuple[str, ...] = ("vendor", "target", "third_party")
 
-#: The same trees as the glob patterns safelint's ``extend_exclude_paths`` wants.
-#: Derived from the names above so the generated config and the harness's own
-#: eligibility check cannot drift apart.
-EXTRA_EXCLUDES: tuple[str, ...] = tuple(pattern for name in EXCLUDED_DIR_NAMES for pattern in (f"{name}/**", f"**/{name}/**"))
+#: Directory names safelint's own ``exclude_paths`` default already skips.
+#: Mirrored rather than imported, for the same reason as EXTENSIONS: the harness
+#: must not depend on the dev checkout matching the binary under test.
+#:
+#: The eligibility check needs these, not just the harness's own: a project whose
+#: only files of the target language sit under ``.venv/`` or ``node_modules/``
+#: would otherwise satisfy it while the scanner skipped every one of them -
+#: ``scanned=0, findings=0`` written up as a clean result, which is the exact
+#: false pass that check exists to prevent.
+SCANNER_EXCLUDED_DIR_NAMES: tuple[str, ...] = (
+    ".venv",
+    "venv",
+    ".tox",
+    ".nox",
+    "__pycache__",
+    ".pytest_cache",
+    ".ruff_cache",
+    ".mypy_cache",
+    ".ty_cache",
+    "build",
+    "dist",
+    "htmlcov",
+    "node_modules",
+    "site-packages",
+)
+
+#: Every directory name a file can sit under and still never be scanned.
+EXCLUDED_DIR_NAMES: tuple[str, ...] = (*HARNESS_EXCLUDED_DIR_NAMES, *SCANNER_EXCLUDED_DIR_NAMES)
+
+#: The harness-added trees as the glob patterns ``extend_exclude_paths`` wants.
+#: Derived from the names above so the generated config and the eligibility check
+#: cannot drift apart. Only the harness-specific names go here - re-listing
+#: safelint's own defaults would add nothing and obscure what the harness changes.
+EXTRA_EXCLUDES: tuple[str, ...] = tuple(pattern for name in HARNESS_EXCLUDED_DIR_NAMES for pattern in (f"{name}/**", f"**/{name}/**"))
 
 #: ``--preset`` and ``--label`` are interpolated into a TOML file and a
 #: filename respectively. Restricting both to this shape means a quote or
@@ -374,8 +403,8 @@ def _check_selection_has_files(target: Target) -> None:
         if path.is_file() and path.name.endswith(exts) and not _is_excluded(rel) and (not target.include or _path_under(str(rel), target.include)):
             return
     where = f"--include {target.include!r} selects" if target.include else f"{target.project} holds"
-    hint = " - check the path (it is matched against paths relative to --project)" if target.include else " - check --lang"
-    msg = f"{where} no {target.lang} file{hint}"
+    hint = "check the path (it is matched against paths relative to --project)" if target.include else "check --lang"
+    msg = f"{where} no scannable {target.lang} file - {hint}, or whether every match sits in an excluded tree ({', '.join(EXCLUDED_DIR_NAMES)})"
     raise HarnessError(msg)
 
 

@@ -216,10 +216,15 @@ def test_every_preset_combination_generates_valid_toml() -> None:
         tomllib.loads(harness.preset_toml(target))  # raises on a duplicate table
 
 
-def test_extra_excludes_stay_in_step_with_the_directory_names() -> None:
-    """The generated glob list is derived from the names the eligibility check uses."""
+def test_extra_excludes_stay_in_step_with_the_harness_directory_names() -> None:
+    """Both glob forms are derived for every harness-added name.
+
+    Superseded in part by the scanner-exclusion test below: this one pins the
+    derivation itself (each name yields a root-level and an any-depth pattern),
+    which the other does not assert.
+    """
     harness = _load_harness()
-    for name in harness.EXCLUDED_DIR_NAMES:
+    for name in harness.HARNESS_EXCLUDED_DIR_NAMES:
         assert f"{name}/**" in harness.EXTRA_EXCLUDES
         assert f"**/{name}/**" in harness.EXTRA_EXCLUDES
 
@@ -237,7 +242,7 @@ def test_a_project_with_no_files_of_the_language_is_an_error(tmp_path: Path) -> 
 
     harness = _load_harness()
     target = harness.Target(_safelint_on_path(), "rust", project, "wrong", out_dir=tmp_path / "o")
-    with pytest.raises(harness.HarnessError, match="no rust file"):
+    with pytest.raises(harness.HarnessError, match="no scannable rust file"):
         harness.validate(target)
 
 
@@ -320,8 +325,41 @@ def test_an_include_matching_no_source_file_is_an_error(tmp_path: Path) -> None:
 
     harness = _load_harness()
     typo = harness.Target(_safelint_on_path(), "python", project, "m", include="crates/typo_", out_dir=tmp_path / "o")
-    with pytest.raises(harness.HarnessError, match="selects no python file"):
+    with pytest.raises(harness.HarnessError, match="selects no scannable python file"):
         harness.validate(typo)
+
+
+def test_files_only_under_a_scanner_excluded_tree_are_not_eligible(tmp_path: Path) -> None:
+    """Eligibility must know safelint's OWN exclusions, not just the harness's.
+
+    A project whose only Python sits under `.venv/` satisfied the extension test
+    while the scanner skipped every file, producing `scanned=0, findings=0` -
+    written up as a clean result, which is the exact false pass this check
+    exists to prevent.
+    """
+    project = tmp_path / "venvonly"
+    (project / ".venv" / "lib").mkdir(parents=True)
+    (project / ".venv" / "lib" / "dep.py").write_text("x = 1\n", encoding="utf-8")
+
+    harness = _load_harness()
+    target = harness.Target(_safelint_on_path(), "python", project, "v", out_dir=tmp_path / "o")
+    with pytest.raises(harness.HarnessError, match="no scannable python file"):
+        harness.validate(target)
+
+
+def test_generated_config_adds_only_the_harness_specific_excludes(tmp_path: Path) -> None:
+    """`extend_exclude_paths` names what the harness ADDS, not safelint's own defaults.
+
+    Eligibility has to know both sets; the generated config only needs the
+    difference, and re-listing safelint's defaults would obscure what the
+    harness actually changes.
+    """
+    harness = _load_harness()
+    for name in harness.HARNESS_EXCLUDED_DIR_NAMES:
+        assert f"{name}/**" in harness.EXTRA_EXCLUDES
+    for name in harness.SCANNER_EXCLUDED_DIR_NAMES:
+        assert f"{name}/**" not in harness.EXTRA_EXCLUDES, f"{name} is already a safelint default"
+        assert name in harness.EXCLUDED_DIR_NAMES, f"{name} must still block eligibility"
 
 
 def test_an_include_matching_only_vendored_files_is_an_error(tmp_path: Path) -> None:
@@ -332,7 +370,7 @@ def test_an_include_matching_only_vendored_files_is_an_error(tmp_path: Path) -> 
 
     harness = _load_harness()
     target = harness.Target(_safelint_on_path(), "python", project, "m", include="vendor", out_dir=tmp_path / "o")
-    with pytest.raises(harness.HarnessError, match="selects no python file"):
+    with pytest.raises(harness.HarnessError, match="selects no scannable python file"):
         harness.validate(target)
 
 
@@ -371,7 +409,7 @@ def test_a_directory_named_like_a_source_file_is_not_eligible(tmp_path: Path) ->
 
     harness = _load_harness()
     target = harness.Target(_safelint_on_path(), "python", project, "m", include="crates/ty_", out_dir=tmp_path / "o")
-    with pytest.raises(harness.HarnessError, match="selects no python file"):
+    with pytest.raises(harness.HarnessError, match="selects no scannable python file"):
         harness.validate(target)
 
 
