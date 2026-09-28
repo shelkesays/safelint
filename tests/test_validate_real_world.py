@@ -223,6 +223,62 @@ def test_extra_excludes_stay_in_step_with_the_directory_names() -> None:
         assert f"**/{name}/**" in harness.EXTRA_EXCLUDES
 
 
+def test_a_project_with_no_files_of_the_language_is_an_error(tmp_path: Path) -> None:
+    """The wrong --lang must fail loudly; it needs no typo to reach.
+
+    `--lang rust` against a Python repository scans the Python files, filters
+    every finding out by extension, and would otherwise report a confident
+    `scanned=N, findings=0` Rust result for a project holding no Rust at all.
+    """
+    project = tmp_path / "pyonly"
+    project.mkdir()
+    (project / "a.py").write_text("x = 1\n", encoding="utf-8")
+
+    harness = _load_harness()
+    target = harness.Target(_safelint_on_path(), "rust", project, "wrong", out_dir=tmp_path / "o")
+    with pytest.raises(harness.HarnessError, match="no rust file"):
+        harness.validate(target)
+
+
+def test_include_is_matched_relative_to_the_project_root(tmp_path: Path) -> None:
+    """The PROJECT ROOT's own path must not satisfy --include.
+
+    safelint echoes paths as given and the harness passes an absolute project
+    path, so a checkout at `/tmp/crates/ty_root` made `--include crates/ty_`
+    match every file in the repository - silently widening the subtree it is
+    supposed to narrow.
+    """
+    project = tmp_path / "crates" / "ty_root"
+    (project / "crates" / "ty_a").mkdir(parents=True)
+    (project / "src").mkdir(parents=True)
+    bad = "def f(a, b, c, d, e, f, g, h):\n    return a\n"
+    (project / "crates" / "ty_a" / "in.py").write_text(bad, encoding="utf-8")
+    (project / "src" / "out.py").write_text(bad, encoding="utf-8")
+
+    harness = _load_harness()
+    target = harness.Target(_safelint_on_path(), "python", project, "t", include="crates/ty_", out_dir=tmp_path / "o")
+    files = {v["filepath"] for v in harness.validate(target)[1].violations}
+    assert len(files) == 1, f"only the subtree file may survive the filter, got {files}"
+    assert all("ty_a" in f for f in files)
+
+
+def test_a_scan_that_hangs_is_an_error_not_a_clean_run(tmp_path: Path) -> None:
+    """A stalled scanner must be a HarnessError, never zero findings."""
+    harness = _load_harness()
+    with pytest.raises(harness.HarnessError, match="did not finish within"):
+        harness._measured([sys.executable, "-c", "import time; time.sleep(30)"], timeout=1.0)
+
+
+def test_rule_entries_without_the_expected_fields_are_an_error(tmp_path: Path) -> None:
+    """`{"rules":[{"name":"x"}]}` must not raise KeyError out of the guard."""
+    fake = tmp_path / "safelint"
+    fake.write_text('#!/bin/sh\necho \'{"rules":[{"name":"x"}]}\'\n', encoding="utf-8")
+    fake.chmod(0o755)
+    harness = _load_harness()
+    with pytest.raises(harness.HarnessError, match="without 'name' / 'languages'"):
+        harness.rules_for(fake, "python")
+
+
 def test_an_include_matching_no_source_file_is_an_error(tmp_path: Path) -> None:
     """A mistyped --include must fail loudly, not report zero findings.
 

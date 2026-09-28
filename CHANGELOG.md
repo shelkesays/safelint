@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Validation harness: four robustness defects** (`scripts/validate_real_world.py`). Dev tooling only - nothing in the wheel changes. Found in review of the 2.14.1 release PR (#184), after that release had been cut.
+  - **`--include` was matched against the absolute path safelint echoes back**, so the *project root* could satisfy it: a checkout at `/tmp/crates/ty_root` made `--include crates/ty_` match every file in the repository, silently widening the subtree the flag exists to narrow. Paths are now made relative to `--project` first.
+  - **The eligibility check only ran when `--include` was given**, so the wrong `--lang` - which needs no typo to reach - produced a confident committed zero-findings report for a project holding none of that language (`--lang rust` against a Python repository reported `scanned=1, findings=0`). It now runs either way and names the likely cause.
+  - **`list-rules` entries missing `name` / `languages`** raised `KeyError` outside the error guard, printing a traceback instead of the documented `error:` line and exit 2.
+  - **Neither the scan nor the metadata subprocesses were bounded**, so a stalled scanner hung the harness indefinitely. `--timeout` (default 1800s, deliberately generous) bounds the scan and 60s bounds the metadata calls; the scan's bound is applied *inside* the measurement wrapper so the scanner child is killed rather than orphaned, and a timeout is an error rather than a zero-findings run.
+
 ## [2.14.1] - 2026-09-28
 
 ### Changed

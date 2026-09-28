@@ -89,6 +89,18 @@ EXTRA_EXCLUDES: tuple[str, ...] = tuple(pattern for name in EXCLUDED_DIR_NAMES f
 _IDENTIFIER = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$")
 
 
+#: Seconds before a scan is called hung. Generous on purpose: an all-rules pass
+#: over a large monorepo legitimately takes minutes (Ruff's 2006 Rust files take
+#: ~25s, and the dataflow rules are the expensive ones), so this is a "something
+#: is wrong" bound, not a performance budget. ``--timeout`` overrides it.
+DEFAULT_SCAN_TIMEOUT = 1800.0
+
+#: Metadata calls (``--version``, ``git rev-parse``, ``list-rules``) are
+#: sub-second in every healthy case; a minute means the binary is not what we
+#: think it is, or is waiting on something it will never get.
+METADATA_TIMEOUT = 60.0
+
+
 class HarnessError(RuntimeError):
     """A run could not be measured - the binary crashed or produced no report.
 
@@ -120,6 +132,7 @@ class Target:
     pydantic: bool = False
     include: str | None = None  # keep only findings whose path contains this
     out_dir: Path = Path("plan/real-world-results")
+    timeout: float = DEFAULT_SCAN_TIMEOUT
 
 
 @dataclass
@@ -149,8 +162,17 @@ class RunResult:
 
 
 def _run(cmd: list[str], *, cwd: Path | None = None) -> subprocess.CompletedProcess[str]:
-    """Run *cmd* and capture its output; never raises on a non-zero exit."""
-    return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False)  # noqa: S603 - argv list, no shell
+    """Run a short metadata command; never raises on a non-zero exit.
+
+    Bounded by METADATA_TIMEOUT so a binary that blocks - waiting on stdin, say -
+    cannot hang the harness before the scan even starts. A timeout is reported as
+    an empty result with a non-zero return code, which every caller already
+    treats as "this is not a working safelint".
+    """
+    try:
+        return subprocess.run(cmd, cwd=cwd, capture_output=True, text=True, check=False, timeout=METADATA_TIMEOUT)  # noqa: S603 - argv list, no shell
+    except subprocess.TimeoutExpired:
+        return subprocess.CompletedProcess(cmd, returncode=124, stdout="", stderr=f"timed out after {METADATA_TIMEOUT:.0f}s")
 
 
 def safelint_version(binary: Path) -> str:
@@ -180,6 +202,12 @@ def rules_for(binary: Path, lang: str) -> list[str]:
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         msg = f"list-rules did not return the expected JSON (is --safelint a safelint binary?): {proc.stdout.strip()[:300]!r}"
         raise HarnessError(msg) from exc
+    # Same reasoning one level down: the ENTRIES have to carry the two fields we
+    # read, or `r["languages"]` raises KeyError outside any guard and main prints
+    # a traceback rather than its documented error line.
+    if not isinstance(rules, list) or not all(isinstance(r, dict) and {"name", "languages"} <= r.keys() for r in rules):
+        msg = f"list-rules returned entries without 'name' / 'languages' (is --safelint a safelint binary?): {proc.stdout.strip()[:300]!r}"
+        raise HarnessError(msg)
     return [r["name"] for r in rules if lang in r["languages"]]
 
 
@@ -219,13 +247,30 @@ def write_config(directory: Path, target: Target, rule_names: list[str]) -> None
 #: over every child the calling process has ever reaped, so measuring in the
 #: harness process would report the larger of the two runs for both. A fresh
 #: wrapper per run has exactly one child.
+#:
+#: The timeout is applied HERE, not around the wrapper: killing the wrapper from
+#: outside would leave its scanner child running and still holding the CPU, and
+#: the run would be unmeasurable either way. ``subprocess.run`` kills the child
+#: on ``TimeoutExpired``, which the wrapper reports as an envelope the parent
+#: turns into a HarnessError.
+#:
+#: This reaches the direct child only - the shape every real scan has, since
+#: ``--safelint`` names an executable, not a shell pipeline. A binary that is
+#: itself a wrapper script could leave a grandchild behind; that is a limitation
+#: of ``subprocess`` timeouts rather than something this bound pretends to solve.
 _MEASURED_RUNNER = """
 import json, resource, subprocess, sys, time
+timeout = float(sys.argv[1])
 t0 = time.perf_counter()
-p = subprocess.run(sys.argv[1:], capture_output=True, text=True, check=False)
+try:
+    p = subprocess.run(sys.argv[2:], capture_output=True, text=True, check=False, timeout=timeout)
+    envelope = {"rc": p.returncode, "out": p.stdout, "err": p.stderr}
+except subprocess.TimeoutExpired:
+    envelope = {"rc": None, "out": "", "err": "", "timed_out": timeout}
 raw = resource.getrusage(resource.RUSAGE_CHILDREN).ru_maxrss
 mb = raw / (1024 * 1024) if sys.platform == "darwin" else raw / 1024
-print(json.dumps({"rc": p.returncode, "out": p.stdout, "err": p.stderr, "wall": time.perf_counter() - t0, "rss_mb": mb}))
+envelope.update({"wall": time.perf_counter() - t0, "rss_mb": mb})
+print(json.dumps(envelope))
 """
 
 
@@ -245,13 +290,21 @@ def _path_under(path: str, include: str) -> bool:
     return bool(needle) and (haystack.startswith(needle) or f"/{needle}" in haystack)
 
 
-def _measured(cmd: list[str]) -> dict[str, Any]:
-    """Run *cmd* under the one-child wrapper; return its envelope."""
-    proc = subprocess.run([sys.executable, "-c", _MEASURED_RUNNER, *cmd], capture_output=True, text=True, check=False)  # noqa: S603 - argv list, no shell
+def _measured(cmd: list[str], timeout: float = DEFAULT_SCAN_TIMEOUT) -> dict[str, Any]:
+    """Run *cmd* under the one-child wrapper; return its envelope.
+
+    A scan that exceeds *timeout* is a HarnessError, never a zero-findings run -
+    the same rule the crash path follows.
+    """
+    proc = subprocess.run([sys.executable, "-c", _MEASURED_RUNNER, str(timeout), *cmd], capture_output=True, text=True, check=False)  # noqa: S603 - argv list, no shell
     if proc.returncode != 0:
         msg = f"measurement wrapper failed: {proc.stderr.strip()[:500]}"
         raise HarnessError(msg)
-    return json.loads(proc.stdout)
+    envelope: dict[str, Any] = json.loads(proc.stdout)
+    if "timed_out" in envelope:
+        msg = f"scan did not finish within {envelope['timed_out']:.0f}s - raise --timeout if this project is legitimately slower"
+        raise HarnessError(msg)
+    return envelope
 
 
 def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
@@ -261,7 +314,7 @@ def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
     # safelint version, so it is correct in production - it is re-runs of the
     # SAME version that would be measured wrong.
     cmd = [str(target.safelint), "check", str(target.project), "--all-files", "--no-cache", "--config", str(config_dir), "--format", "json"]
-    env = _measured(cmd)
+    env = _measured(cmd, target.timeout)
     # safelint exits 1 when it finds blocking violations, which is a successful
     # run for our purposes; anything else, or a report we cannot parse, is not.
     try:
@@ -276,7 +329,8 @@ def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
     raw: list[dict[str, Any]] = payload.get("violations", [])
     violations = [v for v in raw if str(v["filepath"]).endswith(exts)]
     if target.include:
-        violations = [v for v in violations if _path_under(str(v["filepath"]), target.include)]
+        root = target.project.resolve()
+        violations = [v for v in violations if _path_under(_project_relative(str(v["filepath"]), root), target.include)]
     files_checked = int(payload.get("summary", {}).get("files_checked", 0))
     result = RunResult(mode, files_checked, violations, float(env["wall"]), float(env["rss_mb"]), env["err"], env["rc"])
     for v in violations:
@@ -285,28 +339,53 @@ def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
     return result
 
 
-def _check_include_selects_files(target: Target) -> None:
-    """Fail if ``--include`` selects no file of the target language.
+def _check_selection_has_files(target: Target) -> None:
+    """Fail if the selection holds no file of the target language.
 
-    Without this a typo is indistinguishable from a clean subtree: the include
-    filter empties the findings while ``files_checked`` stays positive (it counts
-    the whole project), so the harness would write a confident zero-findings
-    report for a subtree it never actually validated, and that report gets
-    committed. A subtree that genuinely contains eligible files and no findings
-    still passes - only "nothing was ever eligible" is rejected.
+    Two ways to end up scanning nothing while the report still looks clean, both
+    of which write a committed zero-findings summary for source that was never
+    examined:
+
+    * a mistyped ``--include`` - the filter empties the findings while
+      ``files_checked`` stays positive, because it counts the whole project;
+    * the **wrong ``--lang``** for the project, which needs no typo at all:
+      ``--lang rust`` against a Python repository scans the Python files, filters
+      every finding out by extension, and reports ``scanned=N, findings=0``.
+
+    A selection that genuinely holds eligible files and no findings still passes -
+    only "nothing was ever eligible" is rejected.
     """
-    if not target.include:
-        return
     exts = EXTENSIONS[target.lang]
     for path in target.project.rglob("*"):
         rel = path.relative_to(target.project)
         # is_file() is load-bearing: a DIRECTORY named e.g. ``generated.py``
         # matches the extension test but is not something safelint can scan, so
         # without it an empty subtree could still pass this check.
-        if path.is_file() and path.name.endswith(exts) and _path_under(str(rel), target.include) and not _is_excluded(rel):
+        if path.is_file() and path.name.endswith(exts) and not _is_excluded(rel) and (not target.include or _path_under(str(rel), target.include)):
             return
-    msg = f"--include {target.include!r} selects no {target.lang} file under {target.project} - check the path (it is matched against paths relative to --project)"
+    where = f"--include {target.include!r} selects" if target.include else f"{target.project} holds"
+    hint = " - check the path (it is matched against paths relative to --project)" if target.include else " - check --lang"
+    msg = f"{where} no {target.lang} file{hint}"
     raise HarnessError(msg)
+
+
+def _project_relative(filepath: str, root: Path) -> str:
+    """Return *filepath* relative to *root*, so an include matches only the subtree.
+
+    safelint echoes each path as it was given, and the harness passes an absolute
+    project path, so findings come back absolute. Matching ``--include`` against
+    the full path let the PROJECT ROOT satisfy it: a checkout at
+    ``/tmp/crates/ty_root`` made ``--include crates/ty_`` match every file in the
+    repository, silently widening the subtree it claims to narrow.
+
+    A path outside the project is returned unchanged rather than raising; it
+    cannot legitimately occur, and failing the whole run over it would be worse
+    than letting the include decide.
+    """
+    try:
+        return str(Path(filepath).resolve().relative_to(root))
+    except ValueError:
+        return filepath
 
 
 def _is_excluded(rel: Path) -> bool:
@@ -316,7 +395,7 @@ def _is_excluded(rel: Path) -> bool:
 
 def validate(target: Target) -> list[RunResult]:
     """Run the all-rules pass and the stock-defaults pass; return both."""
-    _check_include_selects_files(target)
+    _check_selection_has_files(target)
     names = rules_for(target.safelint, target.lang)
     results: list[RunResult] = []
     with tempfile.TemporaryDirectory(prefix="safelint-validate-") as tmp:
@@ -399,10 +478,11 @@ def parse_args(argv: list[str] | None = None) -> Target:
     parser.add_argument("--pydantic", action="store_true", help="also set [python] pydantic = true")
     parser.add_argument("--include", help="keep only findings whose path contains this substring, e.g. crates/ty_ (for a project inside a monorepo)")
     parser.add_argument("--out", type=Path, default=Path("plan/real-world-results"), help="directory for the summary (default: plan/real-world-results)")
+    parser.add_argument("--timeout", type=float, default=DEFAULT_SCAN_TIMEOUT, help=f"seconds before a scan is called hung (default: {DEFAULT_SCAN_TIMEOUT:.0f})")
     ns = parser.parse_args(argv)
     if not ns.project.is_dir():
         parser.error(f"--project is not a directory: {ns.project}")
-    return Target(ns.safelint, ns.lang, ns.project.resolve(), ns.label, ns.preset, ns.pydantic, ns.include, ns.out)
+    return Target(ns.safelint, ns.lang, ns.project.resolve(), ns.label, ns.preset, ns.pydantic, ns.include, ns.out, ns.timeout)
 
 
 def main(argv: list[str] | None = None) -> int:
