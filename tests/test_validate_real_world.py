@@ -11,6 +11,7 @@ from __future__ import annotations
 import importlib.util
 import itertools
 from pathlib import Path
+import re
 import shutil
 import sys
 import tomllib
@@ -269,14 +270,42 @@ def test_a_scan_that_hangs_is_an_error_not_a_clean_run(tmp_path: Path) -> None:
         harness._measured([sys.executable, "-c", "import time; time.sleep(30)"], timeout=1.0)
 
 
-def test_rule_entries_without_the_expected_fields_are_an_error(tmp_path: Path) -> None:
-    """`{"rules":[{"name":"x"}]}` must not raise KeyError out of the guard."""
+@pytest.mark.parametrize(
+    "payload",
+    (
+        '{"rules":[{"name":"x"}]}',
+        '{"rules":[{"name":"x","languages":null}]}',
+        '{"rules":[{"name":123,"languages":["python"]}]}',
+        '{"rules":[{"name":"x","languages":"python"}]}',
+        '{"rules":[{"name":"x","languages":[1]}]}',
+    ),
+    ids=["missing-languages", "languages-null", "name-not-str", "languages-bare-str", "languages-item-not-str"],
+)
+def test_malformed_rule_entries_are_a_harness_error(tmp_path: Path, payload: str) -> None:
+    """Entry SHAPE is validated, not merely the presence of the two keys.
+
+    Each of these failed differently without the type check: `null` languages
+    raised TypeError on the membership test; a non-string name yielded a rule
+    name that would be interpolated into the generated TOML as `[rules.123]`;
+    and a bare-string languages field silently degraded membership to a
+    substring match, so `go` would have matched `golang`.
+    """
     fake = tmp_path / "safelint"
-    fake.write_text('#!/bin/sh\necho \'{"rules":[{"name":"x"}]}\'\n', encoding="utf-8")
+    fake.write_text(f"#!/bin/sh\necho '{payload}'\n", encoding="utf-8")
     fake.chmod(0o755)
     harness = _load_harness()
-    with pytest.raises(harness.HarnessError, match="without 'name' / 'languages'"):
+    with pytest.raises(harness.HarnessError, match=re.escape("not {'name': str, 'languages': [str]}")):
         harness.rules_for(fake, "python")
+
+
+def test_well_formed_rule_entries_are_accepted(tmp_path: Path) -> None:
+    """The guard must not reject a valid registry - language filtering still works."""
+    fake = tmp_path / "safelint"
+    payload = '{"rules":[{"name":"x","languages":["python"]},{"name":"y","languages":["go"]}]}'
+    fake.write_text(f"#!/bin/sh\necho '{payload}'\n", encoding="utf-8")
+    fake.chmod(0o755)
+    harness = _load_harness()
+    assert harness.rules_for(fake, "python") == ["x"]
 
 
 def test_an_include_matching_no_source_file_is_an_error(tmp_path: Path) -> None:

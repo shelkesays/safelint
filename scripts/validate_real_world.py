@@ -202,13 +202,23 @@ def rules_for(binary: Path, lang: str) -> list[str]:
     except (json.JSONDecodeError, KeyError, TypeError) as exc:
         msg = f"list-rules did not return the expected JSON (is --safelint a safelint binary?): {proc.stdout.strip()[:300]!r}"
         raise HarnessError(msg) from exc
-    # Same reasoning one level down: the ENTRIES have to carry the two fields we
-    # read, or `r["languages"]` raises KeyError outside any guard and main prints
-    # a traceback rather than its documented error line.
-    if not isinstance(rules, list) or not all(isinstance(r, dict) and {"name", "languages"} <= r.keys() for r in rules):
-        msg = f"list-rules returned entries without 'name' / 'languages' (is --safelint a safelint binary?): {proc.stdout.strip()[:300]!r}"
+    # Same reasoning one level down, and the TYPES matter as much as the keys:
+    # `"languages": null` raises TypeError on the membership test, `"name": 123`
+    # yields a non-string rule name that would be interpolated into the generated
+    # TOML as `[rules.123]`, and `"languages": "python"` silently degrades the
+    # membership test to a substring match (so `go` would match `golang`).
+    if not isinstance(rules, list) or not all(_is_rule_entry(r) for r in rules):
+        msg = f"list-rules returned entries that are not {{'name': str, 'languages': [str]}} (is --safelint a safelint binary?): {proc.stdout.strip()[:300]!r}"
         raise HarnessError(msg)
     return [r["name"] for r in rules if lang in r["languages"]]
+
+
+def _is_rule_entry(entry: object) -> bool:
+    """Return True if *entry* is a ``{"name": str, "languages": [str]}`` mapping."""
+    if not isinstance(entry, dict) or not isinstance(entry.get("name"), str):
+        return False
+    languages = entry.get("languages")
+    return isinstance(languages, list) and all(isinstance(item, str) for item in languages)
 
 
 def preset_toml(target: Target) -> str:
