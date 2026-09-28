@@ -397,10 +397,7 @@ def _check_selection_has_files(target: Target) -> None:
     exts = EXTENSIONS[target.lang]
     for path in target.project.rglob("*"):
         rel = path.relative_to(target.project)
-        # is_file() is load-bearing: a DIRECTORY named e.g. ``generated.py``
-        # matches the extension test but is not something safelint can scan, so
-        # without it an empty subtree could still pass this check.
-        if path.is_file() and path.name.endswith(exts) and not _is_excluded(rel) and (not target.include or _path_under(str(rel), target.include)):
+        if _is_scannable(path, exts) and not _is_excluded(rel) and (not target.include or _path_under(str(rel), target.include)):
             return
     where = f"--include {target.include!r} selects" if target.include else f"{target.project} holds"
     hint = "check the path (it is matched against paths relative to --project)" if target.include else "check --lang"
@@ -425,6 +422,22 @@ def _project_relative(filepath: str, root: Path) -> str:
         return str(Path(filepath).resolve().relative_to(root))
     except ValueError:
         return filepath
+
+
+def _is_scannable(path: Path, exts: tuple[str, ...]) -> bool:
+    """Return True if safelint would actually read *path* as a source file.
+
+    Three things have to hold, and each was a way to pass eligibility over
+    something the scanner never looks at:
+
+    * a real FILE - a *directory* named ``generated.py`` satisfies the extension
+      test on its own;
+    * not a SYMLINK - safelint refuses to follow them (the 2.8.4 hardening, kept
+      deliberately as a reject-all), while ``is_file()`` follows them happily, so
+      a symlinked source counted as eligible and was then skipped;
+    * the right extension for the language under test.
+    """
+    return path.is_file() and not path.is_symlink() and path.name.endswith(exts)
 
 
 def _is_excluded(rel: Path) -> bool:

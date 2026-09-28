@@ -329,6 +329,28 @@ def test_an_include_matching_no_source_file_is_an_error(tmp_path: Path) -> None:
         harness.validate(typo)
 
 
+def test_a_symlinked_source_file_is_not_eligible(tmp_path: Path) -> None:
+    """safelint refuses to follow symlinks, so one cannot make a subtree eligible.
+
+    `Path.is_file()` follows symlinks, so a symlinked source satisfied the check
+    while the scanner skipped it - `scanned=0, findings=0` recorded as clean.
+    The reject-all stance is deliberate on safelint's side (2.8.4 hardening), so
+    the harness has to mirror it rather than resolve the link.
+    """
+    project = tmp_path / "symproj"
+    project.mkdir()
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    real = outside / "real.py"
+    real.write_text("x = 1\n", encoding="utf-8")
+    (project / "link.py").symlink_to(real)
+
+    harness = _load_harness()
+    target = harness.Target(_safelint_on_path(), "python", project, "sym", out_dir=tmp_path / "o")
+    with pytest.raises(harness.HarnessError, match="no scannable python file"):
+        harness.validate(target)
+
+
 def test_files_only_under_a_scanner_excluded_tree_are_not_eligible(tmp_path: Path) -> None:
     """Eligibility must know safelint's OWN exclusions, not just the harness's.
 
