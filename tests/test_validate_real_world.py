@@ -505,24 +505,35 @@ def test_a_wedged_measurement_wrapper_is_an_error_not_a_hang() -> None:
     assert time.perf_counter() - started < 20, "the bound must fire, not wait out the sleep"
 
 
-def test_the_eligibility_walk_does_not_descend_excluded_trees(tmp_path: Path) -> None:
+def test_the_eligibility_walk_prunes_excluded_trees(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     """Excluded directories are PRUNED, not enumerated and discarded.
 
-    Asserted via a directory symlink loop inside an excluded tree: pruning never
-    enters it, so the walk terminates. A walk that descends first and filters
-    afterwards has to traverse whatever is in there - which on a built project
-    is the whole of `target/` or `node_modules/`, paid for on the failure path
-    precisely when the run is about to abort anyway.
+    Asserted by recording which directories the walk actually enters, because
+    the obvious alternatives do not test pruning at all: a symlink-loop test
+    passes on any `os.walk` (`followlinks=False` terminates whether or not
+    dirnames are pruned), and a timing test would be flaky. This spy fails if
+    the implementation descends into an excluded tree and filters afterwards.
     """
     project = tmp_path / "proj"
-    (project / "src").mkdir(parents=True)
-    (project / "node_modules").mkdir()
-    (project / "node_modules" / "loop").symlink_to(project, target_is_directory=True)
+    (project / "node_modules" / "dep" / "deeper").mkdir(parents=True)
+    (project / "src").mkdir()
 
     harness = _load_harness()
-    target = harness.Target(Path("safelint"), "python", project, "p")
+    real_walk = harness.os.walk
+    visited: list[str] = []
 
-    # No source anywhere, so the walk must exhaust the tree and then raise - it
-    # cannot short-circuit on a find, which is what makes this meaningful.
+    def spy(top, *args, **kwargs):
+        for dirpath, dirnames, filenames in real_walk(top, *args, **kwargs):
+            visited.append(str(dirpath))
+            # Yield the SAME dirnames list so the caller's in-place pruning works.
+            yield dirpath, dirnames, filenames
+
+    monkeypatch.setattr(harness.os, "walk", spy)
+    target = harness.Target(Path("safelint"), "python", project, "p")
     with pytest.raises(harness.HarnessError, match="no scannable python file"):
         harness._check_selection_has_files(target)
+
+    assert str(project) in visited, "the project root is walked"
+    assert str(project / "src") in visited, "non-excluded subtrees are still walked"
+    descended = [v for v in visited if "node_modules" in v]
+    assert descended == [], f"excluded trees must not be entered, but walked: {descended}"
