@@ -372,16 +372,50 @@ def test_files_only_under_a_scanner_excluded_tree_are_not_eligible(tmp_path: Pat
 def test_generated_config_adds_only_the_harness_specific_excludes(tmp_path: Path) -> None:
     """`extend_exclude_paths` names what the harness ADDS, not safelint's own defaults.
 
-    Eligibility has to know both sets; the generated config only needs the
-    difference, and re-listing safelint's defaults would obscure what the
-    harness actually changes.
+    Asserts the WRITTEN config, parsed back, rather than the constants it is
+    derived from: a tuple-membership check passes even if `write_config`
+    serialises something safelint cannot read, which is the half that actually
+    has to work.
+
+    Eligibility has to know both sets; the config only needs the difference, and
+    re-listing safelint's defaults would obscure what the harness changes.
     """
     harness = _load_harness()
+    target = harness.Target(Path("safelint"), "python", tmp_path, "cfg")
+    harness.write_config(tmp_path, target, [])
+    written = tomllib.loads((tmp_path / "safelint.toml").read_text(encoding="utf-8"))
+
+    excludes = written["extend_exclude_paths"]
     for name in harness.HARNESS_EXCLUDED_DIR_NAMES:
-        assert f"{name}/**" in harness.EXTRA_EXCLUDES
+        assert f"{name}/**" in excludes, f"{name} missing its root-level pattern"
+        assert f"**/{name}/**" in excludes, f"{name} missing its any-depth pattern"
     for name in harness.SCANNER_EXCLUDED_DIR_NAMES:
-        assert f"{name}/**" not in harness.EXTRA_EXCLUDES, f"{name} is already a safelint default"
+        assert f"{name}/**" not in excludes, f"{name} is already a safelint default"
         assert name in harness.EXCLUDED_DIR_NAMES, f"{name} must still block eligibility"
+
+
+def test_the_generated_exclusions_actually_suppress_findings(tmp_path: Path) -> None:
+    """The emitted globs must WORK, not merely be present in the file.
+
+    Pairs with the test above: that one proves the config says the right thing,
+    this one proves safelint acts on it. A glob that parses but never matches
+    would satisfy the first and silently let vendored code into the results -
+    which is how the programme's first pass came to lint dependency source and
+    report it as the project's own.
+    """
+    project = tmp_path / "proj"
+    (project / "vendor" / "dep").mkdir(parents=True)
+    (project / "src").mkdir(parents=True)
+    bad = "def f(a, b, c, d, e, f, g, h):\n    return a\n"
+    (project / "vendor" / "dep" / "vendored.py").write_text(bad, encoding="utf-8")
+    (project / "src" / "own.py").write_text(bad, encoding="utf-8")
+
+    harness = _load_harness()
+    target = harness.Target(_safelint_on_path(), "python", project, "ex", out_dir=tmp_path / "o")
+    files = {v["filepath"] for v in harness.validate(target)[1].violations}
+
+    assert len(files) == 1, f"only the project's own file may report, got {files}"
+    assert all("vendor" not in f for f in files)
 
 
 def test_an_include_matching_only_vendored_files_is_an_error(tmp_path: Path) -> None:

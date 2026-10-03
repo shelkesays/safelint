@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CI: bump `anthropics/claude-code-action` to v1.0.237** (folded in from the Dependabot PR). Still SHA-pinned; the new SHA was verified against its dereferenced tag object, since `v1.0.237` is an annotated tag and the naive ref lookup returns the tag object rather than the commit. No packaged behaviour change.
+
 ### Fixed
 
 - **Validation harness: four robustness defects** (`scripts/validate_real_world.py`). Dev tooling only - nothing in the wheel changes. Found in review of the 2.14.1 release PR (#184), after that release had been cut.
