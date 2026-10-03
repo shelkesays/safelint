@@ -14,6 +14,7 @@ from pathlib import Path
 import re
 import shutil
 import sys
+import time
 import tomllib
 
 import pytest
@@ -481,3 +482,47 @@ def test_unparseable_list_rules_output_is_a_harness_error(tmp_path: Path) -> Non
     harness = _load_harness()
     with pytest.raises(harness.HarnessError, match="did not return the expected JSON"):
         harness.rules_for(fake, "python")
+
+
+def test_a_wedged_measurement_wrapper_is_an_error_not_a_hang() -> None:
+    """The wrapper bounds the scan; something must bound the WRAPPER.
+
+    Simulated by replacing the runner with one that ignores its own timeout
+    argument and sleeps - the shape a wedged wrapper would have. Without an
+    outer bound this call never returns, which is the one failure mode the
+    timeout work exists to rule out.
+
+    `METADATA_TIMEOUT` is patched down because the real outer bound is the scan
+    timeout plus a minute, deliberately too long for a test to wait out.
+    """
+    harness = _load_harness()
+    harness._MEASURED_RUNNER = "import time\ntime.sleep(60)\n"
+    harness.METADATA_TIMEOUT = 1.0
+
+    started = time.perf_counter()
+    with pytest.raises(harness.HarnessError, match="wrapper did not return within"):
+        harness._measured([sys.executable, "-c", "pass"], timeout=0.5)
+    assert time.perf_counter() - started < 20, "the bound must fire, not wait out the sleep"
+
+
+def test_the_eligibility_walk_does_not_descend_excluded_trees(tmp_path: Path) -> None:
+    """Excluded directories are PRUNED, not enumerated and discarded.
+
+    Asserted via a directory symlink loop inside an excluded tree: pruning never
+    enters it, so the walk terminates. A walk that descends first and filters
+    afterwards has to traverse whatever is in there - which on a built project
+    is the whole of `target/` or `node_modules/`, paid for on the failure path
+    precisely when the run is about to abort anyway.
+    """
+    project = tmp_path / "proj"
+    (project / "src").mkdir(parents=True)
+    (project / "node_modules").mkdir()
+    (project / "node_modules" / "loop").symlink_to(project, target_is_directory=True)
+
+    harness = _load_harness()
+    target = harness.Target(Path("safelint"), "python", project, "p")
+
+    # No source anywhere, so the walk must exhaust the tree and then raise - it
+    # cannot short-circuit on a find, which is what makes this meaningful.
+    with pytest.raises(harness.HarnessError, match="no scannable python file"):
+        harness._check_selection_has_files(target)

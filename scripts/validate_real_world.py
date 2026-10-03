@@ -48,6 +48,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import dataclass, field
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -335,7 +336,23 @@ def _measured(cmd: list[str], timeout: float = DEFAULT_SCAN_TIMEOUT) -> dict[str
     A scan that exceeds *timeout* is a HarnessError, never a zero-findings run -
     the same rule the crash path follows.
     """
-    proc = subprocess.run([sys.executable, "-c", _MEASURED_RUNNER, str(timeout), *cmd], capture_output=True, text=True, check=False)  # noqa: S603 - argv list, no shell
+    # The wrapper bounds the scan; this bounds the WRAPPER, which is otherwise
+    # the one unbounded wait left in the harness. Set above the scan bound so it
+    # can only fire when the wrapper itself fails to come back after its own
+    # timeout has already elapsed - it must never pre-empt a legitimate scan.
+    #
+    # Belt-and-braces rather than a fixed defect: the motivating scenario (a
+    # grandchild holding the inherited stdout open past the inner kill, which
+    # would block the wrapper's final drain) did NOT reproduce on CPython 3.13 -
+    # two variants, including a grandchild writing continuously, both returned
+    # cleanly at the scan bound. The bound stays because "a stalled scan must
+    # not hang the harness" was the whole point of the timeout work, and an
+    # unbounded wait with no diagnostic is the one outcome that defeats it.
+    try:
+        proc = subprocess.run([sys.executable, "-c", _MEASURED_RUNNER, str(timeout), *cmd], capture_output=True, text=True, check=False, timeout=timeout + METADATA_TIMEOUT)  # noqa: S603 - argv list, no shell
+    except subprocess.TimeoutExpired as exc:
+        msg = f"measurement wrapper did not return within {timeout + METADATA_TIMEOUT:.0f}s (its own scan bound is {timeout:.0f}s) - the wrapper itself is wedged, not just the scan"
+        raise HarnessError(msg) from exc
     if proc.returncode != 0:
         msg = f"measurement wrapper failed: {proc.stderr.strip()[:500]}"
         raise HarnessError(msg)
@@ -395,14 +412,35 @@ def _check_selection_has_files(target: Target) -> None:
     only "nothing was ever eligible" is rejected.
     """
     exts = EXTENSIONS[target.lang]
-    for path in target.project.rglob("*"):
-        rel = path.relative_to(target.project)
-        if _is_scannable(path, exts) and not _is_excluded(rel) and (not target.include or _path_under(str(rel), target.include)):
+    # ``os.walk`` rather than ``rglob`` so excluded trees are PRUNED instead of
+    # enumerated and discarded. The success path barely notices - it returns on
+    # the first qualifying file - but the failure path has to exhaust the tree,
+    # and that is exactly when a built project is at its worst: 40k artifacts
+    # under ``target/`` cost 0.47s to walk and throw away. It also stops at
+    # directory symlinks (``followlinks=False``), which a ``rglob`` can follow.
+    for dirpath, dirnames, filenames in os.walk(target.project):
+        dirnames[:] = [d for d in dirnames if d not in EXCLUDED_DIR_NAMES]
+        if _any_eligible(Path(dirpath), filenames, target, exts):
             return
     where = f"--include {target.include!r} selects" if target.include else f"{target.project} holds"
     hint = "check the path (it is matched against paths relative to --project)" if target.include else "check --lang"
     msg = f"{where} no scannable {target.lang} file - {hint}, or whether every match sits in an excluded tree ({', '.join(EXCLUDED_DIR_NAMES)})"
     raise HarnessError(msg)
+
+
+def _any_eligible(dirpath: Path, filenames: list[str], target: Target, exts: tuple[str, ...]) -> bool:
+    """Return True if any of *filenames* in *dirpath* is a file safelint would scan.
+
+    Split out of the walk so each function keeps safelint's own nesting limit of
+    2 - the walk plus an inner file loop plus the predicate is depth 3, which
+    SAFE102 rejects in this repository.
+    """
+    for name in filenames:
+        path = dirpath / name
+        rel = path.relative_to(target.project)
+        if _is_scannable(path, exts) and (not target.include or _path_under(str(rel), target.include)):
+            return True
+    return False
 
 
 def _project_relative(filepath: str, root: Path) -> str:
@@ -438,11 +476,6 @@ def _is_scannable(path: Path, exts: tuple[str, ...]) -> bool:
     * the right extension for the language under test.
     """
     return path.is_file() and not path.is_symlink() and path.name.endswith(exts)
-
-
-def _is_excluded(rel: Path) -> bool:
-    """Return True if any component of *rel* is a vendored / generated directory."""
-    return any(part in EXCLUDED_DIR_NAMES for part in rel.parts)
 
 
 def validate(target: Target) -> list[RunResult]:
