@@ -1334,22 +1334,26 @@ def _callee_is(name: str, node: tree_sitter.Node) -> bool:
 def _strip_parens(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
     """Return *node* with any wrapping ``parenthesized_expression`` layers removed.
 
-    Bounded loop, never recursion - SAFE105 polices this codebase, and an
-    unbounded ``while`` trips its own SAFE501. Follows the same shape as
-    ``_strip_template_arguments`` in ``languages/_node_utils.py``. One layer is
-    the realistic maximum (``(cb)()``); the headroom is defensive, and anything
-    deeper simply keeps its parentheses and reads as "not this binding", which
-    is the quiet direction.
+    Bounded loop, never recursion - SAFE105 bars recursion in this file and an
+    unbounded ``while`` trips its own SAFE501.
+
+    The bound is the callee's own source span, not a fixed layer count. Every
+    layer costs at least two characters (``(`` and ``)``), so the span is
+    provably more than enough, and unlike a magic number it cannot be outgrown:
+    a first attempt capped at four layers still mis-read ``(((((cb)))))()`` and
+    advised the ``mut`` away.
     """
     cur = node
-    for _ in range(4):
-        if cur is None or cur.type != _rust.PARENTHESIZED_EXPRESSION:
+    if cur is None:
+        return None
+    for _ in range(cur.end_byte - cur.start_byte):
+        if cur.type != _rust.PARENTHESIZED_EXPRESSION:
             return cur
         inner = cur.named_children
         if len(inner) != 1:
             return cur  # pragma: no cover - defensive: a parenthesised expression wraps exactly one child
         cur = inner[0]
-    return cur
+    return cur  # pragma: no cover - unreachable: the span bounds the layer count
 
 
 def _assignment_left_is(name: str, node: tree_sitter.Node) -> bool:

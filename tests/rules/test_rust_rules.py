@@ -1222,3 +1222,19 @@ def test_rust_a_doubly_parenthesised_closure_call_is_a_mut_use(tmp_path: Path) -
     """Nesting is unbounded in principle, so the unwrap loops rather than peeling one layer."""
     src = "fn nested_paren() -> bool {\n    let mut n = 0;\n    let mut cb = || { n += 1; };\n    ((cb))();\n    n > 0\n}\n"
     assert _safe110(src, tmp_path, "paren2.rs") == []
+
+
+def test_rust_a_deeply_parenthesised_closure_call_is_a_mut_use(tmp_path: Path) -> None:
+    """Five layers must work, and so must any number.
+
+    A first fix capped the unwrap at four layers, which `(((((cb)))))()` walked
+    straight past - the loop ran out while still holding a
+    ``parenthesized_expression``, the callee failed the identifier test, and
+    SAFE110 went back to advising a required ``mut`` away. The bound is now the
+    callee's source span, which cannot be outgrown because every layer costs at
+    least two characters. Raised in review of PR #197.
+    """
+    five = "fn deep() -> bool {\n    let mut n = 0;\n    let mut cb = || { n += 1; };\n    (((((cb)))))();\n    n > 0\n}\n"
+    ten = "fn deeper() -> bool {\n    let mut n = 0;\n    let mut cb = || { n += 1; };\n    ((((((((((cb))))))))))();\n    n > 0\n}\n"
+    assert _safe110(five, tmp_path, "deep.rs") == []
+    assert _safe110(ten, tmp_path, "deeper.rs") == []
