@@ -172,9 +172,9 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 
 | Preset | Project | Repository | Status |
 |---|---|---|---|
-| python / `django` | Django | `django/django` | todo |
-| python / `flask` | Flask | `pallets/flask` | todo |
-| python / `fastapi` + `pydantic = true` | FastAPI | `fastapi/fastapi` | todo |
+| python / `django` | Django | `django/django` | **done** (2.14.3 @ `a461af8`) |
+| python / `flask` | Flask | `pallets/flask` | **done** (2.14.3 @ `d73fa1c`) |
+| python / `fastapi` + `pydantic = true` | FastAPI | `fastapi/fastapi` | **done** (2.14.3 @ `5f9fc5c`) |
 | java / `spring-boot` | Spring PetClinic | `spring-projects/spring-petclinic` | run (`plan/real-world-results/java-spring-petclinic-2.14.0-c7ee170.md`) |
 | php / `laravel` | Laravel framework | `laravel/framework` | todo |
 | php / `laravel` | FreeScout (application, not framework) | `freescout-help-desk/freescout` | run |
@@ -306,7 +306,7 @@ confirming on a public one before the issue is worked.
 | 25 | SAFE501 | Blind inside Rust macro token trees - three literal `break;` unseen | High | **yes** | yes | ty | #179 |
 | 26 | SAFE801 | Rust sinks matched by bare callee - a closure parameter named `query` fires | High | no | yes | ty 3/4, ruff 5/5 | #180 |
 | 27 | SAFE104 | Rust exhaustive `match` arms dominate the complexity score | Tuning | **yes** | yes | ruff 54%, ty 24% | #181 |
-| 28 | SAFE401 / SAFE304 | ~90% of findings land in test code, where the pattern is conventional (SAFE401 91/94 in Requests; SAFE304 203/227 in Rich) | High | **yes** | yes | requests, rich | #198 |
+| 28 | SAFE304 / SAFE401 / SAFE101 | Default-on rules land most findings in test code: SAFE304 82%, SAFE401 78%, SAFE101 56% across 5/5 Python projects (6688 findings). Controls SAFE104 4%, SAFE103 5%. safelint relaxes 3 of these for its own `tests/**` but ships no user default | High | **yes** | yes | all 5 python | #198 |
 | 29 | SAFE203 | Only stdlib `logging` counts, so printing or re-raising an error still reads as swallowing it; Rust's SAFE207 analogue already accepts both | High | **yes** | yes | requests, rich | #199 |
 
 ## What three Rust projects showed together
