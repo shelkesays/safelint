@@ -1,7 +1,7 @@
 # spring-petclinic - java / `spring-boot`
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/spring-petclinic` @ `500158f732419217507c7656904b8e6aa1bcc0d6`
+- safelint: **2.14.3**
+- project: `spring-petclinic` @ `500158f732419217507c7656904b8e6aa1bcc0d6`
 - preset: `spring-boot`
 - run: 2026-10-04 19:42 UTC
 

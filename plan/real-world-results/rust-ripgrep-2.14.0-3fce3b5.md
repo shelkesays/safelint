@@ -1,7 +1,7 @@
 # ripgrep - rust
 
-- safelint: **2.14.0** (`/tmp/pipchk/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/ripgrep` @ `3fce3b5bb0236da2df6d99672afb8a719642eca7`
+- safelint: **2.14.0**
+- project: `ripgrep` @ `3fce3b5bb0236da2df6d99672afb8a719642eca7`
 - preset: `none`
 - run: 2026-09-24 20:43 UTC
 

@@ -1,7 +1,7 @@
 # fmt - cpp
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/fmt` @ `4afd0e498e9e1dd68775cc52087df774a19c761f`
+- safelint: **2.14.3**
+- project: `fmt` @ `4afd0e498e9e1dd68775cc52087df774a19c761f`
 - preset: `none`
 - run: 2026-10-04 19:33 UTC
 

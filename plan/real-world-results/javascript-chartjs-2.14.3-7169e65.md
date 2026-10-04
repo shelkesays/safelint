@@ -1,7 +1,7 @@
 # chartjs - javascript / `browser`
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/chartjs` @ `7169e65147a47f3720957a6f156a33c838ab9f57`
+- safelint: **2.14.3**
+- project: `chartjs` @ `7169e65147a47f3720957a6f156a33c838ab9f57`
 - preset: `browser`
 - run: 2026-10-04 19:39 UTC
 

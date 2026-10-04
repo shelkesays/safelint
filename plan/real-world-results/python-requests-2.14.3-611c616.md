@@ -1,7 +1,7 @@
 # requests - python
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/requests` @ `611c6162cbc4ac2020a2f91c7cfa4f3abf9bbb60`
+- safelint: **2.14.3**
+- project: `requests` @ `611c6162cbc4ac2020a2f91c7cfa4f3abf9bbb60`
 - preset: `none`
 - run: 2026-10-04 18:41 UTC
 

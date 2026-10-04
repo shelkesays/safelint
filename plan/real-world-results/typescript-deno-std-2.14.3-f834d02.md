@@ -1,7 +1,7 @@
 # deno-std - typescript / `deno`
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/std` @ `f834d0223364361169314833e3c7a8f62ce11d58`
+- safelint: **2.14.3**
+- project: `std` @ `f834d0223364361169314833e3c7a8f62ce11d58`
 - preset: `deno`
 - run: 2026-10-04 19:39 UTC
 

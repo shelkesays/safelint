@@ -1,27 +1,0 @@
-Ò
-zvec_grep_files
-file_id*
-
-collection_id*
-
-absolute_path*
-
-relative_path
-	root_path
-
-size_bytes
-last_modified_time
-content_hash *
-
-kind*
-
-format*
-
-has_index_status
-indexed_time 
-entity_count
-token_count 
-error 
-entity_ids_json€­â*»G2file_id2collection_id2absolute_path2content_hash2kind2formatï2_zvec_g_doc_id_2
-_zvec_uid_2file_id2collection_id2absolute_path2relative_path2	root_path2
-size_bytes2last_modified_time2content_hash2kind2format2has_index_status2indexed_time2entity_count2token_count2error2entity_ids_json@

@@ -1,7 +1,7 @@
 # rich - python
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/rich` @ `9d8f9a372cc5916fd4781fec207ced7ddac2f08f`
+- safelint: **2.14.3**
+- project: `rich` @ `9d8f9a372cc5916fd4781fec207ced7ddac2f08f`
 - preset: `none`
 - run: 2026-10-04 18:41 UTC
 

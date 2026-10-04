@@ -1,7 +1,7 @@
 # flask - python / `flask`
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/flask` @ `d73fa1cdcbd8b1465c151db8924ba58b1dd14e35`
+- safelint: **2.14.3**
+- project: `flask` @ `d73fa1cdcbd8b1465c151db8924ba58b1dd14e35`
 - preset: `flask`
 - run: 2026-10-04 18:53 UTC
 

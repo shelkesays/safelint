@@ -1,7 +1,7 @@
 # axios - javascript
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/axios` @ `e1a8a57519d1b896c2a795d0ec0138fe24a77a33`
+- safelint: **2.14.3**
+- project: `axios` @ `e1a8a57519d1b896c2a795d0ec0138fe24a77a33`
 - preset: `none`
 - run: 2026-10-04 19:18 UTC
 

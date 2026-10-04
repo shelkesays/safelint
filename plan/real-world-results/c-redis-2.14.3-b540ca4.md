@@ -1,7 +1,7 @@
 # redis - c
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/redis` @ `b540ca49cba815f3fbe634363c3df68d4f4f127a`
+- safelint: **2.14.3**
+- project: `redis` @ `b540ca49cba815f3fbe634363c3df68d4f4f127a`
 - preset: `none`
 - run: 2026-10-04 19:32 UTC
 

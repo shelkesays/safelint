@@ -1,7 +1,7 @@
 # zod - typescript
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/zod` @ `0b216ef674e297ebe41d8bf902262e56f8755822`
+- safelint: **2.14.3**
+- project: `zod` @ `0b216ef674e297ebe41d8bf902262e56f8755822`
 - preset: `none`
 - run: 2026-10-04 19:19 UTC
 

@@ -1,7 +1,7 @@
 # vue-core - typescript
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/core` @ `4ab865a848a1da3d10fb674f857e5fff13094644`
+- safelint: **2.14.3**
+- project: `core` @ `4ab865a848a1da3d10fb674f857e5fff13094644`
 - preset: `none`
 - run: 2026-10-04 19:19 UTC
 
