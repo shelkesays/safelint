@@ -314,7 +314,7 @@ confirming on a public one before the issue is worked.
 | 32 | SAFE302 | Every package-level `var` in Go flagged as shared mutable state, including ones `const` cannot express (slices, ldflags-written strings) and that are never mutated. 120 findings in fzf, 97% library code; the never-mutated file yields 2 and the genuinely-mutated one 1 | High | **yes** | yes | fzf, cobra | #204 |
 | 33 | SAFE000 | 17-44% of real C/C++ files reported as syntax errors and dropped from analysis, though the code is valid - the cause is the preprocessor (`#ifdef` mid-expression, macro parameter lists, guarded `__attribute__`) which tree-sitter does not run. Redis 347/788 C files (44%), curl 277/1048 (26%), fmt 19/47 (40%), LevelDB 13/76 (17%). The message tells the user to check syntax | High | **yes** | yes | redis, curl, fmt, leveldb | #206 |
 | 34 | SAFE901 | `@Autowired` field injection reported in Spring TEST classes, where it is the pattern Spring's own docs and sample code use. 17/17 findings in tests on Spring PetClinic - 51% of the project's default output | High | **yes** | yes | spring-petclinic | #208 |
-| 35 | SAFE906 | Laravel's own framework internals flagged for `$guarded = []` (`Pivot`, `DatabaseNotification`), models the framework populates itself rather than from request input. 273 findings, one repeated message | Tuning | no | yes | laravel/framework | - |
+| 35 | SAFE906 | Laravel's own framework internals flagged for `$guarded = []` (`Pivot`, `DatabaseNotification`), models the framework populates itself rather than from request input. 273 findings, one repeated message | Tuning | no | yes | laravel/framework | #210 |
 
 ## What three Rust projects showed together
 
