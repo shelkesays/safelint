@@ -518,8 +518,14 @@ def summary_markdown(target: Target, version: str, sha: str, results: list[RunRe
     head = [
         f"# {target.label} - {target.lang}" + (f" / `{target.preset}`" if target.preset else ""),
         "",
-        f"- safelint: **{version}** (`{target.safelint}`)",
-        f"- project: `{target.project}` @ `{sha}`" + (f", subtree `{target.include}`" if target.include else ""),
+        # Deliberately NOT the absolute paths. These summaries are committed to a
+        # public repository, and `target.safelint` / `target.project` are local
+        # filesystem paths that carry the operator's username and directory
+        # layout. The version and the project SHA are the provenance that
+        # actually matters - they are what makes a run reproducible - and the
+        # label identifies the project.
+        f"- safelint: **{version}**",
+        f"- project: `{target.label}`" + (f" ({target.project.name})" if target.project.name != target.label else "") + f" @ `{sha}`" + (f", subtree `{target.include}`" if target.include else ""),
         f"- preset: `{target.preset or 'none'}`" + (" + `pydantic = true`" if target.pydantic else ""),
         f"- run: {time.strftime('%Y-%m-%d %H:%M UTC', time.gmtime())}",
         "",

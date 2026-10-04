@@ -1,7 +1,7 @@
 # leveldb - cpp
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/leveldb` @ `7ee830d02b623e8ffe0b95d59a74db1e58da04c5`
+- safelint: **2.14.3**
+- project: `leveldb` @ `7ee830d02b623e8ffe0b95d59a74db1e58da04c5`
 - preset: `none`
 - run: 2026-10-04 19:33 UTC
 

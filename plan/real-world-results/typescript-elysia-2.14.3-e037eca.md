@@ -1,7 +1,7 @@
 # elysia - typescript / `bun`
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/elysia` @ `e037eca710e7ad193be09cc6615ab0dbe54af914`
+- safelint: **2.14.3**
+- project: `elysia` @ `e037eca710e7ad193be09cc6615ab0dbe54af914`
 - preset: `bun`
 - run: 2026-10-04 19:40 UTC
 

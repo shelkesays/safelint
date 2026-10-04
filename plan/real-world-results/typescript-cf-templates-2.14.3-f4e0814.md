@@ -1,7 +1,7 @@
 # cf-templates - typescript / `cloudflare-workers`
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/templates` @ `f4e08147e7367363cf9c7733ef308048794d27ac`
+- safelint: **2.14.3**
+- project: `templates` @ `f4e08147e7367363cf9c7733ef308048794d27ac`
 - preset: `cloudflare-workers`
 - run: 2026-10-04 19:41 UTC
 

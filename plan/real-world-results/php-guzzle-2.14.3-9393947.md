@@ -1,7 +1,7 @@
 # guzzle - php
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/guzzle` @ `93939470950a9b11e2e84204166ef5e048c55fe4`
+- safelint: **2.14.3**
+- project: `guzzle` @ `93939470950a9b11e2e84204166ef5e048c55fe4`
 - preset: `none`
 - run: 2026-10-04 19:31 UTC
 

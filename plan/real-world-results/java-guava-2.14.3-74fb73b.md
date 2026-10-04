@@ -1,7 +1,7 @@
 # guava - java
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/guava` @ `74fb73b20e17e1b3fa072d7754af493217f86781`
+- safelint: **2.14.3**
+- project: `guava` @ `74fb73b20e17e1b3fa072d7754af493217f86781`
 - preset: `none`
 - run: 2026-10-04 19:26 UTC
 

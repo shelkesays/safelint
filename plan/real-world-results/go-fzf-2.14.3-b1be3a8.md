@@ -1,7 +1,7 @@
 # fzf - go
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/fzf` @ `b1be3a8be1b833ce5b92fbbac11637643d60a046`
+- safelint: **2.14.3**
+- project: `fzf` @ `b1be3a8be1b833ce5b92fbbac11637643d60a046`
 - preset: `none`
 - run: 2026-10-04 19:26 UTC
 

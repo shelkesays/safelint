@@ -1,7 +1,7 @@
 # django - python / `django`
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/django` @ `a461af8ce48762d7ec602260aaff81014ddccbcb`
+- safelint: **2.14.3**
+- project: `django` @ `a461af8ce48762d7ec602260aaff81014ddccbcb`
 - preset: `django`
 - run: 2026-10-04 18:54 UTC
 

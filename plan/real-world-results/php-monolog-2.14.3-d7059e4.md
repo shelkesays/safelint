@@ -1,7 +1,7 @@
 # monolog - php
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/monolog` @ `d7059e4c691d05ea1222b5124bed0f961be46e15`
+- safelint: **2.14.3**
+- project: `monolog` @ `d7059e4c691d05ea1222b5124bed0f961be46e15`
 - preset: `none`
 - run: 2026-10-04 19:31 UTC
 

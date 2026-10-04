@@ -1,7 +1,7 @@
 # curl - c
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/curl` @ `61a31e02be295596a0a20b692df585fd498bdb7b`
+- safelint: **2.14.3**
+- project: `curl` @ `61a31e02be295596a0a20b692df585fd498bdb7b`
 - preset: `none`
 - run: 2026-10-04 19:31 UTC
 

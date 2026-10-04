@@ -1,7 +1,7 @@
 # express - javascript
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/express` @ `7ef98448f8b38099ab1ded55e458538ad47a51e7`
+- safelint: **2.14.3**
+- project: `express` @ `7ef98448f8b38099ab1ded55e458538ad47a51e7`
 - preset: `none`
 - run: 2026-10-04 19:18 UTC
 

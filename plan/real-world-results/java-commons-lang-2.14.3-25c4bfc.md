@@ -1,7 +1,7 @@
 # commons-lang - java
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/commons-lang` @ `25c4bfcd6d9dc3a7333088bfc3031b05cd93837e`
+- safelint: **2.14.3**
+- project: `commons-lang` @ `25c4bfcd6d9dc3a7333088bfc3031b05cd93837e`
 - preset: `none`
 - run: 2026-10-04 19:25 UTC
 

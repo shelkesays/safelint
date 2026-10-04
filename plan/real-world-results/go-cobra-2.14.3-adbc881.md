@@ -1,7 +1,7 @@
 # cobra - go
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/cobra` @ `adbc8813901bba65827259daa8e22ff94ec1f30e`
+- safelint: **2.14.3**
+- project: `cobra` @ `adbc8813901bba65827259daa8e22ff94ec1f30e`
 - preset: `none`
 - run: 2026-10-04 19:26 UTC
 

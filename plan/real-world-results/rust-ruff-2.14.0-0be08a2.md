@@ -1,7 +1,7 @@
 # ruff - rust
 
-- safelint: **2.14.0** (`/tmp/pipchk/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/ruff` @ `0be08a206f9c3180afd3e93bcc792ed5cb1f4db1`
+- safelint: **2.14.0**
+- project: `ruff` @ `0be08a206f9c3180afd3e93bcc792ed5cb1f4db1`
 - preset: `none`
 - run: 2026-09-24 20:44 UTC
 

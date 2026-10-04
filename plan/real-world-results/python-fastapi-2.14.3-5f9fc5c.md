@@ -1,7 +1,7 @@
 # fastapi - python / `fastapi`
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/fastapi` @ `5f9fc5c59a9bb54608aa35376715f3ba9708188e`
+- safelint: **2.14.3**
+- project: `fastapi` @ `5f9fc5c59a9bb54608aa35376715f3ba9708188e`
 - preset: `fastapi` + `pydantic = true`
 - run: 2026-10-04 18:53 UTC
 

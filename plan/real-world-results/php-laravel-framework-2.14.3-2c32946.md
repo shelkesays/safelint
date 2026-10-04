@@ -1,7 +1,7 @@
 # laravel-framework - php / `laravel`
 
-- safelint: **2.14.3** (`/Users/rahulshelke/sources/safelint_tests/.venvs/v2143/bin/safelint`)
-- project: `/Users/rahulshelke/sources/safelint_tests/framework` @ `2c3294632cd68cbe35eaaa6f34fdd97087934098`
+- safelint: **2.14.3**
+- project: `framework` @ `2c3294632cd68cbe35eaaa6f34fdd97087934098`
 - preset: `laravel`
 - run: 2026-10-04 19:42 UTC
 
