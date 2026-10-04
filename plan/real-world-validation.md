@@ -8,8 +8,7 @@ classifying each finding as a true positive, a false positive, or debatable.
 
 safelint's own test suite proves rules fire on code written to make them fire.
 It cannot prove they *stay quiet* on idiomatic code someone else wrote. The
-programme has so far found **27** defects across Python, JavaScript, TypeScript,
-Java, PHP and Rust - none of which the full suite - 2237 tests, 97% coverage -
+programme has so far found **29** defects across Python, JavaScript, TypeScript, Java, PHP and Rust - none of which the full suite - 2237 tests, 97% coverage -
 catches, because
 every one of them is a rule being wrong about a language idiom rather than wrong
 about its own logic.
@@ -148,8 +147,8 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 
 | Language | Project | Repository | Why this one | Status |
 |---|---|---|---|---|
-| Python | Requests | `psf/requests` | The most-copied Python idiom source there is; small, pure library | todo |
-| Python | Rich | `Textualize/rich` | Modern typed Python, very different style from Requests | todo |
+| Python | Requests | `psf/requests` | The most-copied Python idiom source there is; small, pure library | **done** (2.14.3 @ `611c616`) |
+| Python | Rich | `Textualize/rich` | Modern typed Python, very different style from Requests | **done** (2.14.3 @ `9d8f9a3`) |
 | JavaScript | Express | `expressjs/express` | Canonical Node service code, callback-heavy | todo |
 | JavaScript | Axios | `axios/axios` | Promise/async idioms, dual browser+node target | todo |
 | TypeScript | Vue core | `vuejs/core` | Large idiomatic TS without styled-components | todo |
@@ -307,6 +306,8 @@ confirming on a public one before the issue is worked.
 | 25 | SAFE501 | Blind inside Rust macro token trees - three literal `break;` unseen | High | **yes** | yes | ty | #179 |
 | 26 | SAFE801 | Rust sinks matched by bare callee - a closure parameter named `query` fires | High | no | yes | ty 3/4, ruff 5/5 | #180 |
 | 27 | SAFE104 | Rust exhaustive `match` arms dominate the complexity score | Tuning | **yes** | yes | ruff 54%, ty 24% | #181 |
+| 28 | SAFE401 / SAFE304 | ~90% of findings land in test code, where the pattern is conventional (SAFE401 91/94 in Requests; SAFE304 203/227 in Rich) | High | **yes** | yes | requests, rich | #198 |
+| 29 | SAFE203 | Only stdlib `logging` counts, so printing or re-raising an error still reads as swallowing it; Rust's SAFE207 analogue already accepts both | High | **yes** | yes | requests, rich | #199 |
 
 ## What three Rust projects showed together
 
