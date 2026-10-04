@@ -1290,9 +1290,10 @@ def _binds_plain_name(node: tree_sitter.Node, name: str) -> bool:
 
 def _node_is_mut_use_of(name: str, node: tree_sitter.Node) -> bool:
     """Return True if *node* is a usage of *name* that requires the binding to be ``mut``."""
-    if node.type == _rust.ASSIGNMENT_EXPRESSION:
-        return _assignment_left_is(name, node)
-    if node.type == _rust.COMPOUND_ASSIGNMENT_EXPR:
+    # Plain and compound assignment share a predicate; grouped rather than
+    # listed separately so adding the call branch keeps the function within
+    # ruff's PLR0911 return-statement limit.
+    if node.type in (_rust.ASSIGNMENT_EXPRESSION, _rust.COMPOUND_ASSIGNMENT_EXPR):
         return _assignment_left_is(name, node)
     if node.type == _rust.REFERENCE_EXPRESSION:
         return _is_mut_reference_of(name, node)
@@ -1300,7 +1301,29 @@ def _node_is_mut_use_of(name: str, node: tree_sitter.Node) -> bool:
         return _field_expression_value_is(name, node)
     if node.type == _rust.INDEX_EXPRESSION:
         return _first_named_child_is(name, node)  # pragma: no cover - rare: index_expression as a mut-needing usage isn't reached by the current tests
+    if node.type == _rust.CALL_EXPRESSION:
+        return _callee_is(name, node)
     return False
+
+
+def _callee_is(name: str, node: tree_sitter.Node) -> bool:
+    """Return True if *node* calls the binding *name* directly, as in ``cb()``.
+
+    Calling a closure held in a binding needs that binding to be ``mut`` when the
+    closure is ``FnMut`` - ``call_mut`` takes ``&mut self`` - and whether it is
+    cannot be known without type information. So the rule assumes it is, exactly
+    the conservative choice the method-receiver case already makes: a missed
+    needless ``mut`` costs nothing, while a wrong suggestion fails to compile.
+
+    Without this, ``let mut cb = || { n += 1; }; cb();`` was reported as needless
+    and following the advice gave ``error[E0596]: cannot borrow 'cb' as mutable``.
+
+    Only a bare-identifier callee matches. A method call (``v.push(x)``) has a
+    ``field_expression`` callee and is already covered, and a path call
+    (``ns::g()``) is a free function that no local binding shadows.
+    """
+    callee = node.child_by_field_name("function")
+    return callee is not None and callee.type == _rust.IDENTIFIER and node_text(callee) == name
 
 
 def _assignment_left_is(name: str, node: tree_sitter.Node) -> bool:

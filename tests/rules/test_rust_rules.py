@@ -1153,10 +1153,11 @@ def test_rust_mut_borrowed_in_the_shadowing_lets_initializer_is_not_needless(tmp
     case, one line later. The cutoff is the ``let``'s end for this reason.
     """
     src = "fn outer() -> bool {\n    let mut failed = false;\n    let mut cb = || { let failed = &mut failed; *failed = true; };\n    cb();\n    failed\n}\n"
-    # Line 3's own ``mut cb`` is a separate, pre-existing matter (calling a FnMut
-    # closure needs ``mut``, which the rule does not yet recognise), so assert on
-    # the outer binding specifically rather than on an empty result.
-    assert 2 not in [v.lineno for v in _safe110(src, tmp_path, "init.rs")], "the outer binding is mutably borrowed"
+    # Nothing may be reported: the outer binding is mutably borrowed, and line
+    # 3's ``mut cb`` is required because ``cb()`` calls a FnMut closure. That
+    # second half used to be a known false positive this assertion had to work
+    # around; it is fixed, so the stronger empty-result assertion is available.
+    assert _safe110(src, tmp_path, "init.rs") == []
 
 
 def test_rust_needless_mut_fires_when_a_typed_closure_parameter_shadows(tmp_path: Path) -> None:
@@ -1169,3 +1170,37 @@ def test_rust_needless_mut_fires_when_a_typed_closure_parameter_shadows(tmp_path
     inner = "let c = |mut failed: bool| { failed = true; }; c(true);"
     src = f"fn outer(items: Vec<bool>) -> bool {{\n    let mut failed = false;\n    items.iter().for_each(|_x| {{ {inner} }});\n    failed\n}}\n"
     assert [v.lineno for v in _safe110(src, tmp_path, "typed.rs")] == [2]
+
+
+def test_rust_mut_closure_that_is_called_is_not_needless(tmp_path: Path) -> None:
+    """Calling a closure held in a binding needs that binding to be ``mut``.
+
+    ``FnMut::call_mut`` takes ``&mut self``, so dropping the ``mut`` here makes
+    rustc fail with ``error[E0596]: cannot borrow 'cb' as mutable``. Whether the
+    closure is ``FnMut`` or ``Fn`` needs type information the rule does not
+    have, so a call is assumed to require ``mut`` - the same conservative choice
+    the method-receiver case makes. Issue #186.
+    """
+    src = "fn call_fnmut() -> bool {\n    let mut n = 0;\n    let mut cb = || { n += 1; };\n    cb();\n    n > 0\n}\n"
+    assert _safe110(src, tmp_path, "fnmut.rs") == []
+
+
+def test_rust_an_unrelated_call_does_not_suppress_a_needless_mut(tmp_path: Path) -> None:
+    """Only a call OF the binding counts; a call beside it must not silence the rule.
+
+    The negative control for the fix above - matching any `call_expression`
+    rather than its callee would suppress every finding in a function that
+    happens to call something.
+    """
+    src = "fn free_fn_call() -> bool {\n    let mut flag = false;\n    helper(1);\n    flag\n}\n"
+    assert [v.lineno for v in _safe110(src, tmp_path, "freefn.rs")] == [2]
+
+
+def test_rust_a_method_call_on_another_binding_does_not_suppress(tmp_path: Path) -> None:
+    """A method call resolves through a ``field_expression`` callee, not an identifier.
+
+    ``v.push(1)`` must keep crediting ``v``, not the unrelated ``flag``, which a
+    looser callee match would conflate.
+    """
+    src = "fn method_call() -> bool {\n    let mut flag = false;\n    let mut v = Vec::new();\n    v.push(1);\n    flag\n}\n"
+    assert [v.lineno for v in _safe110(src, tmp_path, "method.rs")] == [2], "flag is needless; v is not"

@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CI / dev dependencies: bump `urllib3` to 2.8.0, `virtualenv` to 21.14.5 and `python-discovery` to 1.6.1** (folded in from the Dependabot PR). Lockfile only - safelint's single runtime dependency is `tree-sitter`, and all three reach the project through dev tooling (`requests` -> urllib3; `pre-commit` -> virtualenv -> python-discovery), so the published wheel is unaffected. urllib3 2.8.0 carries three security fixes, two rated High (HTTPS-proxy TLS configuration being ignored, and an unbounded chunk-size line buffered during streaming). Each proposed artefact hash was verified against the PyPI JSON API before applying.
+
+### Fixed
+
+- **SAFE110 `needless_mut` no longer advises dropping a `mut` that a closure CALL requires (Rust).** `let mut cb = || { n += 1; }; cb();` was reported as needless, and following the advice gives `error[E0596]: cannot borrow 'cb' as mutable` - calling a `FnMut` closure goes through `call_mut`, which takes `&mut self`. The liveness scan recognised assignment, `&mut`, method-receiver, field and index uses, but a bare call of the binding matched none of them. Whether a closure is `FnMut` or `Fn` needs type information the rule does not have, so a call is now assumed to require `mut`, the same conservative choice the method-receiver case already makes. Measured against the Ruff monorepo this removes **24 of 310** findings (ripgrep: 1 of 42) and adds none; every sampled removal is a `let mut <name> = |...| {...}` that is later called. Same family as the 2.14.1 fix: a rule whose suggestion does not compile. Closes #186.
+
 ## [2.14.2] - 2026-10-03
 
 ### Changed
