@@ -176,7 +176,7 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | python / `django` | Django | `django/django` | `run` (2.14.3 @ `a461af8`) |
 | python / `flask` | Flask | `pallets/flask` | `run` (2.14.3 @ `d73fa1c`) |
 | python / `fastapi` + `pydantic = true` | FastAPI | `fastapi/fastapi` | `run` (2.14.3 @ `5f9fc5c`) |
-| java / `spring-boot` | Spring PetClinic | `spring-projects/spring-petclinic` | run (`plan/real-world-results/java-spring-petclinic-2.14.0-c7ee170.md`) |
+| java / `spring-boot` | Spring PetClinic | `spring-projects/spring-petclinic` | `run` (2.14.3 @ `500158f`); the earlier 2.14.0 @ `c7ee170` report is kept beside it for comparison |
 | php / `laravel` | Laravel framework | `laravel/framework` | `run` (2.14.3 @ `2c32946`) |
 | php / `laravel` | FreeScout (application, not framework) | `freescout-help-desk/freescout` | run |
 | javascript / `browser` | Chart.js | `chartjs/Chart.js` | `run` (2.14.3 @ `7169e65`) |
