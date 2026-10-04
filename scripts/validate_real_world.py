@@ -388,6 +388,17 @@ def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
         root = target.project.resolve()
         violations = [v for v in violations if _path_under(_project_relative(str(v["filepath"]), root), target.include)]
     files_checked = int(payload.get("summary", {}).get("files_checked", 0))
+    # The scanner's own count is AUTHORITATIVE, unlike the eligibility check that
+    # ran before it: that check re-derives safelint's discovery rules, and every
+    # version of that re-derivation has eventually disagreed with the scanner
+    # (five separate false-clean routes, see #192). This needs no mirroring and
+    # cannot drift - if safelint read nothing, there is no result to report,
+    # whatever the harness predicted. safelint's own stderr note says why.
+    if files_checked == 0:
+        detail = env["err"].strip().splitlines()
+        reason = next((line for line in detail if "no files linted" in line), "safelint gave no reason")
+        msg = f"{mode}: safelint read 0 files, so there is nothing to report - {reason}"
+        raise HarnessError(msg)
     result = RunResult(mode, files_checked, violations, float(env["wall"]), float(env["rss_mb"]), env["err"], env["rc"])
     for v in violations:
         code = str(v["code"])

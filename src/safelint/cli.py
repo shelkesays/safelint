@@ -1301,12 +1301,26 @@ def _emit_scan_notes(out: _TargetOutcome, output_format: str) -> None:
     The git-discovery notes (``git unavailable`` fallback and the "no modified
     files" note) go through :func:`_print_status`, so - as before the multi-path
     refactor - they reach **every** output mode (stdout in pretty, stderr in
-    json / sarif) and still explain an empty JSON document to a CI operator. The
-    missing-grammar warnings and the "no files linted" note stay **pretty-only**
-    (json / sarif stderr must stay clean for parsing pipelines): the "no files
-    linted" note keeps a skipped-by-exclusion target distinguishable from a
-    clean one - e.g. ``check src tests`` where ``tests/**`` is excluded would
-    otherwise read identically to ``check src``.
+    json / sarif) and still explain an empty JSON document to a CI operator.
+
+    The **"no files linted" note now does the same**, for exactly that reason. It
+    is the only signal separating "I scanned nothing" from "I scanned your code
+    and it is clean", and withholding it from json / sarif left every machine
+    consumer unable to tell those apart: ``summary.files_checked`` says *that*
+    nothing was read, never *why*. It was previously pretty-only to keep json /
+    sarif stderr quiet for parsing pipelines, but pipelines parse **stdout** -
+    a line on stderr cannot break them, which is the same argument already
+    accepted for the git-discovery notes beside it.
+
+    It still goes through :func:`_diagnostics.print_warning` rather than
+    :func:`_print_status`, so it stays on stderr with the usual
+    ``safelint: warning:`` prefix in every mode. Routing it through
+    ``_print_status`` would have moved it to *stdout* in pretty mode and dropped
+    the prefix - a gratuitous change to output people already read.
+
+    The missing-grammar warnings stay pretty-only. Those are install advice
+    ("pip install 'safelint[rust]'") aimed at a person at a terminal, not a
+    description of what the run did, and they can run to several lines.
     """
     if out.git_fallback_targets:
         noun, targets = _quoted_targets(out.git_fallback_targets)
@@ -1320,13 +1334,13 @@ def _emit_scan_notes(out: _TargetOutcome, output_format: str) -> None:
             "use --all-files to scan everything or install the needed grammar extra.",
             output_format=output_format,
         )
+    if out.empty_targets:
+        noun, targets = _quoted_targets(out.empty_targets)
+        _diagnostics.print_warning(f"no files linted under {noun} {targets} - all excluded by config, empty, or no supported source files")
     if output_format != "pretty":
         return
     if out.unavailable:
         _print_grammar_warnings(out.unavailable)
-    if out.empty_targets:
-        noun, targets = _quoted_targets(out.empty_targets)
-        _diagnostics.print_warning(f"no files linted under {noun} {targets} - all excluded by config, empty, or no supported source files")
 
 
 def _run_check(args: argparse.Namespace) -> int:

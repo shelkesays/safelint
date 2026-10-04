@@ -537,3 +537,42 @@ def test_the_eligibility_walk_prunes_excluded_trees(tmp_path: Path, monkeypatch:
     assert str(project / "src") in visited, "non-excluded subtrees are still walked"
     descended = [v for v in visited if "node_modules" in v]
     assert descended == [], f"excluded trees must not be entered, but walked: {descended}"
+
+
+def test_a_run_that_read_zero_files_is_an_error_not_a_result(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """`files_checked == 0` is authoritative: no scan happened, so there is no result.
+
+    The eligibility check that runs first re-derives safelint's discovery rules,
+    and every version of that re-derivation has eventually disagreed with the
+    scanner - five separate false-clean routes. This backstop needs no mirroring
+    and cannot drift, so it is asserted with the mirrored check DISABLED, which
+    is the whole point of having it. Issue #192.
+    """
+    project = tmp_path / "proj"
+    (project / ".venv").mkdir(parents=True)
+    (project / ".venv" / "dep.py").write_text("x = 1\n", encoding="utf-8")
+
+    harness = _load_harness()
+    monkeypatch.setattr(harness, "_check_selection_has_files", lambda _target: None)
+    target = harness.Target(_safelint_on_path(), "python", project, "zero", out_dir=tmp_path / "o")
+
+    with pytest.raises(harness.HarnessError, match="read 0 files, so there is nothing to report"):
+        harness.validate(target)
+
+
+def test_the_zero_files_error_carries_safelints_own_reason(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The message quotes safelint's 'no files linted' note, so the cause is visible.
+
+    That note only reaches `--format json` stderr as of #191; before it, the
+    harness could say *that* nothing was scanned but never *why*.
+    """
+    project = tmp_path / "proj"
+    (project / "node_modules").mkdir(parents=True)
+    (project / "node_modules" / "dep.py").write_text("x = 1\n", encoding="utf-8")
+
+    harness = _load_harness()
+    monkeypatch.setattr(harness, "_check_selection_has_files", lambda _target: None)
+    target = harness.Target(_safelint_on_path(), "python", project, "why", out_dir=tmp_path / "o")
+
+    with pytest.raises(harness.HarnessError, match="no files linted under"):
+        harness.validate(target)

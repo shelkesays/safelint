@@ -1189,3 +1189,30 @@ def test_run_check_per_target_fail_on_keeps_stricter_subtree_gate(tmp_path: Path
     # No CLI --fail-on/--mode, so each target's own config governs its threshold.
     rc = cli._run_check(_multipath_args([lax, strict], all_files=True, fail_on=None, mode=None, output_format="pretty"))
     assert rc == 1, f"the strict subtree's fail_on=warning must still block; got {rc}"
+
+
+@pytest.mark.parametrize("output_format", ("pretty", "json", "sarif"))
+def test_run_check_empty_target_note_reaches_every_output_format(output_format: str, tmp_path: Path, mocker: MockerFixture, capsys: pytest.CaptureFixture[str]) -> None:
+    """The 'no files linted' note must reach json / sarif, not only pretty.
+
+    It is the only signal separating "I scanned nothing" from "I scanned your
+    code and it is clean": `summary.files_checked` says *that* nothing was read,
+    never *why*. Withholding it from the machine-readable formats left every
+    automated consumer unable to tell a skipped target from a clean one - which
+    is how the validation harness came to write confident zero-findings reports
+    over source it had never examined. Issue #191.
+
+    It stays on stderr in all three modes, so a pipeline parsing stdout is
+    unaffected.
+    """
+    empty = tmp_path / "vendored"
+    empty.mkdir()
+    mocker.patch.object(cli, "_get_git_modified_supported_files", return_value=None)
+
+    rc = cli._run_check(_multipath_args([empty], all_files=True, output_format=output_format))
+    captured = capsys.readouterr()
+
+    assert rc == 0
+    assert "no files linted under" in captured.err, f"{output_format}: note missing from stderr"
+    assert "vendored" in captured.err
+    assert "no files linted" not in captured.out, "the note must never pollute stdout"
