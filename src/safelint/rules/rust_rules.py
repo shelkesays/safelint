@@ -1318,12 +1318,38 @@ def _callee_is(name: str, node: tree_sitter.Node) -> bool:
     Without this, ``let mut cb = || { n += 1; }; cb();`` was reported as needless
     and following the advice gave ``error[E0596]: cannot borrow 'cb' as mutable``.
 
-    Only a bare-identifier callee matches. A method call (``v.push(x)``) has a
-    ``field_expression`` callee and is already covered, and a path call
-    (``ns::g()``) is a free function that no local binding shadows.
+    Parentheses around the callee are stripped first: ``(cb)()`` and ``((cb))()``
+    call the binding just as ``cb()`` does, but their callee is a
+    ``parenthesized_expression``, so an identifier-only check missed them and
+    went back to advising the ``mut`` away.
+
+    Beyond that, only a bare-identifier callee matches. A method call
+    (``v.push(x)``) has a ``field_expression`` callee and is already covered, and
+    a path call (``ns::g()``) is a free function that no local binding shadows.
     """
-    callee = node.child_by_field_name("function")
+    callee = _strip_parens(node.child_by_field_name("function"))
     return callee is not None and callee.type == _rust.IDENTIFIER and node_text(callee) == name
+
+
+def _strip_parens(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
+    """Return *node* with any wrapping ``parenthesized_expression`` layers removed.
+
+    Bounded loop, never recursion - SAFE105 polices this codebase, and an
+    unbounded ``while`` trips its own SAFE501. Follows the same shape as
+    ``_strip_template_arguments`` in ``languages/_node_utils.py``. One layer is
+    the realistic maximum (``(cb)()``); the headroom is defensive, and anything
+    deeper simply keeps its parentheses and reads as "not this binding", which
+    is the quiet direction.
+    """
+    cur = node
+    for _ in range(4):
+        if cur is None or cur.type != _rust.PARENTHESIZED_EXPRESSION:
+            return cur
+        inner = cur.named_children
+        if len(inner) != 1:
+            return cur  # pragma: no cover - defensive: a parenthesised expression wraps exactly one child
+        cur = inner[0]
+    return cur
 
 
 def _assignment_left_is(name: str, node: tree_sitter.Node) -> bool:

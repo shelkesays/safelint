@@ -1204,3 +1204,21 @@ def test_rust_a_method_call_on_another_binding_does_not_suppress(tmp_path: Path)
     """
     src = "fn method_call() -> bool {\n    let mut flag = false;\n    let mut v = Vec::new();\n    v.push(1);\n    flag\n}\n"
     assert [v.lineno for v in _safe110(src, tmp_path, "method.rs")] == [2], "flag is needless; v is not"
+
+
+def test_rust_a_parenthesised_closure_call_is_a_mut_use(tmp_path: Path) -> None:
+    """``(cb)()`` calls the binding just as ``cb()`` does.
+
+    The callee is a ``parenthesized_expression``, so an identifier-only check
+    missed it and went back to advising the ``mut`` away - the same
+    ``error[E0596]`` the call branch exists to prevent. Raised in review of
+    PR #195.
+    """
+    src = "fn paren_call() -> bool {\n    let mut n = 0;\n    let mut cb = || { n += 1; };\n    (cb)();\n    n > 0\n}\n"
+    assert _safe110(src, tmp_path, "paren.rs") == []
+
+
+def test_rust_a_doubly_parenthesised_closure_call_is_a_mut_use(tmp_path: Path) -> None:
+    """Nesting is unbounded in principle, so the unwrap loops rather than peeling one layer."""
+    src = "fn nested_paren() -> bool {\n    let mut n = 0;\n    let mut cb = || { n += 1; };\n    ((cb))();\n    n > 0\n}\n"
+    assert _safe110(src, tmp_path, "paren2.rs") == []
