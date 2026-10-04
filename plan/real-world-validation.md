@@ -9,9 +9,10 @@ classifying each finding as a true positive, a false positive, or debatable.
 safelint's own test suite proves rules fire on code written to make them fire.
 It cannot prove they *stay quiet* on idiomatic code someone else wrote. The
 programme has so far found **29** defects across Python, JavaScript, TypeScript, Java, PHP and Rust - none of which the full suite - 2237 tests, 97% coverage -
-catches, because
-every one of them is a rule being wrong about a language idiom rather than wrong
-about its own logic.
+catches. Almost
+every one is a rule being wrong about a language idiom rather than wrong about
+its own logic; the exceptions are engine-level, such as finding 22, where a
+parse failure removes a file from analysis with no signal in the summary.
 
 Two rules were firing on **default settings**: `SAFE105` on Java method
 overloads, and `SAFE102` on every JavaScript `else if` chain.
@@ -147,8 +148,8 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 
 | Language | Project | Repository | Why this one | Status |
 |---|---|---|---|---|
-| Python | Requests | `psf/requests` | The most-copied Python idiom source there is; small, pure library | **done** (2.14.3 @ `611c616`) |
-| Python | Rich | `Textualize/rich` | Modern typed Python, very different style from Requests | **done** (2.14.3 @ `9d8f9a3`) |
+| Python | Requests | `psf/requests` | The most-copied Python idiom source there is; small, pure library | `run` (2.14.3 @ `611c616`) |
+| Python | Rich | `Textualize/rich` | Modern typed Python, very different style from Requests | `run` (2.14.3 @ `9d8f9a3`) |
 | JavaScript | Express | `expressjs/express` | Canonical Node service code, callback-heavy | todo |
 | JavaScript | Axios | `axios/axios` | Promise/async idioms, dual browser+node target | todo |
 | TypeScript | Vue core | `vuejs/core` | Large idiomatic TS without styled-components | todo |
@@ -172,9 +173,9 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 
 | Preset | Project | Repository | Status |
 |---|---|---|---|
-| python / `django` | Django | `django/django` | **done** (2.14.3 @ `a461af8`) |
-| python / `flask` | Flask | `pallets/flask` | **done** (2.14.3 @ `d73fa1c`) |
-| python / `fastapi` + `pydantic = true` | FastAPI | `fastapi/fastapi` | **done** (2.14.3 @ `5f9fc5c`) |
+| python / `django` | Django | `django/django` | `run` (2.14.3 @ `a461af8`) |
+| python / `flask` | Flask | `pallets/flask` | `run` (2.14.3 @ `d73fa1c`) |
+| python / `fastapi` + `pydantic = true` | FastAPI | `fastapi/fastapi` | `run` (2.14.3 @ `5f9fc5c`) |
 | java / `spring-boot` | Spring PetClinic | `spring-projects/spring-petclinic` | run (`plan/real-world-results/java-spring-petclinic-2.14.0-c7ee170.md`) |
 | php / `laravel` | Laravel framework | `laravel/framework` | todo |
 | php / `laravel` | FreeScout (application, not framework) | `freescout-help-desk/freescout` | run |
@@ -307,7 +308,7 @@ confirming on a public one before the issue is worked.
 | 26 | SAFE801 | Rust sinks matched by bare callee - a closure parameter named `query` fires | High | no | yes | ty 3/4, ruff 5/5 | #180 |
 | 27 | SAFE104 | Rust exhaustive `match` arms dominate the complexity score | Tuning | **yes** | yes | ruff 54%, ty 24% | #181 |
 | 28 | SAFE304 / SAFE401 / SAFE101 | Default-on rules land most findings in test code: SAFE304 82%, SAFE401 78%, SAFE101 56% across 5/5 Python projects (6688 findings). Controls SAFE104 4%, SAFE103 5%. safelint relaxes 3 of these for its own `tests/**` but ships no user default | High | **yes** | yes | all 5 python | #198 |
-| 29 | SAFE203 | Only stdlib `logging` counts, so printing or re-raising an error still reads as swallowing it; Rust's SAFE207 analogue already accepts both | High | **yes** | yes | requests, rich | #199 |
+| 29 | SAFE203 | Output writers are not accepted, so adding a diagnostic `print` to a handler that re-raises *introduces* a finding - `raise` alone is exempt, `print(exc); raise` is not. Logging method names on any receiver already count, and bare re-raise is already exempt, so the affected share is small: 68/1795 (3%) | Low | **yes** | yes | all 5 python | #199 |
 
 ## What three Rust projects showed together
 
