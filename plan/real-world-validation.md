@@ -8,7 +8,7 @@ classifying each finding as a true positive, a false positive, or debatable.
 
 safelint's own test suite proves rules fire on code written to make them fire.
 It cannot prove they *stay quiet* on idiomatic code someone else wrote. The
-programme has so far found **29** defects across Python, JavaScript, TypeScript, Java, PHP and Rust - none of which the full suite - 2237 tests, 97% coverage -
+programme has so far found **31** defects across Python, JavaScript, TypeScript, Java, PHP and Rust - none of which the full suite - 2237 tests, 97% coverage -
 catches. Almost
 every one is a rule being wrong about a language idiom rather than wrong about
 its own logic; the exceptions are engine-level, such as finding 22, where a
@@ -150,10 +150,10 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 |---|---|---|---|---|
 | Python | Requests | `psf/requests` | The most-copied Python idiom source there is; small, pure library | `run` (2.14.3 @ `611c616`) |
 | Python | Rich | `Textualize/rich` | Modern typed Python, very different style from Requests | `run` (2.14.3 @ `9d8f9a3`) |
-| JavaScript | Express | `expressjs/express` | Canonical Node service code, callback-heavy | todo |
-| JavaScript | Axios | `axios/axios` | Promise/async idioms, dual browser+node target | todo |
-| TypeScript | Vue core | `vuejs/core` | Large idiomatic TS without styled-components | todo |
-| TypeScript | Zod | `colinhacks/zod` | Type-level heavy TS; very different shape from Vue | todo |
+| JavaScript | Express | `expressjs/express` | Canonical Node service code, callback-heavy | `run` (2.14.3 @ `7ef9844`) |
+| JavaScript | Axios | `axios/axios` | Promise/async idioms, dual browser+node target | `run` (2.14.3 @ `e1a8a57`) |
+| TypeScript | Vue core | `vuejs/core` | Large idiomatic TS without styled-components | `run` (2.14.3 @ `4ab865a`) |
+| TypeScript | Zod | `colinhacks/zod` | Type-level heavy TS; very different shape from Vue | `run` (2.14.3 @ `0b216ef`) |
 | TypeScript | Superset frontend | `apache/superset` (`superset-frontend/`) | Large React/TS app; already run, and the source of the styled-components finding | run |
 | Java | Commons Lang | `apache/commons-lang` | Vanilla Java, no framework; pure library idioms | todo |
 | Java | Guava | `google/guava` | Large, heavily reviewed, different house style | todo |
@@ -309,6 +309,8 @@ confirming on a public one before the issue is worked.
 | 27 | SAFE104 | Rust exhaustive `match` arms dominate the complexity score | Tuning | **yes** | yes | ruff 54%, ty 24% | #181 |
 | 28 | SAFE304 / SAFE401 / SAFE101 | Default-on rules land most findings in test code: SAFE304 82%, SAFE401 78%, SAFE101 56% across 5/5 Python projects (6688 findings). Controls SAFE104 4%, SAFE103 5%. safelint relaxes 3 of these for its own `tests/**` but ships no user default | High | **yes** | yes | all 5 python | #198 |
 | 29 | SAFE203 | Output writers are not accepted, so adding a diagnostic `print` to a handler that re-raises *introduces* a finding - `raise` alone is exempt, `print(exc); raise` is not. Logging method names on any receiver already count, and bare re-raise is already exempt, so the affected share is small: 68/1795 (3%) | Low | **yes** | yes | all 5 python | #199 |
+| 30 | SAFE305 | Every `var` flagged identically, so a pre-ES6 codebase is 89% one rule (1748/1960 in Express) and the genuinely hoisting-hazardous cases are indistinguishable from harmless module-scope ones | High | **yes** | yes | express, axios | #201 |
+| 31 | SAFE302 | A local `const self = this` is reported as a write to the browser global `self`; the name is matched without checking for a shadowing declaration | High | **yes** | yes | axios 3 sites | #202 |
 
 ## What three Rust projects showed together
 
