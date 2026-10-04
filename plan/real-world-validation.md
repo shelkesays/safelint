@@ -8,7 +8,7 @@ classifying each finding as a true positive, a false positive, or debatable.
 
 safelint's own test suite proves rules fire on code written to make them fire.
 It cannot prove they *stay quiet* on idiomatic code someone else wrote. The
-programme has so far found **31** defects across Python, JavaScript, TypeScript, Java, PHP and Rust - none of which the full suite - 2237 tests, 97% coverage -
+programme has so far found **32** defects across Python, JavaScript, TypeScript, Java, Go, PHP and Rust - none of which the full suite - 2237 tests, 97% coverage -
 catches. Almost
 every one is a rule being wrong about a language idiom rather than wrong about
 its own logic; the exceptions are engine-level, such as finding 22, where a
@@ -155,13 +155,13 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | TypeScript | Vue core | `vuejs/core` | Large idiomatic TS without styled-components | `run` (2.14.3 @ `4ab865a`) |
 | TypeScript | Zod | `colinhacks/zod` | Type-level heavy TS; very different shape from Vue | `run` (2.14.3 @ `0b216ef`) |
 | TypeScript | Superset frontend | `apache/superset` (`superset-frontend/`) | Large React/TS app; already run, and the source of the styled-components finding | run |
-| Java | Commons Lang | `apache/commons-lang` | Vanilla Java, no framework; pure library idioms | todo |
-| Java | Guava | `google/guava` | Large, heavily reviewed, different house style | todo |
+| Java | Commons Lang | `apache/commons-lang` | Vanilla Java, no framework; pure library idioms | `run` (2.14.3 @ `25c4bfc`) |
+| Java | Guava | `google/guava` | Large, heavily reviewed, different house style | `run` (2.14.3 @ `74fb73b`) |
 | Rust | Ruff | `astral-sh/ruff` | Large modern idiomatic Rust; a linter itself. **Includes ty**: the type checker's source is `crates/ty_*` in this monorepo | **triaged** (`plan/real-world-results/rust-ruff-2.14.0-0be08a2.md`) |
 | Rust | ty | `astral-sh/ruff` subtree `crates/ty_` | The type checker: a recursion-heavy subsystem by partly different authors. Validated with `--include` rather than its own clone - see the note below | **triaged** (`plan/real-world-results/rust-ty-2.14.0-0be08a2.md`) |
 | Rust | ripgrep | `BurntSushi/ripgrep` | Single author, different domain, classic idiomatic Rust - the unrelated second project the two-project rule requires | **triaged** (`plan/real-world-results/rust-ripgrep-2.14.0-3fce3b5.md`) |
-| Go | Cobra | `spf13/cobra` | CLI library; no web framework involved | todo |
-| Go | fzf | `junegunn/fzf` | Application rather than library; concurrency-heavy | todo |
+| Go | Cobra | `spf13/cobra` | CLI library; no web framework involved | `run` (2.14.3 @ `adbc881`) |
+| Go | fzf | `junegunn/fzf` | Application rather than library; concurrency-heavy | `run` (2.14.3 @ `b1be3a8`) |
 | PHP | Guzzle | `guzzle/guzzle` | Widely used PHP with no framework preset | todo |
 | PHP | Monolog | `Seldaek/monolog` | Different domain; exercises SAFE203 logging rules honestly | todo |
 | C | curl | `curl/curl` | Security-critical C, heavily audited, idiomatic | todo |
@@ -311,6 +311,7 @@ confirming on a public one before the issue is worked.
 | 29 | SAFE203 | Output writers are not accepted, so adding a diagnostic `print` to a handler that re-raises *introduces* a finding - `raise` alone is exempt, `print(exc); raise` is not. Logging method names on any receiver already count, and bare re-raise is already exempt, so the affected share is small: 68/1795 (3%) | Low | **yes** | yes | all 5 python | #199 |
 | 30 | SAFE305 | Every `var` flagged identically, so a pre-ES6 codebase is 89% one rule (1748/1960 in Express) and the genuinely hoisting-hazardous cases are indistinguishable from harmless module-scope ones | High | **yes** | yes | express, axios | #201 |
 | 31 | SAFE302 | A local `const self = this` is reported as a write to the browser global `self`; the name is matched without checking for a shadowing declaration | High | **yes** | yes | axios 3 sites | #202 |
+| 32 | SAFE302 | Every package-level `var` in Go flagged as shared mutable state, including ones `const` cannot express (slices, ldflags-written strings) and that are never mutated. 120 findings in fzf, 97% library code; the never-mutated file yields 2 and the genuinely-mutated one 1 | High | **yes** | yes | fzf, cobra | #204 |
 
 ## What three Rust projects showed together
 
