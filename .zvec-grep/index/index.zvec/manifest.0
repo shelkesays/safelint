@@ -1,0 +1,33 @@
+Ä
+zvec_grep_entities
+	embedding€*	
+2ô
+group *
+
+file_id*
+
+content_kind
+content_hash 
+metadata_kind 
+symbol_type *
+
+symbol_name *
+
+symbol_scope 
+symbol_signature 
+
+symbol_doc 
+symbol_modifiers 
+	node_type 
+heading 
+heading_level 
+text*:
+jieba	lowercase
+fragment_index
+
+range_json
+content_base64 
+image_format €­â*Î.2group2file_id2symbol_type2symbol_name•2_zvec_g_doc_id_2
+_zvec_uid_2group2file_id2content_kind2content_hash2metadata_kind2symbol_type2symbol_name2symbol_scope2symbol_signature2
+symbol_doc2symbol_modifiers2	node_type2heading2heading_level2text2fragment_index2
+range_json2content_base642image_format@
