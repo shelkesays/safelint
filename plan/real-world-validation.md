@@ -8,7 +8,7 @@ classifying each finding as a true positive, a false positive, or debatable.
 
 safelint's own test suite proves rules fire on code written to make them fire.
 It cannot prove they *stay quiet* on idiomatic code someone else wrote. The
-programme has so far found **32** defects across Python, JavaScript, TypeScript, Java, Go, PHP and Rust - none of which the full suite - 2237 tests, 97% coverage -
+programme has so far found **33** defects across all nine supported languages - none of which the full suite - 2237 tests, 97% coverage -
 catches. Almost
 every one is a rule being wrong about a language idiom rather than wrong about
 its own logic; the exceptions are engine-level, such as finding 22, where a
@@ -162,12 +162,12 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | Rust | ripgrep | `BurntSushi/ripgrep` | Single author, different domain, classic idiomatic Rust - the unrelated second project the two-project rule requires | **triaged** (`plan/real-world-results/rust-ripgrep-2.14.0-3fce3b5.md`) |
 | Go | Cobra | `spf13/cobra` | CLI library; no web framework involved | `run` (2.14.3 @ `adbc881`) |
 | Go | fzf | `junegunn/fzf` | Application rather than library; concurrency-heavy | `run` (2.14.3 @ `b1be3a8`) |
-| PHP | Guzzle | `guzzle/guzzle` | Widely used PHP with no framework preset | todo |
-| PHP | Monolog | `Seldaek/monolog` | Different domain; exercises SAFE203 logging rules honestly | todo |
-| C | curl | `curl/curl` | Security-critical C, heavily audited, idiomatic | todo |
-| C | Redis | `redis/redis` | Different C style; allocation and string-handling heavy | todo |
-| C++ | fmt | `fmtlib/fmt` | Modern C++, template-heavy, widely vendored | todo |
-| C++ | LevelDB | `google/leveldb` | Classic OO C++; RAII and pointer discipline | todo |
+| PHP | Guzzle | `guzzle/guzzle` | Widely used PHP with no framework preset | `run` (2.14.3 @ `9393947`) |
+| PHP | Monolog | `Seldaek/monolog` | Different domain; exercises SAFE203 logging rules honestly | `run` (2.14.3 @ `d7059e4`) |
+| C | curl | `curl/curl` | Security-critical C, heavily audited, idiomatic | `run` (2.14.3 @ `61a31e0`) |
+| C | Redis | `redis/redis` | Different C style; allocation and string-handling heavy | `run` (2.14.3 @ `b540ca4`) |
+| C++ | fmt | `fmtlib/fmt` | Modern C++, template-heavy, widely vendored | `run` (2.14.3 @ `4afd0e4`) |
+| C++ | LevelDB | `google/leveldb` | Classic OO C++; RAII and pointer discipline | `run` (2.14.3 @ `7ee830d`) |
 
 ### Framework / runtime rows (preset enabled)
 
@@ -312,6 +312,7 @@ confirming on a public one before the issue is worked.
 | 30 | SAFE305 | Every `var` flagged identically, so a pre-ES6 codebase is 89% one rule (1748/1960 in Express) and the genuinely hoisting-hazardous cases are indistinguishable from harmless module-scope ones | High | **yes** | yes | express, axios | #201 |
 | 31 | SAFE302 | A local `const self = this` is reported as a write to the browser global `self`; the name is matched without checking for a shadowing declaration | High | **yes** | yes | axios 3 sites | #202 |
 | 32 | SAFE302 | Every package-level `var` in Go flagged as shared mutable state, including ones `const` cannot express (slices, ldflags-written strings) and that are never mutated. 120 findings in fzf, 97% library code; the never-mutated file yields 2 and the genuinely-mutated one 1 | High | **yes** | yes | fzf, cobra | #204 |
+| 33 | SAFE000 | 9-41% of real C/C++ files reported as syntax errors and dropped from analysis, though the code is valid - the cause is the preprocessor (`#ifdef` mid-expression, macro parameter lists, guarded `__attribute__`) which tree-sitter does not run. Redis 347/845 files, curl 277/1101. The message tells the user to check syntax | High | **yes** | yes | redis, curl, fmt, leveldb | #206 |
 
 ## What three Rust projects showed together
 
