@@ -350,6 +350,91 @@ in the others. That is what the two-project rule buys, and it earned its keep:
 binding forms of the same bug appeared in Ruff and ty - so the fix had to widen
 rather than being dismissed as a one-off.
 
+## Fix programme: classification and order
+
+The sweep is finished - every language and every preset has been run, and the
+register above is closed. What follows is how the resulting backlog is ordered,
+and the principle it is ordered on.
+
+**Nothing is dropped.** Every open issue is in scope, including the engine and
+harness ones in class C. A finding that is recorded and never fixed is worse than
+one never found, because the register then documents known-bad behaviour that
+nobody is accountable for.
+
+### The ordering principle: is safelint telling the truth?
+
+Severity is the wrong primary axis. It measures how much a finding *hurts* -
+whether it blocks a run - not whether safelint is **correct**. A rule that reports
+a defect which does not exist costs the same trust whether it is an `error` or a
+`warning`: the user investigates, finds nothing, and from then on discounts
+everything the tool says. safelint's value is entirely that its findings can be
+believed, so correctness comes first and blocking-ness is a tiebreaker.
+
+That reorders things against intuition. SAFE105's 2814 Java findings are
+`warning` severity and do not fail a default local run, yet they rank above
+SAFE305's 1748 blocking-in-CI findings, because "this recurses" is false about
+code that does not recurse while "this is a `var`" is true about a `var`.
+
+### Class A - safelint reports a defect that does not exist
+
+The trust problem. These are first, grouped by shared mechanism so one fix closes
+several.
+
+| group | issues | what safelint claims | what is true |
+|---|---|---|---|
+| Recursion that is not recursion | #153, #160, #173 | "recursion" (2814 Java findings, 51% of Commons Lang defaults) | a different overload, an `impl` method, a shadowed local `use` |
+| Valid code called a syntax error | #206, #164, #174 | "syntax error - check syntax" on 17-44% of C/C++ files | valid C/C++/TS/Rust; the preprocessor is not run, and some macros defeat the grammar |
+| A name matched without its context | #202, #178, #180, #158, #171 | a local `self` "writes to a global"; a closure parameter named `query` is "injection"; `write!` to a `Formatter` is "I/O" | the name is shadowed, or the receiver decides and is ignored |
+| Structure counted that is not there | #154, #166 | nesting depth N | `else if`, `with` and `try` are not nesting levels |
+| Control flow misread | #170, #179 | "infinite loop"; statements invisible inside macro token trees | the loop `return`s; the statements exist |
+| A premise that is false | #161, #177, #172, #157, #162, #159, #199 | "unlogged", "assertion-free", "production code", "unvalidated", "swallowed" | it logs via a helper, insta macros are assertions, it is a test, `Validator::make` validates, the error is re-raised |
+| Python semantics borrowed from C | #155, #156 | "may return None" | `dict.get(k, default)` cannot; `mkdir` / `unlink` do not return a sentinel |
+| A label that is wrong | #165 | `Function "<anonymous>"` | `const Foo = () => {}` has a name |
+
+**Class A2, called out separately:** #180, #158, #178 land on SAFE801, the
+security rule. A false positive there costs more than elsewhere - a security
+finding that turns out to be nothing teaches the user to skim the next one.
+
+### Class B - true, but inapplicable in context
+
+The finding is correct; the context makes it unhelpful. Real work, and large by
+volume, but safelint is not lying.
+
+| issues | nature |
+|---|---|
+| #198 | test-scoping: 10 rules, 5 languages, 9 default-on. SAFE901 100%, SAFE302 95%, SAFE401 93%, SAFE101 74%, SAFE304 82% |
+| #201, #204 | a construct reported rather than the hazard it names: every JS `var` (85-89% of defaults), every Go package `var` (and the harmless file yields *more* findings than the hazardous one) |
+| #181, #208, #210, #163 | tuning: Rust `match` arms 54%, Spring test field injection 100%, Laravel internals, the SAFE601 default |
+
+#198 is the largest single lever in the backlog - one decision across ten rules -
+and it is deliberately *not* first, because it makes safelint quieter rather than
+more honest.
+
+### Class C - engine and reporting
+
+In scope, not deferred. #175 in particular is a prerequisite rather than a
+nicety: #206 silently drops up to 44% of a C project's files, and that is only
+discoverable if the run reports how many it skipped.
+
+| issue | why it matters |
+|---|---|
+| #175 | no skipped-file signal - pairs with #206; a clean Redis run currently reads as a pass over three fifths of the code |
+| #196 | per-language scan counts. Needed by #192, and the absence of it has already put a wrong number in this document twice |
+| #192 | the harness re-derives safelint's discovery rules; five false-clean defects came from that model drifting. Blocked on #196 |
+
+### Execution order
+
+1. **Class A, by mechanism** - recursion (#153, #160, #173) first: largest measured
+   volume, unambiguous mechanism, and argument counts alone resolve most of it
+   with no type resolution. Then the name-without-context family (#202, #178,
+   #180, #158, #171), then structure (#154, #166), then control flow, then the
+   false premises.
+2. **#175 plus #206's message** - the only issue where safelint both misreports
+   and hides the consequence.
+3. **Remaining Class A**, including the Python-semantics and labelling fixes.
+4. **Class C** - #196 then #192.
+5. **Class B**, led by #198.
+
 ## Cross-cutting root cause
 
 Most of the above are one problem wearing different hats: **safelint matches
