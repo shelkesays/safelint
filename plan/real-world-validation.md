@@ -8,7 +8,7 @@ classifying each finding as a true positive, a false positive, or debatable.
 
 safelint's own test suite proves rules fire on code written to make them fire.
 It cannot prove they *stay quiet* on idiomatic code someone else wrote. The
-programme has so far found **33** defects across all nine supported languages - none of which the full suite - 2237 tests, 97% coverage -
+programme has so far found **35** defects across all nine supported languages - none of which the full suite - 2237 tests, 97% coverage -
 catches. Almost
 every one is a rule being wrong about a language idiom rather than wrong about
 its own logic; the exceptions are engine-level, such as finding 22, where a
@@ -177,12 +177,12 @@ actual projects and can be wiped and re-cloned at will. Status: `todo`,
 | python / `flask` | Flask | `pallets/flask` | `run` (2.14.3 @ `d73fa1c`) |
 | python / `fastapi` + `pydantic = true` | FastAPI | `fastapi/fastapi` | `run` (2.14.3 @ `5f9fc5c`) |
 | java / `spring-boot` | Spring PetClinic | `spring-projects/spring-petclinic` | run (`plan/real-world-results/java-spring-petclinic-2.14.0-c7ee170.md`) |
-| php / `laravel` | Laravel framework | `laravel/framework` | todo |
+| php / `laravel` | Laravel framework | `laravel/framework` | `run` (2.14.3 @ `2c32946`) |
 | php / `laravel` | FreeScout (application, not framework) | `freescout-help-desk/freescout` | run |
-| javascript / `browser` | Chart.js | `chartjs/Chart.js` | todo |
-| javascript / `deno` | Deno std | `denoland/std` | todo |
-| javascript / `bun` | Elysia | `elysiajs/elysia` | todo |
-| javascript / `cloudflare-workers` | Workers templates | `cloudflare/templates` | todo |
+| javascript / `browser` | Chart.js | `chartjs/Chart.js` | `run` (2.14.3 @ `7169e65`) |
+| javascript / `deno` | Deno std | `denoland/std` | `run` (2.14.3 @ `f834d02`) |
+| javascript / `bun` | Elysia | `elysiajs/elysia` | `run` (2.14.3 @ `e037eca`) |
+| javascript / `cloudflare-workers` | Workers templates | `cloudflare/templates` | `run` (2.14.3 @ `f4e0814`) |
 
 Notes on the Rust rows:
 
@@ -313,6 +313,8 @@ confirming on a public one before the issue is worked.
 | 31 | SAFE302 | A local `const self = this` is reported as a write to the browser global `self`; the name is matched without checking for a shadowing declaration | High | **yes** | yes | axios 3 sites | #202 |
 | 32 | SAFE302 | Every package-level `var` in Go flagged as shared mutable state, including ones `const` cannot express (slices, ldflags-written strings) and that are never mutated. 120 findings in fzf, 97% library code; the never-mutated file yields 2 and the genuinely-mutated one 1 | High | **yes** | yes | fzf, cobra | #204 |
 | 33 | SAFE000 | 9-41% of real C/C++ files reported as syntax errors and dropped from analysis, though the code is valid - the cause is the preprocessor (`#ifdef` mid-expression, macro parameter lists, guarded `__attribute__`) which tree-sitter does not run. Redis 347/845 files, curl 277/1101. The message tells the user to check syntax | High | **yes** | yes | redis, curl, fmt, leveldb | #206 |
+| 34 | SAFE901 | `@Autowired` field injection reported in Spring TEST classes, where it is the pattern Spring's own docs and sample code use. 17/17 findings in tests on Spring PetClinic - 51% of the project's default output | High | **yes** | yes | spring-petclinic | #208 |
+| 35 | SAFE906 | Laravel's own framework internals flagged for `$guarded = []` (`Pivot`, `DatabaseNotification`), models the framework populates itself rather than from request input. 273 findings, one repeated message | Tuning | no | yes | laravel/framework | - |
 
 ## What three Rust projects showed together
 
