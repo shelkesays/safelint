@@ -28,11 +28,14 @@ concurrency:
 jobs:
   guard:
     name: Reject fork PRs targeting main
-    # Only forks, only when the base is main. A branch inside this repository is
-    # the maintainer's own release flow and is left alone.
+    # Only forks, and any base that is not `development`. Stated as an allow-list
+    # rather than "not main": `release/*` branches flow into `main` by design, so
+    # a fork PR merged into one would reach a release the same way, and `main` is
+    # not the only base worth refusing. A branch inside this repository is the
+    # maintainer's own flow and is never touched, whatever its base.
     if: >-
       github.event.pull_request.head.repo.fork == true &&
-      github.event.pull_request.base.ref == 'main'
+      github.event.pull_request.base.ref != 'development'
     runs-on: ubuntu-latest
     steps:
       - name: Explain and close
@@ -41,19 +44,20 @@ jobs:
           PR: ${{ github.event.pull_request.number }}
           REPO: ${{ github.repository }}
           HEAD_LABEL: ${{ github.event.pull_request.head.label }}
+          BASE: ${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
           cat > /tmp/body.md <<'MSG'
           Thanks for the contribution - closing this one on process grounds only, and it is a two-click fix.
 
-          **Pull requests from forks must target `development`, not `main`.**
+          **Pull requests from forks must target `development`.** This one targets a different branch.
 
           `main` is the release branch. The publish workflow reads `project.version` on every push to it and cuts a PyPI release when that version is new, so a change merged straight into `main` bypasses the release-candidate cycle that every other change goes through. GitHub offers `main` as the default base and gives maintainers no way to restrict which base a fork may pick, which is why this is enforced here rather than in the PR form.
 
           **To reopen against the right base**, no new branch or force-push needed:
 
           1. Open your PR and click **Edit** next to the title.
-          2. Change the base branch from `main` to `development`.
+          2. Change the base branch to `development`.
           3. Reopen the pull request.
 
           Your commits, review history and comments all carry over. Everything else about the change is unaffected - this says nothing about its quality, only its target.
@@ -67,6 +71,13 @@ jobs:
           git push --force-with-lease
           ```
           MSG
-          gh pr comment "$PR" --repo "$REPO" --body-file /tmp/body.md
+          # The comment must never gate the close. Under `set -e` a transient
+          # failure here - a rate limit, a flaky API call - would abort the step
+          # and leave the PR open with the guard having silently not run. Closing
+          # is the part that enforces the rule, so it happens either way and the
+          # failure is surfaced as a warning instead.
+          if ! gh pr comment "$PR" --repo "$REPO" --body-file /tmp/body.md; then
+            echo "::warning::could not post the explanation on #$PR - closing anyway"
+          fi
           gh pr close "$PR" --repo "$REPO"
-          echo "::notice::closed fork PR #$PR from $HEAD_LABEL - base was main, must be development"
+          echo "::notice::closed fork PR #$PR from $HEAD_LABEL - base was '$BASE', must be development"
