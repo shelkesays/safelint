@@ -209,3 +209,139 @@ def test_python_shadowed_self_qualified_call_still_fires(tmp_path: Path) -> None
     # ``self.walk(...)`` is the method (real recursion); the nested ``walk``
     # only shadows the *bare* name, not the qualified receiver.
     assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+# ---------------------------------------------------------------------------
+# Java: argument count separates a convenience overload from real recursion
+# ---------------------------------------------------------------------------
+
+
+def test_java_overload_with_different_arity_is_not_recursion(tmp_path: Path) -> None:
+    """A call whose argument count differs from the signature is a different overload.
+
+    The convenience-overload-delegates-to-the-general-one pattern is what Commons
+    Lang and Guava are built from, so the rule was loudest on the most idiomatic
+    Java in the ecosystem - 2814 findings across the two, 51% of Commons Lang's
+    default output. Arity settles it without any type resolution. Issue #153.
+    """
+    sample = tmp_path / "Over.java"
+    sample.write_text(
+        "class A {\n"
+        "    boolean[] add(boolean[] a, int i, boolean e) { return (boolean[]) add(a, i, Boolean.valueOf(e), Boolean.TYPE); }\n"
+        "    Object add(Object a, int i, Object e, Class<?> t) { return null; }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_java_same_arity_self_call_still_fires(tmp_path: Path) -> None:
+    """Matching arity is still reported - the arity check must not silence real recursion."""
+    sample = tmp_path / "Fact.java"
+    sample.write_text("class A {\n    int fact(int n) { return n * fact(n - 1); }\n}\n", encoding="utf-8")
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_java_varargs_mismatch_still_fires(tmp_path: Path) -> None:
+    """Varargs accept any argument count, so a mismatch proves nothing and stays reported.
+
+    `vg(String... s)` has one parameter and `vg("a", "b")` passes two; that is a
+    genuine self-call. Arity can only rule a call OUT when the signature is fixed.
+    """
+    sample = tmp_path / "Var.java"
+    sample.write_text('class A {\n    void vg(String... s) { vg("a", "b"); }\n}\n', encoding="utf-8")
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_java_zero_arg_self_call_still_fires(tmp_path: Path) -> None:
+    """Zero parameters and zero arguments match, so the call is real recursion."""
+    sample = tmp_path / "Zero.java"
+    sample.write_text("class A {\n    void spin() { spin(); }\n}\n", encoding="utf-8")
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+# ---------------------------------------------------------------------------
+# Rust: a bare call inside an impl / trait, and a function-local `use`
+# ---------------------------------------------------------------------------
+
+
+def test_rust_bare_call_in_impl_method_is_not_recursion(tmp_path: Path) -> None:
+    """A bare call inside an inherent method can never reach the method itself.
+
+    Calling it requires `self.name()` or `Type::name(..)`, so a bare `name(..)`
+    always resolves to a free function or an import. Issue #160.
+    """
+    sample = tmp_path / "impl.rs"
+    sample.write_text(
+        'impl Script {\n    pub fn schema_hash(&self) -> String { schema_hash("x") }\n}\n',
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_rust_bare_call_in_trait_default_method_is_not_recursion(tmp_path: Path) -> None:
+    """A trait default method has the same reachability rule as an inherent one."""
+    sample = tmp_path / "trait.rs"
+    sample.write_text("trait T {\n    fn render(&self) -> String { render() }\n}\n", encoding="utf-8")
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_rust_self_qualified_method_call_still_fires(tmp_path: Path) -> None:
+    """`self.name()` inside an impl IS recursion - the suppression is bare-call only."""
+    sample = tmp_path / "selfcall.rs"
+    sample.write_text("impl S {\n    fn walk(&self) { self.walk(); }\n}\n", encoding="utf-8")
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_rust_free_function_recursion_still_fires(tmp_path: Path) -> None:
+    """A free function calling itself is unaffected by the impl rule."""
+    sample = tmp_path / "free.rs"
+    sample.write_text("fn real(n: u32) -> u32 { if n == 0 { 0 } else { real(n - 1) } }\n", encoding="utf-8")
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_rust_function_local_use_shadows_the_name(tmp_path: Path) -> None:
+    """A `use` inside the body rebinds the name for the rest of the block.
+
+    This exact shape is in ripgrep (`crates/ignore/src/walk.rs`). Issue #173.
+    """
+    sample = tmp_path / "localuse.rs"
+    sample.write_text(
+        "fn symlink(a: u32, b: u32) -> u32 {\n    use std::os::unix::fs::symlink;\n    symlink(a, b)\n}\n",
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_rust_function_local_use_list_shadows_the_name(tmp_path: Path) -> None:
+    """A brace list binds each name in it, so `use p::{symlink, other}` shadows too."""
+    sample = tmp_path / "uselist.rs"
+    sample.write_text(
+        "fn symlink(a: u32) -> u32 {\n    use std::os::unix::fs::{symlink, chown};\n    symlink(a)\n}\n",
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_rust_function_local_use_alias_shadows_the_name(tmp_path: Path) -> None:
+    """With `use p::inner as name`, the ALIAS is what binds the bare identifier."""
+    sample = tmp_path / "usealias.rs"
+    sample.write_text(
+        "fn hash(a: u32) -> u32 {\n    use crate::other::compute as hash;\n    hash(a)\n}\n",
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_rust_unrelated_local_use_does_not_silence_recursion(tmp_path: Path) -> None:
+    """A `use` of a DIFFERENT name must not suppress a genuine self-call.
+
+    The negative control for the shadowing check: importing something unrelated
+    leaves the bare identifier bound to the enclosing function.
+    """
+    sample = tmp_path / "unrelated.rs"
+    sample.write_text(
+        'fn walk(n: u32) -> u32 {\n    use std::fs::read_dir;\n    let _ = read_dir(".");\n    walk(n - 1)\n}\n',
+        encoding="utf-8",
+    )
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1

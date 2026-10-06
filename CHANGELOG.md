@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **SAFE105 `no_recursion`: three shapes that are not self-calls are no longer reported as recursion.** The rule resolved a bare call by name with no notion of what that name refers to at the call site.
+  - **Java overloads (#153).** A call whose argument count differs from the enclosing method's parameter count cannot be a self-call, and deciding that needs no type information: `boolean[] add(boolean[], int, boolean)` calling `add(a, i, Boolean.valueOf(e), Boolean.TYPE)` is a different method. Varargs are exempt from the check, since a fixed-arity comparison proves nothing there. Measured: Commons Lang **655 -> 279** findings (-57%), Guava **2159 -> 477** (-78%).
+  - **Rust associated functions (#160).** A bare `name(..)` inside an `impl` or `trait` body can never reach the method - that requires `self.name()` or `Type::name(..)` - so it always resolves to a free function or an import. This is the same reasoning the existing `is_method` flag already applied to Go and PHP methods.
+  - **Rust function-local `use` (#173).** `use std::os::unix::fs::symlink;` inside a `fn symlink` rebinds the name for the rest of the block, so the bare call is not recursion. Covers plain paths, brace lists and `as` aliases. The shape is in ripgrep's `crates/ignore/src/walk.rs`.
+
+  Together on ripgrep: **32 -> 23** findings, removing exactly the 9 that #173 predicted. Self-qualified calls, genuine free-function recursion, matching-arity Java calls and unrelated local imports all still report - each pinned by a test, and each fix verified to be load-bearing by mutation.
+
+  **#153 is improved but not closed.** Of the 279 findings remaining on Commons Lang, 267 (95%) are same-arity overloads - `remove(boolean[], int)` delegating to `remove(Object, int)` - which only type resolution can separate. The issue anticipated that residue but expected it to be rare; it is in fact the dominant remaining class.
+
 ## [2.14.3] - 2026-10-04
 
 ### Changed

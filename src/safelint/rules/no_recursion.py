@@ -277,6 +277,102 @@ def _call_is_bare(call_node: tree_sitter.Node, lang: str) -> bool:
     return callee is not None and callee.type == _py.IDENTIFIER
 
 
+def _java_arity_rules_out_self(call_node: tree_sitter.Node, func: tree_sitter.Node) -> bool:
+    """Return True if argument count proves this Java call is a *different* overload.
+
+    Java overloads by signature, and the convenience-overload-delegates-to-the-
+    general-one pattern is what Commons Lang and Guava are built from::
+
+        boolean[] add(boolean[] a, int i, boolean e) {
+            return (boolean[]) add(a, i, Boolean.valueOf(e), Boolean.TYPE);
+        }                        ^ four arguments, three parameters - a different method
+
+    A call whose argument count differs from the enclosing method's parameter
+    count cannot be a self-call, and deciding that needs no type resolution at
+    all. Measured on Commons Lang this accounted for the overwhelming majority of
+    SAFE105 findings, which were 51% of the project's default output.
+
+    Varargs are the one case arity cannot settle: ``vg(String... s)`` has one
+    parameter and accepts any number of arguments, so a mismatch proves nothing
+    and the call stays reported. Same for a call that omits the argument list
+    entirely, which should not occur but must not be read as arity zero.
+    """
+    params = func.child_by_field_name("parameters")
+    args = call_node.child_by_field_name("arguments")
+    if params is None or args is None:
+        return False  # pragma: no cover - defensive: both fields are always present on these nodes
+    if any(child.type == _java.SPREAD_PARAMETER for child in params.named_children):
+        return False
+    return len(args.named_children) != len(params.named_children)
+
+
+def _rust_is_associated_fn(func: tree_sitter.Node) -> bool:
+    """Return True if *func* is a Rust ``fn`` declared inside an ``impl`` or ``trait``.
+
+    A bare ``name(..)`` inside an associated function can never be a self-call:
+    reaching the method requires ``self.name()`` or ``Type::name(..)``, so the
+    bare identifier always resolves to a free function or an imported item. This
+    is the same reasoning the ``is_method`` flag already applies to Go and PHP
+    methods, which Rust simply never got.
+    """
+    parent = func.parent
+    if parent is None or parent.type != _rust.DECLARATION_LIST:
+        return False
+    grandparent = parent.parent
+    return grandparent is not None and grandparent.type in (_rust.IMPL_ITEM, _rust.TRAIT_ITEM)
+
+
+def _rust_locally_shadowed(func: tree_sitter.Node, func_name: str) -> bool:
+    """Return True if *func*'s own body imports an item named *func_name*.
+
+    ``use`` inside a function body rebinds the name for the rest of the block, so
+    the bare identifier no longer refers to the enclosing function::
+
+        fn symlink(src: u32, dst: u32) -> u32 {
+            use std::os::unix::fs::symlink;   // shadows the fn name
+            symlink(src, dst).unwrap()        // std's symlink, not recursion
+        }
+
+    This shape is in ripgrep (`crates/ignore/src/walk.rs`). Only the final
+    segment is compared, because that is the name the import binds - the path it
+    came from is irrelevant. Nested functions are skipped so an import inside one
+    does not silence the outer function.
+    """
+    for node in walk(func, skip_types=(_rust.FUNCTION_ITEM,)):
+        if node is func or node.type != _rust.USE_DECLARATION:
+            continue
+        if func_name in _rust_imported_names(node):
+            return True
+    return False
+
+
+def _rust_imported_names(use_decl: tree_sitter.Node) -> set[str]:
+    """Return every name a Rust ``use`` declaration binds in the current scope.
+
+    Covers the three shapes that can bind a bare name: a plain or scoped path
+    (``use p::q::name``), a brace list (``use p::{a, b}``, including a nested
+    list), and an alias (``use p::x as name``), where the alias is what binds.
+    Collecting the identifiers reachable without descending past an alias is
+    enough - a superfluous name costs only a missed finding, never a false one.
+    """
+    return {name for node in walk(use_decl) if (name := _rust_bound_name(node)) is not None}
+
+
+def _rust_bound_name(node: tree_sitter.Node) -> str | None:
+    """Return the bare name *node* contributes to the enclosing ``use``, or None.
+
+    A ``scoped_identifier`` binds its trailing ``name`` field; a bare
+    ``identifier`` that is not part of one binds itself (a brace-list entry or an
+    ``as`` alias).
+    """
+    if node.type == _rust.SCOPED_IDENTIFIER:
+        name = node.child_by_field_name("name")
+        return node_text(name) if name is not None else None
+    if node.type == _rust.IDENTIFIER and node.parent is not None and node.parent.type != _rust.SCOPED_IDENTIFIER:
+        return node_text(node)
+    return None
+
+
 def _directly_nested_function_names(func: tree_sitter.Node, func_types: frozenset[str]) -> set[str]:
     """Return the names of functions defined directly inside *func*'s own body.
 
@@ -294,6 +390,54 @@ def _directly_nested_function_names(func: tree_sitter.Node, func_types: frozense
         if name_node is not None:
             names.add(node_text(name_node))
     return names
+
+
+def _bare_call_cannot_recurse(func: tree_sitter.Node, func_name: str, func_types: frozenset[str], lang: str) -> bool:
+    """Return True if an unqualified call in *func*'s body cannot be a self-call.
+
+    Three independent reasons, combined here rather than threaded through
+    ``_targets_self`` - that dispatcher's Rust path takes no ``is_method``
+    argument, so setting the flag there would be a silent no-op:
+
+    * a same-named nested function rebinds the name (every language);
+    * a Rust ``fn`` in an ``impl`` / ``trait`` is reachable only as
+      ``self.name()`` or ``Type::name(..)``, never bare (#160);
+    * a Rust function-local ``use`` rebinds the name for the block (#173).
+
+    Qualified calls are unaffected in every case - ``self.name()`` still reports.
+    """
+    if func_name in _directly_nested_function_names(func, func_types):
+        return True
+    if lang != _rust.EXTRA_NAME:
+        return False
+    return _rust_is_associated_fn(func) or _rust_locally_shadowed(func, func_name)
+
+
+def _is_self_call(
+    call_node: tree_sitter.Node,
+    func: tree_sitter.Node,
+    func_name: str,
+    lang: str,
+    receiver_name: str | None,
+    *,
+    bare_cannot_recurse: bool,
+    is_method: bool,
+) -> bool:
+    """Return True if *call_node* really is a self-call of *func*.
+
+    The two exclusions run before the name match, because both decide the
+    question without needing it:
+
+    * an unqualified call where the name cannot denote this function
+      (:func:`_bare_call_cannot_recurse`);
+    * in Java, an argument count that does not fit this signature, which proves a
+      different overload (:func:`_java_arity_rules_out_self`).
+    """
+    if bare_cannot_recurse and _call_is_bare(call_node, lang):
+        return False
+    if lang == _java.EXTRA_NAME and _java_arity_rules_out_self(call_node, func):
+        return False
+    return _targets_self(call_node, func_name, lang, receiver_name, is_method=is_method)
 
 
 class NoRecursionRule(BaseRule):
@@ -342,19 +486,18 @@ class NoRecursionRule(BaseRule):
         # method). Only Go carries a user-named receiver to resolve.
         is_method = func.type == _go.METHOD_DECLARATION and lang in (_go.EXTRA_NAME, _php.EXTRA_NAME)
         receiver_name = _go_receiver_name(func) if (is_method and lang == _go.EXTRA_NAME) else None
-        shadowed = func_name in _directly_nested_function_names(func, func_types)
+        bare_cannot_recurse = _bare_call_cannot_recurse(func, func_name, func_types, lang)
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(func_types)):
             if node.type not in call_types:
                 continue
-            if shadowed and _call_is_bare(node, lang):
+            if not _is_self_call(node, func, func_name, lang, receiver_name, bare_cannot_recurse=bare_cannot_recurse, is_method=is_method):
                 continue
-            if _targets_self(node, func_name, lang, receiver_name, is_method=is_method):
-                base = self._make_violation_for_node(
-                    filepath,
-                    node,
-                    f'Function "{func_name}" calls itself; recursion has no guaranteed stack bound (Power of Ten rule 1) - refactor to an explicit loop or worklist',
-                )
-                # Violation is frozen; attach the advisory suggestion via replace.
-                violations.append(replace(base, suggestions=(_ITERATIVE_SUGGESTION,)))
+            base = self._make_violation_for_node(
+                filepath,
+                node,
+                f'Function "{func_name}" calls itself; recursion has no guaranteed stack bound (Power of Ten rule 1) - refactor to an explicit loop or worklist',
+            )
+            # Violation is frozen; attach the advisory suggestion via replace.
+            violations.append(replace(base, suggestions=(_ITERATIVE_SUGGESTION,)))
         return violations
