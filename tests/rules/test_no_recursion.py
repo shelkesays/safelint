@@ -260,6 +260,138 @@ def test_java_zero_arg_self_call_still_fires(tmp_path: Path) -> None:
     assert len(_safe105(_engine().check_file(str(sample)))) == 1
 
 
+def test_java_argument_cast_to_object_rules_out_a_non_object_parameter(tmp_path: Path) -> None:
+    """`remove((Object) array, index)` inside `remove(boolean[], int)` is delegation.
+
+    Same arity, so the arity check cannot settle it, but `Object` is not assignable
+    to `boolean[]`, which makes the enclosing method inapplicable. Issue #153.
+    """
+    sample = tmp_path / "Cast.java"
+    sample.write_text(
+        "class A {\n"
+        "    static boolean[] remove(boolean[] array, int index) { return (boolean[]) remove((Object) array, index); }\n"
+        "    static Object remove(Object array, int index) { return array; }\n"
+        "}\n",
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_java_cast_to_object_against_an_object_parameter_still_fires(tmp_path: Path) -> None:
+    """A cast to `Object` proves nothing when the parameter is already `Object`."""
+    sample = tmp_path / "CastObj.java"
+    sample.write_text(
+        "class A {\n    static Object f(Object a, int i) { return f((Object) a, i); }\n}\n",
+        encoding="utf-8",
+    )
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_java_cast_to_object_against_a_type_variable_still_fires(tmp_path: Path) -> None:
+    """`<T> T f(T a, int i)` really does accept `f((Object) a, i)`, inferring T as Object.
+
+    The negative control that keeps the cast rule from over-reaching: a parameter
+    declared as a type variable accepts anything, so the cast rules nothing out.
+    """
+    sample = tmp_path / "CastTvar.java"
+    sample.write_text(
+        "class A {\n    static <T> T f(T a, int i) { return f((Object) a, i); }\n}\n",
+        encoding="utf-8",
+    )
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_java_array_element_of_the_same_positions_parameter_is_delegation(tmp_path: Path) -> None:
+    """`append(lhs[0], ..)` inside `append(Object[] lhs, ..)` reaches the element overload.
+
+    An element type is never assignable to its own array type, so this needs no
+    type hierarchy to decide. The shape is Commons Lang's `CompareToBuilder`.
+    """
+    sample = tmp_path / "Elem.java"
+    sample.write_text(
+        "class A {\n    int append(Object[] lhs, Object[] rhs) { return append(lhs[0], rhs[0]); }\n    int append(Object a, Object b) { return 0; }\n}\n",
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_java_foreach_variable_over_an_array_parameter_is_delegation(tmp_path: Path) -> None:
+    """`for (boolean e : array) append(e);` inside `append(boolean[] array)` is delegation.
+
+    The same fact as the array-element rule, spelled through a for-each variable
+    rather than an index. This is Commons Lang's `HashCodeBuilder` family, six
+    findings in one file, none of which carries a cast.
+    """
+    sample = tmp_path / "ForEach.java"
+    sample.write_text(
+        "class A {\n    void append(boolean[] array) { for (boolean element : array) { append(element); } }\n    void append(boolean e) {}\n}\n",
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_java_varargs_loses_to_a_fixed_arity_sibling(tmp_path: Path) -> None:
+    """JLS 15.12.2 resolves fixed-arity candidates before varargs ones.
+
+    A three-argument call cannot reach `j(String, String...)` while
+    `j(String, String, String)` exists, because phases 1 and 2 of overload
+    resolution exclude varargs entirely and only phase 3 admits them.
+    """
+    sample = tmp_path / "Varargs.java"
+    sample.write_text(
+        'class A {\n    static String j(String a, String b, String c) { return a; }\n    static String j(String a, String... rest) { return j(a, "b", "c"); }\n}\n',
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_java_varargs_without_a_fixed_arity_sibling_still_fires(tmp_path: Path) -> None:
+    """With no fixed-arity candidate, phase 3 selects the varargs method itself.
+
+    The negative control for the rule above: remove the sibling and the same call
+    is genuine recursion.
+    """
+    sample = tmp_path / "VarargsOnly.java"
+    sample.write_text(
+        'class A {\n    static String j(String a, String... rest) { return j(a, "b", "c"); }\n}\n',
+        encoding="utf-8",
+    )
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_java_overloaded_name_reports_that_the_target_is_unresolvable(tmp_path: Path) -> None:
+    """A same-arity call to an overloaded name is reported, but not as certain recursion.
+
+    Neither silence nor a flat assertion is honest here: the call may reach the
+    sibling, and safelint cannot tell without a classpath. Suppressing instead
+    would silence genuine recursion in any overloaded method.
+    """
+    sample = tmp_path / "Amb.java"
+    sample.write_text(
+        "class A {\n    int f(int a, int b) { return f(a, b); }\n    int f(String a, String b) { return 0; }\n}\n",
+        encoding="utf-8",
+    )
+    found = _safe105(_engine().check_file(str(sample)))
+    assert len(found) == 1
+    assert "overloaded in this type" in found[0].message
+    assert "cannot be resolved without type information" in found[0].message
+
+
+def test_java_sole_declaration_asserts_recursion_outright(tmp_path: Path) -> None:
+    """When the name is declared once, the call provably is recursion, so say so.
+
+    The counterpart to the test above, and the reason the message is split rather
+    than weakened everywhere: `getAllInterfaces` in Commons Lang's `ClassUtils` is
+    real recursion and should read as such.
+    """
+    sample = tmp_path / "Sole.java"
+    sample.write_text("class A {\n    int fact(int n) { return n * fact(n - 1); }\n}\n", encoding="utf-8")
+    found = _safe105(_engine().check_file(str(sample)))
+    assert len(found) == 1
+    assert found[0].message.startswith('Function "fact" calls itself;')
+    assert "overloaded" not in found[0].message
+
+
 def test_java_explicit_receiver_parameter_is_not_counted_as_an_argument(tmp_path: Path) -> None:
     """An explicit receiver parameter is never passed at the call site.
 

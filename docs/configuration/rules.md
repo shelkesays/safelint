@@ -183,6 +183,26 @@ The rule fires on **direct self-recursion** - a function whose body contains a c
 
 Enabled by default at `warning` severity (mirrors `unbounded_loops`), so intentional recursion (tree walks, divide-and-conquer) does not block a local run. Annotate deliberate recursion with `# nosafe: SAFE105` (or the language's comment form) and a one-line justification.
 
+#### What counts as "its own name"
+
+A name match alone is not a self-call, so the rule rules a call out whenever the source text settles the question. These need no type information and so cannot hide genuine recursion:
+
+- **A same-named nested function** rebinds the name, so a bare call in the enclosing body reaches the nested one (every language). A `self`/`this`-qualified call still fires.
+- **Rust:** a bare `name(..)` inside an `impl` or `trait` body cannot reach the method, which needs `self.name()` or `Type::name(..)`. A function-local `use` rebinds the name for its enclosing block, so `use std::os::unix::fs::symlink;` inside `fn symlink` silences the bare call within that block (and only within it); an `as` alias binds the alias, not the path's last segment.
+- **Java:** the argument count must fit the signature, with the explicit receiver parameter (`void tick(Outer Outer.this, int n)`) discounted since it is never passed, and varargs exempt because a fixed-arity comparison proves nothing there. Beyond arity, three facts rule a call out: an argument cast to `Object` where the parameter is not `Object` (`remove((Object) array, index)` inside `remove(boolean[], int)`); an element of the array parameter at that same position, by index or through a for-each variable (`append(lhs[i], ..)` inside `append(Object[] lhs, ..)`); and a varargs method whose argument count is claimed by a fixed-arity sibling, since [JLS 15.12.2](https://docs.oracle.com/javase/specs/jls/se21/html/jls-15.html#jls-15.12.2) resolves fixed-arity candidates before varargs ones.
+
+#### Overloaded Java methods
+
+What the source text cannot settle is a same-arity call to an **overloaded** name: `f(a, b)` inside `int f(int a, int b)` may reach a sibling `f(String, String)`, and choosing between them needs the declared types of the arguments, which means a classpath. safelint reports these, with a message that says the target is unresolvable rather than asserting recursion:
+
+```
+SAFE105 Function "f" calls "f", which is overloaded in this type, so the target cannot be
+        resolved without type information; if it is this method, recursion has no guaranteed
+        stack bound (Power of Ten rule 1) - refactor to an explicit loop or worklist
+```
+
+Dropping these instead would silence genuine recursion in any method that happens to be overloaded, which is the more dangerous error for this rule: real recursion passes plain identifiers and so carries none of the signals above. When the name is the type's sole declaration the call provably is recursion, and the message says so outright.
+
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |

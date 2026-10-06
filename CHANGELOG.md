@@ -7,7 +7,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **SAFE105 `no_recursion` no longer asserts recursion it cannot prove (Java).** A same-arity call to an **overloaded** method name may reach a sibling overload rather than recursing, and choosing between them needs the declared types of the arguments, which means a classpath. Such findings now carry a message that says the target is unresolvable instead of stating outright that the method calls itself:
+
+  ```
+  SAFE105 Function "f" calls "f", which is overloaded in this type, so the target cannot be
+          resolved without type information; if it is this method, recursion has no guaranteed
+          stack bound (Power of Ten rule 1) - refactor to an explicit loop or worklist
+  ```
+
+  Where the name is the type's sole declaration the call provably is recursion and the message is unchanged. On Commons Lang this means **11 of 207** findings now assert recursion outright rather than all 279 doing so; on Guava, 63 of 444. Dropping the ambiguous ones instead was considered and rejected: genuine recursion passes plain identifiers and so carries none of the signals below, so suppressing on name ambiguity alone would have silenced real recursion in Commons Lang's `ClassUtils.getAllInterfaces` and `walkInterfaces` and in Guava's `AbstractIteratorTester.recurse`. The code and severity are unchanged, so no config or CI gate moves; only the message text differs, and only for overloaded Java methods.
+
 ### Fixed
+
+- **SAFE105 `no_recursion`: three more Java shapes that are not self-calls (#153).** Each is a fact about overload resolution that the source text settles on its own, so none can hide genuine recursion. Together they take Commons Lang **279 -> 207** and Guava **477 -> 444**; ripgrep (23) and Ruff (612) are unaffected, having no Java.
+  - **An argument cast to `Object` where the parameter is not `Object`.** `remove((Object) array, index)` inside `remove(boolean[] array, int index)`: `Object` is not assignable to `boolean[]`. Only this direction is decidable without a type hierarchy, since a cast to a *subtype* of the parameter type is still applicable; a parameter declared as a type variable is also exempt, because `<T> T f(T a)` really does accept `f((Object) a)` with `T` inferred as `Object`.
+  - **An element of the array parameter at that same position**, by index (`append(lhs[i], rhs[i])` inside `append(Object[] lhs, Object[] rhs)`) or through a for-each variable (`for (boolean e : array) append(e);` inside `append(boolean[] array)`). An element type is never assignable to its own array type. The for-each form is Commons Lang's `HashCodeBuilder` family, six findings in one file, none of which carries a cast.
+  - **A varargs method whose argument count is claimed by a fixed-arity sibling.** JLS 15.12.2 resolves phases 1 and 2 (no varargs) before phase 3, so a six-argument call cannot reach `joinA(A, T...)` while a six-parameter `joinA` exists in the class.
+
+  Performance: the overload table is built once per file, in the same tree walk that collects the functions, and the for-each map is resolved only for methods that declare an array parameter. End to end on Guava this costs about **3.5%** (21.3s -> 22.0s); a first cut that re-derived both per call cost 17%.
 
 - **SAFE105 `no_recursion`: three shapes that are not self-calls are no longer reported as recursion.** The rule resolved a bare call by name with no notion of what that name refers to at the call site.
   - **Java overloads (#153).** A call whose argument count differs from the enclosing method's parameter count cannot be a self-call, and deciding that needs no type information: `boolean[] add(boolean[], int, boolean)` calling `add(a, i, Boolean.valueOf(e), Boolean.TYPE)` is a different method. Varargs are exempt from the check, since a fixed-arity comparison proves nothing there. Measured: Commons Lang **655 -> 279** findings (-57%), Guava **2159 -> 477** (-78%).
