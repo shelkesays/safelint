@@ -189,19 +189,32 @@ A name match alone is not a self-call, so the rule rules a call out whenever the
 
 - **A same-named nested function** rebinds the name, so a bare call in the enclosing body reaches the nested one (every language). A `self`/`this`-qualified call still fires.
 - **Rust:** a bare `name(..)` inside an `impl` or `trait` body cannot reach the method, which needs `self.name()` or `Type::name(..)`. A function-local `use` rebinds the name for its enclosing block, so `use std::os::unix::fs::symlink;` inside `fn symlink` silences the bare call within that block (and only within it); an `as` alias binds the alias, not the path's last segment.
-- **Java:** the argument count must fit the signature, with the explicit receiver parameter (`void tick(Outer Outer.this, int n)`) discounted since it is never passed, and varargs exempt because a fixed-arity comparison proves nothing there. Beyond arity, three facts rule a call out: an argument cast to `Object` where the parameter is not `Object` (`remove((Object) array, index)` inside `remove(boolean[], int)`); an element of the array parameter at that same position, by index or through a for-each variable (`append(lhs[i], ..)` inside `append(Object[] lhs, ..)`); and a varargs method whose argument count is claimed by a fixed-arity sibling, since [JLS 15.12.2](https://docs.oracle.com/javase/specs/jls/se21/html/jls-15.html#jls-15.12.2) resolves fixed-arity candidates before varargs ones.
+- **Java:** the argument count must fit the signature, with the explicit receiver parameter (`void tick(Outer Outer.this, int n)`) discounted since it is never passed, and varargs exempt because a fixed-arity comparison proves nothing there. Beyond arity, two facts rule a call out: an argument cast to `Object` where the parameter is not `Object` (`remove((Object) array, index)` inside `remove(boolean[], int)`, with `java.lang.Object` recognised as the same type); and an element of the array parameter at that same position, by index or through a for-each variable (`append(lhs[i], ..)` inside `append(Object[] lhs, ..)`).
 
 #### Overloaded Java methods
 
-What the source text cannot settle is a same-arity call to an **overloaded** name: `f(a, b)` inside `int f(int a, int b)` may reach a sibling `f(String, String)`, and choosing between them needs the declared types of the arguments, which means a classpath. safelint reports these, with a message that says the target is unresolvable rather than asserting recursion:
+What the source text cannot settle is a call that an **overloaded** sibling could also accept. Resolving it needs the declared types of the arguments, which means a classpath:
+
+```java
+void expectContents(E... elements)      { expectContents(asList(elements)); }
+void expectContents(Collection<E> expected) { ... }
+```
+
+`asList(elements)` returns something safelint cannot type, so either method could be the target. safelint reports the call, with a message that says so rather than asserting recursion:
 
 ```
-SAFE105 Function "f" calls "f", which is overloaded in this type, so the target cannot be
-        resolved without type information; if it is this method, recursion has no guaranteed
-        stack bound (Power of Ten rule 1) - refactor to an explicit loop or worklist
+SAFE105 Function "expectContents" calls "expectContents", which is overloaded in this type, so
+        the target cannot be resolved without type information; if it is this method, recursion
+        has no guaranteed stack bound (Power of Ten rule 1) - refactor to an explicit loop or
+        worklist
 ```
 
-Dropping these instead would silence genuine recursion in any method that happens to be overloaded, which is the more dangerous error for this rule: real recursion passes plain identifiers and so carries none of the signals above. When the name is the type's sole declaration the call provably is recursion, and the message says so outright.
+Dropping these instead would silence genuine recursion in any method that happens to be overloaded, which is the more dangerous error for this rule: real recursion passes plain identifiers and so carries none of the signals above.
+
+The hedge is decided **per call**, from the argument count: a type holding `f(int)` and `f(int, int)` has an overloaded name, but a one-argument call inside `f(int)` has only one candidate, so that message is unhedged. A varargs sibling counts as a rival for any count from its fixed prefix upwards.
+
+!!! note "Inheritance is not resolved"
+    Only declarations on the enclosing type are known, so an unhedged message means "no rival **in this type**", not "no rival anywhere". A same-named method inherited from a superclass can also win resolution; seeing that would need the supertype's source, which again means a classpath.
 
 | Option | Default | Description |
 |---|---|---|

@@ -330,19 +330,69 @@ def test_java_foreach_variable_over_an_array_parameter_is_delegation(tmp_path: P
     assert _safe105(_engine().check_file(str(sample))) == []
 
 
-def test_java_varargs_loses_to_a_fixed_arity_sibling(tmp_path: Path) -> None:
-    """JLS 15.12.2 resolves fixed-arity candidates before varargs ones.
+def test_java_varargs_with_an_incompatible_fixed_arity_sibling_still_fires(tmp_path: Path) -> None:
+    """A fixed-arity sibling at the same arity does NOT rule out a varargs self-call.
 
-    A three-argument call cannot reach `j(String, String...)` while
-    `j(String, String, String)` exists, because phases 1 and 2 of overload
-    resolution exclude varargs entirely and only phase 3 admits them.
+    JLS 15.12.2 reaches phase 3 (varargs) only when nothing is applicable in phases
+    1 and 2, and applicability needs compatible argument *types*, not a matching
+    count. `j(int, int, int)` cannot take `j(a, "b", "c")`, so phases 1 and 2 find
+    nothing and phase 3 selects `j(String, String...)` - genuine recursion. An
+    earlier revision suppressed this on arity alone; that was unsound and was
+    withdrawn.
     """
     sample = tmp_path / "Varargs.java"
     sample.write_text(
-        'class A {\n    static String j(String a, String b, String c) { return a; }\n    static String j(String a, String... rest) { return j(a, "b", "c"); }\n}\n',
+        'class A {\n    static String j(int a, int b, int c) { return ""; }\n    static String j(String a, String... rest) { return j(a, "b", "c"); }\n}\n',
         encoding="utf-8",
     )
-    assert _safe105(_engine().check_file(str(sample))) == []
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_java_cast_rule_treats_java_lang_object_as_object(tmp_path: Path) -> None:
+    """A parameter declared `java.lang.Object` accepts an `(Object)` cast.
+
+    Comparing the raw source text reads the two spellings as different types and
+    silences a genuine self-call.
+    """
+    sample = tmp_path / "Fqn.java"
+    sample.write_text(
+        "class A {\n    static Object f(java.lang.Object a, int i) { return f((Object) a, i); }\n}\n",
+        encoding="utf-8",
+    )
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_java_overloaded_name_with_no_same_arity_rival_is_not_hedged(tmp_path: Path) -> None:
+    """Ambiguity is a per-call question, not a per-name one.
+
+    A type holding `f(int)` and `f(int, int)` has an overloaded name, but a
+    one-argument call inside `f(int)` has exactly one candidate, so the message
+    must not hedge.
+    """
+    sample = tmp_path / "ArityRival.java"
+    sample.write_text(
+        "class A {\n    int f(int n) { return f(n); }\n    int f(int a, int b) { return 0; }\n}\n",
+        encoding="utf-8",
+    )
+    found = _safe105(_engine().check_file(str(sample)))
+    assert len(found) == 1
+    assert found[0].message.startswith('Function "f" calls itself;')
+
+
+def test_java_varargs_rival_can_claim_a_wider_arity(tmp_path: Path) -> None:
+    """A varargs sibling accepts any count from its fixed prefix up, so it is a rival.
+
+    `g(int, Object...)` can take a one-argument call, so the call inside `g(int)`
+    has two candidates and the message hedges.
+    """
+    sample = tmp_path / "VarargsRival.java"
+    sample.write_text(
+        "class A {\n    int g(int n) { return g(n); }\n    int g(int a, Object... rest) { return 0; }\n}\n",
+        encoding="utf-8",
+    )
+    found = _safe105(_engine().check_file(str(sample)))
+    assert len(found) == 1
+    assert "overloaded in this type" in found[0].message
 
 
 def test_java_varargs_without_a_fixed_arity_sibling_still_fires(tmp_path: Path) -> None:

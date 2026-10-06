@@ -435,39 +435,35 @@ def _java_signature_shape(func: tree_sitter.Node) -> tuple[int, bool]:
 def _java_delegation_is_provable(call_node: tree_sitter.Node, facts: _FunctionFacts) -> bool:
     """Return True if *call_node* provably targets a method other than the enclosing one.
 
-    Three independent facts, each decidable from the source text alone. None is a
+    Two independent facts, each decidable from the source text alone. Neither is a
     likelihood heuristic: each is a reason the enclosing method is not a candidate
     for this call at all, so suppressing cannot hide genuine recursion.
 
-    * **Varargs beaten by a fixed-arity sibling.** JLS 15.12.2 resolves phases 1
-      and 2 (no varargs) before phase 3, so when a same-named method takes exactly
-      this many parameters without varargs, a varargs enclosing method can never
-      be selected. ``joinA(A, T...)`` calling ``joinA(a, b, c, d, e, f)`` with a
-      six-parameter ``joinA`` in the class reaches that one.
     * **An argument cast to ``Object`` against a non-``Object`` parameter.**
       ``remove((Object) array, index)`` inside ``remove(boolean[], int)``:
       ``Object`` is not assignable to ``boolean[]``.
     * **An element of the parameter at that same position.** ``append(lhs[i], ..)``
       inside ``append(Object[] lhs, ..)``, directly or via a for-each variable: an
       element type is never assignable to its own array type.
+
+    A third condition was tried and withdrawn: "a varargs method loses to a
+    same-named fixed-arity sibling at this argument count". JLS 15.12.2 does
+    resolve phases 1 and 2 (no varargs) before phase 3, but a method is a
+    *candidate* in those phases only if it is applicable, which needs the argument
+    types to be compatible and not merely counted. With an incompatible sibling -
+    ``j(int, int, int)`` beside ``j(String, String...)`` calling
+    ``j(a, "b", "c")`` - phases 1 and 2 find nothing and phase 3 selects the
+    varargs method, so that call is genuine recursion. Arity alone cannot
+    establish applicability, so the condition is unsound and was removed.
     """
     args_node = call_node.child_by_field_name("arguments")
     if args_node is None:
         return False  # pragma: no cover - defensive: method_invocation always has arguments
     args = args_node.named_children
     params = facts.positional_params
-    if _java_varargs_loses_to_sibling(facts, len(args), len(params)):
-        return True
     if len(args) != len(params):
         return False
     return any(_java_arg_rules_out_param(arg, params[index], facts.type_variables, facts.foreach_array_sources) for index, arg in enumerate(args))
-
-
-def _java_varargs_loses_to_sibling(facts: _FunctionFacts, arg_count: int, param_count: int) -> bool:
-    """Return True if a fixed-arity sibling claims this argument count ahead of varargs."""
-    if not facts.is_varargs or arg_count == param_count:
-        return False
-    return any(count == arg_count and not varargs for count, varargs in facts.sibling_arities)
 
 
 def _java_arg_rules_out_param(
@@ -487,6 +483,12 @@ def _java_arg_rules_out_param(
     return _java_arg_is_element_of(arg, pname, foreach)
 
 
+#: ``Object`` written both ways. A parameter declared ``java.lang.Object`` accepts
+#: an ``(Object)`` cast, so comparing the raw source text would read the two
+#: spellings as different types and silence a genuine self-call.
+_JAVA_OBJECT_SPELLINGS = frozenset({"Object", "java.lang.Object"})
+
+
 def _java_cast_rules_out_param(arg: tree_sitter.Node, ptype: str) -> bool:
     """Return True if *arg* is cast to ``Object`` and *ptype* is not ``Object``.
 
@@ -495,7 +497,9 @@ def _java_cast_rules_out_param(arg: tree_sitter.Node, ptype: str) -> bool:
     ``CharSequence`` parameter proves nothing.
     """
     cast_type = arg.child_by_field_name("type")
-    return cast_type is not None and node_text(cast_type) == "Object" and ptype != "Object"
+    if cast_type is None or node_text(cast_type) not in _JAVA_OBJECT_SPELLINGS:
+        return False
+    return ptype not in _JAVA_OBJECT_SPELLINGS
 
 
 def _java_arg_is_element_of(arg: tree_sitter.Node, pname: str, foreach: Mapping[str, str]) -> bool:
@@ -699,14 +703,18 @@ class _FunctionFacts:
     foreach_array_sources: Mapping[str, str] = field(default_factory=dict)
 
     @property
-    def name_is_overloaded(self) -> bool:
-        """True when the enclosing type declares this method name more than once.
+    def rival_arities(self) -> tuple[tuple[int, bool], ...]:
+        """The same-named declarations in this type other than this method.
 
-        A same-arity call to an overloaded name cannot be resolved without type
-        information, so the finding is reported with a message that says so rather
-        than asserting recursion outright.
+        One occurrence of this method's own shape is dropped rather than every
+        matching one: ``f(int)`` and ``f(String)`` share the shape ``(1, False)``,
+        so removing all of them would hide a genuine rival.
         """
-        return len(self.sibling_arities) > 1
+        rivals = list(self.sibling_arities)
+        own = (len(self.positional_params), self.is_varargs)
+        if own in rivals:
+            rivals.remove(own)
+        return tuple(rivals)
 
 
 def _is_self_call(call_node: tree_sitter.Node, facts: _FunctionFacts) -> bool:
@@ -728,6 +736,38 @@ def _is_self_call(call_node: tree_sitter.Node, facts: _FunctionFacts) -> bool:
     return _targets_self(call_node, facts.name, facts.lang, facts.receiver_name, is_method=facts.is_method)
 
 
+def _message_for(call_node: tree_sitter.Node, facts: _FunctionFacts) -> str:
+    """Return the message for this call, hedged only when a rival overload could take it."""
+    return _ambiguous_message(facts.name) if _java_rival_could_take_call(call_node, facts) else _certain_message(facts.name)
+
+
+def _java_rival_could_take_call(call_node: tree_sitter.Node, facts: _FunctionFacts) -> bool:
+    """Return True if a same-named sibling could accept this call's argument count.
+
+    The question is per call, not per method: a type holding ``f(int)`` and
+    ``f(int, int)`` has an overloaded name, but a one-argument call inside
+    ``f(int)`` has only one candidate and so resolves with certainty. Hedging it
+    would be over-correction in the other direction.
+    """
+    args = call_node.child_by_field_name("arguments")
+    if args is None:
+        return False  # pragma: no cover - defensive: method_invocation always has arguments
+    count = len(args.named_children)
+    return any(_java_accepts_arity(shape, count) for shape in facts.rival_arities)
+
+
+def _java_accepts_arity(shape: tuple[int, bool], arg_count: int) -> bool:
+    """Return True if a method of *shape* can be invoked with *arg_count* arguments.
+
+    *shape* is the ``(parameter count, is varargs)`` pair the overload table stores.
+    A varargs method accepts anything from its fixed prefix upwards.
+    """
+    param_count, varargs = shape
+    if varargs:
+        return arg_count >= param_count - 1
+    return arg_count == param_count
+
+
 def _certain_message(func_name: str) -> str:
     """Build the message for a call that can only be a self-call."""
     return f'Function "{func_name}" calls itself; recursion has no guaranteed stack bound (Power of Ten rule 1) - refactor to an explicit loop or worklist'
@@ -743,6 +783,11 @@ def _ambiguous_message(func_name: str) -> str:
     classpath. Saying so is more useful than either asserting recursion that may
     not be there or dropping the finding - the latter would silence genuine
     recursion in any method that happens to be overloaded.
+
+    Limitation: only declarations on the enclosing type are known. A same-named
+    method **inherited** from a superclass can also win resolution, so the
+    unhedged message means "no rival in this type", not "no rival anywhere";
+    resolving that would need the supertype's source, which means a classpath.
     """
     return (
         f'Function "{func_name}" calls "{func_name}", which is overloaded in this type, so the target cannot be '
@@ -884,14 +929,13 @@ class NoRecursionRule(BaseRule):
             return []
         func_name = node_text(name_node)
         facts = _build_function_facts(func, func_name, func_types, lang, methods)
-        message = _ambiguous_message(func_name) if facts.name_is_overloaded else _certain_message(func_name)
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(func_types)):
             if node.type not in call_types:
                 continue
             if not _is_self_call(node, facts):
                 continue
-            base = self._make_violation_for_node(filepath, node, message)
+            base = self._make_violation_for_node(filepath, node, _message_for(node, facts))
             # Violation is frozen; attach the advisory suggestion via replace.
             violations.append(replace(base, suggestions=(_ITERATIVE_SUGGESTION,)))
         return violations
