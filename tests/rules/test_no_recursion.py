@@ -260,6 +260,36 @@ def test_java_zero_arg_self_call_still_fires(tmp_path: Path) -> None:
     assert len(_safe105(_engine().check_file(str(sample)))) == 1
 
 
+def test_java_explicit_receiver_parameter_is_not_counted_as_an_argument(tmp_path: Path) -> None:
+    """An explicit receiver parameter is never passed at the call site.
+
+    Java 8's `void tick(Outer Outer.this, int n)` form parses the receiver as a
+    `receiver_parameter` named child of `formal_parameters`, so counting it makes
+    the two-parameter signature look like a mismatch against the one-argument
+    self-call and silences genuine recursion.
+    """
+    sample = tmp_path / "Recv.java"
+    sample.write_text(
+        "class Outer {\n    void tick(Outer Outer.this, int n) { if (n > 0) tick(n - 1); }\n}\n",
+        encoding="utf-8",
+    )
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_java_receiver_parameter_with_real_arity_mismatch_is_still_silent(tmp_path: Path) -> None:
+    """Discounting the receiver must not disable the arity check itself.
+
+    The negative control for the test above: with the receiver excluded the
+    signature takes one argument, so a two-argument call is a different overload.
+    """
+    sample = tmp_path / "RecvOver.java"
+    sample.write_text(
+        "class Outer {\n    void tick(Outer Outer.this, int n) { tick(n, n); }\n    void tick(int a, int b) {}\n}\n",
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
 # ---------------------------------------------------------------------------
 # Rust: a bare call inside an impl / trait, and a function-local `use`
 # ---------------------------------------------------------------------------
@@ -345,3 +375,46 @@ def test_rust_unrelated_local_use_does_not_silence_recursion(tmp_path: Path) -> 
         encoding="utf-8",
     )
     assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_rust_use_in_a_nested_block_does_not_silence_a_call_outside_it(tmp_path: Path) -> None:
+    """A `use` is an item, so it binds throughout its own block but no further.
+
+    Treating any import anywhere in the body as function-wide hides the genuine
+    recursion on the last line, which is the failure mode the shadowing check
+    exists to avoid creating.
+    """
+    sample = tmp_path / "nestedblock.rs"
+    sample.write_text(
+        "fn walk(n: u32) -> u32 {\n    { use std::fs::walk; let _ = walk; }\n    walk(n - 1)\n}\n",
+        encoding="utf-8",
+    )
+    assert [v.lineno for v in _safe105(_engine().check_file(str(sample)))] == [3]
+
+
+def test_rust_use_in_a_nested_block_still_silences_a_call_inside_it(tmp_path: Path) -> None:
+    """Within the shadowing block the bare name does resolve to the import.
+
+    The positive half of the scoping rule: the span is the block, not the file and
+    not the whole function.
+    """
+    sample = tmp_path / "insideblock.rs"
+    sample.write_text(
+        "fn walk(n: u32) -> u32 {\n    { use std::fs::walk; let _ = walk(n); }\n    n\n}\n",
+        encoding="utf-8",
+    )
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_rust_aliased_use_does_not_bind_the_paths_final_segment(tmp_path: Path) -> None:
+    """`use other::bar as helper` binds `helper`, not `bar`.
+
+    Collecting every identifier under the `use` reads the path's trailing segment
+    as bound, which silences a genuine `bar()` self-call in `fn bar`.
+    """
+    sample = tmp_path / "aliaspath.rs"
+    sample.write_text(
+        "fn bar(n: u32) -> u32 {\n    use other::bar as helper;\n    let _ = helper;\n    bar(n - 1)\n}\n",
+        encoding="utf-8",
+    )
+    assert [v.lineno for v in _safe105(_engine().check_file(str(sample)))] == [4]

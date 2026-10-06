@@ -158,6 +158,7 @@ ATTRIBUTE = "attribute"
 CONST_ITEM = "const_item"  # ``const FOO: T = ...``
 EXPRESSION_STATEMENT = "expression_statement"
 USE_DECLARATION = "use_declaration"
+USE_AS_CLAUSE = "use_as_clause"  # ``use p::x as y`` (only ``y`` is bound)
 ATTRIBUTE_ITEM = "attribute_item"  # outer ``#[attr]``
 INNER_ATTRIBUTE_ITEM = "inner_attribute_item"  # inner ``#![attr]``
 

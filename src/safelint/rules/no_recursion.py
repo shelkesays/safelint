@@ -27,7 +27,7 @@ count.
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import TYPE_CHECKING
 
 from safelint.languages import c as _c
@@ -296,6 +296,11 @@ def _java_arity_rules_out_self(call_node: tree_sitter.Node, func: tree_sitter.No
     parameter and accepts any number of arguments, so a mismatch proves nothing
     and the call stays reported. Same for a call that omits the argument list
     entirely, which should not occur but must not be read as arity zero.
+
+    A ``receiver_parameter`` (``void tick(Outer Outer.this, int n)``, Java 8's
+    explicit-receiver form) is a named child of ``formal_parameters`` but is never
+    passed at a call site, so counting it would make every self-call in such a
+    method look like an arity mismatch and silence it.
     """
     params = func.child_by_field_name("parameters")
     args = call_node.child_by_field_name("arguments")
@@ -303,7 +308,8 @@ def _java_arity_rules_out_self(call_node: tree_sitter.Node, func: tree_sitter.No
         return False  # pragma: no cover - defensive: both fields are always present on these nodes
     if any(child.type == _java.SPREAD_PARAMETER for child in params.named_children):
         return False
-    return len(args.named_children) != len(params.named_children)
+    declared = [child for child in params.named_children if child.type != _java.RECEIVER_PARAMETER]
+    return len(args.named_children) != len(declared)
 
 
 def _rust_is_associated_fn(func: tree_sitter.Node) -> bool:
@@ -322,11 +328,11 @@ def _rust_is_associated_fn(func: tree_sitter.Node) -> bool:
     return grandparent is not None and grandparent.type in (_rust.IMPL_ITEM, _rust.TRAIT_ITEM)
 
 
-def _rust_locally_shadowed(func: tree_sitter.Node, func_name: str) -> bool:
-    """Return True if *func*'s own body imports an item named *func_name*.
+def _rust_shadowed_spans(func: tree_sitter.Node, func_name: str) -> tuple[tuple[int, int], ...]:
+    """Return the byte spans in which a function-local ``use`` rebinds *func_name*.
 
-    ``use`` inside a function body rebinds the name for the rest of the block, so
-    the bare identifier no longer refers to the enclosing function::
+    ``use`` inside a function body rebinds the name, so the bare identifier no
+    longer refers to the enclosing function::
 
         fn symlink(src: u32, dst: u32) -> u32 {
             use std::os::unix::fs::symlink;   // shadows the fn name
@@ -337,13 +343,46 @@ def _rust_locally_shadowed(func: tree_sitter.Node, func_name: str) -> bool:
     segment is compared, because that is the name the import binds - the path it
     came from is irrelevant. Nested functions are skipped so an import inside one
     does not silence the outer function.
+
+    A ``use`` is an *item*, so it binds throughout its enclosing block regardless
+    of position, but no further: an import in a nested block leaves the rest of
+    the body alone. Returning that block's span rather than a function-wide
+    boolean keeps a genuine recursive call outside the block reportable::
+
+        fn walk(n: u32) -> u32 {
+            { use std::fs::walk; let _ = walk; }
+            walk(n - 1)                       // still recursion
+        }
     """
+    spans: list[tuple[int, int]] = []
     for node in walk(func, skip_types=(_rust.FUNCTION_ITEM,)):
         if node is func or node.type != _rust.USE_DECLARATION:
             continue
-        if func_name in _rust_imported_names(node):
-            return True
-    return False
+        if func_name not in _rust_imported_names(node):
+            continue
+        scope = _rust_enclosing_block(node)
+        if scope is not None:
+            spans.append((scope.start_byte, scope.end_byte))
+    return tuple(spans)
+
+
+def _rust_enclosing_block(use_decl: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the innermost ``block`` whose scope *use_decl* binds its names in."""
+    parent = use_decl.parent
+    while parent is not None:
+        if parent.type == _rust.BLOCK:
+            return parent
+        parent = parent.parent
+    return None  # pragma: no cover - defensive: a function-local `use` always sits in a block
+
+
+def _node_within_spans(node: tree_sitter.Node, spans: tuple[tuple[int, int], ...]) -> bool:
+    """Return True if *node* starts inside any of *spans*.
+
+    Tree-sitter byte spans nest exactly, so a start byte inside a block's span is
+    the same test as "is a descendant of that block".
+    """
+    return any(start <= node.start_byte < end for start, end in spans)
 
 
 def _rust_imported_names(use_decl: tree_sitter.Node) -> set[str]:
@@ -351,11 +390,25 @@ def _rust_imported_names(use_decl: tree_sitter.Node) -> set[str]:
 
     Covers the three shapes that can bind a bare name: a plain or scoped path
     (``use p::q::name``), a brace list (``use p::{a, b}``, including a nested
-    list), and an alias (``use p::x as name``), where the alias is what binds.
-    Collecting the identifiers reachable without descending past an alias is
-    enough - a superfluous name costs only a missed finding, never a false one.
+    list), and an alias (``use p::x as name``).
+
+    An alias binds *only* the new name, so the walk stops at a ``use_as_clause``
+    and takes its ``alias`` field. Descending into it instead would read
+    ``use other::bar as helper`` as binding ``bar``, which silences a genuine
+    ``bar()`` recursion, and would miss that ``helper`` is the shadowed name.
     """
-    return {name for node in walk(use_decl) if (name := _rust_bound_name(node)) is not None}
+    names: set[str] = set()
+    for node in walk(use_decl, skip_types=(_rust.USE_AS_CLAUSE,)):
+        name = _rust_alias_name(node) if node.type == _rust.USE_AS_CLAUSE else _rust_bound_name(node)
+        if name is not None:
+            names.add(name)
+    return names
+
+
+def _rust_alias_name(use_as_clause: tree_sitter.Node) -> str | None:
+    """Return the name an ``as`` clause binds, which is the alias and not the renamed path."""
+    alias = use_as_clause.child_by_field_name("alias")
+    return node_text(alias) if alias is not None else None
 
 
 def _rust_bound_name(node: tree_sitter.Node) -> str | None:
@@ -395,14 +448,17 @@ def _directly_nested_function_names(func: tree_sitter.Node, func_types: frozense
 def _bare_call_cannot_recurse(func: tree_sitter.Node, func_name: str, func_types: frozenset[str], lang: str) -> bool:
     """Return True if an unqualified call in *func*'s body cannot be a self-call.
 
-    Three independent reasons, combined here rather than threaded through
+    Two function-wide reasons, combined here rather than threaded through
     ``_targets_self`` - that dispatcher's Rust path takes no ``is_method``
     argument, so setting the flag there would be a silent no-op:
 
     * a same-named nested function rebinds the name (every language);
     * a Rust ``fn`` in an ``impl`` / ``trait`` is reachable only as
-      ``self.name()`` or ``Type::name(..)``, never bare (#160);
-    * a Rust function-local ``use`` rebinds the name for the block (#173).
+      ``self.name()`` or ``Type::name(..)``, never bare (#160).
+
+    The third reason, a Rust function-local ``use`` (#173), is block-scoped rather
+    than function-wide, so it is decided per call against
+    :func:`_rust_shadowed_spans` instead of here.
 
     Qualified calls are unaffected in every case - ``self.name()`` still reports.
     """
@@ -410,34 +466,50 @@ def _bare_call_cannot_recurse(func: tree_sitter.Node, func_name: str, func_types
         return True
     if lang != _rust.EXTRA_NAME:
         return False
-    return _rust_is_associated_fn(func) or _rust_locally_shadowed(func, func_name)
+    return _rust_is_associated_fn(func)
 
 
-def _is_self_call(
-    call_node: tree_sitter.Node,
-    func: tree_sitter.Node,
-    func_name: str,
-    lang: str,
-    receiver_name: str | None,
-    *,
-    bare_cannot_recurse: bool,
-    is_method: bool,
-) -> bool:
-    """Return True if *call_node* really is a self-call of *func*.
+@dataclass(frozen=True)
+class _FunctionFacts:
+    """Everything about the enclosing function a per-call decision needs.
+
+    All seven are computed once per function, so grouping them keeps the
+    per-call predicates to two arguments instead of eight.
+    """
+
+    node: tree_sitter.Node
+    name: str
+    lang: str
+    receiver_name: str | None
+    bare_cannot_recurse: bool
+    shadowed_spans: tuple[tuple[int, int], ...]
+    is_method: bool
+
+
+def _is_self_call(call_node: tree_sitter.Node, facts: _FunctionFacts) -> bool:
+    """Return True if *call_node* really is a self-call of the enclosing function.
 
     The two exclusions run before the name match, because both decide the
     question without needing it:
 
-    * an unqualified call where the name cannot denote this function
-      (:func:`_bare_call_cannot_recurse`);
+    * an unqualified call where the name cannot denote this function, either
+      function-wide (:func:`_bare_call_cannot_recurse`) or only within the block
+      an import shadows it in (:func:`_rust_shadowed_spans`);
     * in Java, an argument count that does not fit this signature, which proves a
       different overload (:func:`_java_arity_rules_out_self`).
     """
-    if bare_cannot_recurse and _call_is_bare(call_node, lang):
+    if _bare_call_rules_out_self(call_node, facts):
         return False
-    if lang == _java.EXTRA_NAME and _java_arity_rules_out_self(call_node, func):
+    if facts.lang == _java.EXTRA_NAME and _java_arity_rules_out_self(call_node, facts.node):
         return False
-    return _targets_self(call_node, func_name, lang, receiver_name, is_method=is_method)
+    return _targets_self(call_node, facts.name, facts.lang, facts.receiver_name, is_method=facts.is_method)
+
+
+def _bare_call_rules_out_self(call_node: tree_sitter.Node, facts: _FunctionFacts) -> bool:
+    """Return True if *call_node* is unqualified and cannot denote the enclosing function."""
+    if not _call_is_bare(call_node, facts.lang):
+        return False
+    return facts.bare_cannot_recurse or _node_within_spans(call_node, facts.shadowed_spans)
 
 
 class NoRecursionRule(BaseRule):
@@ -486,12 +558,20 @@ class NoRecursionRule(BaseRule):
         # method). Only Go carries a user-named receiver to resolve.
         is_method = func.type == _go.METHOD_DECLARATION and lang in (_go.EXTRA_NAME, _php.EXTRA_NAME)
         receiver_name = _go_receiver_name(func) if (is_method and lang == _go.EXTRA_NAME) else None
-        bare_cannot_recurse = _bare_call_cannot_recurse(func, func_name, func_types, lang)
+        facts = _FunctionFacts(
+            node=func,
+            name=func_name,
+            lang=lang,
+            receiver_name=receiver_name,
+            bare_cannot_recurse=_bare_call_cannot_recurse(func, func_name, func_types, lang),
+            shadowed_spans=_rust_shadowed_spans(func, func_name) if lang == _rust.EXTRA_NAME else (),
+            is_method=is_method,
+        )
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(func_types)):
             if node.type not in call_types:
                 continue
-            if not _is_self_call(node, func, func_name, lang, receiver_name, bare_cannot_recurse=bare_cannot_recurse, is_method=is_method):
+            if not _is_self_call(node, facts):
                 continue
             base = self._make_violation_for_node(
                 filepath,
