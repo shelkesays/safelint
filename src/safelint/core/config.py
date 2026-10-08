@@ -488,6 +488,21 @@ DEFAULTS: dict[str, Any] = {
                 # be too noisy; SAFE303 only catches them when the
                 # function name signals purity, which is a stronger
                 # signal of incorrect placement.
+                #
+                # ``read`` / ``status`` / ``spawn`` / ``output`` / ``recv``
+                # joined that SAFE303-only group in 2.14.4. ``call_name``
+                # discards the receiver, so as bare method names they match
+                # whatever they are called on, and Rust's standard library
+                # spends these verbs on non-I/O operations that are
+                # pervasive in ordinary code: ``RwLock::read`` /
+                # ``Mutex::write`` for locks, ``mpsc::Receiver::recv`` for
+                # channels, ``tokio::spawn`` for tasks, and ``status`` /
+                # ``output`` as accessors on any domain type. Measured on
+                # Ruff they were wrong far more often than right (#178).
+                # The specific spellings - ``read_to_string``, ``write_all``,
+                # ``read_dir`` - carry the same coverage without the
+                # collisions, and the macros stay because ``write!``'s
+                # target is now checked syntactically (#171).
                 "println",
                 "print",
                 "eprintln",
@@ -498,15 +513,10 @@ DEFAULTS: dict[str, Any] = {
                 "read_to_string",
                 "read_to_end",
                 "read_dir",
-                "read",
                 "read_line",
                 "write_all",
                 "flush",
-                "spawn",
-                "output",
-                "status",
                 "connect",
-                "recv",
                 "send_to",
             ],
             # Go: a deliberately narrower subset of SAFE303's
@@ -1094,13 +1104,17 @@ DEFAULTS: dict[str, Any] = {
                 "arg",
                 "args",
                 # Database raw-SQL (sqlx / diesel / rusqlite / postgres).
-                # All four crates expose a ``query`` / ``execute`` entry
-                # point that takes a SQL string; bind parameters via
-                # placeholders are safe, but interpolation isn't.
-                "query",
+                # The crate-specific spellings only. The bare ``query`` and
+                # ``execute`` were removed in 2.14.4: Rust has no database
+                # API in its standard library, so as barewords they matched
+                # any builder, any LSP snapshot accessor and any closure
+                # parameter named ``query``. Validated on ty and Ruff, 1 of
+                # 9 findings was defensible; 30 of Ruff's 55 were
+                # ``snapshot.query()`` on a ``DocumentSnapshot`` (#180). Add
+                # them back explicitly, or list your crate's entry point, if
+                # you call raw SQL through a bare ``query`` / ``execute``.
                 "query_as",
                 "query_scalar",
-                "execute",
                 "execute_batch",
                 # File-path sinks (path traversal). ``Path::new`` and
                 # the ``read`` / ``write`` family take paths; tainted

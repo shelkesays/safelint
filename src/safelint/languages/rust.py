@@ -165,6 +165,7 @@ INNER_ATTRIBUTE_ITEM = "inner_attribute_item"  # inner ``#![attr]``
 # Expressions.
 CALL_EXPRESSION = "call_expression"
 MACRO_INVOCATION = "macro_invocation"  # ``println!(...)``
+TOKEN_TREE = "token_tree"  # noqa: S105 - a grammar node name, not a secret
 FIELD_EXPRESSION = "field_expression"  # ``obj.field``
 INDEX_EXPRESSION = "index_expression"  # ``arr[i]``
 ASSIGNMENT_EXPRESSION = "assignment_expression"

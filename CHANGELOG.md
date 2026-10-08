@@ -9,6 +9,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **SAFE304 `side_effects`: `read`, `status`, `spawn`, `output` and `recv` are no longer Rust defaults (#178).** Call names are resolved with the receiver discarded - deliberately, so that `fs::read_to_string` and `std::fs::read_to_string` both match one entry - which is right for free functions and wrong for methods. As bare method names these five matched whatever they were called on, and Rust's standard library spends those verbs on non-I/O operations that are pervasive in ordinary code: `RwLock::read` and `Mutex::write` for locks, `mpsc::Receiver::recv` for channels, `tokio::spawn` for tasks, `status` and `output` as accessors on any domain type. Confirmed on Ruff at `crates/ruff_db/src/files.rs:520` (a salsa query accessor), `system/memory_fs.rs:104` (`RwLock::read`) and `vendored.rs:93` (a zip-archive wrapper).
+
+  They remain in **SAFE303**'s list, where the enclosing function's own name must also signal purity - the same split Go's list already uses for `Get` / `Post` / `Do` / `Exec` / `Query`. The specific spellings (`read_to_string`, `read_dir`, `write_all`, `read_line`) carry the same coverage without the collisions. Add any of them back via `io_functions_rust`.
+
+- **SAFE801 `tainted_sink`: bare `query` and `execute` are no longer Rust sink defaults (#180).** Rust has no database API in its standard library, so as barewords they matched any builder, any LSP snapshot accessor and any closure parameter of that name. Validating every finding rather than sampling: **1 defensible out of 9** across ty and Ruff, with 30 of Ruff's 55 being `snapshot.query()` on a `DocumentSnapshot`. The crate-specific spellings stay (`query_as`, `query_scalar`, `execute_batch`), as do `arg` / `args` / `open`; list your crate's entry point explicitly if you call raw SQL through a bare `query`.
+
+### Fixed
+
+- **SAFE302 `global_mutation` no longer reports a write to a local that shadows a browser global (JavaScript) (#202).** Every configured global namespace is also an ordinary variable name, and a local declaration shadows the global completely. The pre-arrow idiom for carrying `this` into a nested function was therefore reported as mutating a global:
+
+  ```javascript
+  function Headers() {
+    const self = this;              // a LOCAL alias for `this`
+    return function set(key, value) {
+      self[key] = value;            // was: SAFE302 writes to global "self"
+    };
+  }
+  ```
+
+  Found in Axios, three times in `lib/core/AxiosHeaders.js`, which made a library's ordinary self-reference indistinguishable from a genuine `window.XMLHttpRequest = null`. A write is now skipped when its root name is bound by an enclosing declaration: a `const` / `let` / `var` declarator, a function parameter (including the TypeScript typed form and an arrow function's single unparenthesised parameter), or a `catch` binding, in any scope up to and including module scope. A **destructured** binding (`const { self } = x`) is deliberately not recognised: failing to see a binding reports a write that is already reported today, whereas inventing one would silence a genuine global mutation. Axios **157 -> 154** SAFE302 findings; the remaining 154 are test files assigning `window.XMLHttpRequest` as mock setup, which is #198's mechanism.
+
+- **SAFE304 / SAFE303: Rust `write!` / `writeln!` is checked against its target instead of assumed to be I/O (#171).** `write!` is not an I/O function in Rust - it expands to `write_fmt` on its first argument, which may implement `std::io::Write` (I/O) or `std::fmt::Write` (a string buffer, no I/O). Both of these used to fire, and neither performs I/O:
+
+  ```rust
+  impl fmt::Display for X {
+      fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+          write!(f, "hello")                // the only way to implement Display
+      }
+  }
+
+  let mut s = String::new();
+  write!(&mut s, "x").unwrap();             // string building
+  ```
+
+  Where the first argument is a plain binding (a leading `&` / `&mut` is stripped), its own declaration decides: a parameter typed `Formatter` or `String`, or a local initialised from `String::new` / `String::with_capacity` / `String::from` / `format!`, is a non-I/O target. Anything else - a path expression, a call, an unknown binding - keeps reporting, so `writeln!(std::io::stdout(), ..)` is unaffected and the unresolved case stays a finding rather than being silently dropped. SAFE303 shares the matcher and so is fixed by the same change. ripgrep **83 -> 62** SAFE304 findings from this alone (**-> 49** together with the defaults change above); Ruff **1410 -> 986** and SAFE303 **74 -> 62**.
+
+- **SAFE801 `tainted_sink`: invoking a local binding whose name collides with a Rust sink is no longer a sink call (#180).** A bare `query(nested)` whose callee is a parameter or a `let`-bound closure invokes that local, not the configured free function:
+
+  ```rust
+  fn visit(nested: u32, query: &impl Fn(u32) -> bool) -> bool {
+      query(nested)                         // a predicate closure; no database, no SQL
+  }
+  ```
+
+  The guard is independent of the defaults change above and holds even when `query` is explicitly configured, which is the only way a bare identifier callee reaches the sink list now. Only a bare identifier callee is considered: a method or path call (`conn.query(..)`, `sqlx::query(..)`) cannot name a local. Ruff **72 -> 37** SAFE801 findings.
+
+
 - **SAFE105 `no_recursion` no longer asserts recursion it cannot prove (Java).** A same-arity call to an **overloaded** method name may reach a sibling overload rather than recursing, and choosing between them needs the declared types of the arguments, which means a classpath. Such findings now carry a message that says the target is unresolvable instead of stating outright that the method calls itself:
 
   ```

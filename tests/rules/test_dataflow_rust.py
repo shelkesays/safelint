@@ -696,3 +696,75 @@ def test_rust_tainted_receiver_with_constant_argument_does_not_fire(tmp_path: Pa
     sample.write_text('fn h(req: Req) {\n    req.run_query("SELECT 1");\n}\n', encoding="utf-8")
     eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["run_query"]}}})
     assert not any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
+
+
+# ---------------------------------------------------------------------------
+# Bare `query` / `execute` left the Rust sink defaults, and invoking a local
+# binding of a sink name is not a sink call (#180).
+# ---------------------------------------------------------------------------
+
+
+def test_rust_bare_query_is_no_longer_a_default_sink(tmp_path: Path) -> None:
+    """Rust has no database API in its standard library, so bare ``query`` over-matched.
+
+    Validated on ty and Ruff, 1 of 9 findings was defensible; 30 of Ruff's 55
+    were ``snapshot.query()`` on an LSP ``DocumentSnapshot``.
+    """
+    sample = tmp_path / "snap.rs"
+    sample.write_text("fn handle(snapshot: Snapshot) -> u32 {\n    snapshot.query()\n}\n", encoding="utf-8")
+    eng = _enabled_engine("tainted_sink")
+    assert [v for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"] == []
+
+
+def test_rust_crate_specific_sql_spellings_are_still_default_sinks(tmp_path: Path) -> None:
+    """``query_as`` / ``query_scalar`` / ``execute_batch`` are unambiguous and stay."""
+    sample = tmp_path / "sql.rs"
+    sample.write_text("fn run(user: String) {\n    sqlx::query_as(&user);\n}\n", encoding="utf-8")
+    eng = _enabled_engine("tainted_sink")
+    assert len([v for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"]) == 1
+
+
+def test_rust_calling_a_closure_parameter_named_like_a_sink_does_not_fire(tmp_path: Path) -> None:
+    """``query(nested)`` where ``query`` is a closure parameter is not a sink call.
+
+    The guard is independent of the defaults change above: it holds even when the
+    user has configured ``query`` as a sink, which is how a bare identifier callee
+    can reach the sink list at all.
+    """
+    sample = tmp_path / "closure.rs"
+    sample.write_text(
+        "fn visit(nested: u32, query: &impl Fn(u32) -> bool) -> bool {\n    query(nested)\n}\n",
+        encoding="utf-8",
+    )
+    eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["query"]}}})
+    assert [v for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"] == []
+
+
+def test_rust_calling_a_let_bound_closure_named_like_a_sink_does_not_fire(tmp_path: Path) -> None:
+    """A ``let``-bound closure shadows the sink name for the rest of the function."""
+    sample = tmp_path / "letclosure.rs"
+    sample.write_text(
+        "fn visit(nested: u32) -> bool {\n    let query = |x: u32| x > 0;\n    query(nested)\n}\n",
+        encoding="utf-8",
+    )
+    eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["query"]}}})
+    assert [v for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"] == []
+
+
+def test_rust_a_free_function_sink_with_no_local_of_that_name_still_fires(tmp_path: Path) -> None:
+    """The positive control: no local binding, so the bare call is the configured sink."""
+    sample = tmp_path / "freefn.rs"
+    sample.write_text("fn visit(nested: u32) -> bool {\n    query(nested)\n}\n", encoding="utf-8")
+    eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["query"]}}})
+    assert len([v for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"]) == 1
+
+
+def test_rust_a_method_call_is_unaffected_by_the_local_binding_guard(tmp_path: Path) -> None:
+    """A local named ``query`` cannot be the target of ``conn.query(..)``, so that still fires."""
+    sample = tmp_path / "method.rs"
+    sample.write_text(
+        "fn visit(user: String, conn: Conn) {\n    let query = 1;\n    conn.query(&user);\n}\n",
+        encoding="utf-8",
+    )
+    eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["query"]}}})
+    assert len([v for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"]) == 1

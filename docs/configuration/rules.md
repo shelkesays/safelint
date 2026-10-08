@@ -404,6 +404,19 @@ severity = "warning"
 
 **JavaScript:** function-body writes, `assignment_expression`, `augmented_assignment_expression`, or `update_expression` (`++` / `--`), whose target is a `member_expression` or `subscript_expression` rooted in a configured global namespace. The receiver chain is walked leftward, `process.env.NODE_ENV = '...'`, `process.env['NODE_ENV'] = '...'`, and `process.exitCode++` all resolve to `process` and fire. Bracket-notation writes (`globalThis['x'] = 1`, `window["config"] = {}`) work the same way as dot access. The default namespace list (`global_namespaces_javascript`) is `["globalThis", "window", "global", "self", "process"]`; runtime presets adjust this (browser drops `process`, adds `document`; Deno adds `Deno`, drops `window` and `process`). Module-level (top-of-file) writes do NOT fire, that's setup, not the bug pattern. Reading a global (`return globalThis.env;`) does NOT fire, only writes.
 
+A write is also skipped when the root name is **shadowed by a local declaration**, since the write then targets the local and not the global:
+
+```javascript
+function Headers() {
+  const self = this;              // a local alias for `this`
+  return function set(key, value) {
+    self[key] = value;            // writes to the local - not reported
+  };
+}
+```
+
+That pre-arrow idiom is how JavaScript carried `this` into a nested function for years, and it appears three times in Axios's `lib/core/AxiosHeaders.js`. Reporting it made a library's ordinary self-reference indistinguishable from a genuine `window.XMLHttpRequest = null`. Recognised binding forms are a `const` / `let` / `var` declarator, a function parameter (including the TypeScript typed form and an arrow function's single unparenthesised parameter), and a `catch` binding, in any enclosing scope up to and including module scope. A **destructured** binding (`const { self } = x`) is not recognised, which leaves such a write reported as before rather than risking a silenced global mutation.
+
 **Java** *(added in 2.4.0):* non-final `static` field declarations. This is **declaration-site** detection, not write-site: a mutable static field IS the smallest-scope violation regardless of where it is written, and a single tree walk over field declarations has near-zero false positives (the same shape PMD's `MutableStaticState` flags). `static final` fields are clean, even when the referent is interiorly mutable (`static final List<String> CACHE = new ArrayList<>()`) - detecting interior mutability would need type resolution safelint does not do, so it is a documented exclusion. Instance fields and local variables never fire. Interface fields are implicitly `public static final` and so are never flagged. This fulfils the Java SAFE302 work previously deferred in the language docs. **Rust** is not covered by SAFE302: `static mut` is unsafe-gated (SAFE602's territory) and safe interior-mutable statics are covered by SAFE307 (`interior_mutable_static`). **Go** *(added in 2.5.0):* declaration-site detection on every package-level `var`, including sentinel errors (`var ErrNotFound = errors.New(...)`) - the rule does not special-case the initialiser, so treat sentinels as immutable by suppressing with a per-file ignore or `//nosafe` if desired. `const` declarations and block-scoped `var` / `:=` inside functions are clean.
 
 | Option | Default | Description |
@@ -498,6 +511,29 @@ Broader than `SAFE303`, applies to *all* functions, not just pure-named ones. A 
 Default `io_name_keywords`: `print`, `log`, `write`, `read`, `save`, `load`, `send`, `fetch`, `export`, `import`. The substring check is case-insensitive, so it matches `writeData` (camelCase) the same way as `write_data` (snake_case).
 
 Default `io_functions_javascript` (Node, the default): `["log", "error", "warn", "info", "debug", "fetch", "readFile", "writeFile", "readFileSync", "writeFileSync"]`. The browser / deno / cloudflare-workers presets swap in different verbs, see [JavaScript runtime presets](toml.md#javascript-runtime-presets).
+
+#### Rust: `write!` targets and receiver-blind method names
+
+Two Rust-specific behaviours, both changed in 2.14.4.
+
+**`write!` / `writeln!` are checked against their target.** `write!` is not an I/O function in Rust; it expands to `write_fmt` on its first argument, which may implement `std::io::Write` (I/O) or `std::fmt::Write` (a string buffer, no I/O). Where the first argument is a plain binding, its declaration decides:
+
+```rust
+impl fmt::Display for X {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "hello")                // not reported - Formatter parameter
+    }
+}
+
+let mut s = String::new();
+write!(&mut s, "x").unwrap();             // not reported - String buffer
+
+writeln!(std::io::stdout(), "x");         // reported - genuine I/O
+```
+
+A parameter typed `Formatter` or `String`, or a local initialised from `String::new` / `String::with_capacity` / `String::from` / `format!`, is treated as a non-I/O target. Anything else (a path expression, a call, an unknown binding) keeps reporting, so the unresolved case stays a finding. On ripgrep `write!` / `writeln!` were 34 of 83 SAFE304 findings, 16 inside `fn fmt`.
+
+**`read`, `status`, `spawn`, `output` and `recv` left the Rust SAFE304 default.** Call names are resolved with the receiver discarded, so as bare method names these matched whatever they were called on, and Rust's standard library spends those verbs on non-I/O operations that are pervasive in ordinary code: `RwLock::read` and `Mutex::write` for locks, `mpsc::Receiver::recv` for channels, `tokio::spawn` for tasks, and `status` / `output` as accessors on any domain type. They remain in SAFE303's list, where the function's own name must also signal purity, which is the same split Go's list already uses for `Get` / `Query` / `Exec`. Add any of them back via `io_functions_rust` if your codebase uses them for real I/O.
 
 ```toml
 [tool.safelint.rules.side_effects]

@@ -290,3 +290,62 @@ def test_js_parenthesized_lhs_target_fires(tmp_path: Path) -> None:
     sample.write_text("function f() { (globalThis.x) = 1; }\n", encoding="utf-8")
     result = _engine().check_file(str(sample))
     assert any(v.code == "SAFE302" for v in result.violations)
+
+
+# ---------------------------------------------------------------------------
+# A local declaration shadows the global of the same name (#202).
+# ---------------------------------------------------------------------------
+
+
+def test_js_const_self_alias_for_this_does_not_fire(tmp_path: Path) -> None:
+    """``const self = this`` shadows the browser global, so writes hit the local.
+
+    The pre-arrow idiom for carrying ``this`` into a nested function, used three
+    times in Axios's ``lib/core/AxiosHeaders.js``. Reporting it made a library's
+    ordinary self-reference indistinguishable from ``window.XMLHttpRequest = null``.
+    """
+    sample = tmp_path / "alias.js"
+    sample.write_text(
+        "function Headers() {\n  const self = this;\n  return function set(key, value) {\n    self[key] = value;\n  };\n}\n",
+        encoding="utf-8",
+    )
+    assert [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE302"] == []
+
+
+def test_js_unshadowed_global_write_still_fires(tmp_path: Path) -> None:
+    """The negative control: with no local binding, the same write still reports."""
+    sample = tmp_path / "unshadowed.js"
+    sample.write_text("function outer() {\n  function inner() { self.code = 1; }\n}\n", encoding="utf-8")
+    assert any(v.code == "SAFE302" for v in _engine().check_file(str(sample)).violations)
+
+
+_BINDING_FORMS = [
+    ["parameter", "function f(self) { self.x = 1; }\n"],
+    ["catch binding", "function f() { try { g(); } catch (self) { self.x = 1; } }\n"],
+    ["var in an enclosing function", "function outer() { var self = {}; function inner() { self.x = 1; } }\n"],
+    ["let in an enclosing block", "function f() { { let global = {}; global.x = 1; } }\n"],
+    ["module-scope const", "const self = {};\nfunction f() { self.x = 1; }\n"],
+    ["arrow single parameter", "const f = self => { self.x = 1; };\n"],
+]
+
+
+@pytest.mark.parametrize(["label", "source"], _BINDING_FORMS, ids=[case[0] for case in _BINDING_FORMS])
+def test_js_every_binding_form_shadows_the_global(tmp_path: Path, label: str, source: str) -> None:
+    """Each binding form that shadows a configured global suppresses the write."""
+    sample = tmp_path / "bind.js"
+    sample.write_text(source, encoding="utf-8")
+    assert [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE302"] == [], label
+
+
+def test_js_typescript_typed_parameter_shadows_the_global(tmp_path: Path) -> None:
+    """A TypeScript ``required_parameter`` holds its identifier under a ``pattern`` field."""
+    sample = tmp_path / "typed.ts"
+    sample.write_text("function f(self: any) { self.x = 1; }\n", encoding="utf-8")
+    assert [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE302"] == []
+
+
+def test_js_shadowing_does_not_break_the_typescript_escape_hatch(tmp_path: Path) -> None:
+    """``(globalThis as any).foo = 1`` is a real global write and must still report."""
+    sample = tmp_path / "hatch.ts"
+    sample.write_text("function f() { (globalThis as any).foo = 1; }\n", encoding="utf-8")
+    assert any(v.code == "SAFE302" for v in _engine().check_file(str(sample)).violations)

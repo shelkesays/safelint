@@ -117,6 +117,11 @@ class RustTaintTracker:
         self.assume_taint_preserving = assume_taint_preserving
         self.sink_kinds = sink_kinds if sink_kinds is not None else SinkKinds()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
+        # Names bound locally in this function: the parameters, plus every
+        # ``let`` pattern as the walk reaches it. A bare call to one of these is
+        # an invocation of a local closure or parameter, never the configured
+        # free function of the same name - see ``_callee_is_local_binding``.
+        self._local_bindings: set[str] = set(params)
 
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
@@ -225,6 +230,7 @@ class RustTaintTracker:
         value = node.child_by_field_name("value")
         status = value_status(self._is_tainted, self._properties, value) if value is not None else None
         for ident in self._iter_pattern_identifiers(pattern):
+            self._local_bindings.add(node_text(ident))
             self._update_name(ident, status)
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
@@ -250,6 +256,8 @@ class RustTaintTracker:
         name = call_name(node)
         if name not in self.sinks:
             return
+        if self._callee_is_local_binding(node, name):
+            return
         required = self.contract.required_for(name)
         if self._record_arg_hits(node, name, required):
             return  # a tainted argument already reached the sink; receiver is redundant
@@ -263,6 +271,26 @@ class RustTaintTracker:
             receiver = function.child_by_field_name("value")
             if receiver is not None and self._is_tainted(receiver, required) and (name in self.sink_kinds.receiver or not call_has_arguments(node)):
                 self._record_sink_hit(node, receiver, name)
+
+    def _callee_is_local_binding(self, node: tree_sitter.Node, name: str) -> bool:
+        """Return True if this call invokes a local binding rather than the configured sink.
+
+        A bare ``query(x)`` whose callee name is a parameter or a ``let``-bound
+        closure is an invocation of that local, not of the sink::
+
+            fn visit(nested: u32, query: &impl Fn(u32) -> bool) -> bool {
+                query(nested)          // a predicate closure, no database
+            }
+
+        Only a bare identifier callee is considered; a method or path call
+        (``conn.query(..)``, ``sqlx::query(..)``) cannot name a local. See #180,
+        where this shape plus the over-generic default sink list produced 1
+        defensible finding out of 9 validated across ty and Ruff.
+        """
+        function = node.child_by_field_name("function")
+        if function is None or function.type != _rust.IDENTIFIER:
+            return False
+        return node_text(function) == name and name in self._local_bindings
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str, required: str | None) -> bool:
         """Record one sink hit per tainted positional argument; return True if any fired."""

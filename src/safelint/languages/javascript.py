@@ -106,6 +106,11 @@ FUNCTION_TYPES = frozenset(
 CLASS_DECLARATION = "class_declaration"
 CLASS_BODY = "class_body"
 
+# Scope-introducing containers. ``statement_block`` is any ``{ ... }`` body
+# (function bodies included); ``program`` is module scope.
+STATEMENT_BLOCK = "statement_block"
+PROGRAM = "program"
+
 # Control flow.
 IF_STATEMENT = "if_statement"
 ELSE_CLAUSE = "else_clause"

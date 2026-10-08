@@ -178,3 +178,112 @@ def test_rust_io_in_nested_closure_does_not_attribute_to_outer(tmp_path: Path) -
     assert len(fired) >= 1, "SAFE304 must fire on the closure body"
     # Outer ``process`` should NOT be in the fired list - the I/O isn't in its body.
     assert all("process" not in v.message or "anonymous" in v.message for v in fired)
+
+
+# ---------------------------------------------------------------------------
+# ``write!`` / ``writeln!`` perform I/O only if their TARGET does (#171).
+# ---------------------------------------------------------------------------
+
+
+def test_rust_write_to_a_formatter_in_fn_fmt_is_not_io(tmp_path: Path) -> None:
+    """``write!(f, ..)`` where ``f`` is a ``Formatter`` performs no I/O.
+
+    This is the only way to implement ``Display``, so reporting it made the rule
+    fire on every formatting impl in the codebase. On ripgrep 16 of 34
+    ``write!`` findings were inside ``fn fmt``.
+    """
+    sample = tmp_path / "disp.rs"
+    sample.write_text(
+        'impl fmt::Display for X {\n    fn fmt(&self, f: &mut fmt::Formatter<\'_>) -> fmt::Result {\n        write!(f, "hello")\n    }\n}\n',
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert _violations(result, "SAFE304") == []
+    assert _violations(result, "SAFE303") == []
+
+
+def test_rust_write_to_a_local_string_buffer_is_not_io(tmp_path: Path) -> None:
+    """``write!(&mut s, ..)`` into a ``String`` is string building, not I/O."""
+    sample = tmp_path / "build.rs"
+    sample.write_text(
+        'fn build() -> String {\n    let mut s = String::new();\n    write!(&mut s, "x").unwrap();\n    s\n}\n',
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert _violations(result, "SAFE304") == []
+
+
+def test_rust_write_to_a_string_parameter_is_not_io(tmp_path: Path) -> None:
+    """A parameter typed ``&mut String`` is a buffer, so writing to it is not I/O."""
+    sample = tmp_path / "param.rs"
+    sample.write_text('fn into(buf: &mut String) {\n    write!(buf, "x").unwrap();\n}\n', encoding="utf-8")
+    assert _violations(_engine().check_file(str(sample)), "SAFE304") == []
+
+
+def test_rust_writeln_to_stdout_still_fires(tmp_path: Path) -> None:
+    """The positive control: a path-expression target is not a known buffer, so it reports.
+
+    Without this the fix could silence every ``write!`` and the tests above would
+    still pass.
+    """
+    sample = tmp_path / "real.rs"
+    sample.write_text('fn emit() {\n    writeln!(std::io::stdout(), "x").unwrap();\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_write_to_an_io_write_parameter_still_fires(tmp_path: Path) -> None:
+    """A parameter typed ``&mut dyn std::io::Write`` is a stream, so it still reports."""
+    sample = tmp_path / "stream.rs"
+    sample.write_text('fn emit(w: &mut dyn std::io::Write) {\n    write!(w, "x").unwrap();\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_write_to_an_unknown_binding_still_fires(tmp_path: Path) -> None:
+    """An unresolved target keeps reporting rather than being silently dropped."""
+    sample = tmp_path / "unknown.rs"
+    sample.write_text('fn q(w: Thing) {\n    write!(w, "x").unwrap();\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_println_is_unaffected_by_the_write_target_check(tmp_path: Path) -> None:
+    """``println!`` has no target argument and must keep reporting."""
+    sample = tmp_path / "p.rs"
+    sample.write_text('fn p() {\n    println!("x");\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+# ---------------------------------------------------------------------------
+# High-collision bare method names left SAFE304's Rust defaults (#178).
+# ---------------------------------------------------------------------------
+
+
+def test_rust_rwlock_read_no_longer_fires_safe304(tmp_path: Path) -> None:
+    """``lock.read()`` is a lock acquisition, not filesystem I/O.
+
+    ``call_name`` discards the receiver, so ``read`` / ``status`` / ``spawn`` /
+    ``output`` / ``recv`` as bare names matched whatever they were called on.
+    They stay in SAFE303's list, where the function name must also signal purity.
+    """
+    sample = tmp_path / "lock.rs"
+    sample.write_text("fn lookup(lock: &RwLock<u32>) -> u32 {\n    *lock.read().unwrap()\n}\n", encoding="utf-8")
+    assert _violations(_engine().check_file(str(sample)), "SAFE304") == []
+
+
+def test_rust_specific_io_spellings_still_fire_safe304(tmp_path: Path) -> None:
+    """``read_to_string`` and friends are unambiguous and keep reporting.
+
+    The enclosing function is named ``contents`` rather than ``load`` on purpose:
+    ``load`` is in ``io_name_keywords``, which exempts the function outright and
+    would make this test pass without exercising the I/O list at all.
+    """
+    sample = tmp_path / "fs.rs"
+    sample.write_text('fn contents() -> String {\n    std::fs::read_to_string("f").unwrap()\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_dropped_names_still_reachable_via_config(tmp_path: Path) -> None:
+    """The names are defaults, not hard-coded: listing one restores the behaviour."""
+    sample = tmp_path / "lock2.rs"
+    sample.write_text("fn lookup(lock: &RwLock<u32>) -> u32 {\n    *lock.read().unwrap()\n}\n", encoding="utf-8")
+    eng = _engine({"rules": {"side_effects": {"io_functions_rust": ["read"]}}})
+    assert len(_violations(eng.check_file(str(sample)), "SAFE304")) == 1
