@@ -13,6 +13,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SAFE105 `no_recursion`: a Rust `use` now binds only what it imports, not the segments of its path.** The resolver swept every identifier under the declaration, so a path segment read as a bound name and silenced genuine recursion in a function called after it:
+
+  ```rust
+  fn b(n: u32) -> u32 {
+      use a::b::{c};     // binds c only - NOT b
+      b(n - 1)           // was: suppressed. Real recursion.
+  }
+  ```
+
+  Three shapes were affected: a braced list (`use a::b::{c}` read as binding `b`), a wildcard (`use a::b::*`, likewise), and a braced list's own root (`use a::{b::c, d}` read as binding `a`). The walk is now structured by node kind rather than flat: a plain path binds its trailing segment, a wildcard binds nothing nameable, a braced list binds only its entries, `self` inside a list binds the path's trailing segment (`use a::b::{self, c}` does bind `b`), and an `as` clause binds only its alias. Unrecognised roots (`crate`, `super`) contribute no name, which leaves the call reported. Found by CodeRabbit reviewing #223's code while it looked at #216; shipped in 2.14.4rc1 through rc3.
+
+- **CI: the fork-PR base guard re-reads the base before closing.** The job condition evaluates against the triggering event's snapshot, which goes stale. If an author retargeted a fork PR to `development` while an earlier run was still queued, that run would close the PR they had just corrected - and `edited` does not refresh an in-flight run's snapshot. The step now reads the current base from the API and exits quietly when it is already `development`, checked before the explanatory comment as well so a corrected PR gets neither a close nor a misleading notice. Workflow only. Found by CodeRabbit on #216, whose author had performed exactly that retarget.
+
 - **SAFE102 `nesting_depth`: an `else if` chain is no longer counted as nesting (#154).** A flat `if / else if / else if` chain branches once, but each continuation was counted as a further level, so a chain of N was over-counted by N-1:
 
   ```js

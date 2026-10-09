@@ -16,6 +16,8 @@ if TYPE_CHECKING:
     from safelint.core.engine import LintResult
     from safelint.rules.base import Violation
 
+import pytest
+
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
 
@@ -600,3 +602,42 @@ def test_rust_aliased_use_does_not_bind_the_paths_final_segment(tmp_path: Path) 
         encoding="utf-8",
     )
     assert [v.lineno for v in _safe105(_engine().check_file(str(sample)))] == [4]
+
+
+_USE_SHAPES = [
+    # (label, source, expected violation lines)
+    # The path segments of a braced or wildcard `use` are NOT bound; only the
+    # entries are. A flat sweep over the declaration collected the path too,
+    # which silenced genuine recursion in a function named after a segment.
+    ["braced list does not bind the path tail", "fn b(n: u32) -> u32 {\n    use a::b::{c};\n    let _ = c;\n    b(n - 1)\n}\n", [4]],
+    ["wildcard does not bind the path tail", "fn b(n: u32) -> u32 {\n    use a::b::*;\n    b(n - 1)\n}\n", [3]],
+    ["braced list does not bind the path root", "fn a(n: u32) -> u32 {\n    use a::{b::c, d};\n    let _ = (c, d);\n    a(n - 1)\n}\n", [4]],
+    ["`self as z` binds z, not the path tail", "fn b(n: u32) -> u32 {\n    use a::b::{self as z};\n    let _ = z;\n    b(n - 1)\n}\n", [4]],
+    # ... while every shape that really does bind the name still suppresses.
+    ["a plain scoped path binds its tail", "fn b(n: u32) -> u32 {\n    use a::b;\n    b(n - 1)\n}\n", []],
+    ["a braced entry binds itself", "fn c(n: u32) -> u32 {\n    use a::b::{c};\n    c(n - 1)\n}\n", []],
+    ["`self` in a list binds the path tail", "fn b(n: u32) -> u32 {\n    use a::b::{self, c};\n    let _ = c;\n    b(n - 1)\n}\n", []],
+    ["`self as z` binds z", "fn z(n: u32) -> u32 {\n    use a::b::{self as z};\n    z(n - 1)\n}\n", []],
+    ["a nested braced list binds its leaves", "fn d(n: u32) -> u32 {\n    use a::{b::{c, d}};\n    let _ = c;\n    d(n - 1)\n}\n", []],
+    ["the ripgrep shape still suppresses", "fn symlink(a: u32, b: u32) -> u32 {\n    use std::os::unix::fs::symlink;\n    symlink(a, b)\n}\n", []],
+    # An unscoped brace group (`use {a, b};`) is legal and binds each entry.
+    ["an unscoped brace group binds its entries", "fn b(n: u32) -> u32 {\n    use {a, b};\n    let _ = a;\n    b(n - 1)\n}\n", []],
+    # `crate` / `super` roots are not plain paths, so they contribute no name of
+    # their own; the braced entry still binds.
+    ["a crate-rooted list binds only its entry", "fn crate_fn(n: u32) -> u32 {\n    use crate::{c};\n    let _ = c;\n    crate_fn(n - 1)\n}\n", [4]],
+    ["a crate-rooted path binds its tail", "fn e(n: u32) -> u32 {\n    use crate::e;\n    e(n - 1)\n}\n", []],
+]
+
+
+@pytest.mark.parametrize(["label", "source", "expected"], _USE_SHAPES, ids=[str(case[0]) for case in _USE_SHAPES])
+def test_rust_use_declaration_binds_only_what_it_imports(tmp_path: Path, label: str, source: str, expected: list[int]) -> None:
+    """A Rust ``use`` binds its entries, not the segments of its path.
+
+    The original resolver swept every identifier under the declaration, so
+    ``use a::b::{c}`` and ``use a::b::*`` both read as binding ``b`` and silenced
+    recursion in a function called ``b``. Found by CodeRabbit on PR #223's code
+    while it was reviewing PR #216.
+    """
+    sample = tmp_path / "use_shape.rs"
+    sample.write_text(source, encoding="utf-8")
+    assert [v.lineno for v in _safe105(_engine().check_file(str(sample)))] == expected, label

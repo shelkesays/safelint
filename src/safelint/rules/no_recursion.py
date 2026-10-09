@@ -591,40 +591,81 @@ def _node_within_spans(node: tree_sitter.Node, spans: tuple[tuple[int, int], ...
 def _rust_imported_names(use_decl: tree_sitter.Node) -> set[str]:
     """Return every name a Rust ``use`` declaration binds in the current scope.
 
-    Covers the three shapes that can bind a bare name: a plain or scoped path
-    (``use p::q::name``), a brace list (``use p::{a, b}``, including a nested
-    list), and an alias (``use p::x as name``).
+    The shape of the declaration decides, so this walks the structure rather than
+    sweeping every identifier underneath it. A flat sweep over-collects the
+    *path* segments, which silences genuine recursion in a function named after
+    one of them::
 
-    An alias binds *only* the new name, so the walk stops at a ``use_as_clause``
-    and takes its ``alias`` field. Descending into it instead would read
-    ``use other::bar as helper`` as binding ``bar``, which silences a genuine
-    ``bar()`` recursion, and would miss that ``helper`` is the shadowed name.
+        use a::b::{c};     // binds c only - NOT b
+        use a::b::*;       // binds b's contents under their own names - not b
+        use a::{b::c, d};  // binds c and d - not a, not b
+
+    The rules, one per node kind:
+
+    * a plain or scoped path (``use p::q``) binds its trailing segment;
+    * ``use_wildcard`` (``use p::q::*``) binds nothing nameable - the imported
+      names are whatever ``q`` contains, which is not in this file;
+    * ``scoped_use_list`` (``use p::q::{..}``) binds only what its brace list
+      says, with the path's trailing segment carried in for the ``self`` case;
+    * ``self`` inside a brace list (``use p::q::{self, a}``) binds ``q``;
+    * ``use_as_clause`` binds its ``alias`` and nothing else, so
+      ``use other::bar as helper`` does not bind ``bar``.
+
+    Unrecognised path kinds (``crate``, ``super``, a metavariable) contribute no
+    name, which leaves the call reported - the safe direction for this rule.
+    Iterative, not recursive: SAFE105 polices this codebase.
     """
     names: set[str] = set()
-    for node in walk(use_decl, skip_types=(_rust.USE_AS_CLAUSE,)):
-        name = _rust_alias_name(node) if node.type == _rust.USE_AS_CLAUSE else _rust_bound_name(node)
+    # Each entry pairs a node with the path segment a ``self`` entry under it
+    # would bind (None outside a braced list).
+    stack: list[tuple[tree_sitter.Node, str | None]] = [(child, None) for child in use_decl.named_children]
+    while len(stack) > 0:
+        node, path_tail = stack.pop()
+        if node.type == _rust.USE_WILDCARD:
+            continue
+        if node.type == _rust.SCOPED_USE_LIST:
+            _rust_push_use_list(stack, node)
+            continue
+        if node.type == _rust.USE_LIST:
+            stack.extend((entry, path_tail) for entry in node.named_children)
+            continue
+        name = _rust_use_entry_name(node, path_tail)
         if name is not None:
             names.add(name)
     return names
 
 
-def _rust_alias_name(use_as_clause: tree_sitter.Node) -> str | None:
-    """Return the name an ``as`` clause binds, which is the alias and not the renamed path."""
-    alias = use_as_clause.child_by_field_name("alias")
-    return node_text(alias) if alias is not None else None
+def _rust_use_entry_name(node: tree_sitter.Node, path_tail: str | None) -> str | None:
+    """Return the name a leaf ``use`` entry binds, or None if it binds nothing nameable.
 
-
-def _rust_bound_name(node: tree_sitter.Node) -> str | None:
-    """Return the bare name *node* contributes to the enclosing ``use``, or None.
-
-    A ``scoped_identifier`` binds its trailing ``name`` field; a bare
-    ``identifier`` that is not part of one binds itself (a brace-list entry or an
-    ``as`` alias).
+    An ``as`` clause binds its alias and nothing else; a ``self`` entry inside a
+    braced list binds the path's trailing segment; anything else binds its own
+    trailing segment.
     """
+    if node.type == _rust.USE_AS_CLAUSE:
+        return _rust_path_tail(node.child_by_field_name("alias"))
+    if node.type == _rust.SELF:
+        return path_tail
+    return _rust_path_tail(node)
+
+
+def _rust_push_use_list(stack: list[tuple[tree_sitter.Node, str | None]], scoped_use_list: tree_sitter.Node) -> None:
+    """Queue a ``scoped_use_list``'s entries, carrying its path's trailing segment."""
+    entries = scoped_use_list.child_by_field_name("list")
+    if entries is None:
+        return  # pragma: no cover - defensive: a scoped_use_list always has a list
+    tail = _rust_path_tail(scoped_use_list.child_by_field_name("path"))
+    stack.extend((entry, tail) for entry in entries.named_children)
+
+
+def _rust_path_tail(node: tree_sitter.Node | None) -> str | None:
+    """Return the trailing segment of a Rust path, or None if it is not a plain path."""
+    if node is None:
+        return None
     if node.type == _rust.SCOPED_IDENTIFIER:
         name = node.child_by_field_name("name")
         return node_text(name) if name is not None else None
-    if node.type == _rust.IDENTIFIER and node.parent is not None and node.parent.type != _rust.SCOPED_IDENTIFIER:
+    if node.type == _rust.IDENTIFIER:
         return node_text(node)
     return None
 
