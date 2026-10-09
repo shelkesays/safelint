@@ -97,6 +97,52 @@ _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 }
 
 
+#: Per-language ``(if-node types, else-clause type)`` used to recognise an
+#: ``else if`` continuation, which must not count as a nesting step.
+#:
+#: Python and PHP are absent: their grammars give ``elif`` / ``elseif`` a node
+#: type of its own, which was never in the depth set, so they were already
+#: correct. Every other language expresses the same idea structurally, in one of
+#: two shapes - the continuation ``if`` sits under an ``else_clause``
+#: (JavaScript, TypeScript, Rust, C, C++), or it is the ``alternative`` child of
+#: the enclosing ``if`` (Java, Go). Both are handled by
+#: :func:`_is_else_if_continuation`.
+_ELSE_IF_SHAPES_BY_LANG: dict[str, tuple[frozenset[str], str | None]] = {
+    "javascript": (frozenset({_js.IF_STATEMENT}), _js.ELSE_CLAUSE),
+    "typescript": (frozenset({_ts.IF_STATEMENT}), _js.ELSE_CLAUSE),
+    "java": (frozenset({_java.IF_STATEMENT}), None),
+    "rust": (frozenset({_rust.IF_EXPRESSION}), _rust.ELSE_CLAUSE),
+    "go": (frozenset({_go.IF_STATEMENT}), None),
+    "c": (frozenset({_c.IF_STATEMENT}), _c.ELSE_CLAUSE),
+    "cpp": (frozenset({_cpp.IF_STATEMENT}), _cpp.ELSE_CLAUSE),
+}
+
+
+def _is_else_if_continuation(node: tree_sitter.Node, if_types: frozenset[str], else_clause_type: str | None) -> bool:
+    """Return True if *node* is the ``if`` half of an ``else if``, not a new level.
+
+    A flat ``if / else if / else if`` chain branches once; counting each
+    continuation as a further level over-counted a chain of N by N-1, so the most
+    ordinary branching idiom reported as deeply nested on seven of the nine
+    languages. Python and PHP were already right because their grammars name
+    ``elif`` / ``elseif`` separately.
+
+    Only ``if`` nodes qualify. ``else while (x);`` is legal C and *is* a real
+    nesting step, so the node's own type is checked rather than just its parent's.
+    An ``else { if (..) }`` written with braces also still counts: the inner
+    ``if``'s parent is then the block, not the ``else``.
+    """
+    if node.type not in if_types:
+        return False
+    parent = node.parent
+    if parent is None:
+        return False
+    if else_clause_type is not None and parent.type == else_clause_type:
+        return True
+    alternative = parent.child_by_field_name("alternative")
+    return alternative is not None and alternative.id == node.id
+
+
 class NestingDepthRule(BaseRule):
     """Reject functions whose control-flow nesting exceeds the configured depth."""
 
@@ -110,11 +156,12 @@ class NestingDepthRule(BaseRule):
         lang_name = resolve_lang_name(filepath)
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         depth_types = _DEPTH_NODE_TYPES_BY_LANG[lang_name]
+        else_if_shape = _ELSE_IF_SHAPES_BY_LANG.get(lang_name)
         violations = []
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
-            depth = self._max_depth(node, function_types, depth_types)
+            depth = self._max_depth(node, function_types, depth_types, else_if_shape)
             if depth > max_depth:
                 name_node = function_name_node(node, lang_name)
                 func_name = node_text(name_node) if name_node else "<anonymous>"
@@ -128,18 +175,25 @@ class NestingDepthRule(BaseRule):
         return violations
 
     @staticmethod
-    def _max_depth(root: tree_sitter.Node, function_types: frozenset[str], depth_types: frozenset[str]) -> int:
+    def _max_depth(
+        root: tree_sitter.Node,
+        function_types: frozenset[str],
+        depth_types: frozenset[str],
+        else_if_shape: tuple[frozenset[str], str | None] | None,
+    ) -> int:
         """Return the maximum control-flow nesting depth rooted at *root*.
 
         Skips nested function definitions - those are scored as their
         own functions by the outer ``check_file`` walk and must not inflate
-        the parent's nesting count.
+        the parent's nesting count. An ``else if`` continuation is not counted
+        either; see :func:`_is_else_if_continuation`.
         """
+        if_types, else_clause_type = else_if_shape if else_if_shape is not None else (frozenset(), None)
         max_seen = 0
         stack: list[tuple[tree_sitter.Node, int]] = [(root, 0)]
         while len(stack) > 0:
             node, depth = stack.pop()
-            if node.type in depth_types:
+            if node.type in depth_types and not _is_else_if_continuation(node, if_types, else_clause_type):
                 depth += 1
             max_seen = max(max_seen, depth)
             if node is not root and node.type in function_types:

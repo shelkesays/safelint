@@ -135,6 +135,7 @@ TYPE_DECLARATION_TYPES = frozenset(
 
 # Control flow.
 IF_EXPRESSION = "if_expression"
+ELSE_CLAUSE = "else_clause"  # ``else { .. }`` / the ``else`` of an ``else if`` chain
 IF_LET_EXPRESSION = "if_let_expression"
 FOR_EXPRESSION = "for_expression"
 WHILE_EXPRESSION = "while_expression"

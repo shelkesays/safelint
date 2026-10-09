@@ -91,6 +91,7 @@ CALL_EXPRESSION = "call_expression"
 
 # Control flow (shared with C).
 IF_STATEMENT = "if_statement"
+ELSE_CLAUSE = "else_clause"  # ``else { .. }`` / the ``else`` of an ``else if`` chain
 FOR_STATEMENT = "for_statement"
 WHILE_STATEMENT = "while_statement"
 DO_STATEMENT = "do_statement"
