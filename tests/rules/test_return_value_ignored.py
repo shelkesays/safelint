@@ -16,10 +16,11 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from safelint.core._validators import ConfigValueError
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
-from safelint.languages import _REGISTRY
-from safelint.rules.dataflow import ReturnValueIgnoredRule, TaintedSinkRule
+from safelint.languages import get_language_for_file
+from safelint.rules.dataflow import NullDereferenceRule, ReturnValueIgnoredRule
 
 
 if TYPE_CHECKING:
@@ -62,9 +63,14 @@ def test_python_defaults_exclude_the_discarded_value_names() -> None:
 
 
 def test_python_defaults_keep_the_names_that_carry_a_signal() -> None:
-    """``run`` / ``call`` / ``check_output`` / the ``send`` family / ``replace`` remain."""
+    """The kept set is exactly these six.
+
+    ``sendall`` is deliberately absent: it returns ``None``, so it fails the same
+    test that removed the other six. Asserted as equality rather than a subset so
+    a name cannot be added back without a decision.
+    """
     flagged = set(DEFAULTS["rules"]["return_value_ignored"]["flagged_calls"])
-    assert {"run", "call", "check_output", "send", "sendall", "sendfile", "replace"} <= flagged
+    assert flagged == {"run", "call", "check_output", "send", "sendfile", "replace"}
 
 
 def test_the_c_defaults_are_untouched() -> None:
@@ -110,6 +116,7 @@ def test_socket_send_still_fires(tmp_path: Path) -> None:
         ["mkdir", 'import os\nos.mkdir("/tmp/foo")\n'],
         ["rmdir", 'import os\nos.rmdir("/tmp/foo")\n'],
     ),
+    ids=["remove", "unlink", "rename", "makedirs", "mkdir", "rmdir"],
 )
 def test_excluded_os_names_do_not_fire(tmp_path: Path, name: str, snippet: str) -> None:
     """Each of the six excluded ``os`` functions produces zero SAFE802 findings."""
@@ -137,6 +144,9 @@ _DISCARDED_VALUE_NAMES = [
 ]
 
 
+# ids is NOT redundant here: with more than one parameter pytest joins them
+# all into the id, which embeds the whole snippet. Naming them keeps the ids
+# readable.
 @pytest.mark.parametrize(["name", "snippet"], tuple(_DISCARDED_VALUE_NAMES), ids=[case[0] for case in _DISCARDED_VALUE_NAMES])
 def test_discarded_value_names_do_not_fire(tmp_path: Path, name: str, snippet: str) -> None:
     """Discarding a byte count, a file position or a truncate result is idiomatic.
@@ -160,56 +170,105 @@ def test_the_removed_names_are_still_reachable_by_config(tmp_path: Path) -> None
 
 
 # ---------------------------------------------------------------------------
-# A partial config must not resurrect the pre-#156 list, and no ClassVar
-# fallback may drift from DEFAULTS again.
+# The default lists now have a single owner, so a partial config behaves like
+# the shipped one in every language.
 # ---------------------------------------------------------------------------
 
 
-_CLASSVAR_FALLBACKS = [
-    ["return_value_ignored.flagged_calls", ReturnValueIgnoredRule, "_DEFAULT_FLAGGED", "return_value_ignored", "flagged_calls"],
-    ["tainted_sink.sinks", TaintedSinkRule, "_DEFAULT_SINKS", "tainted_sink", "sinks"],
-    ["tainted_sink.sanitizers", TaintedSinkRule, "_DEFAULT_SANITIZERS", "tainted_sink", "sanitizers"],
-    ["tainted_sink.sources", TaintedSinkRule, "_DEFAULT_SOURCES", "tainted_sink", "sources"],
-]
-
-
-@pytest.mark.parametrize(
-    ["label", "rule_cls", "attr", "rule_key", "config_key"],
-    tuple(_CLASSVAR_FALLBACKS),
-    ids=[str(case[0]) for case in _CLASSVAR_FALLBACKS],
-)
-def test_classvar_fallbacks_match_defaults(label: str, rule_cls: type, attr: str, rule_key: str, config_key: str) -> None:
-    """Every hard-coded fallback must equal its ``DEFAULTS`` entry.
-
-    These lists exist for a caller who constructs a rule directly with a config
-    that omits the key; the engine always passes the merged ``DEFAULTS``. Being a
-    second copy, they drift silently: `flagged_calls` kept the pre-#156 sixteen
-    names after the default was trimmed to seven, so such a caller still had
-    `write` and `remove` flagged. This asserts all four at once so the next
-    default change cannot repeat it.
-    """
-    fallback = list(getattr(rule_cls, attr))
-    expected = list(DEFAULTS["rules"][rule_key][config_key])
-    assert fallback == expected, f"{label}: fallback {fallback} != DEFAULTS {expected}"
-
-
-def test_a_partial_config_does_not_flag_the_removed_names(tmp_path: Path) -> None:
+def test_a_partial_config_does_not_flag_the_removed_names(parse_python) -> None:
     """A config that enables the rule but omits ``flagged_calls`` uses the trimmed list.
 
-    This is the path the ClassVar fallback serves, and the one the DEFAULTS-merging
-    tests above never reach.
+    The rule classes used to carry ``ClassVar`` copies of their ``DEFAULTS``
+    entries. ``flagged_calls`` kept the pre-#156 sixteen names, so this path still
+    flagged ``os.remove`` and ``f.write``; the copies are gone and the fallback is
+    read from ``DEFAULTS``.
     """
-    sample = tmp_path / "partial.py"
-    sample.write_text('import os\nos.remove("/tmp/x")\nf = open("/tmp/x", "w")\nf.write("hi")\n', encoding="utf-8")
-    tree = _REGISTRY[".py"].create_parser().parse(sample.read_bytes())
+    source = 'import os\nos.remove("/tmp/x")\nf = open("/tmp/x", "w")\nf.write("hi")\n'
     rule = ReturnValueIgnoredRule({"enabled": True})
-    assert rule.check_file(str(sample), tree) == []
+    assert rule.check_file("partial.py", parse_python(source)) == []
 
 
-def test_a_partial_config_still_flags_the_kept_names(tmp_path: Path) -> None:
-    """The positive control: the fallback is the trimmed list, not an empty one."""
-    sample = tmp_path / "partial_keep.py"
-    sample.write_text('import subprocess\nsubprocess.run(["echo"])\n', encoding="utf-8")
-    tree = _REGISTRY[".py"].create_parser().parse(sample.read_bytes())
+def test_a_partial_config_still_flags_the_kept_names(parse_python) -> None:
+    """The control: the fallback is the trimmed list, not an empty one."""
     rule = ReturnValueIgnoredRule({"enabled": True})
-    assert len(rule.check_file(str(sample), tree)) == 1
+    assert len(rule.check_file("keep.py", parse_python('import subprocess\nsubprocess.run(["echo"])\n'))) == 1
+
+
+def test_a_partial_config_uses_the_defaults_for_non_python_languages(tmp_path: Path) -> None:
+    """Every language gets its documented default, not just Python.
+
+    The fallback was Python-only, so a library caller linting Rust, Go, Java, PHP,
+    C or C++ with a partial config fell through to ``[]`` and received a silent
+    clean bill of health.
+    """
+    sample = tmp_path / "x.rs"
+    sample.write_text('fn f(w: W) { w.write_all(b"x"); }\n', encoding="utf-8")
+    language = get_language_for_file(str(sample))
+    assert language is not None, "the rust grammar must be installed for this test"
+    tree = language.create_parser().parse(sample.read_bytes())
+    assert len(ReturnValueIgnoredRule({"enabled": True}).check_file(str(sample), tree)) == 1
+
+
+def test_a_scalar_flagged_calls_raises_instead_of_matching_characters(parse_python) -> None:
+    """``flagged_calls = "remove"`` must raise, not become a set of characters.
+
+    Python was the one language whose list skipped ``_validated_string_list``, so
+    the typo silently produced ``{'r','e','m','o','v'}`` - ``os.remove`` stopped
+    firing and an unrelated ``r()`` started. The docs tell users to edit this very
+    key, which is what made the gap worth closing rather than documenting.
+    """
+    rule = ReturnValueIgnoredRule({"enabled": True, "flagged_calls": "remove"})
+    with pytest.raises(ConfigValueError, match="flagged_calls must be a list of strings"):
+        rule.check_file("scalar.py", parse_python('import os\nos.remove("/tmp/x")\n'))
+
+
+def test_sendall_is_not_flagged_but_send_is(parse_python) -> None:
+    """``sendall`` returns ``None``; only ``send`` and ``sendfile`` return a count.
+
+    It was kept on the trimmed list with the rationale that "a short send is a real
+    bug, which is precisely why ``sendall`` exists" - which argues the opposite of
+    its conclusion: ``sendall`` exists so that check is unnecessary. By the same
+    returns-``None`` test used to remove the other six, it had to go too.
+    """
+    assert ReturnValueIgnoredRule({"enabled": True}).check_file("a.py", parse_python('s.sendall(b"x")\n')) == []
+    assert len(ReturnValueIgnoredRule({"enabled": True}).check_file("b.py", parse_python('s.send(b"x")\n'))) == 1
+
+
+def test_the_severity_fallback_is_the_rules_own_default() -> None:
+    """A partial config must not promote a warning-severity rule to blocking.
+
+    ``BaseRule.__init__`` defaulted to a blanket ``"error"``, which disagreed with
+    every warning-severity rule, so a direct caller got findings marked blocking
+    that the shipped config marks advisory.
+    """
+    assert ReturnValueIgnoredRule({"enabled": True}).severity == DEFAULTS["rules"]["return_value_ignored"]["severity"]
+
+
+def test_nullable_methods_replaces_rather_than_unions(parse_python) -> None:
+    """Setting ``nullable_methods`` must be able to NARROW SAFE803, as in every other language.
+
+    The Python branch OR'd a ``ClassVar`` with the user's list, so narrowing was
+    impossible: all nine built-ins fired whatever was configured. ``DEFAULTS`` also
+    carried an empty list for this key while the docs documented the nine, so the
+    two halves disagreed about what the default even was.
+    """
+    source = 'def f(c):\n    c.get("k").strip()\n    c.pop("k").strip()\n'
+    both = NullDereferenceRule({"enabled": True})
+    narrowed = NullDereferenceRule({"enabled": True, "nullable_methods": ["get"]})
+    assert len(both.check_file("n.py", parse_python(source))) == 2
+    assert len(narrowed.check_file("n.py", parse_python(source))) == 1
+
+
+def test_nullable_methods_default_matches_its_documentation() -> None:
+    """``DEFAULTS`` carries the nine names the docs have always listed."""
+    assert DEFAULTS["rules"]["null_dereference"]["nullable_methods"] == [
+        "get",
+        "pop",
+        "find",
+        "next",
+        "first",
+        "one_or_none",
+        "scalar",
+        "scalar_one_or_none",
+        "fetchone",
+    ]

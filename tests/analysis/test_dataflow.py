@@ -839,11 +839,18 @@ def test_return_value_ignored_flags_write():
 
 
 def test_return_value_ignored_ok_when_write_assigned():
+    """The negative control needs the same explicit config as its positive sibling.
+
+    Left on the default config it asserted nothing once ``write`` left the Python
+    defaults: ``assert not vs`` passes whether or not the assignment exemption
+    works, so breaking ``expression_statement`` detection entirely would keep it
+    green.
+    """
     src = """
     with open("f.txt", "w") as f:
         n = f.write("hello")
     """
-    vs = violations(ReturnValueIgnoredRule, src)
+    vs = violations(ReturnValueIgnoredRule, src, {"enabled": True, "severity": "error", "flagged_calls": ["write"]})
     assert not vs
 
 

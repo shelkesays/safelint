@@ -132,7 +132,7 @@ function f(x) {
 }
 ```
 
-Python and PHP always behaved this way, since their grammars name `elif` / `elseif` separately. The other seven languages express the same idea structurally - the continuation `if` sits under an `else_clause`, or is the enclosing `if`'s `alternative` child - and were corrected in 2.14.4. Three shapes still count, because they really are another level: `else { if (..) }` written with braces, `else while (x);` (legal C), and a nested `if` inside an `else if` body.
+Python and PHP always behaved this way, since their grammars name `elif` / `elseif` separately. The other seven languages express the same idea structurally - the continuation `if` sits under an `else_clause`, or is the enclosing `if`'s `alternative` child - and were corrected in 2.15.0. Three shapes still count, because they really are another level: `else { if (..) }` written with braces, `else while (x);` (legal C), and a nested `if` inside an `else if` body.
 
 | Option | Default | Description |
 |---|---|---|
@@ -526,7 +526,7 @@ Default `io_functions_javascript` (Node, the default): `["log", "error", "warn",
 
 #### Rust: `write!` targets and receiver-blind method names
 
-Two Rust-specific behaviours, both changed in 2.14.4.
+Two Rust-specific behaviours, both changed in 2.15.0.
 
 **`write!` / `writeln!` are checked against their target.** `write!` is not an I/O function in Rust; it expands to `write_fmt` on its first argument, which may implement `std::io::Write` (I/O) or `std::fmt::Write` (a string buffer, no I/O). Where the first argument is a plain binding, its declaration decides:
 
@@ -915,7 +915,7 @@ Two cases are flagged:
 
 #### What counts as leaving the loop
 
-A `break` is not the only exit, and the rule recognises three others. Each was a measured false-positive source before 2.14.4.
+A `break` is not the only exit, and the rule recognises three others. Each was a measured false-positive source before 2.15.0.
 
 **A `return`.** It ends the enclosing function and so leaves every loop inside it:
 
@@ -1320,18 +1320,18 @@ Calling `subprocess.run(["rm", "-rf", path])` as a bare statement (not assigning
 | `severity` | `"warning"` | `"error"` or `"warning"` |
 | `flagged_calls` | see below | Call names whose return value must not be discarded |
 
-Default `flagged_calls`: `run`, `call`, `check_output`, `send`, `sendall`, `sendfile`, `replace`
+Default `flagged_calls`: `run`, `call`, `check_output`, `send`, `sendfile`, `replace`
 
 > **Note:** SAFE802 matches the call name **without its receiver**, so `asyncio.run(main())` and `app.run(workers=4)` both match `run` even though discarding their result is the universal idiom. Keep that in mind when adding entries.
 
-The Python list was trimmed twice in 2.14.4 (#156); it had been ported from C/POSIX semantics, where checking the return code is correct and necessary, without adjusting for Python's. Two groups left it:
+The Python list was trimmed twice in 2.15.0 (#156); it had been ported from C/POSIX semantics, where checking the return code is correct and necessary, without adjusting for Python's. Two groups left it:
 
 | removed | why |
 |---|---|
-| `remove`, `unlink`, `rename`, `makedirs`, `mkdir`, `rmdir` | They return `None`, so the rule demanded a check of a value that cannot exist. Both the `os.*` and `pathlib.Path.*` forms do; `Path.rename` returns a `Path`, which nothing acts on. Because matching ignores the receiver, these also covered `list.remove` and every other method of the name. |
+| `remove`, `unlink`, `rename`, `makedirs`, `mkdir`, `rmdir` | They return `None`, so the rule demanded a check of a value that cannot exist. The `os.*` forms all return `None`; the `pathlib` forms return either `None` (`Path.unlink`, `Path.mkdir`, `Path.rmdir`) or a `Path` that nothing acts on (`Path.rename`, `Path.replace`). Because matching ignores the receiver, these also covered `list.remove` and every other method of the name. |
 | `write`, `seek`, `truncate` | They return a byte count, a file position and a result nobody reads. On Django these were 404 of the 614 findings left after the six above went, so they were the larger half of the problem. |
 
-What stayed, and why: `send` / `sendall` / `sendfile`, because a short `send` is a real bug - which is exactly why `sendall` exists; `run` / `call` / `check_output`, because `subprocess.run` returns a `CompletedProcess` whose `returncode` matters; and `replace`, which is deliberately ambiguous - `str.replace` and `Path.replace` both return a value worth keeping, `os.replace` does not.
+What stayed, and why: `send` and `sendfile`, which return a byte count and may transfer fewer bytes than asked; `run` / `call` / `check_output`, because `subprocess.run` returns a `CompletedProcess` whose `returncode` matters; and `replace`, which is deliberately ambiguous - `str.replace` and `Path.replace` both return a value worth keeping, `os.replace` does not. `sendall` is **not** on the list: it returns `None` and raises on error, so it exists precisely so the short-write check is unnecessary.
 
 All of them are defaults, not hard-coded: list a name in `flagged_calls` to bring it back. The **C** defaults (`flagged_calls_c`) are unchanged - there the return code genuinely is the point.
 
@@ -1339,7 +1339,7 @@ All of them are defaults, not hard-coded: list a name in `flagged_calls` to brin
 [tool.safelint.rules.return_value_ignored]
 enabled = true
 severity = "warning"
-flagged_calls = ["run", "call", "check_output", "send", "sendall", "sendfile", "replace"]
+flagged_calls = ["run", "call", "check_output", "send", "sendfile", "replace"]
 ```
 
 **Python, Bad:**
@@ -1349,7 +1349,7 @@ subprocess.run(["deploy.sh"])    # SAFE802 - return value discarded
 sock.send(payload)               # SAFE802 - a short send is silently accepted
 ```
 
-`f.write(data)` does **not** fire on the default list: `write` was removed in 2.14.4, because discarding the byte count is idiomatic Python (see the table above). Add `"write"` to `flagged_calls` if your codebase treats it as significant.
+`f.write(data)` does **not** fire on the default list: `write` was removed in 2.15.0, because discarding the byte count is idiomatic Python (see the table above). Add `"write"` to `flagged_calls` if your codebase treats it as significant.
 
 **Python, Good:**
 

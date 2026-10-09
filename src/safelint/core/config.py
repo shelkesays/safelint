@@ -490,7 +490,7 @@ DEFAULTS: dict[str, Any] = {
                 # signal of incorrect placement.
                 #
                 # ``read`` / ``status`` / ``spawn`` / ``output`` / ``recv``
-                # joined that SAFE303-only group in 2.14.4. ``call_name``
+                # joined that SAFE303-only group in 2.15.0. ``call_name``
                 # discards the receiver, so as bare method names they match
                 # whatever they are called on, and Rust's standard library
                 # spends these verbs on non-I/O operations that are
@@ -1105,7 +1105,7 @@ DEFAULTS: dict[str, Any] = {
                 "args",
                 # Database raw-SQL (sqlx / diesel / rusqlite / postgres).
                 # The crate-specific spellings only. The bare ``query`` and
-                # ``execute`` were removed in 2.14.4: Rust has no database
+                # ``execute`` were removed in 2.15.0: Rust has no database
                 # API in its standard library, so as barewords they matched
                 # any builder, any LSP snapshot accessor and any closure
                 # parameter named ``query``. Validated on ty and Ruff, 1 of
@@ -1348,9 +1348,7 @@ DEFAULTS: dict[str, Any] = {
         "return_value_ignored": {
             "enabled": False,
             "severity": "warning",
-            # Python defaults - Python file/network/subprocess functions
-            # whose return value carries success/failure info.
-            # Python defaults. Trimmed twice in 2.14.4 (#156); the list had been
+            # Python defaults. Trimmed twice in #156; the list had been
             # ported from C/POSIX semantics, where checking the return code is
             # correct and necessary, without adjusting for Python's.
             #
@@ -1367,8 +1365,14 @@ DEFAULTS: dict[str, Any] = {
             # ``truncate``. On Django these were 404 of 614 remaining findings,
             # far more than the six above (207).
             #
-            # ``send`` / ``sendall`` / ``sendfile`` stay: a short ``send`` is a
-            # real bug, which is precisely why ``sendall`` exists. ``run`` /
+            # ``send`` / ``sendfile`` stay: both return a byte count and may
+            # transfer fewer bytes than asked, so the value is worth checking.
+            # ``sendall`` does NOT stay - it returns ``None`` and raises on
+            # error, so it fails the same test as the six above. The earlier
+            # rationale here ("a short send is a real bug, which is why
+            # ``sendall`` exists") argued the opposite of what it concluded:
+            # ``sendall`` exists precisely so the short-write check is
+            # unnecessary. ``run`` /
             # ``call`` / ``check_output`` stay because ``subprocess.run``
             # returns a ``CompletedProcess`` whose ``returncode`` matters, though
             # they carry the highest collision rate - ``asyncio.run(main())`` and
@@ -1381,7 +1385,6 @@ DEFAULTS: dict[str, Any] = {
                 "call",
                 "check_output",
                 "send",
-                "sendall",
                 "sendfile",
                 "replace",
             ],
@@ -1571,7 +1574,23 @@ DEFAULTS: dict[str, Any] = {
         "null_dereference": {
             "enabled": False,
             "severity": "error",
-            "nullable_methods": [],
+            # Python's nullable methods. These were missing here and lived only
+            # as a ClassVar on the rule, which then OR'd the two - so a user who
+            # set ``nullable_methods`` to narrow the rule still got all nine and
+            # had no way to turn any of them off, unlike every other language,
+            # which replaces. The docs have always documented this list as the
+            # default; ``DEFAULTS`` was the half that disagreed.
+            "nullable_methods": [
+                "get",
+                "pop",
+                "find",
+                "next",
+                "first",
+                "one_or_none",
+                "scalar",
+                "scalar_one_or_none",
+                "fetchone",
+            ],
             # JavaScript's null-or-undefined-returning methods. ``find``
             # / ``pop`` / ``shift`` are Array.prototype; ``get`` is
             # Map.prototype (returns ``undefined`` for missing keys);
