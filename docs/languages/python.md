@@ -43,7 +43,7 @@ Python is in scope for every cross-language rule plus SAFE201 `bare_except` (sha
 | [SAFE701](../configuration/rules.md#safe701-test_existence) | `test_existence` | Every source file should have a matching `test_<stem>.py` under `test_dirs`. Disabled by default. |
 | [SAFE702](../configuration/rules.md#safe702-test_coupling) | `test_coupling` | If you change `src/foo.py`, you must also change `tests/test_foo.py` in the same commit. Disabled by default. |
 | [SAFE801](../configuration/rules.md#safe801-tainted_sink) | `tainted_sink` | Function parameters / `input()` flowing into `eval` / `exec` / `subprocess` / `cursor.execute`. Disabled by default. |
-| [SAFE802](../configuration/rules.md#safe802-return_value_ignored) | `return_value_ignored` | Bare calls to `subprocess.run`, `f.write`, `socket.send`, `os.rename`, etc., return value carries success/failure. Disabled by default. |
+| [SAFE802](../configuration/rules.md#safe802-return_value_ignored) | `return_value_ignored` | Bare calls to `subprocess.run`, `socket.send`, etc., where the return value carries success/failure. Names are matched without the receiver, so `asyncio.run()` matches `run`. Disabled by default. |
 | [SAFE803](../configuration/rules.md#safe803-null_dereference) | `null_dereference` | `config.get("k").strip()`, dereferencing a call that can return `None`. Disabled by default. |
 
 The 1 rule **not registered for Python:** [SAFE305 `wide_scope_declaration`](../configuration/rules.md#safe305-wide_scope_declaration), JavaScript-only; Python has no `var` / `let` / `const` distinction.

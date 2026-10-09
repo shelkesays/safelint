@@ -1320,7 +1320,20 @@ Calling `subprocess.run(["rm", "-rf", path])` as a bare statement (not assigning
 | `severity` | `"warning"` | `"error"` or `"warning"` |
 | `flagged_calls` | see below | Call names whose return value must not be discarded |
 
-Default `flagged_calls`: `run`, `call`, `check_output`, `write`, `send`, `sendall`, `sendfile`, `seek`, `truncate`, `remove`, `unlink`, `rename`, `replace`, `makedirs`, `mkdir`, `rmdir`
+Default `flagged_calls`: `run`, `call`, `check_output`, `send`, `sendall`, `sendfile`, `replace`
+
+> **Note:** SAFE802 matches the call name **without its receiver**, so `asyncio.run(main())` and `app.run(workers=4)` both match `run` even though discarding their result is the universal idiom. Keep that in mind when adding entries.
+
+The Python list was trimmed twice in 2.14.4 (#156); it had been ported from C/POSIX semantics, where checking the return code is correct and necessary, without adjusting for Python's. Two groups left it:
+
+| removed | why |
+|---|---|
+| `remove`, `unlink`, `rename`, `makedirs`, `mkdir`, `rmdir` | They return `None`, so the rule demanded a check of a value that cannot exist. Both the `os.*` and `pathlib.Path.*` forms do; `Path.rename` returns a `Path`, which nothing acts on. Because matching ignores the receiver, these also covered `list.remove` and every other method of the name. |
+| `write`, `seek`, `truncate` | They return a byte count, a file position and a result nobody reads. On Django these were 404 of the 614 findings left after the six above went, so they were the larger half of the problem. |
+
+What stayed, and why: `send` / `sendall` / `sendfile`, because a short `send` is a real bug - which is exactly why `sendall` exists; `run` / `call` / `check_output`, because `subprocess.run` returns a `CompletedProcess` whose `returncode` matters; and `replace`, which is deliberately ambiguous - `str.replace` and `Path.replace` both return a value worth keeping, `os.replace` does not.
+
+All of them are defaults, not hard-coded: list a name in `flagged_calls` to bring it back. The **C** defaults (`flagged_calls_c`) are unchanged - there the return code genuinely is the point.
 
 ```toml
 [tool.safelint.rules.return_value_ignored]

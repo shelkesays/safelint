@@ -1350,23 +1350,40 @@ DEFAULTS: dict[str, Any] = {
             "severity": "warning",
             # Python defaults - Python file/network/subprocess functions
             # whose return value carries success/failure info.
+            # Python defaults. Trimmed twice in 2.14.4 (#156); the list had been
+            # ported from C/POSIX semantics, where checking the return code is
+            # correct and necessary, without adjusting for Python's.
+            #
+            # Removed because they return ``None``, so the rule demanded the
+            # caller check a value that cannot exist: ``remove``, ``unlink``,
+            # ``rename``, ``makedirs``, ``mkdir``, ``rmdir``. Both the ``os.*``
+            # and ``pathlib.Path.*`` forms return ``None``; ``Path.rename``
+            # returns a ``Path``, which nothing acts on. Names are matched with
+            # the receiver discarded, so these also covered ``list.remove`` and
+            # every other method of the name.
+            #
+            # Removed because the value they return is one idiomatic Python
+            # discards: ``write`` (a byte count), ``seek`` (the new position) and
+            # ``truncate``. On Django these were 404 of 614 remaining findings,
+            # far more than the six above (207).
+            #
+            # ``send`` / ``sendall`` / ``sendfile`` stay: a short ``send`` is a
+            # real bug, which is precisely why ``sendall`` exists. ``run`` /
+            # ``call`` / ``check_output`` stay because ``subprocess.run``
+            # returns a ``CompletedProcess`` whose ``returncode`` matters, though
+            # they carry the highest collision rate - ``asyncio.run(main())`` and
+            # ``app.run(workers=4)`` both match ``run``, which the docs now say.
+            # ``replace`` stays and is deliberately ambiguous: ``str.replace`` and
+            # ``Path.replace`` both return a value worth keeping, ``os.replace``
+            # does not.
             "flagged_calls": [
                 "run",
                 "call",
                 "check_output",
-                "write",
                 "send",
                 "sendall",
                 "sendfile",
-                "seek",
-                "truncate",
-                "remove",
-                "unlink",
-                "rename",
                 "replace",
-                "makedirs",
-                "mkdir",
-                "rmdir",
             ],
             # JavaScript defaults - Node fs / stream / process methods
             # whose return value (or returned promise) carries
