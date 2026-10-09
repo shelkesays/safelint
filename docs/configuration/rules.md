@@ -122,6 +122,19 @@ When switching to `"statements"`, lower `max_lines` accordingly, a function with
 
 Deep nesting (if inside for inside if inside while…) makes code hard to follow and test. Two levels is enough for most real functions.
 
+**`with` and `try` are not nesting levels.** The rule exists to keep *decisions* shallow, and a resource or error-handling wrapper adds indentation without adding a branch:
+
+```python
+with open(path) as fh:        # depth 0
+    for row in fh:            # depth 1
+        if row:               # depth 2 - clears the default cap
+            handle(row)
+```
+
+The reason this matters more than tidiness is actionability: a developer told to reduce nesting in `with session: for x: if y:` has no good move short of restructuring resource handling, which is a worse outcome than the nesting it was flagged for. So the finding was unactionable even where the count was literally correct.
+
+This extends a principle the rule already applied: Java's `synchronized` block and Rust's `unsafe` block were never nesting steps, for exactly this reason. Removed in 2.15.0 (#166) from Python (`with`, `try`), Java (`try`, try-with-resources), JavaScript / TypeScript (`try`), PHP (`try`) and C++ (`try`). Rust, Go and C had none to remove, so all nine languages now agree. `switch` and `match` remain steps - they branch.
+
 **`else if` is not a nesting level.** A flat `if / else if / else if` chain branches once, so it scores depth 1 in every language:
 
 ```js
@@ -138,7 +151,7 @@ Python and PHP always behaved this way, since their grammars name `elif` / `else
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"error"` | `"error"` or `"warning"` |
-| `max_depth` | `2` | Maximum allowed nesting depth of `if`, `for`, `while`, `with`, `try` |
+| `max_depth` | `2` | Maximum allowed nesting depth of branching constructs (`if`, `for`, `while`, `switch` / `match`) |
 
 ```toml
 [tool.safelint.rules.nesting_depth]
