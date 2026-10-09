@@ -86,6 +86,22 @@ _ASSIGNMENT_SHAPES = AssignmentShapes(
 )
 
 
+def _rust_binding_scope(let_node: tree_sitter.Node) -> tuple[int, int] | None:
+    """Return the byte span of the block a Rust ``let`` binds its names in.
+
+    A ``let`` is in scope from its own position to the end of the enclosing block,
+    so the span starts at the declaration rather than at the block's opening brace:
+    a call to the same name *before* the ``let`` refers to whatever was in scope
+    then, not to this binding.
+    """
+    cur = let_node.parent
+    while cur is not None:
+        if cur.type == _rust.BLOCK:
+            return (let_node.start_byte, cur.end_byte)
+        cur = cur.parent
+    return None
+
+
 class RustTaintTracker:
     """Track tainted variable flow through a Rust function / closure body.
 
@@ -117,11 +133,13 @@ class RustTaintTracker:
         self.assume_taint_preserving = assume_taint_preserving
         self.sink_kinds = sink_kinds if sink_kinds is not None else SinkKinds()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
-        # Names bound locally in this function: the parameters, plus every
-        # ``let`` pattern as the walk reaches it. A bare call to one of these is
-        # an invocation of a local closure or parameter, never the configured
-        # free function of the same name - see ``_callee_is_local_binding``.
-        self._local_bindings: set[str] = set(params)
+        # Names bound locally in this function. Parameters bind the whole body;
+        # a ``let`` binds only its enclosing block, so those are recorded as byte
+        # spans rather than bare names. A bare call inside such a span invokes the
+        # local, never the configured free function - see
+        # ``_callee_is_local_binding``.
+        self._param_names: frozenset[str] = frozenset(params)
+        self._let_spans: dict[str, list[tuple[int, int]]] = {}
 
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
@@ -229,8 +247,10 @@ class RustTaintTracker:
             return
         value = node.child_by_field_name("value")
         status = value_status(self._is_tainted, self._properties, value) if value is not None else None
+        scope = _rust_binding_scope(node)
         for ident in self._iter_pattern_identifiers(pattern):
-            self._local_bindings.add(node_text(ident))
+            if scope is not None:
+                self._let_spans.setdefault(node_text(ident), []).append(scope)
             self._update_name(ident, status)
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
@@ -282,15 +302,27 @@ class RustTaintTracker:
                 query(nested)          // a predicate closure, no database
             }
 
+        A ``let`` binds only its enclosing block, so the check is scoped to that
+        block's byte range. Keeping the names function-wide would let a closure in
+        an already-closed block silence a later genuine call, which is the
+        dangerous direction for a security rule::
+
+            fn h(user: String) {
+                { let query = |x: u32| x > 0; let _ = query(1); }
+                query(&user);          // still reported - the closure is out of scope
+            }
+
         Only a bare identifier callee is considered; a method or path call
         (``conn.query(..)``, ``sqlx::query(..)``) cannot name a local. See #180,
         where this shape plus the over-generic default sink list produced 1
         defensible finding out of 9 validated across ty and Ruff.
         """
         function = node.child_by_field_name("function")
-        if function is None or function.type != _rust.IDENTIFIER:
+        if function is None or function.type != _rust.IDENTIFIER or node_text(function) != name:
             return False
-        return node_text(function) == name and name in self._local_bindings
+        if name in self._param_names:
+            return True
+        return any(start <= node.start_byte < end for start, end in self._let_spans.get(name, ()))
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str, required: str | None) -> bool:
         """Record one sink hit per tainted positional argument; return True if any fired."""

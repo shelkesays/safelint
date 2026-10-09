@@ -63,9 +63,17 @@ def _io_funcs_for_lang(rule_config: dict, lang_name: str, fallback: list[str]) -
 #: ``std::io::Write`` (I/O) or ``std::fmt::Write`` (a string buffer, no I/O).
 _RUST_FMT_MACROS = frozenset({"write", "writeln"})
 
-#: Parameter / initialiser spellings that prove a ``write!`` target is a formatter
-#: or an in-memory string rather than a stream.
-_RUST_NON_IO_TARGET_TYPES = ("Formatter", "String")
+#: Type base names that prove a ``write!`` target is an in-memory buffer rather
+#: than a stream. Matched EXACTLY: a substring test would read ``StringWriter``
+#: as a ``String`` and silence a real write to an ``io::Write`` impl.
+_RUST_BUFFER_TYPES = frozenset({"String"})
+
+#: Formatter types are matched by SUFFIX instead. ``fmt::Formatter`` is the std
+#: one, but domain formatters follow the ``XFormatter`` convention and are the
+#: same thing semantically - Ruff's ``PyFormatter`` accounts for 82 of its
+#: ``write!`` sites. A suffix rule covers them without the unsoundness of a
+#: substring test, which would also match ``StringWriter``/``FormatterStream``.
+_RUST_FORMATTER_SUFFIX = "Formatter"
 _RUST_STRING_INITIALISERS = ("String::new", "String::with_capacity", "String::from", "format!")
 
 
@@ -142,8 +150,34 @@ def _rust_parameter_declares_non_io(params: tree_sitter.Node, name: str) -> bool
         type_node = param.child_by_field_name("type")
         if pattern is None or type_node is None or node_text(pattern) != name:
             continue
-        return any(spelling in node_text(type_node) for spelling in _RUST_NON_IO_TARGET_TYPES)
+        return _rust_type_is_buffer(node_text(type_node))
     return False
+
+
+def _rust_type_is_buffer(type_text: str) -> bool:
+    """Return True if *type_text* names an in-memory write target, not a stream."""
+    base = _rust_base_type_name(type_text)
+    return base in _RUST_BUFFER_TYPES or base.endswith(_RUST_FORMATTER_SUFFIX)
+
+
+def _rust_base_type_name(type_text: str) -> str:
+    """Reduce a Rust type's source text to its bare base name.
+
+    ``&mut fmt::Formatter<'_>`` -> ``Formatter``; ``&mut String`` -> ``String``;
+    ``&mut dyn std::io::Write`` -> ``Write``; ``&mut StringWriter`` ->
+    ``StringWriter``. References, ``mut`` / ``dyn`` qualifiers, generic arguments
+    and path segments are all stripped so the comparison is exact.
+    """
+    # Generic arguments go FIRST: they can contain whitespace
+    # (``TypeWriter<'_, '_, 'db>``), which would otherwise make the
+    # last-token step pick a lifetime out of the parameter list. What is
+    # left is ``&mut path::Name``, whose base name is the final token's
+    # last path segment.
+    without_generics = type_text.split("<", 1)[0]
+    tokens = without_generics.lstrip("&").split()
+    if not tokens:
+        return ""
+    return tokens[-1].rsplit("::", 1)[-1].strip()
 
 
 def _rust_local_is_string_buffer(func_node: tree_sitter.Node, name: str) -> bool:

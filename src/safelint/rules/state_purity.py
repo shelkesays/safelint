@@ -391,7 +391,7 @@ def _javascript_scope_binds(scope: tree_sitter.Node, name: str) -> bool:
     if scope.type == _js.CATCH_CLAUSE:
         return _javascript_binds_identifier(scope.child_by_field_name("parameter"), name)
     if scope.type in _js.FUNCTION_TYPES:
-        return _javascript_parameters_bind(scope, name)
+        return _javascript_parameters_bind(scope, name) or _javascript_hoisted_var_binds(scope, name)
     if scope.type in (_js.STATEMENT_BLOCK, _js.PROGRAM):
         return _javascript_block_declares(scope, name)
     return False
@@ -414,6 +414,23 @@ def _javascript_parameters_bind(func: tree_sitter.Node, name: str) -> bool:
         if any(_javascript_binds_identifier(child, name) for child in holder.named_children):
             return True
     return False
+
+
+def _javascript_hoisted_var_binds(func: tree_sitter.Node, name: str) -> bool:
+    """Return True if *func*'s body declares ``var name`` anywhere outside a nested function.
+
+    ``var`` is function-scoped, not block-scoped, so a declaration inside an ``if``
+    or a loop binds the name for the whole function body::
+
+        function f(x) {
+          if (x) { var self = {}; }
+          self.y = 1;                 // the hoisted local, not the global
+        }
+
+    ``let`` / ``const`` are block-scoped and are handled per block by
+    :func:`_javascript_block_declares` instead.
+    """
+    return any(node.type == _js.VARIABLE_DECLARATION and _javascript_declaration_binds(node, name) for node in walk(func, skip_types=tuple(_js.FUNCTION_TYPES)) if node is not func)
 
 
 def _javascript_block_declares(block: tree_sitter.Node, name: str) -> bool:

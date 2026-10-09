@@ -287,3 +287,52 @@ def test_rust_dropped_names_still_reachable_via_config(tmp_path: Path) -> None:
     sample.write_text("fn lookup(lock: &RwLock<u32>) -> u32 {\n    *lock.read().unwrap()\n}\n", encoding="utf-8")
     eng = _engine({"rules": {"side_effects": {"io_functions_rust": ["read"]}}})
     assert len(_violations(eng.check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_write_to_a_custom_string_named_type_still_fires(tmp_path: Path) -> None:
+    """``&mut StringWriter`` is not a ``String``; a substring test would silence it.
+
+    A custom type whose name merely contains ``String`` or ``Formatter`` may well
+    implement ``std::io::Write``. The comparison is against the type's base name.
+    Found in review of PR #223.
+    """
+    sample = tmp_path / "sw.rs"
+    sample.write_text('fn emit(w: &mut StringWriter) {\n    write!(w, "x").unwrap();\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_qualified_formatter_type_is_still_recognised(tmp_path: Path) -> None:
+    """Base-name matching must still see through ``&mut``, a path and generics."""
+    sample = tmp_path / "qual.rs"
+    sample.write_text(
+        'impl D for X {\n    fn fmt(&self, f: &mut fmt::Formatter<\'_>) -> R {\n        write!(f, "x")\n    }\n}\n',
+        encoding="utf-8",
+    )
+    assert _violations(_engine().check_file(str(sample)), "SAFE304") == []
+
+
+def test_rust_domain_formatter_type_is_treated_as_a_formatter(tmp_path: Path) -> None:
+    """``&mut PyFormatter`` is a formatter by convention, so writing to it is not I/O.
+
+    Exact matching on ``Formatter`` alone added 82 findings on Ruff, every one a
+    write to its own ``PyFormatter``. A suffix rule covers the ``XFormatter``
+    convention without the unsoundness of a substring test.
+    """
+    sample = tmp_path / "pyfmt.rs"
+    sample.write_text('fn render(f: &mut PyFormatter) {\n    write!(f, "x").unwrap();\n}\n', encoding="utf-8")
+    assert _violations(_engine().check_file(str(sample)), "SAFE304") == []
+
+
+def test_rust_generic_arguments_with_spaces_do_not_break_type_resolution(tmp_path: Path) -> None:
+    """``TypeWriter<'_, '_, 'db>`` must resolve to ``TypeWriter``, not to a lifetime.
+
+    Taking the last whitespace-separated token before stripping generics picked
+    ``'db>`` out of the parameter list. The type is not a buffer either way, so
+    this asserts the finding survives for the right reason.
+    """
+    sample = tmp_path / "gen.rs"
+    sample.write_text(
+        "fn emit(w: &mut TypeWriter<'_, '_, 'db>) {\n    write!(w, \"x\").unwrap();\n}\n",
+        encoding="utf-8",
+    )
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1

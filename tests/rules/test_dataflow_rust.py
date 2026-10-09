@@ -768,3 +768,42 @@ def test_rust_a_method_call_is_unaffected_by_the_local_binding_guard(tmp_path: P
     )
     eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["query"]}}})
     assert len([v for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"]) == 1
+
+
+def test_rust_a_closure_in_a_finished_block_does_not_silence_a_later_call(tmp_path: Path) -> None:
+    """A ``let`` binds only its enclosing block, so the guard must be scoped to it.
+
+    Keeping local names for the whole function let a closure in an already-closed
+    block suppress a later genuine ``query(user_input)``, which is the dangerous
+    direction for a security rule. Found in review of PR #223.
+    """
+    sample = tmp_path / "scoped.rs"
+    sample.write_text(
+        "fn h(user: String) {\n    { let query = |x: u32| x > 0; let _ = query(1); }\n    query(&user);\n}\n",
+        encoding="utf-8",
+    )
+    eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["query"]}}})
+    found = [v for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"]
+    assert [v.lineno for v in found] == [3]
+
+
+def test_rust_a_call_inside_the_binding_block_is_still_silenced(tmp_path: Path) -> None:
+    """The other half of the scoping rule: within the block, the local does shadow."""
+    sample = tmp_path / "inblock.rs"
+    sample.write_text(
+        "fn h(user: String) {\n    { let query = |x: u32| x > 0; let _ = query(1); }\n}\n",
+        encoding="utf-8",
+    )
+    eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["query"]}}})
+    assert [v for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"] == []
+
+
+def test_rust_a_call_before_the_let_is_not_silenced(tmp_path: Path) -> None:
+    """A ``let`` is in scope from its own position, so an earlier call still reports."""
+    sample = tmp_path / "before.rs"
+    sample.write_text(
+        "fn h(user: String) {\n    query(&user);\n    let query = |x: &str| x.len();\n}\n",
+        encoding="utf-8",
+    )
+    eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["query"]}}})
+    assert [v.lineno for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"] == [2]

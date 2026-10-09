@@ -349,3 +349,28 @@ def test_js_shadowing_does_not_break_the_typescript_escape_hatch(tmp_path: Path)
     sample = tmp_path / "hatch.ts"
     sample.write_text("function f() { (globalThis as any).foo = 1; }\n", encoding="utf-8")
     assert any(v.code == "SAFE302" for v in _engine().check_file(str(sample)).violations)
+
+
+def test_js_var_hoists_out_of_a_nested_block(tmp_path: Path) -> None:
+    """``var`` is function-scoped, so a declaration inside an ``if`` binds the whole body.
+
+    Found in review of PR #223: the per-block scan alone missed the hoist and kept
+    reporting the write.
+    """
+    sample = tmp_path / "hoist.js"
+    sample.write_text("function f(x) { if (x) { var self = {}; } self.y = 1; }\n", encoding="utf-8")
+    assert [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE302"] == []
+
+
+def test_js_var_in_a_nested_function_does_not_leak_out(tmp_path: Path) -> None:
+    """The negative control: hoisting stops at the function boundary."""
+    sample = tmp_path / "noleak.js"
+    sample.write_text("function f(x) { function g() { var self = {}; } self.y = 1; }\n", encoding="utf-8")
+    assert any(v.code == "SAFE302" for v in _engine().check_file(str(sample)).violations)
+
+
+def test_js_block_scoped_let_does_not_hoist_but_still_shadows_in_its_block(tmp_path: Path) -> None:
+    """``let`` is block-scoped: it shadows inside its block and nowhere else."""
+    sample = tmp_path / "letscope.js"
+    sample.write_text("function f(x) { if (x) { let other = {}; } self.y = 1; }\n", encoding="utf-8")
+    assert any(v.code == "SAFE302" for v in _engine().check_file(str(sample)).violations)
