@@ -55,7 +55,7 @@ When the user asks "why is this flagged?", the universal rationale in the per-cl
 | Code | Rule | PHP-specific notes |
 |---|---|---|
 | SAFE101 | function_length | Counts source lines on `function_definition` / `method_declaration` / closures (`anonymous_function` / arrow `fn`). Default cap is 60 source lines. Closure bodies count toward their own size, not the enclosing function. |
-| SAFE102 | nesting_depth | Counts `if_statement` / `for_statement` / `foreach_statement` / `while_statement` / `do_statement` / `switch_statement` / `try_statement`. Default max is 2. Per-arm `case` nodes are not counted - the switch counts once. |
+| SAFE102 | nesting_depth | Counts `if_statement` / `for_statement` / `foreach_statement` / `while_statement` / `do_statement` / `switch_statement` . Default max is 2. Per-arm `case` nodes are not counted - the switch counts once. `try` is NOT counted (#166): it adds indentation without adding a branch. |
 | SAFE103 | max_arguments | Counts declared parameters in the `formal_parameters` list. A variadic `...$args` counts as one. Default cap is 7. |
 | SAFE104 | complexity | Cyclomatic complexity: every `if` / `elseif` / `for` / `foreach` / `while` / `case` / `catch` adds one; `&&` / `\|\|` / `and` / `or` / `??` each add one. The `default` case is not counted. Default cap is 10. |
 | SAFE105 | no_recursion | Flags a function calling itself bare (`recurse($n - 1)`) or a method calling itself receiver-qualified (`$this->walk(...)` inside `walk`). Direct self-recursion only; indirect / mutual recursion is out of scope. Enabled by default at warning severity. |

@@ -24,7 +24,7 @@ JavaScript is in scope for every cross-language rule plus SAFE302 `global_mutati
 | Code | Rule | Notes for JavaScript |
 |---|---|---|
 | [SAFE101](../configuration/rules.md#safe101-function_length) | `function_length` | Default cap 60 lines. Counts function declarations, function expressions, arrow functions, generators, and class methods uniformly. `count_mode = "statements"` is Python-only, JS files use `lines` (default) or `logical_lines`. |
-| [SAFE102](../configuration/rules.md#safe102-nesting_depth) | `nesting_depth` | Counts `if` / `for` / `for…in` / `while` / `do…while` / `switch` / `try` blocks. Default max 2. Optional chaining (`?.`) does not count toward depth. |
+| [SAFE102](../configuration/rules.md#safe102-nesting_depth) | `nesting_depth` | Counts `if` / `for` / `for…in` / `while` / `do…while` / `switch` blocks. Default max 2. `try` is NOT counted (#166): it adds indentation without adding a branch. Optional chaining (`?.`) does not count toward depth. |
 | [SAFE103](../configuration/rules.md#safe103-max_arguments) | `max_arguments` | Counts named, default-value (`b = 5`), rest (`...args`), and destructured (`{a, b}` / `[x, y]`) parameters. Default cap 7. No `self` / `cls` skip. |
 | [SAFE104](../configuration/rules.md#safe104-complexity) | `complexity` | Cyclomatic complexity, every `if` / `else if` / `for` / `while` / `case` / `catch` / ternary / `&&` / `||` / `??` adds one. Default cap 10. |
 | [SAFE105](../configuration/rules.md#safe105-no_recursion) | `no_recursion` | Flags a named function / method that calls itself directly, bare (`fact(n-1)`) or `this`-qualified (`this.walk(...)`). `other.walk(...)` does not fire. Anonymous arrow / function expressions are a documented blind spot. Enabled by default at warning severity. |

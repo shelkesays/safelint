@@ -3,7 +3,8 @@
 C++-specific cases beyond C's:
 
 * ``FUNCTION_TYPES`` adds ``lambda_expression`` alongside ``function_definition``.
-* SAFE102 counts ``try_statement`` toward nesting depth.
+* SAFE102 does NOT count ``try_statement`` toward nesting depth (#166): a try
+  adds indentation without adding a branch.
 * SAFE105 resolves the enclosing name from a ``field_identifier`` (in-class
   method) or ``qualified_identifier`` (``S::m`` out-of-line), and detects a
   ``this->m()`` self-call - neither exists in C.
@@ -41,9 +42,21 @@ def test_cpp_short_function_is_clean_for_safe101(tmp_path: Path) -> None:
     assert "SAFE101" not in _codes("int add(int a, int b) { return a + b; }\n", tmp_path)
 
 
-def test_cpp_try_block_counts_toward_nesting_safe102(tmp_path: Path) -> None:
-    """A ``try`` inside an ``if`` inside a ``for`` exceeds the depth-2 cap (SAFE102)."""
+def test_cpp_try_block_does_not_count_toward_nesting_safe102(tmp_path: Path) -> None:
+    """A ``try`` is not a nesting step, so ``for`` + ``if`` + ``try`` stays at depth 2 (#166).
+
+    This test previously asserted the opposite. ``try`` adds indentation without
+    adding a branch, and SAFE102 exists to keep *decisions* shallow - the same
+    reasoning that already excluded Java's ``synchronized`` and Rust's
+    ``unsafe``. The control below keeps the third-real-level case covered.
+    """
     src = "void f() {\n    for (int i = 0; i < 3; i++) {\n        if (i) {\n            try { g(); } catch (...) { h(); }\n        }\n    }\n}\n"
+    assert "SAFE102" not in _codes(src, tmp_path)
+
+
+def test_cpp_three_real_levels_still_fire_safe102(tmp_path: Path) -> None:
+    """The control for the test above: three genuine decisions still exceed the cap."""
+    src = "void f() {\n    for (int i = 0; i < 3; i++) {\n        if (i) {\n            while (i) { g(); }\n        }\n    }\n}\n"
     assert "SAFE102" in _codes(src, tmp_path)
 
 

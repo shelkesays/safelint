@@ -48,7 +48,7 @@ For pre-commit integration you normally only need to add the grammar extra via `
 | Code | Rule | C++-specific notes |
 |---|---|---|
 | SAFE101 | function_length | Source lines on `function_definition` / `lambda_expression`. Default cap 60. |
-| SAFE102 | nesting_depth | Counts `if` / `for` (classic and range-based `for (auto x : v)`) / `while` / `do` / `switch` / `try`. Default max 2. |
+| SAFE102 | nesting_depth | Counts `if` / `for` (classic and range-based `for (auto x : v)`) / `while` / `do` / `switch`. Default max 2. `try` is NOT counted (#166): it adds indentation without adding a branch. |
 | SAFE103 | max_arguments | Counts `parameter_declaration` nodes on both `function_definition` and `lambda_expression` (a lambda's params nest under `abstract_function_declarator`). `int f()` / `int f(void)` is zero args. Default cap 7. |
 | SAFE104 | complexity | Every `if` / `for` (classic and range-based) / `while` / `do` / `case` / `catch` / ternary adds one; `&&` / `\|\|` each add one. Default cap 10. |
 | SAFE105 | no_recursion | Flags a function calling its own name directly, including a method's `this->m()` and a namespace-qualified `ns::f()`. Enabled by default at warning severity. **Known limitation:** the check is name-based, so a call to a *different overload* of the same name (`log(int)` calling `log(const char*)`) is reported as recursion - distinguishing overloads needs type resolution safelint does not do. Annotate a genuine non-recursive overload call with `// nosafe: SAFE105`. |

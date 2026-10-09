@@ -24,7 +24,7 @@ Python is in scope for every cross-language rule plus SAFE201 `bare_except` (sha
 | Code | Rule | Notes for Python |
 |---|---|---|
 | [SAFE101](../configuration/rules.md#safe101-function_length) | `function_length` | Default cap 60 lines; `count_mode` supports `lines` / `logical_lines` / `statements` (Python-only mode). |
-| [SAFE102](../configuration/rules.md#safe102-nesting_depth) | `nesting_depth` | Counts `if` / `for` / `while` / `with` / `try` / `match` blocks. Default max 2. |
+| [SAFE102](../configuration/rules.md#safe102-nesting_depth) | `nesting_depth` | Counts `if` / `for` / `while` / `match` blocks. Default max 2. `with` and `try` are NOT counted (#166): they add indentation without adding a branch. |
 | [SAFE103](../configuration/rules.md#safe103-max_arguments) | `max_arguments` | Counts positional, keyword, `*args`, `**kwargs` separately. Excludes `self` / `cls`. Default cap 7. |
 | [SAFE104](../configuration/rules.md#safe104-complexity) | `complexity` | Cyclomatic complexity, every `if` / `elif` / `for` / `while` / `except` / `case` / ternary / `and` / `or` adds one. Default cap 10. |
 | [SAFE105](../configuration/rules.md#safe105-no_recursion) | `no_recursion` | Flags a function that calls itself directly, bare (`fact(n-1)`) or `self`/`cls`-qualified (`self.walk(...)`). `other.walk(...)` does not fire. Direct self-recursion only. Enabled by default at warning severity. |
