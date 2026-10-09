@@ -18,6 +18,8 @@ import pytest
 
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
+from safelint.languages import _REGISTRY
+from safelint.rules.dataflow import ReturnValueIgnoredRule, TaintedSinkRule
 
 
 if TYPE_CHECKING:
@@ -155,3 +157,59 @@ def test_the_removed_names_are_still_reachable_by_config(tmp_path: Path) -> None
     config = deep_merge(DEFAULTS, {"rules": {"return_value_ignored": {"enabled": True, "flagged_calls": ["remove"]}}})
     hits = [v for v in SafetyEngine(config).check_file(str(sample)).violations if v.code == "SAFE802"]
     assert len(hits) == 1
+
+
+# ---------------------------------------------------------------------------
+# A partial config must not resurrect the pre-#156 list, and no ClassVar
+# fallback may drift from DEFAULTS again.
+# ---------------------------------------------------------------------------
+
+
+_CLASSVAR_FALLBACKS = [
+    ["return_value_ignored.flagged_calls", ReturnValueIgnoredRule, "_DEFAULT_FLAGGED", "return_value_ignored", "flagged_calls"],
+    ["tainted_sink.sinks", TaintedSinkRule, "_DEFAULT_SINKS", "tainted_sink", "sinks"],
+    ["tainted_sink.sanitizers", TaintedSinkRule, "_DEFAULT_SANITIZERS", "tainted_sink", "sanitizers"],
+    ["tainted_sink.sources", TaintedSinkRule, "_DEFAULT_SOURCES", "tainted_sink", "sources"],
+]
+
+
+@pytest.mark.parametrize(
+    ["label", "rule_cls", "attr", "rule_key", "config_key"],
+    tuple(_CLASSVAR_FALLBACKS),
+    ids=[str(case[0]) for case in _CLASSVAR_FALLBACKS],
+)
+def test_classvar_fallbacks_match_defaults(label: str, rule_cls: type, attr: str, rule_key: str, config_key: str) -> None:
+    """Every hard-coded fallback must equal its ``DEFAULTS`` entry.
+
+    These lists exist for a caller who constructs a rule directly with a config
+    that omits the key; the engine always passes the merged ``DEFAULTS``. Being a
+    second copy, they drift silently: `flagged_calls` kept the pre-#156 sixteen
+    names after the default was trimmed to seven, so such a caller still had
+    `write` and `remove` flagged. This asserts all four at once so the next
+    default change cannot repeat it.
+    """
+    fallback = list(getattr(rule_cls, attr))
+    expected = list(DEFAULTS["rules"][rule_key][config_key])
+    assert fallback == expected, f"{label}: fallback {fallback} != DEFAULTS {expected}"
+
+
+def test_a_partial_config_does_not_flag_the_removed_names(tmp_path: Path) -> None:
+    """A config that enables the rule but omits ``flagged_calls`` uses the trimmed list.
+
+    This is the path the ClassVar fallback serves, and the one the DEFAULTS-merging
+    tests above never reach.
+    """
+    sample = tmp_path / "partial.py"
+    sample.write_text('import os\nos.remove("/tmp/x")\nf = open("/tmp/x", "w")\nf.write("hi")\n', encoding="utf-8")
+    tree = _REGISTRY[".py"].create_parser().parse(sample.read_bytes())
+    rule = ReturnValueIgnoredRule({"enabled": True})
+    assert rule.check_file(str(sample), tree) == []
+
+
+def test_a_partial_config_still_flags_the_kept_names(tmp_path: Path) -> None:
+    """The positive control: the fallback is the trimmed list, not an empty one."""
+    sample = tmp_path / "partial_keep.py"
+    sample.write_text('import subprocess\nsubprocess.run(["echo"])\n', encoding="utf-8")
+    tree = _REGISTRY[".py"].create_parser().parse(sample.read_bytes())
+    rule = ReturnValueIgnoredRule({"enabled": True})
+    assert len(rule.check_file(str(sample), tree)) == 1

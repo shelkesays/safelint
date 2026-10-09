@@ -1312,7 +1312,7 @@ function runQuery(userInput) {
 
 **What it flags:** Calls to functions whose return value signals success or failure, where the return value is discarded. Cross-language.
 
-Calling `subprocess.run(["rm", "-rf", path])` as a bare statement (not assigning the result) means you never check whether the command succeeded. Same with `file.write()`, it returns the number of bytes written, and silently ignoring it means you may have written nothing.
+Calling `subprocess.run(["rm", "-rf", path])` as a bare statement (not assigning the result) means you never check whether the command succeeded. Same with `sock.send()`, which returns the number of bytes actually sent and may send fewer than asked - that is why `sendall` exists.
 
 | Option | Default | Description |
 |---|---|---|
@@ -1339,15 +1339,17 @@ All of them are defaults, not hard-coded: list a name in `flagged_calls` to brin
 [tool.safelint.rules.return_value_ignored]
 enabled = true
 severity = "warning"
-flagged_calls = ["run", "write", "send", "remove", "unlink"]
+flagged_calls = ["run", "call", "check_output", "send", "sendall", "sendfile", "replace"]
 ```
 
 **Python, Bad:**
 
 ```python
 subprocess.run(["deploy.sh"])    # SAFE802 - return value discarded
-f.write(data)                    # SAFE802 - bytes written not checked
+sock.send(payload)               # SAFE802 - a short send is silently accepted
 ```
+
+`f.write(data)` does **not** fire on the default list: `write` was removed in 2.14.4, because discarding the byte count is idiomatic Python (see the table above). Add `"write"` to `flagged_calls` if your codebase treats it as significant.
 
 **Python, Good:**
 

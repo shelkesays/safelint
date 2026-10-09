@@ -1268,23 +1268,24 @@ class ReturnValueIgnoredRule(BaseRule):
     code = "SAFE802"
     language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
+    #: Fallback for a caller who constructs the rule directly with a config that
+    #: omits ``flagged_calls``; the engine always passes the merged DEFAULTS.
+    #: It MUST equal ``DEFAULTS["rules"]["return_value_ignored"]["flagged_calls"]``
+    #: - a drift test asserts it, because this list silently kept the pre-#156
+    #: sixteen names and so flagged ``write`` and ``remove`` for such a caller
+    #: after the default had been trimmed.
+    #:
+    #: ``"call"`` is the function name ``subprocess.call``. It was previously
+    #: written as the node-type constant ``_py.CALL``, which is equal only by
+    #: coincidence.
     _DEFAULT_FLAGGED: ClassVar[list[str]] = [
         "run",
-        _py.CALL,
+        "call",
         "check_output",
-        "write",
         "send",
         "sendall",
         "sendfile",
-        "seek",
-        "truncate",
-        "remove",
-        "unlink",
-        "rename",
         "replace",
-        "makedirs",
-        "mkdir",
-        "rmdir",
     ]
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
