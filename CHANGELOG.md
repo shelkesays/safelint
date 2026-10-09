@@ -35,19 +35,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Measured together:
 
+  A switch arm stops a ``break`` but not a ``return``, so the ``return`` search uses the break boundaries **minus** the switch-like nodes. Reusing them wholesale kept reporting `for (;;) { switch (x) { case 1: return 1; } }` - the classic state-machine loop, and common enough that discounting switch arms is what takes Guava, fzf and LevelDB to zero.
+
+  Inside a macro body an exit keyword is credited only when the same body writes no nested loop and no closure. A ``token_tree`` has no structure to walk, so a ``break`` there cannot be told apart from one belonging to a ``for`` the macro itself writes, nor a ``return`` from one inside a closure. The unit of judgement is the whole macro invocation, not each token tree: one `select!` nests several, so judging them separately let an inner tree holding just the ``break`` look free of the ``for`` around it.
+
   | project | before | after |
   | --- | --- | --- |
-  | ripgrep | 7 | **0** |
-  | Guava | 126 | **12** |
+  | Guava | 126 | **0** |
   | Ruff | 174 | **134** |
   | Django | 71 | **60** |
-  | fzf | 12 | **5** |
+  | fzf | 12 | **0** |
   | Rich | 29 | **26** |
   | curl | 9 | **5** |
-  | LevelDB | 3 | **1** |
+  | ripgrep | 7 | **0** |
+  | LevelDB | 3 | **0** |
   | requests, Cobra, Axios | 2, 0, 0 | unchanged |
 
-  290 findings removed. ripgrep reaching zero is #170's own Verify condition.
+  333 findings removed. ripgrep reaching zero is #170's own Verify condition.
 
 - **SAFE105 `no_recursion`: a Rust `use` now binds only what it imports, not the segments of its path.** The resolver swept every identifier under the declaration, so a path segment read as a bound name and silenced genuine recursion in a function called after it:
 

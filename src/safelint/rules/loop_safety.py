@@ -550,13 +550,52 @@ def _has_exiting_return(while_node: tree_sitter.Node, lang_name: str) -> bool:
     and is excluded for the same reason it is excluded from the break search.
     """
     return_type = _RETURN_NODE_BY_LANG[lang_name]
-    boundaries = _BREAK_SCOPE_BOUNDARIES_BY_LANG.get(lang_name, _FUNCTION_TYPES_BY_LANG.get(lang_name, frozenset()))
-    return any(child.type == return_type for child in walk(while_node, skip_types=tuple(boundaries)))
+    return any(child.type == return_type for child in walk(while_node, skip_types=_return_scope_boundaries(lang_name)))
+
+
+#: Nodes that stop a ``break`` but NOT a ``return``. A ``break`` in a switch arm
+#: exits the switch, which is why these are break boundaries; a ``return`` there
+#: still returns from the function and so leaves the loop. Reusing the break set
+#: wholesale therefore skipped switch arms and kept reporting
+#: ``for (;;) { switch (x) { case 1: return 1; } }``.
+_SWITCH_LIKE_BY_LANG: dict[str, tuple[str, ...]] = {
+    "javascript": (_js.SWITCH_STATEMENT,),
+    "typescript": (_js.SWITCH_STATEMENT,),
+    "java": (_java.SWITCH_EXPRESSION,),
+    "go": (_go.EXPRESSION_SWITCH_STATEMENT, _go.TYPE_SWITCH_STATEMENT, _go.SELECT_STATEMENT),
+    "c": (_c.SWITCH_STATEMENT,),
+    "cpp": (_cpp.SWITCH_STATEMENT,),
+}
+
+
+def _return_scope_boundaries(lang_name: str) -> tuple[str, ...]:
+    """Return the nodes a ``return`` search must not descend into.
+
+    The break boundaries minus the switch-like ones: a nested loop still bounds a
+    ``return`` (it may run zero times, so the ``return`` is not guaranteed), and a
+    nested function or closure owns its own ``return``, but a switch arm does not
+    stop a ``return`` from leaving the enclosing function.
+
+    Rust and Python need no subtraction - Rust's ``match`` was never a break
+    boundary and Python has no switch in the set.
+    """
+    breaks = _BREAK_SCOPE_BOUNDARIES_BY_LANG.get(lang_name)
+    if breaks is None:
+        return tuple(_FUNCTION_TYPES_BY_LANG.get(lang_name, frozenset()))
+    switch_like = frozenset(_SWITCH_LIKE_BY_LANG.get(lang_name, ()))
+    return tuple(node_type for node_type in breaks if node_type not in switch_like)
 
 
 #: Anonymous keyword tokens that mean "this leaves the loop" inside an otherwise
 #: opaque Rust macro body. ``continue`` is absent: it re-enters the loop.
 _RUST_MACRO_EXIT_TOKENS: frozenset[str] = frozenset({"break", "return"})
+
+#: Tokens whose presence makes an exit keyword in the same macro body
+#: unattributable. Inside a ``token_tree`` there is no structure to walk, so a
+#: ``break`` cannot be told apart from one belonging to a nested loop written in
+#: the macro, nor a ``return`` from one inside a closure there. When any of these
+#: appears the exit keyword is not credited and the loop reports as before.
+_RUST_MACRO_NESTING_TOKENS: frozenset[str] = frozenset({"loop", "while", "for", "|", "||", "move"})
 
 
 def _rust_macro_body_may_exit(while_node: tree_sitter.Node) -> bool:
@@ -582,10 +621,31 @@ def _rust_macro_body_may_exit(while_node: tree_sitter.Node) -> bool:
 
     Scanning needs the raw child walk rather than :func:`walk`, which yields named
     nodes only and is precisely why these tokens were invisible.
+
+    A token tree has no structure to walk, so an exit keyword in one cannot be
+    attributed when the same body also writes a nested loop or a closure - the
+    ``break`` may belong to that ``for``, and the ``return`` to that closure.
+    :data:`_RUST_MACRO_NESTING_TOKENS` detects those and withholds the credit, so
+    such a loop reports exactly as it did before. That keeps the fix to macro
+    bodies whose exit really is the outer loop's, which is the shape the issue
+    reports.
     """
     boundaries = _BREAK_SCOPE_BOUNDARIES_BY_LANG[_rust.EXTRA_NAME]
-    token_trees = [child for child in walk(while_node, skip_types=tuple(boundaries)) if child.type == _rust.TOKEN_TREE]
-    return any(_contains_token(tree, _RUST_MACRO_EXIT_TOKENS) for tree in token_trees)
+    macros = [child for child in walk(while_node, skip_types=tuple(boundaries)) if child.type == _rust.MACRO_INVOCATION]
+    return any(_macro_exit_is_attributable(macro) for macro in macros)
+
+
+def _macro_exit_is_attributable(macro: tree_sitter.Node) -> bool:
+    """Return True if *macro*'s body holds an exit keyword that must be the loop's.
+
+    The whole macro invocation is one unit. Judging each ``token_tree`` separately
+    is wrong: a single ``select!`` nests several, so an inner tree holding just the
+    ``break`` looks free of nesting even when the body around it writes a ``for``
+    that would own that ``break``.
+    """
+    if not _contains_token(macro, _RUST_MACRO_EXIT_TOKENS):
+        return False
+    return not _contains_token(macro, _RUST_MACRO_NESTING_TOKENS)
 
 
 def _contains_token(node: tree_sitter.Node, token_types: frozenset[str]) -> bool:

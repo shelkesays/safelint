@@ -111,6 +111,67 @@ def test_rust_return_inside_a_macro_token_tree_counts(tmp_path: Path) -> None:
     assert _safe501_lines(sample) == []
 
 
+_SWITCH_ARM_RETURNS = [
+    ["c", "sw.c", "int f(int x) {\n    for (;;) {\n        switch (x) {\n            case 1: return 1;\n        }\n    }\n}\n"],
+    ["java", "Sw.java", "class C {\n  int f(int x) {\n    while (true) {\n      switch (x) { case 1: return 1; }\n    }\n  }\n}\n"],
+    ["go", "sw.go", "package m\nfunc f(x int) int {\n\tfor {\n\t\tswitch x {\n\t\tcase 1:\n\t\t\treturn 1\n\t\t}\n\t}\n}\n"],
+    ["javascript", "sw.js", "function f(x) {\n  while (true) {\n    switch (x) { case 1: return 1; }\n  }\n}\n"],
+    ["php", "sw.php", "<?php\nfunction f($x) {\n    for (;;) {\n        switch ($x) { case 1: return 1; }\n    }\n}\n"],
+]
+
+
+@pytest.mark.parametrize(["lang", "filename", "source"], _SWITCH_ARM_RETURNS, ids=[case[0] for case in _SWITCH_ARM_RETURNS])
+def test_a_return_in_a_switch_arm_exits_the_loop(tmp_path: Path, lang: str, filename: str, source: str) -> None:
+    """A switch arm stops a ``break``, not a ``return``.
+
+    The first cut reused the break boundaries wholesale, which skipped switch arms
+    and so kept reporting these. Found in review of PR #226.
+    """
+    sample = tmp_path / filename
+    sample.write_text(source, encoding="utf-8")
+    assert _safe501_lines(sample) == [], lang
+
+
+def test_a_break_in_a_switch_arm_is_still_not_a_loop_exit(tmp_path: Path) -> None:
+    """The negative control: a ``break`` there exits the switch, so the loop still reports."""
+    sample = tmp_path / "swbreak.c"
+    sample.write_text(
+        "void f(int x) {\n    for (;;) {\n        switch (x) {\n            case 1: break;\n        }\n    }\n}\n",
+        encoding="utf-8",
+    )
+    assert _safe501_lines(sample) == [2]
+
+
+def _macro_arm(body: str) -> str:
+    """Wrap *body* as the arm of a ``select!`` inside a bare ``loop``."""
+    return f"fn f(rx: R, xs: Vec<u32>) {{\n    loop {{\n        select! {{\n            recv(rx) -> m => {{\n{body}\n            }}\n        }}\n    }}\n}}\n"
+
+
+_MACRO_NESTED_EXITS = [
+    # A token tree has no structure, so a `break` there cannot be told apart from
+    # one belonging to a loop the macro body itself writes.
+    ["nested for owns the break", "mfor.rs", _macro_arm("                for x in xs { break; }")],
+    # Likewise a `return` inside a closure written in the macro body. A
+    # zero-argument closure is a single `||` token, not two `|`.
+    ["zero-arg closure owns the return", "mclos.rs", _macro_arm("                let g = || { return 1; };\n                g();")],
+    ["one-arg closure owns the return", "mclos1.rs", _macro_arm("                let g = |x: u32| { return x; };\n                g(1);")],
+]
+
+
+@pytest.mark.parametrize(["label", "filename", "source"], _MACRO_NESTED_EXITS, ids=[case[0] for case in _MACRO_NESTED_EXITS])
+def test_an_exit_keyword_a_macro_body_may_own_is_not_credited(tmp_path: Path, label: str, filename: str, source: str) -> None:
+    """An exit keyword a nested construct in the macro could own is not the loop's.
+
+    The whole macro invocation is the unit of judgement: one ``select!`` nests
+    several ``token_tree`` nodes, so judging each separately let an inner tree
+    holding just the ``break`` look free of the ``for`` around it. Found in review
+    of PR #226.
+    """
+    sample = tmp_path / filename
+    sample.write_text(source, encoding="utf-8")
+    assert _safe501_lines(sample) == [2], label
+
+
 def test_rust_continue_inside_a_macro_is_not_an_exit(tmp_path: Path) -> None:
     """``continue`` re-enters the loop, so it must not be read as an exit."""
     sample = tmp_path / "cont.rs"
