@@ -507,6 +507,111 @@ def _has_outward_labelled_break(while_node: tree_sitter.Node, lang_name: str) ->
     return False
 
 
+#: The ``return`` node type per language. A ``return`` terminates the enclosing
+#: function and so exits every loop inside it, which makes it an exit from the
+#: loop just as much as a ``break``. Rust names it ``return_expression``;
+#: everywhere else it is ``return_statement``.
+_RETURN_NODE_BY_LANG: dict[str, str] = {
+    "python": _py.RETURN_STATEMENT,
+    "javascript": _js.RETURN_STATEMENT,
+    "typescript": _ts.RETURN_STATEMENT,
+    "java": _java.RETURN_STATEMENT,
+    "rust": _rust.RETURN_EXPRESSION,
+    "go": _go.RETURN_STATEMENT,
+    "php": _php.RETURN_STATEMENT,
+    "c": _c.RETURN_STATEMENT,
+    "cpp": _cpp.RETURN_STATEMENT,
+}
+
+
+def _has_exiting_return(while_node: tree_sitter.Node, lang_name: str) -> bool:
+    """Return True if *while_node*'s body can exit via ``return``.
+
+    The rule searched only for ``break``, so an infinite loop whose exits are
+    ``return`` read as having none. In Rust that is the *more* common shape,
+    because ``?``-propagation forces it - you cannot ``?`` out of a loop with a
+    ``break`` - and on ripgrep it accounted for **7 of 7** SAFE501 findings, the
+    rule's entire output there. The same blind spot was present in all eight
+    languages the rule covers (#170).
+
+    The scope boundaries are the same ones the ``break`` search uses, so a
+    ``return`` inside a nested loop does not clear the outer one. That is
+    deliberate and not merely an analogy with ``break``: the nested loop may run
+    zero times, in which case the ``return`` is never reached and the outer loop
+    really is unbounded::
+
+        loop {
+            for x in items {       // if `items` is empty ...
+                return;            // ... this never runs, and the outer loops forever
+            }
+        }
+
+    A ``return`` inside a nested *function* or closure belongs to that function
+    and is excluded for the same reason it is excluded from the break search.
+    """
+    return_type = _RETURN_NODE_BY_LANG[lang_name]
+    boundaries = _BREAK_SCOPE_BOUNDARIES_BY_LANG.get(lang_name, _FUNCTION_TYPES_BY_LANG.get(lang_name, frozenset()))
+    return any(child.type == return_type for child in walk(while_node, skip_types=tuple(boundaries)))
+
+
+#: Anonymous keyword tokens that mean "this leaves the loop" inside an otherwise
+#: opaque Rust macro body. ``continue`` is absent: it re-enters the loop.
+_RUST_MACRO_EXIT_TOKENS: frozenset[str] = frozenset({"break", "return"})
+
+
+def _rust_macro_body_may_exit(while_node: tree_sitter.Node) -> bool:
+    """Return True if an opaque Rust macro body inside *while_node* can leave the loop.
+
+    tree-sitter parses a macro's arguments as a ``token_tree``, so statements
+    inside are never typed nodes: in ``loop { select! { .. break; .. } }`` the
+    ``break`` exists only as an **anonymous token** and no ``break_expression``
+    appears anywhere in the tree, so a search for one reports "no break" on a loop
+    that plainly has three. Real instance: ty's
+    ``crates/ty_project/src/watch/watcher.rs:44`` (#179).
+
+    The keyword tokens *are* in the tree, just untyped, so this looks for them
+    directly. The issue's own preferred fix was the blunter "a body containing any
+    ``token_tree`` cannot be claimed break-less", which was tried first and is too
+    broad: ``loop { println!("x"); }`` is a genuine infinite loop and would stop
+    being reported, and a ``println!`` inside a loop is ordinary Rust.
+
+    The issue flags the risk that a ``break`` which does not expand to a loop break
+    would match - inside a string, say. It does not: a token tree is still
+    tokenised, so ``println!("break")`` holds a ``string_literal``, not a ``break``
+    keyword token.
+
+    Scanning needs the raw child walk rather than :func:`walk`, which yields named
+    nodes only and is precisely why these tokens were invisible.
+    """
+    boundaries = _BREAK_SCOPE_BOUNDARIES_BY_LANG[_rust.EXTRA_NAME]
+    token_trees = [child for child in walk(while_node, skip_types=tuple(boundaries)) if child.type == _rust.TOKEN_TREE]
+    return any(_contains_token(tree, _RUST_MACRO_EXIT_TOKENS) for tree in token_trees)
+
+
+def _contains_token(node: tree_sitter.Node, token_types: frozenset[str]) -> bool:
+    """Return True if *node*'s subtree holds any of *token_types*, anonymous included."""
+    stack: list[tree_sitter.Node] = [node]
+    while len(stack) > 0:
+        current = stack.pop()
+        if current.type in token_types:
+            return True
+        stack.extend(current.children)
+    return False
+
+
+def _has_non_break_exit(while_node: tree_sitter.Node, lang_name: str) -> bool:
+    """Return True if the loop can leave by something other than a ``break``.
+
+    Two independent reasons, neither of which depends on the per-language break
+    paths: the body can ``return`` (#170), or - in Rust - part of the body is an
+    opaque macro token tree holding a ``break`` / ``return`` keyword token that no
+    typed-node search can see (#179).
+    """
+    if _has_exiting_return(while_node, lang_name):
+        return True
+    return lang_name == _rust.EXTRA_NAME and _rust_macro_body_may_exit(while_node)
+
+
 def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
     """Return True if *while_node*'s body contains a break that exits it.
 
@@ -516,6 +621,12 @@ def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
     whose target is NOT a label defined strictly inside *while_node*
     (see :func:`_has_outward_labelled_break`).
     """
+    # A ``return`` exits the loop in every language the rule covers (#170), and a
+    # Rust macro body is opaque so "no break" cannot be asserted through it
+    # (#179). Both are checked before the per-language break paths because
+    # neither depends on them.
+    if _has_non_break_exit(while_node, lang_name):
+        return True
     if lang_name == "php":
         # PHP uses numeric ``break N`` levels rather than named labels, so a
         # dedicated depth-counting walk replaces both the direct-break and

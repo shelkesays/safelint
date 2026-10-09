@@ -913,6 +913,38 @@ Two cases are flagged:
 1. **Literal-`true` condition with no `break` inside**, applies to both `while True:` (Python) and `while (true)` (JavaScript). Guaranteed infinite loop unless something inside the body breaks out.
 2. **Non-comparison condition**, applies to Python only (`while x:` where `x` isn't a comparison expression). JS idioms like `while (queue.length)` and `while (token)` are commonly bounded, so the heuristic stays Python-only, flagging them on JS files would produce too much noise.
 
+#### What counts as leaving the loop
+
+A `break` is not the only exit, and the rule recognises three others. Each was a measured false-positive source before 2.14.4.
+
+**A `return`.** It ends the enclosing function and so leaves every loop inside it:
+
+```rust
+fn poll(done: bool) -> u32 {
+    loop {
+        if done { return 1; }      // not reported
+    }
+}
+```
+
+In Rust this is the *more* common shape, because `?`-propagation forces it - you cannot `?` out of a loop with a `break` - and on ripgrep it accounted for every SAFE501 finding the rule produced. The gap was present in all eight languages.
+
+A `return` inside a **nested loop** does not clear the outer one. The inner loop may run zero times, in which case the `return` is never reached and the outer loop really is unbounded:
+
+```rust
+loop {
+    for x in items {       // if `items` is empty ...
+        return;            // ... this never runs; the outer loop still reports
+    }
+}
+```
+
+A `return` inside a nested **function or closure** belongs to that function and likewise does not count.
+
+**A `goto` out of the loop (C and C++).** Counted only when the target label sits outside the loop body; a jump to an in-loop label is intra-loop control flow.
+
+**A `break` or `return` inside a Rust macro body.** tree-sitter parses a macro's arguments as an opaque `token_tree`, so statements inside are never typed nodes - in `loop { select! { .. break; .. } }` the `break` exists only as an anonymous token. The rule looks for those keyword tokens directly, so `crossbeam::select!` and `tokio::select!` bodies are read correctly. A macro carrying no exit keyword still reports, so `loop { println!("x"); }` is unaffected, and because a token tree is still tokenised the word `break` inside a string literal does not count.
+
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
