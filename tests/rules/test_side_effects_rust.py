@@ -22,8 +22,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+import pytest
+
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
+from safelint.rules.side_effects import _rust_base_type_name
 
 
 def _engine(overrides: dict | None = None) -> SafetyEngine:
@@ -178,3 +181,226 @@ def test_rust_io_in_nested_closure_does_not_attribute_to_outer(tmp_path: Path) -
     assert len(fired) >= 1, "SAFE304 must fire on the closure body"
     # Outer ``process`` should NOT be in the fired list - the I/O isn't in its body.
     assert all("process" not in v.message or "anonymous" in v.message for v in fired)
+
+
+# ---------------------------------------------------------------------------
+# ``write!`` / ``writeln!`` perform I/O only if their TARGET does (#171).
+# ---------------------------------------------------------------------------
+
+
+def test_rust_write_to_a_formatter_in_fn_fmt_is_not_io(tmp_path: Path) -> None:
+    """``write!(f, ..)`` where ``f`` is a ``Formatter`` performs no I/O.
+
+    This is the only way to implement ``Display``, so reporting it made the rule
+    fire on every formatting impl in the codebase. On ripgrep 16 of 34
+    ``write!`` findings were inside ``fn fmt``.
+    """
+    sample = tmp_path / "disp.rs"
+    sample.write_text(
+        'impl fmt::Display for X {\n    fn fmt(&self, f: &mut fmt::Formatter<\'_>) -> fmt::Result {\n        write!(f, "hello")\n    }\n}\n',
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert _violations(result, "SAFE304") == []
+    assert _violations(result, "SAFE303") == []
+
+
+def test_rust_write_to_a_local_string_buffer_is_not_io(tmp_path: Path) -> None:
+    """``write!(&mut s, ..)`` into a ``String`` is string building, not I/O."""
+    sample = tmp_path / "build.rs"
+    sample.write_text(
+        'fn build() -> String {\n    let mut s = String::new();\n    write!(&mut s, "x").unwrap();\n    s\n}\n',
+        encoding="utf-8",
+    )
+    result = _engine().check_file(str(sample))
+    assert _violations(result, "SAFE304") == []
+
+
+def test_rust_write_to_a_string_parameter_is_not_io(tmp_path: Path) -> None:
+    """A parameter typed ``&mut String`` is a buffer, so writing to it is not I/O."""
+    sample = tmp_path / "param.rs"
+    sample.write_text('fn into(buf: &mut String) {\n    write!(buf, "x").unwrap();\n}\n', encoding="utf-8")
+    assert _violations(_engine().check_file(str(sample)), "SAFE304") == []
+
+
+def test_rust_writeln_to_stdout_still_fires(tmp_path: Path) -> None:
+    """The positive control: a path-expression target is not a known buffer, so it reports.
+
+    Without this the fix could silence every ``write!`` and the tests above would
+    still pass.
+    """
+    sample = tmp_path / "real.rs"
+    sample.write_text('fn emit() {\n    writeln!(std::io::stdout(), "x").unwrap();\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_write_to_an_io_write_parameter_still_fires(tmp_path: Path) -> None:
+    """A parameter typed ``&mut dyn std::io::Write`` is a stream, so it still reports."""
+    sample = tmp_path / "stream.rs"
+    sample.write_text('fn emit(w: &mut dyn std::io::Write) {\n    write!(w, "x").unwrap();\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_write_to_an_unknown_binding_still_fires(tmp_path: Path) -> None:
+    """An unresolved target keeps reporting rather than being silently dropped."""
+    sample = tmp_path / "unknown.rs"
+    sample.write_text('fn q(w: Thing) {\n    write!(w, "x").unwrap();\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_println_is_unaffected_by_the_write_target_check(tmp_path: Path) -> None:
+    """``println!`` has no target argument and must keep reporting."""
+    sample = tmp_path / "p.rs"
+    sample.write_text('fn p() {\n    println!("x");\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+# ---------------------------------------------------------------------------
+# High-collision bare method names left SAFE304's Rust defaults (#178).
+# ---------------------------------------------------------------------------
+
+
+def test_rust_rwlock_read_no_longer_fires_safe304(tmp_path: Path) -> None:
+    """``lock.read()`` is a lock acquisition, not filesystem I/O.
+
+    ``call_name`` discards the receiver, so ``read`` / ``status`` / ``spawn`` /
+    ``output`` / ``recv`` as bare names matched whatever they were called on.
+    They stay in SAFE303's list, where the function name must also signal purity.
+    """
+    sample = tmp_path / "lock.rs"
+    sample.write_text("fn lookup(lock: &RwLock<u32>) -> u32 {\n    *lock.read().unwrap()\n}\n", encoding="utf-8")
+    assert _violations(_engine().check_file(str(sample)), "SAFE304") == []
+
+
+def test_rust_specific_io_spellings_still_fire_safe304(tmp_path: Path) -> None:
+    """``read_to_string`` and friends are unambiguous and keep reporting.
+
+    The enclosing function is named ``contents`` rather than ``load`` on purpose:
+    ``load`` is in ``io_name_keywords``, which exempts the function outright and
+    would make this test pass without exercising the I/O list at all.
+    """
+    sample = tmp_path / "fs.rs"
+    sample.write_text('fn contents() -> String {\n    std::fs::read_to_string("f").unwrap()\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_dropped_names_still_reachable_via_config(tmp_path: Path) -> None:
+    """The names are defaults, not hard-coded: listing one restores the behaviour."""
+    sample = tmp_path / "lock2.rs"
+    sample.write_text("fn lookup(lock: &RwLock<u32>) -> u32 {\n    *lock.read().unwrap()\n}\n", encoding="utf-8")
+    eng = _engine({"rules": {"side_effects": {"io_functions_rust": ["read"]}}})
+    assert len(_violations(eng.check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_write_to_a_custom_string_named_type_still_fires(tmp_path: Path) -> None:
+    """``&mut StringWriter`` is not a ``String``; a substring test would silence it.
+
+    A custom type whose name merely contains ``String`` or ``Formatter`` may well
+    implement ``std::io::Write``. The comparison is against the type's base name.
+    Found in review of PR #223.
+    """
+    sample = tmp_path / "sw.rs"
+    sample.write_text('fn emit(w: &mut StringWriter) {\n    write!(w, "x").unwrap();\n}\n', encoding="utf-8")
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_qualified_formatter_type_is_still_recognised(tmp_path: Path) -> None:
+    """Base-name matching must still see through ``&mut``, a path and generics."""
+    sample = tmp_path / "qual.rs"
+    sample.write_text(
+        'impl D for X {\n    fn fmt(&self, f: &mut fmt::Formatter<\'_>) -> R {\n        write!(f, "x")\n    }\n}\n',
+        encoding="utf-8",
+    )
+    assert _violations(_engine().check_file(str(sample)), "SAFE304") == []
+
+
+def test_rust_domain_formatter_type_is_treated_as_a_formatter(tmp_path: Path) -> None:
+    """``&mut PyFormatter`` is a formatter by convention, so writing to it is not I/O.
+
+    Exact matching on ``Formatter`` alone added 82 findings on Ruff, every one a
+    write to its own ``PyFormatter``. A suffix rule covers the ``XFormatter``
+    convention without the unsoundness of a substring test.
+    """
+    sample = tmp_path / "pyfmt.rs"
+    sample.write_text('fn render(f: &mut PyFormatter) {\n    write!(f, "x").unwrap();\n}\n', encoding="utf-8")
+    assert _violations(_engine().check_file(str(sample)), "SAFE304") == []
+
+
+def test_rust_generic_arguments_with_spaces_do_not_break_type_resolution(tmp_path: Path) -> None:
+    """``TypeWriter<'_, '_, 'db>`` must resolve to ``TypeWriter``, not to a lifetime.
+
+    Taking the last whitespace-separated token before stripping generics picked
+    ``'db>`` out of the parameter list. The type is not a buffer either way, so
+    this asserts the finding survives for the right reason.
+    """
+    sample = tmp_path / "gen.rs"
+    sample.write_text(
+        "fn emit(w: &mut TypeWriter<'_, '_, 'db>) {\n    write!(w, \"x\").unwrap();\n}\n",
+        encoding="utf-8",
+    )
+    assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_string_local_in_a_sibling_block_does_not_cover_an_earlier_write(tmp_path: Path) -> None:
+    """A ``String`` local in another block says nothing about the name at the write site.
+
+    Matching on the name alone let a `let s = String::new()` anywhere in the
+    function silence a genuine write to an `io::Write` parameter also called `s`.
+    Found in review of PR #223.
+    """
+    sample = tmp_path / "sibling.rs"
+    sample.write_text(
+        'fn emit(s: &mut dyn std::io::Write) {\n    write!(s, "x").unwrap();\n    { let s = String::new(); let _ = s; }\n}\n',
+        encoding="utf-8",
+    )
+    assert [v.lineno for v in _violations(_engine().check_file(str(sample)), "SAFE304")] == [2]
+
+
+def test_rust_string_local_declared_after_the_write_does_not_cover_it(tmp_path: Path) -> None:
+    """A binding introduced later cannot describe the target of an earlier write."""
+    sample = tmp_path / "later.rs"
+    sample.write_text(
+        'fn emit(s: &mut dyn std::io::Write) {\n    write!(s, "x").unwrap();\n    let s = String::new();\n    let _ = s;\n}\n',
+        encoding="utf-8",
+    )
+    assert [v.lineno for v in _violations(_engine().check_file(str(sample)), "SAFE304")] == [2]
+
+
+_BASE_TYPE_SHAPES = [
+    ["plain", "String", "String"],
+    ["reference", "&mut String", "String"],
+    ["qualified with a lifetime generic", "&mut fmt::Formatter<'_>", "Formatter"],
+    ["generic with spaces", "&mut TypeWriter<'_, '_, 'db>", "TypeWriter"],
+    ["explicit lifetime before mut", "&'a mut String", "String"],
+    ["trait object", "&mut dyn std::io::Write", "Write"],
+    ["container", "&mut Vec<String>", "Vec"],
+    ["domain formatter", "&mut PyFormatter", "PyFormatter"],
+]
+
+
+@pytest.mark.parametrize(["label", "type_text", "expected"], _BASE_TYPE_SHAPES, ids=[c[0] for c in _BASE_TYPE_SHAPES])
+def test_rust_base_type_name_resolves_every_shape(label: str, type_text: str, expected: str) -> None:
+    """The base-name reduction is the trickiest part of the `write!` target check.
+
+    Generic arguments are stripped first because they may contain whitespace,
+    which would otherwise make the last-token step pick a lifetime out of the
+    parameter list.
+    """
+    assert _rust_base_type_name(type_text) == expected, label
+
+
+def test_rust_a_shadowing_string_binding_is_found(tmp_path: Path) -> None:
+    """The nearest in-scope binding decides, not the first one with a matching name.
+
+    The original loop returned on the FIRST `let` whose pattern matched, so a
+    non-`String` binding earlier in the function stopped the search and a later
+    `let s = String::new()` was never seen. Rewriting it to consider every
+    candidate fixed that; this pins the behaviour, which accounts for one Ruff
+    SAFE304 finding (986 -> 985).
+    """
+    sample = tmp_path / "shadow.rs"
+    sample.write_text(
+        'fn emit() {\n    let s = compute();\n    let s = String::new();\n    write!(&mut s, "x").unwrap();\n}\n',
+        encoding="utf-8",
+    )
+    assert _violations(_engine().check_file(str(sample)), "SAFE304") == []

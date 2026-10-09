@@ -58,6 +58,168 @@ def _io_funcs_for_lang(rule_config: dict, lang_name: str, fallback: list[str]) -
     return frozenset(_validated_string_list(raw, error_key))
 
 
+#: Rust macros whose target decides whether they perform I/O at all. ``write!``
+#: is sugar for ``.write_fmt(..)`` on its first argument, which may implement
+#: ``std::io::Write`` (I/O) or ``std::fmt::Write`` (a string buffer, no I/O).
+_RUST_FMT_MACROS = frozenset({"write", "writeln"})
+
+#: Type base names that prove a ``write!`` target is an in-memory buffer rather
+#: than a stream. Matched EXACTLY: a substring test would read ``StringWriter``
+#: as a ``String`` and silence a real write to an ``io::Write`` impl.
+_RUST_BUFFER_TYPES = frozenset({"String"})
+
+#: Formatter types are matched by SUFFIX instead. ``fmt::Formatter`` is the std
+#: one, but domain formatters follow the ``XFormatter`` convention and are the
+#: same thing semantically - Ruff's ``PyFormatter`` accounts for 82 of its
+#: ``write!`` sites. A suffix rule covers them without the unsoundness of a
+#: substring test, which would also match ``StringWriter``/``FormatterStream``.
+_RUST_FORMATTER_SUFFIX = "Formatter"
+_RUST_STRING_INITIALISERS = ("String::new", "String::with_capacity", "String::from", "format!")
+
+
+def _rust_write_target_is_not_io(macro_node: tree_sitter.Node, func_node: tree_sitter.Node) -> bool:
+    """Return True if a Rust ``write!`` / ``writeln!`` writes somewhere that is not I/O.
+
+    ``write!`` is not an I/O function in Rust. It expands to ``write_fmt`` on its
+    first argument, so whether it touches the outside world depends entirely on
+    that argument's type::
+
+        impl fmt::Display for X {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "hello")          // no I/O - the only way to impl Display
+            }
+        }
+
+        let mut s = String::new();
+        write!(&mut s, "x").unwrap();        // no I/O - string building
+
+        writeln!(std::io::stdout(), "x");    // genuine I/O
+
+    Tree-sitter gives no types, but it does give the first argument, and where that
+    argument is a plain binding its own declaration carries the answer: a parameter
+    typed ``Formatter`` or ``String``, or a local initialised from ``String::new``.
+    Anything else - a path expression, a call, an unknown binding - keeps reporting,
+    so the unresolved case stays a finding rather than being silently dropped.
+
+    On ripgrep ``write!`` / ``writeln!`` were 34 of 83 SAFE304 findings, 16 of them
+    inside ``fn fmt``. See #171.
+    """
+    if _rust_macro_name_text(macro_node) not in _RUST_FMT_MACROS:
+        return False
+    target = _rust_macro_first_argument_name(macro_node)
+    if target is None:
+        return False
+    return _rust_binding_is_non_io_target(func_node, target, macro_node)
+
+
+def _rust_macro_first_argument_name(macro_node: tree_sitter.Node) -> str | None:
+    """Return the first macro argument when it is a plain binding, else None.
+
+    Strips a leading ``&`` / ``&mut`` so ``write!(&mut s, ..)`` resolves to ``s``.
+    Returns None whenever the argument is anything other than a single identifier,
+    which is what keeps ``writeln!(std::io::stdout(), ..)`` reporting.
+    """
+    tokens = next((child for child in macro_node.children if child.type == _rust.TOKEN_TREE), None)
+    if tokens is None:
+        return None  # pragma: no cover - defensive: a macro invocation always has a token tree
+    first: list[tree_sitter.Node] = []
+    for token in tokens.children[1:]:  # skip the opening delimiter
+        if token.type in (",", ")", "]", "}"):
+            break
+        if token.type not in ("&", _rust.MUTABLE_SPECIFIER):
+            first.append(token)
+    if len(first) != 1 or first[0].type != _rust.IDENTIFIER:
+        return None
+    return node_text(first[0])
+
+
+def _rust_binding_is_non_io_target(func_node: tree_sitter.Node, name: str, use_node: tree_sitter.Node) -> bool:
+    """Return True if *name* is a formatter or string buffer in scope at *use_node*."""
+    params = func_node.child_by_field_name("parameters")
+    if params is not None and _rust_parameter_declares_non_io(params, name):
+        return True
+    return _rust_local_is_string_buffer(func_node, name, use_node)
+
+
+def _rust_parameter_declares_non_io(params: tree_sitter.Node, name: str) -> bool:
+    """Return True if a parameter named *name* is typed as a ``Formatter`` or ``String``."""
+    for param in params.named_children:
+        if param.type != _rust.PARAMETER:
+            continue
+        pattern = param.child_by_field_name("pattern")
+        type_node = param.child_by_field_name("type")
+        if pattern is None or type_node is None or node_text(pattern) != name:
+            continue
+        return _rust_type_is_buffer(node_text(type_node))
+    return False
+
+
+def _rust_type_is_buffer(type_text: str) -> bool:
+    """Return True if *type_text* names an in-memory write target, not a stream."""
+    base = _rust_base_type_name(type_text)
+    return base in _RUST_BUFFER_TYPES or base.endswith(_RUST_FORMATTER_SUFFIX)
+
+
+def _rust_base_type_name(type_text: str) -> str:
+    """Reduce a Rust type's source text to its bare base name.
+
+    ``&mut fmt::Formatter<'_>`` -> ``Formatter``; ``&mut String`` -> ``String``;
+    ``&mut dyn std::io::Write`` -> ``Write``; ``&mut StringWriter`` ->
+    ``StringWriter``. References, ``mut`` / ``dyn`` qualifiers, generic arguments
+    and path segments are all stripped so the comparison is exact.
+    """
+    # Generic arguments go FIRST: they can contain whitespace
+    # (``TypeWriter<'_, '_, 'db>``), which would otherwise make the
+    # last-token step pick a lifetime out of the parameter list. What is
+    # left is ``&mut path::Name``, whose base name is the final token's
+    # last path segment.
+    without_generics = type_text.split("<", 1)[0]
+    tokens = without_generics.lstrip("&").split()
+    if not tokens:
+        return ""  # pragma: no cover - defensive: a parameter always has a non-empty type
+    return tokens[-1].rsplit("::", 1)[-1].strip()
+
+
+def _rust_local_is_string_buffer(func_node: tree_sitter.Node, name: str, use_node: tree_sitter.Node) -> bool:
+    """Return True if *name* is a ``String`` local that is in scope at *use_node*.
+
+    Scope is checked, not just the name: a ``let s = String::new()`` in a sibling
+    block, or one declared *after* the write, says nothing about what ``s`` is at
+    the write site, and treating it as a buffer would silence genuine I/O::
+
+        fn emit(s: &mut dyn std::io::Write) {
+            write!(s, "x").unwrap();                 // real I/O - still reported
+            { let s = String::new(); let _ = s; }    // a different `s`
+        }
+    """
+    return any(_rust_let_is_string_buffer_for(node, name, use_node) for node in walk(func_node, skip_types=(_rust.FUNCTION_ITEM,)) if node.type == _rust.LET_DECLARATION)
+
+
+def _rust_let_is_string_buffer_for(let_node: tree_sitter.Node, name: str, use_node: tree_sitter.Node) -> bool:
+    """Return True if *let_node* binds *name* to a ``String`` and covers *use_node*."""
+    pattern = let_node.child_by_field_name("pattern")
+    value = let_node.child_by_field_name("value")
+    if pattern is None or value is None or node_text(pattern) != name:
+        return False
+    if not any(node_text(value).startswith(prefix) for prefix in _RUST_STRING_INITIALISERS):
+        return False
+    return _rust_let_covers(let_node, use_node)
+
+
+def _rust_let_covers(let_node: tree_sitter.Node, use_node: tree_sitter.Node) -> bool:
+    """Return True if *use_node* sits inside *let_node*'s scope.
+
+    That is after the declaration itself (its initialiser runs in the enclosing
+    scope) and before the end of the enclosing block.
+    """
+    cur = let_node.parent
+    while cur is not None:
+        if cur.type == _rust.BLOCK:
+            return let_node.end_byte <= use_node.start_byte < cur.end_byte
+        cur = cur.parent
+    return False  # pragma: no cover - defensive: a `let` always sits inside a block
+
+
 def _first_io_call(func_node: tree_sitter.Node, io_funcs: frozenset[str], function_types: frozenset[str]) -> tree_sitter.Node | None:
     """Return the first I/O call (or Rust I/O macro) inside *func_node*, or None.
 
@@ -72,7 +234,7 @@ def _first_io_call(func_node: tree_sitter.Node, io_funcs: frozenset[str], functi
     are analysed separately.
     """
     return next(
-        (child for child in walk(func_node, skip_types=tuple(function_types)) if _io_call_name(child) in io_funcs),
+        (child for child in walk(func_node, skip_types=tuple(function_types)) if _io_call_name(child) in io_funcs and not _rust_write_target_is_not_io(child, func_node)),
         None,
     )
 

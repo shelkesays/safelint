@@ -351,6 +351,113 @@ def _javascript_global_namespace_root(target: tree_sitter.Node) -> str | None:
     return node_text(cur)
 
 
+def _javascript_name_is_locally_bound(node: tree_sitter.Node, name: str) -> bool:
+    """Return True if *name* is bound by a declaration enclosing *node* (JavaScript).
+
+    Every configured global namespace is also a perfectly ordinary variable name,
+    and a local declaration shadows the global completely::
+
+        function Headers() {
+          const self = this;            // a LOCAL alias for `this`
+          return function set(k, v) {
+            self[k] = v;                // writes to the local, not to the global
+          };
+        }
+
+    That pre-arrow idiom is how JavaScript carried ``this`` into a nested function
+    for years, and it is in Axios three times. The same applies to the rest of the
+    default list: ``name``, ``status``, ``length``, ``top``, ``parent``, ``origin``
+    and ``event`` are browser globals and all plausible locals, especially in
+    server-side code where no browser global exists at all.
+
+    The walk climbs the ancestor chain, so a binding in any enclosing scope counts,
+    including module scope. Only plain-identifier bindings are recognised (a
+    ``const`` / ``let`` / ``var`` declarator, a function parameter, a ``catch``
+    binding); a destructured binding such as ``const { self } = x`` is not. That
+    direction is deliberate: failing to see a binding reports a write that is
+    already reported today, whereas inventing one would silence a genuine global
+    mutation.
+    """
+    cur: tree_sitter.Node | None = node
+    while cur is not None:
+        if _javascript_scope_binds(cur, name):
+            return True
+        cur = cur.parent
+    return False
+
+
+def _javascript_scope_binds(scope: tree_sitter.Node, name: str) -> bool:
+    """Return True if *scope* itself introduces a binding for *name*."""
+    if scope.type == _js.CATCH_CLAUSE:
+        return _javascript_binds_identifier(scope.child_by_field_name("parameter"), name)
+    if scope.type in _js.FUNCTION_TYPES:
+        return _javascript_parameters_bind(scope, name) or _javascript_hoisted_var_binds(scope, name)
+    if scope.type in (_js.STATEMENT_BLOCK, _js.PROGRAM):
+        return _javascript_block_declares(scope, name)
+    return False
+
+
+def _javascript_parameters_bind(func: tree_sitter.Node, name: str) -> bool:
+    """Return True if *func*'s parameter list binds *name*.
+
+    Covers the ``parameters`` list and an arrow function's single unparenthesised
+    ``parameter`` (``self => self.x = 1``), plus the TypeScript
+    ``required_parameter`` / ``optional_parameter`` wrappers, whose own identifier
+    sits under a ``pattern`` field.
+    """
+    for field_name in ("parameters", "parameter"):
+        holder = func.child_by_field_name(field_name)
+        if holder is None:
+            continue
+        if _javascript_binds_identifier(holder, name):
+            return True
+        if any(_javascript_binds_identifier(child, name) for child in holder.named_children):
+            return True
+    return False
+
+
+def _javascript_hoisted_var_binds(func: tree_sitter.Node, name: str) -> bool:
+    """Return True if *func*'s body declares ``var name`` anywhere outside a nested function.
+
+    ``var`` is function-scoped, not block-scoped, so a declaration inside an ``if``
+    or a loop binds the name for the whole function body::
+
+        function f(x) {
+          if (x) { var self = {}; }
+          self.y = 1;                 // the hoisted local, not the global
+        }
+
+    ``let`` / ``const`` are block-scoped and are handled per block by
+    :func:`_javascript_block_declares` instead.
+    """
+    return any(node.type == _js.VARIABLE_DECLARATION and _javascript_declaration_binds(node, name) for node in walk(func, skip_types=tuple(_js.FUNCTION_TYPES)) if node is not func)
+
+
+def _javascript_block_declares(block: tree_sitter.Node, name: str) -> bool:
+    """Return True if *block* has a direct ``const`` / ``let`` / ``var`` binding of *name*."""
+    return any(_javascript_declaration_binds(statement, name) for statement in block.named_children if statement.type in (_js.LEXICAL_DECLARATION, _js.VARIABLE_DECLARATION))
+
+
+def _javascript_declaration_binds(declaration: tree_sitter.Node, name: str) -> bool:
+    """Return True if a single ``const`` / ``let`` / ``var`` declaration binds *name*."""
+    return any(declarator.type == _js.VARIABLE_DECLARATOR and _javascript_binds_identifier(declarator.child_by_field_name("name"), name) for declarator in declaration.named_children)
+
+
+def _javascript_binds_identifier(node: tree_sitter.Node | None, name: str) -> bool:
+    """Return True if *node* is the plain identifier *name*, or a TS parameter wrapping it.
+
+    The TypeScript ``required_parameter`` / ``optional_parameter`` wrappers hold the
+    identifier under a ``pattern`` field, so they are unwrapped first. Iteratively,
+    not recursively - SAFE105 polices this codebase.
+    """
+    cur = node
+    while cur is not None:
+        if cur.type not in (_js.REQUIRED_PARAMETER, _js.OPTIONAL_PARAMETER):
+            break
+        cur = cur.child_by_field_name("pattern")
+    return cur is not None and cur.type == _js.IDENTIFIER and node_text(cur) == name
+
+
 class GlobalStateRule(BaseRule):
     """Reject use of the ``global`` keyword inside functions.
 
@@ -511,6 +618,8 @@ class GlobalMutationRule(BaseRule):
                 continue
             root = _javascript_global_namespace_root(target)
             if root is None or root not in namespaces:
+                continue
+            if _javascript_name_is_locally_bound(node, root):
                 continue
             target_text = node_text(target)
             violations.append(
