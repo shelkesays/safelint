@@ -136,9 +136,25 @@ class BaseRule(ABC):
     language: tuple[str, ...] = ("python",)
 
     def __init__(self, config: dict[str, Any]) -> None:
-        """Bind rule-specific config and resolve severity."""
+        """Bind rule-specific config and resolve severity.
+
+        The fallback is this rule's own ``DEFAULTS`` severity, not a blanket
+        ``"error"``. The blanket default disagreed with every warning-severity
+        rule - SAFE105, SAFE501, SAFE802 and the rest - so a caller who built a
+        rule directly with a partial config got findings marked blocking that the
+        shipped config marks advisory. ``DEFAULTS`` is imported lazily because
+        ``core.config`` must not import ``rules``, whose package ``__init__``
+        pulls in every rule module.
+        """
         self.config = config
-        self.severity: str = config.get("severity", "error")
+        self.severity: str = config.get("severity", self._default_severity())
+
+    @classmethod
+    def _default_severity(cls) -> str:
+        """Return this rule's shipped severity, or ``"error"`` for an unregistered rule."""
+        from safelint.core.config import DEFAULTS  # noqa: PLC0415 - circular avoidance
+
+        return str(DEFAULTS["rules"].get(cls.name, {}).get("severity", "error"))
 
     @abstractmethod
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:

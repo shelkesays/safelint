@@ -490,7 +490,7 @@ DEFAULTS: dict[str, Any] = {
                 # signal of incorrect placement.
                 #
                 # ``read`` / ``status`` / ``spawn`` / ``output`` / ``recv``
-                # joined that SAFE303-only group in 2.14.4. ``call_name``
+                # joined that SAFE303-only group in 2.15.0. ``call_name``
                 # discards the receiver, so as bare method names they match
                 # whatever they are called on, and Rust's standard library
                 # spends these verbs on non-I/O operations that are
@@ -1105,7 +1105,7 @@ DEFAULTS: dict[str, Any] = {
                 "args",
                 # Database raw-SQL (sqlx / diesel / rusqlite / postgres).
                 # The crate-specific spellings only. The bare ``query`` and
-                # ``execute`` were removed in 2.14.4: Rust has no database
+                # ``execute`` were removed in 2.15.0: Rust has no database
                 # API in its standard library, so as barewords they matched
                 # any builder, any LSP snapshot accessor and any closure
                 # parameter named ``query``. Validated on ty and Ruff, 1 of
@@ -1348,25 +1348,45 @@ DEFAULTS: dict[str, Any] = {
         "return_value_ignored": {
             "enabled": False,
             "severity": "warning",
-            # Python defaults - Python file/network/subprocess functions
-            # whose return value carries success/failure info.
+            # Python defaults. Trimmed twice in #156; the list had been
+            # ported from C/POSIX semantics, where checking the return code is
+            # correct and necessary, without adjusting for Python's.
+            #
+            # Removed because they return ``None``, so the rule demanded the
+            # caller check a value that cannot exist: ``remove``, ``unlink``,
+            # ``rename``, ``makedirs``, ``mkdir``, ``rmdir``. Both the ``os.*``
+            # and ``pathlib.Path.*`` forms return ``None``; ``Path.rename``
+            # returns a ``Path``, which nothing acts on. Names are matched with
+            # the receiver discarded, so these also covered ``list.remove`` and
+            # every other method of the name.
+            #
+            # Removed because the value they return is one idiomatic Python
+            # discards: ``write`` (a byte count), ``seek`` (the new position) and
+            # ``truncate``. On Django these were 404 of 614 remaining findings,
+            # far more than the six above (207).
+            #
+            # ``send`` / ``sendfile`` stay: both return a byte count and may
+            # transfer fewer bytes than asked, so the value is worth checking.
+            # ``sendall`` does NOT stay - it returns ``None`` and raises on
+            # error, so it fails the same test as the six above. The earlier
+            # rationale here ("a short send is a real bug, which is why
+            # ``sendall`` exists") argued the opposite of what it concluded:
+            # ``sendall`` exists precisely so the short-write check is
+            # unnecessary. ``run`` /
+            # ``call`` / ``check_output`` stay because ``subprocess.run``
+            # returns a ``CompletedProcess`` whose ``returncode`` matters, though
+            # they carry the highest collision rate - ``asyncio.run(main())`` and
+            # ``app.run(workers=4)`` both match ``run``, which the docs now say.
+            # ``replace`` stays and is deliberately ambiguous: ``str.replace`` and
+            # ``Path.replace`` both return a value worth keeping, ``os.replace``
+            # does not.
             "flagged_calls": [
                 "run",
                 "call",
                 "check_output",
-                "write",
                 "send",
-                "sendall",
                 "sendfile",
-                "seek",
-                "truncate",
-                "remove",
-                "unlink",
-                "rename",
                 "replace",
-                "makedirs",
-                "mkdir",
-                "rmdir",
             ],
             # JavaScript defaults - Node fs / stream / process methods
             # whose return value (or returned promise) carries
@@ -1554,7 +1574,23 @@ DEFAULTS: dict[str, Any] = {
         "null_dereference": {
             "enabled": False,
             "severity": "error",
-            "nullable_methods": [],
+            # Python's nullable methods. These were missing here and lived only
+            # as a ClassVar on the rule, which then OR'd the two - so a user who
+            # set ``nullable_methods`` to narrow the rule still got all nine and
+            # had no way to turn any of them off, unlike every other language,
+            # which replaces. The docs have always documented this list as the
+            # default; ``DEFAULTS`` was the half that disagreed.
+            "nullable_methods": [
+                "get",
+                "pop",
+                "find",
+                "next",
+                "first",
+                "one_or_none",
+                "scalar",
+                "scalar_one_or_none",
+                "fetchone",
+            ],
             # JavaScript's null-or-undefined-returning methods. ``find``
             # / ``pop`` / ``shift`` are Array.prototype; ``get`` is
             # Map.prototype (returns ``undefined`` for missing keys);

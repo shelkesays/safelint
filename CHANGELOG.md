@@ -9,9 +9,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **SAFE802 `return_value_ignored`: the Python `flagged_calls` default is trimmed from sixteen names to seven (#156).** The list had been ported from C/POSIX semantics, where checking the return code is correct and necessary, without adjusting for Python's. Two groups left it.
+
+  Six return `None`, so the rule demanded the caller check a value that cannot exist: `remove`, `unlink`, `rename`, `makedirs`, `mkdir`, `rmdir`. The `os.*` forms all return `None`; the `pathlib` forms return either `None` (`Path.unlink`, `Path.mkdir`, `Path.rmdir`) or a `Path` that nothing acts on (`Path.rename`, `Path.replace`). Because names are matched with the receiver discarded, these also covered `list.remove` and every other method of the name. **This half, and the `os`-name tests covering it, are @Jah-yee's work** (PRs #216 / #227).
+
+  Three return a value idiomatic Python discards: `write` (a byte count), `seek` (the new position) and `truncate`. On Django these were **404 of the 614** findings left after the six above went, so they were the larger half of the problem rather than a tidy-up after it - a correction to this issue's original framing, which identified the `None`-returning names as the main cause.
+
+  What stayed, and why: `send` and `sendfile`, which return a byte count and may transfer fewer bytes than asked; `run` / `call` / `check_output`, because `subprocess.run` returns a `CompletedProcess` whose `returncode` matters; and `replace`, deliberately ambiguous, since `str.replace` and `Path.replace` both return a value worth keeping while `os.replace` does not. **`sendall` went too**: it returns `None` and raises on error, so it fails the same test as the six above - `sendall` exists precisely so the short-write check is unnecessary, which is the opposite of what an earlier draft of this entry concluded from it. The docs now state that matching ignores the receiver, with `asyncio.run()` as the worked example.
+
+  Measured: Django **821 -> 133** (-84%), Rich **57 -> 2**, requests **61 -> 36**. The rule is disabled by default, so no existing user's output moves unless they have opted in. `flagged_calls_c` is unchanged - there the return code genuinely is the point - and every removed name is still reachable by listing it in `flagged_calls`.
+
 - **CI: bump `anthropics/claude-code-action` to v1.0.244** (folded in from the Dependabot PR). Still SHA-pinned. `v1.0.244` is an annotated tag, so the naive ref lookup returns the tag object rather than the commit; the pinned SHA was verified by dereferencing it (`git/tags/<obj>`), and the outgoing `v1.0.237` pin was re-verified the same way to confirm the method. Workflow only - nothing in the published wheel changes.
 
+- **SAFE304 `side_effects`: `read`, `status`, `spawn`, `output` and `recv` are no longer Rust defaults (#178).** Call names are resolved with the receiver discarded - deliberately, so that `fs::read_to_string` and `std::fs::read_to_string` both match one entry - which is right for free functions and wrong for methods. As bare method names these five matched whatever they were called on, and Rust's standard library spends those verbs on non-I/O operations that are pervasive in ordinary code: `RwLock::read` for locks, `mpsc::Receiver::recv` for channels, `tokio::spawn` for tasks, `status` and `output` as accessors on any domain type. `write` is **not** among the five and still fires on `Mutex::write()`: it has to stay for the `write!` macro, whose target is instead checked syntactically (see the SAFE304 entry below). The same caveat applies to `flush`, `connect` and `send_to`, which remain bare names on the list. Confirmed on Ruff at `crates/ruff_db/src/files.rs:520` (a salsa query accessor), `system/memory_fs.rs:104` (`RwLock::read`) and `vendored.rs:93` (a zip-archive wrapper).
+
+  They remain in **SAFE303**'s list, where the enclosing function's own name must also signal purity - the same split Go's list already uses for `Get` / `Post` / `Do` / `Exec` / `Query`. The specific spellings (`read_to_string`, `read_dir`, `write_all`, `read_line`) carry the same coverage without the collisions. Add any of them back via `io_functions_rust`.
+
+- **SAFE801 `tainted_sink`: bare `query` and `execute` are no longer Rust sink defaults (#180).** Rust has no database API in its standard library, so as barewords they matched any builder, any LSP snapshot accessor and any closure parameter of that name. Validating every finding rather than sampling: **1 defensible out of 9** across ty and Ruff, with 30 of Ruff's 55 being `snapshot.query()` on a `DocumentSnapshot`. The crate-specific spellings stay (`query_as`, `query_scalar`, `execute_batch`), as do `arg` / `args` / `open`; list your crate's entry point explicitly if you call raw SQL through a bare `query`.
+
 ### Fixed
+
+- **Rule default lists now have a single owner, so a hand-built config behaves like the shipped one.** Five dataflow rule classes carried `ClassVar` copies of their `DEFAULTS` entries, consulted when a caller constructs a rule directly with a config that omits the key. Being second copies they drifted, in both directions:
+  - `flagged_calls` kept the pre-#156 sixteen names, so such a caller still had `os.remove()` and `f.write()` flagged after the default was trimmed;
+  - `nullable_methods` had **never** matched `DEFAULTS`, which held an empty list while the copy held the nine names the docs have always documented - and the Python branch OR'd the two, so setting `nullable_methods` to narrow SAFE803 produced all nine regardless and there was no way to drop one. Every other language replaces; Python now does too;
+  - `sinks` / `sanitizers` / `sources` agreed with `DEFAULTS` but were still duplicated, and spelled `subprocess.call` as the Tree-sitter *node-type* constant `_py.CALL`, which equals the function name only by coincidence.
+
+  All five copies are deleted. The fallback is read from `DEFAULTS` through one accessor, which also gives every language the documented default rather than `[]` - the fallback had been Python-only, so a library caller linting Rust, Go, Java, PHP, C or C++ with a partial config received a silent clean bill of health. A drift test was written first and then removed as unnecessary: there is nothing left to drift.
+
+- **SAFE802: a scalar `flagged_calls` now raises instead of matching single characters (Python).** Python was the one language whose list bypassed `_validated_string_list`, so `flagged_calls = "remove"` became `{'r','e','m','o','v'}` - `os.remove(...)` stopped firing and an unrelated `r()` started. The other languages have rejected this since the JS-family sites were converted; the Python site and the Python `nullable_methods` site were never converted. Both now raise `ConfigValueError` like the rest. This mattered more than usual because #156's own guidance tells users to edit that key.
+
+- **A rule built with a partial config no longer reports warning-severity findings as blocking.** `BaseRule.__init__` fell back to a blanket `"error"`, which disagreed with every warning-severity rule - SAFE105, SAFE501, SAFE802 and the rest - so a direct library caller got findings marked blocking that the shipped config marks advisory. The fallback is now the rule's own `DEFAULTS` severity.
 
 - **SAFE501 `unbounded_loops`: a `return` is an exit, in all eight languages (#170).** The rule searched only for `break`, so an infinite loop whose exits are `return` read as having none:
 
@@ -83,16 +110,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Measured: Guava **1121 -> 956**, Chart.js **62 -> 44**, ripgrep **83 -> 70**, Axios **49 -> 39**, Zod **91 -> 82**, Express **5 -> 4**; 216 findings in total. fzf, Cobra and Spring PetClinic are unchanged - Go style reaches for `switch` rather than long `else if` chains, so the fix is a no-op on those two despite Go being affected in principle.
 
-### Changed
-
-- **SAFE304 `side_effects`: `read`, `status`, `spawn`, `output` and `recv` are no longer Rust defaults (#178).** Call names are resolved with the receiver discarded - deliberately, so that `fs::read_to_string` and `std::fs::read_to_string` both match one entry - which is right for free functions and wrong for methods. As bare method names these five matched whatever they were called on, and Rust's standard library spends those verbs on non-I/O operations that are pervasive in ordinary code: `RwLock::read` for locks, `mpsc::Receiver::recv` for channels, `tokio::spawn` for tasks, `status` and `output` as accessors on any domain type. `write` is **not** among the five and still fires on `Mutex::write()`: it has to stay for the `write!` macro, whose target is instead checked syntactically (see the SAFE304 entry below). The same caveat applies to `flush`, `connect` and `send_to`, which remain bare names on the list. Confirmed on Ruff at `crates/ruff_db/src/files.rs:520` (a salsa query accessor), `system/memory_fs.rs:104` (`RwLock::read`) and `vendored.rs:93` (a zip-archive wrapper).
-
-  They remain in **SAFE303**'s list, where the enclosing function's own name must also signal purity - the same split Go's list already uses for `Get` / `Post` / `Do` / `Exec` / `Query`. The specific spellings (`read_to_string`, `read_dir`, `write_all`, `read_line`) carry the same coverage without the collisions. Add any of them back via `io_functions_rust`.
-
-- **SAFE801 `tainted_sink`: bare `query` and `execute` are no longer Rust sink defaults (#180).** Rust has no database API in its standard library, so as barewords they matched any builder, any LSP snapshot accessor and any closure parameter of that name. Validating every finding rather than sampling: **1 defensible out of 9** across ty and Ruff, with 30 of Ruff's 55 being `snapshot.query()` on a `DocumentSnapshot`. The crate-specific spellings stay (`query_as`, `query_scalar`, `execute_batch`), as do `arg` / `args` / `open`; list your crate's entry point explicitly if you call raw SQL through a bare `query`.
-
-### Fixed
-
 - **SAFE302 `global_mutation` no longer reports a write to a local that shadows a browser global (JavaScript) (#202).** Every configured global namespace is also an ordinary variable name, and a local declaration shadows the global completely. The pre-arrow idiom for carrying `this` into a nested function was therefore reported as mutating a global:
 
   ```javascript
@@ -133,7 +150,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   Scope is honoured on both sides, because a name-only check hides real findings: a `let` binds from the **end** of its declaration (so in `let query = query(user_input)` the right-hand call is still the free function, its initialiser running in the enclosing scope) to the end of its enclosing block (so a closure in an already-closed block cannot silence a later call). The same discipline applies to the `write!` target check above: a `let s = String::new()` in a sibling block, or one declared after the write, no longer describes the target. Ruff **72 -> 37** SAFE801 findings.
 
-
 - **SAFE105 `no_recursion` no longer asserts recursion it cannot prove (Java).** A same-arity call to an **overloaded** method name may reach a sibling overload rather than recursing, and choosing between them needs the declared types of the arguments, which means a classpath. Such findings now carry a message that says the target is unresolvable instead of stating outright that the method calls itself:
 
   ```
@@ -147,8 +163,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Dropping the hedged ones instead was considered and rejected: genuine recursion passes plain identifiers and so carries none of the signals below, so suppressing on name ambiguity alone would have silenced real recursion in Commons Lang's `ClassUtils.getAllInterfaces` and `walkInterfaces` and in Guava's `AbstractIteratorTester.recurse`. The code and severity are unchanged, so no config or CI gate moves; only the message text differs, and only for Java.
 
   Known limit: only declarations on the enclosing type are visible, so an unhedged message means "no rival **in this type**", not "no rival anywhere" - a same-named method inherited from a superclass can also win resolution. Seeing that needs the supertype's source.
-
-### Fixed
 
 - **SAFE105 `no_recursion`: two more Java shapes that are not self-calls (#153).** Each is a fact about overload resolution that the source text settles on its own, so neither can hide genuine recursion. Together they take Commons Lang **279 -> 224** and Guava **477 -> 475**; ripgrep (23) and Ruff (612) are unaffected, having no Java.
   - **An argument cast to `Object` where the parameter is not `Object`.** `remove((Object) array, index)` inside `remove(boolean[] array, int index)`: `Object` is not assignable to `boolean[]`. Only this direction is decidable without a type hierarchy, since a cast to a *subtype* of the parameter type is still applicable; a parameter declared as a type variable is also exempt, because `<T> T f(T a)` really does accept `f((Object) a)` with `T` inferred as `Object`. `java.lang.Object` and `Object` are recognised as the same type, so the fully-qualified spelling does not read as a mismatch.

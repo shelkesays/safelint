@@ -197,3 +197,31 @@ def resolve_lang_config_lookup(
         if fallback_key in rule_config:
             return rule_config[fallback_key], fallback_key
     return default, primary_key
+
+
+def rule_default_list(rule_name: str, base_key: str, lang_name: str) -> list[str]:
+    """Return the DEFAULTS list a rule should fall back to for *base_key* and *lang_name*.
+
+    Exists so a default list has exactly ONE definition. The dataflow rule classes
+    used to carry ``ClassVar`` copies of their ``DEFAULTS`` entries, which drifted
+    silently and in two directions: ``flagged_calls`` kept nine names after the
+    default was trimmed, so a caller with a partial config still had ``os.remove``
+    flagged; and ``nullable_methods`` had never matched ``DEFAULTS`` at all, which
+    was empty while the copy held nine names.
+
+    Falls back to the bare key when no per-language one exists, which is how Python
+    is spelled (``flagged_calls`` rather than ``flagged_calls_python``).
+
+    ``DEFAULTS`` is imported lazily: ``core.config`` must not import ``rules``,
+    whose package ``__init__`` pulls in every rule module, so the dependency cannot
+    be module-level in either direction. The codebase already uses this pattern for
+    the same reason.
+    """
+    from safelint.core.config import DEFAULTS  # noqa: PLC0415 - circular avoidance
+
+    rule_defaults = DEFAULTS["rules"].get(rule_name, {})
+    key = resolve_lang_config_key(base_key, lang_name)
+    value = rule_defaults.get(key)
+    if value is None:
+        value = rule_defaults.get(base_key, [])
+    return list(value) if isinstance(value, list) else []
