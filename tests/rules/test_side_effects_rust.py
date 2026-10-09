@@ -387,3 +387,20 @@ def test_rust_base_type_name_resolves_every_shape(label: str, type_text: str, ex
     parameter list.
     """
     assert _rust_base_type_name(type_text) == expected, label
+
+
+def test_rust_a_shadowing_string_binding_is_found(tmp_path: Path) -> None:
+    """The nearest in-scope binding decides, not the first one with a matching name.
+
+    The original loop returned on the FIRST `let` whose pattern matched, so a
+    non-`String` binding earlier in the function stopped the search and a later
+    `let s = String::new()` was never seen. Rewriting it to consider every
+    candidate fixed that; this pins the behaviour, which accounts for one Ruff
+    SAFE304 finding (986 -> 985).
+    """
+    sample = tmp_path / "shadow.rs"
+    sample.write_text(
+        'fn emit() {\n    let s = compute();\n    let s = String::new();\n    write!(&mut s, "x").unwrap();\n}\n',
+        encoding="utf-8",
+    )
+    assert _violations(_engine().check_file(str(sample)), "SAFE304") == []
