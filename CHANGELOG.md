@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **CI: bump `anthropics/claude-code-action` to v1.0.244** (folded in from the Dependabot PR). Still SHA-pinned. `v1.0.244` is an annotated tag, so the naive ref lookup returns the tag object rather than the commit; the pinned SHA was verified by dereferencing it (`git/tags/<obj>`), and the outgoing `v1.0.237` pin was re-verified the same way to confirm the method. Workflow only - nothing in the published wheel changes.
+
 ### Fixed
 
 - **SAFE102 `nesting_depth`: an `else if` chain is no longer counted as nesting (#154).** A flat `if / else if / else if` chain branches once, but each continuation was counted as a further level, so a chain of N was over-counted by N-1:
