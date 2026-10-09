@@ -13,6 +13,46 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SAFE501 `unbounded_loops`: a `return` is an exit, in all eight languages (#170).** The rule searched only for `break`, so an infinite loop whose exits are `return` read as having none:
+
+  ```rust
+  fn poll(done: bool) -> u32 {
+      loop {
+          if done { return 1; }      // was: "loop has no break - potential infinite loop"
+      }
+  }
+  ```
+
+  A `return` ends the enclosing function and so leaves every loop inside it. In Rust it is the *more* common exit, because `?`-propagation forces it - you cannot `?` out of a loop with a `break` - and on ripgrep it accounted for **7 of 7** findings, the rule's entire output there. The issue reported Rust; the blind spot was in all eight languages the rule covers, confirmed by running the same shape through each.
+
+  A `return` inside a **nested loop** deliberately does not clear the outer one: the inner loop may run zero times, in which case the `return` is never reached and the outer loop really is unbounded. A `return` inside a nested function or closure belongs to that function and likewise does not count. Both are pinned by tests.
+
+- **SAFE501 `unbounded_loops`: a `break` or `return` inside a Rust macro body is now seen (#179).** tree-sitter parses a macro's arguments as an opaque `token_tree`, so statements inside are never typed nodes - in `loop { select! { .. break; .. } }` the `break` exists only as an **anonymous token** and no `break_expression` appears in the tree at all. Real instance: ty's `crates/ty_project/src/watch/watcher.rs:44`, a `loop` with three literal `break;` statements reported as having none.
+
+  The keyword tokens are present, just untyped, so the rule now looks for them directly. The issue's own preferred fix was the blunter "a body containing any `token_tree` cannot be claimed break-less"; that was implemented first and measured too broad - `loop { println!("x"); }` is a genuine infinite loop and stopped being reported, and a `println!` inside a loop is ordinary Rust. A macro carrying no exit keyword therefore still reports, and because a token tree is still tokenised, the word `break` inside a string literal does not count. `continue` is excluded: it re-enters the loop.
+
+  Both fixes are needed for that ty file, as the issue notes - its exit is a `return` *and* it sits inside the token tree.
+
+  Measured together:
+
+  A switch arm stops a ``break`` but not a ``return``, so the ``return`` search uses the break boundaries **minus** the switch-like nodes. Reusing them wholesale kept reporting `for (;;) { switch (x) { case 1: return 1; } }` - the classic state-machine loop, and common enough that discounting switch arms is what takes Guava, fzf and LevelDB to zero.
+
+  Inside a macro body an exit keyword is credited only when the same body writes no nested loop and no closure. A ``token_tree`` has no structure to walk, so a ``break`` there cannot be told apart from one belonging to a ``for`` the macro itself writes, nor a ``return`` from one inside a closure. The unit of judgement is the whole macro invocation, not each token tree: one `select!` nests several, so judging them separately let an inner tree holding just the ``break`` look free of the ``for`` around it.
+
+  | project | before | after |
+  | --- | --- | --- |
+  | Guava | 126 | **0** |
+  | Ruff | 174 | **134** |
+  | Django | 71 | **60** |
+  | fzf | 12 | **0** |
+  | Rich | 29 | **26** |
+  | curl | 9 | **5** |
+  | ripgrep | 7 | **0** |
+  | LevelDB | 3 | **0** |
+  | requests, Cobra, Axios | 2, 0, 0 | unchanged |
+
+  333 findings removed. ripgrep reaching zero is #170's own Verify condition.
+
 - **SAFE105 `no_recursion`: a Rust `use` now binds only what it imports, not the segments of its path.** The resolver swept every identifier under the declaration, so a path segment read as a bound name and silenced genuine recursion in a function called after it:
 
   ```rust

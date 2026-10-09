@@ -507,6 +507,171 @@ def _has_outward_labelled_break(while_node: tree_sitter.Node, lang_name: str) ->
     return False
 
 
+#: The ``return`` node type per language. A ``return`` terminates the enclosing
+#: function and so exits every loop inside it, which makes it an exit from the
+#: loop just as much as a ``break``. Rust names it ``return_expression``;
+#: everywhere else it is ``return_statement``.
+_RETURN_NODE_BY_LANG: dict[str, str] = {
+    "python": _py.RETURN_STATEMENT,
+    "javascript": _js.RETURN_STATEMENT,
+    "typescript": _ts.RETURN_STATEMENT,
+    "java": _java.RETURN_STATEMENT,
+    "rust": _rust.RETURN_EXPRESSION,
+    "go": _go.RETURN_STATEMENT,
+    "php": _php.RETURN_STATEMENT,
+    "c": _c.RETURN_STATEMENT,
+    "cpp": _cpp.RETURN_STATEMENT,
+}
+
+
+def _has_exiting_return(while_node: tree_sitter.Node, lang_name: str) -> bool:
+    """Return True if *while_node*'s body can exit via ``return``.
+
+    The rule searched only for ``break``, so an infinite loop whose exits are
+    ``return`` read as having none. In Rust that is the *more* common shape,
+    because ``?``-propagation forces it - you cannot ``?`` out of a loop with a
+    ``break`` - and on ripgrep it accounted for **7 of 7** SAFE501 findings, the
+    rule's entire output there. The same blind spot was present in all eight
+    languages the rule covers (#170).
+
+    The scope boundaries are the same ones the ``break`` search uses, so a
+    ``return`` inside a nested loop does not clear the outer one. That is
+    deliberate and not merely an analogy with ``break``: the nested loop may run
+    zero times, in which case the ``return`` is never reached and the outer loop
+    really is unbounded::
+
+        loop {
+            for x in items {       // if `items` is empty ...
+                return;            // ... this never runs, and the outer loops forever
+            }
+        }
+
+    A ``return`` inside a nested *function* or closure belongs to that function
+    and is excluded for the same reason it is excluded from the break search.
+    """
+    return_type = _RETURN_NODE_BY_LANG[lang_name]
+    return any(child.type == return_type for child in walk(while_node, skip_types=_return_scope_boundaries(lang_name)))
+
+
+#: Nodes that stop a ``break`` but NOT a ``return``. A ``break`` in a switch arm
+#: exits the switch, which is why these are break boundaries; a ``return`` there
+#: still returns from the function and so leaves the loop. Reusing the break set
+#: wholesale therefore skipped switch arms and kept reporting
+#: ``for (;;) { switch (x) { case 1: return 1; } }``.
+_SWITCH_LIKE_BY_LANG: dict[str, tuple[str, ...]] = {
+    "javascript": (_js.SWITCH_STATEMENT,),
+    "typescript": (_js.SWITCH_STATEMENT,),
+    "java": (_java.SWITCH_EXPRESSION,),
+    "go": (_go.EXPRESSION_SWITCH_STATEMENT, _go.TYPE_SWITCH_STATEMENT, _go.SELECT_STATEMENT),
+    "c": (_c.SWITCH_STATEMENT,),
+    "cpp": (_cpp.SWITCH_STATEMENT,),
+}
+
+
+def _return_scope_boundaries(lang_name: str) -> tuple[str, ...]:
+    """Return the nodes a ``return`` search must not descend into.
+
+    The break boundaries minus the switch-like ones: a nested loop still bounds a
+    ``return`` (it may run zero times, so the ``return`` is not guaranteed), and a
+    nested function or closure owns its own ``return``, but a switch arm does not
+    stop a ``return`` from leaving the enclosing function.
+
+    Rust and Python need no subtraction - Rust's ``match`` was never a break
+    boundary and Python has no switch in the set.
+    """
+    breaks = _BREAK_SCOPE_BOUNDARIES_BY_LANG.get(lang_name)
+    if breaks is None:
+        return tuple(_FUNCTION_TYPES_BY_LANG.get(lang_name, frozenset()))
+    switch_like = frozenset(_SWITCH_LIKE_BY_LANG.get(lang_name, ()))
+    return tuple(node_type for node_type in breaks if node_type not in switch_like)
+
+
+#: Anonymous keyword tokens that mean "this leaves the loop" inside an otherwise
+#: opaque Rust macro body. ``continue`` is absent: it re-enters the loop.
+_RUST_MACRO_EXIT_TOKENS: frozenset[str] = frozenset({"break", "return"})
+
+#: Tokens whose presence makes an exit keyword in the same macro body
+#: unattributable. Inside a ``token_tree`` there is no structure to walk, so a
+#: ``break`` cannot be told apart from one belonging to a nested loop written in
+#: the macro, nor a ``return`` from one inside a closure there. When any of these
+#: appears the exit keyword is not credited and the loop reports as before.
+_RUST_MACRO_NESTING_TOKENS: frozenset[str] = frozenset({"loop", "while", "for", "|", "||", "move"})
+
+
+def _rust_macro_body_may_exit(while_node: tree_sitter.Node) -> bool:
+    """Return True if an opaque Rust macro body inside *while_node* can leave the loop.
+
+    tree-sitter parses a macro's arguments as a ``token_tree``, so statements
+    inside are never typed nodes: in ``loop { select! { .. break; .. } }`` the
+    ``break`` exists only as an **anonymous token** and no ``break_expression``
+    appears anywhere in the tree, so a search for one reports "no break" on a loop
+    that plainly has three. Real instance: ty's
+    ``crates/ty_project/src/watch/watcher.rs:44`` (#179).
+
+    The keyword tokens *are* in the tree, just untyped, so this looks for them
+    directly. The issue's own preferred fix was the blunter "a body containing any
+    ``token_tree`` cannot be claimed break-less", which was tried first and is too
+    broad: ``loop { println!("x"); }`` is a genuine infinite loop and would stop
+    being reported, and a ``println!`` inside a loop is ordinary Rust.
+
+    The issue flags the risk that a ``break`` which does not expand to a loop break
+    would match - inside a string, say. It does not: a token tree is still
+    tokenised, so ``println!("break")`` holds a ``string_literal``, not a ``break``
+    keyword token.
+
+    Scanning needs the raw child walk rather than :func:`walk`, which yields named
+    nodes only and is precisely why these tokens were invisible.
+
+    A token tree has no structure to walk, so an exit keyword in one cannot be
+    attributed when the same body also writes a nested loop or a closure - the
+    ``break`` may belong to that ``for``, and the ``return`` to that closure.
+    :data:`_RUST_MACRO_NESTING_TOKENS` detects those and withholds the credit, so
+    such a loop reports exactly as it did before. That keeps the fix to macro
+    bodies whose exit really is the outer loop's, which is the shape the issue
+    reports.
+    """
+    boundaries = _BREAK_SCOPE_BOUNDARIES_BY_LANG[_rust.EXTRA_NAME]
+    macros = [child for child in walk(while_node, skip_types=tuple(boundaries)) if child.type == _rust.MACRO_INVOCATION]
+    return any(_macro_exit_is_attributable(macro) for macro in macros)
+
+
+def _macro_exit_is_attributable(macro: tree_sitter.Node) -> bool:
+    """Return True if *macro*'s body holds an exit keyword that must be the loop's.
+
+    The whole macro invocation is one unit. Judging each ``token_tree`` separately
+    is wrong: a single ``select!`` nests several, so an inner tree holding just the
+    ``break`` looks free of nesting even when the body around it writes a ``for``
+    that would own that ``break``.
+    """
+    if not _contains_token(macro, _RUST_MACRO_EXIT_TOKENS):
+        return False
+    return not _contains_token(macro, _RUST_MACRO_NESTING_TOKENS)
+
+
+def _contains_token(node: tree_sitter.Node, token_types: frozenset[str]) -> bool:
+    """Return True if *node*'s subtree holds any of *token_types*, anonymous included."""
+    stack: list[tree_sitter.Node] = [node]
+    while len(stack) > 0:
+        current = stack.pop()
+        if current.type in token_types:
+            return True
+        stack.extend(current.children)
+    return False
+
+
+def _has_non_break_exit(while_node: tree_sitter.Node, lang_name: str) -> bool:
+    """Return True if the loop can leave by something other than a ``break``.
+
+    Two independent reasons, neither of which depends on the per-language break
+    paths: the body can ``return`` (#170), or - in Rust - part of the body is an
+    opaque macro token tree holding a ``break`` / ``return`` keyword token that no
+    typed-node search can see (#179).
+    """
+    if _has_exiting_return(while_node, lang_name):
+        return True
+    return lang_name == _rust.EXTRA_NAME and _rust_macro_body_may_exit(while_node)
+
+
 def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
     """Return True if *while_node*'s body contains a break that exits it.
 
@@ -516,6 +681,12 @@ def _has_exiting_break(while_node: tree_sitter.Node, lang_name: str) -> bool:
     whose target is NOT a label defined strictly inside *while_node*
     (see :func:`_has_outward_labelled_break`).
     """
+    # A ``return`` exits the loop in every language the rule covers (#170), and a
+    # Rust macro body is opaque so "no break" cannot be asserted through it
+    # (#179). Both are checked before the per-language break paths because
+    # neither depends on them.
+    if _has_non_break_exit(while_node, lang_name):
+        return True
     if lang_name == "php":
         # PHP uses numeric ``break N`` levels rather than named labels, so a
         # dedicated depth-counting walk replaces both the direct-break and
