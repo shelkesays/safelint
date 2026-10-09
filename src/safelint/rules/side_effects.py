@@ -109,7 +109,7 @@ def _rust_write_target_is_not_io(macro_node: tree_sitter.Node, func_node: tree_s
     target = _rust_macro_first_argument_name(macro_node)
     if target is None:
         return False
-    return _rust_binding_is_non_io_target(func_node, target)
+    return _rust_binding_is_non_io_target(func_node, target, macro_node)
 
 
 def _rust_macro_first_argument_name(macro_node: tree_sitter.Node) -> str | None:
@@ -133,12 +133,12 @@ def _rust_macro_first_argument_name(macro_node: tree_sitter.Node) -> str | None:
     return node_text(first[0])
 
 
-def _rust_binding_is_non_io_target(func_node: tree_sitter.Node, name: str) -> bool:
-    """Return True if *name* is declared in *func_node* as a formatter or a string."""
+def _rust_binding_is_non_io_target(func_node: tree_sitter.Node, name: str, use_node: tree_sitter.Node) -> bool:
+    """Return True if *name* is a formatter or string buffer in scope at *use_node*."""
     params = func_node.child_by_field_name("parameters")
     if params is not None and _rust_parameter_declares_non_io(params, name):
         return True
-    return _rust_local_is_string_buffer(func_node, name)
+    return _rust_local_is_string_buffer(func_node, name, use_node)
 
 
 def _rust_parameter_declares_non_io(params: tree_sitter.Node, name: str) -> bool:
@@ -176,22 +176,48 @@ def _rust_base_type_name(type_text: str) -> str:
     without_generics = type_text.split("<", 1)[0]
     tokens = without_generics.lstrip("&").split()
     if not tokens:
-        return ""
+        return ""  # pragma: no cover - defensive: a parameter always has a non-empty type
     return tokens[-1].rsplit("::", 1)[-1].strip()
 
 
-def _rust_local_is_string_buffer(func_node: tree_sitter.Node, name: str) -> bool:
-    """Return True if *name* is a local initialised from a ``String`` constructor."""
-    for node in walk(func_node, skip_types=(_rust.FUNCTION_ITEM,)):
-        if node.type != _rust.LET_DECLARATION:
-            continue
-        pattern = node.child_by_field_name("pattern")
-        value = node.child_by_field_name("value")
-        if pattern is None or value is None or node_text(pattern) != name:
-            continue
-        initialiser = node_text(value)
-        return any(initialiser.startswith(prefix) for prefix in _RUST_STRING_INITIALISERS)
-    return False
+def _rust_local_is_string_buffer(func_node: tree_sitter.Node, name: str, use_node: tree_sitter.Node) -> bool:
+    """Return True if *name* is a ``String`` local that is in scope at *use_node*.
+
+    Scope is checked, not just the name: a ``let s = String::new()`` in a sibling
+    block, or one declared *after* the write, says nothing about what ``s`` is at
+    the write site, and treating it as a buffer would silence genuine I/O::
+
+        fn emit(s: &mut dyn std::io::Write) {
+            write!(s, "x").unwrap();                 // real I/O - still reported
+            { let s = String::new(); let _ = s; }    // a different `s`
+        }
+    """
+    return any(_rust_let_is_string_buffer_for(node, name, use_node) for node in walk(func_node, skip_types=(_rust.FUNCTION_ITEM,)) if node.type == _rust.LET_DECLARATION)
+
+
+def _rust_let_is_string_buffer_for(let_node: tree_sitter.Node, name: str, use_node: tree_sitter.Node) -> bool:
+    """Return True if *let_node* binds *name* to a ``String`` and covers *use_node*."""
+    pattern = let_node.child_by_field_name("pattern")
+    value = let_node.child_by_field_name("value")
+    if pattern is None or value is None or node_text(pattern) != name:
+        return False
+    if not any(node_text(value).startswith(prefix) for prefix in _RUST_STRING_INITIALISERS):
+        return False
+    return _rust_let_covers(let_node, use_node)
+
+
+def _rust_let_covers(let_node: tree_sitter.Node, use_node: tree_sitter.Node) -> bool:
+    """Return True if *use_node* sits inside *let_node*'s scope.
+
+    That is after the declaration itself (its initialiser runs in the enclosing
+    scope) and before the end of the enclosing block.
+    """
+    cur = let_node.parent
+    while cur is not None:
+        if cur.type == _rust.BLOCK:
+            return let_node.end_byte <= use_node.start_byte < cur.end_byte
+        cur = cur.parent
+    return False  # pragma: no cover - defensive: a `let` always sits inside a block
 
 
 def _first_io_call(func_node: tree_sitter.Node, io_funcs: frozenset[str], function_types: frozenset[str]) -> tree_sitter.Node | None:

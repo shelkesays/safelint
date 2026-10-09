@@ -89,17 +89,21 @@ _ASSIGNMENT_SHAPES = AssignmentShapes(
 def _rust_binding_scope(let_node: tree_sitter.Node) -> tuple[int, int] | None:
     """Return the byte span of the block a Rust ``let`` binds its names in.
 
-    A ``let`` is in scope from its own position to the end of the enclosing block,
-    so the span starts at the declaration rather than at the block's opening brace:
-    a call to the same name *before* the ``let`` refers to whatever was in scope
-    then, not to this binding.
+    The span runs from the **end** of the declaration to the end of the enclosing
+    block. Both bounds matter:
+
+    * starting after the declaration excludes the ``let``'s own initialiser, which
+      runs in the *enclosing* scope - in ``let query = query(user_input);`` the
+      right-hand call is the free function, not the binding being created. This is
+      the same reasoning SAFE110's ``_closure_shadows_from`` already applies.
+    * ending at the block excludes anything after the binding goes out of scope.
     """
     cur = let_node.parent
     while cur is not None:
         if cur.type == _rust.BLOCK:
-            return (let_node.start_byte, cur.end_byte)
+            return (let_node.end_byte, cur.end_byte)
         cur = cur.parent
-    return None
+    return None  # pragma: no cover - defensive: a `let` always sits inside a block
 
 
 class RustTaintTracker:

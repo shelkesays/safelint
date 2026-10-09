@@ -53,7 +53,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   }
   ```
 
-  The guard is independent of the defaults change above and holds even when `query` is explicitly configured, which is the only way a bare identifier callee reaches the sink list now. Only a bare identifier callee is considered: a method or path call (`conn.query(..)`, `sqlx::query(..)`) cannot name a local. Ruff **72 -> 37** SAFE801 findings.
+  The guard is independent of the defaults change above and holds even when `query` is explicitly configured, which is the only way a bare identifier callee reaches the sink list now. Only a bare identifier callee is considered: a method or path call (`conn.query(..)`, `sqlx::query(..)`) cannot name a local.
+
+  Scope is honoured on both sides, because a name-only check hides real findings: a `let` binds from the **end** of its declaration (so in `let query = query(user_input)` the right-hand call is still the free function, its initialiser running in the enclosing scope) to the end of its enclosing block (so a closure in an already-closed block cannot silence a later call). The same discipline applies to the `write!` target check above: a `let s = String::new()` in a sibling block, or one declared after the write, no longer describes the target. Ruff **72 -> 37** SAFE801 findings.
 
 
 - **SAFE105 `no_recursion` no longer asserts recursion it cannot prove (Java).** A same-arity call to an **overloaded** method name may reach a sibling overload rather than recursing, and choosing between them needs the declared types of the arguments, which means a classpath. Such findings now carry a message that says the target is unresolvable instead of stating outright that the method calls itself:

@@ -807,3 +807,18 @@ def test_rust_a_call_before_the_let_is_not_silenced(tmp_path: Path) -> None:
     )
     eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["query"]}}})
     assert [v.lineno for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"] == [2]
+
+
+def test_rust_a_lets_own_initialiser_is_not_covered_by_its_binding(tmp_path: Path) -> None:
+    """In ``let query = query(user)`` the right-hand call is the FREE function.
+
+    A ``let``'s initialiser runs in the enclosing scope, before the binding
+    exists, so the scope span must start at the end of the declaration. Starting
+    it at the declaration swallowed the initialiser and hid a tainted sink. Same
+    reasoning SAFE110's `_closure_shadows_from` already applies. Found in review
+    of PR #223.
+    """
+    sample = tmp_path / "selfinit.rs"
+    sample.write_text("fn h(user: String) {\n    let query = query(&user);\n}\n", encoding="utf-8")
+    eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["query"]}}})
+    assert [v.lineno for v in eng.check_file(str(sample)).violations if v.code == "SAFE801"] == [2]

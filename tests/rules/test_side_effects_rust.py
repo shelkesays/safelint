@@ -22,8 +22,11 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from pathlib import Path
 
+import pytest
+
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
+from safelint.rules.side_effects import _rust_base_type_name
 
 
 def _engine(overrides: dict | None = None) -> SafetyEngine:
@@ -336,3 +339,51 @@ def test_rust_generic_arguments_with_spaces_do_not_break_type_resolution(tmp_pat
         encoding="utf-8",
     )
     assert len(_violations(_engine().check_file(str(sample)), "SAFE304")) == 1
+
+
+def test_rust_string_local_in_a_sibling_block_does_not_cover_an_earlier_write(tmp_path: Path) -> None:
+    """A ``String`` local in another block says nothing about the name at the write site.
+
+    Matching on the name alone let a `let s = String::new()` anywhere in the
+    function silence a genuine write to an `io::Write` parameter also called `s`.
+    Found in review of PR #223.
+    """
+    sample = tmp_path / "sibling.rs"
+    sample.write_text(
+        'fn emit(s: &mut dyn std::io::Write) {\n    write!(s, "x").unwrap();\n    { let s = String::new(); let _ = s; }\n}\n',
+        encoding="utf-8",
+    )
+    assert [v.lineno for v in _violations(_engine().check_file(str(sample)), "SAFE304")] == [2]
+
+
+def test_rust_string_local_declared_after_the_write_does_not_cover_it(tmp_path: Path) -> None:
+    """A binding introduced later cannot describe the target of an earlier write."""
+    sample = tmp_path / "later.rs"
+    sample.write_text(
+        'fn emit(s: &mut dyn std::io::Write) {\n    write!(s, "x").unwrap();\n    let s = String::new();\n    let _ = s;\n}\n',
+        encoding="utf-8",
+    )
+    assert [v.lineno for v in _violations(_engine().check_file(str(sample)), "SAFE304")] == [2]
+
+
+_BASE_TYPE_SHAPES = [
+    ["plain", "String", "String"],
+    ["reference", "&mut String", "String"],
+    ["qualified with a lifetime generic", "&mut fmt::Formatter<'_>", "Formatter"],
+    ["generic with spaces", "&mut TypeWriter<'_, '_, 'db>", "TypeWriter"],
+    ["explicit lifetime before mut", "&'a mut String", "String"],
+    ["trait object", "&mut dyn std::io::Write", "Write"],
+    ["container", "&mut Vec<String>", "Vec"],
+    ["domain formatter", "&mut PyFormatter", "PyFormatter"],
+]
+
+
+@pytest.mark.parametrize(["label", "type_text", "expected"], _BASE_TYPE_SHAPES, ids=[c[0] for c in _BASE_TYPE_SHAPES])
+def test_rust_base_type_name_resolves_every_shape(label: str, type_text: str, expected: str) -> None:
+    """The base-name reduction is the trickiest part of the `write!` target check.
+
+    Generic arguments are stripped first because they may contain whitespace,
+    which would otherwise make the last-token step pick a lifetime out of the
+    parameter list.
+    """
+    assert _rust_base_type_name(type_text) == expected, label
