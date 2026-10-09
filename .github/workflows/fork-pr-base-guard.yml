@@ -47,6 +47,19 @@ jobs:
           BASE: ${{ github.event.pull_request.base.ref }}
         run: |
           set -euo pipefail
+          # Re-read the base before doing anything. The job condition evaluates
+          # against this run's event snapshot, which goes stale: if the author
+          # retargets to `development` while an earlier run (from `opened`, or a
+          # previous `edited`) is still queued or in flight, that run would close
+          # the PR the author has just corrected. The `edited` event does not
+          # refresh an existing run's snapshot, so the only reliable source is
+          # the API, read as late as possible. This is checked before the comment
+          # too, so a corrected PR gets neither a close nor a misleading notice.
+          CURRENT_BASE=$(gh pr view "$PR" --repo "$REPO" --json baseRefName --jq .baseRefName)
+          if [ "$CURRENT_BASE" = 'development' ]; then
+            echo "::notice::#$PR now targets development (event snapshot said '$BASE') - nothing to do"
+            exit 0
+          fi
           cat > /tmp/body.md <<'MSG'
           Thanks for the contribution - closing this one on process grounds only, and it is a two-click fix.
 
@@ -80,4 +93,4 @@ jobs:
             echo "::warning::could not post the explanation on #$PR - closing anyway"
           fi
           gh pr close "$PR" --repo "$REPO"
-          echo "::notice::closed fork PR #$PR from $HEAD_LABEL - base was '$BASE', must be development"
+          echo "::notice::closed fork PR #$PR from $HEAD_LABEL - base is '$CURRENT_BASE', must be development"

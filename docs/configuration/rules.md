@@ -122,6 +122,18 @@ When switching to `"statements"`, lower `max_lines` accordingly, a function with
 
 Deep nesting (if inside for inside if inside while…) makes code hard to follow and test. Two levels is enough for most real functions.
 
+**`else if` is not a nesting level.** A flat `if / else if / else if` chain branches once, so it scores depth 1 in every language:
+
+```js
+function f(x) {
+  if (x === 1) { doA(); }
+  else if (x === 2) { doB(); }
+  else if (x === 3) { doC(); }      // depth 1, not 3
+}
+```
+
+Python and PHP always behaved this way, since their grammars name `elif` / `elseif` separately. The other seven languages express the same idea structurally - the continuation `if` sits under an `else_clause`, or is the enclosing `if`'s `alternative` child - and were corrected in 2.14.4. Three shapes still count, because they really are another level: `else { if (..) }` written with braces, `else while (x);` (legal C), and a nested `if` inside an `else if` body.
+
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |

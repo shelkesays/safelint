@@ -105,6 +105,7 @@ CALL_EXPRESSION = "call_expression"
 
 # Control flow.
 IF_STATEMENT = "if_statement"
+ELSE_CLAUSE = "else_clause"  # ``else { .. }`` / the ``else`` of an ``else if`` chain
 FOR_STATEMENT = "for_statement"  # ``for (;;)`` is the infinite form (empty condition)
 WHILE_STATEMENT = "while_statement"  # ``while (1)`` / ``while (true)`` is the infinite form
 DO_STATEMENT = "do_statement"  # ``do { ... } while (cond);``
