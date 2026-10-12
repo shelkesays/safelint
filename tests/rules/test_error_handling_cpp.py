@@ -140,3 +140,15 @@ def test_cpp_fputs_to_non_stderr_still_fires_safe203(tmp_path: Path) -> None:
     """`fputs(msg, logfile)` to a non-stderr stream is not error logging - SAFE203 still fires."""
     src = "void f() {\n    try { g(); } catch (const std::exception& e) { fputs(e.what(), logfile); }\n}\n"
     assert "SAFE203" in _codes(src, tmp_path)
+
+
+def test_cpp_non_insertion_binary_expression_still_fires_safe203(tmp_path: Path) -> None:
+    """Arithmetic in the handler is a ``binary_expression`` but not a stream insertion."""
+    src = "void f() {\n    try { g(); } catch (const std::exception& e) { int n = a + b; use(n); }\n}\n"
+    assert "SAFE203" in _codes(src, tmp_path)
+
+
+def test_cpp_indirect_call_in_handler_still_fires_safe203(tmp_path: Path) -> None:
+    """A call through a function pointer resolves to no name, so it cannot be a log call."""
+    src = "void f() {\n    try { g(); } catch (const std::exception& e) { (*handler)(e); }\n}\n"
+    assert "SAFE203" in _codes(src, tmp_path)

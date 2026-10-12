@@ -189,11 +189,64 @@ def resolve_lang_config_lookup(
     *primary* key (e.g. ``foo_typescript`` for a TS file) - that's the
     key the user would set to override the default.
     """
+    chain = lang_config_key_chain(base_key, lang_name)
+    for key in chain:
+        if key in rule_config:
+            return rule_config[key], key
+    return default, chain[0]
+
+
+def lang_config_key_chain(base_key: str, lang_name: str) -> tuple[str, ...]:
+    """Return the LANGUAGE-SPECIFIC config keys to try for *base_key*, most specific first.
+
+    One definition of the per-language lookup order, because it is consulted from
+    two places - the user's TOML (:func:`resolve_lang_config_lookup`) and the
+    shipped ``DEFAULTS`` (:func:`rule_default_list`) - and the two had drifted.
+    Only the TOML path carried the TypeScript → JavaScript step, so a rule falling
+    back to a shipped default for a ``.ts`` file skipped the JavaScript list and
+    landed on the bare (Python) one: a TypeScript caller got Python's ``sinks``
+    and ``flagged_calls`` and never saw ``Function`` / ``spawn`` /
+    ``writeFileSync``.
+
+    The bare key is deliberately NOT in this chain. In ``DEFAULTS`` it is how
+    Python is spelled, so the defaults path appends it; in a user's TOML it is
+    Python's key too, and letting a ``.rs`` file inherit a bare ``sinks = [...]``
+    would silently widen every other language.
+    """
     primary_key = resolve_lang_config_key(base_key, lang_name)
-    if primary_key in rule_config:
-        return rule_config[primary_key], primary_key
     if lang_name == "typescript":
-        fallback_key = f"{base_key}_javascript"
-        if fallback_key in rule_config:
-            return rule_config[fallback_key], fallback_key
-    return default, primary_key
+        return (primary_key, f"{base_key}_javascript")
+    return (primary_key,)
+
+
+def rule_default_list(rule_name: str, base_key: str, lang_name: str) -> list[str]:
+    """Return the DEFAULTS list a rule should fall back to for *base_key* and *lang_name*.
+
+    Exists so a default list has exactly ONE definition. The dataflow rule classes
+    used to carry ``ClassVar`` copies of their ``DEFAULTS`` entries, which drifted
+    silently and in two directions: ``flagged_calls`` kept nine names after the
+    default was trimmed, so a caller with a partial config still had ``os.remove``
+    flagged; and ``nullable_methods`` had never matched ``DEFAULTS`` at all, which
+    was empty while the copy held nine names.
+
+    Walks the same per-language chain the user's TOML does
+    (:func:`lang_config_key_chain`), then the bare key, which is how Python is
+    spelled in ``DEFAULTS`` (``flagged_calls`` rather than
+    ``flagged_calls_python``). The TypeScript → JavaScript step matters here: TS
+    declares none of these keys, so without it a ``.ts`` file fell through to
+    Python's list and a TypeScript caller never saw ``Function`` / ``spawn`` /
+    ``writeFileSync``.
+
+    ``DEFAULTS`` is imported lazily: ``core.config`` must not import ``rules``,
+    whose package ``__init__`` pulls in every rule module, so the dependency cannot
+    be module-level in either direction. The codebase already uses this pattern for
+    the same reason.
+    """
+    from safelint.core.config import DEFAULTS  # noqa: PLC0415 - circular avoidance
+
+    rule_defaults = DEFAULTS["rules"].get(rule_name, {})
+    for key in (*lang_config_key_chain(base_key, lang_name), base_key):
+        value = rule_defaults.get(key)
+        if value is not None:
+            return list(value) if isinstance(value, list) else []
+    return []

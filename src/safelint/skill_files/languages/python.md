@@ -36,7 +36,7 @@ When the user asks "why is this flagged?", the universal rationale in the per-cl
 | Code | Rule | Python-specific notes |
 |---|---|---|
 | SAFE101 | function_length | Default cap is 60 source lines (configurable via `[tool.safelint.rules.function_length]` `max_lines`). Class methods and module-level functions are both counted; the cap is per-function. |
-| SAFE102 | nesting_depth | Counts `if`/`for`/`while`/`with`/`try` blocks. Default max is 2. Comprehension nesting (`[x for x in y for z in w]`) does not count toward the depth; it's a single AST node. |
+| SAFE102 | nesting_depth | Counts `if`/`for`/`while`/`match` blocks. Default max is 2. `with` and `try` are NOT counted (#166): they add indentation without adding a branch. Comprehension nesting (`[x for x in y for z in w]`) does not count toward the depth; it's a single AST node. |
 | SAFE103 | max_arguments | Counts positional, keyword, `*args`, `**kwargs`, and keyword-only arguments. `self`/`cls` are *included* in the count. Default cap is 7. |
 | SAFE104 | complexity | Cyclomatic complexity: every `if`/`elif`/`else`/`for`/`while`/`except`/`and`/`or`/ternary adds one. Default cap is 10. |
 | SAFE105 | no_recursion | Flags a function that calls itself directly, bare (`fact(n-1)`) or `self`/`cls`-qualified. `other.walk(...)` does not fire. Direct self-recursion only. Enabled by default at warning severity; annotate intentional recursion with `# nosafe: SAFE105`. |

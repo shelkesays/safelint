@@ -1,4 +1,12 @@
-"""Shared lexical test-file identification, used by SAFE601 / SAFE701 / SAFE702.
+"""Shared lexical test-file identification.
+
+Used two ways, in opposite directions:
+
+* SAFE601 / SAFE701 / SAFE702 ask "is this a test file?" to scope *into* test
+  code (``test_functions_only``);
+* SAFE101 / SAFE203 / SAFE302 / SAFE304 / SAFE401 ask the same question to scope
+  *out of* it (``skip_test_code``, #198), because the patterns those rules flag
+  are conventional in a test and the volume was burying the findings that matter.
 
 Answers one question purely from a path (no filesystem probing): *is this file a
 test file?* - a file is a test either because it lives under a configured
@@ -16,6 +24,9 @@ differently from SAFE701/702 for the same ``test_dirs``.
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any
+
+from safelint.core._validators import _validated_string_list
 
 
 # Java's three conventional test-filename suffixes (Maven Surefire / Failsafe +
@@ -113,3 +124,77 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
         if _path_components_contain(path_parts, td_parts):
             return True
     return _filename_matches_test_pattern(filepath, lang_name)
+
+
+#: Filename conventions that are unambiguous enough to EXCLUDE a file on, keyed
+#: by language. Deliberately narrower than :func:`_filename_matches_test_pattern`,
+#: which answers the opposite question.
+#:
+#: The difference is the ``test_`` *prefix*. For finding tests it is a fine
+#: signal; for excluding production code it is not, because production modules
+#: legitimately carry it - safelint's own ``src/safelint/rules/test_coverage.py``
+#: is a rule implementation, and an earlier draft of this skipped five rules in
+#: it (caught by safelint's own SAFE004 ``unused_suppression``, which noticed the
+#: annotations inside had stopped suppressing anything). The helper's docstring
+#: already records the same reasoning for Java, where ``TestDataFactory`` and
+#: ``TestConfig`` under ``src/main/java`` are production utilities.
+#:
+#: What remains is infix and suffix forms that nothing but a test is called:
+#: ``foo.test.ts`` / ``foo.spec.js``, Go's toolchain-enforced ``foo_test.go``,
+#: ``FooTest.java`` / ``FooTests.java`` / ``FooIT.java``, ``FooTest.php``, and
+#: the ``_test`` stem suffix in Rust / C / C++.
+_UNAMBIGUOUS_TEST_INFIXES: tuple[str, ...] = (".test.", ".spec.")
+
+
+def _filename_is_unambiguously_test(filepath: str, lang_name: str) -> bool:
+    """Return True only for filename forms that production code does not use.
+
+    See :data:`_UNAMBIGUOUS_TEST_INFIXES` for why this is stricter than
+    :func:`_filename_matches_test_pattern`.
+    """
+    path = Path(filepath)
+    if lang_name in ("javascript", "typescript"):
+        return any(infix in path.name for infix in _UNAMBIGUOUS_TEST_INFIXES)
+    if lang_name in ("java", "php"):
+        return any(path.stem.endswith(suffix) for suffix in _JAVA_TEST_SUFFIXES if lang_name == "java" or suffix == "Test")
+    # Go's toolchain compiles ``_test.go`` only under ``go test``; Rust / C / C++
+    # use the same stem suffix by convention. The ``test_`` prefix is excluded.
+    return path.stem.endswith("_test")
+
+
+#: Config key shared by every rule that scopes out of test code, and its default.
+#: On by default: the status quo is not a conservative setting but a loud one, and
+#: the loudness is what hides the true positives (#198). A project that wants the
+#: strict reading sets it to ``false``.
+SKIP_TEST_CODE_KEY = "skip_test_code"
+
+#: Default ``test_dirs``. Four names because ``tests`` alone would have missed
+#: Express entirely, where the directory is ``test`` (singular) and holds 161 of
+#: its 165 SAFE101 findings.
+_DEFAULT_TEST_DIRS: list[str] = ["tests", "test", "__tests__", "spec"]
+
+
+def skips_test_code(rule_config: dict[str, Any], filepath: str, lang_name: str) -> bool:
+    """Return True when *filepath* is test code this rule is configured to skip.
+
+    File-level only, deliberately. The measured noise in #198 is entirely in test
+    files - a session opened in ``test_requests.py``, a ``print`` in
+    ``test_render`` - and a whole-file answer also covers the fixtures, helpers and
+    ``conftest.py`` that live there without following a naming convention.
+    Matching individual ``test_``-prefixed *functions* instead would have skipped
+    a production ``test_connection()`` helper, which is a real finding.
+
+    ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702 read, so a project
+    that has already told safelint where its tests live does not say it twice.
+    The filename half is **stricter** than theirs: see
+    :func:`_filename_is_unambiguously_test`.
+    """
+    if not rule_config.get(SKIP_TEST_CODE_KEY, True):
+        return False
+    # Validated as a string list so a scalar typo (``test_dirs = "mytests"``)
+    # fails loud rather than iterating characters - matching every other list key.
+    test_dirs = _validated_string_list(rule_config.get("test_dirs", _DEFAULT_TEST_DIRS), "test_dirs")
+    path_parts = Path(filepath).absolute().parts
+    if any(_path_components_contain(path_parts, Path(td).absolute().parts) for td in test_dirs):
+        return True
+    return _filename_is_unambiguously_test(filepath, lang_name)
