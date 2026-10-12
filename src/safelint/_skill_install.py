@@ -896,7 +896,7 @@ def _write_file_replace(target: Path, text: str) -> None:
     try:
         handle = os.fdopen(fd, "w", encoding="utf-8")  # takes ownership of fd
     # Cleanup-and-reraise: close the raw fd so it can't leak, drop the temp.
-    except OSError:  # nosafe: SAFE203
+    except OSError:
         with contextlib.suppress(OSError):
             os.close(fd)  # reached only when fdopen did NOT take ownership
         _unlink_quietly(tmp)
@@ -907,7 +907,7 @@ def _write_file_replace(target: Path, text: str) -> None:
             _apply_preserved_mode(handle.fileno(), tmp, mode)
         tmp.replace(target)
     # Cleanup-and-reraise: drop the orphan temp; the error propagates upward.
-    except OSError:  # nosafe: SAFE203
+    except OSError:
         _unlink_quietly(tmp)
         raise
 

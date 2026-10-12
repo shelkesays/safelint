@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
+from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup, rule_default_list
 from safelint.languages import cpp as _cpp
 from safelint.languages import java as _java
 from safelint.languages import javascript as _js
@@ -655,6 +656,136 @@ class EmptyExceptRule(BaseRule):
         return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if _is_noop_body(_catch_body(clause), lang_name)]
 
 
+#: Block nodes, across the six grammars SAFE203 covers. Python ``block``,
+#: JS / TS ``statement_block``, C++ ``compound_statement``, Java ``block``.
+_HANDLER_BLOCK_TYPES: frozenset[str] = frozenset({"block", "statement_block", "compound_statement"})
+
+#: Conditional nodes that carry their own obligation to cover every path. An
+#: ``else if`` reaches the analysis as one of these: Python makes it an
+#: ``elif_clause`` sibling, PHP an ``else_if_clause``, Java a bare nested
+#: ``if_statement``, and JS / C++ an ``else_clause`` wrapping an ``if_statement``.
+_CONDITIONAL_TYPES: frozenset[str] = frozenset({"if_statement", "elif_clause", "else_if_clause"})
+
+#: The wrapper an ``else`` arm may arrive in before its body.
+_ELSE_WRAPPER_TYPES: frozenset[str] = frozenset({"else_clause"})
+
+#: ``else if`` arms that belong to the SAME chain as their ``if`` - the chain's
+#: final ``else`` is their sibling, not their child, so they close nothing alone.
+_CHAIN_ARM_TYPES: frozenset[str] = frozenset({"elif_clause", "else_if_clause"})
+
+
+def _unwrap_else(node: tree_sitter.Node) -> tree_sitter.Node:
+    """Return an ``else`` arm's payload, which may itself be a nested conditional.
+
+    JavaScript and C++ spell ``else if`` as an ``else_clause`` wrapping an
+    ``if_statement``, so unwrapping first is what lets one test serve all four
+    grammar shapes.
+    """
+    if node.type not in _ELSE_WRAPPER_TYPES:
+        return node
+    body = node.child_by_field_name("body")
+    if body is not None:
+        return body
+    return node.named_children[0] if node.named_children else node
+
+
+def _conditional_arms(conditional: tree_sitter.Node) -> tuple[list[tree_sitter.Node], bool]:
+    """Return a conditional's arms and whether a terminal ``else`` covers the no-match path.
+
+    The grammars split ``else if`` two ways, and the difference decides who owes
+    the final ``else``:
+
+    * Python's ``elif_clause`` and PHP's ``else_if_clause`` are **sibling arms of
+      the same chain** - the chain's ``else`` is a sibling of theirs under the same
+      ``if``, so an elif contributes its branch and closes nothing by itself;
+    * Java's bare nested ``if_statement`` and the JS / C++ ``else_clause`` wrapping
+      one are **nested chains** that carry their own obligation, so they are
+      deferred whole and must be covered by an ``else`` of their own.
+
+    Treating an ``elif`` as the second kind made ``if / elif / else`` where every
+    arm raises report as swallowing: analysed alone, the elif looked like a
+    conditional with no else.
+    """
+    arms: list[tree_sitter.Node] = []
+    for field in ("consequence", "body"):
+        branch = conditional.child_by_field_name(field)
+        if branch is not None:
+            arms.append(branch)
+            break
+    has_else = False
+    for alternative in conditional.children_by_field_name("alternative"):
+        if alternative.type in _CHAIN_ARM_TYPES:
+            arms.extend(_chain_arm_branches(alternative))
+            continue
+        # Any non-chain alternative covers this conditional's no-match path. When
+        # it is itself a nested conditional (JS / C++ ``else { if ... }``, Java's
+        # bare ``else if``) the obligation is DELEGATED rather than discharged:
+        # it is pushed as an arm and must carry its own ``else``, which is what
+        # makes a chain ending without one still report - from the innermost
+        # link, where the gap actually is.
+        arms.append(_unwrap_else(alternative))
+        has_else = True
+    return arms, has_else
+
+
+def _chain_arm_branches(arm: tree_sitter.Node) -> list[tree_sitter.Node]:
+    """Return the body of a same-chain ``elif`` / ``elseif`` arm."""
+    for field in ("consequence", "body"):
+        branch = arm.child_by_field_name(field)
+        if branch is not None:
+            return [branch]
+    return []
+
+
+def _propagation_leak_step(node: tree_sitter.Node, catch_node: tree_sitter.Node, lang_name: str, pending: list[tree_sitter.Node]) -> tree_sitter.Node | None:
+    """Advance one node of the exit-path walk; return it if this path falls through.
+
+    Blocks defer to their last statement, conditionals to their arms. Anything
+    else terminates the path, so it propagates only if it raises.
+    """
+    if node.type in _HANDLER_BLOCK_TYPES:
+        statements = [child for child in node.named_children if child.type != "comment"]
+        if not statements:
+            return node
+        pending.append(statements[-1])
+        return None
+    if _statement_propagates(node, catch_node, lang_name):
+        return None
+    if node.type in _CONDITIONAL_TYPES:
+        arms, has_else = _conditional_arms(node)
+        pending.extend(arms)
+        return None if has_else else node
+    return node
+
+
+def _statement_propagates(statement: tree_sitter.Node, catch_node: tree_sitter.Node, lang_name: str) -> bool:
+    """Return True if *statement* leaves the handler with the caught error intact.
+
+    Propagating is not enough on its own: throwing a **fresh** error discards the
+    original, so the failure that actually happened is gone and logging it is
+    still warranted. That distinction is already the rule's position and is
+    pinned by tests in four languages, so this reuses the same predicates rather
+    than reading the node type alone.
+
+    Python is the exception, and genuinely so: a ``raise`` inside an ``except``
+    block chains the active exception onto the new one automatically
+    (``__context__``, or ``__cause__`` with an explicit ``from``), so the original
+    stays reachable whichever form is used. That is what makes
+    ``raise RuntimeError(msg) from err`` safe to exempt (#159) while
+    ``throw new Error(msg)`` is not.
+    """
+    if lang_name == _py.EXTRA_NAME:
+        return statement.type == _py.RAISE_STATEMENT
+    if lang_name == _php.EXTRA_NAME:
+        return _php_only_reraises(catch_node, [statement])
+    if statement.type not in _RERAISE_STATEMENT_TYPES_BY_LANG.get(lang_name, frozenset()):
+        return False
+    if lang_name == _cpp.EXTRA_NAME and not statement.named_children:
+        # Bare ``throw;`` rethrows the active exception.
+        return True
+    return _throw_reraises_caught_binding(statement, catch_node, lang_name)
+
+
 class LoggingOnErrorRule(BaseRule):
     """Require a logging call in every except / catch block that does not simply re-raise.
 
@@ -677,36 +808,15 @@ class LoggingOnErrorRule(BaseRule):
     # listed). ``call_name`` already strips the receiver
     # (``logger.error()`` and ``console.error()`` both resolve to
     # ``"error"``) so a single set covers every language without ambiguity.
-    _LOG_METHODS = frozenset(
-        {
-            # Python stdlib logging.
-            "debug",
-            "info",
-            "warning",
-            "error",
-            "exception",
-            "critical",
-            # JavaScript console + common logger libraries (winston, pino, bunyan).
-            "log",
-            "warn",
-            "trace",
-            # Java java.util.logging severity-level methods (SLF4J / log4j
-            # share names with the JS / Python set above).
-            "severe",
-            "fine",
-            "finer",
-            "finest",
-            # PHP: the ``error_log`` builtin plus the PSR-3 severity levels
-            # not already listed (``info`` / ``warning`` / ``error`` /
-            # ``debug`` / ``critical`` overlap with the Python set above).
-            # ``$logger->notice($e)`` resolves via ``call_name`` to
-            # ``"notice"``; ``error_log($e)`` to ``"error_log"``.
-            "error_log",
-            "notice",
-            "alert",
-            "emergency",
-        }
-    )
+
+    def _log_methods(self, lang_name: str) -> frozenset[str]:
+        """Return the call names that count as making the failure visible.
+
+        Read from config rather than a hard-coded class attribute, so the list has
+        one owner and users can adjust it - it previously had no config key at all.
+        """
+        raw, error_key = resolve_lang_config_lookup(self.config, "log_methods", lang_name, default=rule_default_list(self.name, "log_methods", lang_name))
+        return frozenset(_validated_string_list(raw, error_key))
 
     def _only_reraises(self, except_node: tree_sitter.Node, lang_name: str) -> bool:
         """Return True when the handler body just propagates the caught error.
@@ -756,6 +866,79 @@ class LoggingOnErrorRule(BaseRule):
             return True
         return _throw_reraises_caught_binding(stmts[0], except_node, lang_name)
 
+    def _is_unlogged(self, except_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str]) -> bool:
+        """Return True when this catch clause swallows an error without logging."""
+        body_node = _catch_body(except_node)
+        # Empty body (no named children) means this rule's job is done by
+        # ``empty_except`` (SAFE202); skip here. ``body_node is None`` is
+        # the same defensive case as elsewhere.
+        if body_node is None or not body_node.named_children:  # pragma: no branch
+            return False
+        if self._only_reraises(except_node, lang_name):
+            return False
+        if self._has_log_call(except_node, function_types, lang_name):
+            return False
+        return self._propagation_leak(except_node, lang_name) is not None
+
+    @staticmethod
+    def _propagation_leak(except_node: tree_sitter.Node, lang_name: str) -> tree_sitter.Node | None:
+        """Return the node where a path leaves the handler WITHOUT propagating, or None.
+
+        ``_only_reraises`` asked whether the body was *exactly* one bare ``raise``,
+        which is far narrower than the message's claim, so three shapes were
+        reported as swallowing an error they do not swallow:
+
+        * ``raise RuntimeError(msg) from err`` - the idiomatic add-context
+          re-raise. Logging there yields two reports of one failure (#159);
+        * report-then-propagate::
+
+              except ValueError as exc:
+                  print(f"failed: {exc}")
+                  raise
+
+          both statements make the failure observable, but the body is two
+          statements (#199);
+        * a branch where **every** arm raises::
+
+              if recoverable:
+                  raise Retry() from err
+              else:
+                  raise
+
+          nothing is swallowed on any path, yet it was reported.
+
+        Containment is not the test - this body really does swallow::
+
+            if never_true:
+                raise
+            return None
+
+        so the question is whether every *exit path* propagates. A block
+        propagates when its last statement does; a conditional propagates when
+        every arm does **and** an ``else`` exists, since without one the no-match
+        path falls straight through.
+
+        Returning the leaking node rather than a bool is what lets the violation
+        point at the branch that falls through instead of at the ``except`` line.
+        On a handler with several arms, "something in here leaks" makes the reader
+        re-derive which; naming it is the difference between a finding that is
+        acted on and one that is scrolled past.
+        """
+        body_node = _catch_body(except_node)
+        if body_node is None or not body_node.named_children:  # pragma: no cover - guarded by the caller
+            return None
+        leaks: list[tree_sitter.Node] = []
+        # Iterative, not recursive: SAFE105 polices this codebase.
+        pending: list[tree_sitter.Node] = [body_node]
+        while len(pending) > 0:
+            block = pending.pop()
+            leak = _propagation_leak_step(block, except_node, lang_name, pending)
+            if leak is not None:
+                leaks.append(leak)
+        if not leaks:
+            return None
+        return min(leaks, key=lambda node: node.start_byte)
+
     def _has_log_call(self, except_node: tree_sitter.Node, function_types: frozenset[str], lang_name: str) -> bool:
         """Return True when the handler body contains at least one logging call.
 
@@ -769,21 +952,12 @@ class LoggingOnErrorRule(BaseRule):
         body = _catch_body(except_node)
         if body is None:  # pragma: no cover
             return False
-        if any(call_name(node) in self._LOG_METHODS for node in walk(body, skip_types=tuple(function_types)) if node.type in CALL_TYPES):
+        log_methods = self._log_methods(lang_name)
+        if any(call_name(node) in log_methods for node in walk(body, skip_types=tuple(function_types)) if node.type in CALL_TYPES):
             return True
         if lang_name != "cpp":
             return False
         return _cpp_body_has_stream_log(body, function_types) or _cpp_body_has_stderr_log(body, function_types)
-
-    def _is_unlogged(self, except_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str]) -> bool:
-        """Return True when this catch clause swallows an error without logging."""
-        body_node = _catch_body(except_node)
-        # Empty body (no named children) means this rule's job is done by
-        # ``empty_except`` (SAFE202); skip here. ``body_node is None`` is
-        # the same defensive case as elsewhere.
-        if body_node is None or not body_node.named_children:  # pragma: no branch
-            return False
-        return not self._only_reraises(except_node, lang_name) and not self._has_log_call(except_node, function_types, lang_name)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag catch blocks that handle an error without any logging call."""
@@ -801,4 +975,29 @@ class LoggingOnErrorRule(BaseRule):
             if lang_name in (_js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _php.EXTRA_NAME, _cpp.EXTRA_NAME)
             else "Except block missing logging call - errors must be logged before being swallowed"
         )
-        return [self._make_violation_for_node(filepath, clause, message) for clause in _iter_catch_clauses(tree, lang_name) if self._is_unlogged(clause, lang_name, function_types)]
+        violations: list[Violation] = []
+        for clause in _iter_catch_clauses(tree, lang_name):
+            if not self._is_unlogged(clause, lang_name, function_types):
+                continue
+            violations.append(self._unlogged_violation(filepath, clause, lang_name, message))
+        return violations
+
+    def _unlogged_violation(self, filepath: str, clause: tree_sitter.Node, lang_name: str, blanket_message: str) -> Violation:
+        """Build the violation, anchored at the path that leaks when only some do.
+
+        When the whole handler falls through, the clause is the right anchor - the
+        handler as a unit is the problem. When it branches and only some arms
+        propagate, pointing at the clause says "something in here leaks" and leaves
+        the reader to find which; on a four-arm handler that is most of the work.
+        Anchoring at the arm that falls through names it.
+        """
+        leak = self._propagation_leak(clause, lang_name)
+        body = _catch_body(clause)
+        branching = body is not None and bool(body.named_children) and body.named_children[-1].type in _CONDITIONAL_TYPES
+        if leak is None or not branching:
+            return self._make_violation_for_node(filepath, clause, blanket_message)
+        return self._make_violation_for_node(
+            filepath,
+            leak,
+            "This path leaves the error handler without logging or re-raising - other paths here do re-raise, so only this one swallows the error",
+        )

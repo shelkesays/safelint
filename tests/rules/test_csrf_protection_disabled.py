@@ -196,6 +196,80 @@ def test_php_unrelated_property_is_clean(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
+# PHP class context (#162): ``$except`` only means CSRF inside VerifyCsrfToken
+# ---------------------------------------------------------------------------
+
+_LARAVEL_SCAFFOLD = """<?php
+namespace App\\Http\\Middleware;
+
+use Illuminate\\Foundation\\Http\\Middleware\\{base} as Middleware;
+
+class {name} extends Middleware
+{{
+    protected $except = [{entries}];
+}}
+"""
+
+
+def _middleware(tmp_path: Path, name: str, base: str, entries: str) -> Path:
+    """Write Laravel's generated middleware shape: a class extending an aliased framework base."""
+    body = _LARAVEL_SCAFFOLD.format(name=name, base=base, entries=entries)
+    return _write(tmp_path, f"{name}.php", body)
+
+
+def test_php_scaffolded_verify_csrf_token_fires(tmp_path: Path) -> None:
+    """The shape Laravel scaffolds - ``VerifyCsrfToken extends Middleware`` - still fires."""
+    src = _middleware(tmp_path, "VerifyCsrfToken", "VerifyCsrfToken", "'stripe/*'")
+    assert _codes(src) == ["SAFE908"]
+
+
+def test_php_trim_strings_except_is_clean(tmp_path: Path) -> None:
+    """Laravel's stock ``TrimStrings`` carries an ``$except`` that has nothing to do with CSRF (#162)."""
+    src = _middleware(tmp_path, "TrimStrings", "TrimStrings", "'password', 'password_confirmation'")
+    assert _codes(src) == []
+
+
+def test_php_encrypt_cookies_except_is_clean(tmp_path: Path) -> None:
+    """``EncryptCookies::$except`` lists cookies left unencrypted, not CSRF-exempt routes (#162)."""
+    src = _middleware(tmp_path, "EncryptCookies", "EncryptCookies", "'remember_choice'")
+    assert _codes(src) == []
+
+
+def test_php_renamed_subclass_of_aliased_base_fires(tmp_path: Path) -> None:
+    """A differently-named class extending the ``VerifyCsrfToken`` alias is still the CSRF middleware."""
+    src = _middleware(tmp_path, "CustomCsrf", "VerifyCsrfToken", "'hooks/*'")
+    assert _codes(src) == ["SAFE908"]
+
+
+def test_php_qualified_extends_fires(tmp_path: Path) -> None:
+    """``extends \\Illuminate\\...\\VerifyCsrfToken`` resolves on its final segment."""
+    body = "<?php\nclass C extends \\Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken { protected $except = ['a']; }\n"
+    assert _codes(_write(tmp_path, "C.php", body)) == ["SAFE908"]
+
+
+def test_php_except_outside_any_class_is_clean(tmp_path: Path) -> None:
+    """A file-scope ``$except`` has no class context at all and cannot be a CSRF allow-list."""
+    assert _codes(_write(tmp_path, "boot.php", "<?php\n$except = ['a'];\n")) == []
+
+
+def test_php_except_in_a_trait_is_clean(tmp_path: Path) -> None:
+    """A trait has no ``extends`` clause, so an ``$except`` declared there has no CSRF context.
+
+    Documents the limit of the class-context check: a trait mixed into
+    ``VerifyCsrfToken`` is not followed. Reporting every trait ``$except`` is the
+    false positive #162 is about, so the quiet side is the right default.
+    """
+    body = "<?php\ntrait HasExceptions { protected $except = ['a']; }\n"
+    assert _codes(_write(tmp_path, "HasExceptions.php", body)) == []
+
+
+def test_php_unrelated_middleware_without_extends_is_clean(tmp_path: Path) -> None:
+    """A standalone class named neither ``VerifyCsrfToken`` nor extending it does not fire."""
+    body = "<?php\nclass ThrottleRequests { protected $except = ['api/*']; }\n"
+    assert _codes(_write(tmp_path, "ThrottleRequests.php", body)) == []
+
+
+# ---------------------------------------------------------------------------
 # Gating
 # ---------------------------------------------------------------------------
 

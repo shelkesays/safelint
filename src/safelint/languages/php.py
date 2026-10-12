@@ -189,12 +189,15 @@ INTERFACE_DECLARATION = "interface_declaration"
 TRAIT_DECLARATION = "trait_declaration"
 ENUM_DECLARATION = "enum_declaration"
 DECLARATION_LIST = "declaration_list"  # the ``{ ... }`` body of a class-like
+BASE_CLAUSE = "base_clause"  # ``extends Foo`` on a class/interface declaration
+NAMESPACE_USE_CLAUSE = "namespace_use_clause"  # one entry of a ``use A\\B as C;`` statement
 
 # Parameters.
 FORMAL_PARAMETERS = "formal_parameters"
 SIMPLE_PARAMETER = "simple_parameter"  # ``$a`` / ``int $a = 1``
 VARIADIC_PARAMETER = "variadic_parameter"  # ``...$args``
 PROPERTY_PROMOTION_PARAMETER = "property_promotion_parameter"  # ``private int $x`` in a constructor
+NAMED_TYPE = "named_type"  # the declared type of a parameter / return, e.g. ``Request`` or ``\\App\\Foo``
 
 # Identifiers / scope keywords / literals.
 NAME = "name"  # a bareword identifier (function names, member names, the inner part of ``variable_name``)

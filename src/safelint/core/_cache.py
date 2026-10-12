@@ -200,7 +200,7 @@ def _atomic_write_json(cache_dir: Path, dest: Path, payload: dict[str, Any]) -> 
         handle = os.fdopen(fd, "w", encoding="utf-8")  # takes ownership of fd
     # Cleanup-and-reraise (not a swallow): close the raw fd so it can't leak,
     # drop the temp, and let the error propagate to the best-effort caller.
-    except OSError:  # nosafe: SAFE203
+    except OSError:
         with contextlib.suppress(OSError):
             os.close(fd)  # reached only when fdopen did NOT take ownership
         with contextlib.suppress(OSError):
@@ -211,7 +211,7 @@ def _atomic_write_json(cache_dir: Path, dest: Path, payload: dict[str, Any]) -> 
             handle.write(data)
         tmp.replace(dest)
     # Cleanup-and-reraise: drop the orphan temp; the error propagates upward.
-    except OSError:  # nosafe: SAFE203
+    except OSError:
         with contextlib.suppress(OSError):
             tmp.unlink()
         raise

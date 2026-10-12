@@ -212,6 +212,97 @@ def test_php_nullsafe_call_validator_clears(tmp_path: Path) -> None:
     assert _codes_with(src, {"request_validators_php": ["allowlist"]}) == []
 
 
+# ---------------------------------------------------------------------------
+# Validator facade (#157): ``Validator::make($request->all(), $rules)``
+# ---------------------------------------------------------------------------
+
+
+def test_php_validator_facade_make_clears(tmp_path: Path) -> None:
+    """``Validator::make($request->all(), $rules)`` is the documented Laravel manual-validation form (#157)."""
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::make($request->all(), ['name'=>'required'])->validate(); return M::create($request->all()); } } ?>")
+    assert _codes(src) == []
+
+
+def test_php_namespaced_validator_facade_clears(tmp_path: Path) -> None:
+    """The root-namespaced ``\\Validator::make(...)`` form clears too."""
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ \\Validator::make($request->all(), [])->validate(); return M::create($request->all()); } } ?>")
+    assert _codes(src) == []
+
+
+def test_php_validator_facade_validate_clears(tmp_path: Path) -> None:
+    """``Validator::validate($request->all(), $rules)`` (the one-shot facade form) clears."""
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::validate($request->all(), []); return M::create($request->all()); } } ?>")
+    assert _codes(src) == []
+
+
+def test_php_validator_facade_on_partial_request_clears(tmp_path: Path) -> None:
+    """A facade call validating a subset (``$request->only(...)``) still mentions the request and clears."""
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::make($request->only('name'), [])->validate(); return M::create($request->all()); } } ?>")
+    assert _codes(src) == []
+
+
+def test_php_validator_facade_without_request_still_fires(tmp_path: Path) -> None:
+    """The facade clears only when it validates THE request; an unrelated payload does not."""
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::make($defaults, [])->validate(); return M::create($request->all()); } } ?>")
+    assert _codes(src) == ["SAFE907"]
+
+
+def test_php_unrelated_facade_make_still_fires(tmp_path: Path) -> None:
+    """``make`` on a facade that is not ``Validator`` is not a validation signal."""
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Response::make($request->all()); return M::create($request->all()); } } ?>")
+    assert _codes(src) == ["SAFE907"]
+
+
+def test_php_aliased_request_data_validated_clears(tmp_path: Path) -> None:
+    """``$post = $request->all()`` then ``Validator::make($post, ...)`` clears (the FreeScout shape in #157)."""
+    body = "<?php class C { function store($request){ $post = $request->all(); $post['b'] = strip_tags($post['b']); Validator::make($post, [])->validate(); return M::create($post); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", body)) == []
+
+
+def test_php_unrelated_variable_in_facade_still_fires(tmp_path: Path) -> None:
+    """A variable that was never assigned a request read does not stand in for the request."""
+    body = "<?php class C { function store($request){ $defaults = config('x'); Validator::make($defaults, [])->validate(); return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", body)) == ["SAFE907"]
+
+
+def test_php_form_request_parameter_clears(tmp_path: Path) -> None:
+    """A typed Form Request parameter means validation ran before the method body (#157)."""
+    body = "<?php class C { function store(StoreUserRequest $request){ return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", body)) == []
+
+
+def test_php_qualified_form_request_parameter_clears(tmp_path: Path) -> None:
+    """The Form Request type is matched on its final segment, so a qualified name clears too."""
+    body = "<?php class C { function store(\\App\\Http\\Requests\\StoreUserRequest $request){ return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", body)) == []
+
+
+def test_php_base_request_parameter_still_fires(tmp_path: Path) -> None:
+    """The base ``Request`` (and ``FormRequest``) carry no rules, so they are not a Form Request."""
+    base = "<?php class C { function store(Request $request){ return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", base)) == ["SAFE907"]
+    form = "<?php class D { function store(FormRequest $request){ return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "D.php", form)) == ["SAFE907"]
+
+
+def test_php_validator_factory_chain_clears(tmp_path: Path) -> None:
+    """``$this->validator($request->all())->validate()`` - Laravel's own ``RegistersUsers`` shape - clears."""
+    body = "<?php class C { function register($request){ $this->validator($request->all())->validate(); return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", body)) == []
+
+
+def test_php_validate_on_plain_receiver_still_fires(tmp_path: Path) -> None:
+    """``validate()`` on a receiver that is not a call built from the request does not clear."""
+    body = "<?php class C { function store($request){ $this->form->validate(); return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", body)) == ["SAFE907"]
+
+
+def test_php_validator_factory_without_request_still_fires(tmp_path: Path) -> None:
+    """A validator built from unrelated data does not clear the request read."""
+    body = "<?php class C { function store($request){ $this->validator($defaults)->validate(); return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", body)) == ["SAFE907"]
+
+
 def test_request_validators_scalar_typo_raises(tmp_path: Path) -> None:
     """A bare-string typo for ``request_validators`` fails loud."""
     import pytest  # noqa: PLC0415

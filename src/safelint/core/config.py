@@ -171,7 +171,56 @@ DEFAULTS: dict[str, Any] = {
         "no_recursion": {"enabled": True, "severity": "warning"},
         "bare_except": {"enabled": True, "severity": "error"},
         "empty_except": {"enabled": True, "severity": "error"},
-        "logging_on_error": {"enabled": True, "severity": "warning"},
+        "logging_on_error": {
+            "enabled": True,
+            "severity": "warning",
+            # Call names that count as "the failure was made visible". Matched
+            # with the receiver discarded, so ``$logger->notice($e)`` resolves to
+            # ``notice`` and ``console.print_exception()`` to ``print_exception``.
+            # Inside a handler body that is the right granularity: the rule looks
+            # nowhere else.
+            #
+            # Per language, because whether a stdout write counts is a question
+            # about the language's culture, not about the rule. Java has a strong
+            # logging convention and ``System.out.println`` in a catch block is
+            # the very anti-pattern this rule exists to find, so it is NOT
+            # accepted there. Python's ``print`` is - see the Python list.
+            "log_methods": [
+                # Python stdlib logging.
+                "debug",
+                "info",
+                "warning",
+                "error",
+                "exception",
+                "critical",
+                # Writers that surface the failure without being loggers. Added in
+                # 2.15.0 (#199): Rust's SAFE207, the documented analogue of this
+                # rule, has always accepted ``println`` / ``eprintln`` / ``print``
+                # with the comment "also count as made the failure visible", so one
+                # act was judged two ways across the two languages. Reporting
+                # Rich's ``console.print_exception(show_locals=True)`` as an
+                # unlogged error branch is the rule contradicting the code's
+                # obvious intent. Scoped to Python because that is where the
+                # evidence came from and where the idiom is defensible: a script
+                # or CLI legitimately prints its own failure.
+                "print",
+                "print_exception",
+                "print_exc",
+            ],
+            # JavaScript / TypeScript: ``console.log`` / ``.error`` / ``.warn``
+            # resolve to the bare names below.
+            "log_methods_javascript": ["debug", "info", "warning", "error", "exception", "critical", "log", "warn", "trace"],
+            "log_methods_typescript": ["debug", "info", "warning", "error", "exception", "critical", "log", "warn", "trace"],
+            # Java: java.util.logging severity levels plus the SLF4J / log4j names.
+            # ``println`` is deliberately absent - printing to stdout instead of
+            # logging is the anti-pattern, not a fix for it.
+            "log_methods_java": ["debug", "info", "warning", "error", "exception", "critical", "log", "warn", "trace", "severe", "fine", "finer", "finest"],
+            # PHP: the ``error_log`` builtin plus the PSR-3 levels.
+            "log_methods_php": ["debug", "info", "warning", "error", "exception", "critical", "log", "warn", "notice", "alert", "emergency", "error_log"],
+            # C++: ``std::cerr << ...`` is a stream insertion rather than a call
+            # and is recognised separately in the rule.
+            "log_methods_cpp": ["debug", "info", "warning", "error", "exception", "critical", "log", "warn", "trace"],
+        },
         "global_state": {"enabled": True, "severity": "warning"},
         "global_mutation": {
             "enabled": True,
@@ -846,6 +895,26 @@ DEFAULTS: dict[str, Any] = {
                 "prop_assert",
                 "prop_assert_eq",
                 "prop_assert_ne",
+                # insta snapshot macros (#177). Snapshot testing is the dominant
+                # assertion idiom in modern Rust suites, and a test whose only
+                # assertion is a snapshot was read as having none: on Ruff, 557 of
+                # the 5412 sampled SAFE601 findings were ``#[test]`` functions that
+                # do assert, just not with a name on this list. Genuine
+                # assertion-free tests were 82.
+                "assert_snapshot",
+                "assert_debug_snapshot",
+                "assert_json_snapshot",
+                "assert_yaml_snapshot",
+                "assert_ron_snapshot",
+                "assert_toml_snapshot",
+                "assert_csv_snapshot",
+                "assert_compact_debug_snapshot",
+                "assert_compact_json_snapshot",
+                "assert_binary_snapshot",
+                "assert_display_snapshot",
+                # std / matches! family also absent.
+                "assert_matches",
+                "debug_assert_matches",
             ],
             # PHP has no ``assert`` keyword (``assert()`` is a function);
             # PHPUnit assertions are method calls. ``call_name`` resolves both
