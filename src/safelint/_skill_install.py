@@ -53,6 +53,7 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import Iterator
     from importlib.abc import Traversable
+    from typing import TextIO
 
 
 # ---------------------------------------------------------------------------
@@ -893,23 +894,39 @@ def _write_file_replace(target: Path, text: str) -> None:
         mode = stat.S_IMODE(info.st_mode) if stat.S_ISREG(info.st_mode) else None
     fd, tmp_name = tempfile.mkstemp(dir=target.parent, prefix=".safelint-section-", suffix=".tmp")
     tmp = Path(tmp_name)
-    try:
-        handle = os.fdopen(fd, "w", encoding="utf-8")  # takes ownership of fd
-    # Cleanup-and-reraise: close the raw fd so it can't leak, drop the temp.
-    except OSError:
-        with contextlib.suppress(OSError):
-            os.close(fd)  # reached only when fdopen did NOT take ownership
-        _unlink_quietly(tmp)
-        raise
+    handle = _adopt_temp_fd(fd, tmp)
+    replaced = False
     try:
         with handle:
             handle.write(text)
             _apply_preserved_mode(handle.fileno(), tmp, mode)
         tmp.replace(target)
-    # Cleanup-and-reraise: drop the orphan temp; the error propagates upward.
-    except OSError:
-        _unlink_quietly(tmp)
-        raise
+        replaced = True
+    finally:
+        if not replaced:
+            _unlink_quietly(tmp)
+
+
+def _adopt_temp_fd(fd: int, tmp: Path) -> TextIO:
+    """Wrap *fd* in a text handle, closing the raw descriptor if that fails.
+
+    ``os.fdopen`` takes ownership of the descriptor on success, so there is
+    exactly one window in which the raw fd can leak: a failure before the
+    handover. Cleanup runs in a ``finally`` rather than an ``except OSError``
+    because an interrupt is not an ``OSError`` - on that path the earlier form
+    skipped cleanup entirely and left a ``.safelint-section-*.tmp`` behind in the
+    user's skills directory. The error propagates unchanged either way.
+    """
+    adopted = False
+    try:
+        handle = os.fdopen(fd, "w", encoding="utf-8")
+        adopted = True
+    finally:
+        if not adopted:
+            with contextlib.suppress(OSError):
+                os.close(fd)  # reached only when fdopen did NOT take ownership
+            _unlink_quietly(tmp)
+    return handle
 
 
 def _install_copy(source: Path, target: Path) -> None:
