@@ -129,3 +129,25 @@ def test_a_deliberately_deep_wrapped_function_still_reports_on_the_default(tmp_p
     found = [v for v in engine.check_file(str(sample)).violations if v.code == "SAFE102"]
     assert len(found) == 1
     assert "depth is 3" in found[0].message
+
+
+_JS_LOOP_FORMS = [
+    ["for...of", "function f(a) {\n  for (const x of a) {\n    for (const y of x) {\n      g(y);\n    }\n  }\n}\n"],
+    ["for...in", "function f(a) {\n  for (const x in a) {\n    for (const y in x) {\n      g(y);\n    }\n  }\n}\n"],
+    ["classic for", "function f(a) {\n  for (let i = 0; i < 3; i++) {\n    for (let j = 0; j < 3; j++) {\n      g(j);\n    }\n  }\n}\n"],
+]
+
+
+@pytest.mark.parametrize(["label", "source"], tuple(_JS_LOOP_FORMS), ids=[case[0] for case in _JS_LOOP_FORMS])
+def test_every_javascript_loop_form_counts_as_a_level(tmp_path: Path, label: str, source: str) -> None:
+    """All three JavaScript loop forms are nesting steps, ``for...of`` included.
+
+    tree-sitter emits ``for_in_statement`` for both ``for...in`` and ``for...of``
+    (``FOR_OF_STATEMENT`` is a never-emitted alias kept for symmetry), so the
+    depth table lists one node type for two syntaxes. The docs listed only
+    ``for…in``, which read as though ``for...of`` were free - accurate about node
+    types and wrong about the language. Found in review of PR #229.
+    """
+    sample = tmp_path / "loops.js"
+    sample.write_text(source, encoding="utf-8")
+    assert _depth(sample) == 2, label
