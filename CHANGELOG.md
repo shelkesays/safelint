@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **SAFE102 `nesting_depth` no longer counts `with` or `try` as a nesting level (#166).** The rule exists to keep *decisions* shallow - that is what makes a function hard to follow and to test - and a resource or error-handling wrapper adds indentation without adding a branch:
+
+  ```python
+  with open(path) as fh:        # depth 0
+      for row in fh:            # depth 1
+          if row:               # depth 2 - clears the default cap
+              handle(row)
+  ```
+
+  What settles it is actionability rather than tidiness: a developer told to reduce nesting in `with session: for x: if y:` has no good move short of restructuring resource handling, which is a worse outcome than the nesting it was flagged for. The finding was unactionable even where the count was literally correct.
+
+  This extends a principle the rule already applied rather than introducing one - Java's `synchronized` block and Rust's `unsafe` block were never nesting steps, for exactly this reason. Removed from Python (`with`, `try`), Java (`try`, try-with-resources), JavaScript / TypeScript (`try`), PHP (`try`) and C++ (`try`); Rust, Go and C had none to remove, so all nine languages now agree. `switch` and `match` remain steps, because they branch.
+
+  Measured: Django **1301 -> 722** (-45%), Guzzle **73 -> 42** (-42%), requests **24 -> 16** (-33%), Rich **81 -> 65** (-20%). The 45% matches the figure this issue reported from a different sample, which is a good sign the effect is stable rather than sample-specific.
+
+  `nesting_depth` is **enabled by default**, so this moves existing finding counts - which is why it is a MINOR release rather than a patch, and why the whole accumulated 2.14.4 stack ships as 2.15.0.
+
 - **SAFE802 `return_value_ignored`: the Python `flagged_calls` default is trimmed from sixteen names to seven (#156).** The list had been ported from C/POSIX semantics, where checking the return code is correct and necessary, without adjusting for Python's. Two groups left it.
 
   Six return `None`, so the rule demanded the caller check a value that cannot exist: `remove`, `unlink`, `rename`, `makedirs`, `mkdir`, `rmdir`. The `os.*` forms all return `None`; the `pathlib` forms return either `None` (`Path.unlink`, `Path.mkdir`, `Path.rmdir`) or a `Path` that nothing acts on (`Path.rename`, `Path.replace`). Because names are matched with the receiver discarded, these also covered `list.remove` and every other method of the name. **This half, and the `os`-name tests covering it, are @Jah-yee's work** (PRs #216 / #227).
@@ -108,7 +125,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The two grammar shapes are both handled: the continuation `if` either sits under an `else_clause` (JavaScript, TypeScript, Rust, C, C++) or is the `alternative` child of the enclosing `if` (Java, Go). Only `if` nodes are exempt, and only when they are the continuation itself, so three cases keep counting as they should: `else { if (..) }` written with braces (the inner `if`'s parent is the block), `else while (x);` which is legal C and a real level, and a genuine nested `if` inside an `else if` body.
 
-  Measured: Guava **1121 -> 956**, Chart.js **62 -> 44**, ripgrep **83 -> 70**, Axios **49 -> 39**, Zod **91 -> 82**, Express **5 -> 4**; 216 findings in total. fzf, Cobra and Spring PetClinic are unchanged - Go style reaches for `switch` rather than long `else if` chains, so the fix is a no-op on those two despite Go being affected in principle.
+  Measured: Guava **1121 -> 956**, fzf **178 -> 158**, Chart.js **62 -> 44**, ripgrep **83 -> 70**, Axios **49 -> 39**, Zod **91 -> 82**, Express **5 -> 4**; **236** findings in total. Cobra and Spring PetClinic are unchanged, both being small enough to have no `else if` chain inside a function already near the depth cap.
 
 - **SAFE302 `global_mutation` no longer reports a write to a local that shadows a browser global (JavaScript) (#202).** Every configured global namespace is also an ordinary variable name, and a local declaration shadows the global completely. The pre-arrow idiom for carrying `this` into a nested function was therefore reported as mutating a global:
 

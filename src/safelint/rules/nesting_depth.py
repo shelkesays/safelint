@@ -36,6 +36,21 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 }
 
 # Per-language node-type sets that count as one nesting step.
+#
+# Resource and error-handling wrappers - ``with`` / ``try`` / ``try``-with-resources
+# - are NOT steps (#166). The rule exists to keep *decisions* shallow, which is
+# what makes a function hard to follow and to test; those constructs add
+# indentation without adding a branch. The asymmetry that settles it is
+# actionability: a developer told to reduce nesting in
+# ``with session: for x: if y:`` has no good move short of restructuring resource
+# handling, which is a worse outcome than the nesting it was flagged for, so the
+# finding was not actionable even when the count was literally correct.
+#
+# This extends a principle the table already applied rather than introducing one:
+# Java's ``synchronized_statement`` and Rust's ``unsafe_block`` were excluded on
+# exactly this reasoning. Rust, Go and C have no entry to remove - Rust and Go
+# have no ``try`` block and C has no exceptions - so the set is now consistent
+# across all nine languages. ``switch`` / ``match`` stay: they branch.
 # Python: ``if`` / ``for`` / ``while`` / ``with`` / ``try`` / ``match``
 # (PEP 634, Python 3.10+ - safelint requires 3.11+ so the construct is
 # always available). ``elif_clause`` is *not* in this set - in
@@ -71,9 +86,9 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
 # ``match_conditional_expression`` arms are not counted - the enclosing
 # ``switch`` / ``match`` is the single step.
 _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
-    "python": frozenset({_py.IF_STATEMENT, _py.FOR_STATEMENT, _py.WHILE_STATEMENT, _py.WITH_STATEMENT, _py.TRY_STATEMENT, _py.MATCH_STATEMENT}),
-    "javascript": frozenset({_js.IF_STATEMENT, _js.FOR_STATEMENT, _js.FOR_IN_STATEMENT, _js.WHILE_STATEMENT, _js.DO_STATEMENT, _js.SWITCH_STATEMENT, _js.TRY_STATEMENT}),
-    "typescript": frozenset({_ts.IF_STATEMENT, _ts.FOR_STATEMENT, _ts.FOR_IN_STATEMENT, _ts.WHILE_STATEMENT, _ts.DO_STATEMENT, _ts.SWITCH_STATEMENT, _ts.TRY_STATEMENT}),
+    "python": frozenset({_py.IF_STATEMENT, _py.FOR_STATEMENT, _py.WHILE_STATEMENT, _py.MATCH_STATEMENT}),
+    "javascript": frozenset({_js.IF_STATEMENT, _js.FOR_STATEMENT, _js.FOR_IN_STATEMENT, _js.WHILE_STATEMENT, _js.DO_STATEMENT, _js.SWITCH_STATEMENT}),
+    "typescript": frozenset({_ts.IF_STATEMENT, _ts.FOR_STATEMENT, _ts.FOR_IN_STATEMENT, _ts.WHILE_STATEMENT, _ts.DO_STATEMENT, _ts.SWITCH_STATEMENT}),
     "java": frozenset(
         {
             _java.IF_STATEMENT,
@@ -81,19 +96,18 @@ _DEPTH_NODE_TYPES_BY_LANG: dict[str, frozenset[str]] = {
             _java.ENHANCED_FOR_STATEMENT,
             _java.WHILE_STATEMENT,
             _java.DO_STATEMENT,
-            _java.TRY_STATEMENT,
-            _java.TRY_WITH_RESOURCES_STATEMENT,
             _java.SWITCH_EXPRESSION,
         }
     ),
     "rust": frozenset({_rust.IF_EXPRESSION, _rust.IF_LET_EXPRESSION, _rust.FOR_EXPRESSION, _rust.WHILE_EXPRESSION, _rust.WHILE_LET_EXPRESSION, _rust.LOOP_EXPRESSION, _rust.MATCH_EXPRESSION}),
     "go": frozenset({_go.IF_STATEMENT, _go.FOR_STATEMENT, _go.EXPRESSION_SWITCH_STATEMENT, _go.TYPE_SWITCH_STATEMENT, _go.SELECT_STATEMENT}),
-    "php": frozenset({_php.IF_STATEMENT, _php.WHILE_STATEMENT, _php.DO_STATEMENT, _php.FOR_STATEMENT, _php.FOREACH_STATEMENT, _php.SWITCH_STATEMENT, _php.TRY_STATEMENT, _php.MATCH_EXPRESSION}),
+    "php": frozenset({_php.IF_STATEMENT, _php.WHILE_STATEMENT, _php.DO_STATEMENT, _php.FOR_STATEMENT, _php.FOREACH_STATEMENT, _php.SWITCH_STATEMENT, _php.MATCH_EXPRESSION}),
     # C: the four loop forms, ``if``, and ``switch``. No try/catch; ``goto``
     # targets are flat labels, not nesting.
     "c": frozenset({_c.IF_STATEMENT, _c.FOR_STATEMENT, _c.WHILE_STATEMENT, _c.DO_STATEMENT, _c.SWITCH_STATEMENT}),
-    # C++: the C set plus ``try_statement`` (a try block nests its body).
-    "cpp": frozenset({_cpp.IF_STATEMENT, _cpp.FOR_STATEMENT, _cpp.FOR_RANGE_LOOP, _cpp.WHILE_STATEMENT, _cpp.DO_STATEMENT, _cpp.SWITCH_STATEMENT, _cpp.TRY_STATEMENT}),
+    # C++: the C set plus the range-for. ``try_statement`` is NOT a step - see
+    # the resource-wrapper note above.
+    "cpp": frozenset({_cpp.IF_STATEMENT, _cpp.FOR_STATEMENT, _cpp.FOR_RANGE_LOOP, _cpp.WHILE_STATEMENT, _cpp.DO_STATEMENT, _cpp.SWITCH_STATEMENT}),
 }
 
 
