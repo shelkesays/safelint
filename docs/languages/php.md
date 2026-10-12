@@ -257,6 +257,12 @@ PHP source is PHP source - the parser and rule logic are framework-agnostic. The
 | `vanilla` (default) | Plain PHP, framework-free libraries | Stdlib-only defaults (the lists in the rules table above). The `SAFE905-909` framework rules are disabled. |
 | `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks. **Enables the full `SAFE905-909` set**: Eloquent `$guarded = []` mass-assignment (SAFE906), `$request->all()` / bare `$request->input()` without `validate()` (SAFE907; a targeted `$request->input('field')` read is not flagged), a `'debug' => true` config-array entry (SAFE905), a non-empty `$except` CSRF allow-list (SAFE908), and a hardcoded `base64:` `APP_KEY` literal (SAFE909). |
 
+Two of those five changed scope in 2.15.0 after they were measured against a real Laravel app:
+
+- **SAFE907** recognises `Validator::make(...)` / `Validator::validate(...)`, a validator built from the request data and then validated (`$this->validator($request->all())->validate()`), a one-step local alias of the request data (`$post = $request->all();` ... `Validator::make($post, $rules)`), and a **Form Request** parameter (`store(StoreUserRequest $request)`), which means the framework already ran that class's `rules()`. Previously only `$request->validate(...)` and the `ValidatesRequests` trait form counted, so the rule reported the very line that validates the input.
+- **SAFE908** requires class context: `$except` is reported only inside a class named `VerifyCsrfToken` or extending one (including through the `use ... as Middleware` alias Laravel scaffolds). Laravel's stock `TrimStrings` and `EncryptCookies` carry an unrelated `$except`, so matching the property name alone fired on every unmodified app.
+
+
 ```toml
 # safelint.toml (standalone) - no [tool.safelint] wrapper
 [php]

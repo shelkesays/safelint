@@ -349,17 +349,85 @@ severity = "error"
 
 **What it flags:** `except` / `catch` blocks that handle an error without any logging call. Cross-language.
 
-If you catch an exception and do something with it but never log it, the error is invisible. This rule requires at least one call to a logger method (`debug`, `info`, `warning`, `error`, `exception`, `critical`, plus the JavaScript `console.*` family of `log` / `info` / `warn` / `error` / `debug` / `trace`) inside the handler. Blocks that simply re-raise the exact caught binding (Python `raise`; JavaScript `throw e;` where `e` is the catch parameter) are exempt; throwing a *different* identifier or `new Error(...)` still requires logging.
+If you catch an exception and do something with it but never log it, the error is invisible. This rule requires at least one call to a logger method inside the handler, unless the handler propagates the failure instead.
+
+#### What counts as not swallowing it
+
+**A handler that re-raises is not swallowing anything**, and demanding a log there actively hurts: you get two reports of one failure, the second at the wrong altitude. The test is whether *every exit path* leaves by raising, so all of these are clean:
+
+```python
+except ValueError as err:
+    raise RuntimeError("bad") from err      # the idiomatic add-context re-raise
+
+except ValueError as exc:
+    print(f"failed: {exc}")                 # report, then propagate
+    raise
+
+except ValueError as err:
+    if recoverable(err):
+        raise Retry() from err              # every arm raises, so nothing is lost
+    else:
+        raise
+```
+
+Containment is deliberately not the test - this body really does swallow, and still reports:
+
+```python
+except ValueError:
+    if never_true:
+        raise
+    return None                             # reached unconditionally
+```
+
+Throwing a **fresh** error needs a closer look in the C-family languages, which have no automatic chaining. One that carries the caught value along is the local spelling of `raise ... from err`, and is clean:
+
+```java
+catch (IOException e) {
+    throw new ConfigException("loading " + path, e);   // clean: original attached
+}
+```
+```php
+catch (Throwable $e) {
+    throw new RuntimeException('loading config', 0, $e);   // clean: $previous
+}
+```
+
+One that does not still discards the original and still wants logging: `throw new Error("x")` with no mention of the binding. So does `throw makeError(e)` in JavaScript, TypeScript, Java and PHP, because a factory's return value need not be a wrapper; C++ constructs the thrown value with a plain call (`throw std::runtime_error(e.what())`), so there it does count. Python needs none of this - a `raise` inside an `except` chains the active exception automatically, so the original stays reachable either way.
+
+#### Where the finding points
+
+When only *some* arms propagate, the violation anchors at the arm that falls through rather than at the `except` line:
+
+```python
+except ValueError:
+    if a:
+        raise
+    elif b:
+        raise
+    else:
+        cleanup()        # <- reported here: "this path leaves the handler without
+                         #    logging or re-raising"
+```
+
+On a handler with several arms, "something in here leaks" leaves you to work out which. When the handler falls through as a whole, the clause stays the anchor - there the handler as a unit is the problem. So does a branching handler where **no** arm raises: the per-path wording says the other paths re-raise, and saying that where nothing raises would be a false statement about the code.
 
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"warning"` | `"error"` or `"warning"` |
+| `log_methods` | see below | (Python.) Call names that count as making the failure visible |
+| `log_methods_javascript` / `_typescript` / `_java` / `_php` / `_cpp` | see below | The same, per language |
+
+Names are matched with the receiver discarded, so `$logger->notice($e)` resolves to `notice` and `console.print_exception()` to `print_exception`.
+
+Python's list adds `print`, `print_exception` and `print_exc` to the logger names: a script or CLI legitimately prints its own failure, and Rust's SAFE207 - the documented analogue of this rule - has always accepted `println` / `eprintln` / `print` on the same reasoning. **Java's list deliberately does not**, because `System.out.println` inside a catch block is the anti-pattern this rule exists to find, not a fix for it.
 
 ```toml
 [tool.safelint.rules.logging_on_error]
 enabled = true
 severity = "warning"
+log_methods = ["debug", "info", "warning", "error", "exception", "critical", "print"]
+log_methods_java = ["severe", "fine", "warning", "error"]
 ```
 
 **Python, Bad:**
@@ -1039,6 +1107,8 @@ JavaScript has no built-in `assert` keyword, so the rule walks for *calls* to a 
 
 Java, Rust, PHP, C, and C++ have their own `assertion_calls_<lang>` lists (see each language page).
 
+`assertion_calls_rust` covers the `insta` snapshot macros (`assert_snapshot`, `assert_debug_snapshot`, `assert_json_snapshot` and the rest of that family) and `assert_matches` / `debug_assert_matches` *since 2.15.0*. Snapshot testing is the dominant assertion idiom in modern Rust suites, and without those names a test whose only assertion is a snapshot read as having none: on Ruff, 557 of 5412 sampled findings were `#[test]` functions that do assert, against 82 genuinely assertion-free ones.
+
 ```toml
 # pyproject.toml
 [tool.safelint.rules.missing_assertions]
@@ -1692,9 +1762,45 @@ severity = "error"
 Per function / method: a whole-object request-data read with no validation call in the same scope. Detected patterns:
 
 - **Python**: `request.POST` / `request.data` / `request.json` / `request.form` / `request.body` / `request.query_params` consumed whole, with no concrete validation *call* (`is_valid` / `full_clean` / `validate` / `model_validate` / `parse_obj`) in the function (Django / Flask / FastAPI). A bare `Serializer` / `Schema` name reference is not accepted as validation. Single-field access (`request.POST.get('x')`, `request.GET['q']`) is targeted and NOT flagged.
-- **PHP (Laravel)**: `$request->all()` / bare `$request->input()` with no `$request->validate(...)` call in the method (`$request->input('field')` is a targeted read and is not flagged).
+- **PHP (Laravel)**: `$request->all()` / bare `$request->input()` with no validation call in the method (`$request->input('field')` is a targeted read and is not flagged).
 
 The rule is conservative and heuristic: a validation call *anywhere* in the scope clears the whole function.
+
+**What counts as validation in Laravel.** `$request->validate(...)` is the shape the rule started with, but it is not the dominant one; on FreeScout `Validator::make` outnumbers it by 19 to 1. All four of these clear the read (*since 2.15.0*):
+
+```php
+$request->validate(['name' => 'required']);                  // request as receiver
+$this->validate($request, ['name' => 'required']);           // ValidatesRequests trait
+Validator::make($request->all(), $rules)->validate();        // the Validator facade
+$this->validator($request->all())->validate();               // a validator built from the data
+```
+
+Only the unqualified `Validator` (the aliased import Laravel code writes) and the fully-qualified `Illuminate\Support\Facades\Validator` count as the facade; another namespace's `Validator` is a different class. Chaining a `->validate()` onto any call built from the request data clears it regardless of the class, which is the `$this->validator(...)` case above.
+
+The facade form also follows a one-step local alias, which is how Laravel code massages input before validating it:
+
+```php
+$post = $request->all();
+$post['body'] = strip_tags($post['body']);
+$validator = Validator::make($post, $rules);     // clears: $post holds the request data
+if ($validator->fails()) {
+    return back()->withErrors($validator);       // Validator::make BUILDS a validator;
+}                                                // something must then run or check it
+```
+
+Note what the rule does and does not see there. `Validator::make(...)` on its own only *constructs* a validator - the rules do not run until `->validate()` is called or `->fails()` is consulted - and safelint does not verify that you did either. It treats the `make` as the author's declaration of intent to validate, which is the same conservative stance the rule takes everywhere else (any validation call clears the whole function). A `make` whose result is dropped on the floor is a bug this rule will not catch.
+
+A **Form Request** parameter clears the whole method, because the framework ran that class's `rules()` before the body was entered. Recognised by a parameter type whose final name segment ends in `Request` without being one of the base request types that carry no rules of their own - `Request`, `FormRequest`, `ServerRequest`, `ServerRequestInterface`, `RequestInterface`:
+
+```php
+public function store(StoreUserRequest $request) {
+    return User::create($request->all());                     // already validated
+}
+```
+
+Each of these still requires the request: `Validator::make($defaults, $rules)` validates something else and does not clear a `$request->all()` elsewhere in the method, a variable rebound to other data stops standing in for the request, and `$foo->request` is an ordinary property rather than the framework request.
+
+The Form Request test is a **name heuristic**, and cannot be more: confirming that `StoreUserRequest` really extends `FormRequest` needs the file that declares it. A parameter typed `BillingRequest` that is *not* a Form Request will clear the method too. Rename it, or ignore the rule for that file, if the suppression is unwanted.
 
 **Project validators.** Real apps often validate through their own helper (`validate_export_request()`, an allowlist filter builder) rather than the framework's built-in call. Add those names to `request_validators` (Python, bare key) / `request_validators_php` (PHP) and they are unioned with the built-in set, so a read they guard no longer fires. Matched by exact call name (receiver stripped, like `tainted_sink.sanitizers`). This replaces the previous only-recourse of a file-level ignore, which also hid any genuinely-unvalidated read added to the same file later.
 
@@ -1747,9 +1853,25 @@ request_validators = ["validate_export_request", "clean_filters"]
 CSRF protection is on by default in these frameworks; disabling it opens a hole an attacker can drive state-changing requests through. Detected patterns:
 
 - **Python (Django)**: a `@csrf_exempt` decorator - bare (`@csrf_exempt`), called (`@csrf_exempt()`), or wrapped for a class-based view (`@method_decorator(csrf_exempt)`).
-- **PHP (Laravel)**: a non-empty `$except` property - the `VerifyCsrfToken` middleware's route allow-list. An empty `$except = []` exempts nothing and is clean.
+- **PHP (Laravel)**: a non-empty `$except` property **inside the CSRF middleware class** - the `VerifyCsrfToken` route allow-list. An empty `$except = []` exempts nothing and is clean.
 
-More false-positive-prone than SAFE905-907 (a same-named decorator or `$except` property elsewhere would match), so it is **off under `vanilla` and switched on only by the presets that scope it**: the Django and Laravel presets enable it; Flask (CSRF is extension-provided) and FastAPI do not.
+**Class context is required on the PHP side** (*since 2.15.0*). `$except` only means "CSRF-exempt routes" on `VerifyCsrfToken`; Laravel ships `TrimStrings` and `EncryptCookies` with an `$except` of their own that has nothing to do with CSRF, so matching the property name alone reported two findings on every unmodified Laravel app. The class now has to be named `VerifyCsrfToken` or extend it - directly, through a namespace-qualified name, or through the `use ... as Middleware` alias Laravel's own scaffolding writes:
+
+```php
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;
+
+class VerifyCsrfToken extends Middleware {
+    protected $except = ['stripe/*'];      // reported
+}
+
+class TrimStrings extends Middleware {
+    protected $except = ['password'];      // clean: not the CSRF middleware
+}
+```
+
+A trait is not followed into the class that mixes it in, so an `$except` declared in a trait is not reported.
+
+More false-positive-prone than SAFE905-907 (a same-named decorator would match), so it is **off under `vanilla` and switched on only by the presets that scope it**: the Django and Laravel presets enable it; Flask (CSRF is extension-provided) and FastAPI do not.
 
 | Option | Default | Description |
 |---|---|---|
@@ -1983,6 +2105,22 @@ match maybe_save(record) {
 
 The Rust spiritual analogue of `SAFE203 logging_on_error` - handling an error without logging it loses the failure context. Recognised log calls: `error!` / `warn!` / `info!` / `debug!` / `trace!` / `log!` / `event!` (log + tracing crates), `eprintln!` / `eprint!` / `println!` / `print!` / `dbg!`. Exempts bodies that contain a `return_expression`, a panic-like macro (`panic!` / `todo!` / `unreachable!` / `unimplemented!`), or a tail-position `Err(...)` re-raise.
 
+Two further exemptions *since 2.15.0*:
+
+- **Logging through a same-file helper.** A body that calls a function defined in the same file **whose own body contains a recognised log call** is not swallowing the error, it is routing it:
+
+  ```rust
+  Err(e) => self.fail(&object.name, e.to_string()),   // clean: fail() logs
+
+  fn fail(&mut self, object: &str, reason: String) {
+      warn!(object, %reason, "object failed; continuing");
+      self.outcome.failed.push((object.to_string(), reason));
+  }
+  ```
+
+  The log call in the helper is the whole test. A helper that only records the failure to a list and never logs is **not** credited, and the branch still reports. One call hop only; a deeper chain still reports.
+- **An arm that enumerates one error variant and binds nothing.** `Err(store::Error::NotFound { .. }) => Ok(false)` implements a documented "treat not-found as false" contract, and binds nothing, so there is no error value in scope to put in a message. Binding is the test rather than syntax, so the wildcard forms count as binding nothing too: `Err(E::NotFound(_))` and `Err(E::Io { source: _ })` are exempt. An arm that genuinely binds part of the error (`Err(E::Io(e))`, `Err(E::Io { source })`, `Err(E::Io { source: inner })`), a plain binding (`Err(other)`) or a wildcard (`Err(_)`) still reports, because there the author either has a value to log or has not discriminated anything.
+
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `false` | Toggle the rule |
@@ -2007,7 +2145,12 @@ if let Err(e) = save(record) {
 
 ### SAFE208: `result_unwrap_outside_tests`
 
-**What it flags:** Any `.unwrap()` / `.expect()` / `.unwrap_unchecked()` outside test code (`#[test]` / `#[cfg(test)] mod` exempt). Rust only.
+**What it flags:** Any `.unwrap()` / `.expect()` / `.unwrap_unchecked()` outside test code. Rust only.
+
+**What counts as test code** (*widened in 2.15.0*): a `#[test]` / `#[tokio::test]` function or a `#[cfg(test)] mod` in the same file, plus two shapes Cargo makes idiomatic and an in-file attribute search can never see:
+
+- **A file under a `tests/` directory.** Cargo integration tests get no `#[cfg(test)]` - the directory *is* the gate - so every `.unwrap()` in a `tests/` file was reported. A `tests` component **inside** `src` does not count: `src/tests/helpers.rs` is ordinary crate source in a module named `tests`, and when that module is gated the `#[cfg(test)] mod tests;` in its parent is what says so. Cargo's integration tests sit in a `tests/` that is a sibling of `src`, never within it.
+- **A module gated from its parent.** `#[cfg(test)] mod helpers;` in `lib.rs` gates `helpers.rs` entirely; the attribute lives in the parent file, not the module's own. Only a `mod` named after the file counts, so `#[cfg(test)] mod other;` beside a plain `mod helpers;` does not gate `helpers.rs`.
 
 The broad Holzmann-rule-7 form: catches bare-variable unwraps (`let r = foo(); r.unwrap();`) and unwrap chains the narrower SAFE205 (lock-specific) / SAFE803 (nullable-method-specific) rules don't cover. With all three enabled, `mutex.lock().unwrap()` fires multiple codes - documented intentional overlap; users pick strictness level by enabling subsets. `unwrap_or` / `unwrap_or_default` / `unwrap_or_else` are NOT flagged - they're explicit-default-on-Err, not silent failures.
 

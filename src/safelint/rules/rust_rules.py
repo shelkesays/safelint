@@ -58,6 +58,7 @@ operations, smallest scope, checked conversions):
 
 from __future__ import annotations
 
+import pathlib
 import re
 from typing import TYPE_CHECKING, ClassVar
 
@@ -69,6 +70,8 @@ from safelint.rules.base import BaseRule
 
 
 if TYPE_CHECKING:
+    import os
+
     import tree_sitter
 
     from safelint.rules.base import Violation
@@ -294,6 +297,141 @@ def _node_has_test_marker_attribute(node: tree_sitter.Node) -> bool:
         if attribute_item_is_test_marker(cursor):
             return True
         cursor = cursor.prev_named_sibling
+    return False
+
+
+#: Cargo's integration-test directory. Every ``.rs`` file under a crate's
+#: ``tests/`` is a separate test binary and never carries ``#[cfg(test)]`` - the
+#: directory IS the gate, so an in-file attribute search can never see it (#172).
+_CARGO_TEST_DIR = "tests"
+
+#: A crate's source directory. A ``tests`` component inside it is a module name,
+#: not cargo's integration-test directory (see ``_is_cargo_test_path``).
+_RUST_SOURCE_DIR = "src"
+
+
+def _is_cargo_test_path(filepath: str, test_dirs: tuple[str, ...] = (_CARGO_TEST_DIR,)) -> bool:
+    """Return True if *filepath* sits under a cargo INTEGRATION-test directory.
+
+    Any path component matching, rather than a root-anchored prefix: a cargo
+    workspace puts integration tests at ``crates/<name>/tests/``, so anchoring at
+    the project root (which is what the shared ``_is_test_file`` helper does, by
+    design, for the rules that want project-relative ``test_dirs``) would miss
+    every crate in a workspace. On ripgrep that is 15 of the 26 misreported
+    findings.
+
+    A ``tests`` component **under** ``src`` does not count. ``src/tests/helpers.rs``
+    is ordinary crate source that happens to be in a module called ``tests``; it is
+    compiled into the library unless something gates it, and when it IS gated the
+    ``#[cfg(test)] mod tests;`` in its parent is what says so - which
+    ``_is_test_gated_in_parent`` already detects. Cargo's integration tests live in
+    a ``tests/`` that is a SIBLING of ``src``, never inside it.
+
+    Purely lexical - no filesystem probe, no symlink followed.
+    """
+    parts = pathlib.PurePath(filepath).parts
+    return any(part in test_dirs and _RUST_SOURCE_DIR not in parts[:index] for index, part in enumerate(parts))
+
+
+#: Files that can declare a sibling module, in the order cargo would resolve them.
+_RUST_PARENT_MODULE_FILES: tuple[str, ...] = ("lib.rs", "main.rs", "mod.rs")
+
+#: Cache keyed by (directory, module stem, parent-file signature). Resolving the
+#: parent reads and parses one sibling file, and a crate's modules all share the
+#: same parent, so without this a 200-module crate would re-read ``lib.rs`` 200
+#: times. The signature is in the key because this dict is process-global and
+#: safelint also runs as a library inside long-lived processes (the editor
+#: extension): keyed on the path alone, editing ``lib.rs`` to remove a
+#: ``#[cfg(test)]`` would keep returning the stale "gated" answer and go on
+#: suppressing findings in production code.
+_PARENT_GATE_CACHE: dict[tuple[str, str, tuple[tuple[str, int, int], ...]], bool] = {}
+
+
+def _is_test_gated_in_parent(filepath: str) -> bool:
+    """Return True if this file's module is declared ``#[cfg(test)] mod <stem>;``.
+
+    A module can be gated where it is *declared* rather than where it is defined::
+
+        // src/lib.rs
+        #[cfg(test)]
+        mod testutil;      // <- the gate lives here
+
+        // src/testutil.rs
+        pub fn helper() -> u32 { ... }   // no attribute of its own
+
+    so an in-file attribute search cannot see it. On ripgrep this is
+    ``crates/searcher/src/testutil.rs``, gated at ``lib.rs:105`` - 9 of the 26
+    misreported findings (#172).
+
+    Reads at most one sibling file and caches the answer per directory, stem and
+    parent-file signature, so an edited parent is re-read rather than answered
+    from a stale entry. Any failure to read or parse is treated as "not gated",
+    which leaves the finding reported - the safe direction.
+    """
+    path = pathlib.Path(filepath)
+    key = (str(path.parent), path.stem, _parent_module_signature(path))
+    cached = _PARENT_GATE_CACHE.get(key)
+    if cached is not None:
+        return cached
+    gated = _parent_declares_test_module(path)
+    _PARENT_GATE_CACHE[key] = gated
+    return gated
+
+
+def _parent_module_signature(path: pathlib.Path) -> tuple[tuple[str, int, int], ...]:
+    """Return a (name, mtime_ns, size) tuple per candidate parent module file that exists.
+
+    Three ``stat`` calls, against a read plus a full Rust parse on a cache miss,
+    so the cache still pays for itself while a changed parent invalidates it.
+    """
+    # A candidate that is absent (or unstattable) contributes nothing; its later
+    # appearance changes the signature, which is the point of having one.
+    stats = ((name, _stat_or_none(path.parent / name)) for name in _RUST_PARENT_MODULE_FILES)
+    return tuple((name, info.st_mtime_ns, info.st_size) for name, info in stats if info is not None)
+
+
+def _stat_or_none(candidate: pathlib.Path) -> os.stat_result | None:
+    """Return *candidate*'s stat, or None when it does not exist or cannot be read."""
+    try:
+        return candidate.stat()
+    # Absence is the normal case here (most directories have one of the three
+    # module roots, not all), so it is a value rather than an error.
+    except OSError:  # nosafe: SAFE203
+        return None
+
+
+def _parent_declares_test_module(path: pathlib.Path) -> bool:
+    """Search this file's sibling module roots for a ``#[cfg(test)] mod <stem>;``."""
+    for candidate_name in _RUST_PARENT_MODULE_FILES:
+        candidate = path.parent / candidate_name
+        if candidate.name == path.name or not candidate.is_file():
+            continue
+        if _declares_gated_module(candidate, path.stem):
+            return True
+    return False
+
+
+def _declares_gated_module(parent_file: pathlib.Path, stem: str) -> bool:
+    """Return True if *parent_file* has a ``#[cfg(test)]``-attributed ``mod <stem>;``."""
+    # Deliberately swallows: an unreadable parent means "not gated", which leaves
+    # the finding reported - the safe direction for this rule. Raising would abort
+    # the lint over a sibling file the user did not ask about, and logging would
+    # fire once per module in a crate whose parent is simply absent.
+    try:
+        source = parent_file.read_bytes()
+    except OSError:  # nosafe: SAFE203
+        return False
+    # No guard around the parser: reaching here means a ``.rs`` file is being
+    # linted, so the Rust grammar is necessarily installed.
+    tree = _rust.RUST.create_parser().parse(source)
+    for node in walk(tree.root_node):
+        if node.type != _rust.MOD_ITEM:
+            continue
+        name = node.child_by_field_name("name")
+        if name is None or node_text(name) != stem:
+            continue
+        if _node_has_test_marker_attribute(node):
+            return True
     return False
 
 
@@ -769,6 +907,125 @@ _RUST_FUNCTION_TYPES_FOR_SKIP: tuple[str, ...] = (_rust.FUNCTION_ITEM, _rust.CLO
 _RUST_LIVENESS_SKIP: tuple[str, ...] = (_rust.FUNCTION_ITEM,)
 
 
+#: Pattern kinds that can name ONE specific error variant. ``scoped_identifier``
+#: is a unit variant (``Err(Error::NotFound)``); ``struct_pattern`` is the braced
+#: form (``Err(store::Error::NotFound { .. })``); ``tuple_struct_pattern`` is the
+#: positional form (``Err(Error::NotFound(_))``). Whether each actually binds
+#: anything is decided per kind by ``_variant_pattern_binds_nothing``.
+_RUST_DISCRIMINATED_VARIANT_PATTERNS: frozenset[str] = frozenset({_rust.SCOPED_IDENTIFIER, "struct_pattern", _rust.TUPLE_STRUCT_PATTERN})
+
+#: Every field of a struct pattern is a ``field_pattern``, shorthand or not: the
+#: ``{ source }`` form wraps a ``shorthand_field_identifier`` rather than
+#: appearing as one. ``remaining_field_pattern`` (``{ .. }``) is a different type
+#: and binds nothing.
+_RUST_FIELD_PATTERN = "field_pattern"
+
+
+def _variant_pattern_binds_nothing(payload: tree_sitter.Node) -> bool:
+    """Return True when a variant pattern destructures nothing out of the error.
+
+    Binding is what decides the exemption: an arm with a value in scope could log
+    it, an arm without one cannot. So the test is per pattern kind, not per kind
+    name - a wildcard binds no value even though it occupies a position:
+
+    * ``Error::NotFound``                 unit variant, nothing to bind;
+    * ``Error::NotFound(_)``              the ``_`` is an anonymous token, so the
+      only named child is the variant path;
+    * ``Error::NotFound { .. }``          ``remaining_field_pattern``, binds nothing;
+    * ``Error::Io { source: _ }``         a ``field_pattern`` whose sub-pattern is
+      the wildcard, so again no value;
+    * ``Error::Io(e)`` / ``{ source }``   DO bind, and still report.
+    """
+    if payload.type == _rust.SCOPED_IDENTIFIER:
+        return True
+    if payload.type == _rust.TUPLE_STRUCT_PATTERN:
+        # child 0 is the variant path; anything further is a real binding.
+        return len(payload.named_children) <= 1
+    return not any(_field_pattern_binds(child) for child in payload.named_children)
+
+
+def _field_pattern_binds(child: tree_sitter.Node) -> bool:
+    """Return True if a struct-pattern child binds a value out of the error.
+
+    A ``field_pattern`` with no ``pattern`` field is the shorthand ``{ source }``,
+    which binds the field under its own name; with one, it binds unless the
+    sub-pattern is the wildcard (``{ source: _ }``).
+    """
+    if child.type != _RUST_FIELD_PATTERN:
+        return False
+    sub_pattern = child.child_by_field_name("pattern")
+    if sub_pattern is None:
+        return True
+    return sub_pattern.type != "_"
+
+
+def _err_pattern_discriminates_variant(pattern: tree_sitter.Node | None) -> bool:
+    """Return True if an ``Err`` pattern names one specific variant and binds nothing.
+
+    Such an arm is enumerating a known case, not absorbing whatever arrived::
+
+        Err(object_store::Error::NotFound { .. }) => Ok(false),
+        Err(e) => Err(e),                      // everything else propagates
+
+    which implements a documented "treat not-found as false" contract (#161).
+    There is also no error value in scope to log, so the rule would be asking for
+    a message with nothing in it.
+
+    Deliberately narrow. A pattern that BINDS part of the error
+    (``Err(store::Error::Io(e))``, or a struct pattern with field bindings) still
+    reports: the author has the value and could log it. ``Err(_)`` and ``Err(e)``
+    are unchanged - neither discriminates.
+    """
+    # ``_match_arm_pattern_and_body`` already unwraps the ``match_pattern``
+    # wrapper, so *pattern* is the ``Err(..)`` tuple-struct pattern itself.
+    if pattern is None or pattern.type != _rust.TUPLE_STRUCT_PATTERN or len(pattern.named_children) < 2:
+        return False
+    payload = pattern.named_children[1]
+    if payload.type not in _RUST_DISCRIMINATED_VARIANT_PATTERNS:
+        return False
+    return _variant_pattern_binds_nothing(payload)
+
+
+def _logging_function_names(root: tree_sitter.Node) -> frozenset[str]:
+    """Return the names of functions in this file whose body contains a log call.
+
+    Factoring error reporting into a small helper is good practice, and an
+    intra-statement check defeats it entirely::
+
+        Err(e) => self.fail(&object.name, e.to_string()),   // reported as unlogged
+
+        fn fail(&mut self, object: &str, reason: String) {
+            warn!(object, %reason, "object failed; continuing");
+            self.outcome.failed.push((object.to_string(), reason));
+        }
+
+    The error is logged *and* recorded, one call hop away. On the project this
+    was found in, that single shape was 6 of 9 SAFE207 findings (#161).
+
+    Scoped to the file being linted, which is where the helper lives in every
+    observed case and keeps the rule intra-file. A helper imported from another
+    module is not resolved, so such a branch still reports - the safe direction.
+    """
+    names: set[str] = set()
+    for node in walk(root):
+        if node.type != _rust.FUNCTION_ITEM:
+            continue
+        name = node.child_by_field_name("name")
+        body = node.child_by_field_name("body")
+        if name is None or body is None:
+            continue
+        if any(_node_resolves_to_log_call(child) for child in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP)):
+            names.add(node_text(name))
+    return frozenset(names)
+
+
+def _body_calls_logging_helper(body: tree_sitter.Node | None, logging_functions: frozenset[str]) -> bool:
+    """Return True if *body* calls a same-file function that logs."""
+    if body is None or not logging_functions:
+        return False
+    return any(node.type == _rust.CALL_EXPRESSION and call_name(node) in logging_functions for node in walk(body, skip_types=_RUST_FUNCTION_TYPES_FOR_SKIP))
+
+
 def _node_resolves_to_log_call(node: tree_sitter.Node) -> bool:
     """Return True if *node* is a macro or call resolving to a log-call name."""
     if node.type == _rust.MACRO_INVOCATION:
@@ -937,20 +1194,23 @@ class UnloggedErrorBranchRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag Err arms / if-let-Err bodies that handle the error silently."""
+        # Resolved once per file: a branch that delegates its reporting to a
+        # same-file helper is logging, one call hop away (#161).
+        logging_functions = _logging_function_names(tree.root_node)
         violations: list[Violation] = []
         for node in walk(tree.root_node):
-            violation = self._check_node(filepath, node)
+            violation = self._check_node(filepath, node, logging_functions)
             if violation is not None:
                 violations.append(violation)
         return violations
 
-    def _check_node(self, filepath: str, node: tree_sitter.Node) -> Violation | None:
+    def _check_node(self, filepath: str, node: tree_sitter.Node, logging_functions: frozenset[str]) -> Violation | None:
         """Dispatch *node* and return a violation if the Err-branch body is silent."""
         if node.type == _rust.MATCH_ARM:
             pattern, body = _match_arm_pattern_and_body(node)
-            if not _is_err_pattern(pattern):
+            if not _is_err_pattern(pattern) or _err_pattern_discriminates_variant(pattern):
                 return None
-            if self._is_silent_handle(body):
+            if self._is_silent_handle(body, logging_functions):
                 return self._make_violation_for_node(
                     filepath,
                     node,
@@ -961,7 +1221,7 @@ class UnloggedErrorBranchRule(BaseRule):
             _, body = _if_let_err_pattern_and_body(node)
             if body is None:
                 return None
-            if self._is_silent_handle(body):
+            if self._is_silent_handle(body, logging_functions):
                 return self._make_violation_for_node(
                     filepath,
                     node,
@@ -970,11 +1230,16 @@ class UnloggedErrorBranchRule(BaseRule):
         return None
 
     @staticmethod
-    def _is_silent_handle(body: tree_sitter.Node | None) -> bool:
-        """Return True if *body* is non-empty, has no log call, and doesn't propagate."""
+    def _is_silent_handle(body: tree_sitter.Node | None, logging_functions: frozenset[str] = frozenset()) -> bool:
+        """Return True if *body* is non-empty, has no log call, and doesn't propagate.
+
+        A call to a same-file function that logs counts as logging: factoring
+        error reporting into a helper is good practice and an intra-statement
+        check would defeat it (#161).
+        """
         if body is None or _body_is_noop(body):
             return False
-        if _body_has_log_call(body):
+        if _body_has_log_call(body) or _body_calls_logging_helper(body, logging_functions):
             return False
         return not _body_propagates_or_panics(body)
 
@@ -1012,6 +1277,12 @@ class ResultUnwrapOutsideTestsRule(BaseRule):
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag unwrap-family method calls outside test code."""
+        # Two file-level test contexts an in-file attribute search cannot see:
+        # a cargo ``tests/`` directory, and a module gated where it is declared
+        # rather than where it is defined (#172). Both are whole-file answers, so
+        # they are resolved once rather than per call site.
+        if _is_cargo_test_path(filepath) or _is_test_gated_in_parent(filepath):
+            return []
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type != _rust.CALL_EXPRESSION:

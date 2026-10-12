@@ -7,7 +7,47 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`logging_on_error` (SAFE203) gained per-language `log_methods` lists.** `log_methods` (Python, bare key) plus `log_methods_javascript` / `log_methods_typescript` / `log_methods_java` / `log_methods_php` / `log_methods_cpp`. The accepted names had been hardcoded in the rule; they are now configurable like every other name list, matched with the receiver discarded (`$logger->notice($e)` resolves to `notice`). Per language rather than one flat list because whether a stdout write counts is a question about the language's culture: Java's list deliberately omits `println`, since `System.out.println` in a catch block is the anti-pattern the rule exists to find.
+
 ### Changed
+
+- **SAFE203 `logging_on_error`: a handler that re-raises is not swallowing the error (#159, #199).** The rule asked for a logging call in every `except` / `catch` body and said the error was "swallowed" when it found none. A handler that re-raises swallows nothing, and logging there actively hurts - you get two reports of one failure, the second at the wrong altitude, which is why the standard advice is to log at the boundary that handles the error rather than at every frame it passes through.
+
+  The test is now whether **every exit path** out of the handler leaves by raising, which is stricter than "contains a raise" in the direction that matters:
+
+  ```python
+  except ValueError as err:
+      raise RuntimeError("bad") from err      # clean: the add-context re-raise
+
+  except ValueError as exc:
+      print(f"failed: {exc}")                 # clean: report, then propagate
+      raise
+
+  except ValueError:
+      if never_true:
+          raise
+      return None                             # still reported: this path really does swallow
+  ```
+
+  **When only some arms propagate, the finding anchors at the arm that falls through**, not at the `except` line. On a handler with several branches, "something in here leaks" leaves the reader to work out which; the line number is the whole value of the report. The clause stays the anchor when the handler falls through as a unit, because there the handler itself is the problem.
+
+  Language-agnostic from the start rather than Python-first: all six languages with try/catch (Python, JavaScript, TypeScript, Java, PHP, C++) share the exit-path analysis. What differs is what re-raising means in each. Python needs no check on *what* is raised, because a `raise` inside an `except` chains the active exception automatically. The C-family languages have no such automatic chaining, so the thrown value is examined: re-throwing the caught binding counts, and so does a **fresh error that carries it along** -
+
+  ```java
+  catch (IOException e) {
+      throw new ConfigException("loading " + path, e);   // clean: the original is attached
+  }
+  ```
+
+  which is the C-family spelling of `raise RuntimeError(msg) from err`. Exempting the Python form while reporting the Java one would be the same one-act-judged-two-ways problem as the `print` question below. `throw new Error("x")` with no mention of the caught value still discards the original and still wants logging; so does `throw makeError(e)` outside C++, because a factory's return value need not be a wrapper (C++ constructs the thrown value with a plain call, so there it counts). C and Rust have no try/catch, and Rust's analogue SAFE207 already had its own propagation logic; Go has neither, its nearest rule being SAFE209 `empty_error_check`.
+
+  Python's `log_methods` also accepts `print`, `print_exception` and `print_exc` (#199). Rust's SAFE207, the documented analogue of this rule, has always counted `println!` / `eprintln!` / `print!` as making the failure visible, so one act was being judged two ways across the two languages; and reporting Rich's `console.print_exception(show_locals=True)` as an unlogged error branch is the rule contradicting the code's obvious intent. Scoped to Python, where a script or CLI legitimately prints its own failure.
+
+  Four of safelint's own `# nosafe: SAFE203` annotations are gone as a result. All four sat on cleanup-and-reraise handlers in `_skill_install.py` and `core/_cache.py` - close the orphan fd, drop the temp file, `raise` - which the rule now reads correctly; their comments already said "not a swallow". 33 remain, in two groups: the `_diagnostics.print_*` handlers the architecture docs describe (the rule recognises only logger-shaped names, and those are deliberately spelled `print_*` so that SAFE304 exempts them), and the ten optional-grammar `except ImportError` fallbacks across `languages/*.py` and `__init__.py`, where a missing grammar is surfaced later as an install hint rather than at import time. The count is up by one on 2.14.x: the new parent-module stat helper treats an absent file as a value rather than an error.
+
+  Measured. Python, where the exit-path and `print` halves both apply: Django **1476 -> 1146** (-22%), Rich **109 -> 68** (-38%), FastAPI **72 -> 37** (-49%), Flask **57 -> 38** (-33%), requests **81 -> 60** (-26%). The C-family gets the exit-path and wrapping halves, and the wrapping one dominates there because `throw new X("ctx", e)` is the standard way to add context: Guava **1519 -> 1140** (-25%), Commons Lang **168 -> 139** (-17%), laravel/framework **669 -> 593** (-11%), Guzzle **370 -> 337** (-9%), axios **91 -> 86**, zod **138 -> 136**; express, elysia, monolog, fmt and leveldb unchanged, having neither shape. SAFE203 is **enabled by default**, so this moves existing finding counts.
 
 - **SAFE102 `nesting_depth` no longer counts `with` or `try` as a nesting level (#166).** The rule exists to keep *decisions* shallow - that is what makes a function hard to follow and to test - and a resource or error-handling wrapper adds indentation without adding a branch:
 
@@ -45,6 +85,49 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **SAFE801 `tainted_sink`: bare `query` and `execute` are no longer Rust sink defaults (#180).** Rust has no database API in its standard library, so as barewords they matched any builder, any LSP snapshot accessor and any closure parameter of that name. Validating every finding rather than sampling: **1 defensible out of 9** across ty and Ruff, with 30 of Ruff's 55 being `snapshot.query()` on a `DocumentSnapshot`. The crate-specific spellings stay (`query_as`, `query_scalar`, `execute_batch`), as do `arg` / `args` / `open`; list your crate's entry point explicitly if you call raw SQL through a bare `query`.
 
 ### Fixed
+
+- **SAFE907 `unvalidated_request_input` now recognises Laravel's actual validation idioms (#157).** The rule accepted `$request->validate(...)` and the `ValidatesRequests` trait form `$this->validate($request, ...)`, and nothing else - so `Validator::make($request->all(), $rules)` was reported as unvalidated input **on the line that validates it**. That is not a corner: on FreeScout `Validator::make` outnumbers `$request->validate` by 19 to 1, and the rule is switched on by the `laravel` preset, so users met this by opting into the preset rather than the rule. Four forms now clear a read:
+  - the `Validator` facade, `Validator::make(...)` / `Validator::validate(...)`. The unqualified name (the aliased import every Laravel file writes, with or without a leading namespace separator) and the fully-qualified `Illuminate\Support\Facades\Validator` are accepted; some **other** namespace's `Validator` is a different class and is not;
+  - a validator built from the request data and then validated, `$this->validator($request->all())->validate()` - which is how Laravel's own `RegistersUsers` trait is written, and the one SAFE907 finding on laravel/framework itself;
+  - a one-step local alias of the request data: `$post = $request->all();` ... `Validator::make($post, $rules)`, the read-then-massage-then-validate shape named in the issue;
+  - a **Form Request** parameter, `store(StoreUserRequest $request)`, which clears the whole method because the framework ran that class's `rules()` before the body was entered. Matched on the type's final name segment ending in `Request` while not being the base `Request` / `FormRequest`, neither of which carries rules of its own.
+
+  Each still requires the request, and only the request: `Validator::make($defaults, $rules)` validates something else and does not clear a `$request->all()` elsewhere in the method; a variable never assigned a request read does not stand in for one, nor does one that has since been rebound to other data; and `$foo->request` is an ordinary property, not the framework request - every property read contains a bare `request` name node, so considering only whole variable and property expressions is what keeps an unrelated field from clearing a real finding.
+
+  The Form Request half is a **name-based heuristic** and cannot be more than that: confirming `StoreUserRequest` really extends `FormRequest` needs the other file. A `BillingRequest` parameter that is not a Form Request clears the method too. #157 specified this test; rename the parameter or ignore the rule for the file if the suppression is unwanted. Measured on FreeScout: **13 -> 2**, the two remaining being genuine unvalidated bulk reads (one of them the `MailboxesController` site the issue names as its true positive). laravel/framework **1 -> 0**.
+
+- **SAFE908 `csrf_protection_disabled`: `$except` is only CSRF-relevant inside the CSRF middleware (#162).** The PHP side matched a `$except` property by name with no class context. Laravel ships `TrimStrings` and `EncryptCookies` with an `$except` of their own - one lists fields not to trim, the other cookies not to encrypt - so the rule fired twice on the contents of every unmodified `app/Http/Middleware/`. The rule's own docstring had recorded the limitation as an accepted trade while it was opt-in; the `laravel` preset then turned it on, which made it a guaranteed false positive instead.
+
+  The class must now be named `VerifyCsrfToken` or extend it: a bare name, a namespace-qualified one, or the `use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;` alias Laravel's own scaffolding writes. The alias has to be resolved rather than matched, because `TrimStrings` and `EncryptCookies` alias *their* bases to the same name `Middleware`. A trait is not followed into the class that mixes it in, so an `$except` declared in a trait is not reported - the quiet side, since reporting every trait `$except` is the defect being fixed. Measured on FreeScout: **2 -> 0**, with its own `VerifyCsrfToken` (an empty `$except`) correctly clean and a non-empty one still reported; laravel/framework clean across 734 files.
+
+- **SAFE208 `result_unwrap_outside_tests`: Cargo's test layouts count as test context (#172).** Test detection searched for `#[test]` / `#[cfg(test)] mod` on the item or an ancestor in the same file, which misses the two shapes Cargo makes idiomatic:
+  - **a file under a `tests/` directory**, where integration tests carry no `#[cfg(test)]` at all because the directory *is* the gate, so every `.unwrap()` in such a file was reported;
+  - **a module gated from its parent**, `#[cfg(test)] mod helpers;` in `lib.rs`, where the attribute lives in the parent file and the module's own file contains no marker.
+
+  A `tests` component **under** `src` does not count: `src/tests/helpers.rs` is ordinary crate source in a module called `tests`, and when it is gated the `#[cfg(test)] mod tests;` in its parent is what says so. Cargo's integration tests live in a `tests/` that is a sibling of `src`, never inside it.
+
+  Both are whole-file answers, so they are resolved once per file and cached rather than re-derived per unwrap. The cache key carries a stat signature of the parent module files, because it is process-global and safelint also runs as a library inside long-lived hosts: keyed on the path alone, deleting a `#[cfg(test)]` from `lib.rs` would go on returning the stale "gated" answer for what is now production code. Measured: ripgrep **125 -> 99** (-21%), Ruff **1234 -> 1063** (-14%).
+
+- **SAFE207 `unlogged_error_branch`: two handler shapes that are not swallowing the error (#161).** Both were reported as unlogged, and following the advice would have meant adding a message with nothing useful in it.
+  - **Logging through a same-file helper.** A body that calls a function defined in the same file **whose own body contains a log call** is routing the error, not dropping it:
+
+    ```rust
+    Err(e) => self.fail(&object.name, e.to_string()),   // was reported as unlogged
+
+    fn fail(&mut self, object: &str, reason: String) {
+        warn!(object, %reason, "object failed; continuing");
+        self.outcome.failed.push((object.to_string(), reason));
+    }
+    ```
+
+    The log call is the whole test: a helper that only records to a list and never logs is **not** credited, and such a branch still reports. One call hop, too - a transitive search over the file would eventually exempt anything. In the file the issue was found in, this shape was 6 of 9 findings.
+  - **An arm that enumerates a single error variant and binds nothing.** `Err(store::Error::NotFound { .. }) => Ok(false)` implements a documented "treat not-found as false" contract while the next arm propagates everything else, and it has no error value in scope to log. Binding, not syntax, is the test, so the wildcard forms `Err(E::NotFound(_))` and `Err(E::Io { source: _ })` are exempt too. An arm that actually binds part of the error (`Err(E::Io(e))`, `Err(E::Io { source })`, `Err(E::Io { source: inner })`), a plain binding (`Err(other)`) or a wildcard (`Err(_)`) still reports, because there the author either has a value to log or has not discriminated anything.
+
+  Measured: Ruff **211 -> 180** (-15%); ripgrep unchanged at 34, which has neither shape.
+
+- **SAFE601 `missing_assertions`: `assertion_calls_rust` covers the snapshot and `matches!` macro families (#177).** Snapshot testing is the dominant assertion idiom in modern Rust suites, and a test whose only assertion was a snapshot read as having none - the rule telling a passing, asserting test to add an assertion. Added the eleven `insta` macros (`assert_snapshot`, `assert_debug_snapshot`, `assert_json_snapshot`, `assert_yaml_snapshot`, `assert_ron_snapshot`, `assert_toml_snapshot`, `assert_csv_snapshot`, the two compact forms, `assert_binary_snapshot`, `assert_display_snapshot`) plus `assert_matches` / `debug_assert_matches`. Measured on Ruff: **36925 -> 34505**. ripgrep is unchanged at 2900, using no snapshot crate.
+
+- **An interrupted atomic write no longer leaves a temp file behind.** Both atomic-write helpers - the cache's `_atomic_write_json` and the skill installer's `_write_file_replace` - cleaned up in an `except OSError`. A `KeyboardInterrupt` is not an `OSError`, so Ctrl-C during a write skipped cleanup entirely and orphaned a `.json.tmp` in the cache directory or a `.safelint-section-*.tmp` in the user's skills directory. Both now clean up in a `finally`, which covers every exit path including interrupts and cancellation, and the error still propagates unchanged. The fd-leak guard around `os.fdopen` gets the same treatment, so an interrupt in that window cannot leak the raw descriptor either.
 
 - **Rule default lists now have a single owner, so a hand-built config behaves like the shipped one.** Five dataflow rule classes carried `ClassVar` copies of their `DEFAULTS` entries, consulted when a caller constructs a rule directly with a config that omits the key. Being second copies they drifted, in both directions:
   - `flagged_calls` kept the pre-#156 sixteen names, so such a caller still had `os.remove()` and `f.write()` flagged after the default was trimmed;

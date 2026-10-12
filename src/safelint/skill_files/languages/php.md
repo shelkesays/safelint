@@ -60,7 +60,7 @@ When the user asks "why is this flagged?", the universal rationale in the per-cl
 | SAFE104 | complexity | Cyclomatic complexity: every `if` / `elseif` / `for` / `foreach` / `while` / `case` / `catch` adds one; `&&` / `\|\|` / `and` / `or` / `??` each add one. The `default` case is not counted. Default cap is 10. |
 | SAFE105 | no_recursion | Flags a function calling itself bare (`recurse($n - 1)`) or a method calling itself receiver-qualified (`$this->walk(...)` inside `walk`). Direct self-recursion only; indirect / mutual recursion is out of scope. Enabled by default at warning severity. |
 | SAFE202 | empty_except | Flags a `catch` block with an empty (or comment-only) body - the exception was caught and then silently swallowed. PHP's `catch (\Exception $e) {}` is the catch-all-and-drop hazard. |
-| SAFE203 | logging_on_error | Flags a `catch` block that neither logs nor re-throws, losing the failure context. Re-throw (`throw $e;`) and recognised log calls exempt the block. |
+| SAFE203 | logging_on_error | Flags a `catch` block that neither logs nor re-throws, losing the failure context. Exempt when **every exit path** out of the handler re-throws the caught value, either directly (`throw $e;`) or wrapped as `$previous` (`throw new RuntimeException('ctx', 0, $e);`); a handler where only some branches re-throw is reported at the branch that falls through. Accepted log names come from `log_methods_php`: the PSR-3 levels (`emergency` / `alert` / `critical` / `error` / `warning` / `notice` / `info` / `debug` / `log`) plus `warn`, `exception` and the `error_log` builtin. |
 | SAFE301 | global_state | *PHP's first non-Python home.* Fires on the `global $x;` statement inside a function body - it reaches out to module-level state and defeats local reasoning. Pass the value in as a parameter instead. |
 | SAFE302 | global_mutation | Reassigning shared state. PHP additionally flags writes to the `$GLOBALS[...]` superglobal (`$GLOBALS['cfg'] = ...`) on top of the universal patterns. |
 | SAFE303 | side_effects_hidden | Fires when a function with a "pure" name prefix (`get` / `compute` / `is` / `validate` / etc.) contains an I/O call (`echo` / `print` / `file_get_contents` / `fwrite` / `curl_exec` / `->query` / etc.). |
@@ -176,6 +176,12 @@ PHP source is PHP source - the parser and rule logic are framework-agnostic. The
 | --- | --- | --- |
 | `vanilla` (default) | Plain PHP, libraries, no framework | Stdlib-only defaults. SAFE9xx framework rules stay disabled. Existing v2.6.0+ users see no change. |
 | `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks. Enables the full SAFE905-909 set (Eloquent `$guarded = []` mass-assignment, `$request->all()` unvalidated input, `'debug' => true` config, non-empty `$except` CSRF allow-list, hardcoded `base64:` `APP_KEY`). |
+
+Two of those five changed scope in 2.15.0 after they were measured against a real Laravel app:
+
+- **SAFE907** recognises `Validator::make(...)` / `Validator::validate(...)`, a validator built from the request data and then validated (`$this->validator($request->all())->validate()`), a one-step local alias of the request data (`$post = $request->all();` ... `Validator::make($post, $rules)`), and a **Form Request** parameter (`store(StoreUserRequest $request)`), which means the framework already ran that class's `rules()`. Previously only `$request->validate(...)` and the `ValidatesRequests` trait form counted, so the rule reported the very line that validates the input.
+- **SAFE908** requires class context: `$except` is reported only inside a class named `VerifyCsrfToken` or extending one (including through the `use ... as Middleware` alias Laravel scaffolds). Laravel's stock `TrimStrings` and `EncryptCookies` carry an unrelated `$except`, so matching the property name alone fired on every unmodified app.
+
 
 ```toml
 # pyproject.toml
