@@ -337,12 +337,9 @@ def _is_cargo_test_path(filepath: str, test_dirs: tuple[str, ...] = (_CARGO_TEST
     root = _cargo_crate_root(path)
     if root is None:
         return False
-    try:
-        relative = path.relative_to(root)
-    # Only reachable if the resolved root stops being a prefix between the walk
-    # and here (a concurrent rename); reporting is the safe answer.
-    except ValueError:  # pragma: no cover - defensive
-        return False
+    # No guard needed around ``relative_to``: ``_cargo_crate_root`` only ever
+    # returns one of ``path``'s own ancestors, so the prefix always holds.
+    relative = path.relative_to(root)
     return len(relative.parts) > 1 and relative.parts[0] in test_dirs
 
 
