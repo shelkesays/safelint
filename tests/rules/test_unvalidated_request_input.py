@@ -225,25 +225,25 @@ def test_php_validator_facade_make_clears(tmp_path: Path) -> None:
 
 def test_php_namespaced_validator_facade_clears(tmp_path: Path) -> None:
     """The root-namespaced ``\\Validator::make(...)`` form clears too."""
-    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ \\Validator::make($request->all(), [])->validate(); return M::create($request->all()); } } ?>")
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ \\Validator::make($request->all(), ['name'=>'required'])->validate(); return M::create($request->all()); } } ?>")
     assert _codes(src) == []
 
 
 def test_php_validator_facade_validate_clears(tmp_path: Path) -> None:
     """``Validator::validate($request->all(), $rules)`` (the one-shot facade form) clears."""
-    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::validate($request->all(), []); return M::create($request->all()); } } ?>")
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::validate($request->all(), ['name'=>'required']); return M::create($request->all()); } } ?>")
     assert _codes(src) == []
 
 
 def test_php_validator_facade_on_partial_request_clears(tmp_path: Path) -> None:
     """A facade call validating a subset (``$request->only(...)``) still mentions the request and clears."""
-    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::make($request->only('name'), [])->validate(); return M::create($request->all()); } } ?>")
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::make($request->only('name'), ['name'=>'required'])->validate(); return M::create($request->all()); } } ?>")
     assert _codes(src) == []
 
 
 def test_php_validator_facade_without_request_still_fires(tmp_path: Path) -> None:
     """The facade clears only when it validates THE request; an unrelated payload does not."""
-    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::make($defaults, [])->validate(); return M::create($request->all()); } } ?>")
+    src = _write(tmp_path, "C.php", "<?php class C { function store($request){ Validator::make($defaults, ['name'=>'required'])->validate(); return M::create($request->all()); } } ?>")
     assert _codes(src) == ["SAFE907"]
 
 
@@ -255,13 +255,13 @@ def test_php_unrelated_facade_make_still_fires(tmp_path: Path) -> None:
 
 def test_php_aliased_request_data_validated_clears(tmp_path: Path) -> None:
     """``$post = $request->all()`` then ``Validator::make($post, ...)`` clears (the FreeScout shape in #157)."""
-    body = "<?php class C { function store($request){ $post = $request->all(); $post['b'] = strip_tags($post['b']); Validator::make($post, [])->validate(); return M::create($post); } } ?>"
+    body = "<?php class C { function store($request){ $post = $request->all(); $post['b'] = trim($post['b']); Validator::make($post, ['b'=>'required'])->validate(); return M::create($post); } } ?>"
     assert _codes(_write(tmp_path, "C.php", body)) == []
 
 
 def test_php_unrelated_variable_in_facade_still_fires(tmp_path: Path) -> None:
     """A variable that was never assigned a request read does not stand in for the request."""
-    body = "<?php class C { function store($request){ $defaults = config('x'); Validator::make($defaults, [])->validate(); return M::create($request->all()); } } ?>"
+    body = "<?php class C { function store($request){ $defaults = config('x'); Validator::make($defaults, ['name'=>'required'])->validate(); return M::create($request->all()); } } ?>"
     assert _codes(_write(tmp_path, "C.php", body)) == ["SAFE907"]
 
 
@@ -310,3 +310,52 @@ def test_request_validators_scalar_typo_raises(tmp_path: Path) -> None:
     src = _write(tmp_path, "api.py", "def export(request):\n    return Model(**request.data)\n")
     with pytest.raises(TypeError, match="request_validators"):
         _codes_with(src, {"request_validators": "validate_export_request"})
+
+
+def test_php_unrelated_request_property_does_not_stand_in_for_the_request(tmp_path: Path) -> None:
+    """``$foo->request`` is an ordinary property, not the framework request.
+
+    Every property read contains a bare ``name`` node whose text is ``request``,
+    so scanning all descendants of the argument list made
+    ``Validator::make($foo->request->all(), ...)`` look like it validated the
+    request - and that CLEARS a finding, so the mistake loses a real one.
+    """
+    body = "<?php class C { function store($request){ Validator::make($foo->request->all(), ['a'=>'required'])->validate(); return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", body)) == ["SAFE907"]
+
+
+def test_php_another_namespaces_validator_does_not_clear(tmp_path: Path) -> None:
+    """``Other\\Validator::make`` is a different class; only the facade clears on its own.
+
+    Tested on the UNCHAINED call, which is what the facade name governs: a bare
+    ``Validator::make(...)`` clears because the facade is known to validate, and
+    matching the final name segment alone let any class of that name do the same.
+    Chain a ``->validate()`` onto either and the factory-chain rule clears it
+    regardless of the class, which is correct - something built from the request
+    data was then validated.
+    """
+    other = "<?php class C { function store($request){ Other\\Validator::make($request->all(), ['a'=>'required']); return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", other)) == ["SAFE907"]
+    facade = "<?php class D { function store($request){ Validator::make($request->all(), ['a'=>'required']); return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "D.php", facade)) == []
+    fqn = "<?php class E { function store($request){ \\Illuminate\\Support\\Facades\\Validator::make($request->all(), ['a'=>'required']); return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "E.php", fqn)) == []
+
+
+def test_php_an_alias_rebound_to_other_data_stops_standing_in(tmp_path: Path) -> None:
+    """``$post = $request->all()`` then ``$post = $defaults`` leaves ``$post`` unaliased.
+
+    Carrying the alias past the rebind would let a validator call on unrelated
+    data clear every finding in the method.
+    """
+    body = "<?php class C { function store($request){ $post = $request->all(); $post = $defaults; Validator::make($post, ['a'=>'required'])->validate(); return M::create($request->all()); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", body)) == ["SAFE907"]
+
+
+def test_php_a_subscript_write_keeps_the_alias(tmp_path: Path) -> None:
+    """``$post['body'] = ...`` mutates the request data in place; it is not a rebind.
+
+    This is the shape #157 reported, so it must stay cleared.
+    """
+    body = "<?php class C { function store($request){ $post = $request->all(); $post['b'] = trim($post['b']); Validator::make($post, ['b'=>'required'])->validate(); return M::create($post); } } ?>"
+    assert _codes(_write(tmp_path, "C.php", body)) == []

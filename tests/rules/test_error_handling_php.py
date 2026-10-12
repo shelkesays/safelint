@@ -142,3 +142,31 @@ def test_php_catch_with_logger_method_is_clean(tmp_path: Path) -> None:
         )
         violations = _engine(_LOGGING).check_file(str(sample)).violations
         assert not any(v.code == "SAFE203" for v in violations), f"$log->{verb}() should satisfy SAFE203"
+
+
+def test_php_binding_less_catch_cannot_propagate(tmp_path: Path) -> None:
+    """PHP 8 allows ``catch (Throwable)`` with no variable, leaving no name to re-throw.
+
+    A fresh throw there cannot be carrying the caught value, because there is no
+    caught value in scope, so the handler still needs logging.
+    """
+    sample = tmp_path / "nobind.php"
+    sample.write_text("<?php try { f(); } catch (Throwable) { throw new RuntimeException('ctx'); }\n", encoding="utf-8")
+    violations = _engine(_LOGGING).check_file(str(sample)).violations
+    assert any(v.code == "SAFE203" for v in violations)
+
+
+def test_php_throwing_a_property_is_not_a_reraise(tmp_path: Path) -> None:
+    """``throw $this->fallback;`` forwards a different value, not the caught binding."""
+    sample = tmp_path / "prop.php"
+    sample.write_text("<?php try { f(); } catch (Throwable $e) { throw $this->fallback; }\n", encoding="utf-8")
+    violations = _engine(_LOGGING).check_file(str(sample)).violations
+    assert any(v.code == "SAFE203" for v in violations)
+
+
+def test_php_wrapping_the_caught_value_is_clean(tmp_path: Path) -> None:
+    """``throw new RuntimeException('ctx', 0, $e);`` attaches the original as $previous."""
+    sample = tmp_path / "wrap.php"
+    sample.write_text("<?php try { f(); } catch (Throwable $e) { throw new RuntimeException('ctx', 0, $e); }\n", encoding="utf-8")
+    violations = _engine(_LOGGING).check_file(str(sample)).violations
+    assert not any(v.code == "SAFE203" for v in violations)

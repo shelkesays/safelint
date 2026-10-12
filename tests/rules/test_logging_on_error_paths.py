@@ -156,3 +156,51 @@ def test_log_methods_is_configurable(tmp_path: Path) -> None:
     sample.write_text("try:\n    f()\nexcept ValueError:\n    notify_ops('boom')\n", encoding="utf-8")
     engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": {"logging_on_error": {"enabled": True, "log_methods": ["notify_ops"]}}}))
     assert [v for v in engine.check_file(str(sample)).violations if v.code == "SAFE203"] == []
+
+
+_WRAPPING_THROWS = [
+    ("javascript cause option", "w.js", 'try { f(); } catch (e) { throw new Error("ctx", { cause: e }); }\n'),
+    ("java cause argument", "W.java", 'class W { void f() { try { g(); } catch (Exception e) { throw new RuntimeException("ctx", e); } } }\n'),
+    ("php previous argument", "w.php", "<?php try { f(); } catch (Throwable $e) { throw new RuntimeException('ctx', 0, $e); }\n"),
+    ("cpp thrown value", "w.cpp", "void f() {\n    try { g(); } catch (const std::exception& e) { throw std::runtime_error(e.what()); }\n}\n"),
+]
+
+
+@pytest.mark.parametrize(["label", "name", "src"], _WRAPPING_THROWS, ids=[case[0] for case in _WRAPPING_THROWS])
+def test_a_fresh_throw_that_wraps_the_caught_value_is_clean(tmp_path: Path, label: str, name: str, src: str) -> None:
+    """``throw new RuntimeException("ctx", e)`` is the C-family add-context re-raise.
+
+    The caller sees the new error, but the original is attached to it and stays
+    reachable, so nothing is swallowed. Exempting Python's
+    ``raise RuntimeError(msg) from err`` while reporting this would be the same act
+    judged two ways across languages that #199 is about.
+    """
+    sample = tmp_path / name
+    sample.write_text(src, encoding="utf-8")
+    assert _safe203(sample) == [], label
+
+
+def test_a_javascript_factory_throw_is_not_treated_as_wrapping(tmp_path: Path) -> None:
+    """``throw makeError(e)`` throws whatever that returns, which need not carry *e*.
+
+    Only C++ constructs the thrown value with a plain call; in the other four
+    languages the construction form is ``new``, so a bare call is not credited.
+    """
+    sample = tmp_path / "factory.js"
+    sample.write_text("try { f(); } catch (e) { throw makeError(e); }\n", encoding="utf-8")
+    assert _safe203(sample) == [1]
+
+
+def test_a_branching_handler_where_no_arm_raises_is_reported_at_the_clause(tmp_path: Path) -> None:
+    """The per-path message claims the other paths re-raise, so it must not be used here.
+
+    Both arms fall through, so there is no "other path that does re-raise"; saying
+    otherwise would state a fact about the code that is not true. The clause is
+    the honest anchor, and the handler as a unit really is the problem.
+    """
+    sample = tmp_path / "noarm.py"
+    sample.write_text("try:\n    f()\nexcept ValueError:\n    if a:\n        cleanup()\n    else:\n        other()\n", encoding="utf-8")
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": {"logging_on_error": {"enabled": True}}}))
+    found = [v for v in engine.check_file(str(sample)).violations if v.code == "SAFE203"]
+    assert [v.lineno for v in found] == [3]
+    assert "other paths here do re-raise" not in found[0].message

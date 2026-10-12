@@ -70,6 +70,8 @@ from safelint.rules.base import BaseRule
 
 
 if TYPE_CHECKING:
+    import os
+
     import tree_sitter
 
     from safelint.rules.base import Violation
@@ -303,9 +305,13 @@ def _node_has_test_marker_attribute(node: tree_sitter.Node) -> bool:
 #: directory IS the gate, so an in-file attribute search can never see it (#172).
 _CARGO_TEST_DIR = "tests"
 
+#: A crate's source directory. A ``tests`` component inside it is a module name,
+#: not cargo's integration-test directory (see ``_is_cargo_test_path``).
+_RUST_SOURCE_DIR = "src"
+
 
 def _is_cargo_test_path(filepath: str, test_dirs: tuple[str, ...] = (_CARGO_TEST_DIR,)) -> bool:
-    """Return True if *filepath* sits under a cargo test directory.
+    """Return True if *filepath* sits under a cargo INTEGRATION-test directory.
 
     Any path component matching, rather than a root-anchored prefix: a cargo
     workspace puts integration tests at ``crates/<name>/tests/``, so anchoring at
@@ -314,19 +320,31 @@ def _is_cargo_test_path(filepath: str, test_dirs: tuple[str, ...] = (_CARGO_TEST
     every crate in a workspace. On ripgrep that is 15 of the 26 misreported
     findings.
 
+    A ``tests`` component **under** ``src`` does not count. ``src/tests/helpers.rs``
+    is ordinary crate source that happens to be in a module called ``tests``; it is
+    compiled into the library unless something gates it, and when it IS gated the
+    ``#[cfg(test)] mod tests;`` in its parent is what says so - which
+    ``_is_test_gated_in_parent`` already detects. Cargo's integration tests live in
+    a ``tests/`` that is a SIBLING of ``src``, never inside it.
+
     Purely lexical - no filesystem probe, no symlink followed.
     """
     parts = pathlib.PurePath(filepath).parts
-    return any(part in test_dirs for part in parts)
+    return any(part in test_dirs and _RUST_SOURCE_DIR not in parts[:index] for index, part in enumerate(parts))
 
 
 #: Files that can declare a sibling module, in the order cargo would resolve them.
 _RUST_PARENT_MODULE_FILES: tuple[str, ...] = ("lib.rs", "main.rs", "mod.rs")
 
-#: Cache keyed by (directory, module stem). Resolving the parent reads and parses
-#: one sibling file, and a crate's modules all share the same parent, so without
-#: this a 200-module crate would re-read ``lib.rs`` 200 times.
-_PARENT_GATE_CACHE: dict[tuple[str, str], bool] = {}
+#: Cache keyed by (directory, module stem, parent-file signature). Resolving the
+#: parent reads and parses one sibling file, and a crate's modules all share the
+#: same parent, so without this a 200-module crate would re-read ``lib.rs`` 200
+#: times. The signature is in the key because this dict is process-global and
+#: safelint also runs as a library inside long-lived processes (the editor
+#: extension): keyed on the path alone, editing ``lib.rs`` to remove a
+#: ``#[cfg(test)]`` would keep returning the stale "gated" answer and go on
+#: suppressing findings in production code.
+_PARENT_GATE_CACHE: dict[tuple[str, str, tuple[tuple[str, int, int], ...]], bool] = {}
 
 
 def _is_test_gated_in_parent(filepath: str) -> bool:
@@ -345,18 +363,41 @@ def _is_test_gated_in_parent(filepath: str) -> bool:
     ``crates/searcher/src/testutil.rs``, gated at ``lib.rs:105`` - 9 of the 26
     misreported findings (#172).
 
-    Reads at most one sibling file and caches the answer per directory and stem.
-    Any failure to read or parse is treated as "not gated", which leaves the
-    finding reported - the safe direction.
+    Reads at most one sibling file and caches the answer per directory, stem and
+    parent-file signature, so an edited parent is re-read rather than answered
+    from a stale entry. Any failure to read or parse is treated as "not gated",
+    which leaves the finding reported - the safe direction.
     """
     path = pathlib.Path(filepath)
-    key = (str(path.parent), path.stem)
+    key = (str(path.parent), path.stem, _parent_module_signature(path))
     cached = _PARENT_GATE_CACHE.get(key)
     if cached is not None:
         return cached
     gated = _parent_declares_test_module(path)
     _PARENT_GATE_CACHE[key] = gated
     return gated
+
+
+def _parent_module_signature(path: pathlib.Path) -> tuple[tuple[str, int, int], ...]:
+    """Return a (name, mtime_ns, size) tuple per candidate parent module file that exists.
+
+    Three ``stat`` calls, against a read plus a full Rust parse on a cache miss,
+    so the cache still pays for itself while a changed parent invalidates it.
+    """
+    # A candidate that is absent (or unstattable) contributes nothing; its later
+    # appearance changes the signature, which is the point of having one.
+    stats = ((name, _stat_or_none(path.parent / name)) for name in _RUST_PARENT_MODULE_FILES)
+    return tuple((name, info.st_mtime_ns, info.st_size) for name, info in stats if info is not None)
+
+
+def _stat_or_none(candidate: pathlib.Path) -> os.stat_result | None:
+    """Return *candidate*'s stat, or None when it does not exist or cannot be read."""
+    try:
+        return candidate.stat()
+    # Absence is the normal case here (most directories have one of the three
+    # module roots, not all), so it is a value rather than an error.
+    except OSError:  # nosafe: SAFE203
+        return None
 
 
 def _parent_declares_test_module(path: pathlib.Path) -> bool:
@@ -866,10 +907,56 @@ _RUST_FUNCTION_TYPES_FOR_SKIP: tuple[str, ...] = (_rust.FUNCTION_ITEM, _rust.CLO
 _RUST_LIVENESS_SKIP: tuple[str, ...] = (_rust.FUNCTION_ITEM,)
 
 
-#: Pattern kinds that name ONE specific error variant and bind nothing from it.
-#: ``scoped_identifier`` is a unit variant (``Err(Error::NotFound)``);
-#: ``struct_pattern`` is the braced form (``Err(store::Error::NotFound { .. })``).
-_RUST_DISCRIMINATED_VARIANT_PATTERNS: frozenset[str] = frozenset({_rust.SCOPED_IDENTIFIER, "struct_pattern"})
+#: Pattern kinds that can name ONE specific error variant. ``scoped_identifier``
+#: is a unit variant (``Err(Error::NotFound)``); ``struct_pattern`` is the braced
+#: form (``Err(store::Error::NotFound { .. })``); ``tuple_struct_pattern`` is the
+#: positional form (``Err(Error::NotFound(_))``). Whether each actually binds
+#: anything is decided per kind by ``_variant_pattern_binds_nothing``.
+_RUST_DISCRIMINATED_VARIANT_PATTERNS: frozenset[str] = frozenset({_rust.SCOPED_IDENTIFIER, "struct_pattern", _rust.TUPLE_STRUCT_PATTERN})
+
+#: Every field of a struct pattern is a ``field_pattern``, shorthand or not: the
+#: ``{ source }`` form wraps a ``shorthand_field_identifier`` rather than
+#: appearing as one. ``remaining_field_pattern`` (``{ .. }``) is a different type
+#: and binds nothing.
+_RUST_FIELD_PATTERN = "field_pattern"
+
+
+def _variant_pattern_binds_nothing(payload: tree_sitter.Node) -> bool:
+    """Return True when a variant pattern destructures nothing out of the error.
+
+    Binding is what decides the exemption: an arm with a value in scope could log
+    it, an arm without one cannot. So the test is per pattern kind, not per kind
+    name - a wildcard binds no value even though it occupies a position:
+
+    * ``Error::NotFound``                 unit variant, nothing to bind;
+    * ``Error::NotFound(_)``              the ``_`` is an anonymous token, so the
+      only named child is the variant path;
+    * ``Error::NotFound { .. }``          ``remaining_field_pattern``, binds nothing;
+    * ``Error::Io { source: _ }``         a ``field_pattern`` whose sub-pattern is
+      the wildcard, so again no value;
+    * ``Error::Io(e)`` / ``{ source }``   DO bind, and still report.
+    """
+    if payload.type == _rust.SCOPED_IDENTIFIER:
+        return True
+    if payload.type == _rust.TUPLE_STRUCT_PATTERN:
+        # child 0 is the variant path; anything further is a real binding.
+        return len(payload.named_children) <= 1
+    return not any(_field_pattern_binds(child) for child in payload.named_children)
+
+
+def _field_pattern_binds(child: tree_sitter.Node) -> bool:
+    """Return True if a struct-pattern child binds a value out of the error.
+
+    A ``field_pattern`` with no ``pattern`` field is the shorthand ``{ source }``,
+    which binds the field under its own name; with one, it binds unless the
+    sub-pattern is the wildcard (``{ source: _ }``).
+    """
+    if child.type != _RUST_FIELD_PATTERN:
+        return False
+    sub_pattern = child.child_by_field_name("pattern")
+    if sub_pattern is None:
+        return True
+    return sub_pattern.type != "_"
 
 
 def _err_pattern_discriminates_variant(pattern: tree_sitter.Node | None) -> bool:
@@ -896,9 +983,7 @@ def _err_pattern_discriminates_variant(pattern: tree_sitter.Node | None) -> bool
     payload = pattern.named_children[1]
     if payload.type not in _RUST_DISCRIMINATED_VARIANT_PATTERNS:
         return False
-    # A braced variant may still bind fields (``Err(E::Io { source })``); only the
-    # binding-free form qualifies.
-    return not any(child.type == "field_pattern" for child in payload.named_children)
+    return _variant_pattern_binds_nothing(payload)
 
 
 def _logging_function_names(root: tree_sitter.Node) -> frozenset[str]:

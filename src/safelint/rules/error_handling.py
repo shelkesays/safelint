@@ -498,25 +498,79 @@ def _php_only_reraises(catch_node: tree_sitter.Node, stmts: list[tree_sitter.Nod
     if len(inner) != 1 or inner[0].type != _php.THROW_EXPRESSION:
         return False
     operand = inner[0].named_children
-    if len(operand) != 1 or operand[0].type != _php.VARIABLE_NAME:
+    if len(operand) != 1:
         return False
+    # PHP 8 allows a binding-less ``catch (Throwable)``, which leaves no name to
+    # re-throw, so nothing in such a handler can propagate the caught value.
     bound = _caught_binding_name(catch_node, _php.EXTRA_NAME)
-    return bound is not None and node_text(operand[0]) == bound
+    if bound is None:
+        return False
+    # ``throw new RuntimeException('ctx', 0, $e);`` attaches the caught value as
+    # the ``$previous`` argument, so the original stays reachable - the PHP
+    # spelling of ``raise ... from err``.
+    return _thrown_value_carries_binding(operand[0], bound, _php.VARIABLE_NAME, _WRAPPING_THROW_TYPES)
+
+
+#: Node types a C-family ``throw`` uses to construct the thrown value:
+#: ``new Error(..)`` (JS / TS ``new_expression``) and ``new RuntimeException(..)``
+#: (Java / PHP ``object_creation_expression``).
+_WRAPPING_THROW_TYPES = frozenset({"new_expression", "object_creation_expression"})
+
+#: C++ throws a value, not a ``new``, so ``throw std::runtime_error(e.what())``
+#: parses its construction as a plain call. Kept out of the shared set so that a
+#: JavaScript ``throw someFactory(e)`` - which throws whatever that returns, not
+#: necessarily a wrapper - is not exempted on the same rule.
+_CPP_WRAPPING_THROW_TYPES = frozenset({"call_expression"})
+
+
+def _wrapping_throw_types(lang_name: str) -> frozenset[str]:
+    """Return the construction node types a ``throw`` can wrap the caught value in."""
+    if lang_name == _cpp.EXTRA_NAME:
+        return _WRAPPING_THROW_TYPES | _CPP_WRAPPING_THROW_TYPES
+    return _WRAPPING_THROW_TYPES
+
+
+def _thrown_value_carries_binding(thrown: tree_sitter.Node, bound: str, identifier_type: str, wrapping_types: frozenset[str]) -> bool:
+    """Return True when the value being thrown is, or wraps, the caught binding.
+
+    Two shapes, and they are the same question in both language families:
+
+    * ``throw e`` / ``throw $e`` - the binding itself, re-raised;
+    * ``throw new RuntimeException("loading config", e)`` - a FRESH error that
+      carries the original along. This is the C-family spelling of Python's
+      ``raise RuntimeError(msg) from err``: the caller sees the new error, but the
+      original is attached to it and stays reachable, so nothing is swallowed.
+      Demanding a log there is the double-reporting #159 is about, and exempting
+      the Python form while reporting the Java one would be the one-act-judged-two-ways
+      problem #199 is about.
+
+    The binding has to actually appear in the construction arguments:
+    ``throw new Error("x")`` discards the original and still requires logging,
+    which is the distinction the rule has always drawn and still draws.
+
+    *identifier_type* is the node type the binding appears as - ``identifier`` in
+    the JS / TS / Java / C++ grammars, ``variable_name`` in PHP.
+    """
+    if thrown.type in wrapping_types:
+        return any(node.type == identifier_type and node_text(node) == bound for node in walk(thrown))
+    return thrown.type == identifier_type and node_text(thrown) == bound
 
 
 def _throw_reraises_caught_binding(throw_stmt: tree_sitter.Node, catch_node: tree_sitter.Node, lang_name: str) -> bool:
-    """Return True for a JS / TS / Java ``throw <e>;`` that re-throws the exact caught binding.
+    """Return True for a JS / TS / Java / C++ ``throw`` that passes the caught error on.
 
-    ``throw <identifier>;`` only counts as a re-raise when ``<identifier>`` is
-    the precise name bound by the ``catch`` clause. Without a caught binding
-    (``catch {}``) there is no name to re-raise, so any throw there is a fresh
-    error and the rule still requires logging.
+    Either ``throw <e>;`` of the precise name bound by the ``catch`` clause, or a
+    thrown fresh error that wraps it. Without a caught binding (``catch {}``)
+    there is no name to re-raise or wrap, so any throw there is a fresh error and
+    the rule still requires logging.
     """
     children = throw_stmt.named_children
-    if len(children) != 1 or children[0].type != _py.IDENTIFIER:
+    if len(children) != 1:
         return False
-    param_text = _caught_binding_name(catch_node, lang_name)
-    return param_text is not None and node_text(children[0]) == param_text
+    bound = _caught_binding_name(catch_node, lang_name)
+    if bound is None:
+        return False
+    return _thrown_value_carries_binding(children[0], bound, _py.IDENTIFIER, _wrapping_throw_types(lang_name))
 
 
 def _iter_catch_clauses(tree: tree_sitter.Tree, lang_name: str) -> Iterator[tree_sitter.Node]:
@@ -979,10 +1033,10 @@ class LoggingOnErrorRule(BaseRule):
         for clause in _iter_catch_clauses(tree, lang_name):
             if not self._is_unlogged(clause, lang_name, function_types):
                 continue
-            violations.append(self._unlogged_violation(filepath, clause, lang_name, message))
+            violations.append(self._unlogged_violation(filepath, clause, lang_name, function_types, message))
         return violations
 
-    def _unlogged_violation(self, filepath: str, clause: tree_sitter.Node, lang_name: str, blanket_message: str) -> Violation:
+    def _unlogged_violation(self, filepath: str, clause: tree_sitter.Node, lang_name: str, function_types: frozenset[str], blanket_message: str) -> Violation:
         """Build the violation, anchored at the path that leaks when only some do.
 
         When the whole handler falls through, the clause is the right anchor - the
@@ -990,14 +1044,33 @@ class LoggingOnErrorRule(BaseRule):
         propagate, pointing at the clause says "something in here leaks" and leaves
         the reader to find which; on a four-arm handler that is most of the work.
         Anchoring at the arm that falls through names it.
+
+        The per-path message asserts that the OTHER paths re-raise, so it is used
+        only when at least one statement in the handler actually propagates. A
+        branching handler where NO arm raises is reported at the clause: there the
+        per-path wording would state a fact about the code that is not true.
         """
         leak = self._propagation_leak(clause, lang_name)
         body = _catch_body(clause)
         branching = body is not None and bool(body.named_children) and body.named_children[-1].type in _CONDITIONAL_TYPES
-        if leak is None or not branching:
+        if leak is None or not branching or not self._has_propagating_statement(clause, lang_name, function_types):
             return self._make_violation_for_node(filepath, clause, blanket_message)
         return self._make_violation_for_node(
             filepath,
             leak,
             "This path leaves the error handler without logging or re-raising - other paths here do re-raise, so only this one swallows the error",
         )
+
+    @staticmethod
+    def _has_propagating_statement(clause: tree_sitter.Node, lang_name: str, function_types: frozenset[str]) -> bool:
+        """Return True if any statement in the handler propagates the caught error.
+
+        Containment is the right test here, unlike in the verdict: this only
+        chooses the wording. If something in the handler raises and some path
+        still leaks, "other paths here do re-raise" is a true statement about the
+        code; if nothing raises anywhere, it is not.
+        """
+        body = _catch_body(clause)
+        if body is None:  # pragma: no cover - callers reach here only with a body
+            return False
+        return any(_statement_propagates(node, clause, lang_name) for node in walk(body, skip_types=tuple(function_types)))

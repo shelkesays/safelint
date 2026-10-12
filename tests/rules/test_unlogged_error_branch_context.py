@@ -73,9 +73,12 @@ _VARIANT_ARMS: list[tuple[str, str, list[int]]] = [
     # Enumerating a known case, with no error value in scope to log.
     ("braced variant, no binding", "Err(store::Error::NotFound { .. }) => Ok(false),", []),
     ("unit variant, no binding", "Err(Error::NotFound) => Ok(false),", []),
+    ("tuple variant, wildcard payload", "Err(Error::NotFound(_)) => Ok(false),", []),
+    ("struct variant, wildcard field", "Err(Error::Io { source: _ }) => Ok(false),", []),
     # These bind part of the error, so the author has a value and could log it.
     ("tuple variant binds the error", "Err(store::Error::Io(e)) => Ok(false),", [4]),
     ("struct variant binds a field", "Err(store::Error::Io { source }) => Ok(false),", [4]),
+    ("struct variant renames a field", "Err(store::Error::Io { source: inner }) => Ok(false),", [4]),
     # Neither discriminates anything.
     ("plain binding", "Err(other) => Ok(false),", [4]),
     ("wildcard", "Err(_) => Ok(false),", [4]),

@@ -16,7 +16,7 @@ import pytest
 
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
-from safelint.rules.rust_rules import _PARENT_GATE_CACHE
+from safelint.rules.rust_rules import _PARENT_GATE_CACHE, _declares_gated_module
 
 
 def _codes(sample: Path, rule: str, code: str) -> list[int]:
@@ -122,22 +122,60 @@ def test_a_test_with_no_assertion_at_all_still_reports(tmp_path: Path) -> None:
     assert _codes(sample, "missing_assertions", "SAFE601") == [2]
 
 
-def test_an_unreadable_parent_module_file_is_treated_as_not_gated(tmp_path: Path) -> None:
-    """A parent that cannot be read leaves the finding reported, not silently cleared.
+def test_a_tests_directory_inside_src_is_not_a_cargo_test_dir(tmp_path: Path) -> None:
+    """``src/tests/helpers.rs`` is crate source in a module called ``tests``.
 
-    Deliberately the safe direction: failing to see a gate reports something a
-    reader can dismiss, whereas inventing one would hide a real unwrap in
-    production code.
+    Cargo's integration tests sit in a ``tests/`` that is a SIBLING of ``src``,
+    never inside it. A module under ``src`` is compiled into the library unless
+    something gates it, and when it is gated the ``#[cfg(test)] mod tests;`` in
+    its parent says so - which the parent-gate check detects on its own. Matching
+    any ``tests`` component suppressed every finding in such a file.
+    """
+    _PARENT_GATE_CACHE.clear()
+    sample = tmp_path / "src" / "tests" / "helpers.rs"
+    sample.parent.mkdir(parents=True)
+    sample.write_text(_UNWRAP_BODY, encoding="utf-8")
+    assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == [3]
+
+
+def test_a_parent_module_file_that_is_not_a_file_is_skipped(tmp_path: Path) -> None:
+    """A directory named ``lib.rs`` is not a candidate, so nothing is read from it.
+
+    The finding stays reported: failing to see a gate reports something a reader
+    can dismiss, whereas inventing one would hide a real unwrap in production
+    code.
     """
     _PARENT_GATE_CACHE.clear()
     src = tmp_path / "src"
     src.mkdir()
-    # A directory where the parser expects a file: ``read_bytes`` raises
-    # IsADirectoryError, which is an OSError.
     (src / "lib.rs").mkdir()
     sample = src / "mod_under_test.rs"
     sample.write_text(_UNWRAP_BODY, encoding="utf-8")
     assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == [3]
+
+
+def test_an_unreadable_parent_module_file_is_treated_as_not_gated(tmp_path: Path) -> None:
+    """A parent that exists but cannot be READ is treated as not gated.
+
+    Exercised directly, because the caller skips any candidate failing
+    ``is_file()`` and so never reaches the read: the earlier version of this test
+    used a directory named ``lib.rs`` and therefore proved only that the
+    ``is_file()`` guard works (kept above, under its own name).
+    """
+    parent = tmp_path / "lib.rs"
+    parent.write_text("#[cfg(test)]\nmod helper;\n", encoding="utf-8")
+    parent.chmod(0o000)
+    try:
+        assert _declares_gated_module(parent, "helper") is False
+    finally:
+        parent.chmod(0o644)
+
+
+def test_a_readable_parent_is_still_parsed(tmp_path: Path) -> None:
+    """The control for the test above: the same call returns True when the read works."""
+    parent = tmp_path / "lib.rs"
+    parent.write_text("#[cfg(test)]\nmod helper;\n", encoding="utf-8")
+    assert _declares_gated_module(parent, "helper") is True
 
 
 def test_the_parent_gate_answer_is_cached_per_module(tmp_path: Path) -> None:
@@ -153,6 +191,43 @@ def test_the_parent_gate_answer_is_cached_per_module(tmp_path: Path) -> None:
     sample = src / "testutil.rs"
     sample.write_text(_UNWRAP_BODY, encoding="utf-8")
     assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == []
-    assert (str(src), "testutil") in _PARENT_GATE_CACHE
+    # The key carries a signature of the parent module files so an edited parent
+    # invalidates the entry; only the directory and stem are asserted here.
+    assert [key[:2] for key in _PARENT_GATE_CACHE] == [(str(src), "testutil")]
     # Second call takes the cached path.
     assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == []
+
+
+def test_a_parent_gating_a_different_module_does_not_gate_this_one(tmp_path: Path) -> None:
+    """``#[cfg(test)] mod other;`` in the parent says nothing about ``helper.rs``.
+
+    Matching any gated ``mod`` in the parent, rather than the one named after this
+    file, would suppress findings across the whole directory.
+    """
+    _PARENT_GATE_CACHE.clear()
+    src = tmp_path / "src"
+    src.mkdir()
+    (src / "lib.rs").write_text("#[cfg(test)]\nmod other;\nmod helper;\n", encoding="utf-8")
+    sample = src / "helper.rs"
+    sample.write_text(_UNWRAP_BODY, encoding="utf-8")
+    assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == [3]
+
+
+def test_an_edited_parent_invalidates_the_cached_gate(tmp_path: Path) -> None:
+    """The cache is process-global, and safelint runs as a library in long-lived hosts.
+
+    Keyed on the path alone, removing the ``#[cfg(test)]`` from ``lib.rs`` would
+    keep returning the stale "gated" answer and go on suppressing findings in what
+    is now production code.
+    """
+    _PARENT_GATE_CACHE.clear()
+    src = tmp_path / "src"
+    src.mkdir()
+    parent = src / "lib.rs"
+    parent.write_text("#[cfg(test)]\nmod helper;\n", encoding="utf-8")
+    sample = src / "helper.rs"
+    sample.write_text(_UNWRAP_BODY, encoding="utf-8")
+    assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == []
+    # The gate is removed: the module is now compiled into the library.
+    parent.write_text("mod helper;\npub fn extra() {}\n", encoding="utf-8")
+    assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == [3]

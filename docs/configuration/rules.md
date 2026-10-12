@@ -379,7 +379,20 @@ except ValueError:
     return None                             # reached unconditionally
 ```
 
-Throwing a **fresh** error is different in the C-family languages, where it discards the original: `throw new Error("x")` in JavaScript, Java, PHP or C++ still wants logging unless it wraps the caught value. Python needs no such rule - a `raise` inside an `except` chains the active exception automatically, so the original stays reachable either way.
+Throwing a **fresh** error needs a closer look in the C-family languages, which have no automatic chaining. One that carries the caught value along is the local spelling of `raise ... from err`, and is clean:
+
+```java
+catch (IOException e) {
+    throw new ConfigException("loading " + path, e);   // clean: original attached
+}
+```
+```php
+catch (Throwable $e) {
+    throw new RuntimeException('loading config', 0, $e);   // clean: $previous
+}
+```
+
+One that does not still discards the original and still wants logging: `throw new Error("x")` with no mention of the binding. So does `throw makeError(e)` in JavaScript, TypeScript, Java and PHP, because a factory's return value need not be a wrapper; C++ constructs the thrown value with a plain call (`throw std::runtime_error(e.what())`), so there it does count. Python needs none of this - a `raise` inside an `except` chains the active exception automatically, so the original stays reachable either way.
 
 #### Where the finding points
 
@@ -396,7 +409,7 @@ except ValueError:
                          #    logging or re-raising"
 ```
 
-On a handler with several arms, "something in here leaks" leaves you to work out which. When the handler falls through as a whole, the clause stays the anchor - there the handler as a unit is the problem.
+On a handler with several arms, "something in here leaks" leaves you to work out which. When the handler falls through as a whole, the clause stays the anchor - there the handler as a unit is the problem. So does a branching handler where **no** arm raises: the per-path wording says the other paths re-raise, and saying that where nothing raises would be a false statement about the code.
 
 | Option | Default | Description |
 |---|---|---|
@@ -1762,15 +1775,22 @@ Validator::make($request->all(), $rules)->validate();        // the Validator fa
 $this->validator($request->all())->validate();               // a validator built from the data
 ```
 
+Only the unqualified `Validator` (the aliased import Laravel code writes) and the fully-qualified `Illuminate\Support\Facades\Validator` count as the facade; another namespace's `Validator` is a different class. Chaining a `->validate()` onto any call built from the request data clears it regardless of the class, which is the `$this->validator(...)` case above.
+
 The facade form also follows a one-step local alias, which is how Laravel code massages input before validating it:
 
 ```php
 $post = $request->all();
 $post['body'] = strip_tags($post['body']);
-$validator = Validator::make($post, $rules);                  // clears: $post holds the request data
+$validator = Validator::make($post, $rules);     // clears: $post holds the request data
+if ($validator->fails()) {
+    return back()->withErrors($validator);       // Validator::make BUILDS a validator;
+}                                                // something must then run or check it
 ```
 
-A **Form Request** parameter clears the whole method, because the framework ran that class's `rules()` before the body was entered. Recognised by a parameter type whose final name segment ends in `Request` without being the base `Request` / `FormRequest`:
+Note what the rule does and does not see there. `Validator::make(...)` on its own only *constructs* a validator - the rules do not run until `->validate()` is called or `->fails()` is consulted - and safelint does not verify that you did either. It treats the `make` as the author's declaration of intent to validate, which is the same conservative stance the rule takes everywhere else (any validation call clears the whole function). A `make` whose result is dropped on the floor is a bug this rule will not catch.
+
+A **Form Request** parameter clears the whole method, because the framework ran that class's `rules()` before the body was entered. Recognised by a parameter type whose final name segment ends in `Request` without being one of the base request types that carry no rules of their own - `Request`, `FormRequest`, `ServerRequest`, `ServerRequestInterface`, `RequestInterface`:
 
 ```php
 public function store(StoreUserRequest $request) {
@@ -1778,7 +1798,9 @@ public function store(StoreUserRequest $request) {
 }
 ```
 
-Each of these still requires the request: `Validator::make($defaults, $rules)` validates something else and does not clear a `$request->all()` elsewhere in the method.
+Each of these still requires the request: `Validator::make($defaults, $rules)` validates something else and does not clear a `$request->all()` elsewhere in the method, a variable rebound to other data stops standing in for the request, and `$foo->request` is an ordinary property rather than the framework request.
+
+The Form Request test is a **name heuristic**, and cannot be more: confirming that `StoreUserRequest` really extends `FormRequest` needs the file that declares it. A parameter typed `BillingRequest` that is *not* a Form Request will clear the method too. Rename it, or ignore the rule for that file, if the suppression is unwanted.
 
 **Project validators.** Real apps often validate through their own helper (`validate_export_request()`, an allowlist filter builder) rather than the framework's built-in call. Add those names to `request_validators` (Python, bare key) / `request_validators_php` (PHP) and they are unioned with the built-in set, so a read they guard no longer fires. Matched by exact call name (receiver stripped, like `tainted_sink.sanitizers`). This replaces the previous only-recourse of a file-level ignore, which also hid any genuinely-unvalidated read added to the same file later.
 
@@ -2085,8 +2107,19 @@ The Rust spiritual analogue of `SAFE203 logging_on_error` - handling an error wi
 
 Two further exemptions *since 2.15.0*:
 
-- **Logging through a same-file helper.** A body whose only statement calls a function defined in the same file that does log (`self.record(e.to_string())` where `record` pushes onto a failure list, or any helper whose own body carries a recognised log call) is not swallowing the error, it is routing it. One call hop only; a deeper chain still reports.
-- **An arm that enumerates one error variant.** `Err(store::Error::NotFound { .. }) => Ok(false)` implements a documented "treat not-found as false" contract, and binds nothing, so there is no error value in scope to put in a message. An arm that binds part of the error (`Err(Error::Io(e))`), a plain binding (`Err(other)`) or a wildcard (`Err(_)`) still reports, because there the author either has a value to log or has not discriminated anything.
+- **Logging through a same-file helper.** A body that calls a function defined in the same file **whose own body contains a recognised log call** is not swallowing the error, it is routing it:
+
+  ```rust
+  Err(e) => self.fail(&object.name, e.to_string()),   // clean: fail() logs
+
+  fn fail(&mut self, object: &str, reason: String) {
+      warn!(object, %reason, "object failed; continuing");
+      self.outcome.failed.push((object.to_string(), reason));
+  }
+  ```
+
+  The log call in the helper is the whole test. A helper that only records the failure to a list and never logs is **not** credited, and the branch still reports. One call hop only; a deeper chain still reports.
+- **An arm that enumerates one error variant and binds nothing.** `Err(store::Error::NotFound { .. }) => Ok(false)` implements a documented "treat not-found as false" contract, and binds nothing, so there is no error value in scope to put in a message. Binding is the test rather than syntax, so the wildcard forms count as binding nothing too: `Err(E::NotFound(_))` and `Err(E::Io { source: _ })` are exempt. An arm that genuinely binds part of the error (`Err(E::Io(e))`, `Err(E::Io { source })`, `Err(E::Io { source: inner })`), a plain binding (`Err(other)`) or a wildcard (`Err(_)`) still reports, because there the author either has a value to log or has not discriminated anything.
 
 | Option | Default | Description |
 |---|---|---|
@@ -2116,8 +2149,8 @@ if let Err(e) = save(record) {
 
 **What counts as test code** (*widened in 2.15.0*): a `#[test]` / `#[tokio::test]` function or a `#[cfg(test)] mod` in the same file, plus two shapes Cargo makes idiomatic and an in-file attribute search can never see:
 
-- **A file under a `tests/` directory.** Cargo integration tests get no `#[cfg(test)]` - the directory *is* the gate - so every `.unwrap()` in a `tests/` file was reported.
-- **A module gated from its parent.** `#[cfg(test)] mod helpers;` in `lib.rs` gates `helpers.rs` entirely; the attribute lives in the parent file, not the module's own.
+- **A file under a `tests/` directory.** Cargo integration tests get no `#[cfg(test)]` - the directory *is* the gate - so every `.unwrap()` in a `tests/` file was reported. A `tests` component **inside** `src` does not count: `src/tests/helpers.rs` is ordinary crate source in a module named `tests`, and when that module is gated the `#[cfg(test)] mod tests;` in its parent is what says so. Cargo's integration tests sit in a `tests/` that is a sibling of `src`, never within it.
+- **A module gated from its parent.** `#[cfg(test)] mod helpers;` in `lib.rs` gates `helpers.rs` entirely; the attribute lives in the parent file, not the module's own. Only a `mod` named after the file counts, so `#[cfg(test)] mod other;` beside a plain `mod helpers;` does not gate `helpers.rs`.
 
 The broad Holzmann-rule-7 form: catches bare-variable unwraps (`let r = foo(); r.unwrap();`) and unwrap chains the narrower SAFE205 (lock-specific) / SAFE803 (nullable-method-specific) rules don't cover. With all three enabled, `mutex.lock().unwrap()` fires multiple codes - documented intentional overlap; users pick strictness level by enabling subsets. `unwrap_or` / `unwrap_or_default` / `unwrap_or_else` are NOT flagged - they're explicit-default-on-Err, not silent failures.
 

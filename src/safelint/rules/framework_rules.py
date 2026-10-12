@@ -433,6 +433,17 @@ _PHP_FACADE_VALIDATION_METHODS: frozenset[str] = frozenset({"make", "validate"})
 #: one of these is NOT a Form Request and does not clear the finding.
 _PHP_BASE_REQUEST_TYPES: frozenset[str] = frozenset({"Request", "FormRequest", "ServerRequest", "ServerRequestInterface", "RequestInterface"})
 
+#: Node types that can BE the request as a whole expression (``$request``,
+#: ``$this->request``). A bare ``name`` is excluded deliberately: it is the inner
+#: child of every property read, so matching it treated ``$foo->request`` as the
+#: framework request.
+_PHP_REQUEST_EXPRESSION_TYPES: frozenset[str] = frozenset({_php.VARIABLE_NAME, _php.MEMBER_ACCESS_EXPRESSION})
+
+#: Fully-qualified Laravel ``Validator`` facade. An unqualified ``Validator`` is
+#: the aliased import every Laravel file writes; any OTHER namespace's
+#: ``Validator`` is a different class and proves nothing about the request.
+_PHP_VALIDATOR_FACADE_FQN = "Illuminate\\Support\\Facades\\Validator"
+
 
 def _php_arguments_mention_request(node: tree_sitter.Node, aliases: frozenset[str] = frozenset()) -> bool:
     """Return True when any argument of *node* derives from the framework request.
@@ -446,11 +457,18 @@ def _php_arguments_mention_request(node: tree_sitter.Node, aliases: frozenset[st
     *aliases* carries the local variables that were themselves assigned a
     whole-object request read (``$post = $request->all()``), so the common
     read-then-massage-then-validate shape is recognised as well.
+
+    Only whole variable / property expressions are considered, never the bare
+    ``name`` nodes inside them. ``$foo->request->all()`` contains a ``name`` whose
+    text is ``request``, so scanning every descendant made an unrelated property
+    read look like the framework request - and that clears a finding, so the error
+    is the losing direction.
     """
     args = node.child_by_field_name("arguments")
     if args is None:
         return False
-    texts = [node_text(child) for arg in args.named_children for child in walk(arg)]
+    candidates = (child for arg in args.named_children for child in walk(arg) if child.type in _PHP_REQUEST_EXPRESSION_TYPES)
+    texts = [node_text(child) for child in candidates]
     return any(_php_text_is_request(text) or text in aliases for text in texts)
 
 
@@ -468,8 +486,17 @@ def _php_request_aliases(func: tree_sitter.Node, func_types: frozenset[str]) -> 
     unrecognised - which is the FreeScout shape named in #157. Scoped to the
     function's own body (nested functions are skipped) and to a direct
     ``$var = <request read>`` binding; no further propagation is modelled.
+
+    Each whole-variable assignment **replaces** the previous answer for that name,
+    so `$post = $request->all();` followed by `$post = $defaults;` leaves `$post`
+    out: carrying the alias past the rebind would let a validator call on
+    unrelated data clear every finding in the method. Not full flow sensitivity -
+    a rebind inside one branch of an `if` still counts for the whole function -
+    but a plain reassignment no longer goes unnoticed. A subscript write
+    (`$post['body'] = ...`) is not a whole-variable assignment and keeps the
+    alias, which is the shape the issue reported.
     """
-    aliases: set[str] = set()
+    aliases: dict[str, bool] = {}
     for node in walk(func, skip_types=tuple(func_types)):
         if node.type != _php.ASSIGNMENT_EXPRESSION:
             continue
@@ -477,9 +504,8 @@ def _php_request_aliases(func: tree_sitter.Node, func_types: frozenset[str]) -> 
         right = node.child_by_field_name("right")
         if left is None or right is None or left.type != _php.VARIABLE_NAME:
             continue
-        if any(_php_is_bulk_request_call(child) for child in walk(right)):
-            aliases.add(node_text(left))
-    return frozenset(aliases)
+        aliases[node_text(left)] = any(_php_is_bulk_request_call(child) for child in walk(right))
+    return frozenset(name for name, holds_request in aliases.items() if holds_request)
 
 
 def _php_is_form_request_method(func: tree_sitter.Node) -> bool:
@@ -488,9 +514,16 @@ def _php_is_form_request_method(func: tree_sitter.Node) -> bool:
     A typed ``StoreUserRequest $request`` parameter means the framework resolved a
     ``FormRequest`` subclass and ran its ``rules()`` **before** the method body was
     entered, so every read inside is already validated. Recognised by the type
-    name ending in ``Request`` while not being the base ``Request`` / ``FormRequest``
-    itself (those carry no rules of their own). Namespace-qualified types are
-    matched on their final segment.
+    name ending in ``Request`` while not being one of ``_PHP_BASE_REQUEST_TYPES``
+    (those carry no rules of their own). Namespace-qualified types are matched on
+    their final segment.
+
+    Known limit, and the reason this is a heuristic: the name is all there is to
+    go on. A ``BillingRequest`` that is NOT a ``FormRequest`` subclass clears the
+    method too, because confirming the supertype needs the other file. #157
+    specified exactly this test; the alternative - resolving the class - is out of
+    reach for a single-file analyser. Rename such a parameter, or disable the rule
+    for the file, if the suppression is unwanted.
     """
     params = func.child_by_field_name("parameters")
     if params is None:
@@ -531,9 +564,11 @@ def _php_is_facade_validation(node: tree_sitter.Node, aliases: frozenset[str] = 
 
     Scoped to the ``Validator`` facade and to arguments that actually carry the
     request, so an unrelated ``Other::make($thing)`` cannot clear a real
-    unvalidated-input finding. A leading namespace separator
-    (``\\Validator::make``) is tolerated, since Laravel code often writes the
-    fully-qualified facade inside a namespaced class.
+    unvalidated-input finding. Accepted scopes are the unqualified ``Validator``
+    (the aliased import Laravel code writes, with or without a leading namespace
+    separator) and the fully-qualified facade. A different namespace's
+    ``Other\\Validator`` is a different class and is NOT accepted - matching on the
+    final segment alone let any such class clear a real finding.
     """
     if node.type != _php.SCOPED_CALL_EXPRESSION:
         return False
@@ -541,7 +576,7 @@ def _php_is_facade_validation(node: tree_sitter.Node, aliases: frozenset[str] = 
     name = node.child_by_field_name("name")
     if scope is None or name is None:
         return False
-    if node_text(scope).lstrip("\\").rsplit("\\", 1)[-1] != _PHP_VALIDATOR_FACADE:
+    if node_text(scope).lstrip("\\") not in (_PHP_VALIDATOR_FACADE, _PHP_VALIDATOR_FACADE_FQN):
         return False
     if node_text(name) not in _PHP_FACADE_VALIDATION_METHODS:
         return False
