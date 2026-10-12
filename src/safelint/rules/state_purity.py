@@ -14,6 +14,7 @@ from safelint.languages import php as _php
 from safelint.languages import python as _py
 from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.rules._test_files import skips_test_code
 from safelint.rules.base import BaseRule
 
 
@@ -651,6 +652,11 @@ class GlobalMutationRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every write to a module-level state binding inside a function."""
         lang_name = resolve_lang_name(filepath)
+        # #198: the patterns this rule flags are conventional in test code, where
+        # they were the overwhelming majority of its findings and were burying the
+        # ones in library code. Whole-file answer, resolved before any walk.
+        if skips_test_code(self.config, filepath, lang_name):
+            return []
         # Dedicated per-language checkers (declaration-site detection); every
         # other language routes through the JS-family assignment-site checker.
         dedicated = {

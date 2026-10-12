@@ -89,6 +89,50 @@ def f():
 
 Severity is fixed at `warning`. Disable globally via `ignore = ["SAFE004"]` if your workflow involves many transient suppressions you'd rather not police. **Per-file ignores do not apply to SAFE004**: like SAFE000, it's an engine-internal code gated solely on the global `ignore` list (configuring it inside `per_file_ignores` will surface a typo-guard warning and otherwise do nothing). Self-referential `# nosafe: SAFE004` is special-cased; a directive that only mentions SAFE004 is always considered "used" to avoid recursion.
 
+## Test code is skipped by five rules
+
+*Changed in 2.15.0 (#198).* Five rules skip files they recognise as test code: **SAFE101** `function_length`, **SAFE203** `logging_on_error`, **SAFE302** `global_mutation`, **SAFE304** `side_effects` and **SAFE401** `resource_lifecycle`. All five are enabled by default, so this changes what an untuned run reports.
+
+The reason is measured rather than aesthetic. Those five put the overwhelming majority of their findings in test files, where the pattern they flag is conventional:
+
+```python
+# tests/test_requests.py
+def test_session():
+    s = requests.Session()      # SAFE401: a session scoped to one test
+    print(render(result))       # SAFE304: observing output IS the test
+```
+
+On Requests that shape was 91 of SAFE401's 94 findings, and the three in library code - including a genuine unclosed `zipfile.ZipFile` in `utils.py` - were buried under them. A rule users learn to ignore protects nothing.
+
+| Option | Default | Description |
+|---|---|---|
+| `skip_test_code` | `true` | Skip files recognised as test code |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories whose contents are test code, matched as a path-component subsequence |
+
+A file is test code when it is under a `test_dirs` entry, **or** its filename uses a convention nothing but a test uses: `foo.test.ts` / `foo.spec.js`, `foo_test.go`, `foo_test.rs`, `FooTest.java` / `FooTests.java` / `FooIT.java`, `FooTest.php`.
+
+A bare `test_` **prefix** is deliberately not enough. Production modules use it - safelint's own `src/safelint/rules/test_coverage.py` is a rule implementation, and `TestDataFactory.java` under `src/main/java` is a factory - so excluding on it would silently drop five rules on real source files. Python tests are still covered, because `tests/test_foo.py` matches on the directory. This is stricter than the detection `test_functions_only` (SAFE601) and SAFE701/702 use, which answer the opposite question and can afford the looser signal.
+
+Turn it off for the strict reading, per rule:
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.resource_lifecycle]
+skip_test_code = false
+
+# ... or tell safelint where your tests actually live
+[tool.safelint.rules.side_effects]
+test_dirs = ["tests", "integration", "examples"]
+```
+
+```toml
+# safelint.toml
+[rules.resource_lifecycle]
+skip_test_code = false
+```
+
+`test_dirs` entries are **project-root-relative**, so run safelint from the directory your config lives in (it already walks parents to find that config). An absolute entry also works.
+
 ## Structural rules
 
 These check the shape of your functions. They are cheap to run and always go first.
@@ -105,6 +149,8 @@ Long functions are hard to read, test, and reason about. The Holzmann rule says 
 | `severity` | `"error"` | `"error"` or `"warning"` |
 | `max_lines` | `60` | Maximum allowed function size (units depend on `count_mode`) |
 | `count_mode` | `"lines"` | How to measure size: `"lines"` (raw source lines incl. blanks/comments, Holzmann's original framing), `"logical_lines"` (lines minus blanks and pure-comment lines, less game-able), or `"statements"` (count Python statement nodes, robust to formatting, equivalent to ruff's `PLR0915`). *Added in 1.8.0.* |
+| `skip_test_code` | `true` | Skip files recognised as test code - [see above](#test-code-is-skipped-by-five-rules). *Added in 2.15.0.* |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories treated as test code. *Added in 2.15.0.* |
 
 ```toml
 [tool.safelint.rules.function_length]
@@ -417,6 +463,8 @@ On a handler with several arms, "something in here leaks" leaves you to work out
 | `severity` | `"warning"` | `"error"` or `"warning"` |
 | `log_methods` | see below | (Python.) Call names that count as making the failure visible |
 | `log_methods_javascript` / `_typescript` / `_java` / `_php` / `_cpp` | see below | The same, per language |
+| `skip_test_code` | `true` | Skip files recognised as test code - [see above](#test-code-is-skipped-by-five-rules). *Added in 2.15.0.* |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories treated as test code. *Added in 2.15.0.* |
 
 Names are matched with the receiver discarded, so `$logger->notice($e)` resolves to `notice` and `console.print_exception()` to `print_exception`.
 
@@ -518,6 +566,8 @@ That pre-arrow idiom is how JavaScript carried `this` into a nested function for
 | `severity` | `"error"` | `"error"` or `"warning"` |
 | `strict` | `false` | (Python only.) When `true`, fire on every `global` declaration even without a subsequent write, mirrors ruff's `PLW0603`. *Added in 1.8.0.* |
 | `global_namespaces_javascript` | see above | (JavaScript only.) Receiver names that count as "global namespace", function-body assignments rooted in any of these fire. *Added in 1.13.0.* |
+| `skip_test_code` | `true` | Skip files recognised as test code - [see above](#test-code-is-skipped-by-five-rules). *Added in 2.15.0.* |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories treated as test code. *Added in 2.15.0.* |
 
 ```toml
 [tool.safelint.rules.global_mutation]
@@ -600,6 +650,8 @@ Broader than `SAFE303`, applies to *all* functions, not just pure-named ones. A 
 | `io_functions` | `["open", "print", "input"]` | (Python.) Call names considered I/O |
 | `io_functions_javascript` | see below | (JavaScript.) Call names considered I/O. Runtime presets (`[tool.safelint.javascript] runtime`) adjust this default. *Added in 1.13.0.* |
 | `io_name_keywords` | see below | Functions whose names contain these words are exempt (cross-language) |
+| `skip_test_code` | `true` | Skip files recognised as test code - [see above](#test-code-is-skipped-by-five-rules). *Added in 2.15.0.* |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories treated as test code. *Added in 2.15.0.* |
 
 Default `io_name_keywords`: `print`, `log`, `write`, `read`, `save`, `load`, `send`, `fetch`, `export`, `import`. The substring check is case-insensitive, so it matches `writeData` (camelCase) the same way as `write_data` (snake_case).
 
@@ -907,6 +959,8 @@ dangerous_casts_cpp = ["reinterpret_cast", "const_cast"]
 | `extend_tracked_functions` | `[]` | (Python.) Appended to the default list, use this when you want to *add* custom functions without losing the defaults. *Added in 1.8.0.* |
 | `cleanup_patterns` | `["close", "commit", "rollback", "release", "shutdown"]` | (Python.) Acceptable cleanup method names as an alternative |
 | `tracked_functions_javascript` | (see below) | (JavaScript.) Calls that must be inside a `try { ... } finally { ... }`. Runtime presets (`[tool.safelint.javascript] runtime`) adjust this default. *Added in 1.13.0.* |
+| `skip_test_code` | `true` | Skip files recognised as test code - [see above](#test-code-is-skipped-by-five-rules). *Added in 2.15.0.* |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories treated as test code. *Added in 2.15.0.* |
 
 **Default `tracked_functions`** (Python, expanded in 1.8.0):
 

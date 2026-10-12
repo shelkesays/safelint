@@ -86,6 +86,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Five default-on rules now skip test code (#198).** SAFE101 `function_length`, SAFE203 `logging_on_error`, SAFE302 `global_mutation`, SAFE304 `side_effects` and SAFE401 `resource_lifecycle` put the overwhelming majority of their findings in test files, where the pattern they flag is conventional:
+
+  ```python
+  # tests/test_requests.py
+  def test_session():
+      s = requests.Session()      # SAFE401: a session scoped to one test
+      print(render(result))       # SAFE304: observing output IS the test
+  ```
+
+  On Requests that shape was **91 of SAFE401's 94** findings, and the three in library code - one of them a genuine unclosed `zipfile.ZipFile` in `utils.py` - were buried under them. The status quo was not a conservative default but a loud one, and the loudness is what hid the true positives. safelint already applied this reasoning to its own test tree through per-file-ignores; these five simply never got it.
+
+  Controlled by `skip_test_code` (default `true`) and `test_dirs`, the latter being the key SAFE601 / SAFE701 / SAFE702 already read. A file is test code when it sits under a `test_dirs` entry or its filename uses a convention nothing but a test uses (`foo.test.ts`, `foo_test.go`, `FooTest.java`). Set `skip_test_code = false` per rule for the strict reading.
+
+  Two decisions inside that are worth stating, because both were wrong in a first draft:
+
+  - **`test_dirs` defaults to four names**, `["tests", "test", "__tests__", "spec"]`, not just `tests`. A default of `tests` alone missed Express entirely, where the directory is `test` (singular) and holds **161 of its 165** SAFE101 findings - and a default that needs per-project tuning before it works is not the useful default this issue asked for. The same widening applies to SAFE601 / SAFE701 / SAFE702, which read the same key and are strictly better for recognising more real test layouts.
+  - **A bare `test_` prefix does not exclude a file.** Reusing the existing test-file detection wholesale skipped all five rules inside safelint's own `src/safelint/rules/test_coverage.py`, a rule implementation, and would do the same to any project's `TestDataFactory.java` under `src/main/java`. Finding tests and excluding production code are different risks and the looser signal is only safe for the former. safelint's own SAFE004 `unused_suppression` caught this, by noticing the `# nosafe: SAFE203` annotations in that file had stopped suppressing anything. Python tests are unaffected, since `tests/test_foo.py` matches on the directory: re-measuring after the narrowing moved Django by 3 findings and nothing else at all.
+
+  Measured across five languages, every project linted from its own root (`test_dirs` is project-root-relative):
+
+  | Project | Language | Before | After |
+  |---|---|---|---|
+  | Express | JavaScript | 200 | **27** (-87%) |
+  | Axios | JavaScript | 559 | **83** (-85%) |
+  | Requests | Python | 187 | **61** (-67%) |
+  | laravel/framework | PHP | 1074 | **349** (-68%) |
+  | Elysia | TypeScript | 309 | **104** (-66%) |
+  | Rich | Python | 352 | **139** (-61%) |
+  | Monolog | PHP | 99 | **41** (-59%) |
+  | Flask | Python | 104 | **50** (-52%) |
+  | Commons Lang | Java | 273 | **132** (-52%) |
+  | Zod | TypeScript | 460 | **259** (-44%) |
+  | Django | Python | 2336 | **1371** (-41%) |
+  | PetClinic | Java | 7 | **2** |
+
+  SAFE102 `nesting_depth` is deliberately **not** in the group. It was 37% test code in Python but 6% in JS/TS, and safelint relaxes it for its own tests only because its test helpers happen to nest - that is a property of this repo, not a general one.
+
+
 - **SAFE907 `unvalidated_request_input` now recognises Laravel's actual validation idioms (#157).** The rule accepted `$request->validate(...)` and the `ValidatesRequests` trait form `$this->validate($request, ...)`, and nothing else - so `Validator::make($request->all(), $rules)` was reported as unvalidated input **on the line that validates it**. That is not a corner: on FreeScout `Validator::make` outnumbers `$request->validate` by 19 to 1, and the rule is switched on by the `laravel` preset, so users met this by opting into the preset rather than the rule. Four forms now clear a read:
   - the `Validator` facade, `Validator::make(...)` / `Validator::validate(...)`. The unqualified name (the aliased import every Laravel file writes, with or without a leading namespace separator) and the fully-qualified `Illuminate\Support\Facades\Validator` are accepted; some **other** namespace's `Validator` is a different class and is not;
   - a validator built from the request data and then validated, `$this->validator($request->all())->validate()` - which is how Laravel's own `RegistersUsers` trait is written, and the one SAFE907 finding on laravel/framework itself;

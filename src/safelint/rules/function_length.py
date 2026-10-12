@@ -15,6 +15,7 @@ from safelint.languages import python as _py
 from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import end_lineno, function_name_node, lineno, node_text, resolve_lang_name, walk
+from safelint.rules._test_files import skips_test_code
 from safelint.rules.base import BaseRule
 
 
@@ -135,6 +136,11 @@ class FunctionLengthRule(BaseRule):
         max_lines: int = self.config.get("max_lines", 60)
         count_mode: str = self.config.get("count_mode", "lines")
         lang_name = resolve_lang_name(filepath)
+        # #198: the patterns this rule flags are conventional in test code, where
+        # they were the overwhelming majority of its findings and were burying the
+        # ones in library code. Whole-file answer, resolved before any walk.
+        if skips_test_code(self.config, filepath, lang_name):
+            return []
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         # Sourced from the registered ``LanguageDefinition`` rather than
         # branched per-lang here - adding a new language to the registry
