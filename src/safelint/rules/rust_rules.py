@@ -305,32 +305,59 @@ def _node_has_test_marker_attribute(node: tree_sitter.Node) -> bool:
 #: directory IS the gate, so an in-file attribute search can never see it (#172).
 _CARGO_TEST_DIR = "tests"
 
-#: A crate's source directory. A ``tests`` component inside it is a module name,
-#: not cargo's integration-test directory (see ``_is_cargo_test_path``).
-_RUST_SOURCE_DIR = "src"
+#: Cargo's manifest. Its directory IS the crate root, which is the only
+#: checkout-independent anchor for "is this cargo's ``tests/`` directory".
+_CARGO_MANIFEST = "Cargo.toml"
 
 
 def _is_cargo_test_path(filepath: str, test_dirs: tuple[str, ...] = (_CARGO_TEST_DIR,)) -> bool:
-    """Return True if *filepath* sits under a cargo INTEGRATION-test directory.
+    """Return True if *filepath* is a cargo INTEGRATION test, anchored at the crate root.
 
-    Any path component matching, rather than a root-anchored prefix: a cargo
-    workspace puts integration tests at ``crates/<name>/tests/``, so anchoring at
-    the project root (which is what the shared ``_is_test_file`` helper does, by
-    design, for the rules that want project-relative ``test_dirs``) would miss
-    every crate in a workspace. On ripgrep that is 15 of the 26 misreported
-    findings.
+    Cargo's rule is precise: integration tests are the ``.rs`` files directly under
+    a ``tests/`` directory that is a **sibling of ``src``** at the crate root, which
+    is the directory holding ``Cargo.toml``. So the crate root is what this
+    resolves, and the decision is made on the path *relative to it*.
 
-    A ``tests`` component **under** ``src`` does not count. ``src/tests/helpers.rs``
-    is ordinary crate source that happens to be in a module called ``tests``; it is
-    compiled into the library unless something gates it, and when it IS gated the
-    ``#[cfg(test)] mod tests;`` in its parent is what says so - which
-    ``_is_test_gated_in_parent`` already detects. Cargo's integration tests live in
-    a ``tests/`` that is a SIBLING of ``src``, never inside it.
+    Nothing lexical can stand in for that, which two earlier attempts here show.
+    Matching any ``tests`` component suppressed ``src/tests/helpers.rs``, ordinary
+    crate source in a module named ``tests``. Adding "no ``src`` component before
+    it" made the answer depend on where the repository happens to be checked out:
+    a developer keeping work under ``~/src`` saw every integration test still
+    reported (cancelling #172 for them), while a checkout under ``~/tests`` had its
+    production code silently exempted. Neither is a property of the crate.
 
-    Purely lexical - no filesystem probe, no symlink followed.
+    A workspace is handled by construction: each member has its own ``Cargo.toml``,
+    so ``crates/matcher/tests/it.rs`` resolves to the ``crates/matcher`` root and
+    its relative path starts with ``tests``.
+
+    No ``Cargo.toml`` anywhere above the file means the crate root is unknown, and
+    the answer is False - the finding is reported, which is the safe direction.
     """
-    parts = pathlib.PurePath(filepath).parts
-    return any(part in test_dirs and _RUST_SOURCE_DIR not in parts[:index] for index, part in enumerate(parts))
+    path = pathlib.Path(filepath)
+    root = _cargo_crate_root(path)
+    if root is None:
+        return False
+    try:
+        relative = path.relative_to(root)
+    # Only reachable if the resolved root stops being a prefix between the walk
+    # and here (a concurrent rename); reporting is the safe answer.
+    except ValueError:  # pragma: no cover - defensive
+        return False
+    return len(relative.parts) > 1 and relative.parts[0] in test_dirs
+
+
+def _cargo_crate_root(path: pathlib.Path) -> pathlib.Path | None:
+    """Return the nearest ancestor directory of *path* holding a ``Cargo.toml``.
+
+    Walks upward from the file's own directory, so the innermost crate wins - which
+    is what makes a workspace member resolve to itself rather than to the workspace
+    root. Bounded by the filesystem root; no symlink is followed, since only
+    ``is_file`` is consulted.
+    """
+    for candidate in path.parent, *path.parent.parents:
+        if (candidate / _CARGO_MANIFEST).is_file():
+            return candidate
+    return None
 
 
 #: Files that can declare a sibling module, in the order cargo would resolve them.

@@ -27,13 +27,26 @@ def _codes(sample: Path, rule: str, code: str) -> list[int]:
 _UNWRAP_BODY = "fn helper() -> u32 {\n    let x: Result<u32, ()> = Ok(1);\n    x.unwrap()\n}\n"
 
 
+def _crate(root: Path) -> Path:
+    """Make *root* a cargo crate root by giving it a ``Cargo.toml``.
+
+    Cargo's integration-test directory is defined relative to the crate root, so
+    the fixtures have to BE crates: a bare ``tests/`` in a scratch directory is
+    not cargo's ``tests/``, and treating it as one is what made the answer depend
+    on where the repository happened to be checked out.
+    """
+    root.mkdir(parents=True, exist_ok=True)
+    root.joinpath("Cargo.toml").write_text('[package]\nname = "fixture"\n', encoding="utf-8")
+    return root
+
+
 def test_cargo_integration_tests_are_test_context(tmp_path: Path) -> None:
     """Every ``.rs`` under a crate's ``tests/`` is a test binary by cargo convention.
 
     Such a file never carries ``#[cfg(test)]`` - the directory is the gate - so an
     in-file attribute search can never see it.
     """
-    sample = tmp_path / "tests" / "integration.rs"
+    sample = _crate(tmp_path) / "tests" / "integration.rs"
     sample.parent.mkdir()
     sample.write_text(_UNWRAP_BODY, encoding="utf-8")
     assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == []
@@ -47,8 +60,9 @@ def test_a_workspace_crates_tests_dir_is_recognised(tmp_path: Path) -> None:
     matches ``tests/`` but misses every crate in a workspace. On ripgrep that is
     the larger share of the misreported findings.
     """
-    sample = tmp_path / "crates" / "matcher" / "tests" / "test_matcher.rs"
-    sample.parent.mkdir(parents=True)
+    _crate(tmp_path)  # the workspace root
+    sample = _crate(tmp_path / "crates" / "matcher") / "tests" / "test_matcher.rs"
+    sample.parent.mkdir()
     sample.write_text(_UNWRAP_BODY, encoding="utf-8")
     assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == []
 
@@ -132,7 +146,7 @@ def test_a_tests_directory_inside_src_is_not_a_cargo_test_dir(tmp_path: Path) ->
     any ``tests`` component suppressed every finding in such a file.
     """
     _PARENT_GATE_CACHE.clear()
-    sample = tmp_path / "src" / "tests" / "helpers.rs"
+    sample = _crate(tmp_path) / "src" / "tests" / "helpers.rs"
     sample.parent.mkdir(parents=True)
     sample.write_text(_UNWRAP_BODY, encoding="utf-8")
     assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == [3]
@@ -166,6 +180,12 @@ def test_an_unreadable_parent_module_file_is_treated_as_not_gated(tmp_path: Path
     parent.write_text("#[cfg(test)]\nmod helper;\n", encoding="utf-8")
     parent.chmod(0o000)
     try:
+        # Permission bits do not stop root, and mean nothing on Windows. Where the
+        # read still succeeds there is no OSError to exercise, so skip rather than
+        # fail - a root container is an ordinary way to run this suite.
+        if parent.read_bytes():
+            pytest.skip("permissions do not block this reader (root, or a platform that ignores the bits)")
+    except OSError:
         assert _declares_gated_module(parent, "helper") is False
     finally:
         parent.chmod(0o644)
@@ -231,3 +251,44 @@ def test_an_edited_parent_invalidates_the_cached_gate(tmp_path: Path) -> None:
     # The gate is removed: the module is now compiled into the library.
     parent.write_text("mod helper;\npub fn extra() {}\n", encoding="utf-8")
     assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == [3]
+
+
+def test_the_answer_does_not_depend_on_where_the_crate_is_checked_out(tmp_path: Path) -> None:
+    """The same crate must give the same answer under ``~/src/...`` and ``~/tests/...``.
+
+    An earlier lexical rule ("a ``tests`` component with no ``src`` before it")
+    made both wrong: a developer keeping repositories under ``~/src`` saw every
+    integration test still reported, cancelling #172 for them, while a checkout
+    under ``~/tests`` had its production code silently exempted. Neither is a
+    property of the crate, so neither can be the test.
+    """
+    for parent in ("src/work", "tests/work"):
+        crate = _crate(tmp_path / parent)
+        integration = crate / "tests" / "it.rs"
+        integration.parent.mkdir()
+        integration.write_text(_UNWRAP_BODY, encoding="utf-8")
+        library = crate / "src" / "lib.rs"
+        library.parent.mkdir()
+        library.write_text(_UNWRAP_BODY, encoding="utf-8")
+        assert _codes(integration, "result_unwrap_outside_tests", "SAFE208") == [], parent
+        assert _codes(library, "result_unwrap_outside_tests", "SAFE208") == [3], parent
+
+
+def test_a_file_outside_any_crate_is_not_test_context(tmp_path: Path) -> None:
+    """With no ``Cargo.toml`` above it the crate root is unknown, so the finding stands.
+
+    Reporting something a reader can dismiss beats inventing a crate layout and
+    hiding a real unwrap.
+    """
+    sample = tmp_path / "tests" / "loose.rs"
+    sample.parent.mkdir()
+    sample.write_text(_UNWRAP_BODY, encoding="utf-8")
+    assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == [3]
+
+
+def test_a_nested_module_under_the_tests_dir_is_still_test_context(tmp_path: Path) -> None:
+    """Cargo compiles ``tests/common/mod.rs`` into the integration-test binary."""
+    sample = _crate(tmp_path) / "tests" / "common" / "mod.rs"
+    sample.parent.mkdir(parents=True)
+    sample.write_text(_UNWRAP_BODY, encoding="utf-8")
+    assert _codes(sample, "result_unwrap_outside_tests", "SAFE208") == []

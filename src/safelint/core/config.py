@@ -2661,12 +2661,17 @@ _PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                     "loads",
                 ],
             },
-            # ``QuerySet.first()`` returns None on no match. ``cache.get()`` is
-            # also nullable but deliberately NOT added - ``get`` is too common a
-            # method name and would be noisy; ``QuerySet.get`` is NOT nullable
-            # (it raises ``DoesNotExist``), so it is not listed either.
-            # Applies only when the user enables ``null_dereference``.
-            "null_dereference": {"nullable_methods": ["first"]},
+            # No ``null_dereference`` override. The preset used to carry
+            # ``nullable_methods = ["first"]`` for ``QuerySet.first()``, which
+            # returns None on no match. That was written when the rule OR'd a
+            # ClassVar with the configured list, so the entry *added* ``first`` to
+            # the built-in names. Presets replace wholesale
+            # (``_apply_preset_rules``), and ``first`` is now one of the nine
+            # ``nullable_methods`` defaults in its own right, so the entry had
+            # stopped adding anything and started removing the other eight - a
+            # Django project enabling the rule checked ``first`` alone. Deleting it
+            # restores the effective set. Anything Django-specific worth adding
+            # later has to list the base names alongside it.
             **_ENABLE_FRAMEWORK_RULES,
         },
     },

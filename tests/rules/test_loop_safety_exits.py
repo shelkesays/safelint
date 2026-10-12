@@ -180,3 +180,57 @@ def test_rust_continue_inside_a_macro_is_not_an_exit(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert _safe501_lines(sample) == [2]
+
+
+def test_cpp_co_return_is_a_loop_exit(tmp_path: Path) -> None:
+    """A C++ coroutine leaves via ``co_return``, a node type distinct from ``return``.
+
+    The #170 table mapped one return node per language, so a loop whose only exit
+    was ``co_return`` still reported - the same blind spot the issue was about,
+    one grammar node over.
+    """
+    sample = tmp_path / "coro.cpp"
+    sample.write_text("task<int> poll(bool done) {\n    while (true) {\n        if (done) { co_return 1; }\n    }\n}\n", encoding="utf-8")
+    assert _safe501_lines(sample) == []
+
+
+_NESTED_RETURN_DOES_NOT_CLEAR: list[tuple[str, str, str]] = [
+    # PHP had no break-boundary tuple at all (it counts `break N` levels instead),
+    # so the return search was bounded by function types alone.
+    ("php foreach", "n.php", "<?php function f($rows) {\n    while (true) {\n        foreach ($rows as $r) { return $r; }\n    }\n}\n"),
+    ("php for", "o.php", "<?php function f($n) {\n    while (true) {\n        for ($i = 0; $i < $n; $i++) { return $i; }\n    }\n}\n"),
+    # C++ range-for is a distinct node from `for_statement` and was in neither
+    # boundary set.
+    ("cpp range-for", "p.cpp", "int f(std::vector<int> v) {\n    while (true) {\n        for (auto x : v) { return x; }\n    }\n}\n"),
+]
+
+
+@pytest.mark.parametrize(["label", "name", "src"], _NESTED_RETURN_DOES_NOT_CLEAR, ids=[c[0] for c in _NESTED_RETURN_DOES_NOT_CLEAR])
+def test_a_return_in_a_nested_loop_does_not_clear_the_outer_loop(tmp_path: Path, label: str, name: str, src: str) -> None:
+    """The nested loop may run zero times, so its ``return`` is not an outer exit.
+
+    This is the invariant #170 documented and tested for the other languages; PHP
+    and C++ range-for were the two shapes where the boundary set did not actually
+    enforce it.
+    """
+    sample = tmp_path / name
+    sample.write_text(src, encoding="utf-8")
+    assert _safe501_lines(sample) == [2], label
+
+
+def test_a_return_directly_in_the_php_loop_still_clears(tmp_path: Path) -> None:
+    """The control: PHP's own ``return`` is still an exit when it is not nested."""
+    sample = tmp_path / "direct.php"
+    sample.write_text("<?php function f($x) {\n    while (true) {\n        if ($x) { return $x; }\n    }\n}\n", encoding="utf-8")
+    assert _safe501_lines(sample) == []
+
+
+def test_a_break_in_a_nested_cpp_range_for_does_not_clear_the_outer_loop(tmp_path: Path) -> None:
+    """The same gap on the ``break`` path, which predates #170.
+
+    ``for_range_loop`` was absent from the C++ break boundaries too, so a nested
+    range-for's ``break`` read as exiting the enclosing ``while (true)``.
+    """
+    sample = tmp_path / "brk.cpp"
+    sample.write_text("void f(std::vector<int> v) {\n    while (true) {\n        for (auto x : v) { break; }\n    }\n}\n", encoding="utf-8")
+    assert _safe501_lines(sample) == [2]

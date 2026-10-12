@@ -180,8 +180,13 @@ _C_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (
     _c.FUNCTION_DEFINITION,
 )
 # C++ adds ``lambda_expression`` to C's boundary set: a ``break`` inside a
-# lambda body exits that lambda, not an enclosing loop.
-_CPP_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (*_C_BREAK_SCOPE_BOUNDARIES, _cpp.LAMBDA_EXPRESSION)
+# lambda body exits that lambda, not an enclosing loop. ``for_range_loop`` is a
+# distinct grammar node from ``for_statement``, so the range-based
+# ``for (auto x : v)`` has to be listed explicitly - without it a nested
+# range-for bounded neither a ``break`` nor a ``return``, and
+# ``while (true) { for (auto x : v) { return x; } }`` read as having an exit the
+# outer loop does not have (the inner loop may run zero times).
+_CPP_BREAK_SCOPE_BOUNDARIES: tuple[str, ...] = (*_C_BREAK_SCOPE_BOUNDARIES, _cpp.FOR_RANGE_LOOP, _cpp.LAMBDA_EXPRESSION)
 _BREAK_SCOPE_BOUNDARIES_BY_LANG: dict[str, tuple[str, ...]] = {
     "python": (_py.FOR_STATEMENT, _py.WHILE_STATEMENT, _py.FUNCTION_DEF, _py.ASYNC_FUNCTION_DEF),
     "javascript": _JS_BREAK_SCOPE_BOUNDARIES,
@@ -511,6 +516,13 @@ def _has_outward_labelled_break(while_node: tree_sitter.Node, lang_name: str) ->
 #: function and so exits every loop inside it, which makes it an exit from the
 #: loop just as much as a ``break``. Rust names it ``return_expression``;
 #: everywhere else it is ``return_statement``.
+#: Extra exit statements beyond ``return``. C++ coroutines leave via
+#: ``co_return``, a distinct grammar node, so a loop whose only exit was
+#: ``co_return`` still reported.
+_EXTRA_RETURN_NODES_BY_LANG: dict[str, tuple[str, ...]] = {
+    "cpp": (_cpp.CO_RETURN_STATEMENT,),
+}
+
 _RETURN_NODE_BY_LANG: dict[str, str] = {
     "python": _py.RETURN_STATEMENT,
     "javascript": _js.RETURN_STATEMENT,
@@ -549,8 +561,8 @@ def _has_exiting_return(while_node: tree_sitter.Node, lang_name: str) -> bool:
     A ``return`` inside a nested *function* or closure belongs to that function
     and is excluded for the same reason it is excluded from the break search.
     """
-    return_type = _RETURN_NODE_BY_LANG[lang_name]
-    return any(child.type == return_type for child in walk(while_node, skip_types=_return_scope_boundaries(lang_name)))
+    exit_types = {_RETURN_NODE_BY_LANG[lang_name], *_EXTRA_RETURN_NODES_BY_LANG.get(lang_name, ())}
+    return any(child.type in exit_types for child in walk(while_node, skip_types=_return_scope_boundaries(lang_name)))
 
 
 #: Nodes that stop a ``break`` but NOT a ``return``. A ``break`` in a switch arm
@@ -568,6 +580,25 @@ _SWITCH_LIKE_BY_LANG: dict[str, tuple[str, ...]] = {
 }
 
 
+#: Languages with no entry in :data:`_BREAK_SCOPE_BOUNDARIES_BY_LANG`, which the
+#: return search would otherwise bound by function types alone. PHP is here
+#: because its ``break`` handling counts levels (``break 2;``) instead of walking
+#: boundaries, so it never needed a break-boundary tuple - but a ``return`` in a
+#: nested PHP loop still must not clear the outer one, and without these
+#: ``while (true) { foreach ($rows as $r) { return $r; } }`` read as having an
+#: exit. ``switch_statement`` is deliberately absent: a ``return`` in a switch arm
+#: does leave the function.
+_RETURN_SCOPE_BOUNDARIES_BY_LANG: dict[str, tuple[str, ...]] = {
+    "php": (
+        _php.FOR_STATEMENT,
+        _php.FOREACH_STATEMENT,
+        _php.WHILE_STATEMENT,
+        _php.DO_STATEMENT,
+        *sorted(_php.FUNCTION_TYPES),
+    ),
+}
+
+
 def _return_scope_boundaries(lang_name: str) -> tuple[str, ...]:
     """Return the nodes a ``return`` search must not descend into.
 
@@ -577,8 +608,13 @@ def _return_scope_boundaries(lang_name: str) -> tuple[str, ...]:
     stop a ``return`` from leaving the enclosing function.
 
     Rust and Python need no subtraction - Rust's ``match`` was never a break
-    boundary and Python has no switch in the set.
+    boundary and Python has no switch in the set. A language with its own entry in
+    :data:`_RETURN_SCOPE_BOUNDARIES_BY_LANG` uses that instead, which is how PHP
+    gets loop boundaries without having a break-boundary tuple.
     """
+    explicit = _RETURN_SCOPE_BOUNDARIES_BY_LANG.get(lang_name)
+    if explicit is not None:
+        return explicit
     breaks = _BREAK_SCOPE_BOUNDARIES_BY_LANG.get(lang_name)
     if breaks is None:
         return tuple(_FUNCTION_TYPES_BY_LANG.get(lang_name, frozenset()))
