@@ -62,6 +62,22 @@ def _validated_string_list(value: object, key_name: str) -> list[str]:
     return [item for item in value if isinstance(item, str)]
 
 
+def _validated_bool(value: object, key_name: str) -> bool:
+    """Return *value* as a ``bool`` or raise :class:`ConfigValueError`.
+
+    A quoted TOML value is the trap this exists for. ``skip_test_code = "false"``
+    is a non-empty string, so a plain truth test reads it as ``True`` and the user
+    gets the behaviour they just tried to opt out of, silently. Boolean keys were
+    previously read with a bare ``.get``, which is fine for a knob nobody is
+    fighting; it is not fine for the opt-out of a default that changes what five
+    enabled-by-default rules report.
+    """
+    if isinstance(value, bool):
+        return value
+    msg = f"{key_name} must be a boolean (true / false, unquoted), got {type(value).__name__}"
+    raise ConfigValueError(msg)
+
+
 def _validated_property_map(value: object, key_name: str) -> dict[str, frozenset[str]]:
     """Validate a table of ``name -> [property, ...]``; return ``name -> frozenset``.
 

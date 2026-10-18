@@ -27,7 +27,7 @@ import os
 from pathlib import Path
 from typing import Any
 
-from safelint.core._validators import _validated_string_list
+from safelint.core._validators import _validated_bool, _validated_string_list
 
 
 # Java's three conventional test-filename suffixes (Maven Surefire / Failsafe +
@@ -175,9 +175,10 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
 #: ``TestConfig`` under ``src/main/java`` are production utilities.
 #:
 #: What remains is infix and suffix forms that nothing but a test is called:
-#: ``foo.test.ts`` / ``foo.spec.js``, Go's toolchain-enforced ``foo_test.go``,
-#: ``FooTest.java`` / ``FooTests.java`` / ``FooIT.java``, ``FooTest.php``, and
-#: the ``_test`` stem suffix in Rust / C / C++.
+#: ``foo.test.ts`` / ``foo.spec.js``, ``FooTest.java`` / ``FooTests.java`` /
+#: ``FooIT.java``, ``FooTest.php``, and the ``_test`` stem suffix everywhere else
+#: - Go's toolchain-enforced ``foo_test.go``, and by convention ``foo_test.rs``,
+#: ``foo_test.py``, ``foo_test.c`` / ``foo_test.cpp``.
 _UNAMBIGUOUS_TEST_INFIXES: tuple[str, ...] = (".test.", ".spec.")
 
 
@@ -224,7 +225,7 @@ def skips_test_code(rule_config: dict[str, Any], filepath: str, lang_name: str) 
     The filename half is **stricter** than theirs: see
     :func:`_filename_is_unambiguously_test`.
     """
-    if not rule_config.get(SKIP_TEST_CODE_KEY, True):
+    if not _validated_bool(rule_config.get(SKIP_TEST_CODE_KEY, True), SKIP_TEST_CODE_KEY):
         return False
     # Validated as a string list so a scalar typo (``test_dirs = "mytests"``)
     # fails loud rather than iterating characters - matching every other list key.
@@ -267,19 +268,43 @@ def _under_test_dir(filepath: str, test_dirs: list[str]) -> bool:
 
 
 def _project_relative_parts(normalised_parts: tuple[str, ...]) -> tuple[str, ...]:
-    """Return the components below the working directory, or ``()``.
+    """Return the components below the file's PROJECT root, or ``()``.
 
-    An empty tuple when the file sits outside the working directory: there is no
-    project root to be relative to, so no relative ``test_dirs`` entry can apply
-    and ``_path_components_contain`` finds nothing in it. Reporting the finding is
-    the safe direction.
+    The project root is the directory holding the active config, discovered by
+    walking up from the file itself - the same anchor the cache-dir resolver
+    uses, and the same per-target resolution ``safelint check`` already applies
+    to config. The working directory is only the fallback when no config is
+    discoverable.
+
+    The working directory alone was wrong: ``safelint check /abs/project`` run
+    from somewhere else left every relative ``test_dirs`` entry unmatched, so the
+    whole feature silently did nothing for a perfectly ordinary CI invocation.
+    Anchoring at the file's own project also makes a monorepo with per-package
+    configs behave per package.
+
+    An empty tuple when the file sits outside that root: nothing to be relative
+    to, so no relative entry can apply and ``_path_components_contain`` finds
+    nothing in it. Reporting the finding is the safe direction.
 
     ``is_relative_to`` rather than catching ``ValueError`` from ``relative_to``,
     so the normal case is not an exception path - and so this helper does not
     itself trip SAFE202 / SAFE203 on an ``except`` that returns a value.
     """
     path = Path(*normalised_parts) if normalised_parts else Path()
-    cwd = Path.cwd()
-    if not path.is_relative_to(cwd):
+    root = _project_root_for(path)
+    if not path.is_relative_to(root):
         return ()
-    return path.relative_to(cwd).parts
+    return path.relative_to(root).parts
+
+
+def _project_root_for(path: Path) -> Path:
+    """Return the project root *path* belongs to, falling back to the working directory.
+
+    ``find_config_root`` is imported lazily: ``core.config`` must not import
+    ``rules`` (its package ``__init__`` pulls in every rule module), so the
+    dependency cannot be module-level in either direction. The same pattern is
+    already used by ``rule_default_list``.
+    """
+    from safelint.core.config import find_config_root  # noqa: PLC0415 - circular avoidance
+
+    return find_config_root(path.parent) or Path.cwd()

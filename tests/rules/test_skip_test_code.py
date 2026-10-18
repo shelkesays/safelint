@@ -35,11 +35,18 @@ _SCOPED_RULES: list[tuple[str, str]] = [
     ("resource_lifecycle", "SAFE401"),
 ]
 
-#: A Python module that trips SAFE101, SAFE203, SAFE304 and SAFE401 at once.
+#: A Python module that trips all five scoped rules at once. ``CACHE`` plus the
+#: ``global`` write is what exercises SAFE302 - without it the rule was in
+#: ``_SCOPED_RULES`` but asserted through a code that could never appear, so its
+#: skip went untested.
 _NOISY_SOURCE = (
     "import requests\n"
     "\n"
+    "CACHE = {}\n"
+    "\n"
     "def handle():\n"
+    "    global CACHE\n"
+    "    CACHE = {}\n"
     "    session = requests.Session()\n"
     "    print('working')\n" + "".join(f"    x{i} = {i}\n" for i in range(70)) + "    try:\n"
     "        session.get('http://x')\n"
@@ -71,7 +78,7 @@ def test_the_same_source_reports_in_library_code_and_not_in_a_test_dir(tmp_path:
     test_copy.parent.mkdir()
     test_copy.write_text(_NOISY_SOURCE, encoding="utf-8")
 
-    assert _codes(library) == {"SAFE101", "SAFE203", "SAFE304", "SAFE401"}
+    assert _codes(library) == {code for _, code in _SCOPED_RULES}
     assert _codes(test_copy) == set()
 
 
@@ -81,7 +88,7 @@ def test_skip_test_code_false_restores_the_previous_behaviour(tmp_path: Path, mo
     test_copy = tmp_path / "tests" / "test_handle.py"
     test_copy.parent.mkdir()
     test_copy.write_text(_NOISY_SOURCE, encoding="utf-8")
-    assert _codes(test_copy, skip=False) == {"SAFE101", "SAFE203", "SAFE304", "SAFE401"}
+    assert _codes(test_copy, skip=False) == {code for _, code in _SCOPED_RULES}
 
 
 _TEST_DIR_NAMES = ["tests", "test", "__tests__", "spec"]
@@ -116,7 +123,7 @@ _FILENAME_CASES: list[tuple[str, str, bool]] = [
     ("lib/foo.spec.ts", "typescript", True),
     ("internal/server_test.go", "go", True),
     ("src/lib_test.rs", "rust", True),
-    ("src/test/java/FooTest.java", "java", True),
+    ("src/main/java/FooTest.java", "java", True),
     ("app/FooTest.php", "php", True),
     # Plain production files in each.
     ("lib/foo.js", "javascript", False),
@@ -171,7 +178,7 @@ def test_the_answer_does_not_depend_on_where_the_repo_is_checked_out(tmp_path: P
     source.parent.mkdir(parents=True)
     source.write_text(_NOISY_SOURCE, encoding="utf-8")
     monkeypatch.chdir(crate)
-    assert _codes(source) == {"SAFE101", "SAFE203", "SAFE304", "SAFE401"}
+    assert _codes(source) == {code for _, code in _SCOPED_RULES}
 
 
 def test_an_absolute_test_dir_entry_stays_anchored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -188,7 +195,7 @@ def test_an_absolute_test_dir_entry_stays_anchored(tmp_path: Path, monkeypatch: 
     engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": overrides}))
     wanted = {code for _, code in _SCOPED_RULES}
     assert {v.code for v in engine.check_file(str(scoped / "sample.py")).violations if v.code in wanted} == set()
-    assert {v.code for v in engine.check_file(str(other / "sample.py")).violations if v.code in wanted} == wanted - {"SAFE302"}
+    assert {v.code for v in engine.check_file(str(other / "sample.py")).violations if v.code in wanted} == wanted
 
 
 _TRAVERSAL_CASES: list[tuple[str, str, bool]] = [
