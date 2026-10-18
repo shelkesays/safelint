@@ -103,6 +103,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   - **`test_dirs` defaults to four names**, `["tests", "test", "__tests__", "spec"]`, not just `tests`. A default of `tests` alone missed Express entirely, where the directory is `test` (singular) and holds **161 of its 165** SAFE101 findings - and a default that needs per-project tuning before it works is not the useful default this issue asked for. The same widening applies to SAFE601 / SAFE701 / SAFE702, which read the same key and are strictly better for recognising more real test layouts.
   - **A bare `test_` prefix does not exclude a file.** Reusing the existing test-file detection wholesale skipped all five rules inside safelint's own `src/safelint/rules/test_coverage.py`, a rule implementation, and would do the same to any project's `TestDataFactory.java` under `src/main/java`. Finding tests and excluding production code are different risks and the looser signal is only safe for the former. safelint's own SAFE004 `unused_suppression` caught this, by noticing the `# nosafe: SAFE203` annotations in that file had stopped suppressing anything. Python tests are unaffected, since `tests/test_foo.py` matches on the directory: re-measuring after the narrowing moved Django by 3 findings and nothing else at all.
+  - **A relative `test_dirs` entry matches at any depth below the working directory**, not only at the project root. A monorepo puts tests per package (`services/api/tests/`, `packages/core/__tests__/`), and anchoring at the root missed every one of them - `conftest.py` matches no filename convention either, so a whole monorepo's test tree kept reporting. The working directory bounds the search, which is what stops the answer depending on where the repository is checked out: a clone living in `~/tests/myproj` must not have all of its source treated as test code. An absolute entry stays anchored to exactly the path given. This is the same reasoning the Rust `tests/` detection applies to cargo workspaces.
 
   Measured across five languages, every project linted from its own root (`test_dirs` is project-root-relative):
 
@@ -118,7 +119,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   | Flask | Python | 104 | **50** (-52%) |
   | Commons Lang | Java | 273 | **132** (-52%) |
   | Zod | TypeScript | 460 | **259** (-44%) |
-  | Django | Python | 2336 | **1371** (-41%) |
+  | Django | Python | 2336 | **1314** (-44%) |
   | PetClinic | Java | 7 | **2** |
 
   SAFE102 `nesting_depth` is deliberately **not** in the group. It was 37% test code in Python but 6% in JS/TS, and safelint relaxes it for its own tests only because its test helpers happen to nest - that is a property of this repo, not a general one.

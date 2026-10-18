@@ -194,7 +194,53 @@ def skips_test_code(rule_config: dict[str, Any], filepath: str, lang_name: str) 
     # Validated as a string list so a scalar typo (``test_dirs = "mytests"``)
     # fails loud rather than iterating characters - matching every other list key.
     test_dirs = _validated_string_list(rule_config.get("test_dirs", _DEFAULT_TEST_DIRS), "test_dirs")
-    path_parts = Path(filepath).absolute().parts
-    if any(_path_components_contain(path_parts, Path(td).absolute().parts) for td in test_dirs):
+    if _under_test_dir(filepath, test_dirs):
         return True
     return _filename_is_unambiguously_test(filepath, lang_name)
+
+
+def _under_test_dir(filepath: str, test_dirs: list[str]) -> bool:
+    """Return True if *filepath* sits under one of *test_dirs*.
+
+    A **relative** entry matches at any depth below the working directory, not
+    only at its root. A monorepo puts tests per package - ``services/api/tests/``,
+    ``packages/core/__tests__/`` - and anchoring ``"tests"`` at the project root
+    missed every one of them, so a whole monorepo's test tree kept reporting. This
+    is the same reasoning the Rust side already applies to cargo workspaces, where
+    integration tests live at ``crates/<name>/tests/``.
+
+    The working directory bounds it, which is what stops the match from depending
+    on where the repository is checked out: a clone living in ``~/tests/myproj``
+    must not have all of its source treated as test code. Relative ``test_dirs``
+    are documented as project-root-relative and safelint is run from the directory
+    holding its config, so the working directory is that root. A file outside it
+    cannot be placed in a project at all and only the absolute form can match it.
+
+    An **absolute** entry stays anchored to exactly the path given.
+    """
+    absolute_path = Path(filepath).absolute()
+    within_project = _project_relative_parts(absolute_path)
+    for entry in test_dirs:
+        entry_path = Path(entry)
+        haystack = absolute_path.parts if entry_path.is_absolute() else within_project
+        if _path_components_contain(haystack, entry_path.parts):
+            return True
+    return False
+
+
+def _project_relative_parts(absolute_path: Path) -> tuple[str, ...]:
+    """Return *absolute_path*'s components below the working directory, or ``()``.
+
+    An empty tuple when the file sits outside the working directory: there is no
+    project root to be relative to, so no relative ``test_dirs`` entry can apply
+    and ``_path_components_contain`` finds nothing in it. Reporting the finding is
+    the safe direction.
+
+    ``is_relative_to`` rather than catching ``ValueError`` from ``relative_to``,
+    so the normal case is not an exception path - and so this helper does not
+    itself trip SAFE202 / SAFE203 on an ``except`` that returns a value.
+    """
+    cwd = Path.cwd()
+    if not absolute_path.is_relative_to(cwd):
+        return ()
+    return absolute_path.relative_to(cwd).parts

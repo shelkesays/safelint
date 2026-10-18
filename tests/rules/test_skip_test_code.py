@@ -141,3 +141,51 @@ def test_a_scalar_test_dirs_fails_loud() -> None:
     """A typo must not iterate characters and silently skip the whole project."""
     with pytest.raises(TypeError, match="test_dirs"):
         skips_test_code({"test_dirs": "mytests"}, "tests/x.py", "python")
+
+
+def test_a_nested_test_dir_is_recognised_in_a_monorepo(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A monorepo puts tests per package, not only at the project root.
+
+    Anchoring a relative ``test_dirs`` entry at the root missed
+    ``services/api/tests/conftest.py`` - and ``conftest.py`` matches no filename
+    convention either, so a whole monorepo's test tree kept reporting. The Rust
+    side already applies this reasoning to cargo workspaces.
+    """
+    monkeypatch.chdir(tmp_path)
+    sample = tmp_path / "services" / "api" / "tests" / "conftest.py"
+    sample.parent.mkdir(parents=True)
+    sample.write_text(_NOISY_SOURCE, encoding="utf-8")
+    assert _codes(sample) == set()
+
+
+def test_the_answer_does_not_depend_on_where_the_repo_is_checked_out(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A clone living under a directory called ``tests`` is not all test code.
+
+    Matching a relative entry anywhere in the ABSOLUTE path would treat every
+    file of a repo at ``~/tests/myproj`` as test code. The working directory
+    bounds the search, which is the same trap the Rust ``tests/`` detection hit
+    and fixed by anchoring at the crate root.
+    """
+    crate = tmp_path / "tests" / "myproj"
+    source = crate / "src" / "lib.py"
+    source.parent.mkdir(parents=True)
+    source.write_text(_NOISY_SOURCE, encoding="utf-8")
+    monkeypatch.chdir(crate)
+    assert _codes(source) == {"SAFE101", "SAFE203", "SAFE304", "SAFE401"}
+
+
+def test_an_absolute_test_dir_entry_stays_anchored(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """An absolute entry means exactly that path, not any directory of the same name."""
+    monkeypatch.chdir(tmp_path)
+    scoped = tmp_path / "pkg_a" / "suite"
+    scoped.mkdir(parents=True)
+    (scoped / "sample.py").write_text(_NOISY_SOURCE, encoding="utf-8")
+    other = tmp_path / "pkg_b" / "suite"
+    other.mkdir(parents=True)
+    (other / "sample.py").write_text(_NOISY_SOURCE, encoding="utf-8")
+
+    overrides = {rule: {"enabled": True, "test_dirs": [str(scoped)]} for rule, _ in _SCOPED_RULES}
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": overrides}))
+    wanted = {code for _, code in _SCOPED_RULES}
+    assert {v.code for v in engine.check_file(str(scoped / "sample.py")).violations if v.code in wanted} == set()
+    assert {v.code for v in engine.check_file(str(other / "sample.py")).violations if v.code in wanted} == wanted - {"SAFE302"}
