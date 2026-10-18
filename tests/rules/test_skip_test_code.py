@@ -189,3 +189,39 @@ def test_an_absolute_test_dir_entry_stays_anchored(tmp_path: Path, monkeypatch: 
     wanted = {code for _, code in _SCOPED_RULES}
     assert {v.code for v in engine.check_file(str(scoped / "sample.py")).violations if v.code in wanted} == set()
     assert {v.code for v in engine.check_file(str(other / "sample.py")).violations if v.code in wanted} == wanted - {"SAFE302"}
+
+
+_TRAVERSAL_CASES: list[tuple[str, str, bool]] = [
+    ("a dot-dot escape out of a test dir", "tests/../src/service.py", False),
+    ("a leading dot plus a dot-dot escape", "./tests/../src/service.py", False),
+    ("a dot-dot escape INTO a test dir", "src/../tests/conftest.py", True),
+    ("a plain leading dot", "./tests/conftest.py", True),
+]
+
+
+@pytest.mark.parametrize(["label", "relative", "expected"], _TRAVERSAL_CASES, ids=[c[0] for c in _TRAVERSAL_CASES])
+def test_dot_dot_traversal_does_not_decide_the_answer(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    label: str,
+    relative: str,
+    expected: bool,  # noqa: FBT001 - parametrized test data, not a flag argument
+) -> None:
+    """``Path.absolute()`` prepends the working directory but does NOT normalise.
+
+    So ``tests/../src/service.py`` kept its ``tests`` component and a plain
+    component comparison matched it, skipping five rules on a production file.
+    The collapse is lexical, which keeps this module's existing choice not to
+    follow symlinks.
+
+    The inclusion path (``_is_test_file``, used by SAFE601 / SAFE701 / SAFE702)
+    deliberately does NOT normalise: leaving ``..`` in place is what contains a
+    ``test_dirs`` entry climbing out of the project root (security finding H3),
+    which ``tests/rules/test_test_dirs_containment.py`` pins. Normalising it
+    turned ``["../../../"]`` into a real ancestor directory that prefixes every
+    file under it.
+    """
+    monkeypatch.chdir(tmp_path)
+    for directory in ("tests", "src"):
+        (tmp_path / directory).mkdir()
+    assert skips_test_code({}, relative, "python") is expected, label

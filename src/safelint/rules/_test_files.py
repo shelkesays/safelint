@@ -23,6 +23,7 @@ differently from SAFE701/702 for the same ``test_dirs``.
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -50,6 +51,30 @@ def _path_components_contain(haystack: tuple[str, ...], needle: tuple[str, ...])
         return False
     n = len(needle)
     return any(haystack[i : i + n] == needle for i in range(len(haystack) - n + 1))
+
+
+def _normalised_parts(path: Path) -> tuple[str, ...]:
+    """Return *path*'s components, made absolute and with ``.``/``..`` collapsed.
+
+    ``Path.absolute()`` does NOT normalise - it only prepends the working
+    directory - so ``tests/../src/service.py`` keeps its ``tests`` component and a
+    plain component comparison found it. That skipped five rules on a production
+    file (and, on the inclusion side, scoped SAFE601 into one).
+
+    Used by the EXCLUSION path only (``_under_test_dir``). The inclusion path
+    deliberately does not normalise; see the comment in ``_is_test_file`` for why
+    that is load-bearing for ``test_dirs`` containment.
+
+    ``os.path.normpath`` collapses the traversal **lexically**, which is the same
+    choice this module already makes by using ``.absolute()`` rather than
+    ``.resolve()``: no symlink is followed and the filesystem is never probed. The
+    tradeoff is explicit and deliberate - for a path that crosses a symlink and
+    then goes up (``link/../x``), the lexical answer can differ from the one the
+    kernel would give. Resolving instead would make the rule's scope depend on
+    filesystem layout the user did not write, which is worse for a lint decision
+    than a collapsed ``..``.
+    """
+    return Path(os.path.normpath(path.absolute())).parts
 
 
 def _filename_matches_test_pattern(filepath: str, lang_name: str) -> bool:
@@ -118,6 +143,16 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
     # match against an absolute ``test_dirs`` entry (``/abs/project/tests``)
     # and helper files under the test root would be misclassified as source.
     # ``.absolute()`` (not ``.resolve()``) avoids following symlinks.
+    #
+    # Deliberately NOT normalised, unlike the exclusion path in
+    # ``_under_test_dir``. Leaving ``..`` in place is what contains a
+    # ``test_dirs`` entry that climbs out of the project root (security finding
+    # H3): ``["../../../"]`` stays a parts tuple ending in ``..`` and matches
+    # nothing, whereas collapsing it yields a real ancestor directory that is a
+    # prefix of every file under it - which would classify the whole project as
+    # test code. ``tests/../src/foo.py`` is therefore still read as a test file
+    # here; that errs toward scoping SAFE601/701/702 INTO a file, which is the
+    # safe direction for rules that look for tests.
     path_parts = Path(filepath).absolute().parts
     for td in test_dirs:
         td_parts = Path(td).absolute().parts
@@ -218,18 +253,21 @@ def _under_test_dir(filepath: str, test_dirs: list[str]) -> bool:
 
     An **absolute** entry stays anchored to exactly the path given.
     """
-    absolute_path = Path(filepath).absolute()
-    within_project = _project_relative_parts(absolute_path)
+    normalised = _normalised_parts(Path(filepath))
+    within_project = _project_relative_parts(normalised)
     for entry in test_dirs:
         entry_path = Path(entry)
-        haystack = absolute_path.parts if entry_path.is_absolute() else within_project
-        if _path_components_contain(haystack, entry_path.parts):
+        if entry_path.is_absolute():
+            haystack, needle = normalised, _normalised_parts(entry_path)
+        else:
+            haystack, needle = within_project, entry_path.parts
+        if _path_components_contain(haystack, needle):
             return True
     return False
 
 
-def _project_relative_parts(absolute_path: Path) -> tuple[str, ...]:
-    """Return *absolute_path*'s components below the working directory, or ``()``.
+def _project_relative_parts(normalised_parts: tuple[str, ...]) -> tuple[str, ...]:
+    """Return the components below the working directory, or ``()``.
 
     An empty tuple when the file sits outside the working directory: there is no
     project root to be relative to, so no relative ``test_dirs`` entry can apply
@@ -240,7 +278,8 @@ def _project_relative_parts(absolute_path: Path) -> tuple[str, ...]:
     so the normal case is not an exception path - and so this helper does not
     itself trip SAFE202 / SAFE203 on an ``except`` that returns a value.
     """
+    path = Path(*normalised_parts) if normalised_parts else Path()
     cwd = Path.cwd()
-    if not absolute_path.is_relative_to(cwd):
+    if not path.is_relative_to(cwd):
         return ()
-    return absolute_path.relative_to(cwd).parts
+    return path.relative_to(cwd).parts
