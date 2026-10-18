@@ -753,7 +753,7 @@ wheels = [
 
 [[package]]
 name = "safelint"
-version = "2.15.0"
+version = "2.15.0rc6"
 source = { editable = "." }
 dependencies = [
     { name = "tree-sitter" },
