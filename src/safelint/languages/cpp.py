@@ -100,6 +100,7 @@ CASE_STATEMENT = "case_statement"
 BREAK_STATEMENT = "break_statement"
 CONTINUE_STATEMENT = "continue_statement"
 RETURN_STATEMENT = "return_statement"
+CO_RETURN_STATEMENT = "co_return_statement"  # ``co_return x;`` - a coroutine's return, a distinct node
 GOTO_STATEMENT = "goto_statement"  # SAFE106; loop-exit for SAFE501
 LABELED_STATEMENT = "labeled_statement"
 

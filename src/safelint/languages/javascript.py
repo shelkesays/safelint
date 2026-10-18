@@ -105,6 +105,7 @@ FUNCTION_TYPES = frozenset(
 
 CLASS_DECLARATION = "class_declaration"
 CLASS_BODY = "class_body"
+CLASS_STATIC_BLOCK = "class_static_block"  # ``static { ... }`` - its own scope; ``var`` here does NOT hoist out
 
 # Scope-introducing containers. ``statement_block`` is any ``{ ... }`` body
 # (function bodies included); ``program`` is module scope.
@@ -182,7 +183,9 @@ VARIABLE_DECLARATION = "variable_declaration"  # ``var`` wrapper
 ARRAY_PATTERN = "array_pattern"  # ``[a, b] = ...``
 OBJECT_PATTERN = "object_pattern"  # ``{a, b} = ...``
 REST_PATTERN = "rest_pattern"  # ``...rest`` in destructuring
-ASSIGNMENT_PATTERN = "assignment_pattern"  # ``{a = 1}`` / ``[a = 1]`` default in destructuring
+ASSIGNMENT_PATTERN = "assignment_pattern"  # ``{a = 1}`` / ``[a = 1]`` default in destructuring; also a
+#                                          default-valued PARAMETER (``function f(x = 1)``), whose binding
+#                                          identifier is on the ``left`` field
 SHORTHAND_PROPERTY_IDENTIFIER_PATTERN = "shorthand_property_identifier_pattern"  # ``{foo}`` short form
 PAIR_PATTERN = "pair_pattern"  # ``{key: alias}`` in object destructuring
 # TypeScript typed-parameter wrappers around a binding pattern in ``formal_parameters``.

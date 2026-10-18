@@ -641,3 +641,52 @@ def test_rust_use_declaration_binds_only_what_it_imports(tmp_path: Path, label: 
     sample = tmp_path / "use_shape.rs"
     sample.write_text(source, encoding="utf-8")
     assert [v.lineno for v in _safe105(_engine().check_file(str(sample)))] == expected, label
+
+
+_JAVA_COMMENTED_CALLS: list[tuple[str, str, list[int]]] = [
+    ("block comment in the argument", "class D { int fact(int n) { return n * fact(n - 1 /* step */); } }\n", [1]),
+    (
+        "line comment in a multi-line argument list",
+        "class F {\n  int fact(int n) {\n    return fact(\n      n - 1 // step\n    );\n  }\n}\n",
+        [3],
+    ),
+    (
+        "comment in the parameter list",
+        "class G { int fact(int n /* depth */) { return n * fact(n - 1); } }\n",
+        [1],
+    ),
+]
+
+
+@pytest.mark.parametrize(["label", "source", "expected"], _JAVA_COMMENTED_CALLS, ids=[c[0] for c in _JAVA_COMMENTED_CALLS])
+def test_java_comments_do_not_change_the_argument_count(tmp_path: Path, label: str, source: str, expected: list[int]) -> None:
+    """tree-sitter-java declares comments as extras, and extras are NAMED nodes.
+
+    So a comment inside an argument or parameter list appears in
+    ``named_children`` and inflates the count taken from it:
+    ``fact(n - 1 /* step */)`` inside ``int fact(int n)`` counted two arguments
+    against one parameter, read as an arity mismatch, and dropped a genuine
+    self-call. Commented arguments are ordinary Java, so this lost real findings.
+    """
+    sample = tmp_path / "Commented.java"
+    sample.write_text(source, encoding="utf-8")
+    assert [v.lineno for v in _safe105(_engine().check_file(str(sample)))] == expected, label
+
+
+def test_java_a_real_arity_mismatch_still_rules_out_the_self_call(tmp_path: Path) -> None:
+    """The control: excluding comments must not stop the arity check working.
+
+    The call has to share the enclosing method's NAME for this to test anything.
+    An earlier version called a differently-named ``g``, which SAFE105 would never
+    report whatever the arity logic did, so it passed for the wrong reason.
+    """
+    sample = tmp_path / "Arity.java"
+    sample.write_text("class E { int f(int n) { return f(n, 1, 2); } int f(int a, int b, int c) { return a; } }\n", encoding="utf-8")
+    assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_java_a_matching_arity_self_call_still_reports(tmp_path: Path) -> None:
+    """The other side of the control: same name, same arity, so nothing rules it out."""
+    sample = tmp_path / "Recurse.java"
+    sample.write_text("class R { int f(int n) { return f(n - 1); } }\n", encoding="utf-8")
+    assert [v.lineno for v in _safe105(_engine().check_file(str(sample)))] == [1]

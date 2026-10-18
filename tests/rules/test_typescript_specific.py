@@ -487,3 +487,44 @@ def test_ts_bad_javascript_value_error_message_names_the_javascript_key(tmp_path
     )
     with pytest.raises(TypeError, match="io_functions_javascript"):
         SafetyEngine(cfg).check_file(str(sample))
+
+
+_TS_DEFAULT_LIST_KEYS: list[tuple[str, str, str]] = [
+    ("return_value_ignored.flagged_calls", "return_value_ignored", "flagged_calls"),
+    ("null_dereference.nullable_methods", "null_dereference", "nullable_methods"),
+    ("tainted_sink.sinks", "tainted_sink", "sinks"),
+    ("tainted_sink.sanitizers", "tainted_sink", "sanitizers"),
+    ("tainted_sink.sources", "tainted_sink", "sources"),
+]
+
+
+@pytest.mark.parametrize(["label", "rule_name", "base_key"], _TS_DEFAULT_LIST_KEYS, ids=[c[0] for c in _TS_DEFAULT_LIST_KEYS])
+def test_typescript_inherits_the_javascript_default_list(label: str, rule_name: str, base_key: str) -> None:
+    """A TS file falling back to a shipped default must get JavaScript's, not Python's.
+
+    The TS → JS step existed only on the user's-TOML path. ``DEFAULTS`` declares
+    no ``_typescript`` key for any of these, so the defaults path skipped
+    JavaScript and landed on the bare key - which is how Python is spelled there.
+    A TypeScript caller therefore received Python's ``sinks`` and
+    ``flagged_calls`` and never saw ``Function`` / ``spawn`` / ``writeFileSync``.
+    """
+    from safelint.core._validators import rule_default_list  # noqa: PLC0415 - local to this check
+
+    typescript = rule_default_list(rule_name, base_key, "typescript")
+    javascript = rule_default_list(rule_name, base_key, "javascript")
+    python = rule_default_list(rule_name, base_key, "python")
+    assert typescript == javascript, label
+    assert typescript != python, f"{label}: the JS and Python lists are identical, so this proves nothing"
+
+
+def test_a_language_with_its_own_key_does_not_inherit_the_bare_one() -> None:
+    """Only TypeScript inherits, and only from JavaScript.
+
+    The bare key is Python's, so letting any language fall through to it would
+    silently widen every other language's defaults.
+    """
+    from safelint.core._validators import lang_config_key_chain  # noqa: PLC0415 - local to this check
+
+    assert lang_config_key_chain("sinks", "typescript") == ("sinks_typescript", "sinks_javascript")
+    assert lang_config_key_chain("sinks", "rust") == ("sinks_rust",)
+    assert lang_config_key_chain("sinks", "python") == ("sinks",)

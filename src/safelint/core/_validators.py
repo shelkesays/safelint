@@ -62,6 +62,22 @@ def _validated_string_list(value: object, key_name: str) -> list[str]:
     return [item for item in value if isinstance(item, str)]
 
 
+def _validated_bool(value: object, key_name: str) -> bool:
+    """Return *value* as a ``bool`` or raise :class:`ConfigValueError`.
+
+    A quoted TOML value is the trap this exists for. ``skip_test_code = "false"``
+    is a non-empty string, so a plain truth test reads it as ``True`` and the user
+    gets the behaviour they just tried to opt out of, silently. Boolean keys were
+    previously read with a bare ``.get``, which is fine for a knob nobody is
+    fighting; it is not fine for the opt-out of a default that changes what five
+    enabled-by-default rules report.
+    """
+    if isinstance(value, bool):
+        return value
+    msg = f"{key_name} must be a boolean (true / false, unquoted), got {type(value).__name__}"
+    raise ConfigValueError(msg)
+
+
 def _validated_property_map(value: object, key_name: str) -> dict[str, frozenset[str]]:
     """Validate a table of ``name -> [property, ...]``; return ``name -> frozenset``.
 
@@ -189,14 +205,34 @@ def resolve_lang_config_lookup(
     *primary* key (e.g. ``foo_typescript`` for a TS file) - that's the
     key the user would set to override the default.
     """
+    chain = lang_config_key_chain(base_key, lang_name)
+    for key in chain:
+        if key in rule_config:
+            return rule_config[key], key
+    return default, chain[0]
+
+
+def lang_config_key_chain(base_key: str, lang_name: str) -> tuple[str, ...]:
+    """Return the LANGUAGE-SPECIFIC config keys to try for *base_key*, most specific first.
+
+    One definition of the per-language lookup order, because it is consulted from
+    two places - the user's TOML (:func:`resolve_lang_config_lookup`) and the
+    shipped ``DEFAULTS`` (:func:`rule_default_list`) - and the two had drifted.
+    Only the TOML path carried the TypeScript → JavaScript step, so a rule falling
+    back to a shipped default for a ``.ts`` file skipped the JavaScript list and
+    landed on the bare (Python) one: a TypeScript caller got Python's ``sinks``
+    and ``flagged_calls`` and never saw ``Function`` / ``spawn`` /
+    ``writeFileSync``.
+
+    The bare key is deliberately NOT in this chain. In ``DEFAULTS`` it is how
+    Python is spelled, so the defaults path appends it; in a user's TOML it is
+    Python's key too, and letting a ``.rs`` file inherit a bare ``sinks = [...]``
+    would silently widen every other language.
+    """
     primary_key = resolve_lang_config_key(base_key, lang_name)
-    if primary_key in rule_config:
-        return rule_config[primary_key], primary_key
     if lang_name == "typescript":
-        fallback_key = f"{base_key}_javascript"
-        if fallback_key in rule_config:
-            return rule_config[fallback_key], fallback_key
-    return default, primary_key
+        return (primary_key, f"{base_key}_javascript")
+    return (primary_key,)
 
 
 def rule_default_list(rule_name: str, base_key: str, lang_name: str) -> list[str]:
@@ -209,8 +245,13 @@ def rule_default_list(rule_name: str, base_key: str, lang_name: str) -> list[str
     flagged; and ``nullable_methods`` had never matched ``DEFAULTS`` at all, which
     was empty while the copy held nine names.
 
-    Falls back to the bare key when no per-language one exists, which is how Python
-    is spelled (``flagged_calls`` rather than ``flagged_calls_python``).
+    Walks the same per-language chain the user's TOML does
+    (:func:`lang_config_key_chain`), then the bare key, which is how Python is
+    spelled in ``DEFAULTS`` (``flagged_calls`` rather than
+    ``flagged_calls_python``). The TypeScript → JavaScript step matters here: TS
+    declares none of these keys, so without it a ``.ts`` file fell through to
+    Python's list and a TypeScript caller never saw ``Function`` / ``spawn`` /
+    ``writeFileSync``.
 
     ``DEFAULTS`` is imported lazily: ``core.config`` must not import ``rules``,
     whose package ``__init__`` pulls in every rule module, so the dependency cannot
@@ -220,8 +261,8 @@ def rule_default_list(rule_name: str, base_key: str, lang_name: str) -> list[str
     from safelint.core.config import DEFAULTS  # noqa: PLC0415 - circular avoidance
 
     rule_defaults = DEFAULTS["rules"].get(rule_name, {})
-    key = resolve_lang_config_key(base_key, lang_name)
-    value = rule_defaults.get(key)
-    if value is None:
-        value = rule_defaults.get(base_key, [])
-    return list(value) if isinstance(value, list) else []
+    for key in (*lang_config_key_chain(base_key, lang_name), base_key):
+        value = rule_defaults.get(key)
+        if value is not None:
+            return list(value) if isinstance(value, list) else []
+    return []

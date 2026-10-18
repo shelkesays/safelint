@@ -15,6 +15,7 @@ from safelint.languages import python as _py
 from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import end_lineno, function_name_node, lineno, node_text, resolve_lang_name, walk
+from safelint.rules._test_files import skips_test_code
 from safelint.rules.base import BaseRule
 
 
@@ -97,6 +98,25 @@ _UNIT_BY_MODE: dict[str, str] = {
     "logical_lines": "logical lines",
 }
 
+#: Accepted ``count_mode`` values. ``lines`` has no entry in ``_UNIT_BY_MODE``
+#: because its unit is the default wording.
+_VALID_COUNT_MODES: frozenset[str] = frozenset({"lines", "logical_lines", "statements"})
+
+
+def _validate_count_mode(count_mode: str) -> None:
+    """Raise :class:`ValueError` unless *count_mode* is one of the three accepted values.
+
+    Called at the top of ``check_file``, before any early return. It used to be
+    checked only when a function was actually measured, so a misspelled mode was
+    silently accepted for any file with no functions - and, once this rule learned
+    to skip test code (#198), for any file that was skipped. Config errors should
+    not depend on the contents of the file that happened to be linted first.
+    """
+    if count_mode in _VALID_COUNT_MODES:
+        return
+    msg = f"function_length count_mode must be one of 'lines', 'logical_lines', 'statements' - got {count_mode!r}"
+    raise ValueError(msg)
+
 
 class FunctionLengthRule(BaseRule):
     """Reject functions whose body exceeds the configured size limit.
@@ -134,7 +154,13 @@ class FunctionLengthRule(BaseRule):
         """Flag any function or async function exceeding the configured size."""
         max_lines: int = self.config.get("max_lines", 60)
         count_mode: str = self.config.get("count_mode", "lines")
+        _validate_count_mode(count_mode)
         lang_name = resolve_lang_name(filepath)
+        # #198: the patterns this rule flags are conventional in test code, where
+        # they were the overwhelming majority of its findings and were burying the
+        # ones in library code. Whole-file answer, resolved before any walk.
+        if skips_test_code(self.config, filepath, lang_name):
+            return []
         function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         # Sourced from the registered ``LanguageDefinition`` rather than
         # branched per-lang here - adding a new language to the registry
@@ -173,24 +199,19 @@ class FunctionLengthRule(BaseRule):
     ) -> int:
         """Return the function's size under the requested counting mode.
 
-        Validates *count_mode* explicitly - silently falling back on a
-        typo (e.g. ``"line"`` instead of ``"lines"``) would leave the
-        user wondering why their config didn't take effect. Raise
-        ``ValueError`` so misconfiguration fails clearly when this rule
-        evaluates the function (during ``check_file``), rather than
-        producing silently different output. (Engine construction
-        currently does not pre-validate per-rule config; per-rule
-        validation runs lazily when the rule first runs against a
-        file.)
+        *count_mode* has already been checked by ``_validate_count_mode`` at the
+        top of ``check_file``, which is why there is no fallthrough branch here.
+        That check lives there rather than in this function so a typo fails on any
+        file, not only one that happens to contain a function and to survive the
+        test-code skip. (Engine construction still does not pre-validate per-rule
+        config; validation runs when the rule first sees a file.)
         """
         if count_mode == "statements":
             return FunctionLengthRule._count_statements(func_node, lang_name, function_types)
         if count_mode == "logical_lines":
             return FunctionLengthRule._count_logical_lines(func_node, comment_prefix)
-        if count_mode == "lines":
-            return end_lineno(func_node) - lineno(func_node) + 1
-        msg = f"function_length count_mode must be one of 'lines', 'logical_lines', 'statements' - got {count_mode!r}"
-        raise ValueError(msg)
+        # ``lines``, the only mode left once ``_validate_count_mode`` has run.
+        return end_lineno(func_node) - lineno(func_node) + 1
 
     @staticmethod
     def _count_statements(func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str]) -> int:

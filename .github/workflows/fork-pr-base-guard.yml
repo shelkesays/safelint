@@ -7,7 +7,11 @@ name: Fork PR base guard
 # straight into `main` therefore skips the RC cycle entirely, and an external
 # contributor has no way to know that from the PR form - GitHub offers `main` as
 # the default base and gives no mechanism to restrict which base a fork may
-# choose. So this closes such a PR immediately and says where to retarget.
+# choose. So this closes such a PR immediately and asks for a new one against
+# `development`. It asks for a NEW pull request rather than a retarget because
+# `reopened` is one of this workflow's triggers: reopening the closed PR runs the
+# guard again, and the base is still wrong at that moment, so it would be closed
+# before the author could reach the base selector.
 #
 # `pull_request_target` is required because a `pull_request` run from a fork gets
 # a read-only token and cannot comment or close. It is the privileged trigger, so
@@ -61,21 +65,19 @@ jobs:
             exit 0
           fi
           cat > /tmp/body.md <<'MSG'
-          Thanks for the contribution - closing this one on process grounds only, and it is a two-click fix.
+          Thanks for the contribution - closing this one on process grounds only, and your work is not lost.
 
           **Pull requests from forks must target `development`.** This one targets a different branch.
 
           `main` is the release branch. The publish workflow reads `project.version` on every push to it and cuts a PyPI release when that version is new, so a change merged straight into `main` bypasses the release-candidate cycle that every other change goes through. GitHub offers `main` as the default base and gives maintainers no way to restrict which base a fork may pick, which is why this is enforced here rather than in the PR form.
 
-          **To reopen against the right base**, no new branch or force-push needed:
+          **Please open a new pull request from the same branch, with `development` as the base.** No new branch and no force-push needed - your commits are already pushed, so the new PR picks them up as they are.
 
-          1. Open your PR and click **Edit** next to the title.
-          2. Change the base branch to `development`.
-          3. Reopen the pull request.
+          Retargeting this one is not worth attempting: GitHub only lets you change the base of an *open* pull request, and reopening it trips this same guard, which closes it again before you can get to the base selector. A fresh PR is the one path that works in a single step.
 
-          Your commits, review history and comments all carry over. Everything else about the change is unaffected - this says nothing about its quality, only its target.
+          The commits carry over unchanged. The review thread on this PR does not, so if anything here is worth keeping, please copy it across. Everything else about the change is unaffected - this says nothing about its quality, only its target.
 
-          If `development` has moved on, rebase onto it before reopening:
+          If `development` has moved on, rebase onto it first:
 
           ```bash
           git remote add upstream https://github.com/shelkesays/safelint.git

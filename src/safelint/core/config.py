@@ -161,7 +161,28 @@ DEFAULTS: dict[str, Any] = {
         ],
     },
     "rules": {
-        "function_length": {"enabled": True, "max_lines": 60, "severity": "error"},
+        "function_length": {
+            "enabled": True,
+            "max_lines": 60,
+            "severity": "error",
+            # #198: skip test code. These five rules put the overwhelming
+            # majority of their findings in test files - SAFE401 was 78% in
+            # Python and 93% in JS/TS, SAFE302 95% in JS/TS - where the pattern
+            # is conventional and the volume buries the findings in library
+            # code. ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702
+            # read. Set ``skip_test_code = false`` for the strict reading.
+            #
+            # Four directory names, not just ``tests``: a default that only
+            # recognised ``tests`` would have missed Express entirely, where the
+            # directory is ``test`` (singular) and holds 161 of its 165 SAFE101
+            # findings - and a default needing per-project tuning to work is not
+            # the useful default #198 asked for. ``__tests__`` is Jest's
+            # convention and ``spec`` is Jasmine's. Filename conventions
+            # (``*.test.ts``, ``*_test.go``, ``*Test.java``) are recognised
+            # separately and need no directory entry.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
+        },
         "nesting_depth": {"enabled": True, "max_depth": 2, "severity": "error"},
         "max_arguments": {"enabled": True, "max_args": 7, "severity": "error"},
         "complexity": {"enabled": True, "max_complexity": 10, "severity": "error"},
@@ -172,6 +193,14 @@ DEFAULTS: dict[str, Any] = {
         "bare_except": {"enabled": True, "severity": "error"},
         "empty_except": {"enabled": True, "severity": "error"},
         "logging_on_error": {
+            # #198: skip test code. These five rules put the overwhelming
+            # majority of their findings in test files - SAFE401 was 78% in
+            # Python and 93% in JS/TS, SAFE302 95% in JS/TS - where the pattern
+            # is conventional and the volume buries the findings in library
+            # code. ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702
+            # read. Set ``skip_test_code = false`` for the strict reading.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
             "enabled": True,
             "severity": "warning",
             # Call names that count as "the failure was made visible". Matched
@@ -223,6 +252,14 @@ DEFAULTS: dict[str, Any] = {
         },
         "global_state": {"enabled": True, "severity": "warning"},
         "global_mutation": {
+            # #198: skip test code. These five rules put the overwhelming
+            # majority of their findings in test files - SAFE401 was 78% in
+            # Python and 93% in JS/TS, SAFE302 95% in JS/TS - where the pattern
+            # is conventional and the volume buries the findings in library
+            # code. ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702
+            # read. Set ``skip_test_code = false`` for the strict reading.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
             "enabled": True,
             "severity": "error",
             # JavaScript: function-body assignments to any of these
@@ -492,6 +529,14 @@ DEFAULTS: dict[str, Any] = {
             ],
         },
         "side_effects": {
+            # #198: skip test code. These five rules put the overwhelming
+            # majority of their findings in test files - SAFE401 was 78% in
+            # Python and 93% in JS/TS, SAFE302 95% in JS/TS - where the pattern
+            # is conventional and the volume buries the findings in library
+            # code. ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702
+            # read. Set ``skip_test_code = false`` for the strict reading.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
             "enabled": True,
             "severity": "warning",
             # Per-language defaults - see the note on ``side_effects_hidden``
@@ -667,6 +712,14 @@ DEFAULTS: dict[str, Any] = {
             ],
         },
         "resource_lifecycle": {
+            # #198: skip test code. These five rules put the overwhelming
+            # majority of their findings in test files - SAFE401 was 78% in
+            # Python and 93% in JS/TS, SAFE302 95% in JS/TS - where the pattern
+            # is conventional and the volume buries the findings in library
+            # code. ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702
+            # read. Set ``skip_test_code = false`` for the strict reading.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
             "enabled": True,
             "severity": "error",
             # Default tracked functions cover the most common resource-acquisition
@@ -757,7 +810,7 @@ DEFAULTS: dict[str, Any] = {
             # Directories that mark a file as a test file, matched as a
             # path-component subsequence (same semantics + default as SAFE701 /
             # SAFE702). Only consulted when ``test_functions_only`` is on.
-            "test_dirs": ["tests"],
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
             # Python assertion-CALL names (bare key, per the Python
             # convention - every other language suffixes with ``_<lang>``).
             # Python has the built-in ``assert`` keyword, which the rule
@@ -953,8 +1006,8 @@ DEFAULTS: dict[str, Any] = {
                 "assert",
             ],
         },
-        "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
-        "test_coupling": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
+        "test_existence": {"enabled": False, "test_dirs": ["tests", "test", "__tests__", "spec"], "severity": "warning"},
+        "test_coupling": {"enabled": False, "test_dirs": ["tests", "test", "__tests__", "spec"], "severity": "warning"},
         # Holzmann rule 10 (heed every warning) adapted to blanket suppressions
         # of OTHER analysers - bare flake8 noqa, rule-less ``eslint-disable``,
         # ``@SuppressWarnings("all")``, ``#[allow(clippy::all)]``. Scoped
@@ -2661,12 +2714,17 @@ _PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                     "loads",
                 ],
             },
-            # ``QuerySet.first()`` returns None on no match. ``cache.get()`` is
-            # also nullable but deliberately NOT added - ``get`` is too common a
-            # method name and would be noisy; ``QuerySet.get`` is NOT nullable
-            # (it raises ``DoesNotExist``), so it is not listed either.
-            # Applies only when the user enables ``null_dereference``.
-            "null_dereference": {"nullable_methods": ["first"]},
+            # No ``null_dereference`` override. The preset used to carry
+            # ``nullable_methods = ["first"]`` for ``QuerySet.first()``, which
+            # returns None on no match. That was written when the rule OR'd a
+            # ClassVar with the configured list, so the entry *added* ``first`` to
+            # the built-in names. Presets replace wholesale
+            # (``_apply_preset_rules``), and ``first`` is now one of the nine
+            # ``nullable_methods`` defaults in its own right, so the entry had
+            # stopped adding anything and started removing the other eight - a
+            # Django project enabling the rule checked ``first`` alone. Deleting it
+            # restores the effective set. Anything Django-specific worth adding
+            # later has to list the base names alongside it.
             **_ENABLE_FRAMEWORK_RULES,
         },
     },

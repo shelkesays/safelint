@@ -374,3 +374,27 @@ def test_js_block_scoped_let_does_not_hoist_but_still_shadows_in_its_block(tmp_p
     sample = tmp_path / "letscope.js"
     sample.write_text("function f(x) { if (x) { let other = {}; } self.y = 1; }\n", encoding="utf-8")
     assert any(v.code == "SAFE302" for v in _engine().check_file(str(sample)).violations)
+
+
+def test_js_var_in_a_class_static_block_does_not_shadow_the_global(tmp_path: Path) -> None:
+    """``static { }`` is its own scope, so a ``var`` there does not hoist out of it.
+
+    The hoisted-``var`` search walked the whole function body and credited that
+    binding, which suppressed a genuine write to the global ``self``.
+    """
+    sample = tmp_path / "staticblock.js"
+    sample.write_text("function f() { class C { static { var self = {}; } } self.x = 1; }\n", encoding="utf-8")
+    assert any(v.code == "SAFE302" for v in _engine().check_file(str(sample)).violations)
+
+
+def test_js_default_valued_parameter_is_a_local_binding(tmp_path: Path) -> None:
+    """``function f(self = {})`` binds a perfectly ordinary local.
+
+    A defaulted parameter parses as an ``assignment_pattern`` with the identifier
+    on ``left``, which the binding check did not unwrap - so the parameter bound
+    nothing as far as the rule could see and the write was reported as a global
+    mutation.
+    """
+    sample = tmp_path / "defaultparam.js"
+    sample.write_text("function f(self = {}) { self.x = 1; }\n", encoding="utf-8")
+    assert not any(v.code == "SAFE302" for v in _engine().check_file(str(sample)).violations)

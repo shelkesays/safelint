@@ -308,10 +308,30 @@ def _java_arity_rules_out_self(call_node: tree_sitter.Node, func: tree_sitter.No
     args = call_node.child_by_field_name("arguments")
     if params is None or args is None:
         return False  # pragma: no cover - defensive: both fields are always present on these nodes
-    if any(child.type == _java.SPREAD_PARAMETER for child in params.named_children):
+    if any(child.type == _java.SPREAD_PARAMETER for child in _java_slots(params)):
         return False
-    declared = [child for child in params.named_children if child.type != _java.RECEIVER_PARAMETER]
-    return len(args.named_children) != len(declared)
+    declared = [child for child in _java_slots(params) if child.type != _java.RECEIVER_PARAMETER]
+    return len(_java_slots(args)) != len(declared)
+
+
+#: tree-sitter-java declares ``line_comment`` / ``block_comment`` as **extras**,
+#: and extras are named nodes - so a comment inside an argument list or a
+#: parameter list shows up in ``named_children`` and inflates every count taken
+#: from one. ``fact(n - 1 /* step */)`` inside ``int fact(int n)`` counted two
+#: arguments against one parameter, read as an arity mismatch, and dropped a
+#: genuine self-call; a ``// reason`` line in a multi-line argument list does the
+#: same. Commented arguments are ordinary Java, so this is the losing direction.
+_JAVA_COMMENT_TYPES: frozenset[str] = frozenset({_java.LINE_COMMENT, _java.BLOCK_COMMENT})
+
+
+def _java_slots(node: tree_sitter.Node) -> list[tree_sitter.Node]:
+    """Return *node*'s named children that are real parameter / argument slots.
+
+    Comments are excluded; see :data:`_JAVA_COMMENT_TYPES` for why they appear at
+    all. Every count and every positional pairing taken off an ``argument_list``
+    or ``formal_parameters`` goes through here, so the exclusion has one owner.
+    """
+    return [child for child in node.named_children if child.type not in _JAVA_COMMENT_TYPES]
 
 
 def _java_positional_params(func: tree_sitter.Node) -> tuple[tuple[str | None, str | None], ...]:
@@ -324,7 +344,7 @@ def _java_positional_params(func: tree_sitter.Node) -> tuple[tuple[str | None, s
     if params is None:
         return ()
     out: list[tuple[str | None, str | None]] = []
-    for child in params.named_children:
+    for child in _java_slots(params):
         if child.type == _java.RECEIVER_PARAMETER:
             continue
         type_node = child.child_by_field_name("type")
@@ -424,7 +444,7 @@ def _java_signature_shape(func: tree_sitter.Node) -> tuple[int, bool]:
         return (0, False)
     count = 0
     varargs = False
-    for child in params.named_children:
+    for child in _java_slots(params):
         if child.type == _java.RECEIVER_PARAMETER:
             continue
         count += 1
@@ -459,7 +479,7 @@ def _java_delegation_is_provable(call_node: tree_sitter.Node, facts: _FunctionFa
     args_node = call_node.child_by_field_name("arguments")
     if args_node is None:
         return False  # pragma: no cover - defensive: method_invocation always has arguments
-    args = args_node.named_children
+    args = _java_slots(args_node)
     params = facts.positional_params
     if len(args) != len(params):
         return False
@@ -793,7 +813,7 @@ def _java_rival_could_take_call(call_node: tree_sitter.Node, facts: _FunctionFac
     args = call_node.child_by_field_name("arguments")
     if args is None:
         return False  # pragma: no cover - defensive: method_invocation always has arguments
-    count = len(args.named_children)
+    count = len(_java_slots(args))
     return any(_java_accepts_arity(shape, count) for shape in facts.rival_arities)
 
 
@@ -852,7 +872,7 @@ def _java_is_varargs(func: tree_sitter.Node) -> bool:
     params = func.child_by_field_name("parameters")
     if params is None:
         return False
-    return any(child.type == _java.SPREAD_PARAMETER for child in params.named_children)
+    return any(child.type == _java.SPREAD_PARAMETER for child in _java_slots(params))
 
 
 def _build_function_facts(

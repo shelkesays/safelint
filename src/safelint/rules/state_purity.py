@@ -14,6 +14,7 @@ from safelint.languages import php as _php
 from safelint.languages import python as _py
 from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.rules._test_files import skips_test_code
 from safelint.rules.base import BaseRule
 
 
@@ -429,8 +430,14 @@ def _javascript_hoisted_var_binds(func: tree_sitter.Node, name: str) -> bool:
 
     ``let`` / ``const`` are block-scoped and are handled per block by
     :func:`_javascript_block_declares` instead.
+
+    A ``class_static_block`` is excluded alongside nested functions: ``static { }``
+    is its own scope and a ``var`` inside it does not hoist out, so
+    ``function f() { class C { static { var self = {}; } } self.x = 1; }`` really
+    does write the global - crediting that ``var`` suppressed a genuine finding.
     """
-    return any(node.type == _js.VARIABLE_DECLARATION and _javascript_declaration_binds(node, name) for node in walk(func, skip_types=tuple(_js.FUNCTION_TYPES)) if node is not func)
+    skip = (*_js.FUNCTION_TYPES, _js.CLASS_STATIC_BLOCK)
+    return any(node.type == _js.VARIABLE_DECLARATION and _javascript_declaration_binds(node, name) for node in walk(func, skip_types=skip) if node is not func)
 
 
 def _javascript_block_declares(block: tree_sitter.Node, name: str) -> bool:
@@ -446,15 +453,26 @@ def _javascript_declaration_binds(declaration: tree_sitter.Node, name: str) -> b
 def _javascript_binds_identifier(node: tree_sitter.Node | None, name: str) -> bool:
     """Return True if *node* is the plain identifier *name*, or a TS parameter wrapping it.
 
-    The TypeScript ``required_parameter`` / ``optional_parameter`` wrappers hold the
-    identifier under a ``pattern`` field, so they are unwrapped first. Iteratively,
-    not recursively - SAFE105 polices this codebase.
+    Two wrapper shapes are unwrapped first:
+
+    * the TypeScript ``required_parameter`` / ``optional_parameter`` wrappers, which
+      hold the identifier under a ``pattern`` field;
+    * a default-valued parameter (``function f(self = {})``), which parses as an
+      ``assignment_pattern`` with the binding identifier on ``left``. Without this
+      the parameter bound nothing as far as the rule could see, and a write to that
+      perfectly ordinary local was reported as a global mutation.
+
+    Iteratively, not recursively - SAFE105 polices this codebase.
     """
     cur = node
     while cur is not None:
-        if cur.type not in (_js.REQUIRED_PARAMETER, _js.OPTIONAL_PARAMETER):
-            break
-        cur = cur.child_by_field_name("pattern")
+        if cur.type in (_js.REQUIRED_PARAMETER, _js.OPTIONAL_PARAMETER):
+            cur = cur.child_by_field_name("pattern")
+            continue
+        if cur.type == _js.ASSIGNMENT_PATTERN:
+            cur = cur.child_by_field_name("left")
+            continue
+        break
     return cur is not None and cur.type == _js.IDENTIFIER and node_text(cur) == name
 
 
@@ -634,6 +652,11 @@ class GlobalMutationRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag every write to a module-level state binding inside a function."""
         lang_name = resolve_lang_name(filepath)
+        # #198: the patterns this rule flags are conventional in test code, where
+        # they were the overwhelming majority of its findings and were burying the
+        # ones in library code. Whole-file answer, resolved before any walk.
+        if skips_test_code(self.config, filepath, lang_name):
+            return []
         # Dedicated per-language checkers (declaration-site detection); every
         # other language routes through the JS-family assignment-site checker.
         dedicated = {
