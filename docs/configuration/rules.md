@@ -109,7 +109,7 @@ On Requests that shape was 91 of SAFE401's 94 findings, and the three in library
 | `skip_test_code` | `true` | Skip files recognised as test code |
 | `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories whose contents are test code, matched as a path-component subsequence |
 
-A file is test code when it is under a `test_dirs` entry, **or** its filename uses a convention nothing but a test uses: `foo.test.ts` / `foo.spec.js`, `foo_test.go`, `foo_test.rs`, `FooTest.java` / `FooTests.java` / `FooIT.java`, `FooTest.php`.
+A file is test code when it is under a `test_dirs` entry, **or** its filename uses a convention nothing but a test uses: `foo.test.ts` / `foo.spec.js` (JS/TS), `FooTest.java` / `FooTests.java` / `FooIT.java`, `FooTest.php`, and a `_test` stem suffix everywhere else - `foo_test.go`, `foo_test.rs`, `foo_test.py`, `foo_test.c` / `foo_test.cpp`.
 
 A bare `test_` **prefix** is deliberately not enough. Production modules use it - safelint's own `src/safelint/rules/test_coverage.py` is a rule implementation, and `TestDataFactory.java` under `src/main/java` is a factory - so excluding on it would silently drop five rules on real source files. Python tests are still covered, because `tests/test_foo.py` matches on the directory. This is stricter than the detection `test_functions_only` (SAFE601) and SAFE701/702 use, which answer the opposite question and can afford the looser signal.
 
@@ -131,7 +131,7 @@ test_dirs = ["tests", "integration", "examples"]
 skip_test_code = false
 ```
 
-`test_dirs` entries are **project-root-relative**, so run safelint from the directory your config lives in (it already walks parents to find that config). An absolute entry also works.
+`test_dirs` entries are **project-root-relative**, and the project root is the directory holding your config - discovered by walking up from each file, the same way config itself is resolved. So `safelint check /path/to/repo` works from anywhere, and a monorepo with per-package configs is anchored per package. With no config discoverable, the working directory is the fallback. An absolute entry is matched as given.
 
 ## Structural rules
 

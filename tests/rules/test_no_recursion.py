@@ -674,7 +674,19 @@ def test_java_comments_do_not_change_the_argument_count(tmp_path: Path, label: s
 
 
 def test_java_a_real_arity_mismatch_still_rules_out_the_self_call(tmp_path: Path) -> None:
-    """The control: excluding comments must not stop the arity check working."""
+    """The control: excluding comments must not stop the arity check working.
+
+    The call has to share the enclosing method's NAME for this to test anything.
+    An earlier version called a differently-named ``g``, which SAFE105 would never
+    report whatever the arity logic did, so it passed for the wrong reason.
+    """
     sample = tmp_path / "Arity.java"
-    sample.write_text("class E { int f(int n) { return g(n, 1, 2); } int g(int a, int b, int c) { return a; } }\n", encoding="utf-8")
+    sample.write_text("class E { int f(int n) { return f(n, 1, 2); } int f(int a, int b, int c) { return a; } }\n", encoding="utf-8")
     assert _safe105(_engine().check_file(str(sample))) == []
+
+
+def test_java_a_matching_arity_self_call_still_reports(tmp_path: Path) -> None:
+    """The other side of the control: same name, same arity, so nothing rules it out."""
+    sample = tmp_path / "Recurse.java"
+    sample.write_text("class R { int f(int n) { return f(n - 1); } }\n", encoding="utf-8")
+    assert [v.lineno for v in _safe105(_engine().check_file(str(sample)))] == [1]
