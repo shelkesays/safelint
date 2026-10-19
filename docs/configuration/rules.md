@@ -89,6 +89,50 @@ def f():
 
 Severity is fixed at `warning`. Disable globally via `ignore = ["SAFE004"]` if your workflow involves many transient suppressions you'd rather not police. **Per-file ignores do not apply to SAFE004**: like SAFE000, it's an engine-internal code gated solely on the global `ignore` list (configuring it inside `per_file_ignores` will surface a typo-guard warning and otherwise do nothing). Self-referential `# nosafe: SAFE004` is special-cased; a directive that only mentions SAFE004 is always considered "used" to avoid recursion.
 
+## Test code is skipped by five rules
+
+*Changed in 2.15.0 (#198).* Five rules skip files they recognise as test code: **SAFE101** `function_length`, **SAFE203** `logging_on_error`, **SAFE302** `global_mutation`, **SAFE304** `side_effects` and **SAFE401** `resource_lifecycle`. All five are enabled by default, so this changes what an untuned run reports.
+
+The reason is measured rather than aesthetic. Those five put the overwhelming majority of their findings in test files, where the pattern they flag is conventional:
+
+```python
+# tests/test_requests.py
+def test_session():
+    s = requests.Session()      # SAFE401: a session scoped to one test
+    print(render(result))       # SAFE304: observing output IS the test
+```
+
+On Requests that shape was 91 of SAFE401's 94 findings, and the three in library code - including a genuine unclosed `zipfile.ZipFile` in `utils.py` - were buried under them. A rule users learn to ignore protects nothing.
+
+| Option | Default | Description |
+|---|---|---|
+| `skip_test_code` | `true` | Skip files recognised as test code |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories whose contents are test code, matched as a path-component subsequence |
+
+A file is test code when it is under a `test_dirs` entry, **or** its filename uses a convention nothing but a test uses: `foo.test.ts` / `foo.spec.js` (JS/TS), `FooTest.java` / `FooTests.java` / `FooIT.java`, `FooTest.php`, and a `_test` stem suffix everywhere else - `foo_test.go`, `foo_test.rs`, `foo_test.py`, `foo_test.c` / `foo_test.cpp`.
+
+A bare `test_` **prefix** is deliberately not enough. Production modules use it - safelint's own `src/safelint/rules/test_coverage.py` is a rule implementation, and `TestDataFactory.java` under `src/main/java` is a factory - so excluding on it would silently drop five rules on real source files. Python tests are still covered, because `tests/test_foo.py` matches on the directory. This is stricter than the detection `test_functions_only` (SAFE601) and SAFE701/702 use, which answer the opposite question and can afford the looser signal.
+
+Turn it off for the strict reading, per rule:
+
+```toml
+# pyproject.toml
+[tool.safelint.rules.resource_lifecycle]
+skip_test_code = false
+
+# ... or tell safelint where your tests actually live
+[tool.safelint.rules.side_effects]
+test_dirs = ["tests", "integration", "examples"]
+```
+
+```toml
+# safelint.toml
+[rules.resource_lifecycle]
+skip_test_code = false
+```
+
+`test_dirs` entries are **project-root-relative**, and the project root is the directory holding your config - discovered by walking up from each file, the same way config itself is resolved. So `safelint check /path/to/repo` works from anywhere, and a monorepo with per-package configs is anchored per package. With no config discoverable, the working directory is the fallback. An absolute entry is matched as given.
+
 ## Structural rules
 
 These check the shape of your functions. They are cheap to run and always go first.
@@ -105,6 +149,8 @@ Long functions are hard to read, test, and reason about. The Holzmann rule says 
 | `severity` | `"error"` | `"error"` or `"warning"` |
 | `max_lines` | `60` | Maximum allowed function size (units depend on `count_mode`) |
 | `count_mode` | `"lines"` | How to measure size: `"lines"` (raw source lines incl. blanks/comments, Holzmann's original framing), `"logical_lines"` (lines minus blanks and pure-comment lines, less game-able), or `"statements"` (count Python statement nodes, robust to formatting, equivalent to ruff's `PLR0915`). *Added in 1.8.0.* |
+| `skip_test_code` | `true` | Skip files recognised as test code - [see above](#test-code-is-skipped-by-five-rules). *Added in 2.15.0.* |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories treated as test code. *Added in 2.15.0.* |
 
 ```toml
 [tool.safelint.rules.function_length]
@@ -122,11 +168,36 @@ When switching to `"statements"`, lower `max_lines` accordingly, a function with
 
 Deep nesting (if inside for inside if inside while…) makes code hard to follow and test. Two levels is enough for most real functions.
 
+**`with` and `try` are not nesting levels.** The rule exists to keep *decisions* shallow, and a resource or error-handling wrapper adds indentation without adding a branch:
+
+```python
+with open(path) as fh:        # depth 0
+    for row in fh:            # depth 1
+        if row:               # depth 2 - clears the default cap
+            handle(row)
+```
+
+The reason this matters more than tidiness is actionability: a developer told to reduce nesting in `with session: for x: if y:` has no good move short of restructuring resource handling, which is a worse outcome than the nesting it was flagged for. So the finding was unactionable even where the count was literally correct.
+
+This extends a principle the rule already applied: Java's `synchronized` block and Rust's `unsafe` block were never nesting steps, for exactly this reason. Removed in 2.15.0 (#166) from Python (`with`, `try`), Java (`try`, try-with-resources), JavaScript / TypeScript (`try`), PHP (`try`) and C++ (`try`). Rust, Go and C had none to remove, so all nine languages now agree. `switch` and `match` remain steps - they branch.
+
+**`else if` is not a nesting level.** A flat `if / else if / else if` chain branches once, so it scores depth 1 in every language:
+
+```js
+function f(x) {
+  if (x === 1) { doA(); }
+  else if (x === 2) { doB(); }
+  else if (x === 3) { doC(); }      // depth 1, not 3
+}
+```
+
+Python and PHP always behaved this way, since their grammars name `elif` / `elseif` separately. The other seven languages express the same idea structurally - the continuation `if` sits under an `else_clause`, or is the enclosing `if`'s `alternative` child - and were corrected in 2.15.0. Three shapes still count, because they really are another level: `else { if (..) }` written with braces, `else while (x);` (legal C), and a nested `if` inside an `else if` body.
+
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"error"` | `"error"` or `"warning"` |
-| `max_depth` | `2` | Maximum allowed nesting depth of `if`, `for`, `while`, `with`, `try` |
+| `max_depth` | `2` | Maximum allowed nesting depth of branching constructs (`if`, `for`, `while`, `switch` / `match`) |
 
 ```toml
 [tool.safelint.rules.nesting_depth]
@@ -182,6 +253,39 @@ Holzmann's Power of Ten rule 1 ("restrict all code to very simple control flow c
 The rule fires on **direct self-recursion** - a function whose body contains a call to its own name, either bare (`fact(n - 1)`) or self-qualified (`self.walk(...)` in Python / Rust, `this.walk(...)` in JS / TS / Java). A call on a different receiver (`other.walk(...)`) does not fire. Two cases are intentionally out of scope and documented as blind spots: **indirect / mutual recursion** (`a` calls `b` calls `a`), which needs a call graph, and **anonymous-function recursion** through a binding (`const f = () => f()`), since the function has no name to match.
 
 Enabled by default at `warning` severity (mirrors `unbounded_loops`), so intentional recursion (tree walks, divide-and-conquer) does not block a local run. Annotate deliberate recursion with `# nosafe: SAFE105` (or the language's comment form) and a one-line justification.
+
+#### What counts as "its own name"
+
+A name match alone is not a self-call, so the rule rules a call out whenever the source text settles the question. These need no type information and so cannot hide genuine recursion:
+
+- **A same-named nested function** rebinds the name, so a bare call in the enclosing body reaches the nested one (every language). A `self`/`this`-qualified call still fires.
+- **Rust:** a bare `name(..)` inside an `impl` or `trait` body cannot reach the method, which needs `self.name()` or `Type::name(..)`. A function-local `use` rebinds the name for its enclosing block, so `use std::os::unix::fs::symlink;` inside `fn symlink` silences the bare call within that block (and only within it); an `as` alias binds the alias, not the path's last segment.
+- **Java:** the argument count must fit the signature, with the explicit receiver parameter (`void tick(Outer Outer.this, int n)`) discounted since it is never passed, and varargs exempt because a fixed-arity comparison proves nothing there. Beyond arity, two facts rule a call out: an argument cast to `Object` where the parameter is not `Object` (`remove((Object) array, index)` inside `remove(boolean[], int)`, with `java.lang.Object` recognised as the same type); and an element of the array parameter at that same position, by index or through a for-each variable (`append(lhs[i], ..)` inside `append(Object[] lhs, ..)`).
+
+#### Overloaded Java methods
+
+What the source text cannot settle is a call that an **overloaded** sibling could also accept. Resolving it needs the declared types of the arguments, which means a classpath:
+
+```java
+void expectContents(E... elements)      { expectContents(asList(elements)); }
+void expectContents(Collection<E> expected) { ... }
+```
+
+`asList(elements)` returns something safelint cannot type, so either method could be the target. safelint reports the call, with a message that says so rather than asserting recursion:
+
+```
+SAFE105 Function "expectContents" calls "expectContents", which is overloaded in this type, so
+        the target cannot be resolved without type information; if it is this method, recursion
+        has no guaranteed stack bound (Power of Ten rule 1) - refactor to an explicit loop or
+        worklist
+```
+
+Dropping these instead would silence genuine recursion in any method that happens to be overloaded, which is the more dangerous error for this rule: real recursion passes plain identifiers and so carries none of the signals above.
+
+The hedge is decided **per call**, from the argument count: a type holding `f(int)` and `f(int, int)` has an overloaded name, but a one-argument call inside `f(int)` has only one candidate, so that message is unhedged. A varargs sibling counts as a rival for any count from its fixed prefix upwards.
+
+!!! note "Inheritance is not resolved"
+    Only declarations on the enclosing type are known, so an unhedged message means "no rival **in this type**", not "no rival anywhere". A same-named method inherited from a superclass can also win resolution; seeing that would need the supertype's source, which again means a classpath.
 
 | Option | Default | Description |
 |---|---|---|
@@ -291,17 +395,87 @@ severity = "error"
 
 **What it flags:** `except` / `catch` blocks that handle an error without any logging call. Cross-language.
 
-If you catch an exception and do something with it but never log it, the error is invisible. This rule requires at least one call to a logger method (`debug`, `info`, `warning`, `error`, `exception`, `critical`, plus the JavaScript `console.*` family of `log` / `info` / `warn` / `error` / `debug` / `trace`) inside the handler. Blocks that simply re-raise the exact caught binding (Python `raise`; JavaScript `throw e;` where `e` is the catch parameter) are exempt; throwing a *different* identifier or `new Error(...)` still requires logging.
+If you catch an exception and do something with it but never log it, the error is invisible. This rule requires at least one call to a logger method inside the handler, unless the handler propagates the failure instead.
+
+#### What counts as not swallowing it
+
+**A handler that re-raises is not swallowing anything**, and demanding a log there actively hurts: you get two reports of one failure, the second at the wrong altitude. The test is whether *every exit path* leaves by raising, so all of these are clean:
+
+```python
+except ValueError as err:
+    raise RuntimeError("bad") from err      # the idiomatic add-context re-raise
+
+except ValueError as exc:
+    print(f"failed: {exc}")                 # report, then propagate
+    raise
+
+except ValueError as err:
+    if recoverable(err):
+        raise Retry() from err              # every arm raises, so nothing is lost
+    else:
+        raise
+```
+
+Containment is deliberately not the test - this body really does swallow, and still reports:
+
+```python
+except ValueError:
+    if never_true:
+        raise
+    return None                             # reached unconditionally
+```
+
+Throwing a **fresh** error needs a closer look in the C-family languages, which have no automatic chaining. One that carries the caught value along is the local spelling of `raise ... from err`, and is clean:
+
+```java
+catch (IOException e) {
+    throw new ConfigException("loading " + path, e);   // clean: original attached
+}
+```
+```php
+catch (Throwable $e) {
+    throw new RuntimeException('loading config', 0, $e);   // clean: $previous
+}
+```
+
+One that does not still discards the original and still wants logging: `throw new Error("x")` with no mention of the binding. So does `throw makeError(e)` in JavaScript, TypeScript, Java and PHP, because a factory's return value need not be a wrapper; C++ constructs the thrown value with a plain call (`throw std::runtime_error(e.what())`), so there it does count. Python needs none of this - a `raise` inside an `except` chains the active exception automatically, so the original stays reachable either way.
+
+#### Where the finding points
+
+When only *some* arms propagate, the violation anchors at the arm that falls through rather than at the `except` line:
+
+```python
+except ValueError:
+    if a:
+        raise
+    elif b:
+        raise
+    else:
+        cleanup()        # <- reported here: "this path leaves the handler without
+                         #    logging or re-raising"
+```
+
+On a handler with several arms, "something in here leaks" leaves you to work out which. When the handler falls through as a whole, the clause stays the anchor - there the handler as a unit is the problem. So does a branching handler where **no** arm raises: the per-path wording says the other paths re-raise, and saying that where nothing raises would be a false statement about the code.
 
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
 | `severity` | `"warning"` | `"error"` or `"warning"` |
+| `log_methods` | see below | (Python.) Call names that count as making the failure visible |
+| `log_methods_javascript` / `_typescript` / `_java` / `_php` / `_cpp` | see below | The same, per language |
+| `skip_test_code` | `true` | Skip files recognised as test code - [see above](#test-code-is-skipped-by-five-rules). *Added in 2.15.0.* |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories treated as test code. *Added in 2.15.0.* |
+
+Names are matched with the receiver discarded, so `$logger->notice($e)` resolves to `notice` and `console.print_exception()` to `print_exception`.
+
+Python's list adds `print`, `print_exception` and `print_exc` to the logger names: a script or CLI legitimately prints its own failure, and Rust's SAFE207 - the documented analogue of this rule - has always accepted `println` / `eprintln` / `print` on the same reasoning. **Java's list deliberately does not**, because `System.out.println` inside a catch block is the anti-pattern this rule exists to find, not a fix for it.
 
 ```toml
 [tool.safelint.rules.logging_on_error]
 enabled = true
 severity = "warning"
+log_methods = ["debug", "info", "warning", "error", "exception", "critical", "print"]
+log_methods_java = ["severe", "fine", "warning", "error"]
 ```
 
 **Python, Bad:**
@@ -371,6 +545,19 @@ severity = "warning"
 
 **JavaScript:** function-body writes, `assignment_expression`, `augmented_assignment_expression`, or `update_expression` (`++` / `--`), whose target is a `member_expression` or `subscript_expression` rooted in a configured global namespace. The receiver chain is walked leftward, `process.env.NODE_ENV = '...'`, `process.env['NODE_ENV'] = '...'`, and `process.exitCode++` all resolve to `process` and fire. Bracket-notation writes (`globalThis['x'] = 1`, `window["config"] = {}`) work the same way as dot access. The default namespace list (`global_namespaces_javascript`) is `["globalThis", "window", "global", "self", "process"]`; runtime presets adjust this (browser drops `process`, adds `document`; Deno adds `Deno`, drops `window` and `process`). Module-level (top-of-file) writes do NOT fire, that's setup, not the bug pattern. Reading a global (`return globalThis.env;`) does NOT fire, only writes.
 
+A write is also skipped when the root name is **shadowed by a local declaration**, since the write then targets the local and not the global:
+
+```javascript
+function Headers() {
+  const self = this;              // a local alias for `this`
+  return function set(key, value) {
+    self[key] = value;            // writes to the local - not reported
+  };
+}
+```
+
+That pre-arrow idiom is how JavaScript carried `this` into a nested function for years, and it appears three times in Axios's `lib/core/AxiosHeaders.js`. Reporting it made a library's ordinary self-reference indistinguishable from a genuine `window.XMLHttpRequest = null`. Recognised binding forms are a `const` / `let` / `var` declarator, a function parameter (including the TypeScript typed form and an arrow function's single unparenthesised parameter), and a `catch` binding, in any enclosing scope up to and including module scope. A **destructured** binding (`const { self } = x`) is not recognised, which leaves such a write reported as before rather than risking a silenced global mutation.
+
 **Java** *(added in 2.4.0):* non-final `static` field declarations. This is **declaration-site** detection, not write-site: a mutable static field IS the smallest-scope violation regardless of where it is written, and a single tree walk over field declarations has near-zero false positives (the same shape PMD's `MutableStaticState` flags). `static final` fields are clean, even when the referent is interiorly mutable (`static final List<String> CACHE = new ArrayList<>()`) - detecting interior mutability would need type resolution safelint does not do, so it is a documented exclusion. Instance fields and local variables never fire. Interface fields are implicitly `public static final` and so are never flagged. This fulfils the Java SAFE302 work previously deferred in the language docs. **Rust** is not covered by SAFE302: `static mut` is unsafe-gated (SAFE602's territory) and safe interior-mutable statics are covered by SAFE307 (`interior_mutable_static`). **Go** *(added in 2.5.0):* declaration-site detection on every package-level `var`, including sentinel errors (`var ErrNotFound = errors.New(...)`) - the rule does not special-case the initialiser, so treat sentinels as immutable by suppressing with a per-file ignore or `//nosafe` if desired. `const` declarations and block-scoped `var` / `:=` inside functions are clean.
 
 | Option | Default | Description |
@@ -379,6 +566,8 @@ severity = "warning"
 | `severity` | `"error"` | `"error"` or `"warning"` |
 | `strict` | `false` | (Python only.) When `true`, fire on every `global` declaration even without a subsequent write, mirrors ruff's `PLW0603`. *Added in 1.8.0.* |
 | `global_namespaces_javascript` | see above | (JavaScript only.) Receiver names that count as "global namespace", function-body assignments rooted in any of these fire. *Added in 1.13.0.* |
+| `skip_test_code` | `true` | Skip files recognised as test code - [see above](#test-code-is-skipped-by-five-rules). *Added in 2.15.0.* |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories treated as test code. *Added in 2.15.0.* |
 
 ```toml
 [tool.safelint.rules.global_mutation]
@@ -461,10 +650,35 @@ Broader than `SAFE303`, applies to *all* functions, not just pure-named ones. A 
 | `io_functions` | `["open", "print", "input"]` | (Python.) Call names considered I/O |
 | `io_functions_javascript` | see below | (JavaScript.) Call names considered I/O. Runtime presets (`[tool.safelint.javascript] runtime`) adjust this default. *Added in 1.13.0.* |
 | `io_name_keywords` | see below | Functions whose names contain these words are exempt (cross-language) |
+| `skip_test_code` | `true` | Skip files recognised as test code - [see above](#test-code-is-skipped-by-five-rules). *Added in 2.15.0.* |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories treated as test code. *Added in 2.15.0.* |
 
 Default `io_name_keywords`: `print`, `log`, `write`, `read`, `save`, `load`, `send`, `fetch`, `export`, `import`. The substring check is case-insensitive, so it matches `writeData` (camelCase) the same way as `write_data` (snake_case).
 
 Default `io_functions_javascript` (Node, the default): `["log", "error", "warn", "info", "debug", "fetch", "readFile", "writeFile", "readFileSync", "writeFileSync"]`. The browser / deno / cloudflare-workers presets swap in different verbs, see [JavaScript runtime presets](toml.md#javascript-runtime-presets).
+
+#### Rust: `write!` targets and receiver-blind method names
+
+Two Rust-specific behaviours, both changed in 2.15.0.
+
+**`write!` / `writeln!` are checked against their target.** `write!` is not an I/O function in Rust; it expands to `write_fmt` on its first argument, which may implement `std::io::Write` (I/O) or `std::fmt::Write` (a string buffer, no I/O). Where the first argument is a plain binding, its declaration decides:
+
+```rust
+impl fmt::Display for X {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "hello")                // not reported - Formatter parameter
+    }
+}
+
+let mut s = String::new();
+write!(&mut s, "x").unwrap();             // not reported - String buffer
+
+writeln!(std::io::stdout(), "x");         // reported - genuine I/O
+```
+
+A parameter whose type's base name is `String` exactly or ends in `Formatter`, or a local initialised from `String::new` / `String::with_capacity` / `String::from` / `format!`, is treated as a non-I/O target. The base name is taken after stripping generic arguments, references, lifetimes, `mut` / `dyn` and path segments. The `Formatter` match is a suffix rather than an exact comparison because domain formatters follow the `XFormatter` convention (Ruff's `PyFormatter`); `String` is exact because `StringWriter` may implement `std::io::Write`. Anything else (a path expression, a call, an unknown binding) keeps reporting, so the unresolved case stays a finding. On ripgrep `write!` / `writeln!` were 34 of 83 SAFE304 findings, 16 inside `fn fmt`.
+
+**`read`, `status`, `spawn`, `output` and `recv` left the Rust SAFE304 default.** Call names are resolved with the receiver discarded, so as bare method names these matched whatever they were called on, and Rust's standard library spends those verbs on non-I/O operations that are pervasive in ordinary code: `RwLock::read` and `Mutex::write` for locks, `mpsc::Receiver::recv` for channels, `tokio::spawn` for tasks, and `status` / `output` as accessors on any domain type. They remain in SAFE303's list, where the function's own name must also signal purity, which is the same split Go's list already uses for `Get` / `Query` / `Exec`. Add any of them back via `io_functions_rust` if your codebase uses them for real I/O.
 
 ```toml
 [tool.safelint.rules.side_effects]
@@ -745,6 +959,8 @@ dangerous_casts_cpp = ["reinterpret_cast", "const_cast"]
 | `extend_tracked_functions` | `[]` | (Python.) Appended to the default list, use this when you want to *add* custom functions without losing the defaults. *Added in 1.8.0.* |
 | `cleanup_patterns` | `["close", "commit", "rollback", "release", "shutdown"]` | (Python.) Acceptable cleanup method names as an alternative |
 | `tracked_functions_javascript` | (see below) | (JavaScript.) Calls that must be inside a `try { ... } finally { ... }`. Runtime presets (`[tool.safelint.javascript] runtime`) adjust this default. *Added in 1.13.0.* |
+| `skip_test_code` | `true` | Skip files recognised as test code - [see above](#test-code-is-skipped-by-five-rules). *Added in 2.15.0.* |
+| `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories treated as test code. *Added in 2.15.0.* |
 
 **Default `tracked_functions`** (Python, expanded in 1.8.0):
 
@@ -832,6 +1048,38 @@ Two cases are flagged:
 1. **Literal-`true` condition with no `break` inside**, applies to both `while True:` (Python) and `while (true)` (JavaScript). Guaranteed infinite loop unless something inside the body breaks out.
 2. **Non-comparison condition**, applies to Python only (`while x:` where `x` isn't a comparison expression). JS idioms like `while (queue.length)` and `while (token)` are commonly bounded, so the heuristic stays Python-only, flagging them on JS files would produce too much noise.
 
+#### What counts as leaving the loop
+
+A `break` is not the only exit, and the rule recognises three others. Each was a measured false-positive source before 2.15.0.
+
+**A `return`.** It ends the enclosing function and so leaves every loop inside it:
+
+```rust
+fn poll(done: bool) -> u32 {
+    loop {
+        if done { return 1; }      // not reported
+    }
+}
+```
+
+In Rust this is the *more* common shape, because `?`-propagation forces it - you cannot `?` out of a loop with a `break` - and on ripgrep it accounted for every SAFE501 finding the rule produced. The gap was present in all nine languages.
+
+A `return` inside a **nested loop** does not clear the outer one. The inner loop may run zero times, in which case the `return` is never reached and the outer loop really is unbounded:
+
+```rust
+loop {
+    for x in items {       // if `items` is empty ...
+        return;            // ... this never runs; the outer loop still reports
+    }
+}
+```
+
+A `return` inside a nested **function or closure** belongs to that function and likewise does not count.
+
+**A `goto` out of the loop (C and C++).** Counted only when the target label sits outside the loop body; a jump to an in-loop label is intra-loop control flow.
+
+**A `break` or `return` inside a Rust macro body.** tree-sitter parses a macro's arguments as an opaque `token_tree`, so statements inside are never typed nodes - in `loop { select! { .. break; .. } }` the `break` exists only as an anonymous token. The rule looks for those keyword tokens directly, so `crossbeam::select!` and `tokio::select!` bodies are read correctly. A macro carrying no exit keyword still reports, so `loop { println!("x"); }` is unaffected, and because a token tree is still tokenised the word `break` inside a string literal does not count.
+
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `true` | Turn rule on/off |
@@ -912,6 +1160,8 @@ JavaScript has no built-in `assert` keyword, so the rule walks for *calls* to a 
 | `test_dirs` | `["tests"]` | Directories marking a file as a test file, matched as a path-component subsequence (same as SAFE701/702; used only when `test_functions_only` is on). *Added in 2.12.0.* |
 
 Java, Rust, PHP, C, and C++ have their own `assertion_calls_<lang>` lists (see each language page).
+
+`assertion_calls_rust` covers the `insta` snapshot macros (`assert_snapshot`, `assert_debug_snapshot`, `assert_json_snapshot` and the rest of that family) and `assert_matches` / `debug_assert_matches` *since 2.15.0*. Snapshot testing is the dominant assertion idiom in modern Rust suites, and without those names a test whose only assertion is a snapshot read as having none: on Ruff, 557 of 5412 sampled findings were `#[test]` functions that do assert, against 82 genuinely assertion-free ones.
 
 ```toml
 # pyproject.toml
@@ -1199,7 +1449,7 @@ function runQuery(userInput) {
 
 **What it flags:** Calls to functions whose return value signals success or failure, where the return value is discarded. Cross-language.
 
-Calling `subprocess.run(["rm", "-rf", path])` as a bare statement (not assigning the result) means you never check whether the command succeeded. Same with `file.write()`, it returns the number of bytes written, and silently ignoring it means you may have written nothing.
+Calling `subprocess.run(["rm", "-rf", path])` as a bare statement (not assigning the result) means you never check whether the command succeeded. Same with `sock.send()`, which returns the number of bytes actually sent and may send fewer than asked - that is why `sendall` exists.
 
 | Option | Default | Description |
 |---|---|---|
@@ -1207,21 +1457,36 @@ Calling `subprocess.run(["rm", "-rf", path])` as a bare statement (not assigning
 | `severity` | `"warning"` | `"error"` or `"warning"` |
 | `flagged_calls` | see below | Call names whose return value must not be discarded |
 
-Default `flagged_calls`: `run`, `call`, `check_output`, `write`, `send`, `sendall`, `sendfile`, `seek`, `truncate`, `remove`, `unlink`, `rename`, `replace`, `makedirs`, `mkdir`, `rmdir`
+Default `flagged_calls`: `run`, `call`, `check_output`, `send`, `sendfile`, `replace`
+
+> **Note:** SAFE802 matches the call name **without its receiver**, so `asyncio.run(main())` and `app.run(workers=4)` both match `run` even though discarding their result is the universal idiom. Keep that in mind when adding entries.
+
+The Python list was trimmed twice in 2.15.0 (#156); it had been ported from C/POSIX semantics, where checking the return code is correct and necessary, without adjusting for Python's. Two groups left it:
+
+| removed | why |
+|---|---|
+| `remove`, `unlink`, `rename`, `makedirs`, `mkdir`, `rmdir` | They return `None`, so the rule demanded a check of a value that cannot exist. The `os.*` forms all return `None`; the `pathlib` forms return either `None` (`Path.unlink`, `Path.mkdir`, `Path.rmdir`) or a `Path` that nothing acts on (`Path.rename`, `Path.replace`). Because matching ignores the receiver, these also covered `list.remove` and every other method of the name. |
+| `write`, `seek`, `truncate` | They return a byte count, a file position and a result nobody reads. On Django these were 404 of the 614 findings left after the six above went, so they were the larger half of the problem. |
+
+What stayed, and why: `send` and `sendfile`, which return a byte count and may transfer fewer bytes than asked; `run` / `call` / `check_output`, because `subprocess.run` returns a `CompletedProcess` whose `returncode` matters; and `replace`, which is deliberately ambiguous - `str.replace` and `Path.replace` both return a value worth keeping, `os.replace` does not. `sendall` is **not** on the list: it returns `None` and raises on error, so it exists precisely so the short-write check is unnecessary.
+
+All of them are defaults, not hard-coded: list a name in `flagged_calls` to bring it back. The **C** defaults (`flagged_calls_c`) are unchanged - there the return code genuinely is the point.
 
 ```toml
 [tool.safelint.rules.return_value_ignored]
 enabled = true
 severity = "warning"
-flagged_calls = ["run", "write", "send", "remove", "unlink"]
+flagged_calls = ["run", "call", "check_output", "send", "sendfile", "replace"]
 ```
 
 **Python, Bad:**
 
 ```python
 subprocess.run(["deploy.sh"])    # SAFE802 - return value discarded
-f.write(data)                    # SAFE802 - bytes written not checked
+sock.send(payload)               # SAFE802 - a short send is silently accepted
 ```
+
+`f.write(data)` does **not** fire on the default list: `write` was removed in 2.15.0, because discarding the byte count is idiomatic Python (see the table above). Add `"write"` to `flagged_calls` if your codebase treats it as significant.
 
 **Python, Good:**
 
@@ -1551,9 +1816,45 @@ severity = "error"
 Per function / method: a whole-object request-data read with no validation call in the same scope. Detected patterns:
 
 - **Python**: `request.POST` / `request.data` / `request.json` / `request.form` / `request.body` / `request.query_params` consumed whole, with no concrete validation *call* (`is_valid` / `full_clean` / `validate` / `model_validate` / `parse_obj`) in the function (Django / Flask / FastAPI). A bare `Serializer` / `Schema` name reference is not accepted as validation. Single-field access (`request.POST.get('x')`, `request.GET['q']`) is targeted and NOT flagged.
-- **PHP (Laravel)**: `$request->all()` / bare `$request->input()` with no `$request->validate(...)` call in the method (`$request->input('field')` is a targeted read and is not flagged).
+- **PHP (Laravel)**: `$request->all()` / bare `$request->input()` with no validation call in the method (`$request->input('field')` is a targeted read and is not flagged).
 
 The rule is conservative and heuristic: a validation call *anywhere* in the scope clears the whole function.
+
+**What counts as validation in Laravel.** `$request->validate(...)` is the shape the rule started with, but it is not the dominant one; on FreeScout `Validator::make` outnumbers it by 19 to 1. All four of these clear the read (*since 2.15.0*):
+
+```php
+$request->validate(['name' => 'required']);                  // request as receiver
+$this->validate($request, ['name' => 'required']);           // ValidatesRequests trait
+Validator::make($request->all(), $rules)->validate();        // the Validator facade
+$this->validator($request->all())->validate();               // a validator built from the data
+```
+
+Only the unqualified `Validator` (the aliased import Laravel code writes) and the fully-qualified `Illuminate\Support\Facades\Validator` count as the facade; another namespace's `Validator` is a different class. Chaining a `->validate()` onto any call built from the request data clears it regardless of the class, which is the `$this->validator(...)` case above.
+
+The facade form also follows a one-step local alias, which is how Laravel code massages input before validating it:
+
+```php
+$post = $request->all();
+$post['body'] = strip_tags($post['body']);
+$validator = Validator::make($post, $rules);     // clears: $post holds the request data
+if ($validator->fails()) {
+    return back()->withErrors($validator);       // Validator::make BUILDS a validator;
+}                                                // something must then run or check it
+```
+
+Note what the rule does and does not see there. `Validator::make(...)` on its own only *constructs* a validator - the rules do not run until `->validate()` is called or `->fails()` is consulted - and safelint does not verify that you did either. It treats the `make` as the author's declaration of intent to validate, which is the same conservative stance the rule takes everywhere else (any validation call clears the whole function). A `make` whose result is dropped on the floor is a bug this rule will not catch.
+
+A **Form Request** parameter clears the whole method, because the framework ran that class's `rules()` before the body was entered. Recognised by a parameter type whose final name segment ends in `Request` without being one of the base request types that carry no rules of their own - `Request`, `FormRequest`, `ServerRequest`, `ServerRequestInterface`, `RequestInterface`:
+
+```php
+public function store(StoreUserRequest $request) {
+    return User::create($request->all());                     // already validated
+}
+```
+
+Each of these still requires the request: `Validator::make($defaults, $rules)` validates something else and does not clear a `$request->all()` elsewhere in the method, a variable rebound to other data stops standing in for the request, and `$foo->request` is an ordinary property rather than the framework request.
+
+The Form Request test is a **name heuristic**, and cannot be more: confirming that `StoreUserRequest` really extends `FormRequest` needs the file that declares it. A parameter typed `BillingRequest` that is *not* a Form Request will clear the method too. Rename it, or ignore the rule for that file, if the suppression is unwanted.
 
 **Project validators.** Real apps often validate through their own helper (`validate_export_request()`, an allowlist filter builder) rather than the framework's built-in call. Add those names to `request_validators` (Python, bare key) / `request_validators_php` (PHP) and they are unioned with the built-in set, so a read they guard no longer fires. Matched by exact call name (receiver stripped, like `tainted_sink.sanitizers`). This replaces the previous only-recourse of a file-level ignore, which also hid any genuinely-unvalidated read added to the same file later.
 
@@ -1606,9 +1907,25 @@ request_validators = ["validate_export_request", "clean_filters"]
 CSRF protection is on by default in these frameworks; disabling it opens a hole an attacker can drive state-changing requests through. Detected patterns:
 
 - **Python (Django)**: a `@csrf_exempt` decorator - bare (`@csrf_exempt`), called (`@csrf_exempt()`), or wrapped for a class-based view (`@method_decorator(csrf_exempt)`).
-- **PHP (Laravel)**: a non-empty `$except` property - the `VerifyCsrfToken` middleware's route allow-list. An empty `$except = []` exempts nothing and is clean.
+- **PHP (Laravel)**: a non-empty `$except` property **inside the CSRF middleware class** - the `VerifyCsrfToken` route allow-list. An empty `$except = []` exempts nothing and is clean.
 
-More false-positive-prone than SAFE905-907 (a same-named decorator or `$except` property elsewhere would match), so it is **off under `vanilla` and switched on only by the presets that scope it**: the Django and Laravel presets enable it; Flask (CSRF is extension-provided) and FastAPI do not.
+**Class context is required on the PHP side** (*since 2.15.0*). `$except` only means "CSRF-exempt routes" on `VerifyCsrfToken`; Laravel ships `TrimStrings` and `EncryptCookies` with an `$except` of their own that has nothing to do with CSRF, so matching the property name alone reported two findings on every unmodified Laravel app. The class now has to be named `VerifyCsrfToken` or extend it - directly, through a namespace-qualified name, or through the `use ... as Middleware` alias Laravel's own scaffolding writes:
+
+```php
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;
+
+class VerifyCsrfToken extends Middleware {
+    protected $except = ['stripe/*'];      // reported
+}
+
+class TrimStrings extends Middleware {
+    protected $except = ['password'];      // clean: not the CSRF middleware
+}
+```
+
+A trait is not followed into the class that mixes it in, so an `$except` declared in a trait is not reported.
+
+More false-positive-prone than SAFE905-907 (a same-named decorator would match), so it is **off under `vanilla` and switched on only by the presets that scope it**: the Django and Laravel presets enable it; Flask (CSRF is extension-provided) and FastAPI do not.
 
 | Option | Default | Description |
 |---|---|---|
@@ -1842,6 +2159,22 @@ match maybe_save(record) {
 
 The Rust spiritual analogue of `SAFE203 logging_on_error` - handling an error without logging it loses the failure context. Recognised log calls: `error!` / `warn!` / `info!` / `debug!` / `trace!` / `log!` / `event!` (log + tracing crates), `eprintln!` / `eprint!` / `println!` / `print!` / `dbg!`. Exempts bodies that contain a `return_expression`, a panic-like macro (`panic!` / `todo!` / `unreachable!` / `unimplemented!`), or a tail-position `Err(...)` re-raise.
 
+Two further exemptions *since 2.15.0*:
+
+- **Logging through a same-file helper.** A body that calls a function defined in the same file **whose own body contains a recognised log call** is not swallowing the error, it is routing it:
+
+  ```rust
+  Err(e) => self.fail(&object.name, e.to_string()),   // clean: fail() logs
+
+  fn fail(&mut self, object: &str, reason: String) {
+      warn!(object, %reason, "object failed; continuing");
+      self.outcome.failed.push((object.to_string(), reason));
+  }
+  ```
+
+  The log call in the helper is the whole test. A helper that only records the failure to a list and never logs is **not** credited, and the branch still reports. One call hop only; a deeper chain still reports.
+- **An arm that enumerates one error variant and binds nothing.** `Err(store::Error::NotFound { .. }) => Ok(false)` implements a documented "treat not-found as false" contract, and binds nothing, so there is no error value in scope to put in a message. Binding is the test rather than syntax, so the wildcard forms count as binding nothing too: `Err(E::NotFound(_))` and `Err(E::Io { source: _ })` are exempt. An arm that genuinely binds part of the error (`Err(E::Io(e))`, `Err(E::Io { source })`, `Err(E::Io { source: inner })`), a plain binding (`Err(other)`) or a wildcard (`Err(_)`) still reports, because there the author either has a value to log or has not discriminated anything.
+
 | Option | Default | Description |
 |---|---|---|
 | `enabled` | `false` | Toggle the rule |
@@ -1866,7 +2199,12 @@ if let Err(e) = save(record) {
 
 ### SAFE208: `result_unwrap_outside_tests`
 
-**What it flags:** Any `.unwrap()` / `.expect()` / `.unwrap_unchecked()` outside test code (`#[test]` / `#[cfg(test)] mod` exempt). Rust only.
+**What it flags:** Any `.unwrap()` / `.expect()` / `.unwrap_unchecked()` outside test code. Rust only.
+
+**What counts as test code** (*widened in 2.15.0*): a `#[test]` / `#[tokio::test]` function or a `#[cfg(test)] mod` in the same file, plus two shapes Cargo makes idiomatic and an in-file attribute search can never see:
+
+- **A file under a `tests/` directory.** Cargo integration tests get no `#[cfg(test)]` - the directory *is* the gate - so every `.unwrap()` in a `tests/` file was reported. A `tests` component **inside** `src` does not count: `src/tests/helpers.rs` is ordinary crate source in a module named `tests`, and when that module is gated the `#[cfg(test)] mod tests;` in its parent is what says so. Cargo's integration tests sit in a `tests/` that is a sibling of `src`, never within it.
+- **A module gated from its parent.** `#[cfg(test)] mod helpers;` in `lib.rs` gates `helpers.rs` entirely; the attribute lives in the parent file, not the module's own. Only a `mod` named after the file counts, so `#[cfg(test)] mod other;` beside a plain `mod helpers;` does not gate `helpers.rs`.
 
 The broad Holzmann-rule-7 form: catches bare-variable unwraps (`let r = foo(); r.unwrap();`) and unwrap chains the narrower SAFE205 (lock-specific) / SAFE803 (nullable-method-specific) rules don't cover. With all three enabled, `mutex.lock().unwrap()` fires multiple codes - documented intentional overlap; users pick strictness level by enabling subsets. `unwrap_or` / `unwrap_or_default` / `unwrap_or_else` are NOT flagged - they're explicit-default-on-Err, not silent failures.
 

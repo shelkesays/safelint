@@ -13,7 +13,7 @@ from safelint.analysis.dataflow_javascript import JsTaintTracker
 from safelint.analysis.dataflow_php import PhpTaintTracker
 from safelint.analysis.dataflow_rust import RustTaintTracker
 from safelint.core._diagnostics import print_warning
-from safelint.core._validators import ConfigValueError, _validated_property_map, _validated_string_list, _validated_string_map, resolve_lang_config_lookup
+from safelint.core._validators import ConfigValueError, _validated_property_map, _validated_string_list, _validated_string_map, resolve_lang_config_lookup, rule_default_list
 from safelint.languages import c as _c
 from safelint.languages import cpp as _cpp
 from safelint.languages import go as _go
@@ -764,44 +764,17 @@ class TaintedSinkRule(BaseRule):
     code = "SAFE801"
     language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
-    _DEFAULT_SINKS: ClassVar[list[str]] = [
-        "eval",
-        "exec",
-        "compile",
-        "system",
-        "popen",
-        "Popen",
-        "run",
-        _py.CALL,
-        "check_output",
-        "execute",
-    ]
-    _DEFAULT_SANITIZERS: ClassVar[list[str]] = [
-        "escape",
-        "sanitize",
-        "clean",
-        "validate",
-        "quote",
-        "encode",
-        "bleach",
-    ]
-    _DEFAULT_SOURCES: ClassVar[list[str]] = [
-        "input",
-        "readline",
-        "recv",
-        "recvfrom",
-        "read",
-    ]
+    @property
+    def _python_defaults(self) -> dict[str, list[str]]:
+        """Python's fallback lists, read from ``DEFAULTS`` rather than copied.
 
-    #: Python's built-in fallback lists, keyed as ``_resolve_core_lists`` expects.
-    #: Python is the one language whose defaults live here rather than in
-    #: ``DEFAULTS`` (it predates the per-language keys), so both the construction
-    #: audit and ``_python_check`` need the same mapping.
-    _PYTHON_DEFAULTS: ClassVar[dict[str, list[str]]] = {
-        "sinks": _DEFAULT_SINKS,
-        "sanitizers": _DEFAULT_SANITIZERS,
-        "sources": _DEFAULT_SOURCES,
-    }
+        The comment this replaces claimed Python's defaults "live here rather than
+        in ``DEFAULTS``". They lived in both, and the copies were a second
+        definition of the same three lists - including ``"call"`` spelled as the
+        *node-type* constant ``_py.CALL``, which stands for the sink name
+        ``subprocess.call`` and equals it only by coincidence.
+        """
+        return {key: rule_default_list(self.name, key, "python") for key in ("sinks", "sanitizers", "sources")}
 
     def __init__(self, config: dict[str, Any]) -> None:
         """Initialise the rule and audit the property tables once, up front.
@@ -837,7 +810,7 @@ class TaintedSinkRule(BaseRule):
             if keys in audited:
                 continue
             audited.add(keys)
-            defaults = self._PYTHON_DEFAULTS if lang_name == "python" else None
+            defaults = self._python_defaults if lang_name == "python" else None
             sinks, sanitizers, _sources = self._resolve_core_lists(lang_name, defaults)
             self._resolve_property_contract(lang_name, sinks, sanitizers, warn=True)
 
@@ -939,7 +912,7 @@ class TaintedSinkRule(BaseRule):
 
     def _python_check(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Run Python taint analysis on every function in *tree*."""
-        sinks, sanitizers, sources = self._resolve_core_lists("python", self._PYTHON_DEFAULTS)
+        sinks, sanitizers, sources = self._resolve_core_lists("python", self._python_defaults)
         assume = self._resolve_assume_taint_preserving()
         sink_kinds = self._resolve_sink_kinds("python")
         contract = self._resolve_property_contract("python", sinks, sanitizers)
@@ -1268,35 +1241,20 @@ class ReturnValueIgnoredRule(BaseRule):
     code = "SAFE802"
     language = ("python", "javascript", "typescript", "java", "rust", "go", "php", "c", "cpp")
 
-    _DEFAULT_FLAGGED: ClassVar[list[str]] = [
-        "run",
-        _py.CALL,
-        "check_output",
-        "write",
-        "send",
-        "sendall",
-        "sendfile",
-        "seek",
-        "truncate",
-        "remove",
-        "unlink",
-        "rename",
-        "replace",
-        "makedirs",
-        "mkdir",
-        "rmdir",
-    ]
-
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag bare calls whose return value is discarded."""
         lang_name = resolve_lang_name(filepath)
-        if lang_name == "python":
-            flagged = frozenset(self.config.get("flagged_calls", self._DEFAULT_FLAGGED))
-        else:
-            # JS-family (JS / TS) inherits via TS→JS fallback in
-            # ``get_per_language_config``; Java has its own dedicated set.
-            raw, error_key = resolve_lang_config_lookup(self.config, "flagged_calls", lang_name, default=[])
-            flagged = frozenset(_validated_string_list(raw, error_key))
+        # One path for every language. Python used to branch here, taking its
+        # default from a ClassVar copy and skipping ``_validated_string_list``
+        # entirely - so a scalar ``flagged_calls = "remove"`` silently became the
+        # character set ``{'r','e','m','o','v'}`` instead of raising, which the
+        # other languages have rejected since the JS-family sites were converted.
+        # The default now comes from ``DEFAULTS`` for every language, so a caller
+        # who builds a partial config gets the documented list rather than the
+        # empty one (non-Python) or a stale copy (Python).
+        default = rule_default_list(self.name, "flagged_calls", lang_name)
+        raw, error_key = resolve_lang_config_lookup(self.config, "flagged_calls", lang_name, default=default)
+        flagged = frozenset(_validated_string_list(raw, error_key))
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type != _py.EXPRESSION_STATEMENT:
@@ -1357,20 +1315,6 @@ class NullDereferenceRule(BaseRule):
             "expect",
             "unwrap_err",
             "expect_err",
-        }
-    )
-
-    _DEFAULT_NULLABLE_PYTHON: ClassVar[frozenset[str]] = frozenset(
-        {
-            "get",
-            "pop",
-            "find",
-            "next",
-            "first",
-            "one_or_none",
-            "scalar",
-            "scalar_one_or_none",
-            "fetchone",
         }
     )
 
@@ -1543,7 +1487,11 @@ class NullDereferenceRule(BaseRule):
         """
         lang_name = resolve_lang_name(filepath)
         if lang_name == "python":
-            nullable = self._DEFAULT_NULLABLE_PYTHON | frozenset(self.config.get("nullable_methods", []))
+            # Replaces, like every other language. This used to OR the ClassVar
+            # with the user's list, so setting ``nullable_methods`` to narrow the
+            # rule still produced all nine built-ins with no way to drop one.
+            raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", lang_name, default=rule_default_list(self.name, "nullable_methods", lang_name))
+            nullable = frozenset(_validated_string_list(raw, error_key))
             deref_hit = self._python_deref_hit
         elif lang_name == "java":
             raw, error_key = resolve_lang_config_lookup(self.config, "nullable_methods", "java", default=[])

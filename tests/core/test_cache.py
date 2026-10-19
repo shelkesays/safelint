@@ -197,8 +197,46 @@ class _InjectedOSError(OSError):
 
     A dedicated subclass lets ``pytest.raises`` target exactly the injected
     failure (satisfying ruff PT011) without a message string (TRY003), while
-    still being caught by ``_atomic_write_json``'s ``except OSError`` cleanup.
+    still reaching ``_atomic_write_json``'s cleanup.
     """
+
+
+def test_atomic_write_json_cleans_up_when_the_write_is_interrupted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """A KeyboardInterrupt mid-write must still drop the temp file.
+
+    The cleanup used to be ``except OSError``, and an interrupt is not an
+    OSError: Ctrl-C during a cache write skipped cleanup entirely and left a
+    ``.json.tmp`` behind in the cache directory. ``finally`` covers every exit
+    path, and the interrupt still propagates.
+    """
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+
+    def interrupted_replace(self: Path, target: Path) -> None:
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(cache_mod.Path, "replace", interrupted_replace)
+
+    with pytest.raises(KeyboardInterrupt):
+        _atomic_write_json(cache_dir, cache_dir / "k.json", {"violations": [], "suppressed": []})
+
+    assert list(cache_dir.glob("*.json.tmp")) == [], "an interrupt must not leave an orphan temp"
+
+
+def test_atomic_write_json_closes_the_fd_when_fdopen_is_interrupted(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """The same for the fd-leak window: an interrupt there must not leak the descriptor."""
+    cache_dir = tmp_path / "cache"
+    cache_dir.mkdir()
+    closed: list[int] = []
+    real_close = cache_mod.os.close
+    monkeypatch.setattr(cache_mod.os, "close", lambda fd: (closed.append(fd), real_close(fd))[1])
+    monkeypatch.setattr(cache_mod.os, "fdopen", lambda *a, **k: (_ for _ in ()).throw(KeyboardInterrupt))
+
+    with pytest.raises(KeyboardInterrupt):
+        _atomic_write_json(cache_dir, cache_dir / "k.json", {"violations": [], "suppressed": []})
+
+    assert closed, "the raw fd must be closed even when fdopen is interrupted"
+    assert list(cache_dir.glob("*.json.tmp")) == []
 
 
 def test_atomic_write_json_closes_fd_and_cleans_up_when_fdopen_fails(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:

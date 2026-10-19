@@ -254,3 +254,38 @@ def test_user_sinks_override_the_django_preset(tmp_path, monkeypatch) -> None:
     )
     cfg = load_config(tmp_path)
     assert cfg["rules"]["tainted_sink"]["sinks"] == ["only_this"]
+
+
+def test_no_preset_narrows_a_rule_default_list() -> None:
+    """A preset entry must not silently REMOVE shipped default names.
+
+    Presets replace a key wholesale (``_apply_preset_rules``), so an entry written
+    when the rule OR'd a ClassVar with the config - as the Django
+    ``null_dereference`` entry was, to add ``QuerySet.first()`` - becomes a
+    subtraction once the defaults own the list. That is how a Django project
+    enabling ``null_dereference`` came to check ``first`` alone, losing the other
+    eight names with no warning.
+
+    Asserted over every preset and every list-valued rule key rather than for the
+    one case found, because the next such entry is the same mistake.
+    """
+    presets = [
+        *((f"python:{name}", preset) for name, preset in _PYTHON_FRAMEWORK_PRESETS.items()),
+        *((f"php:{name}", preset) for name, preset in _PHP_FRAMEWORK_PRESETS.items()),
+    ]
+    for label, preset in presets:
+        for rule_name, overrides in preset.get("rules", {}).items():
+            shipped = DEFAULTS["rules"].get(rule_name, {})
+            for key, value in overrides.items():
+                base = shipped.get(key)
+                if not isinstance(value, list) or not isinstance(base, list):
+                    continue
+                missing = sorted(set(base) - set(value))
+                assert not missing, f"{label} {rule_name}.{key} drops shipped defaults: {missing}"
+
+
+def test_django_keeps_every_nullable_method_default() -> None:
+    """The concrete case: Django must not reduce ``nullable_methods`` to one name."""
+    defaults = copy.deepcopy(DEFAULTS)
+    _apply_python_framework_preset(defaults, "django")
+    assert defaults["rules"]["null_dereference"]["nullable_methods"] == DEFAULTS["rules"]["null_dereference"]["nullable_methods"]

@@ -161,7 +161,28 @@ DEFAULTS: dict[str, Any] = {
         ],
     },
     "rules": {
-        "function_length": {"enabled": True, "max_lines": 60, "severity": "error"},
+        "function_length": {
+            "enabled": True,
+            "max_lines": 60,
+            "severity": "error",
+            # #198: skip test code. These five rules put the overwhelming
+            # majority of their findings in test files - SAFE401 was 78% in
+            # Python and 93% in JS/TS, SAFE302 95% in JS/TS - where the pattern
+            # is conventional and the volume buries the findings in library
+            # code. ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702
+            # read. Set ``skip_test_code = false`` for the strict reading.
+            #
+            # Four directory names, not just ``tests``: a default that only
+            # recognised ``tests`` would have missed Express entirely, where the
+            # directory is ``test`` (singular) and holds 161 of its 165 SAFE101
+            # findings - and a default needing per-project tuning to work is not
+            # the useful default #198 asked for. ``__tests__`` is Jest's
+            # convention and ``spec`` is Jasmine's. Filename conventions
+            # (``*.test.ts``, ``*_test.go``, ``*Test.java``) are recognised
+            # separately and need no directory entry.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
+        },
         "nesting_depth": {"enabled": True, "max_depth": 2, "severity": "error"},
         "max_arguments": {"enabled": True, "max_args": 7, "severity": "error"},
         "complexity": {"enabled": True, "max_complexity": 10, "severity": "error"},
@@ -171,9 +192,74 @@ DEFAULTS: dict[str, Any] = {
         "no_recursion": {"enabled": True, "severity": "warning"},
         "bare_except": {"enabled": True, "severity": "error"},
         "empty_except": {"enabled": True, "severity": "error"},
-        "logging_on_error": {"enabled": True, "severity": "warning"},
+        "logging_on_error": {
+            # #198: skip test code. These five rules put the overwhelming
+            # majority of their findings in test files - SAFE401 was 78% in
+            # Python and 93% in JS/TS, SAFE302 95% in JS/TS - where the pattern
+            # is conventional and the volume buries the findings in library
+            # code. ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702
+            # read. Set ``skip_test_code = false`` for the strict reading.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
+            "enabled": True,
+            "severity": "warning",
+            # Call names that count as "the failure was made visible". Matched
+            # with the receiver discarded, so ``$logger->notice($e)`` resolves to
+            # ``notice`` and ``console.print_exception()`` to ``print_exception``.
+            # Inside a handler body that is the right granularity: the rule looks
+            # nowhere else.
+            #
+            # Per language, because whether a stdout write counts is a question
+            # about the language's culture, not about the rule. Java has a strong
+            # logging convention and ``System.out.println`` in a catch block is
+            # the very anti-pattern this rule exists to find, so it is NOT
+            # accepted there. Python's ``print`` is - see the Python list.
+            "log_methods": [
+                # Python stdlib logging.
+                "debug",
+                "info",
+                "warning",
+                "error",
+                "exception",
+                "critical",
+                # Writers that surface the failure without being loggers. Added in
+                # 2.15.0 (#199): Rust's SAFE207, the documented analogue of this
+                # rule, has always accepted ``println`` / ``eprintln`` / ``print``
+                # with the comment "also count as made the failure visible", so one
+                # act was judged two ways across the two languages. Reporting
+                # Rich's ``console.print_exception(show_locals=True)`` as an
+                # unlogged error branch is the rule contradicting the code's
+                # obvious intent. Scoped to Python because that is where the
+                # evidence came from and where the idiom is defensible: a script
+                # or CLI legitimately prints its own failure.
+                "print",
+                "print_exception",
+                "print_exc",
+            ],
+            # JavaScript / TypeScript: ``console.log`` / ``.error`` / ``.warn``
+            # resolve to the bare names below.
+            "log_methods_javascript": ["debug", "info", "warning", "error", "exception", "critical", "log", "warn", "trace"],
+            "log_methods_typescript": ["debug", "info", "warning", "error", "exception", "critical", "log", "warn", "trace"],
+            # Java: java.util.logging severity levels plus the SLF4J / log4j names.
+            # ``println`` is deliberately absent - printing to stdout instead of
+            # logging is the anti-pattern, not a fix for it.
+            "log_methods_java": ["debug", "info", "warning", "error", "exception", "critical", "log", "warn", "trace", "severe", "fine", "finer", "finest"],
+            # PHP: the ``error_log`` builtin plus the PSR-3 levels.
+            "log_methods_php": ["debug", "info", "warning", "error", "exception", "critical", "log", "warn", "notice", "alert", "emergency", "error_log"],
+            # C++: ``std::cerr << ...`` is a stream insertion rather than a call
+            # and is recognised separately in the rule.
+            "log_methods_cpp": ["debug", "info", "warning", "error", "exception", "critical", "log", "warn", "trace"],
+        },
         "global_state": {"enabled": True, "severity": "warning"},
         "global_mutation": {
+            # #198: skip test code. These five rules put the overwhelming
+            # majority of their findings in test files - SAFE401 was 78% in
+            # Python and 93% in JS/TS, SAFE302 95% in JS/TS - where the pattern
+            # is conventional and the volume buries the findings in library
+            # code. ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702
+            # read. Set ``skip_test_code = false`` for the strict reading.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
             "enabled": True,
             "severity": "error",
             # JavaScript: function-body assignments to any of these
@@ -443,6 +529,14 @@ DEFAULTS: dict[str, Any] = {
             ],
         },
         "side_effects": {
+            # #198: skip test code. These five rules put the overwhelming
+            # majority of their findings in test files - SAFE401 was 78% in
+            # Python and 93% in JS/TS, SAFE302 95% in JS/TS - where the pattern
+            # is conventional and the volume buries the findings in library
+            # code. ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702
+            # read. Set ``skip_test_code = false`` for the strict reading.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
             "enabled": True,
             "severity": "warning",
             # Per-language defaults - see the note on ``side_effects_hidden``
@@ -488,6 +582,21 @@ DEFAULTS: dict[str, Any] = {
                 # be too noisy; SAFE303 only catches them when the
                 # function name signals purity, which is a stronger
                 # signal of incorrect placement.
+                #
+                # ``read`` / ``status`` / ``spawn`` / ``output`` / ``recv``
+                # joined that SAFE303-only group in 2.15.0. ``call_name``
+                # discards the receiver, so as bare method names they match
+                # whatever they are called on, and Rust's standard library
+                # spends these verbs on non-I/O operations that are
+                # pervasive in ordinary code: ``RwLock::read`` /
+                # ``Mutex::write`` for locks, ``mpsc::Receiver::recv`` for
+                # channels, ``tokio::spawn`` for tasks, and ``status`` /
+                # ``output`` as accessors on any domain type. Measured on
+                # Ruff they were wrong far more often than right (#178).
+                # The specific spellings - ``read_to_string``, ``write_all``,
+                # ``read_dir`` - carry the same coverage without the
+                # collisions, and the macros stay because ``write!``'s
+                # target is now checked syntactically (#171).
                 "println",
                 "print",
                 "eprintln",
@@ -498,15 +607,10 @@ DEFAULTS: dict[str, Any] = {
                 "read_to_string",
                 "read_to_end",
                 "read_dir",
-                "read",
                 "read_line",
                 "write_all",
                 "flush",
-                "spawn",
-                "output",
-                "status",
                 "connect",
-                "recv",
                 "send_to",
             ],
             # Go: a deliberately narrower subset of SAFE303's
@@ -608,6 +712,14 @@ DEFAULTS: dict[str, Any] = {
             ],
         },
         "resource_lifecycle": {
+            # #198: skip test code. These five rules put the overwhelming
+            # majority of their findings in test files - SAFE401 was 78% in
+            # Python and 93% in JS/TS, SAFE302 95% in JS/TS - where the pattern
+            # is conventional and the volume buries the findings in library
+            # code. ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702
+            # read. Set ``skip_test_code = false`` for the strict reading.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
             "enabled": True,
             "severity": "error",
             # Default tracked functions cover the most common resource-acquisition
@@ -698,7 +810,7 @@ DEFAULTS: dict[str, Any] = {
             # Directories that mark a file as a test file, matched as a
             # path-component subsequence (same semantics + default as SAFE701 /
             # SAFE702). Only consulted when ``test_functions_only`` is on.
-            "test_dirs": ["tests"],
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
             # Python assertion-CALL names (bare key, per the Python
             # convention - every other language suffixes with ``_<lang>``).
             # Python has the built-in ``assert`` keyword, which the rule
@@ -836,6 +948,26 @@ DEFAULTS: dict[str, Any] = {
                 "prop_assert",
                 "prop_assert_eq",
                 "prop_assert_ne",
+                # insta snapshot macros (#177). Snapshot testing is the dominant
+                # assertion idiom in modern Rust suites, and a test whose only
+                # assertion is a snapshot was read as having none: on Ruff, 557 of
+                # the 5412 sampled SAFE601 findings were ``#[test]`` functions that
+                # do assert, just not with a name on this list. Genuine
+                # assertion-free tests were 82.
+                "assert_snapshot",
+                "assert_debug_snapshot",
+                "assert_json_snapshot",
+                "assert_yaml_snapshot",
+                "assert_ron_snapshot",
+                "assert_toml_snapshot",
+                "assert_csv_snapshot",
+                "assert_compact_debug_snapshot",
+                "assert_compact_json_snapshot",
+                "assert_binary_snapshot",
+                "assert_display_snapshot",
+                # std / matches! family also absent.
+                "assert_matches",
+                "debug_assert_matches",
             ],
             # PHP has no ``assert`` keyword (``assert()`` is a function);
             # PHPUnit assertions are method calls. ``call_name`` resolves both
@@ -874,8 +1006,8 @@ DEFAULTS: dict[str, Any] = {
                 "assert",
             ],
         },
-        "test_existence": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
-        "test_coupling": {"enabled": False, "test_dirs": ["tests"], "severity": "warning"},
+        "test_existence": {"enabled": False, "test_dirs": ["tests", "test", "__tests__", "spec"], "severity": "warning"},
+        "test_coupling": {"enabled": False, "test_dirs": ["tests", "test", "__tests__", "spec"], "severity": "warning"},
         # Holzmann rule 10 (heed every warning) adapted to blanket suppressions
         # of OTHER analysers - bare flake8 noqa, rule-less ``eslint-disable``,
         # ``@SuppressWarnings("all")``, ``#[allow(clippy::all)]``. Scoped
@@ -1094,13 +1226,17 @@ DEFAULTS: dict[str, Any] = {
                 "arg",
                 "args",
                 # Database raw-SQL (sqlx / diesel / rusqlite / postgres).
-                # All four crates expose a ``query`` / ``execute`` entry
-                # point that takes a SQL string; bind parameters via
-                # placeholders are safe, but interpolation isn't.
-                "query",
+                # The crate-specific spellings only. The bare ``query`` and
+                # ``execute`` were removed in 2.15.0: Rust has no database
+                # API in its standard library, so as barewords they matched
+                # any builder, any LSP snapshot accessor and any closure
+                # parameter named ``query``. Validated on ty and Ruff, 1 of
+                # 9 findings was defensible; 30 of Ruff's 55 were
+                # ``snapshot.query()`` on a ``DocumentSnapshot`` (#180). Add
+                # them back explicitly, or list your crate's entry point, if
+                # you call raw SQL through a bare ``query`` / ``execute``.
                 "query_as",
                 "query_scalar",
-                "execute",
                 "execute_batch",
                 # File-path sinks (path traversal). ``Path::new`` and
                 # the ``read`` / ``write`` family take paths; tainted
@@ -1334,25 +1470,45 @@ DEFAULTS: dict[str, Any] = {
         "return_value_ignored": {
             "enabled": False,
             "severity": "warning",
-            # Python defaults - Python file/network/subprocess functions
-            # whose return value carries success/failure info.
+            # Python defaults. Trimmed twice in #156; the list had been
+            # ported from C/POSIX semantics, where checking the return code is
+            # correct and necessary, without adjusting for Python's.
+            #
+            # Removed because they return ``None``, so the rule demanded the
+            # caller check a value that cannot exist: ``remove``, ``unlink``,
+            # ``rename``, ``makedirs``, ``mkdir``, ``rmdir``. Both the ``os.*``
+            # and ``pathlib.Path.*`` forms return ``None``; ``Path.rename``
+            # returns a ``Path``, which nothing acts on. Names are matched with
+            # the receiver discarded, so these also covered ``list.remove`` and
+            # every other method of the name.
+            #
+            # Removed because the value they return is one idiomatic Python
+            # discards: ``write`` (a byte count), ``seek`` (the new position) and
+            # ``truncate``. On Django these were 404 of 614 remaining findings,
+            # far more than the six above (207).
+            #
+            # ``send`` / ``sendfile`` stay: both return a byte count and may
+            # transfer fewer bytes than asked, so the value is worth checking.
+            # ``sendall`` does NOT stay - it returns ``None`` and raises on
+            # error, so it fails the same test as the six above. The earlier
+            # rationale here ("a short send is a real bug, which is why
+            # ``sendall`` exists") argued the opposite of what it concluded:
+            # ``sendall`` exists precisely so the short-write check is
+            # unnecessary. ``run`` /
+            # ``call`` / ``check_output`` stay because ``subprocess.run``
+            # returns a ``CompletedProcess`` whose ``returncode`` matters, though
+            # they carry the highest collision rate - ``asyncio.run(main())`` and
+            # ``app.run(workers=4)`` both match ``run``, which the docs now say.
+            # ``replace`` stays and is deliberately ambiguous: ``str.replace`` and
+            # ``Path.replace`` both return a value worth keeping, ``os.replace``
+            # does not.
             "flagged_calls": [
                 "run",
                 "call",
                 "check_output",
-                "write",
                 "send",
-                "sendall",
                 "sendfile",
-                "seek",
-                "truncate",
-                "remove",
-                "unlink",
-                "rename",
                 "replace",
-                "makedirs",
-                "mkdir",
-                "rmdir",
             ],
             # JavaScript defaults - Node fs / stream / process methods
             # whose return value (or returned promise) carries
@@ -1540,7 +1696,23 @@ DEFAULTS: dict[str, Any] = {
         "null_dereference": {
             "enabled": False,
             "severity": "error",
-            "nullable_methods": [],
+            # Python's nullable methods. These were missing here and lived only
+            # as a ClassVar on the rule, which then OR'd the two - so a user who
+            # set ``nullable_methods`` to narrow the rule still got all nine and
+            # had no way to turn any of them off, unlike every other language,
+            # which replaces. The docs have always documented this list as the
+            # default; ``DEFAULTS`` was the half that disagreed.
+            "nullable_methods": [
+                "get",
+                "pop",
+                "find",
+                "next",
+                "first",
+                "one_or_none",
+                "scalar",
+                "scalar_one_or_none",
+                "fetchone",
+            ],
             # JavaScript's null-or-undefined-returning methods. ``find``
             # / ``pop`` / ``shift`` are Array.prototype; ``get`` is
             # Map.prototype (returns ``undefined`` for missing keys);
@@ -2542,12 +2714,17 @@ _PYTHON_FRAMEWORK_PRESETS: dict[str, dict[str, Any]] = {
                     "loads",
                 ],
             },
-            # ``QuerySet.first()`` returns None on no match. ``cache.get()`` is
-            # also nullable but deliberately NOT added - ``get`` is too common a
-            # method name and would be noisy; ``QuerySet.get`` is NOT nullable
-            # (it raises ``DoesNotExist``), so it is not listed either.
-            # Applies only when the user enables ``null_dereference``.
-            "null_dereference": {"nullable_methods": ["first"]},
+            # No ``null_dereference`` override. The preset used to carry
+            # ``nullable_methods = ["first"]`` for ``QuerySet.first()``, which
+            # returns None on no match. That was written when the rule OR'd a
+            # ClassVar with the configured list, so the entry *added* ``first`` to
+            # the built-in names. Presets replace wholesale
+            # (``_apply_preset_rules``), and ``first`` is now one of the nine
+            # ``nullable_methods`` defaults in its own right, so the entry had
+            # stopped adding anything and started removing the other eight - a
+            # Django project enabling the rule checked ``first`` alone. Deleting it
+            # restores the effective set. Anything Django-specific worth adding
+            # later has to list the base names alongside it.
             **_ENABLE_FRAMEWORK_RULES,
         },
     },

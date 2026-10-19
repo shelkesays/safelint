@@ -394,6 +394,11 @@ def _php_text_is_request(text: str) -> bool:
     return text.lstrip("$") in ("request", "this->request")
 
 
+def _php_last_segment(node: tree_sitter.Node) -> str:
+    """Return the final segment of a (possibly namespace-qualified) PHP type name."""
+    return node_text(node).rsplit("\\", 1)[-1].strip()
+
+
 def _php_first_arg_is_request(node: tree_sitter.Node) -> bool:
     """Return True when the call's first argument is the framework request.
 
@@ -416,7 +421,169 @@ def _php_first_arg_is_request(node: tree_sitter.Node) -> bool:
     return _php_text_is_request(node_text(args.named_children[0]))
 
 
-def _php_is_validation(node: tree_sitter.Node, configured: frozenset[str]) -> bool:
+#: Laravel's ``Validator`` facade and the methods on it that validate a request.
+#: ``Validator::make($request->all(), $rules)`` is the dominant idiom - on
+#: FreeScout it outnumbers ``$request->validate`` by 19 to 1 - and matched none of
+#: the recognised shapes, so the rule reported the very line that validates the
+#: input (#157).
+_PHP_VALIDATOR_FACADE = "Validator"
+_PHP_FACADE_VALIDATION_METHODS: frozenset[str] = frozenset({"make", "validate"})
+
+#: Request types that carry no validation rules of their own, so a parameter of
+#: one of these is NOT a Form Request and does not clear the finding.
+_PHP_BASE_REQUEST_TYPES: frozenset[str] = frozenset({"Request", "FormRequest", "ServerRequest", "ServerRequestInterface", "RequestInterface"})
+
+#: Node types that can BE the request as a whole expression (``$request``,
+#: ``$this->request``). A bare ``name`` is excluded deliberately: it is the inner
+#: child of every property read, so matching it treated ``$foo->request`` as the
+#: framework request.
+_PHP_REQUEST_EXPRESSION_TYPES: frozenset[str] = frozenset({_php.VARIABLE_NAME, _php.MEMBER_ACCESS_EXPRESSION})
+
+#: Fully-qualified Laravel ``Validator`` facade. An unqualified ``Validator`` is
+#: the aliased import every Laravel file writes; any OTHER namespace's
+#: ``Validator`` is a different class and proves nothing about the request.
+_PHP_VALIDATOR_FACADE_FQN = "Illuminate\\Support\\Facades\\Validator"
+
+
+def _php_arguments_mention_request(node: tree_sitter.Node, aliases: frozenset[str] = frozenset()) -> bool:
+    """Return True when any argument of *node* derives from the framework request.
+
+    ``Validator::make($request->all(), $rules)`` passes the request indirectly, so
+    the first-argument identity test used for ``$this->validate($request, ...)``
+    is not enough: the argument is a call ON the request, not the request itself.
+    Looking for the request anywhere inside the argument list covers
+    ``$request->all()``, ``$request->only([..])`` and ``$request->input()`` alike.
+
+    *aliases* carries the local variables that were themselves assigned a
+    whole-object request read (``$post = $request->all()``), so the common
+    read-then-massage-then-validate shape is recognised as well.
+
+    Only whole variable / property expressions are considered, never the bare
+    ``name`` nodes inside them. ``$foo->request->all()`` contains a ``name`` whose
+    text is ``request``, so scanning every descendant made an unrelated property
+    read look like the framework request - and that clears a finding, so the error
+    is the losing direction.
+    """
+    args = node.child_by_field_name("arguments")
+    if args is None:
+        return False
+    candidates = (child for arg in args.named_children for child in walk(arg) if child.type in _PHP_REQUEST_EXPRESSION_TYPES)
+    texts = [node_text(child) for child in candidates]
+    return any(_php_text_is_request(text) or text in aliases for text in texts)
+
+
+def _php_request_aliases(func: tree_sitter.Node, func_types: frozenset[str]) -> frozenset[str]:
+    """Return the local variables assigned a whole-object request read inside *func*.
+
+    Laravel code routinely reads the request, adjusts the array and only then
+    validates it::
+
+        $post = $request->all();
+        $post['body'] = strip_tags($post['body']);
+        $validator = Validator::make($post, $rules);
+
+    Without the alias, the facade call mentions no request and the validation goes
+    unrecognised - which is the FreeScout shape named in #157. Scoped to the
+    function's own body (nested functions are skipped) and to a direct
+    ``$var = <request read>`` binding; no further propagation is modelled.
+
+    Each whole-variable assignment **replaces** the previous answer for that name,
+    so `$post = $request->all();` followed by `$post = $defaults;` leaves `$post`
+    out: carrying the alias past the rebind would let a validator call on
+    unrelated data clear every finding in the method. Not full flow sensitivity -
+    a rebind inside one branch of an `if` still counts for the whole function -
+    but a plain reassignment no longer goes unnoticed. A subscript write
+    (`$post['body'] = ...`) is not a whole-variable assignment and keeps the
+    alias, which is the shape the issue reported.
+    """
+    aliases: dict[str, bool] = {}
+    for node in walk(func, skip_types=tuple(func_types)):
+        if node.type != _php.ASSIGNMENT_EXPRESSION:
+            continue
+        left = node.child_by_field_name("left")
+        right = node.child_by_field_name("right")
+        if left is None or right is None or left.type != _php.VARIABLE_NAME:
+            continue
+        aliases[node_text(left)] = any(_php_is_bulk_request_call(child) for child in walk(right))
+    return frozenset(name for name, holds_request in aliases.items() if holds_request)
+
+
+def _php_is_form_request_method(func: tree_sitter.Node) -> bool:
+    """Return True when *func* takes a Laravel Form Request parameter.
+
+    A typed ``StoreUserRequest $request`` parameter means the framework resolved a
+    ``FormRequest`` subclass and ran its ``rules()`` **before** the method body was
+    entered, so every read inside is already validated. Recognised by the type
+    name ending in ``Request`` while not being one of ``_PHP_BASE_REQUEST_TYPES``
+    (those carry no rules of their own). Namespace-qualified types are matched on
+    their final segment.
+
+    Known limit, and the reason this is a heuristic: the name is all there is to
+    go on. A ``BillingRequest`` that is NOT a ``FormRequest`` subclass clears the
+    method too, because confirming the supertype needs the other file. #157
+    specified exactly this test; the alternative - resolving the class - is out of
+    reach for a single-file analyser. Rename such a parameter, or disable the rule
+    for the file, if the suppression is unwanted.
+    """
+    params = func.child_by_field_name("parameters")
+    if params is None:
+        return False
+    for param in params.named_children:
+        declared = param.child_by_field_name("type")
+        if declared is None:
+            continue
+        segment = _php_last_segment(declared).lstrip("?")
+        if segment.endswith("Request") and segment not in _PHP_BASE_REQUEST_TYPES:
+            return True
+    return False
+
+
+def _php_is_validator_factory_chain(node: tree_sitter.Node, aliases: frozenset[str] = frozenset()) -> bool:
+    """Return True for ``<factory>(<request data>)->validate()``.
+
+    Laravel's own ``RegistersUsers`` trait writes
+    ``$this->validator($request->all())->validate();`` - the ``validate`` receiver
+    is the validator instance, not the request, so neither the receiver nor the
+    first-argument test sees the request. Clearing requires the receiver to be a
+    CALL whose own arguments carry the request data, which is what makes it a
+    validator built from that data; a plain ``$someObject->validate()`` on an
+    unrelated receiver is still not a validation signal.
+    """
+    if node.type not in (_php.MEMBER_CALL_EXPRESSION, _php.NULLSAFE_MEMBER_CALL_EXPRESSION):
+        return False
+    if call_name(node) not in _PHP_VALIDATION_CALLS:
+        return False
+    receiver = node.child_by_field_name("object")
+    if receiver is None or receiver.type not in CALL_TYPES:
+        return False
+    return _php_arguments_mention_request(receiver, aliases)
+
+
+def _php_is_facade_validation(node: tree_sitter.Node, aliases: frozenset[str] = frozenset()) -> bool:
+    r"""Return True for ``Validator::make($request->..., $rules)`` and its siblings.
+
+    Scoped to the ``Validator`` facade and to arguments that actually carry the
+    request, so an unrelated ``Other::make($thing)`` cannot clear a real
+    unvalidated-input finding. Accepted scopes are the unqualified ``Validator``
+    (the aliased import Laravel code writes, with or without a leading namespace
+    separator) and the fully-qualified facade. A different namespace's
+    ``Other\\Validator`` is a different class and is NOT accepted - matching on the
+    final segment alone let any such class clear a real finding.
+    """
+    if node.type != _php.SCOPED_CALL_EXPRESSION:
+        return False
+    scope = node.child_by_field_name("scope")
+    name = node.child_by_field_name("name")
+    if scope is None or name is None:
+        return False
+    if node_text(scope).lstrip("\\") not in (_PHP_VALIDATOR_FACADE, _PHP_VALIDATOR_FACADE_FQN):
+        return False
+    if node_text(name) not in _PHP_FACADE_VALIDATION_METHODS:
+        return False
+    return _php_arguments_mention_request(node, aliases)
+
+
+def _php_is_validation(node: tree_sitter.Node, configured: frozenset[str], aliases: frozenset[str] = frozenset()) -> bool:
     """Return True when *node* is a validation call that clears the SAFE907 finding.
 
     Two forms, deliberately scoped to avoid a security false negative:
@@ -433,13 +600,73 @@ def _php_is_validation(node: tree_sitter.Node, configured: frozenset[str]) -> bo
       in ANY PHP call form (``call_name`` resolves the bareword across member /
       nullsafe / scoped / plain function calls), so a global helper such as
       ``validate_export_request($req)`` clears - the user opted into that name.
+
+    Two further forms carry the request indirectly: the ``Validator`` facade
+    (``_php_is_facade_validation``) and a validator built from the request data
+    then validated (``_php_is_validator_factory_chain``).
     """
     name = call_name(node)
     if name is None:
         return False
     if name in _PHP_VALIDATION_CALLS and node.type in (_php.MEMBER_CALL_EXPRESSION, _php.NULLSAFE_MEMBER_CALL_EXPRESSION) and (_php_receiver_is_request(node) or _php_first_arg_is_request(node)):
         return True
+    if _php_is_facade_validation(node, aliases) or _php_is_validator_factory_chain(node, aliases):
+        return True
     return node.type in CALL_TYPES and name in configured
+
+
+#: Laravel's CSRF middleware. ``$except`` is only an exemption list on this class
+#: (or a subclass of it); every other middleware that happens to carry an
+#: ``$except`` property is unrelated to CSRF (#162).
+_CSRF_MIDDLEWARE_CLASS = "VerifyCsrfToken"
+
+
+def _php_csrf_aliases(root: tree_sitter.Node) -> frozenset[str]:
+    r"""Return the local names a ``use ... as`` clause binds to ``VerifyCsrfToken``.
+
+    Laravel's generated ``app/Http/Middleware/VerifyCsrfToken.php`` imports the
+    framework class under the alias ``Middleware``
+    (``use Illuminate\\Foundation\\Http\\Middleware\\VerifyCsrfToken as Middleware;``)
+    and extends that. The alias name alone proves nothing: ``TrimStrings`` and
+    ``EncryptCookies`` alias *their* own bases to the same ``Middleware``, so the
+    alias has to be resolved back to what it actually imports.
+    """
+    aliases: set[str] = set()
+    for node in walk(root):
+        if node.type != _php.NAMESPACE_USE_CLAUSE:
+            continue
+        kids = node.named_children
+        if len(kids) >= 2 and kids[-1].type == _php.NAME and _php_last_segment(kids[0]) == _CSRF_MIDDLEWARE_CLASS:
+            aliases.add(node_text(kids[-1]))
+    return frozenset(aliases)
+
+
+def _php_enclosing_class(node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the ``class_declaration`` *node* sits in, or None at file scope."""
+    current = node.parent
+    while current is not None:
+        if current.type == _php.CLASS_DECLARATION:
+            return current
+        current = current.parent
+    return None
+
+
+def _php_in_csrf_class(element: tree_sitter.Node, csrf_names: set[str]) -> bool:
+    """Return True when *element* belongs to the CSRF middleware class.
+
+    Either the class is itself named ``VerifyCsrfToken`` (the shape Laravel
+    scaffolds) or it extends a name that resolves to it - a bare or qualified
+    ``VerifyCsrfToken``, or one of the ``use ... as`` aliases in *csrf_names*.
+    Nothing else can be an exemption list for CSRF, so nothing else is reported.
+    """
+    klass = _php_enclosing_class(element)
+    if klass is None:
+        return False
+    name = klass.child_by_field_name("name")
+    if name is not None and node_text(name) == _CSRF_MIDDLEWARE_CLASS:
+        return True
+    bases = [child for child in klass.named_children if child.type == _php.BASE_CLAUSE]
+    return any(_php_last_segment(base) in csrf_names for clause in bases for base in clause.named_children)
 
 
 class UnvalidatedRequestInputRule(BaseRule):
@@ -521,12 +748,16 @@ class UnvalidatedRequestInputRule(BaseRule):
         return raw_read
 
     def _php_function_hit(self, func: tree_sitter.Node, func_types: frozenset[str], configured: frozenset[str]) -> tree_sitter.Node | None:
+        # A Form Request parameter means the framework validated before the body ran.
+        if _php_is_form_request_method(func):
+            return None
+        aliases = _php_request_aliases(func, func_types)
         raw_read = None
         for node in walk(func, skip_types=tuple(func_types)):
             # The built-in ``validate`` clears only as ``$request->validate(...)``;
             # a configured project validator clears in any call form. See
             # ``_php_is_validation`` for the security rationale.
-            if _php_is_validation(node, configured):
+            if _php_is_validation(node, configured, aliases):
                 return None
             if raw_read is None and _php_is_bulk_request_call(node):
                 raw_read = node
@@ -543,13 +774,16 @@ class CsrfProtectionDisabledRule(BaseRule):
     * **Python (Django)**: a ``@csrf_exempt`` decorator - bare (``@csrf_exempt``),
       called (``@csrf_exempt()``), or wrapped for a class-based view
       (``@method_decorator(csrf_exempt)``).
-    * **PHP (Laravel)**: a non-empty ``$except`` property - the
-      ``VerifyCsrfToken`` middleware's route allow-list. An empty ``$except = []``
-      exempts nothing and is clean.
+    * **PHP (Laravel)**: a non-empty ``$except`` property **inside the CSRF
+      middleware class** - a class named ``VerifyCsrfToken`` or extending one
+      (directly, via a qualified name, or via a ``use ... as`` alias of it). An
+      empty ``$except = []`` exempts nothing and is clean, and an ``$except`` on
+      any other middleware (Laravel ships ``TrimStrings`` and ``EncryptCookies``
+      with one) is not a CSRF exemption and is not reported.
 
     Serves django (python) + laravel (php); default-disabled, enabled by those
     presets. More false-positive-prone than SAFE905-907 (a same-named decorator
-    or ``$except`` property elsewhere would match), hence off by default.
+    would match), hence off by default.
     """
 
     name = "csrf_protection_disabled"
@@ -667,10 +901,14 @@ class CsrfProtectionDisabledRule(BaseRule):
 
     def _check_php(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         violations: list[Violation] = []
+        csrf_names = {_CSRF_MIDDLEWARE_CLASS, *_php_csrf_aliases(tree.root_node)}
         for node in walk(tree.root_node):
-            if node.type == _php.PROPERTY_ELEMENT and self._php_except_nonempty(node):
-                message = "$except exempts routes from CSRF protection - keep the allow-list empty or minimal"
-                violations.append(self._make_violation_for_node(filepath, node, message))
+            if node.type != _php.PROPERTY_ELEMENT or not self._php_except_nonempty(node):
+                continue
+            if not _php_in_csrf_class(node, csrf_names):
+                continue
+            message = "$except exempts routes from CSRF protection - keep the allow-list empty or minimal"
+            violations.append(self._make_violation_for_node(filepath, node, message))
         return violations
 
     @staticmethod

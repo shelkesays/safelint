@@ -824,21 +824,33 @@ def test_return_value_ignored_ok_when_assigned():
 
 
 def test_return_value_ignored_flags_write():
+    """``write`` is configured explicitly: it left the Python defaults in 2.14.4 (#156).
+
+    What this exercises is the bare-statement-versus-assignment mechanism, not the
+    default list, so naming the call keeps the test about its subject.
+    """
     src = """
     with open("f.txt", "w") as f:
         f.write("hello")
     """
-    vs = violations(ReturnValueIgnoredRule, src)
+    vs = violations(ReturnValueIgnoredRule, src, {"enabled": True, "severity": "error", "flagged_calls": ["write"]})
     assert len(vs) == 1
     assert "write" in vs[0].message
 
 
 def test_return_value_ignored_ok_when_write_assigned():
+    """The negative control needs the same explicit config as its positive sibling.
+
+    Left on the default config it asserted nothing once ``write`` left the Python
+    defaults: ``assert not vs`` passes whether or not the assignment exemption
+    works, so breaking ``expression_statement`` detection entirely would keep it
+    green.
+    """
     src = """
     with open("f.txt", "w") as f:
         n = f.write("hello")
     """
-    vs = violations(ReturnValueIgnoredRule, src)
+    vs = violations(ReturnValueIgnoredRule, src, {"enabled": True, "severity": "error", "flagged_calls": ["write"]})
     assert not vs
 
 
