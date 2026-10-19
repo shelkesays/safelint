@@ -194,7 +194,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **A rule built with a partial config no longer reports warning-severity findings as blocking.** `BaseRule.__init__` fell back to a blanket `"error"`, which disagreed with every warning-severity rule - SAFE105, SAFE501, SAFE802 and the rest - so a direct library caller got findings marked blocking that the shipped config marks advisory. The fallback is now the rule's own `DEFAULTS` severity.
 
-- **SAFE501 `unbounded_loops`: a `return` is an exit, in all eight languages (#170).** The rule searched only for `break`, so an infinite loop whose exits are `return` read as having none:
+- **SAFE501 `unbounded_loops`: a `return` is an exit, in all nine languages (#170).** The rule searched only for `break`, so an infinite loop whose exits are `return` read as having none:
 
   ```rust
   fn poll(done: bool) -> u32 {
@@ -204,7 +204,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   }
   ```
 
-  A `return` ends the enclosing function and so leaves every loop inside it. In Rust it is the *more* common exit, because `?`-propagation forces it - you cannot `?` out of a loop with a `break` - and on ripgrep it accounted for **7 of 7** findings, the rule's entire output there. The issue reported Rust; the blind spot was in all eight languages the rule covers, confirmed by running the same shape through each.
+  A `return` ends the enclosing function and so leaves every loop inside it. In Rust it is the *more* common exit, because `?`-propagation forces it - you cannot `?` out of a loop with a `break` - and on ripgrep it accounted for **7 of 7** findings, the rule's entire output there. The issue reported Rust; the blind spot was in all nine languages the rule covers, confirmed by running the same shape through each.
 
   A `return` inside a **nested loop** deliberately does not clear the outer one: the inner loop may run zero times, in which case the `return` is never reached and the outer loop really is unbounded. A `return` inside a nested function or closure belongs to that function and likewise does not count. Both are pinned by tests.
 

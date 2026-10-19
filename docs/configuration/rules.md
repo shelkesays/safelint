@@ -1062,7 +1062,7 @@ fn poll(done: bool) -> u32 {
 }
 ```
 
-In Rust this is the *more* common shape, because `?`-propagation forces it - you cannot `?` out of a loop with a `break` - and on ripgrep it accounted for every SAFE501 finding the rule produced. The gap was present in all eight languages.
+In Rust this is the *more* common shape, because `?`-propagation forces it - you cannot `?` out of a loop with a `break` - and on ripgrep it accounted for every SAFE501 finding the rule produced. The gap was present in all nine languages.
 
 A `return` inside a **nested loop** does not clear the outer one. The inner loop may run zero times, in which case the `return` is never reached and the outer loop really is unbounded:
 
