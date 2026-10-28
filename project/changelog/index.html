@@ -2090,7 +2090,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2150-2026-10-28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.15.0 - 2026-10-28
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.15.0 - 2026-10-28">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4374,7 +4385,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2150-2026-10-28" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.15.0 - 2026-10-28
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.15.0 - 2026-10-28">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6552,7 +6574,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.14.3...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.15.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="2150-2026-10-28"><a href="https://github.com/shelkesays/safelint/compare/v2.14.3...v2.15.0">2.15.0</a> - 2026-10-28<a class="headerlink" href="#2150-2026-10-28" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
 <li><strong><code>logging_on_error</code> (SAFE203) gained per-language <code>log_methods</code> lists.</strong> <code>log_methods</code> (Python, bare key) plus <code>log_methods_javascript</code> / <code>log_methods_typescript</code> / <code>log_methods_java</code> / <code>log_methods_php</code> / <code>log_methods_cpp</code>. The accepted names had been hardcoded in the rule; they are now configurable like every other name list, matched with the receiver discarded (<code>$logger-&gt;notice($e)</code> resolves to <code>notice</code>). Per language rather than one flat list because whether a stdout write counts is a question about the language's culture: Java's list deliberately omits <code>println</code>, since <code>System.out.println</code> in a catch block is the anti-pattern the rule exists to find.</li>
