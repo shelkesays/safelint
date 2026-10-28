@@ -2090,6 +2090,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Unreleased">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -2606,7 +2623,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#security" class="md-nav__link">
+  <a href="#security_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Security
@@ -2690,7 +2707,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#security_1" class="md-nav__link">
+  <a href="#security_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Security
@@ -2813,7 +2830,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#security_2" class="md-nav__link">
+  <a href="#security_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Security
@@ -4385,6 +4402,23 @@
     </span>
   </a>
   
+    <nav class="md-nav" aria-label="Unreleased">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#security" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
 </li>
       
         <li class="md-nav__item">
@@ -4901,7 +4935,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#security" class="md-nav__link">
+  <a href="#security_1" class="md-nav__link">
     <span class="md-ellipsis">
       
         Security
@@ -4985,7 +5019,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#security_1" class="md-nav__link">
+  <a href="#security_2" class="md-nav__link">
     <span class="md-ellipsis">
       
         Security
@@ -5108,7 +5142,7 @@
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
-  <a href="#security_2" class="md-nav__link">
+  <a href="#security_3" class="md-nav__link">
     <span class="md-ellipsis">
       
         Security
@@ -6575,6 +6609,10 @@
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
 <h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.15.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">#</a></h3>
+<ul>
+<li><strong>Dev lockfile: <code>certifi</code> and <code>filelock</code> bumped to clear four Dependabot advisories.</strong> <code>certifi</code> 2026.7.22 -&gt; 2026.10.23 (critical: the previous releases bundle emSign root CAs whose intermediate CA keys were compromised; fixed upstream in 2026.10.18) and <code>filelock</code> 3.32.2 -&gt; 4.2.4 (one high and two low, all fixed in 4.2.1; the high one is a <code>ReadWriteLock</code> symlink-planting issue on the SQLite lock database). Both are <strong>transitive dev dependencies</strong> - the published wheel's only runtime dependency is <code>tree-sitter</code>, so no released artefact is affected and no version bump is needed. Lock-only change, so <code>publish.yml</code>'s version gate skips it.</li>
+</ul>
 <h2 id="2150-2026-10-28"><a href="https://github.com/shelkesays/safelint/compare/v2.14.3...v2.15.0">2.15.0</a> - 2026-10-28<a class="headerlink" href="#2150-2026-10-28" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
@@ -7152,7 +7190,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><strong>Release automation (internal tooling; the <code>safelint</code> package is unchanged).</strong> A committed version bump now drives the release: merging a bumped version to <code>development</code> (a pre-release <code>X.Y.ZrcN</code>) or <code>main</code> (a final <code>X.Y.Z</code>) automatically tags it, publishes to PyPI, and creates the GitHub release. On a final release the CHANGELOG is auto-dated (<code>[Unreleased]</code> -&gt; <code>[X.Y.Z] - &lt;date&gt;</code>) and <code>development</code> is reset to <code>main</code> so the two never diverge. New helpers <code>scripts/changelog_section.py</code> (release notes from the CHANGELOG) and <code>scripts/date_changelog.py</code> (the auto-date), plus <code>bin/sync.sh</code> for local branch sync. <code>scripts/</code> is now covered by ruff / ty / safelint.</li>
 </ul>
 <h2 id="284-2026-07-15">[2.8.4] - 2026-07-15<a class="headerlink" href="#284-2026-07-15" title="Permanent link">#</a></h2>
-<h3 id="security">Security<a class="headerlink" href="#security" title="Permanent link">#</a></h3>
+<h3 id="security_1">Security<a class="headerlink" href="#security_1" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>safelint no longer follows symlinked source files out of the linted tree, in any mode.</strong> <code>os.walk(followlinks=False)</code> blocks descent into symlinked <em>directories</em>, but a symlinked <em>file</em> was still admitted by the <code>is_file()</code> guard (which follows the link). A cloned repo could commit <code>evil.py -&gt; /etc/passwd</code> (or <code>key.py -&gt; ~/.ssh/id_rsa</code>) and have that out-of-tree target read and even echoed a line at a time into the violation gutter. Symlinks are now handled <strong>follow-if-resolved-within-tree</strong>: a symlinked file (or a symlinked top-level directory target - <code>os.walk</code> follows the top argument regardless of <code>followlinks=False</code>) is followed <strong>only when its real path stays inside the repo root</strong> (the resolved cwd). So a monorepo's in-tree symlink (<code>app/config.py -&gt; ../shared/config.py</code>, <code>shared/</code> under the repo) is still linted, while one escaping the tree is skipped with a warning. The check runs in <strong>both</strong> directory discovery <strong>and</strong> the central pre-read guard, so the pre-commit hook and single-file/explicit-path runs (which reach <code>check_file</code> directly, bypassing discovery) enforce the same boundary. An unresolvable symlink (loop or broken link, including Python 3.13+ where <code>resolve()</code> returns a still-symlink path for a loop rather than raising) fails closed.</li>
 <li><strong>Terminal output now visualises control characters in attacker-controlled strings.</strong> The pretty renderer echoed the offending source line (plus the file path and rule message) verbatim to the TTY; a crafted line containing raw ANSI / OSC escapes could clear or redraw the terminal, spoof "All checks passed." output, set the window title, or drive OSC 52 clipboard writes when its violation was rendered. C0 (except tab), DEL, and C1 bytes are now shown as visible <code>\xNN</code> escapes, matching how ruff / ripgrep / git sanitise terminal output, and Unicode bidi-override / zero-width code points (Trojan Source, CVE-2021-42574) become visible <code>\uNNNN</code> escapes so they cannot visually reorder or hide the flagged text. One shared sanitiser (in <code>_diagnostics</code>) now covers <strong>every</strong> output surface: the stdout violation gutter, the <strong>stderr diagnostic warnings</strong> (e.g. a symlink-skip warning echoing a crafted filename), and the <strong>JSON / SARIF</strong> string fields (<code>message</code>, <code>filepath</code>, suggestion <code>description</code> / <code>replacement</code>) - <code>json.dumps(ensure_ascii=False)</code> escapes C0 but passed C1 and bidi code points through verbatim, so those formatters are now sanitised too (SARIF URIs stay percent-encoded).</li>
@@ -7170,7 +7208,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 <li><strong>Internal refactor: the rules now import Tree-sitter node-type / operator constants from the <code>languages/&lt;lang&gt;.py</code> modules instead of hardcoding raw string literals.</strong> Each language module is the single source of truth for its node types, and every language's rule logic references its own module. <strong>No behaviour change</strong> - every rule's resolved node-type set is byte-identical to before (verified by a deterministic table snapshot), and no rule, code, config key, CLI flag, or output format is affected. Purely additive at the module level (new constants only; none removed or renamed), so any downstream importer of <code>safelint.languages.*</code> stays compatible.</li>
 </ul>
 <h2 id="281-2026-07-12"><a href="https://github.com/shelkesays/safelint/compare/v2.8.0...v2.8.1">2.8.1</a> - 2026-07-12<a class="headerlink" href="#281-2026-07-12" title="Permanent link">#</a></h2>
-<h3 id="security_1">Security<a class="headerlink" href="#security_1" title="Permanent link">#</a></h3>
+<h3 id="security_2">Security<a class="headerlink" href="#security_2" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>Skill-install and CI hardening (internal audit items H7-H9), all LOW / defence-in-depth.</strong> None is exploitable in the default no-flag flow; they close residual TOCTOU and supply-chain gaps around the <code>safelint skill</code> command and the release pipeline. No change to lint behaviour or public API.</li>
 <li>Secondary-file (<code>AGENTS.md</code>) section writes are now atomic and symlink-safe: the merged text is written to an exclusive-create temp in the same directory and <code>os.replace</code>d over the target, so a symlink swapped into the check-then-write window is replaced as a directory entry rather than written through. The original file's permission bits are preserved.</li>
@@ -7213,7 +7251,7 @@ and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semant
 </ul>
 <h2 id="261-2026-06-26"><a href="https://github.com/shelkesays/safelint/compare/v2.6.0...v2.6.1">2.6.1</a> - 2026-06-26<a class="headerlink" href="#261-2026-06-26" title="Permanent link">#</a></h2>
 <p><strong>Security-hardening release.</strong> Six findings (H1-H6) from the 2026-06-25 internal security audit, all <strong>LOW</strong> severity and none reachable in the default no-flag flow: symlink/TOCTOU defences across <code>skill remove --path</code>, <code>skill install</code> (copy), the result-cache temp write, and the OpenCode seed step, plus containment of the <code>test_dirs</code> config search to the project root and an <code>os</code> -&gt; <code>pathlib</code> cleanup. No new rules, CLI flags, or config keys, and no change to how any existing rule evaluates code; the only behaviour changes are defensive - relative <code>test_dirs</code> entries that escape the project root are now dropped, and a few <code>skill install</code> / <code>remove</code> edge cases now fail closed. See <code>plan/security-hardening.md</code> for the full audit record.</p>
-<h3 id="security_2">Security<a class="headerlink" href="#security_2" title="Permanent link">#</a></h3>
+<h3 id="security_3">Security<a class="headerlink" href="#security_3" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>Contain <code>test_dirs</code> filesystem search to the project root (audit finding H3).</strong> A relative <code>test_dirs</code> config value that climbs out of the project root via <code>..</code> (e.g. <code>["../../etc"]</code>) previously let SAFE701 / SAFE702's <code>rglob</code> probe directories outside the tree (read/stat only - a single existence bit, no exfiltration). Relative entries are now collapsed lexically and dropped if they escape the root; absolute <code>test_dirs</code> remain honoured (an explicit, supported config choice). LOW severity, opt-in rules; from the 2026-06-25 internal security audit (see <code>plan/security-hardening.md</code>). First of the audit's hardening items.</li>
 <li><strong>Refuse <code>skill remove --path</code> when a symlinked ancestor redirects the delete (audit finding H1).</strong> The <code>--path</code> guard matched only the <em>lexical</em> tail of the path against a registered install shape, so a path like <code>~/x/.cursor/rules/safelint.mdc</code> whose <code>rules</code> component is a symlink into an unrelated tree could pass the check and have <code>_remove_existing</code> delete a file there. The guard now re-checks the install shape after resolving ancestor symlinks (<code>Path.resolve</code> on the parent): a redirect onto a non-install-shaped location is refused, while genuinely unusual <em>real</em> parents - and shape-preserving symlinks such as dotfile clones - keep working. LOW severity (requires an attacker-planted symlink under a path the user explicitly names).</li>
