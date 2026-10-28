@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.15.0] - 2026-10-28
+
 ### Added
 
 - **`logging_on_error` (SAFE203) gained per-language `log_methods` lists.** `log_methods` (Python, bare key) plus `log_methods_javascript` / `log_methods_typescript` / `log_methods_java` / `log_methods_php` / `log_methods_cpp`. The accepted names had been hardcoded in the rule; they are now configurable like every other name list, matched with the receiver discarded (`$logger->notice($e)` resolves to `notice`). Per language rather than one flat list because whether a stdout write counts is a question about the language's culture: Java's list deliberately omits `println`, since `System.out.println` in a catch block is the anti-pattern the rule exists to find.
@@ -1427,7 +1429,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.14.3...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.15.0...HEAD
+[2.15.0]: https://github.com/shelkesays/safelint/compare/v2.14.3...v2.15.0
 [2.14.3]: https://github.com/shelkesays/safelint/compare/v2.14.2...v2.14.3
 [2.14.2]: https://github.com/shelkesays/safelint/compare/v2.14.1...v2.14.2
 [2.14.1]: https://github.com/shelkesays/safelint/compare/v2.14.0...v2.14.1
