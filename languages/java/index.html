@@ -2520,7 +2520,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe102-nesting_depth">SAFE102</a></td>
 <td><code>nesting_depth</code></td>
-<td>Counts <code>if</code> / <code>for</code> / <code>enhanced_for</code> (for-each) / <code>while</code> / <code>do</code> / <code>try</code> / <code>try_with_resources</code> / <code>switch_expression</code> (Java 14+). <code>synchronized</code> blocks add visual indent but are NOT counted (no control-flow branch). Default max 2.</td>
+<td>Counts <code>if</code> / <code>for</code> / <code>enhanced_for</code> (for-each) / <code>while</code> / <code>do</code> / <code>switch_expression</code> (Java 14+). <code>synchronized</code> blocks add visual indent but are NOT counted (no control-flow branch). Default max 2. <code>try</code> and try-with-resources are NOT counted (#166): they add indentation without adding a branch, the same reasoning that already excluded <code>synchronized</code>.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe103-max_arguments">SAFE103</a></td>
@@ -2535,7 +2535,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe105-no_recursion">SAFE105</a></td>
 <td><code>no_recursion</code></td>
-<td>Flags a <code>method_declaration</code> that calls itself directly, bare (<code>fact(n-1)</code>) or <code>this</code>-qualified (<code>this.fact(n-1)</code>). <code>other.fact(...)</code> does not fire. Direct self-recursion only (mutual recursion is out of scope). Enabled by default at warning severity.</td>
+<td>Flags a <code>method_declaration</code> that calls itself directly, bare (<code>fact(n-1)</code>) or <code>this</code>-qualified (<code>this.fact(n-1)</code>). <code>other.fact(...)</code> does not fire. Direct self-recursion only (mutual recursion is out of scope). Enabled by default at warning severity. Overload-aware: a call is ruled out when the argument count does not fit the signature (explicit receiver discounted; varargs exempt), when an argument is cast to <code>Object</code> against a non-<code>Object</code> parameter (<code>java.lang.Object</code> counts as <code>Object</code>), or when it is an element of that position's array parameter (by index or for-each). A call an overloaded sibling could also accept is still reported, with a message saying the target cannot be resolved without type information - dropping it would silence real recursion in any overloaded method. The hedge is per call, from the argument count, and inherited overloads are not visible.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe202-empty_except">SAFE202</a></td>
@@ -2545,7 +2545,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe203-logging_on_error">SAFE203</a></td>
 <td><code>logging_on_error</code></td>
-<td>Requires a logging call in every catch block that doesn't re-raise. Recognised logger method names cover SLF4J / Log4j / java.util.logging: <code>error</code> / <code>warn</code> / <code>info</code> / <code>debug</code> / <code>trace</code> / <code>severe</code> / <code>fine</code> / <code>finer</code> / <code>finest</code> / <code>log</code> / <code>exception</code>. <code>call_name</code> strips the receiver, so <code>logger.error(...)</code> and <code>LoggerFactory.getLogger(Foo.class).error(...)</code> both resolve to <code>"error"</code>. Re-raise pattern <code>catch (Type e) { throw e; }</code> is recognised when the thrown identifier matches the catch-parameter binding.</td>
+<td>Requires a logging call in every catch block unless <strong>every exit path</strong> out of it re-raises. Recognised logger method names (the <code>log_methods_java</code> default) cover SLF4J / Log4j / java.util.logging: <code>error</code> / <code>warn</code> / <code>warning</code> / <code>info</code> / <code>debug</code> / <code>trace</code> / <code>severe</code> / <code>fine</code> / <code>finer</code> / <code>finest</code> / <code>log</code> / <code>exception</code> / <code>critical</code>. <code>println</code> is deliberately absent. <code>call_name</code> strips the receiver, so <code>logger.error(...)</code> and <code>LoggerFactory.getLogger(Foo.class).error(...)</code> both resolve to <code>"error"</code>. Re-raise pattern <code>catch (Type e) { throw e; }</code> is recognised when the thrown identifier matches the catch-parameter binding.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe302-global_mutation">SAFE302</a></td>

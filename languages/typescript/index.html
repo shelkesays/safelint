@@ -2524,7 +2524,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe203-logging_on_error">SAFE203</a></td>
 <td><code>logging_on_error</code></td>
-<td>Same as JS, requires <code>console.*</code> / <code>logger.*</code> or rethrow in <code>catch</code>.</td>
+<td>Same as JS: requires <code>console.*</code> / <code>logger.*</code> in <code>catch</code>, unless every exit path throws the caught value or a fresh error wrapping it. Configure the accepted names with <code>log_methods_typescript</code>.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe302-global_mutation">SAFE302</a></td>

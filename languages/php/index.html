@@ -2581,7 +2581,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe102-nesting_depth">SAFE102</a></td>
 <td><code>nesting_depth</code></td>
-<td>Counts <code>if_statement</code> / <code>for_statement</code> / <code>foreach_statement</code> / <code>while_statement</code> / <code>do_statement</code> / <code>switch_statement</code> / <code>try_statement</code>. Default max 2. Per-arm <code>case</code> nodes are not counted; the switch counts once.</td>
+<td>Counts <code>if_statement</code> / <code>for_statement</code> / <code>foreach_statement</code> / <code>while_statement</code> / <code>do_statement</code> / <code>switch_statement</code> . Default max 2. Per-arm <code>case</code> nodes are not counted; the switch counts once. <code>try</code> is NOT counted (#166): it adds indentation without adding a branch.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe103-max_arguments">SAFE103</a></td>
@@ -2850,6 +2850,11 @@
 </tr>
 </tbody>
 </table>
+<p>Two of those five changed scope in 2.15.0 after they were measured against a real Laravel app:</p>
+<ul>
+<li><strong>SAFE907</strong> recognises <code>Validator::make(...)</code> / <code>Validator::validate(...)</code>, a validator built from the request data and then validated (<code>$this-&gt;validator($request-&gt;all())-&gt;validate()</code>), a one-step local alias of the request data (<code>$post = $request-&gt;all();</code> ... <code>Validator::make($post, $rules)</code>), and a <strong>Form Request</strong> parameter (<code>store(StoreUserRequest $request)</code>), which means the framework already ran that class's <code>rules()</code>. Previously only <code>$request-&gt;validate(...)</code> and the <code>ValidatesRequests</code> trait form counted, so the rule reported the very line that validates the input.</li>
+<li><strong>SAFE908</strong> requires class context: <code>$except</code> is reported only inside a class named <code>VerifyCsrfToken</code> or extending one (including through the <code>use ... as Middleware</code> alias Laravel scaffolds). Laravel's stock <code>TrimStrings</code> and <code>EncryptCookies</code> carry an unrelated <code>$except</code>, so matching the property name alone fired on every unmodified app.</li>
+</ul>
 <div class="highlight"><pre><span></span><code><a id="__codelineno-18-1" name="__codelineno-18-1" href="#__codelineno-18-1"></a><span class="c1"># safelint.toml (standalone) - no [tool.safelint] wrapper</span>
 <a id="__codelineno-18-2" name="__codelineno-18-2" href="#__codelineno-18-2"></a><span class="k">[php]</span>
 <a id="__codelineno-18-3" name="__codelineno-18-3" href="#__codelineno-18-3"></a><span class="n">framework</span><span class="w"> </span><span class="o">=</span><span class="w"> </span><span class="s2">&quot;laravel&quot;</span>

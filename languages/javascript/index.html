@@ -2460,7 +2460,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe102-nesting_depth">SAFE102</a></td>
 <td><code>nesting_depth</code></td>
-<td>Counts <code>if</code> / <code>for</code> / <code>for…in</code> / <code>while</code> / <code>do…while</code> / <code>switch</code> / <code>try</code> blocks. Default max 2. Optional chaining (<code>?.</code>) does not count toward depth.</td>
+<td>Counts <code>if</code> / <code>for</code> / <code>for…in</code> / <code>for…of</code> / <code>while</code> / <code>do…while</code> / <code>switch</code> blocks. Default max 2. <code>try</code> is NOT counted (#166): it adds indentation without adding a branch. Optional chaining (<code>?.</code>) does not count toward depth.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe103-max_arguments">SAFE103</a></td>
@@ -2485,12 +2485,12 @@
 <tr>
 <td><a href="../../configuration/rules/#safe203-logging_on_error">SAFE203</a></td>
 <td><code>logging_on_error</code></td>
-<td>Requires <code>console.{log,info,warn,error,debug,trace}</code> (or generic <code>logger.*</code> / <code>pino.*</code> / <code>bunyan.*</code>) in every <code>catch</code>. <code>throw e;</code> (exact rethrow of the caught binding) is exempt.</td>
+<td>Requires <code>console.{log,info,warn,error,debug,trace}</code> (or generic <code>logger.*</code> / <code>pino.*</code> / <code>bunyan.*</code>) in every <code>catch</code>, unless <strong>every exit path</strong> out of the handler throws. <code>throw e;</code> (rethrow of the caught binding) propagates, and so does <code>throw new Error("ctx", { cause: e })</code>; a <code>throw new Error(...)</code> that does not mention the caught value discards the original and still wants logging. Configure the accepted names with <code>log_methods_javascript</code>.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe302-global_mutation">SAFE302</a></td>
 <td><code>global_mutation</code></td>
-<td>Function-body writes to a configured global namespace. Default: <code>globalThis</code> / <code>window</code> / <code>global</code> / <code>self</code> / <code>process</code>. Bracket-notation (<code>window["x"] = 1</code>) and update-expressions (<code>process.exitCode++</code>) are also covered.</td>
+<td>Function-body writes to a configured global namespace. Default: <code>globalThis</code> / <code>window</code> / <code>global</code> / <code>self</code> / <code>process</code>. Bracket-notation (<code>window["x"] = 1</code>) and update-expressions (<code>process.exitCode++</code>) are also covered. A write whose root name is shadowed by a local declaration (<code>const self = this</code>, a parameter, a <code>catch</code> binding) targets the local and is not reported; destructured bindings are not recognised.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe303-side_effects_hidden">SAFE303</a></td>

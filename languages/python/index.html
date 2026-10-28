@@ -2472,7 +2472,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe102-nesting_depth">SAFE102</a></td>
 <td><code>nesting_depth</code></td>
-<td>Counts <code>if</code> / <code>for</code> / <code>while</code> / <code>with</code> / <code>try</code> / <code>match</code> blocks. Default max 2.</td>
+<td>Counts <code>if</code> / <code>for</code> / <code>while</code> / <code>match</code> blocks. Default max 2. <code>with</code> and <code>try</code> are NOT counted (#166): they add indentation without adding a branch.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe103-max_arguments">SAFE103</a></td>
@@ -2502,7 +2502,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe203-logging_on_error">SAFE203</a></td>
 <td><code>logging_on_error</code></td>
-<td>Requires a call to <code>logger.{debug,info,warning,error,exception,critical}</code> (or bare <code>raise</code>) in every except handler.</td>
+<td>Requires a call to <code>logger.{debug,info,warning,error,exception,critical}</code> in every except handler, unless <strong>every exit path</strong> out of the handler raises. <code>print</code> / <code>print_exception</code> / <code>print_exc</code> also count as making the failure visible (Python only; see <code>log_methods</code>). When only some arms of the handler propagate, the finding anchors at the arm that falls through.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe301-global_state">SAFE301</a></td>
@@ -2567,7 +2567,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe802-return_value_ignored">SAFE802</a></td>
 <td><code>return_value_ignored</code></td>
-<td>Bare calls to <code>subprocess.run</code>, <code>f.write</code>, <code>socket.send</code>, <code>os.rename</code>, etc., return value carries success/failure. Disabled by default.</td>
+<td>Bare calls to <code>subprocess.run</code>, <code>socket.send</code>, etc., where the return value carries success/failure. Names are matched without the receiver, so <code>asyncio.run()</code> matches <code>run</code>. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe803-null_dereference">SAFE803</a></td>
