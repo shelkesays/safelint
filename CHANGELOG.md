@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Security
+
+- **Dev lockfile: `certifi` and `filelock` bumped to clear four Dependabot advisories.** `certifi` 2026.7.22 -> 2026.10.23 (critical: the previous releases bundle emSign root CAs whose intermediate CA keys were compromised; fixed upstream in 2026.10.18) and `filelock` 3.32.2 -> 4.2.4 (one high and two low, all fixed in 4.2.1; the high one is a `ReadWriteLock` symlink-planting issue on the SQLite lock database). Both are **transitive dev dependencies** - the published wheel's only runtime dependency is `tree-sitter`, so no released artefact is affected and no version bump is needed. Lock-only change, so `publish.yml`'s version gate skips it.
+
 ## [2.15.0] - 2026-10-28
 
 ### Added
