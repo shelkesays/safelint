@@ -111,18 +111,30 @@ jobs:
             git fetch --quiet "$REPO_URL" "$DEV"
             git push "$REPO_URL" "$DEV:refs/heads/$ARCHIVE"
 
-            # How much of development is not reachable from main. After a squash
-            # release this is ALWAYS non-zero (the rc commits live on under
-            # different SHAs), so the wording has to tell the reader when to care
-            # rather than imply every reset lost something.
+            # How much of development is not reachable from main. Zero means
+            # development was a plain ancestor and the reset is provably
+            # lossless, so that case gets a notice, not a warning - the first
+            # real run of this workflow hit it and the warning was pure noise.
+            # After a SQUASH release the count is non-zero even though the
+            # content shipped (the rc commits live on under different SHAs),
+            # which is why the wording tells the reader when to care rather than
+            # implying every reset lost something.
             AHEAD=$(git rev-list --count "$MAIN..$DEV")
-            echo "::warning::development had $AHEAD commit(s) not reachable from main; they are preserved at $ARCHIVE - recover from there if the release did not just ship them"
+            if [ "$AHEAD" -eq 0 ]; then
+              echo "::notice::development was an ancestor of main ($AHEAD commits ahead); reset is lossless. Previous tip archived at $ARCHIVE."
+            else
+              echo "::warning::development had $AHEAD commit(s) not reachable from main; they are preserved at $ARCHIVE - recover from there if the release did not just ship them"
+            fi
             {
               echo "### development synced to main"
               echo
               echo "- previous tip \`$DEV_SHORT\` archived to \`$ARCHIVE\`"
-              echo "- \`$AHEAD\` commit(s) were not reachable from main (expected after a squash release)"
-              echo "- recover with \`git fetch origin $ARCHIVE\` if that work had not been released"
+              if [ "$AHEAD" -eq 0 ]; then
+                echo "- development was an ancestor of main, so nothing was unreachable; the reset is lossless"
+              else
+                echo "- \`$AHEAD\` commit(s) were not reachable from main (expected after a squash release)"
+                echo "- recover with \`git fetch origin $ARCHIVE\` if that work had not been released"
+              fi
             } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
             # Push main's commit straight at the remote ref rather than moving a
