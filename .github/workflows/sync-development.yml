@@ -7,11 +7,36 @@ name: Sync development with main
 # the next release branch cut from development cannot rebase onto main. Keeping
 # development identical to main after each release removes the whole class.
 #
-# Reset-if-safe: development is reset ONLY when it has no commits whose CONTENT
-# is not already in main (measured by patch-id via git cherry, so a squash- or
-# rebase-merged release - content-identical to main but different SHAs - still
-# reads as safe). If genuinely unmerged work exists on development, the job
-# refuses and fails loudly (visible in the Actions tab) rather than clobbering it.
+# Archive-then-reset: development's tip is pushed to an `archive/development-<sha>`
+# branch and only then reset. Nothing is ever unrecoverable, so the job never
+# needs to predict whether a reset is safe - and it never refuses.
+#
+# It USED to refuse unless it could prove development's content was already in
+# main, via patch-id (`git cherry`). That cannot work for this repository, and
+# the 2.15.0 release is the worked example - every candidate predicate was tested
+# against it and every one refused:
+#
+#   * `git cherry` patch-id    - 11 commits read as not-upstream. A squash merge
+#                                collapses N commits into ONE patch-id, which
+#                                matches none of the N. The check was written for
+#                                rebase-merge semantics; this repo squash-merges.
+#   * tree equality            - 6 files differ.
+#   * development's tree found
+#     anywhere in main history - never present.
+#   * net-diff reverse-apply   - fails on uv.lock and pyproject.toml.
+#   * ...excluding those       - fails on CHANGELOG.md, docs and the workflows.
+#
+# The reason is structural, not a bug in the predicate: after a release main is
+# AHEAD of development in the same files (the date-stamped CHANGELOG, any fix
+# folded into the release branch, the version going rcN -> final), so
+# "development's content is in main" is not computable by comparing current
+# states. Development also legitimately holds a string main never had, the rc
+# version, so it is never literally a content subset.
+#
+# The only sound signal would be lineage - was anything pushed to development
+# after the release branch was cut - which needs the cut point recorded at
+# release time. Archiving is simpler and strictly safer than what it replaces:
+# when the old guard PASSED it force-pushed with no backup at all.
 #
 # Loop safety: this force-pushes development, which triggers publish.yml on the
 # development branch. After the reset development == main (a final version), and
@@ -23,8 +48,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
-  issues: write  # open a tracking issue when a sync is refused
+  contents: read  # the force-push and the archive push both go through RELEASE_PAT
 
 concurrency:
   group: sync-development
@@ -32,7 +56,7 @@ concurrency:
 
 jobs:
   sync:
-    name: Reset development to main (if safe)
+    name: Archive development, then reset it to main
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
@@ -42,9 +66,8 @@ jobs:
           # publish.yml). The force-push injects RELEASE_PAT via an explicit URL.
           persist-credentials: false
 
-      - name: Reset development to main when safe
+      - name: Archive development, then reset it to main
         env:
-          GH_TOKEN: ${{ github.token }}
           # RELEASE_PAT: force-pushing development needs to bypass its protection
           # (the default GITHUB_TOKEN cannot). Same token as publish.yml.
           RELEASE_PAT: ${{ secrets.RELEASE_PAT }}
@@ -52,58 +75,34 @@ jobs:
           set -euo pipefail
           git fetch origin main development --quiet
 
-          # Count development commits whose PATCH is not already in main, via
-          # git cherry (patch-id) rather than `rev-list --count` (SHA). A
-          # squash- or rebase-merged release leaves development's commits
-          # content-identical to main but with different SHAs; a SHA count reads
-          # those as "ahead" and refuses every time, whereas the patch-id count
-          # correctly reads 0 and lets the reset auto-resolve. Only genuinely
-          # unmerged content still counts as in-flight work.
-          # Run git cherry on its own line so a real git failure aborts under
-          # `set -e` (never masked as 0 == "safe to reset"); the `|| true` then
-          # only absorbs grep -c's exit 1 on the expected no-'+'-lines case.
-          CHERRY=$(git cherry origin/main origin/development)
-          AHEAD=$(printf '%s\n' "$CHERRY" | grep -c '^+' || true)
-          # git cherry is patch-id based and by construction SKIPS merge commits,
-          # so a merge whose conflict-resolution introduced content unique to
-          # development would be invisible to AHEAD. This repo's flow is
-          # squash/rebase-merge, so development is linear after each reset and this
-          # is normally 0; a merge commit in the range cannot be patch-compared,
-          # so we refuse rather than risk clobbering unmerged resolution content -
-          # the same conservative posture as the AHEAD guard. A human confirms the
-          # merge is contained in main, then resets manually.
-          MERGES=$(git rev-list --merges origin/main..origin/development --count)
-          if [ "$AHEAD" -ne 0 ] || [ "$MERGES" -ne 0 ]; then
-            DETAIL="$AHEAD commit(s) not in main"
-            [ "$MERGES" -ne 0 ] && DETAIL="$DETAIL, $MERGES un-patch-comparable merge commit(s)"
-            echo "::error::development diverges from main - refusing to reset ($DETAIL)."
-            # Open a tracking issue (deduped by exact-title phrase search - the
-            # quotes make the '-' in the title a literal, not a NOT operator, so
-            # repeated main-pushes do not spam duplicates), then fail loudly.
-            TITLE="development is ahead of main - auto-sync blocked"
-            OPEN=$(gh issue list --state open --search "in:title \"$TITLE\"" --json number --jq 'length')
-            if [ "$OPEN" -eq 0 ]; then
-              gh issue create --title "$TITLE" --body \
-          "The **sync-development** workflow refused to reset \`development\` to \`main\`: $DETAIL, so a reset could discard unmerged work.
+          DEV=$(git rev-parse origin/development)
+          MAIN=$(git rev-parse origin/main)
+          DEV_SHORT=$(git rev-parse --short "$DEV")
 
-          Resolve manually - land that work through the release flow, or once it is contained in main run:
-
-              bin/sync.sh   # then: git branch -f development origin/main && git push --force-with-lease origin development
-
-          Triggered by ${GITHUB_SHA:0:7} on main. This issue was opened automatically; close it once development and main are back in sync."
-            fi
-            exit 1
-          fi
-
-          if [ "$(git rev-parse origin/development)" = "$(git rev-parse origin/main)" ]; then
+          if [ "$DEV" = "$MAIN" ]; then
             echo "development already equals main - nothing to do."
             exit 0
           fi
 
-          # Safe: development is fully contained in main, only the SHAs differ.
-          # --force-with-lease guards against a race between the check and push.
           # Push via an explicit PAT URL (credentials are not persisted).
           REPO_URL="https://x-access-token:${RELEASE_PAT}@github.com/${GITHUB_REPOSITORY}.git"
-          git branch -f development origin/main
-          git push --force-with-lease=development:"$(git rev-parse origin/development)" "$REPO_URL" development
-          echo "development reset to main ($(git rev-parse --short origin/main))."
+          ARCHIVE="archive/development-${DEV_SHORT}"
+
+          # Archive BEFORE the reset, and let `set -e` abort if it fails: after
+          # the force-push this branch is the only copy of the old tip. The name
+          # embeds the SHA, so re-running pushes the same commit to the same ref
+          # and is a no-op rather than an error.
+          #
+          # No workflow triggers on `archive/*` (ci.yml and publish.yml both list
+          # main / development / release/* only), so this costs no runs. Safe to
+          # delete once the release is confirmed.
+          git push "$REPO_URL" "$DEV:refs/heads/$ARCHIVE"
+          echo "::notice::archived development tip $DEV_SHORT to $ARCHIVE"
+
+          # Push main's commit straight at the remote ref rather than moving a
+          # local branch first: `git branch -f development` fails outright if
+          # that branch happens to be checked out, and nothing here needs a local
+          # branch. --force-with-lease guards against a race between the read
+          # above and this push.
+          git push --force-with-lease=development:"$DEV" "$REPO_URL" "$MAIN:refs/heads/development"
+          echo "::notice::development reset to main ($(git rev-parse --short "$MAIN")); previous tip kept at $ARCHIVE"
