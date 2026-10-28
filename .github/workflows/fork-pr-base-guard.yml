@@ -1,0 +1,98 @@
+name: Fork PR base guard
+
+# A pull request from a fork must target `development`, never `main`.
+#
+# `main` is the release branch: the publish workflow reads `project.version` on
+# every push to it and cuts a PyPI release when that version is new. A PR merged
+# straight into `main` therefore skips the RC cycle entirely, and an external
+# contributor has no way to know that from the PR form - GitHub offers `main` as
+# the default base and gives no mechanism to restrict which base a fork may
+# choose. So this closes such a PR immediately and asks for a new one against
+# `development`. It asks for a NEW pull request rather than a retarget because
+# `reopened` is one of this workflow's triggers: reopening the closed PR runs the
+# guard again, and the base is still wrong at that moment, so it would be closed
+# before the author could reach the base selector.
+#
+# `pull_request_target` is required because a `pull_request` run from a fork gets
+# a read-only token and cannot comment or close. It is the privileged trigger, so
+# the one rule that matters: this workflow MUST NOT check out or execute any code
+# from the fork. It only reads event metadata and calls the API, which is safe -
+# there is no step that fetches the head ref.
+on:
+  pull_request_target:
+    types: [opened, reopened, edited]
+
+permissions:
+  pull-requests: write
+
+concurrency:
+  group: fork-pr-base-guard-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  guard:
+    name: Reject fork PRs targeting main
+    # Only forks, and any base that is not `development`. Stated as an allow-list
+    # rather than "not main": `release/*` branches flow into `main` by design, so
+    # a fork PR merged into one would reach a release the same way, and `main` is
+    # not the only base worth refusing. A branch inside this repository is the
+    # maintainer's own flow and is never touched, whatever its base.
+    if: >-
+      github.event.pull_request.head.repo.fork == true &&
+      github.event.pull_request.base.ref != 'development'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Explain and close
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+          HEAD_LABEL: ${{ github.event.pull_request.head.label }}
+          BASE: ${{ github.event.pull_request.base.ref }}
+        run: |
+          set -euo pipefail
+          # Re-read the base before doing anything. The job condition evaluates
+          # against this run's event snapshot, which goes stale: if the author
+          # retargets to `development` while an earlier run (from `opened`, or a
+          # previous `edited`) is still queued or in flight, that run would close
+          # the PR the author has just corrected. The `edited` event does not
+          # refresh an existing run's snapshot, so the only reliable source is
+          # the API, read as late as possible. This is checked before the comment
+          # too, so a corrected PR gets neither a close nor a misleading notice.
+          CURRENT_BASE=$(gh pr view "$PR" --repo "$REPO" --json baseRefName --jq .baseRefName)
+          if [ "$CURRENT_BASE" = 'development' ]; then
+            echo "::notice::#$PR now targets development (event snapshot said '$BASE') - nothing to do"
+            exit 0
+          fi
+          cat > /tmp/body.md <<'MSG'
+          Thanks for the contribution - closing this one on process grounds only, and your work is not lost.
+
+          **Pull requests from forks must target `development`.** This one targets a different branch.
+
+          `main` is the release branch. The publish workflow reads `project.version` on every push to it and cuts a PyPI release when that version is new, so a change merged straight into `main` bypasses the release-candidate cycle that every other change goes through. GitHub offers `main` as the default base and gives maintainers no way to restrict which base a fork may pick, which is why this is enforced here rather than in the PR form.
+
+          **Please open a new pull request from the same branch, with `development` as the base.** No new branch and no force-push needed - your commits are already pushed, so the new PR picks them up as they are.
+
+          Retargeting this one is not worth attempting: GitHub only lets you change the base of an *open* pull request, and reopening it trips this same guard, which closes it again before you can get to the base selector. A fresh PR is the one path that works in a single step.
+
+          The commits carry over unchanged. The review thread on this PR does not, so if anything here is worth keeping, please copy it across. Everything else about the change is unaffected - this says nothing about its quality, only its target.
+
+          If `development` has moved on, rebase onto it first:
+
+          ```bash
+          git remote add upstream https://github.com/shelkesays/safelint.git
+          git fetch upstream development
+          git rebase upstream/development
+          git push --force-with-lease
+          ```
+          MSG
+          # The comment must never gate the close. Under `set -e` a transient
+          # failure here - a rate limit, a flaky API call - would abort the step
+          # and leave the PR open with the guard having silently not run. Closing
+          # is the part that enforces the rule, so it happens either way and the
+          # failure is surfaced as a warning instead.
+          if ! gh pr comment "$PR" --repo "$REPO" --body-file /tmp/body.md; then
+            echo "::warning::could not post the explanation on #$PR - closing anyway"
+          fi
+          gh pr close "$PR" --repo "$REPO"
+          echo "::notice::closed fork PR #$PR from $HEAD_LABEL - base is '$CURRENT_BASE', must be development"

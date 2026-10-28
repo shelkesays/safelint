@@ -135,6 +135,7 @@ TYPE_DECLARATION_TYPES = frozenset(
 
 # Control flow.
 IF_EXPRESSION = "if_expression"
+ELSE_CLAUSE = "else_clause"  # ``else { .. }`` / the ``else`` of an ``else if`` chain
 IF_LET_EXPRESSION = "if_let_expression"
 FOR_EXPRESSION = "for_expression"
 WHILE_EXPRESSION = "while_expression"
@@ -158,12 +159,18 @@ ATTRIBUTE = "attribute"
 CONST_ITEM = "const_item"  # ``const FOO: T = ...``
 EXPRESSION_STATEMENT = "expression_statement"
 USE_DECLARATION = "use_declaration"
+USE_AS_CLAUSE = "use_as_clause"  # ``use p::x as y`` (only ``y`` is bound)
+SCOPED_USE_LIST = "scoped_use_list"  # ``use p::q::{a, b}`` - ``path`` plus ``list``
+USE_LIST = "use_list"  # the ``{a, b}`` brace group itself
+USE_WILDCARD = "use_wildcard"  # ``use p::q::*`` - binds q's contents, not ``q``
+SELF = "self"  # the ``self`` entry in ``use p::q::{self, a}``, binding ``q``
 ATTRIBUTE_ITEM = "attribute_item"  # outer ``#[attr]``
 INNER_ATTRIBUTE_ITEM = "inner_attribute_item"  # inner ``#![attr]``
 
 # Expressions.
 CALL_EXPRESSION = "call_expression"
 MACRO_INVOCATION = "macro_invocation"  # ``println!(...)``
+TOKEN_TREE = "token_tree"  # noqa: S105 - a grammar node name, not a secret
 FIELD_EXPRESSION = "field_expression"  # ``obj.field``
 INDEX_EXPRESSION = "index_expression"  # ``arr[i]``
 ASSIGNMENT_EXPRESSION = "assignment_expression"

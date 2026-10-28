@@ -18,6 +18,7 @@ from safelint.languages import python as _py
 from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import call_name, resolve_lang_name, walk
 from safelint.languages._node_utils import node_text as _node_text
+from safelint.rules._test_files import skips_test_code
 from safelint.rules.base import BaseRule
 
 
@@ -814,6 +815,11 @@ class ResourceLifecycleRule(BaseRule):
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
         """Flag unguarded calls to tracked resource-acquisition functions."""
         lang_name = resolve_lang_name(filepath)
+        # #198: the patterns this rule flags are conventional in test code, where
+        # they were the overwhelming majority of its findings and were burying the
+        # ones in library code. Whole-file answer, resolved before any walk.
+        if skips_test_code(self.config, filepath, lang_name):
+            return []
         if lang_name == "python":
             return self._python_check(filepath, tree)
         if lang_name == "java":

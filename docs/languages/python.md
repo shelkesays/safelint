@@ -24,13 +24,13 @@ Python is in scope for every cross-language rule plus SAFE201 `bare_except` (sha
 | Code | Rule | Notes for Python |
 |---|---|---|
 | [SAFE101](../configuration/rules.md#safe101-function_length) | `function_length` | Default cap 60 lines; `count_mode` supports `lines` / `logical_lines` / `statements` (Python-only mode). |
-| [SAFE102](../configuration/rules.md#safe102-nesting_depth) | `nesting_depth` | Counts `if` / `for` / `while` / `with` / `try` / `match` blocks. Default max 2. |
+| [SAFE102](../configuration/rules.md#safe102-nesting_depth) | `nesting_depth` | Counts `if` / `for` / `while` / `match` blocks. Default max 2. `with` and `try` are NOT counted (#166): they add indentation without adding a branch. |
 | [SAFE103](../configuration/rules.md#safe103-max_arguments) | `max_arguments` | Counts positional, keyword, `*args`, `**kwargs` separately. Excludes `self` / `cls`. Default cap 7. |
 | [SAFE104](../configuration/rules.md#safe104-complexity) | `complexity` | Cyclomatic complexity, every `if` / `elif` / `for` / `while` / `except` / `case` / ternary / `and` / `or` adds one. Default cap 10. |
 | [SAFE105](../configuration/rules.md#safe105-no_recursion) | `no_recursion` | Flags a function that calls itself directly, bare (`fact(n-1)`) or `self`/`cls`-qualified (`self.walk(...)`). `other.walk(...)` does not fire. Direct self-recursion only. Enabled by default at warning severity. |
 | [SAFE201](../configuration/rules.md#safe201-bare_except) | `bare_except` | Fires on `except:` with no exception type, catches `KeyboardInterrupt` and `SystemExit`. (Also registered for C++'s `catch (...)`.) |
 | [SAFE202](../configuration/rules.md#safe202-empty_except) | `empty_except` | Fires on `except: pass`, `except: ...`, `except: 0`, `except: "TODO"`. |
-| [SAFE203](../configuration/rules.md#safe203-logging_on_error) | `logging_on_error` | Requires a call to `logger.{debug,info,warning,error,exception,critical}` (or bare `raise`) in every except handler. |
+| [SAFE203](../configuration/rules.md#safe203-logging_on_error) | `logging_on_error` | Requires a call to `logger.{debug,info,warning,error,exception,critical}` in every except handler, unless **every exit path** out of the handler raises. `print` / `print_exception` / `print_exc` also count as making the failure visible (Python only; see `log_methods`). When only some arms of the handler propagate, the finding anchors at the arm that falls through. |
 | [SAFE301](../configuration/rules.md#safe301-global_state) | `global_state` | **Python and PHP.** Fires on the `global` keyword. With `strict = true`, fires on every declaration; default is "declaration + write". |
 | [SAFE302](../configuration/rules.md#safe302-global_mutation) | `global_mutation` | Function-body writes that follow a `global` declaration. Reading a global doesn't fire. |
 | [SAFE303](../configuration/rules.md#safe303-side_effects_hidden) | `side_effects_hidden` | Functions named with a pure-prefix (`calculate_`, `get_`, `is_`, …) that secretly call `open()` / `print()` / `input()`. |
@@ -43,7 +43,7 @@ Python is in scope for every cross-language rule plus SAFE201 `bare_except` (sha
 | [SAFE701](../configuration/rules.md#safe701-test_existence) | `test_existence` | Every source file should have a matching `test_<stem>.py` under `test_dirs`. Disabled by default. |
 | [SAFE702](../configuration/rules.md#safe702-test_coupling) | `test_coupling` | If you change `src/foo.py`, you must also change `tests/test_foo.py` in the same commit. Disabled by default. |
 | [SAFE801](../configuration/rules.md#safe801-tainted_sink) | `tainted_sink` | Function parameters / `input()` flowing into `eval` / `exec` / `subprocess` / `cursor.execute`. Disabled by default. |
-| [SAFE802](../configuration/rules.md#safe802-return_value_ignored) | `return_value_ignored` | Bare calls to `subprocess.run`, `f.write`, `socket.send`, `os.rename`, etc., return value carries success/failure. Disabled by default. |
+| [SAFE802](../configuration/rules.md#safe802-return_value_ignored) | `return_value_ignored` | Bare calls to `subprocess.run`, `socket.send`, etc., where the return value carries success/failure. Names are matched without the receiver, so `asyncio.run()` matches `run`. Disabled by default. |
 | [SAFE803](../configuration/rules.md#safe803-null_dereference) | `null_dereference` | `config.get("k").strip()`, dereferencing a call that can return `None`. Disabled by default. |
 
 The 1 rule **not registered for Python:** [SAFE305 `wide_scope_declaration`](../configuration/rules.md#safe305-wide_scope_declaration), JavaScript-only; Python has no `var` / `let` / `const` distinction.

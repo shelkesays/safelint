@@ -7,6 +7,345 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **`logging_on_error` (SAFE203) gained per-language `log_methods` lists.** `log_methods` (Python, bare key) plus `log_methods_javascript` / `log_methods_typescript` / `log_methods_java` / `log_methods_php` / `log_methods_cpp`. The accepted names had been hardcoded in the rule; they are now configurable like every other name list, matched with the receiver discarded (`$logger->notice($e)` resolves to `notice`). Per language rather than one flat list because whether a stdout write counts is a question about the language's culture: Java's list deliberately omits `println`, since `System.out.println` in a catch block is the anti-pattern the rule exists to find.
+
+### Changed
+
+- **SAFE203 `logging_on_error`: a handler that re-raises is not swallowing the error (#159, #199).** The rule asked for a logging call in every `except` / `catch` body and said the error was "swallowed" when it found none. A handler that re-raises swallows nothing, and logging there actively hurts - you get two reports of one failure, the second at the wrong altitude, which is why the standard advice is to log at the boundary that handles the error rather than at every frame it passes through.
+
+  The test is now whether **every exit path** out of the handler leaves by raising, which is stricter than "contains a raise" in the direction that matters:
+
+  ```python
+  except ValueError as err:
+      raise RuntimeError("bad") from err      # clean: the add-context re-raise
+
+  except ValueError as exc:
+      print(f"failed: {exc}")                 # clean: report, then propagate
+      raise
+
+  except ValueError:
+      if never_true:
+          raise
+      return None                             # still reported: this path really does swallow
+  ```
+
+  **When only some arms propagate, the finding anchors at the arm that falls through**, not at the `except` line. On a handler with several branches, "something in here leaks" leaves the reader to work out which; the line number is the whole value of the report. The clause stays the anchor when the handler falls through as a unit, because there the handler itself is the problem.
+
+  Language-agnostic from the start rather than Python-first: all six languages with try/catch (Python, JavaScript, TypeScript, Java, PHP, C++) share the exit-path analysis. What differs is what re-raising means in each. Python needs no check on *what* is raised, because a `raise` inside an `except` chains the active exception automatically. The C-family languages have no such automatic chaining, so the thrown value is examined: re-throwing the caught binding counts, and so does a **fresh error that carries it along** -
+
+  ```java
+  catch (IOException e) {
+      throw new ConfigException("loading " + path, e);   // clean: the original is attached
+  }
+  ```
+
+  which is the C-family spelling of `raise RuntimeError(msg) from err`. Exempting the Python form while reporting the Java one would be the same one-act-judged-two-ways problem as the `print` question below. `throw new Error("x")` with no mention of the caught value still discards the original and still wants logging; so does `throw makeError(e)` outside C++, because a factory's return value need not be a wrapper (C++ constructs the thrown value with a plain call, so there it counts). C and Rust have no try/catch, and Rust's analogue SAFE207 already had its own propagation logic; Go has neither, its nearest rule being SAFE209 `empty_error_check`.
+
+  Python's `log_methods` also accepts `print`, `print_exception` and `print_exc` (#199). Rust's SAFE207, the documented analogue of this rule, has always counted `println!` / `eprintln!` / `print!` as making the failure visible, so one act was being judged two ways across the two languages; and reporting Rich's `console.print_exception(show_locals=True)` as an unlogged error branch is the rule contradicting the code's obvious intent. Scoped to Python, where a script or CLI legitimately prints its own failure.
+
+  Four of safelint's own `# nosafe: SAFE203` annotations are gone as a result. All four sat on cleanup-and-reraise handlers in `_skill_install.py` and `core/_cache.py` - close the orphan fd, drop the temp file, `raise` - which the rule now reads correctly; their comments already said "not a swallow". 33 remain, in two groups: the `_diagnostics.print_*` handlers the architecture docs describe (the rule recognises only logger-shaped names, and those are deliberately spelled `print_*` so that SAFE304 exempts them), and the ten optional-grammar `except ImportError` fallbacks across `languages/*.py` and `__init__.py`, where a missing grammar is surfaced later as an install hint rather than at import time. The count is up by one on 2.14.x: the new parent-module stat helper treats an absent file as a value rather than an error.
+
+  Measured. Python, where the exit-path and `print` halves both apply: Django **1476 -> 1146** (-22%), Rich **109 -> 68** (-38%), FastAPI **72 -> 37** (-49%), Flask **57 -> 38** (-33%), requests **81 -> 60** (-26%). The C-family gets the exit-path and wrapping halves, and the wrapping one dominates there because `throw new X("ctx", e)` is the standard way to add context: Guava **1519 -> 1140** (-25%), Commons Lang **168 -> 139** (-17%), laravel/framework **669 -> 593** (-11%), Guzzle **370 -> 337** (-9%), axios **91 -> 86**, zod **138 -> 136**; express, elysia, monolog, fmt and leveldb unchanged, having neither shape. SAFE203 is **enabled by default**, so this moves existing finding counts.
+
+- **SAFE102 `nesting_depth` no longer counts `with` or `try` as a nesting level (#166).** The rule exists to keep *decisions* shallow - that is what makes a function hard to follow and to test - and a resource or error-handling wrapper adds indentation without adding a branch:
+
+  ```python
+  with open(path) as fh:        # depth 0
+      for row in fh:            # depth 1
+          if row:               # depth 2 - clears the default cap
+              handle(row)
+  ```
+
+  What settles it is actionability rather than tidiness: a developer told to reduce nesting in `with session: for x: if y:` has no good move short of restructuring resource handling, which is a worse outcome than the nesting it was flagged for. The finding was unactionable even where the count was literally correct.
+
+  This extends a principle the rule already applied rather than introducing one - Java's `synchronized` block and Rust's `unsafe` block were never nesting steps, for exactly this reason. Removed from Python (`with`, `try`), Java (`try`, try-with-resources), JavaScript / TypeScript (`try`), PHP (`try`) and C++ (`try`); Rust, Go and C had none to remove, so all nine languages now agree. `switch` and `match` remain steps, because they branch.
+
+  Measured: Django **1301 -> 722** (-45%), Guzzle **73 -> 42** (-42%), requests **24 -> 16** (-33%), Rich **81 -> 65** (-20%). The 45% matches the figure this issue reported from a different sample, which is a good sign the effect is stable rather than sample-specific.
+
+  `nesting_depth` is **enabled by default**, so this moves existing finding counts - which is why it is a MINOR release rather than a patch, and why the whole accumulated 2.14.4 stack ships as 2.15.0.
+
+- **SAFE802 `return_value_ignored`: the Python `flagged_calls` default is trimmed from sixteen names to seven (#156).** The list had been ported from C/POSIX semantics, where checking the return code is correct and necessary, without adjusting for Python's. Two groups left it.
+
+  Six return `None`, so the rule demanded the caller check a value that cannot exist: `remove`, `unlink`, `rename`, `makedirs`, `mkdir`, `rmdir`. The `os.*` forms all return `None`; the `pathlib` forms return either `None` (`Path.unlink`, `Path.mkdir`, `Path.rmdir`) or a `Path` that nothing acts on (`Path.rename`, `Path.replace`). Because names are matched with the receiver discarded, these also covered `list.remove` and every other method of the name. **This half, and the `os`-name tests covering it, are @Jah-yee's work** (PRs #216 / #227).
+
+  Three return a value idiomatic Python discards: `write` (a byte count), `seek` (the new position) and `truncate`. On Django these were **404 of the 614** findings left after the six above went, so they were the larger half of the problem rather than a tidy-up after it - a correction to this issue's original framing, which identified the `None`-returning names as the main cause.
+
+  What stayed, and why: `send` and `sendfile`, which return a byte count and may transfer fewer bytes than asked; `run` / `call` / `check_output`, because `subprocess.run` returns a `CompletedProcess` whose `returncode` matters; and `replace`, deliberately ambiguous, since `str.replace` and `Path.replace` both return a value worth keeping while `os.replace` does not. **`sendall` went too**: it returns `None` and raises on error, so it fails the same test as the six above - `sendall` exists precisely so the short-write check is unnecessary, which is the opposite of what an earlier draft of this entry concluded from it. The docs now state that matching ignores the receiver, with `asyncio.run()` as the worked example.
+
+  Measured: Django **821 -> 133** (-84%), Rich **57 -> 2**, requests **61 -> 36**. The rule is disabled by default, so no existing user's output moves unless they have opted in. `flagged_calls_c` is unchanged - there the return code genuinely is the point - and every removed name is still reachable by listing it in `flagged_calls`.
+
+- **CI: bump six pinned GitHub Actions** (folded in from Dependabot PRs #236 and #238): `astral-sh/setup-uv` v10.2.0 -> v10.3.0, `anthropics/claude-code-action` v1.0.244 -> v1.0.248, `actions/upload-artifact` v7.0.1 -> v7.0.2 and `actions/download-artifact` v8.0.1 -> v8.0.2, across nine pin sites. Still SHA-pinned. Each SHA was verified against its tag, dereferencing where the tag is annotated: `claude-code-action`'s is, so the naive ref lookup returns the tag object rather than the commit - the same trap as the previous round. `actions/checkout` is untouched despite also sitting at a `v7.0.1`; matching on the pinned SHA rather than the version comment is what kept the two apart. The second round (#238) added `anthropics/claude-code-action` v1.0.248 -> v1.0.255 and `pypa/gh-action-pypi-publish` v1.14.2 -> v1.14.3, both annotated tags and both dereferenced before pinning. Workflow only - nothing in the published wheel changes.
+
+- **Dev lockfile refreshed** (folded in from Dependabot PR #239): `virtualenv` 21.14.5 -> 21.15.1, a transitive dev dependency via pre-commit. Regenerating with the current `uv` also moves the lockfile format from `revision = 3` to `revision = 5`; that is this repository's own `uv` writing its current format, not something the bump imposed, and `uv lock --check` plus a full `uv sync` and test run confirm it reads cleanly. The resolved version is newer than the 21.14.13 the PR proposed, because regenerating takes the latest and 21.15.1 landed in the meantime. Nothing in the published wheel changes - `virtualenv` is not a runtime dependency.
+
+- **SAFE304 `side_effects`: `read`, `status`, `spawn`, `output` and `recv` are no longer Rust defaults (#178).** Call names are resolved with the receiver discarded - deliberately, so that `fs::read_to_string` and `std::fs::read_to_string` both match one entry - which is right for free functions and wrong for methods. As bare method names these five matched whatever they were called on, and Rust's standard library spends those verbs on non-I/O operations that are pervasive in ordinary code: `RwLock::read` for locks, `mpsc::Receiver::recv` for channels, `tokio::spawn` for tasks, `status` and `output` as accessors on any domain type. `write` is **not** among the five and still fires on `Mutex::write()`: it has to stay for the `write!` macro, whose target is instead checked syntactically (see the SAFE304 entry below). The same caveat applies to `flush`, `connect` and `send_to`, which remain bare names on the list. Confirmed on Ruff at `crates/ruff_db/src/files.rs:520` (a salsa query accessor), `system/memory_fs.rs:104` (`RwLock::read`) and `vendored.rs:93` (a zip-archive wrapper).
+
+  They remain in **SAFE303**'s list, where the enclosing function's own name must also signal purity - the same split Go's list already uses for `Get` / `Post` / `Do` / `Exec` / `Query`. The specific spellings (`read_to_string`, `read_dir`, `write_all`, `read_line`) carry the same coverage without the collisions. Add any of them back via `io_functions_rust`.
+
+- **SAFE801 `tainted_sink`: bare `query` and `execute` are no longer Rust sink defaults (#180).** Rust has no database API in its standard library, so as barewords they matched any builder, any LSP snapshot accessor and any closure parameter of that name. Validating every finding rather than sampling: **1 defensible out of 9** across ty and Ruff, with 30 of Ruff's 55 being `snapshot.query()` on a `DocumentSnapshot`. The crate-specific spellings stay (`query_as`, `query_scalar`, `execute_batch`), as do `arg` / `args` / `open`; list your crate's entry point explicitly if you call raw SQL through a bare `query`.
+
+### Fixed
+
+- **Five default-on rules now skip test code (#198).** SAFE101 `function_length`, SAFE203 `logging_on_error`, SAFE302 `global_mutation`, SAFE304 `side_effects` and SAFE401 `resource_lifecycle` put the overwhelming majority of their findings in test files, where the pattern they flag is conventional:
+
+  ```python
+  # tests/test_requests.py
+  def test_session():
+      s = requests.Session()      # SAFE401: a session scoped to one test
+      print(render(result))       # SAFE304: observing output IS the test
+  ```
+
+  On Requests that shape was **91 of SAFE401's 94** findings, and the three in library code - one of them a genuine unclosed `zipfile.ZipFile` in `utils.py` - were buried under them. The status quo was not a conservative default but a loud one, and the loudness is what hid the true positives. safelint already applied this reasoning to its own test tree through per-file-ignores; these five simply never got it.
+
+  Controlled by `skip_test_code` (default `true`) and `test_dirs`, the latter being the key SAFE601 / SAFE701 / SAFE702 already read. A file is test code when it sits under a `test_dirs` entry or its filename uses a convention nothing but a test uses (`foo.test.ts`, `foo_test.go`, `FooTest.java`). Set `skip_test_code = false` per rule for the strict reading.
+
+  Two decisions inside that are worth stating, because both were wrong in a first draft:
+
+  - **`test_dirs` defaults to four names**, `["tests", "test", "__tests__", "spec"]`, not just `tests`. A default of `tests` alone missed Express entirely, where the directory is `test` (singular) and holds **161 of its 165** SAFE101 findings - and a default that needs per-project tuning before it works is not the useful default this issue asked for. The same widening applies to SAFE601 / SAFE701 / SAFE702, which read the same key and are strictly better for recognising more real test layouts.
+  - **A bare `test_` prefix does not exclude a file.** Reusing the existing test-file detection wholesale skipped all five rules inside safelint's own `src/safelint/rules/test_coverage.py`, a rule implementation, and would do the same to any project's `TestDataFactory.java` under `src/main/java`. Finding tests and excluding production code are different risks and the looser signal is only safe for the former. safelint's own SAFE004 `unused_suppression` caught this, by noticing the `# nosafe: SAFE203` annotations in that file had stopped suppressing anything. Python tests are unaffected, since `tests/test_foo.py` matches on the directory: re-measuring after the narrowing moved Django by 3 findings and nothing else at all.
+  - **A relative `test_dirs` entry matches at any depth below the working directory**, not only at the project root. A monorepo puts tests per package (`services/api/tests/`, `packages/core/__tests__/`), and anchoring at the root missed every one of them - `conftest.py` matches no filename convention either, so a whole monorepo's test tree kept reporting. The working directory bounds the search, which is what stops the answer depending on where the repository is checked out: a clone living in `~/tests/myproj` must not have all of its source treated as test code. An absolute entry stays anchored to exactly the path given. This is the same reasoning the Rust `tests/` detection applies to cargo workspaces. The file path is also normalised before matching, because `Path.absolute()` prepends the working directory without collapsing `..` - so `tests/../src/service.py` kept a `tests` component and had all five rules skipped on it. The collapse is lexical, preserving this module's existing choice not to follow symlinks. The inclusion path (`test_functions_only`, SAFE701/702) deliberately does **not** normalise: leaving `..` in place is what contains a `test_dirs` entry that climbs out of the project root, which is security finding H3. Relative entries are anchored at the **config root**, discovered by walking up from each file rather than taken from the working directory: `safelint check /abs/project` run from elsewhere otherwise left every relative entry unmatched, so the feature silently did nothing for an ordinary CI invocation. `skip_test_code` is validated as a boolean, so a quoted `"false"` fails loud instead of reading as truthy and ignoring the opt-out.
+
+  Measured across five languages, every project linted from its own root (`test_dirs` is project-root-relative):
+
+  | Project | Language | Before | After |
+  |---|---|---|---|
+  | Express | JavaScript | 200 | **27** (-87%) |
+  | Axios | JavaScript | 559 | **83** (-85%) |
+  | Requests | Python | 187 | **61** (-67%) |
+  | laravel/framework | PHP | 1074 | **349** (-68%) |
+  | Elysia | TypeScript | 309 | **104** (-66%) |
+  | Rich | Python | 352 | **139** (-61%) |
+  | Monolog | PHP | 99 | **41** (-59%) |
+  | Flask | Python | 104 | **50** (-52%) |
+  | Commons Lang | Java | 273 | **132** (-52%) |
+  | Zod | TypeScript | 460 | **259** (-44%) |
+  | Django | Python | 2336 | **1314** (-44%) |
+  | PetClinic | Java | 7 | **2** |
+
+  SAFE102 `nesting_depth` is deliberately **not** in the group. It was 37% test code in Python but 6% in JS/TS, and safelint relaxes it for its own tests only because its test helpers happen to nest - that is a property of this repo, not a general one.
+
+
+- **SAFE907 `unvalidated_request_input` now recognises Laravel's actual validation idioms (#157).** The rule accepted `$request->validate(...)` and the `ValidatesRequests` trait form `$this->validate($request, ...)`, and nothing else - so `Validator::make($request->all(), $rules)` was reported as unvalidated input **on the line that validates it**. That is not a corner: on FreeScout `Validator::make` outnumbers `$request->validate` by 19 to 1, and the rule is switched on by the `laravel` preset, so users met this by opting into the preset rather than the rule. Four forms now clear a read:
+  - the `Validator` facade, `Validator::make(...)` / `Validator::validate(...)`. The unqualified name (the aliased import every Laravel file writes, with or without a leading namespace separator) and the fully-qualified `Illuminate\Support\Facades\Validator` are accepted; some **other** namespace's `Validator` is a different class and is not;
+  - a validator built from the request data and then validated, `$this->validator($request->all())->validate()` - which is how Laravel's own `RegistersUsers` trait is written, and the one SAFE907 finding on laravel/framework itself;
+  - a one-step local alias of the request data: `$post = $request->all();` ... `Validator::make($post, $rules)`, the read-then-massage-then-validate shape named in the issue;
+  - a **Form Request** parameter, `store(StoreUserRequest $request)`, which clears the whole method because the framework ran that class's `rules()` before the body was entered. Matched on the type's final name segment ending in `Request` while not being the base `Request` / `FormRequest`, neither of which carries rules of its own.
+
+  Each still requires the request, and only the request: `Validator::make($defaults, $rules)` validates something else and does not clear a `$request->all()` elsewhere in the method; a variable never assigned a request read does not stand in for one, nor does one that has since been rebound to other data; and `$foo->request` is an ordinary property, not the framework request - every property read contains a bare `request` name node, so considering only whole variable and property expressions is what keeps an unrelated field from clearing a real finding.
+
+  The Form Request half is a **name-based heuristic** and cannot be more than that: confirming `StoreUserRequest` really extends `FormRequest` needs the other file. A `BillingRequest` parameter that is not a Form Request clears the method too. #157 specified this test; rename the parameter or ignore the rule for the file if the suppression is unwanted. Measured on FreeScout: **13 -> 2**, the two remaining being genuine unvalidated bulk reads (one of them the `MailboxesController` site the issue names as its true positive). laravel/framework **1 -> 0**.
+
+- **SAFE908 `csrf_protection_disabled`: `$except` is only CSRF-relevant inside the CSRF middleware (#162).** The PHP side matched a `$except` property by name with no class context. Laravel ships `TrimStrings` and `EncryptCookies` with an `$except` of their own - one lists fields not to trim, the other cookies not to encrypt - so the rule fired twice on the contents of every unmodified `app/Http/Middleware/`. The rule's own docstring had recorded the limitation as an accepted trade while it was opt-in; the `laravel` preset then turned it on, which made it a guaranteed false positive instead.
+
+  The class must now be named `VerifyCsrfToken` or extend it: a bare name, a namespace-qualified one, or the `use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as Middleware;` alias Laravel's own scaffolding writes. The alias has to be resolved rather than matched, because `TrimStrings` and `EncryptCookies` alias *their* bases to the same name `Middleware`. A trait is not followed into the class that mixes it in, so an `$except` declared in a trait is not reported - the quiet side, since reporting every trait `$except` is the defect being fixed. Measured on FreeScout: **2 -> 0**, with its own `VerifyCsrfToken` (an empty `$except`) correctly clean and a non-empty one still reported; laravel/framework clean across 734 files.
+
+- **SAFE208 `result_unwrap_outside_tests`: Cargo's test layouts count as test context (#172).** Test detection searched for `#[test]` / `#[cfg(test)] mod` on the item or an ancestor in the same file, which misses the two shapes Cargo makes idiomatic:
+  - **a file under a `tests/` directory**, where integration tests carry no `#[cfg(test)]` at all because the directory *is* the gate, so every `.unwrap()` in such a file was reported;
+  - **a module gated from its parent**, `#[cfg(test)] mod helpers;` in `lib.rs`, where the attribute lives in the parent file and the module's own file contains no marker.
+
+  A `tests` component **under** `src` does not count: `src/tests/helpers.rs` is ordinary crate source in a module called `tests`, and when it is gated the `#[cfg(test)] mod tests;` in its parent is what says so. Cargo's integration tests live in a `tests/` that is a sibling of `src`, never inside it.
+
+  Both are whole-file answers, so they are resolved once per file and cached rather than re-derived per unwrap. The cache key carries a stat signature of the parent module files, because it is process-global and safelint also runs as a library inside long-lived hosts: keyed on the path alone, deleting a `#[cfg(test)]` from `lib.rs` would go on returning the stale "gated" answer for what is now production code. Measured: ripgrep **125 -> 99** (-21%), Ruff **1234 -> 1063** (-14%).
+
+- **SAFE207 `unlogged_error_branch`: two handler shapes that are not swallowing the error (#161).** Both were reported as unlogged, and following the advice would have meant adding a message with nothing useful in it.
+  - **Logging through a same-file helper.** A body that calls a function defined in the same file **whose own body contains a log call** is routing the error, not dropping it:
+
+    ```rust
+    Err(e) => self.fail(&object.name, e.to_string()),   // was reported as unlogged
+
+    fn fail(&mut self, object: &str, reason: String) {
+        warn!(object, %reason, "object failed; continuing");
+        self.outcome.failed.push((object.to_string(), reason));
+    }
+    ```
+
+    The log call is the whole test: a helper that only records to a list and never logs is **not** credited, and such a branch still reports. One call hop, too - a transitive search over the file would eventually exempt anything. In the file the issue was found in, this shape was 6 of 9 findings.
+  - **An arm that enumerates a single error variant and binds nothing.** `Err(store::Error::NotFound { .. }) => Ok(false)` implements a documented "treat not-found as false" contract while the next arm propagates everything else, and it has no error value in scope to log. Binding, not syntax, is the test, so the wildcard forms `Err(E::NotFound(_))` and `Err(E::Io { source: _ })` are exempt too. An arm that actually binds part of the error (`Err(E::Io(e))`, `Err(E::Io { source })`, `Err(E::Io { source: inner })`), a plain binding (`Err(other)`) or a wildcard (`Err(_)`) still reports, because there the author either has a value to log or has not discriminated anything.
+
+  Measured: Ruff **211 -> 180** (-15%); ripgrep unchanged at 34, which has neither shape.
+
+- **SAFE601 `missing_assertions`: `assertion_calls_rust` covers the snapshot and `matches!` macro families (#177).** Snapshot testing is the dominant assertion idiom in modern Rust suites, and a test whose only assertion was a snapshot read as having none - the rule telling a passing, asserting test to add an assertion. Added the eleven `insta` macros (`assert_snapshot`, `assert_debug_snapshot`, `assert_json_snapshot`, `assert_yaml_snapshot`, `assert_ron_snapshot`, `assert_toml_snapshot`, `assert_csv_snapshot`, the two compact forms, `assert_binary_snapshot`, `assert_display_snapshot`) plus `assert_matches` / `debug_assert_matches`. Measured on Ruff: **36925 -> 34505**. ripgrep is unchanged at 2900, using no snapshot crate.
+
+- **The Django preset no longer narrows `nullable_methods` to a single name (SAFE803).** The preset carried `nullable_methods = ["first"]` for `QuerySet.first()`, written when the rule OR'd a `ClassVar` with the configured list - so the entry *added* `first` to the built-in names. Presets replace a key wholesale, and the single-owner change above moved those names into `DEFAULTS`, which turned the entry into a subtraction: a Django project enabling `null_dereference` checked `first` alone and silently lost `get`, `pop`, `find`, `next`, `one_or_none`, `scalar`, `scalar_one_or_none` and `fetchone`. `first` is a shipped default in its own right, so the entry is deleted. A guard now asserts that **no** preset, for any language, drops a shipped default from any list-valued rule key.
+
+- **TypeScript falls back to the JavaScript default lists, not Python's.** The TypeScript → JavaScript step existed only on the user's-TOML path. `DEFAULTS` declares no `_typescript` key for `sinks`, `sanitizers`, `sources`, `flagged_calls` or `nullable_methods`, so a rule falling back to a shipped default for a `.ts` file skipped JavaScript and landed on the bare key - which is how Python is spelled there. A TypeScript caller got Python's lists and never saw `Function` / `spawn` / `writeFileSync` / `querySelector`. The lookup order now has one owner (`lang_config_key_chain`) consulted by both paths. The bare key is deliberately **not** in that chain: in a user's TOML it is Python's key, and letting a `.rs` file inherit a bare `sinks = [...]` would silently widen every other language.
+
+- **SAFE208 `result_unwrap_outside_tests` is anchored at the crate root, not at a path component.** Cargo's rule is that integration tests live in a `tests/` directory that is a sibling of `src` **at the crate root**, which is the directory holding `Cargo.toml`. Two lexical approximations both got this wrong: matching any `tests` component suppressed `src/tests/helpers.rs`, ordinary crate source in a module named `tests`; adding "no `src` component before it" made the answer depend on where the repository happened to be checked out, so a developer keeping work under `~/src` saw every integration test still reported (cancelling the fix for them) while a checkout under `~/tests` had its production code silently exempted. The crate root is now resolved by walking up to the nearest `Cargo.toml`, and the decision is made on the path relative to it; a workspace member resolves to itself because it has its own manifest. No `Cargo.toml` above the file means the root is unknown and the finding is reported. Corpus counts are unchanged (ripgrep 99, Ruff 1063), which is the point: the fix removes the location dependence without moving the result.
+
+- **SAFE105 `no_recursion`: a comment in a Java argument list no longer hides recursion.** tree-sitter-java declares `line_comment` / `block_comment` as **extras**, and extras are named nodes, so a comment inside an `argument_list` or `formal_parameters` appears in `named_children` and inflates every count taken from one. `fact(n - 1 /* step */)` inside `int fact(int n)` counted two arguments against one parameter, read as an arity mismatch, and dropped a genuine self-call. Named-argument comments are idiomatic Java and this is the losing direction: on Guava it was hiding real recursion at `RegularImmutableMap.java:166`, where `fromEntryArrayCheckingBucketOverflow` calls itself with a `/* throwIfDuplicateKeys= */` marker. Guava **475 -> 476**; the five sites that count parameters or arguments now share one helper.
+
+- **SAFE501 `unbounded_loops`: three exits and boundaries that were missing.** All three are the #170 / #179 invariants failing to hold in a language the issues did not sample.
+  - **C++ `co_return` is an exit.** A coroutine leaves via `co_return`, a distinct grammar node, so a loop whose only exit was `co_return` still reported.
+  - **A `return` in a nested PHP loop does not clear the outer loop.** PHP has no break-boundary tuple - its `break N` handling counts levels instead - so the return search was bounded by function types alone and `while (true) { foreach ($rows as $r) { return $r; } }` read as having an exit. The nested loop may run zero times, which is the invariant #170 documented and tested everywhere else.
+  - **C++ `for_range_loop` is a boundary.** The range-based `for (auto x : v)` is a distinct node from `for_statement` and was in neither the break nor the return boundary set, so a nested range-for bounded neither. The `break` half of that predates #170.
+
+- **SAFE302 `global_mutation`: two JavaScript binding shapes.** A `var` inside a `class_static_block` was credited as shadowing the global, but `static { }` is its own scope and the `var` does not hoist out of it - so a genuine write to `self` was suppressed. And a default-valued parameter (`function f(self = {})`) parses as an `assignment_pattern` with the identifier on `left`, which the binding check did not unwrap, so the parameter bound nothing as far as the rule could see and a write to that ordinary local was reported as a global mutation.
+
+- **An interrupted atomic write no longer leaves a temp file behind.** Both atomic-write helpers - the cache's `_atomic_write_json` and the skill installer's `_write_file_replace` - cleaned up in an `except OSError`. A `KeyboardInterrupt` is not an `OSError`, so Ctrl-C during a write skipped cleanup entirely and orphaned a `.json.tmp` in the cache directory or a `.safelint-section-*.tmp` in the user's skills directory. Both now clean up in a `finally`, which covers every exit path including interrupts and cancellation, and the error still propagates unchanged. The fd-leak guard around `os.fdopen` gets the same treatment, so an interrupt in that window cannot leak the raw descriptor either.
+
+- **Rule default lists now have a single owner, so a hand-built config behaves like the shipped one.** Five dataflow rule classes carried `ClassVar` copies of their `DEFAULTS` entries, consulted when a caller constructs a rule directly with a config that omits the key. Being second copies they drifted, in both directions:
+  - `flagged_calls` kept the pre-#156 sixteen names, so such a caller still had `os.remove()` and `f.write()` flagged after the default was trimmed;
+  - `nullable_methods` had **never** matched `DEFAULTS`, which held an empty list while the copy held the nine names the docs have always documented - and the Python branch OR'd the two, so setting `nullable_methods` to narrow SAFE803 produced all nine regardless and there was no way to drop one. Every other language replaces; Python now does too;
+  - `sinks` / `sanitizers` / `sources` agreed with `DEFAULTS` but were still duplicated, and spelled `subprocess.call` as the Tree-sitter *node-type* constant `_py.CALL`, which equals the function name only by coincidence.
+
+  All five copies are deleted. The fallback is read from `DEFAULTS` through one accessor, which also gives every language the documented default rather than `[]` - the fallback had been Python-only, so a library caller linting Rust, Go, Java, PHP, C or C++ with a partial config received a silent clean bill of health. A drift test was written first and then removed as unnecessary: there is nothing left to drift.
+
+- **SAFE802: a scalar `flagged_calls` now raises instead of matching single characters (Python).** Python was the one language whose list bypassed `_validated_string_list`, so `flagged_calls = "remove"` became `{'r','e','m','o','v'}` - `os.remove(...)` stopped firing and an unrelated `r()` started. The other languages have rejected this since the JS-family sites were converted; the Python site and the Python `nullable_methods` site were never converted. Both now raise `ConfigValueError` like the rest. This mattered more than usual because #156's own guidance tells users to edit that key.
+
+- **A rule built with a partial config no longer reports warning-severity findings as blocking.** `BaseRule.__init__` fell back to a blanket `"error"`, which disagreed with every warning-severity rule - SAFE105, SAFE501, SAFE802 and the rest - so a direct library caller got findings marked blocking that the shipped config marks advisory. The fallback is now the rule's own `DEFAULTS` severity.
+
+- **SAFE501 `unbounded_loops`: a `return` is an exit, in all nine languages (#170).** The rule searched only for `break`, so an infinite loop whose exits are `return` read as having none:
+
+  ```rust
+  fn poll(done: bool) -> u32 {
+      loop {
+          if done { return 1; }      // was: "loop has no break - potential infinite loop"
+      }
+  }
+  ```
+
+  A `return` ends the enclosing function and so leaves every loop inside it. In Rust it is the *more* common exit, because `?`-propagation forces it - you cannot `?` out of a loop with a `break` - and on ripgrep it accounted for **7 of 7** findings, the rule's entire output there. The issue reported Rust; the blind spot was in all nine languages the rule covers, confirmed by running the same shape through each.
+
+  A `return` inside a **nested loop** deliberately does not clear the outer one: the inner loop may run zero times, in which case the `return` is never reached and the outer loop really is unbounded. A `return` inside a nested function or closure belongs to that function and likewise does not count. Both are pinned by tests.
+
+- **SAFE501 `unbounded_loops`: a `break` or `return` inside a Rust macro body is now seen (#179).** tree-sitter parses a macro's arguments as an opaque `token_tree`, so statements inside are never typed nodes - in `loop { select! { .. break; .. } }` the `break` exists only as an **anonymous token** and no `break_expression` appears in the tree at all. Real instance: ty's `crates/ty_project/src/watch/watcher.rs:44`, a `loop` with three literal `break;` statements reported as having none.
+
+  The keyword tokens are present, just untyped, so the rule now looks for them directly. The issue's own preferred fix was the blunter "a body containing any `token_tree` cannot be claimed break-less"; that was implemented first and measured too broad - `loop { println!("x"); }` is a genuine infinite loop and stopped being reported, and a `println!` inside a loop is ordinary Rust. A macro carrying no exit keyword therefore still reports, and because a token tree is still tokenised, the word `break` inside a string literal does not count. `continue` is excluded: it re-enters the loop.
+
+  Both fixes are needed for that ty file, as the issue notes - its exit is a `return` *and* it sits inside the token tree.
+
+  Measured together:
+
+  A switch arm stops a ``break`` but not a ``return``, so the ``return`` search uses the break boundaries **minus** the switch-like nodes. Reusing them wholesale kept reporting `for (;;) { switch (x) { case 1: return 1; } }` - the classic state-machine loop, and common enough that discounting switch arms is what takes Guava, fzf and LevelDB to zero.
+
+  Inside a macro body an exit keyword is credited only when the same body writes no nested loop and no closure. A ``token_tree`` has no structure to walk, so a ``break`` there cannot be told apart from one belonging to a ``for`` the macro itself writes, nor a ``return`` from one inside a closure. The unit of judgement is the whole macro invocation, not each token tree: one `select!` nests several, so judging them separately let an inner tree holding just the ``break`` look free of the ``for`` around it.
+
+  | project | before | after |
+  | --- | --- | --- |
+  | Guava | 126 | **0** |
+  | Ruff | 174 | **134** |
+  | Django | 71 | **60** |
+  | fzf | 12 | **0** |
+  | Rich | 29 | **26** |
+  | curl | 9 | **5** |
+  | ripgrep | 7 | **0** |
+  | LevelDB | 3 | **0** |
+  | requests, Cobra, Axios | 2, 0, 0 | unchanged |
+
+  333 findings removed. ripgrep reaching zero is #170's own Verify condition.
+
+- **SAFE105 `no_recursion`: a Rust `use` now binds only what it imports, not the segments of its path.** The resolver swept every identifier under the declaration, so a path segment read as a bound name and silenced genuine recursion in a function called after it:
+
+  ```rust
+  fn b(n: u32) -> u32 {
+      use a::b::{c};     // binds c only - NOT b
+      b(n - 1)           // was: suppressed. Real recursion.
+  }
+  ```
+
+  Three shapes were affected: a braced list (`use a::b::{c}` read as binding `b`), a wildcard (`use a::b::*`, likewise), and a braced list's own root (`use a::{b::c, d}` read as binding `a`). The walk is now structured by node kind rather than flat: a plain path binds its trailing segment, a wildcard binds nothing nameable, a braced list binds only its entries, `self` inside a list binds the path's trailing segment (`use a::b::{self, c}` does bind `b`), and an `as` clause binds only its alias. Unrecognised roots (`crate`, `super`) contribute no name, which leaves the call reported. Found by CodeRabbit reviewing #223's code while it looked at #216; shipped in 2.14.4rc1 through rc3.
+
+- **CI: the fork-PR base guard re-reads the base before closing.** The job condition evaluates against the triggering event's snapshot, which goes stale. If an author retargeted a fork PR to `development` while an earlier run was still queued, that run would close the PR they had just corrected - and `edited` does not refresh an in-flight run's snapshot. The step now reads the current base from the API and exits quietly when it is already `development`, checked before the explanatory comment as well so a corrected PR gets neither a close nor a misleading notice. Workflow only. Found by CodeRabbit on #216, whose author had performed exactly that retarget.
+
+- **SAFE102 `nesting_depth`: an `else if` chain is no longer counted as nesting (#154).** A flat `if / else if / else if` chain branches once, but each continuation was counted as a further level, so a chain of N was over-counted by N-1:
+
+  ```js
+  function f(x) {
+    if (x === 1) { doA(); }
+    else if (x === 2) { doB(); }
+    else if (x === 3) { doC(); }
+    else if (x === 4) { doD(); }      // was: SAFE102 nesting depth is 4 (max 2)
+  }
+  ```
+
+  The issue reported this for JavaScript and TypeScript. It affected **seven of the nine languages**: JavaScript, TypeScript, Java, Rust, Go, C and C++ all scored the sample above at depth 4. Python and PHP were already correct, because their grammars give `elif` / `elseif` a node type of its own which was never in the depth set. `nesting_depth` is enabled by default, so any codebase in the other seven using the most ordinary branching idiom got findings out of the box.
+
+  The two grammar shapes are both handled: the continuation `if` either sits under an `else_clause` (JavaScript, TypeScript, Rust, C, C++) or is the `alternative` child of the enclosing `if` (Java, Go). Only `if` nodes are exempt, and only when they are the continuation itself, so three cases keep counting as they should: `else { if (..) }` written with braces (the inner `if`'s parent is the block), `else while (x);` which is legal C and a real level, and a genuine nested `if` inside an `else if` body.
+
+  Measured: Guava **1121 -> 956**, fzf **178 -> 158**, Chart.js **62 -> 44**, ripgrep **83 -> 70**, Axios **49 -> 39**, Zod **91 -> 82**, Express **5 -> 4**; **236** findings in total. Cobra and Spring PetClinic are unchanged, both being small enough to have no `else if` chain inside a function already near the depth cap.
+
+- **SAFE302 `global_mutation` no longer reports a write to a local that shadows a browser global (JavaScript) (#202).** Every configured global namespace is also an ordinary variable name, and a local declaration shadows the global completely. The pre-arrow idiom for carrying `this` into a nested function was therefore reported as mutating a global:
+
+  ```javascript
+  function Headers() {
+    const self = this;              // a LOCAL alias for `this`
+    return function set(key, value) {
+      self[key] = value;            // was: SAFE302 writes to global "self"
+    };
+  }
+  ```
+
+  Found in Axios, three times in `lib/core/AxiosHeaders.js`, which made a library's ordinary self-reference indistinguishable from a genuine `window.XMLHttpRequest = null`. A write is now skipped when its root name is bound by an enclosing declaration: a `const` / `let` / `var` declarator, a function parameter (including the TypeScript typed form and an arrow function's single unparenthesised parameter), or a `catch` binding, in any scope up to and including module scope. `let` / `const` are matched per block and `var` is matched anywhere in the enclosing function body, which is its real scope. A **destructured** binding (`const { self } = x`) is deliberately not recognised: failing to see a binding reports a write that is already reported today, whereas inventing one would silence a genuine global mutation. Axios **157 -> 154** SAFE302 findings; the remaining 154 are test files assigning `window.XMLHttpRequest` as mock setup, which is #198's mechanism.
+
+- **SAFE304 / SAFE303: Rust `write!` / `writeln!` is checked against its target instead of assumed to be I/O (#171).** `write!` is not an I/O function in Rust - it expands to `write_fmt` on its first argument, which may implement `std::io::Write` (I/O) or `std::fmt::Write` (a string buffer, no I/O). Both of these used to fire, and neither performs I/O:
+
+  ```rust
+  impl fmt::Display for X {
+      fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+          write!(f, "hello")                // formatting, not I/O
+      }
+  }
+
+  let mut s = String::new();
+  write!(&mut s, "x").unwrap();             // string building
+  ```
+
+  Where the first argument is a plain binding (a leading `&` / `&mut` is stripped), its own declaration decides: a parameter whose type's base name is `String` exactly, or ends in `Formatter`, or a local initialised from `String::new` / `String::with_capacity` / `String::from` / `format!`, is a non-I/O target. The base name is resolved by stripping generic arguments first, then references, lifetimes and `mut` / `dyn`, then path segments, so `&mut fmt::Formatter<'_>` and `&mut TypeWriter<'_, '_, 'db>` both resolve correctly. Matching is deliberately not a substring test (`StringWriter` may well implement `std::io::Write`) and deliberately not exact on `Formatter` either, since domain formatters follow the `XFormatter` convention and are the same thing semantically - Ruff's own `PyFormatter` is 82 of its `write!` sites. Anything else - a path expression, a call, an unknown binding - keeps reporting, so `writeln!(std::io::stdout(), ..)` is unaffected and the unresolved case stays a finding rather than being silently dropped. SAFE303 shares the matcher and so is fixed by the same change. ripgrep **83 -> 62** SAFE304 findings from this alone (**-> 49** together with the defaults change above); Ruff **1410 -> 985** and SAFE303 **74 -> 62**. One of Ruff's comes from fixing a related defect found while scoping the check: the search returned on the first `let` whose name matched, so a non-`String` binding earlier in the function hid a later `let s = String::new()`. The nearest in-scope binding now decides.
+
+- **SAFE801 `tainted_sink`: invoking a local binding whose name collides with a Rust sink is no longer a sink call (#180).** A bare `query(nested)` whose callee is a parameter or a `let`-bound closure invokes that local, not the configured free function:
+
+  ```rust
+  fn visit(nested: u32, query: &impl Fn(u32) -> bool) -> bool {
+      query(nested)                         // a predicate closure; no database, no SQL
+  }
+  ```
+
+  The guard is independent of the defaults change above and holds even when `query` is explicitly configured, which is the only way a bare identifier callee reaches the sink list now. Only a bare identifier callee is considered: a method or path call (`conn.query(..)`, `sqlx::query(..)`) cannot name a local.
+
+  Scope is honoured on both sides, because a name-only check hides real findings: a `let` binds from the **end** of its declaration (so in `let query = query(user_input)` the right-hand call is still the free function, its initialiser running in the enclosing scope) to the end of its enclosing block (so a closure in an already-closed block cannot silence a later call). The same discipline applies to the `write!` target check above: a `let s = String::new()` in a sibling block, or one declared after the write, no longer describes the target. Ruff **72 -> 37** SAFE801 findings.
+
+- **SAFE105 `no_recursion` no longer asserts recursion it cannot prove (Java).** A same-arity call to an **overloaded** method name may reach a sibling overload rather than recursing, and choosing between them needs the declared types of the arguments, which means a classpath. Such findings now carry a message that says the target is unresolvable instead of stating outright that the method calls itself:
+
+  ```
+  SAFE105 Function "f" calls "f", which is overloaded in this type, so the target cannot be
+          resolved without type information; if it is this method, recursion has no guaranteed
+          stack bound (Power of Ten rule 1) - refactor to an explicit loop or worklist
+  ```
+
+  The hedge is decided **per call**, from the argument count, not per method name: a type holding `f(int)` and `f(int, int)` has an overloaded name, but a one-argument call inside `f(int)` has only one candidate and keeps the unhedged message. A varargs sibling counts as a rival for any count from its fixed prefix upwards. On Commons Lang **16 of 224** findings now assert recursion outright rather than all 279 doing so; on Guava, 81 of 475.
+
+  Dropping the hedged ones instead was considered and rejected: genuine recursion passes plain identifiers and so carries none of the signals below, so suppressing on name ambiguity alone would have silenced real recursion in Commons Lang's `ClassUtils.getAllInterfaces` and `walkInterfaces` and in Guava's `AbstractIteratorTester.recurse`. The code and severity are unchanged, so no config or CI gate moves; only the message text differs, and only for Java.
+
+  Known limit: only declarations on the enclosing type are visible, so an unhedged message means "no rival **in this type**", not "no rival anywhere" - a same-named method inherited from a superclass can also win resolution. Seeing that needs the supertype's source.
+
+- **SAFE105 `no_recursion`: two more Java shapes that are not self-calls (#153).** Each is a fact about overload resolution that the source text settles on its own, so neither can hide genuine recursion. Together they take Commons Lang **279 -> 224** and Guava **477 -> 475**; ripgrep (23) and Ruff (612) are unaffected, having no Java.
+  - **An argument cast to `Object` where the parameter is not `Object`.** `remove((Object) array, index)` inside `remove(boolean[] array, int index)`: `Object` is not assignable to `boolean[]`. Only this direction is decidable without a type hierarchy, since a cast to a *subtype* of the parameter type is still applicable; a parameter declared as a type variable is also exempt, because `<T> T f(T a)` really does accept `f((Object) a)` with `T` inferred as `Object`. `java.lang.Object` and `Object` are recognised as the same type, so the fully-qualified spelling does not read as a mismatch.
+  - **An element of the array parameter at that same position**, by index (`append(lhs[i], rhs[i])` inside `append(Object[] lhs, Object[] rhs)`) or through a for-each variable (`for (boolean e : array) append(e);` inside `append(boolean[] array)`). An element type is never assignable to its own array type. The for-each form is Commons Lang's `HashCodeBuilder` family, six findings in one file, none of which carries a cast.
+
+  A third condition was implemented, measured and then **withdrawn as unsound** before release: "a varargs method loses to a same-named fixed-arity sibling at this argument count". JLS 15.12.2 does resolve phases 1 and 2 (no varargs) before phase 3, but a method is a candidate in those phases only if it is *applicable*, which needs compatible argument types and not merely a matching count. With an incompatible sibling - `j(int, int, int)` beside `j(String, String...)` calling `j(a, "b", "c")` - phases 1 and 2 find nothing, phase 3 selects the varargs method, and the call is genuine recursion that the condition silenced. It accounted for 17 Commons Lang and 31 Guava suppressions, which is why those totals are 224 / 475 rather than 207 / 444.
+
+  Performance: the overload table is built once per file, in the same tree walk that collects the functions, and the for-each map is resolved only for methods that declare an array parameter. End to end on Guava this costs about **3.5%** (21.3s -> 22.0s); a first cut that re-derived both per call cost 17%.
+
+- **SAFE105 `no_recursion`: three shapes that are not self-calls are no longer reported as recursion.** The rule resolved a bare call by name with no notion of what that name refers to at the call site.
+  - **Java overloads (#153).** A call whose argument count differs from the enclosing method's parameter count cannot be a self-call, and deciding that needs no type information: `boolean[] add(boolean[], int, boolean)` calling `add(a, i, Boolean.valueOf(e), Boolean.TYPE)` is a different method. Varargs are exempt from the check, since a fixed-arity comparison proves nothing there. Measured: Commons Lang **655 -> 279** findings (-57%), Guava **2159 -> 477** (-78%).
+  - **Rust associated functions (#160).** A bare `name(..)` inside an `impl` or `trait` body can never reach the method - that requires `self.name()` or `Type::name(..)` - so it always resolves to a free function or an import. This is the same reasoning the existing `is_method` flag already applied to Go and PHP methods.
+  - **Rust function-local `use` (#173).** `use std::os::unix::fs::symlink;` inside a `fn symlink` rebinds the name for the rest of the block, so the bare call is not recursion. Covers plain paths, brace lists and `as` aliases. The shape is in ripgrep's `crates/ignore/src/walk.rs`.
+
+  Together on ripgrep: **32 -> 23** findings, removing exactly the 9 that #173 predicted. Self-qualified calls, genuine free-function recursion, matching-arity Java calls and unrelated local imports all still report - each pinned by a test, and each fix verified to be load-bearing by mutation.
+
+  Three ways the new suppressions could themselves have hidden genuine recursion were found in review and closed before release; all three were the dangerous direction for this rule, a missed finding rather than a false one. Counts on Commons Lang, Guava, ripgrep and Ruff are unchanged by the three, so none of the shapes occurs in that corpus - which is precisely why each needed a test rather than a measurement.
+  - **Java explicit receiver parameters.** `void tick(Outer Outer.this, int n)` parses the receiver as a `receiver_parameter` child of `formal_parameters`, but it is never passed at a call site, so counting it made the signature look like a two-parameter one and the one-argument self-call read as an arity mismatch. It is now discounted, and the arity check still fires on a genuine mismatch in such a method.
+  - **Rust `use` scope.** A `use` is an item, so it binds throughout its enclosing block and no further. Treating any import in the body as function-wide silenced a recursive call *outside* the block that shadowed the name. The check now carries the shadowing block's byte span and applies per call, so `{ use std::fs::walk; }` followed by `walk(n - 1)` still reports, while a call inside that block does not.
+  - **Rust `as` aliases.** `use other::bar as helper` binds only `helper`. Collecting every identifier beneath the `use` also read `bar` as bound, which silenced a genuine `bar()` call in `fn bar`; the walk now stops at the `as` clause and takes its alias.
+
+  **#153 is improved but not closed.** What remains is **224** findings on Commons Lang and **476** on Guava, almost all same-arity overloads such as `remove(boolean[], int)` delegating to `remove(Object, int)`. The issue anticipated that residue but expected it to be rare; it is in fact the dominant remaining class. Of those, 208 and 394 respectively now carry the hedged "target cannot be resolved" message rather than asserting recursion, leaving 16 and 82 stated outright - which is the value this release delivered on the issue: the rule's confidence, not its count.
+
+  An earlier draft of this entry claimed 81% of the residue states in the source text that it targets a different signature, and listed four reachable signals. Both were wrong and are corrected here. The 81% came from counting "the argument is itself a call" as proof of a different target, which it is not - `f(new ArrayList())` against a `List` parameter is perfectly applicable - and re-classifying gives 279 -> 207, around a quarter rather than four fifths. The fourth signal, "a varargs method whose arity is claimed by a fixed-arity sibling", was implemented, measured and then **withdrawn as unsound** during this same release (see the note in the preceding entry): phases 1 and 2 of JLS 15.12.2 require *applicability*, which needs argument types, so arity cannot establish that a fixed-arity sibling wins.
+
+  Closing the issue therefore needs real type resolution - a classpath, the JDK and every dependency - which is a different kind of tool from a single-file syntactic analyser. The remaining syntactic signals are worth little on the evidence: on Guava they suppress 2 findings, because its dominant shape is `expectContents(asList(elements))`, where the argument's type comes from a call safelint cannot resolve. Narrowing further is deliberately *not* "stay quiet whenever the name is overloaded": genuine recursion passes plain identifiers and so carries none of those signals, which is why suppressing on name ambiguity alone would have silenced real recursion in `ClassUtils.getAllInterfaces` and Guava's `AbstractIteratorTester.recurse`.
+
 ## [2.14.3] - 2026-10-04
 
 ### Changed

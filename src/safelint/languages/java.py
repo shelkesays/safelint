@@ -205,6 +205,8 @@ FORMAL_PARAMETER = "formal_parameter"
 SPREAD_PARAMETER = "spread_parameter"  # ``T... args`` varargs
 RECEIVER_PARAMETER = "receiver_parameter"  # ``Foo this`` (rare; method-on-self idiom)
 INFERRED_PARAMETERS = "inferred_parameters"  # lambda parameter list with no types
+TYPE_PARAMETERS = "type_parameters"  # ``<T, U extends V>`` on a method or type
+TYPE_PARAMETER = "type_parameter"  # a single entry in the list above
 
 # Annotations - the key signal for Spring Boot framework detection.
 ANNOTATION = "annotation"  # full ``@Foo(arg=value)`` form

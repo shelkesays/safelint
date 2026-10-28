@@ -38,7 +38,7 @@ PHP supports **line-comment directives only** (`//`): `// nosafe`, `// nosafe: S
 | Code | Rule | Notes for PHP |
 |---|---|---|
 | [SAFE101](../configuration/rules.md#safe101-function_length) | `function_length` | Counts source lines on `function_definition` / `method_declaration` / anonymous functions and arrow functions. Default cap is 60. Closure bodies count toward their own size, not the enclosing function. |
-| [SAFE102](../configuration/rules.md#safe102-nesting_depth) | `nesting_depth` | Counts `if_statement` / `for_statement` / `foreach_statement` / `while_statement` / `do_statement` / `switch_statement` / `try_statement`. Default max 2. Per-arm `case` nodes are not counted; the switch counts once. |
+| [SAFE102](../configuration/rules.md#safe102-nesting_depth) | `nesting_depth` | Counts `if_statement` / `for_statement` / `foreach_statement` / `while_statement` / `do_statement` / `switch_statement` . Default max 2. Per-arm `case` nodes are not counted; the switch counts once. `try` is NOT counted (#166): it adds indentation without adding a branch. |
 | [SAFE103](../configuration/rules.md#safe103-max_arguments) | `max_arguments` | Counts declared parameters. Variadic `...$args` counts as one. Promoted constructor parameters (`public int $x`) count as parameters. Default cap 7. |
 | [SAFE104](../configuration/rules.md#safe104-complexity) | `complexity` | Cyclomatic complexity: every `if` / `for` / `foreach` / `while` / `do` / `case` / `catch` adds one; `&&` / `\|\|` (and `and` / `or`) each add one. The `default` case is not counted (it adds no decision). Default cap 10. |
 | [SAFE105](../configuration/rules.md#safe105-no_recursion) | `no_recursion` | Flags a `function_definition` calling itself bare (`recurse($n - 1)`) or a `method_declaration` calling itself via `$this->walk(...)` / `self::walk(...)` / `static::walk(...)` inside `walk()`. A call on another object does not fire. Direct self-recursion only (mutual recursion is out of scope). Enabled by default at warning severity. |
@@ -256,6 +256,12 @@ PHP source is PHP source - the parser and rule logic are framework-agnostic. The
 |---|---|---|
 | `vanilla` (default) | Plain PHP, framework-free libraries | Stdlib-only defaults (the lists in the rules table above). The `SAFE905-909` framework rules are disabled. |
 | `laravel` | Laravel apps | Adds the raw-SQL query-builder methods `whereRaw` / `orderByRaw` / `havingRaw` / `selectRaw` / `unprepared` to the SAFE801 PHP sinks. **Enables the full `SAFE905-909` set**: Eloquent `$guarded = []` mass-assignment (SAFE906), `$request->all()` / bare `$request->input()` without `validate()` (SAFE907; a targeted `$request->input('field')` read is not flagged), a `'debug' => true` config-array entry (SAFE905), a non-empty `$except` CSRF allow-list (SAFE908), and a hardcoded `base64:` `APP_KEY` literal (SAFE909). |
+
+Two of those five changed scope in 2.15.0 after they were measured against a real Laravel app:
+
+- **SAFE907** recognises `Validator::make(...)` / `Validator::validate(...)`, a validator built from the request data and then validated (`$this->validator($request->all())->validate()`), a one-step local alias of the request data (`$post = $request->all();` ... `Validator::make($post, $rules)`), and a **Form Request** parameter (`store(StoreUserRequest $request)`), which means the framework already ran that class's `rules()`. Previously only `$request->validate(...)` and the `ValidatesRequests` trait form counted, so the rule reported the very line that validates the input.
+- **SAFE908** requires class context: `$except` is reported only inside a class named `VerifyCsrfToken` or extending one (including through the `use ... as Middleware` alias Laravel scaffolds). Laravel's stock `TrimStrings` and `EncryptCookies` carry an unrelated `$except`, so matching the property name alone fired on every unmodified app.
+
 
 ```toml
 # safelint.toml (standalone) - no [tool.safelint] wrapper

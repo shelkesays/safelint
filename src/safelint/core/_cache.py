@@ -196,25 +196,31 @@ def _atomic_write_json(cache_dir: Path, dest: Path, payload: dict[str, Any]) -> 
     data = json.dumps(payload)  # before mkstemp: a serialisation error leaves no temp behind
     fd, tmp_name = tempfile.mkstemp(dir=cache_dir, suffix=".json.tmp")
     tmp = Path(tmp_name)
+    # ``finally`` rather than ``except OSError``: an interrupt (KeyboardInterrupt,
+    # or a cancellation in an async host) is not an OSError, and on that path the
+    # old form skipped cleanup and left a ``.json.tmp`` behind in the cache
+    # directory. Every exit path now drops the temp, and the error still
+    # propagates to the best-effort caller untouched.
+    adopted = False
     try:
         handle = os.fdopen(fd, "w", encoding="utf-8")  # takes ownership of fd
-    # Cleanup-and-reraise (not a swallow): close the raw fd so it can't leak,
-    # drop the temp, and let the error propagate to the best-effort caller.
-    except OSError:  # nosafe: SAFE203
-        with contextlib.suppress(OSError):
-            os.close(fd)  # reached only when fdopen did NOT take ownership
-        with contextlib.suppress(OSError):
-            tmp.unlink()
-        raise
+        adopted = True
+    finally:
+        if not adopted:
+            with contextlib.suppress(OSError):
+                os.close(fd)  # reached only when fdopen did NOT take ownership
+            with contextlib.suppress(OSError):
+                tmp.unlink()
+    replaced = False
     try:
         with handle:
             handle.write(data)
         tmp.replace(dest)
-    # Cleanup-and-reraise: drop the orphan temp; the error propagates upward.
-    except OSError:  # nosafe: SAFE203
-        with contextlib.suppress(OSError):
-            tmp.unlink()
-        raise
+        replaced = True
+    finally:
+        if not replaced:
+            with contextlib.suppress(OSError):
+                tmp.unlink()
 
 
 class LintCache:
