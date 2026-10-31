@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from types import MappingProxyType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from safelint.languages._node_utils import node_text
 
@@ -74,6 +74,142 @@ def set_status(tainted: dict[str, frozenset[str]], name: str, status: frozenset[
         tainted.pop(name, None)
     else:
         tainted[name] = status
+
+
+# ---------------------------------------------------------------------------
+# Taint ORIGIN (#158 item 3)
+#
+# Every tracker seeds taint from two very different places. A recognised SOURCE
+# (``$_GET['q']``, ``request.args``, ``getenv``) is evidence that attacker data
+# is in play. A function PARAMETER is not: seeding parameters is what makes an
+# intra-procedural analysis useful, but it means any helper taking an argument
+# and calling a dangerous builtin lights up whether or not a request can reach
+# it. On FreeScout none of the ten SAFE801 findings had a traced source, yet
+# every message read "Tainted variable", which states a fact the analysis does
+# not have. Keeping the two apart is what lets the message say which it is.
+# ---------------------------------------------------------------------------
+
+
+def hit_key(call_node: tree_sitter.Node, var: str, sink: str) -> tuple[int, str, str]:
+    """Return the identity of a sink hit: its call position, variable and sink.
+
+    One owner for the key, because three things key off it - de-duplicating the
+    double-analysed lambda bodies, recording which hits traced to a source, and
+    looking that up again when the message is built. Position rather than node
+    id so a hit found by two different trackers over the same tree matches.
+    """
+    return (call_node.start_byte, var, sink)
+
+
+def traces_to_source(
+    is_tainted: Callable[[tree_sitter.Node, str | None], bool],
+    tainted: dict[str, frozenset[str]],
+    source_seeded: set[str],
+    value: tree_sitter.Node,
+    required_property: str | None = None,
+) -> bool:
+    """Return True when *value*'s taint survives without parameter seeding.
+
+    Asks the tracker's own ``is_tainted`` a second time with *tainted* narrowed
+    to the variables whose taint came from a recognised source, so a path that
+    rests only on a seeded parameter answers False. Direct source reads are
+    unaffected: a tracker recognises ``$_GET['q']`` or ``getenv()`` from the
+    syntax, not from the tainted set, so they still answer True with the set
+    narrowed to nothing.
+
+    Re-using ``is_tainted`` rather than growing a parallel worklist is
+    deliberate: the origin answer then cannot drift from the taint answer, and a
+    tracker that learns a new propagation shape gets it here for free. The
+    narrowing is done in place and restored, because the callable closes over
+    the very dict passed in; it only ever REMOVES entries, so a failure part way
+    through cannot invent taint.
+    """
+    keep = dict(tainted)
+    tainted.clear()
+    tainted.update({name: cleared for name, cleared in keep.items() if name in source_seeded})
+    try:
+        return is_tainted(value, required_property)
+    finally:
+        tainted.clear()
+        tainted.update(keep)
+
+
+class ValueState(NamedTuple):
+    """A value's taint status, plus whether that taint traced to a real source.
+
+    Bundled rather than passed as two arguments so the seventeen assignment
+    sites across the seven trackers keep handing ``_update_name`` a single
+    value, and so a tracker cannot record the status while forgetting the
+    origin.
+    """
+
+    status: frozenset[str] | None
+    from_source: bool
+
+
+#: A clean value: no taint, and therefore no origin.
+CLEAN_STATE = ValueState(None, from_source=False)
+
+
+def value_state(
+    is_tainted: Callable[[tree_sitter.Node, str | None], bool],
+    properties: frozenset[str],
+    tainted: dict[str, frozenset[str]],
+    source_seeded: set[str],
+    value: tree_sitter.Node,
+) -> ValueState:
+    """Return *value*'s taint status and whether that taint traced to a source."""
+    status = value_status(is_tainted, properties, value)
+    if status is None:
+        return CLEAN_STATE
+    return ValueState(status, traces_to_source(is_tainted, tainted, source_seeded, value))
+
+
+def combine_state(a: ValueState, b: ValueState) -> ValueState:
+    """OR-combine two value states: tainted iff either is, sourced iff either is.
+
+    Used for a read-modify-write (``x += tainted``), where x keeps whatever it
+    already carried. A parameter-seeded x that is then appended a superglobal
+    read is source-traced from that point on.
+    """
+    status = combine_status(a.status, b.status)
+    return ValueState(status, status is not None and (a.from_source or b.from_source))
+
+
+def combine_with_recorded(tainted: dict[str, frozenset[str]], source_seeded: set[str], name: str, state: ValueState) -> ValueState:
+    """OR *state* with whatever is currently recorded for *name*."""
+    return combine_state(ValueState(tainted.get(name), name in source_seeded), state)
+
+
+class ScopeTaint(NamedTuple):
+    """A finished scope's taint state, for seeding a closure defined inside it.
+
+    The two halves travel together for the same reason :class:`ValueState`
+    bundles its own: a closure capturing a source-tainted local must inherit
+    that origin, or its sink hit would be worded as parameter-derived when a
+    real source was traced through the capture.
+    """
+
+    tainted: dict[str, frozenset[str]]
+    source_seeded: set[str]
+
+
+#: An empty scope, for a closure whose enclosing function is not in the cache.
+EMPTY_SCOPE = ScopeTaint({}, set())
+
+
+def record_state(tainted: dict[str, frozenset[str]], source_seeded: set[str], name: str, state: ValueState) -> None:
+    """Record *state* for variable *name*, status and origin together.
+
+    Assignment OVERWRITES, so the origin is overwritten too: ``$x = $param``
+    after ``$x = $_GET['q']`` leaves ``$x`` parameter-seeded, which is what the
+    message should then say.
+    """
+    set_status(tainted, name, state.status)
+    if state.status is not None and state.from_source:
+        source_seeded.add(name)
+    else:
+        source_seeded.discard(name)
 
 
 def assignment_sink_name(target: tree_sitter.Node, member_fields: Mapping[str, tuple[str, bool]]) -> str | None:
