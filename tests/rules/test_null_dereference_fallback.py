@@ -39,11 +39,17 @@ def _write(tmp_path: Path, name: str, body: str) -> Path:
 # on. A list rather than a flag so the table says what it expects to see, and
 # because a boolean parameter is a positional trap (ruff FBT001).
 _FALLBACK_FORMS: list[tuple[str, str, list[int]]] = [
-    # A non-None fallback rules None out, for every default name that has one.
+    # A literal fallback rules None out, for every default name that has one.
     ("dict.get with a fallback", 'd.get("k", {}).x', []),
-    ("dict.get with a named fallback", 'd.get("k", fallback).x', []),
     ("dict.pop with a fallback", 'd.pop("k", {}).x', []),
     ("next with a fallback", "next(d, {}).x", []),
+    # Every literal shape a fallback is written as in practice.
+    ("empty list fallback", 'd.get("k", []).x', []),
+    ("string fallback", 'd.get("k", "").x', []),
+    ("integer fallback", 'd.get("k", 0).x', []),
+    ("boolean fallback", 'd.get("k", False).x', []),
+    ("comprehension fallback", 'd.get("k", [y for y in ()]).x', []),
+    ("lambda fallback", 'd.get("k", lambda: 1).x', []),
     # No fallback: the original hazard, untouched.
     ("dict.get with no fallback", 'd.get("k").x', [2]),
     ("dict.pop with no fallback", 'd.pop("k").x', [2]),
@@ -51,6 +57,11 @@ _FALLBACK_FORMS: list[tuple[str, str, list[int]]] = [
     # The fallback IS None, so None is still what comes back.
     ("dict.get defaulting to None", 'd.get("k", None).x', [2]),
     ("dict.pop defaulting to None", 'd.pop("k", None).x', [2]),
+    # An opaque fallback proves nothing: each of these may BE None at runtime.
+    ("a named fallback may itself be None", 'd.get("k", fallback).x', [2]),
+    ("a computed fallback may return None", 'd.get("k", compute()).x', [2]),
+    ("an or-chain falls through to its last operand", 'd.get("k", a or b).x', [2]),
+    ("a conditional fallback has two values", 'd.get("k", a if a else b).x', [2]),
     # The positional count is unknowable, so the finding stands.
     ("positional splat", "d.get(*args).x", [2]),
     ("keyword splat in the fallback slot", 'd.get("k", **kw).x', [2]),
@@ -63,13 +74,16 @@ _FALLBACK_FORMS: list[tuple[str, str, list[int]]] = [
 
 @pytest.mark.parametrize(["label", "expression", "expected"], _FALLBACK_FORMS, ids=[case[0] for case in _FALLBACK_FORMS])
 def test_fallback_argument_decides_whether_none_is_possible(tmp_path: Path, label: str, expression: str, expected: list[int]) -> None:
-    """Only a provably non-None fallback suppresses; every unknown shape reports.
+    """Only a literal non-None fallback suppresses; every opaque shape reports.
 
-    The suppression is deliberately one-directional. ``d.get(*args)`` may well
-    pass a fallback, but nothing in the syntax says so, and a rule that guessed
-    would trade a noisy false positive for a silent false negative.
+    The suppression is deliberately one-directional and syntactic. ``d.get(k,
+    fallback)`` may well pass something non-None, but the name is opaque and
+    ``fallback`` being ``None`` is exactly the dereference the rule exists to
+    catch; likewise ``d.get(*args)`` may pass a fallback, but nothing in the
+    syntax says so. A rule that guessed either way would trade a noisy false
+    positive for a silent false negative.
     """
-    sample = _write(tmp_path, "fallback.py", f"def f(d, args, kw, fallback):\n    return {expression}\n")
+    sample = _write(tmp_path, "fallback.py", f"def f(d, args, kw, fallback, a, b, compute):\n    return {expression}\n")
     assert _safe803(sample) == expected, label
 
 
@@ -169,3 +183,24 @@ def test_two_dereferences_on_one_line_are_distinct_findings(tmp_path: Path) -> N
     found = [v for v in engine.check_file(str(sample)).violations if v.code == "SAFE803"]
     assert [v.lineno for v in found] == [2, 2]
     assert len({v.column_start for v in found}) == 2
+
+
+def test_a_mapping_that_stores_none_is_a_documented_limit(tmp_path: Path) -> None:
+    """``d.get(k, {})`` returns None when ``d[k]`` IS None, and the rule stays quiet.
+
+    A deliberate false negative, pinned so the gap is recorded rather than
+    discovered. Whether the mapping stores ``None`` under the key is a property
+    of its values, and SAFE803 tracks nullability per call name with no value
+    model at all - so the only alternatives are to accept this miss or to fire
+    on every defaulting lookup, which is the noise #155 was filed about.
+    """
+    sample = _write(
+        tmp_path,
+        "stored_none.py",
+        """\
+        def f():
+            d = {"k": None}
+            return d.get("k", {}).x
+        """,
+    )
+    assert _safe803(sample) == []
