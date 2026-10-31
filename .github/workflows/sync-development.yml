@@ -128,8 +128,20 @@ jobs:
           # Split "X.Y.Z" / "X.Y.ZrcN" into "<major> <minor> <patch> <is_prerelease>".
           # Returns non-zero for anything else, which is what makes the guard
           # below fail closed on a version scheme it does not understand.
+          # The prerelease suffixes accepted here MUST match the set
+          # publish.yml classifies as a pre-release, which is
+          # `grep -qiE '(rc|a|b|\.dev)[0-9]*$'` - case-insensitive, four
+          # families, digits optional. The first version of this parser took
+          # only lowercase `rcN`, so a legitimate `2.16.0b1` or `2.16.0RC1`
+          # released from development would fail to parse, the guard would fail
+          # closed, and development would stay unsynced until someone noticed
+          # and dispatched the workflow by hand. Lowercased with `tr` rather
+          # than `${1,,}` because macOS ships bash 3.2 and the sandbox harness
+          # runs there.
           parse_version() {
-            if [[ "$1" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(rc([0-9]+))?$ ]]; then
+            local lowered
+            lowered=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+            if [[ "$lowered" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)((rc|a|b|\.dev)[0-9]*)?$ ]]; then
               if [ -n "${BASH_REMATCH[4]}" ]; then
                 echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]} 1"
               else
@@ -176,6 +188,16 @@ jobs:
             read -r main_major main_minor main_patch main_is_rc <<< "$main_parsed"
             if [ "$dev_is_rc" -eq 0 ]; then
               echo "development is not a prerelease, so its commits never shipped as one"
+              return 1
+            fi
+            # main carrying a prerelease means nothing has been released as
+            # final, so development's rc commits may not have shipped either and
+            # there is nothing to reset over. publish.yml only releases a final
+            # from main, so this should not arise - but `main_is_rc` was being
+            # parsed and then ignored, which left the one case it exists for
+            # unhandled.
+            if [ "$main_is_rc" -ne 0 ]; then
+              echo "main is itself at a prerelease ($2), so no final release has shipped"
               return 1
             fi
             # Single comparable integer. Minor and patch are assumed below 1000,
