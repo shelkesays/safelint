@@ -211,11 +211,26 @@ def test_js_method_on_tainted_receiver_fires(tmp_path: Path) -> None:
     assert any(v.code == "SAFE801" for v in result.violations)
 
 
-def test_js_method_sink_on_tainted_receiver_fires(tmp_path: Path) -> None:
-    """A sink method on a tainted receiver (``req.runQuery()``) fires even with no arguments."""
+def test_js_undeclared_method_sink_on_tainted_receiver_does_not_fire(tmp_path: Path) -> None:
+    """``req.runQuery()`` with no arguments reports nothing (#158).
+
+    A no-argument call conveys no payload, and nothing declares this sink's
+    payload to be its receiver. The companion test declares it.
+    """
     sample = tmp_path / "recv_sink.js"
     sample.write_text("function f(req) { req.runQuery(); }\n", encoding="utf-8")
     engine = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_javascript": ["runQuery"]}}})
+    assert not any(v.code == "SAFE801" for v in engine.check_file(str(sample)).violations)
+
+
+def test_js_declared_receiver_sink_on_tainted_receiver_fires(tmp_path: Path) -> None:
+    """The same call fires once ``runQuery`` is in ``receiver_sinks_javascript``."""
+    sample = tmp_path / "recv_declared.js"
+    sample.write_text("function f(req) { req.runQuery(); }\n", encoding="utf-8")
+    engine = _enabled_engine(
+        "tainted_sink",
+        {"rules": {"tainted_sink": {"sinks_javascript": ["runQuery"], "receiver_sinks_javascript": ["runQuery"]}}},
+    )
     assert any(v.code == "SAFE801" for v in engine.check_file(str(sample)).violations)
 
 

@@ -1218,12 +1218,20 @@ DEFAULTS: dict[str, Any] = {
             # Receiver-payload sinks: the injected payload is the *receiver*, not
             # an argument, so a tainted receiver fires regardless of the call's
             # arguments (``url.openConnection(proxy)`` is SSRF even with a clean
-            # proxy). Every OTHER sink reports a tainted receiver only when the
-            # call has no arguments (an argument-consuming sink's payload is its
-            # argument, so ``stmt.executeQuery("SELECT 1")`` on a tainted receiver
-            # is not injection). Java's URL SSRF methods are the built-in members;
-            # add ``receiver_sinks_<lang>`` (bare ``receiver_sinks`` for Python)
-            # for a project's own receiver-payload sinks. Must also appear in the
+            # proxy). A sink NOT listed here never reports on its receiver: its
+            # payload is its argument, so ``stmt.executeQuery("SELECT 1")`` on a
+            # tainted receiver is not injection.
+            #
+            # Until 2.16.0 an unlisted sink also reported whenever the call had
+            # NO arguments, on the reasoning that a no-argument call must carry
+            # its payload in the receiver. It need not, and #158 is the worked
+            # example: ``$folder->query()`` on a php-imap folder has neither an
+            # argument nor a receiver carrying user data. Declaring the sink here
+            # is now the only evidence accepted.
+            #
+            # Java's URL SSRF methods are the built-in members; add
+            # ``receiver_sinks_<lang>`` (bare ``receiver_sinks`` for Python) for a
+            # project's own receiver-payload sinks. Must also appear in the
             # matching ``sinks_<lang>`` list to be a sink at all.
             # Sinks that are WRITTEN TO rather than called. Deliberately a
             # separate list from ``sinks_*``: those are function names, so
@@ -1402,6 +1410,23 @@ DEFAULTS: dict[str, Any] = {
             # mysqli / PDO method, ``mysqli_query`` / ``pg_query``). Variable
             # ``include`` / ``require`` with a non-literal path are handled
             # structurally by the tracker, not via this name list.
+            #
+            # ``query`` STAYS, against #158's recommendation to drop it, because
+            # the collisions it was blamed for are all zero-argument calls and
+            # none of them fires any more:
+            #
+            #   $folder->query()->unseen()->get()   # php-imap, builds an IMAP search
+            #   $model->query()->where('a', 1)      # Eloquent, parameterised builder
+            #   DB::query()                         # Laravel, parameterised
+            #
+            # Each took its "payload" through the receiver branch, which now
+            # requires a ``receiver_sinks_php`` declaration (see
+            # ``SinkKinds.receiver_is_payload``). Verified on FreeScout's own
+            # shape plus the Eloquent one: both clean, while
+            # ``$db->query('SELECT '.$_GET['id'])`` still reports. Dropping the
+            # name would have cost that true positive - mysqli / PDO ``query``
+            # with a concatenated argument is the commonest PHP SQL injection
+            # there is - to fix false positives that were already gone.
             "sinks_php": [
                 "eval",
                 "exec",
