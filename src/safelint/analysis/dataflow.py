@@ -298,7 +298,11 @@ class TaintTracker:
         """Append a hit record for a tainted argument reaching *sink*."""
         arg_name = node_text(arg_node) if arg_node.type == _py.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
-        if traces_to_source(self._is_tainted, self.tainted, self.source_seeded, arg_node):
+        # Asked with the SINK's required property, the same question the hit
+        # itself asked. Without it a source this sink's own sanitiser already
+        # cleared still counts as traced, so ``htmlsink(esc(src) + param)`` -
+        # which fires only because of ``param`` - claimed a traced source.
+        if traces_to_source(self._is_tainted, self.tainted, self.source_seeded, arg_node, self.contract.required_for(sink)):
             self.source_traced.add(hit_key(call_node, arg_name, sink))
 
     def _state_of(self, value: tree_sitter.Node) -> ValueState:
