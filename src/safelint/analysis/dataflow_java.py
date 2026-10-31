@@ -42,7 +42,7 @@ from typing import TYPE_CHECKING
 
 from safelint.analysis._taint_contract import AssignmentShapes, PropertyContract, SinkKinds, combine_status, identifier_tainted, iter_assignment_writes, set_status, value_status
 from safelint.languages import java as _java
-from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
+from safelint.languages._node_utils import call_name, node_text, walk
 
 
 if TYPE_CHECKING:
@@ -333,7 +333,7 @@ class JavaTaintTracker:
         # arguments (``stmt.executeQuery("SELECT 1")``) is not injection. The early
         # return above already fired for a tainted argument, so one call is never
         # double-reported (receiver + argument).
-        if node.type == _java.METHOD_INVOCATION and (name in self.sink_kinds.receiver or not call_has_arguments(node)):
+        if node.type == _java.METHOD_INVOCATION and self.sink_kinds.receiver_is_payload(name):
             obj = node.child_by_field_name("object")
             if obj is not None and self._is_tainted(obj, required):
                 self._record_sink_hit(node, obj, name)

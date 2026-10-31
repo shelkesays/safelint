@@ -20,7 +20,7 @@ from typing import TYPE_CHECKING
 
 from safelint.analysis._taint_contract import AssignmentShapes, PropertyContract, SinkKinds, combine_status, identifier_tainted, iter_assignment_writes, set_status, value_status
 from safelint.languages import python as _py
-from safelint.languages._node_utils import call_has_arguments, call_name, node_text, walk
+from safelint.languages._node_utils import call_name, node_text, walk
 
 
 if TYPE_CHECKING:
@@ -247,7 +247,7 @@ class TaintTracker:
         function = node.child_by_field_name("function")
         if function is not None and function.type == _py.ATTRIBUTE:
             receiver = function.child_by_field_name("object")
-            if receiver is not None and self._is_tainted(receiver, required) and (name in self.sink_kinds.receiver or not call_has_arguments(node)):
+            if receiver is not None and self._is_tainted(receiver, required) and self.sink_kinds.receiver_is_payload(name):
                 self._record_sink_hit(node, receiver, name)
 
     def _record_arg_hits(self, node: tree_sitter.Node, name: str, required: str | None) -> bool:

@@ -682,11 +682,26 @@ def test_rust_unwrap_message_recommends_if_let(tmp_path: Path) -> None:
     assert "?" in msg
 
 
-def test_rust_sink_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> None:
-    """A sink method on a tainted receiver (``req.run_query()``) fires even with no arguments."""
+def test_rust_undeclared_sink_method_on_tainted_receiver_does_not_fire(tmp_path: Path) -> None:
+    """``req.run_query()`` with no arguments reports nothing (#158).
+
+    A no-argument call conveys no payload, and nothing declares this sink's
+    payload to be its receiver. The companion test declares it.
+    """
     sample = tmp_path / "recv.rs"
     sample.write_text("fn h(req: Req) {\n    req.run_query();\n}\n", encoding="utf-8")
     eng = _enabled_engine("tainted_sink", {"rules": {"tainted_sink": {"sinks_rust": ["run_query"]}}})
+    assert not any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
+
+
+def test_rust_declared_receiver_sink_on_tainted_receiver_fires(tmp_path: Path) -> None:
+    """The same call fires once ``run_query`` is in ``receiver_sinks_rust``."""
+    sample = tmp_path / "recv_declared.rs"
+    sample.write_text("fn h(req: Req) {\n    req.run_query();\n}\n", encoding="utf-8")
+    eng = _enabled_engine(
+        "tainted_sink",
+        {"rules": {"tainted_sink": {"sinks_rust": ["run_query"], "receiver_sinks_rust": ["run_query"]}}},
+    )
     assert any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
 
 

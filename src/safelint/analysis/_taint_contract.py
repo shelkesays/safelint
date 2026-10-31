@@ -209,6 +209,30 @@ class SinkKinds:
     receiver: frozenset[str] = frozenset()
     assignment: frozenset[str] = frozenset()
 
+    def receiver_is_payload(self, name: str) -> bool:
+        """Return True when *name* is declared to take its payload as the receiver.
+
+        Membership in :attr:`receiver` is the ONLY evidence accepted, which is
+        what the class docstring above has always described. Every tracker used
+        to OR this with "...or the call has no arguments", on the reasoning that
+        a no-argument call must be carrying its payload in the receiver. That
+        inference does not hold, and #158 is the worked example:
+
+            $messages = $folder->query()->unseen()->get();
+
+        ``$folder`` is a webklex/php-imap folder, ``query()`` builds an IMAP
+        search rather than SQL, and it takes no arguments - so there was neither
+        an argument nor a receiver carrying user data, and the finding claimed
+        an injection that cannot exist. 6 of 10 SAFE801 findings on FreeScout
+        were this one shape.
+
+        A no-argument call conveys no payload on its own. If a sink really does
+        take its payload as the receiver, say so: ``receiver_sinks_<lang>``
+        exists for exactly that, and Java's ``openConnection`` / ``openStream``
+        defaults are the precedent.
+        """
+        return name in self.receiver
+
 
 @dataclass(frozen=True)
 class PropertyContract:
