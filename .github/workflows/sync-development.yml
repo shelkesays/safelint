@@ -48,11 +48,12 @@ name: Sync development with main
 # version, so it is never literally a content subset.
 #
 # Lineage - was anything pushed to development after the release branch was cut -
-# would be sound but needs the cut point recorded at release time. The VERSION is
-# the next best thing and needs nothing recorded: it says what development IS
-# rather than how its content compares. A prerelease of an already-released
-# version is stale by construction, which is exactly the case the reset exists
-# for, and every other shape is left alone.
+# is the sound signal, and the cut point IS recorded: publish.yml tags every
+# release, so `v<development's version>` points at whatever development's tip was
+# when that prerelease published. Both signals are now required. The VERSION says
+# development is a prerelease of something main has already released; the TAG
+# says this exact commit is what that prerelease shipped. Version alone would
+# approve a development that grew commits after the release branch was cut.
 #
 # Archiving remains, and is strictly safer than what the patch-id guard did:
 # when that guard PASSED it force-pushed with no backup at all.
@@ -211,6 +212,41 @@ jobs:
             return 0
           }
 
+          # Was development's tip actually PUBLISHED as that prerelease?
+          #
+          # reset_is_safe compares version numbers only, so on its own it
+          # approves any prerelease at or below main's - including a development
+          # that grew commits after the release branch was cut, which therefore
+          # never shipped. The file header used to say that answering this needs
+          # "the cut point recorded at release time"; it is recorded. publish.yml
+          # tags every release `v<version>`, so the rc tag points at whatever
+          # development's tip was when that rc was published. A tip that has
+          # moved since carries commits the release does not have.
+          #
+          # No tag means the rc was never published - bumped but not merged, or
+          # the publish failed - so that fails closed as well.
+          tip_is_the_published_rc() {
+            local tag="v$1" tagged
+            git fetch --quiet "$REPO_URL" "+refs/tags/${tag}:refs/tags/${tag}" 2>/dev/null || return 1
+            # rev-list resolves an annotated tag to its commit; `rev-parse` on
+            # one would return the tag OBJECT and never match a branch tip.
+            tagged=$(git rev-list -n 1 "$tag" 2>/dev/null) || return 1
+            [ "$tagged" = "$2" ]
+          }
+
+          # Report a refusal to reset. Two callers now, so it lives in one place.
+          skip_reset() {
+            echo "::warning::development NOT reset: it has $1 commit(s) main lacks and $3. Land that work on main, or dispatch this workflow once it has shipped."
+            {
+              echo "### development left as it is"
+              echo
+              echo "- development \`$2\` has \`$1\` commit(s) not reachable from main \`${MAIN:0:7}\`"
+              echo "- $3"
+              echo "- nothing was archived or reset; this is the guard against a push to main discarding unshipped work"
+              echo "- to sync anyway, land that work on main first, or re-run this workflow once it has shipped"
+            } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          }
+
           # Read project.version out of a commit without checking it out.
           version_at() {
             git show "$1:pyproject.toml" | python3 -c 'import sys, tomllib; print(tomllib.loads(sys.stdin.read())["project"]["version"])' 2>/dev/null || echo "<unreadable>"
@@ -249,20 +285,18 @@ jobs:
             if [ "$AHEAD" -gt 0 ]; then
               DEV_VERSION=$(version_at "$DEV")
               MAIN_VERSION=$(version_at "$MAIN")
-              if VERDICT=$(reset_is_safe "$DEV_VERSION" "$MAIN_VERSION"); then
-                echo "::notice::development has $AHEAD commit(s) main lacks, but $VERDICT ($DEV_VERSION against $MAIN_VERSION); resetting."
-              else
-                echo "::warning::development NOT reset: it has $AHEAD commit(s) main lacks and $VERDICT ($DEV_VERSION against $MAIN_VERSION). Land that work on main, or dispatch this workflow once it has shipped."
-                {
-                  echo "### development left as it is"
-                  echo
-                  echo "- development \`$DEV_SHORT\` has \`$AHEAD\` commit(s) not reachable from main \`${MAIN:0:7}\`"
-                  echo "- version check: $VERDICT (development \`$DEV_VERSION\`, main \`$MAIN_VERSION\`)"
-                  echo "- nothing was archived or reset; this is the guard against a push to main discarding unshipped work"
-                  echo "- to sync anyway, land that work on main first, or re-run this workflow once it has shipped"
-                } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+              # Two independent questions, both of which must answer yes:
+              # does the VERSION say development is a shipped prerelease, and is
+              # this exact COMMIT the one that prerelease published?
+              if ! VERDICT=$(reset_is_safe "$DEV_VERSION" "$MAIN_VERSION"); then
+                skip_reset "$AHEAD" "$DEV_SHORT" "version check: $VERDICT (development \`$DEV_VERSION\`, main \`$MAIN_VERSION\`)"
                 exit 0
               fi
+              if ! tip_is_the_published_rc "$DEV_VERSION" "$DEV"; then
+                skip_reset "$AHEAD" "$DEV_SHORT" "development's tip is not the commit published as \`v$DEV_VERSION\`, so it has grown commits since that prerelease shipped (or that prerelease was never published)"
+                exit 0
+              fi
+              echo "::notice::development has $AHEAD commit(s) main lacks, but $VERDICT ($DEV_VERSION against $MAIN_VERSION) and its tip is the commit published as v$DEV_VERSION; resetting."
             fi
 
             # Archive BEFORE the reset, and let a failure here abort the attempt:
