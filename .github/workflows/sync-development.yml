@@ -80,6 +80,32 @@ jobs:
           # Push via an explicit PAT URL (credentials are not persisted).
           REPO_URL="https://x-access-token:${RELEASE_PAT}@github.com/${GITHUB_REPOSITORY}.git"
 
+          # Reporting for every path that does NOT leave development at main.
+          # It re-reads the remote rather than asserting what happened: a lease
+          # rejection on the last attempt can coincide with another writer
+          # having already set development to main, and a dropped response can
+          # hide a push that did land, so "the reset failed" does not imply
+          # "development is unchanged". Returns success when development turns
+          # out to equal main anyway, which is the job's actual goal.
+          report_not_reset() {
+            FINAL=$(git ls-remote "$REPO_URL" refs/heads/development 2>/dev/null | cut -f1 || true)
+            {
+              echo "### development was not reset by this run"
+              echo
+              echo "- $1"
+              if [ -z "$FINAL" ]; then
+                echo "- development could not be re-read from the remote, so its current state is unconfirmed"
+              elif [ "$FINAL" = "$MAIN" ]; then
+                echo "- re-read after the failure: development already equals main (\`${MAIN:0:7}\`), so nothing is pending"
+              else
+                echo "- re-read after the failure: development is at \`${FINAL:0:7}\`, main is at \`${MAIN:0:7}\`"
+              fi
+              echo "- tips archived before each attempt: ${FAILED_ARCHIVES:-none}"
+              echo "- git's own message for the rejected push is in the step log"
+            } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+            [ -n "$FINAL" ] && [ "$FINAL" = "$MAIN" ]
+          }
+
           # Retry the archive-and-reset pair, re-reading development's tip each
           # time. --force-with-lease rejects the push if development moved between
           # the read and the write, and nothing else would retry: this workflow
@@ -111,30 +137,77 @@ jobs:
             git fetch --quiet "$REPO_URL" "$DEV"
             git push "$REPO_URL" "$DEV:refs/heads/$ARCHIVE"
 
-            # How much of development is not reachable from main. After a squash
-            # release this is ALWAYS non-zero (the rc commits live on under
-            # different SHAs), so the wording has to tell the reader when to care
-            # rather than imply every reset lost something.
+            # How much of development is not reachable from main. Zero means
+            # development was a plain ancestor and the reset is provably
+            # lossless, so that case gets a notice, not a warning - the first
+            # real run of this workflow hit it and the warning was pure noise.
+            # After a SQUASH release the count is non-zero even though the
+            # content shipped (the rc commits live on under different SHAs),
+            # which is why the wording tells the reader when to care rather than
+            # implying every reset lost something.
             AHEAD=$(git rev-list --count "$MAIN..$DEV")
-            echo "::warning::development had $AHEAD commit(s) not reachable from main; they are preserved at $ARCHIVE - recover from there if the release did not just ship them"
-            {
-              echo "### development synced to main"
-              echo
-              echo "- previous tip \`$DEV_SHORT\` archived to \`$ARCHIVE\`"
-              echo "- \`$AHEAD\` commit(s) were not reachable from main (expected after a squash release)"
-              echo "- recover with \`git fetch origin $ARCHIVE\` if that work had not been released"
-            } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
             # Push main's commit straight at the remote ref rather than moving a
             # local branch first: `git branch -f development` fails outright if
             # that branch happens to be checked out, and nothing here needs a
             # local branch.
-            if git push --force-with-lease=development:"$DEV" "$REPO_URL" "$MAIN:refs/heads/development"; then
+            #
+            # Everything is reported AFTER this push succeeds, never before: an
+            # attempt that loses the lease retries with a different tip, so a
+            # report written ahead of the push would be duplicated per attempt
+            # and - if all three attempts failed - would claim a sync that never
+            # happened.
+            PUSH_LOG=$(mktemp)
+            if git push --force-with-lease=development:"$DEV" "$REPO_URL" "$MAIN:refs/heads/development" >"$PUSH_LOG" 2>&1; then
+              cat "$PUSH_LOG"
+              if [ "$AHEAD" -eq 0 ]; then
+                echo "::notice::development was an ancestor of main ($AHEAD commits ahead); reset is lossless. Previous tip archived at $ARCHIVE."
+              else
+                echo "::warning::development had $AHEAD commit(s) not reachable from main; they are preserved at $ARCHIVE - recover from there if the release did not just ship them"
+              fi
+              {
+                echo "### development synced to main"
+                echo
+                echo "- previous tip \`$DEV_SHORT\` archived to \`$ARCHIVE\`"
+                if [ "$AHEAD" -eq 0 ]; then
+                  echo "- development was an ancestor of main, so nothing was unreachable; the reset is lossless"
+                else
+                  echo "- \`$AHEAD\` commit(s) were not reachable from main (expected after a squash release)"
+                  echo "- recover with \`git fetch origin $ARCHIVE\` if that work had not been released"
+                fi
+              } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
               echo "::notice::development reset to main ($(git rev-parse --short "$MAIN")); previous tip kept at $ARCHIVE"
               exit 0
             fi
-            echo "::warning::development moved during attempt $attempt (lease rejected); re-reading and retrying"
+            cat "$PUSH_LOG"
+            FAILED_ARCHIVES="${FAILED_ARCHIVES:+$FAILED_ARCHIVES, }$ARCHIVE"
+
+            # A lost lease is the only rejection a retry can fix, and git names
+            # it: `(stale info)`. Anything else - branch protection, a revoked
+            # token, a pre-receive hook, a transport error - will be rejected
+            # the same way three times, and "re-run once pushes have settled"
+            # would send the operator looking for a race that never happened.
+            # So retry only on the stale lease, and otherwise stop at the first
+            # rejection and point at git's message.
+            #
+            # Anchored on git's own per-ref rejection line rather than searched
+            # for anywhere in the log: the rest of the output is text the remote
+            # supplied (a hook's stderr is echoed verbatim as `remote:`), and
+            # that must not be able to talk this into retrying.
+            if ! grep -qE '^[[:space:]]*! \[rejected\].*\(stale info\)' "$PUSH_LOG"; then
+              if report_not_reset "the reset push was rejected for a reason a retry cannot fix (not a lost lease)"; then
+                echo "::notice::the reset push was rejected, but development already equals main; the sync is satisfied"
+                exit 0
+              fi
+              echo "::error::the reset push to development was rejected and retrying cannot help (not a lost lease). See git's message in this step's log."
+              exit 1
+            fi
+            echo "::warning::attempt $attempt was rejected as stale, so development moved after it was read; re-reading and retrying"
           done
 
-          echo "::error::could not reset development after 3 attempts - it kept moving. Re-run this workflow once pushes to development have settled."
+          if report_not_reset "development kept moving: all 3 attempts lost the lease between reading its tip and pushing"; then
+            echo "::notice::the retries were exhausted, but development already equals main; the sync is satisfied"
+            exit 0
+          fi
+          echo "::error::could not reset development after 3 attempts - the lease was stale every time, so pushes to development are still arriving. Re-run this workflow once they have settled."
           exit 1

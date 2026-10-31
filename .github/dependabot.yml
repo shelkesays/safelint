@@ -7,11 +7,16 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
-    # Raise bumps against ``development`` (the RC branch), not the default
-    # ``main`` - so action updates flow through the normal
-    # feature/* -> development -> main release path and never diverge main from
-    # development (which would conflict at the next development -> main release).
-    target-branch: "development"
+    # Raise bumps against the default branch, ``main``.
+    #
+    # They used to target ``development`` so that action updates flowed through
+    # the normal feature/* -> development -> main release path. That stopped
+    # being safe when sync-development.yml became archive-then-reset: it now
+    # resets development to main after EVERY push to main, unconditionally, so
+    # a bump merged into development is discarded (recoverable from its
+    # archive/* branch, but gone from the branch) as soon as anything lands on
+    # main ahead of the next release. Targeting main instead means the bump
+    # lands once and the sync carries it into development for free.
     schedule:
       interval: "weekly"
     commit-message:
