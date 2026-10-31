@@ -66,6 +66,10 @@ _FALLBACK_FORMS: list[tuple[str, str, list[int]]] = [
     ("positional splat", "d.get(*args).x", [2]),
     ("keyword splat in the fallback slot", 'd.get("k", **kw).x', [2]),
     ("keyword argument in the fallback slot", 'd.get("k", default=fallback).x', [2]),
+    # A grouped literal is still a literal: `parenthesized_expression` is a
+    # wrapper node, so the allow-list has to look through it.
+    ("a grouped literal fallback", 'd.get("k", ({})).x', []),
+    ("a grouped None is still None", 'd.get("k", (None)).x', [2]),
     # Subscript dereference, not attribute - same rule, same suppression.
     ("subscript on a fallback form", 'd.get("k", {})["id"]', []),
     ("subscript with no fallback", 'd.get("k")["id"]', [2]),
