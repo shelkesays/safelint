@@ -100,6 +100,8 @@ CALL = "call"
 IDENTIFIER = "identifier"
 ATTRIBUTE = "attribute"
 KEYWORD_ARGUMENT = "keyword_argument"  # ``f(name=value)`` - ``name`` then ``value`` named children
+LIST_SPLAT = "list_splat"  # ``f(*args)`` in a call; the ``*a`` of an assignment target is LIST_SPLAT_PATTERN
+DICTIONARY_SPLAT = "dictionary_splat"  # ``f(**kwargs)`` in a call; the pattern form is DICTIONARY_SPLAT_PATTERN
 SUBSCRIPT = "subscript"
 
 GLOBAL_STATEMENT = "global_statement"
