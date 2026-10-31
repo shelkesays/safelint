@@ -28,7 +28,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import AssignmentShapes, PropertyContract, SinkKinds, combine_status, identifier_tainted, iter_assignment_writes, set_status, value_status
+from safelint.analysis._taint_contract import (
+    AssignmentShapes,
+    PropertyContract,
+    SinkKinds,
+    combine_with_recorded,
+    hit_key,
+    identifier_tainted,
+    iter_assignment_writes,
+    record_state,
+    traces_to_source,
+    value_state,
+)
 from safelint.languages import c as _c
 from safelint.languages import cpp as _cpp
 from safelint.languages._node_utils import call_name, node_text, walk
@@ -36,6 +47,8 @@ from safelint.languages._node_utils import call_name, node_text, walk
 
 if TYPE_CHECKING:
     import tree_sitter
+
+    from safelint.analysis._taint_contract import ValueState
 
 
 # Expressions whose taint state is the OR of their named children.
@@ -161,6 +174,10 @@ class CTaintTracker:
         self.assume_taint_preserving = assume_taint_preserving
         self.sink_kinds = sink_kinds if sink_kinds is not None else SinkKinds()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
+        # Taint ORIGIN (#158, reasoned out in ``_taint_contract``): parameters
+        # seed ``tainted`` but deliberately NOT ``source_seeded``.
+        self.source_seeded: set[str] = set()
+        self.source_traced: set[tuple[int, str, str]] = set()
 
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation (nested functions skipped)."""
@@ -185,7 +202,7 @@ class CTaintTracker:
             return
         name_node = _declarator_identifier(node.child_by_field_name("declarator"))
         if name_node is not None:
-            self._update_name(name_node, value_status(self._is_tainted, self._properties, value))
+            self._update_name(name_node, self._state_of(value))
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x = value`` / ``x += value`` (compound keeps prior taint)."""
@@ -195,7 +212,7 @@ class CTaintTracker:
             return
         operator = node.child_by_field_name("operator")
         keep_existing = operator is not None and node_text(operator) != "="
-        self._update_name(left, value_status(self._is_tainted, self._properties, right), keep_existing=keep_existing)
+        self._update_name(left, self._state_of(right), keep_existing=keep_existing)
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink via a tainted argument or (C++) receiver."""
@@ -245,8 +262,10 @@ class CTaintTracker:
         """Append a hit record for a tainted argument reaching *sink*."""
         arg_name = node_text(arg_node) if arg_node.type == _c.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
+        if traces_to_source(self._is_tainted, self.tainted, self.source_seeded, arg_node):
+            self.source_traced.add(hit_key(call_node, arg_name, sink))
 
-    def _update_name(self, target: tree_sitter.Node, status: frozenset[str] | None, *, keep_existing: bool = False) -> None:
+    def _update_name(self, target: tree_sitter.Node, state: ValueState, *, keep_existing: bool = False) -> None:
         """Record taint *status* for identifier *target* (``None`` clears).
 
         No ``_`` blank-identifier skip: unlike Go / Python, C has no blank
@@ -258,8 +277,12 @@ class CTaintTracker:
             return
         name = node_text(target)
         if keep_existing:
-            status = combine_status(self.tainted.get(name), status)
-        set_status(self.tainted, name, status)
+            state = combine_with_recorded(self.tainted, self.source_seeded, name, state)
+        record_state(self.tainted, self.source_seeded, name, state)
+
+    def _state_of(self, value: tree_sitter.Node) -> ValueState:
+        """Return *value*'s taint status together with the origin of that taint."""
+        return value_state(self._is_tainted, self._properties, self.tainted, self.source_seeded, value)
 
     def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
         """Return True if *node* may carry data still tainted for *required_property*.

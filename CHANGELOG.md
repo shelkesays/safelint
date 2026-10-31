@@ -13,6 +13,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SAFE801 `tainted_sink`: the message now says whether a source was traced or only a parameter seeded (#158).** Taint is seeded from two places that are not equally good evidence, and until now both produced the same sentence:
+
+  ```
+  SAFE801: Tainted variable "$mailbox" flows into dangerous sink "query"
+  ```
+
+  `$mailbox` was an Eloquent model loaded from the database, never request input. It was tainted only because the tracker seeds every function parameter, which is what makes an intra-procedural analysis useful; it is not a finding that attacker data is in play. Against FreeScout, **0 of 10** SAFE801 findings had a traced source, yet every message read like the one above.
+
+  There are now two wordings:
+
+  | Message | Evidence |
+  |---|---|
+  | `Tainted variable "x" flows into dangerous sink "s"` | a recognised source (`input()`, `$_GET['q']`, `os.Getenv`, a framework request accessor) was traced to the sink |
+  | `Parameter-derived value "x" reaches dangerous sink "s"` | only a parameter was seeded; the sink is real, but what callers pass is the open question |
+
+  Both still report, and the parameter kind is worth reading - it is how an injection arrives once a caller is attacker-facing. What changed is that it no longer claims to have traced untrusted input. Re-measured on FreeScout's `app/` tree after the receiver fix above: 5 SAFE801 findings, **all five** parameter-derived, which is the honest reading of all of them (three `unserialize` calls on database and queue payloads, a `shell_exec` wrapper, and an `unserialize` of a decrypted value).
+
+  The distinction follows the flow, not the spelling. A value derived from a parameter stays parameter-derived (`built = "sh -c " + cmd`); mixing a parameter with a source escalates to the stronger wording (`cmd = prefix + input()`); reassignment overwrites the origin along with the taint, in both directions; and a closure capturing a source-tainted local inherits the stronger wording through the capture, which Java, Rust and Go each needed because they analyse closures in a second pass seeded from the enclosing scope.
+
+  All nine languages, since the overstatement was never PHP-specific. No new rule code and no config: the two messages are the same hazard seen with different amounts of evidence, so filtering is a matter of the message prefix in `--format json`.
+
+  Deciding the origin costs one extra pass of the tracker's own `is_tainted` per assignment and per hit, asked with the tainted set narrowed to source-derived names. Re-using that function rather than growing a parallel worklist is what keeps the origin answer from drifting away from the taint answer. Measured on FreeScout's `app/` tree with SAFE801 on: **1.53s -> 1.69s**, about 10%. SAFE801 is opt-in, so nobody pays it who had not already chosen the expensive rule.
+
+  **If you parse SAFE801 messages**, this is a breaking change to that text, and the only one. For anything programmatic, note that the analysis trackers grew a public `source_traced` set (hit keys that reached a source) and a public `source_seeded` set (variables whose taint did), alongside the existing `tainted` and `sink_hits`; `sink_hits` keeps its `(call_node, var, sink)` shape.
+
 - **SAFE305 `wide_scope_declaration`: report a `var` only where its hoisting is observable (#201).** The rule reported every `var`, which inverted its own value. On Express, 1748 of 1960 default findings (89%, across 136 of 141 files) were SAFE305, so the `var`s whose hoisting actually bites were indistinguishable from the rest and the other ten rules were drowned out. Every finding was technically true, and these two were reported identically:
 
   ```javascript

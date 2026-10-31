@@ -199,6 +199,8 @@ Framework and pydantic presets merge *before* your explicit TOML, so per-rule ke
 
 The preset enables the `SAFE905-909` structural rules directly (which subset depends on the framework - see the table above), but the dataflow additions (extra SAFE801 sinks, `.first()` nullable, pydantic constructors) only extend the *lists* - the multi-language dataflow rules stay opt-in (enable `tainted_sink` explicitly), so a Python framework choice never turns dataflow on for other languages in a polyglot repo. The intra-procedural tracker follows taint through `request.<attr>` attribute / subscript / method-receiver chains (`request.GET["q"]`), so the framework sinks fire on idiomatic request-driven code, not only direct-parameter flows.
 
+**Taint origin in the SAFE801 message (2.16.0).** Function parameters seed the tainted set alongside recognised sources, and the two are not equally good evidence, so the message says which it has. `Tainted variable "x" flows into dangerous sink` means a source (`input`, `read`, a framework request accessor) was traced to the sink. `Parameter-derived value "x" reaches dangerous sink` means only that a parameter was seeded: the sink is real, but nothing in this function shows untrusted data reaching it, so the question to answer is what callers pass. Report the second as a call-site question, never as confirmed attacker input.
+
 ## Stdin mode for editor / Claude Code unsaved buffers
 
 If the user is asking about a buffer that isn't saved to disk (e.g. they paste code in chat and ask for a safelint review), use stdin mode:

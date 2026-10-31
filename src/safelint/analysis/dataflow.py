@@ -18,7 +18,18 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import AssignmentShapes, PropertyContract, SinkKinds, combine_status, identifier_tainted, iter_assignment_writes, set_status, value_status
+from safelint.analysis._taint_contract import (
+    AssignmentShapes,
+    PropertyContract,
+    SinkKinds,
+    combine_with_recorded,
+    hit_key,
+    identifier_tainted,
+    iter_assignment_writes,
+    record_state,
+    traces_to_source,
+    value_state,
+)
 from safelint.languages import python as _py
 from safelint.languages._node_utils import call_name, node_text, walk
 
@@ -27,6 +38,8 @@ if TYPE_CHECKING:
     from collections.abc import Iterator
 
     import tree_sitter
+
+    from safelint.analysis._taint_contract import ValueState
 
 
 _SPREADING_TYPES = frozenset(
@@ -138,6 +151,9 @@ class TaintTracker:
         self.assume_taint_preserving = assume_taint_preserving
         self.sink_kinds = sink_kinds if sink_kinds is not None else SinkKinds()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
+        # Taint ORIGIN (#158, reasoned out in ``_taint_contract``): parameters seed ``tainted``, never this.
+        self.source_seeded: set[str] = set()
+        self.source_traced: set[tuple[int, str, str]] = set()
 
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
@@ -216,11 +232,11 @@ class TaintTracker:
         values = list(value.named_children) if value.type in _PAIRABLE_RHS_TYPES else []
         if len(values) == len(names) and target.type in _PATTERN_TYPES:
             for ident, item in zip(names, values, strict=True):
-                set_status(self.tainted, node_text(ident), value_status(self._is_tainted, self._properties, item))
+                record_state(self.tainted, self.source_seeded, node_text(ident), self._state_of(item))
             return
-        status = value_status(self._is_tainted, self._properties, value)
+        state = self._state_of(value)
         for ident in names:
-            set_status(self.tainted, node_text(ident), status)
+            record_state(self.tainted, self.source_seeded, node_text(ident), state)
 
     def _visit_aug_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x += value`` (read-modify-write preserves x's taint)."""
@@ -228,8 +244,8 @@ class TaintTracker:
         right = node.child_by_field_name("right")
         if left is None or right is None or left.type != _py.IDENTIFIER:
             return
-        combined = combine_status(self.tainted.get(node_text(left)), value_status(self._is_tainted, self._properties, right))
-        set_status(self.tainted, node_text(left), combined)
+        name = node_text(left)
+        record_state(self.tainted, self.source_seeded, name, combine_with_recorded(self.tainted, self.source_seeded, name, self._state_of(right)))
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink via a tainted argument or method receiver."""
@@ -282,6 +298,12 @@ class TaintTracker:
         """Append a hit record for a tainted argument reaching *sink*."""
         arg_name = node_text(arg_node) if arg_node.type == _py.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
+        if traces_to_source(self._is_tainted, self.tainted, self.source_seeded, arg_node):
+            self.source_traced.add(hit_key(call_node, arg_name, sink))
+
+    def _state_of(self, value: tree_sitter.Node) -> ValueState:
+        """Return *value*'s taint status together with the origin of that taint."""
+        return value_state(self._is_tainted, self._properties, self.tainted, self.source_seeded, value)
 
     def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
         """Return True if *node* may carry data still tainted for *required_property*.

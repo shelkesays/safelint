@@ -40,7 +40,20 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-from safelint.analysis._taint_contract import AssignmentShapes, PropertyContract, SinkKinds, combine_status, identifier_tainted, iter_assignment_writes, set_status, value_status
+from safelint.analysis._taint_contract import (
+    CLEAN_STATE,
+    AssignmentShapes,
+    PropertyContract,
+    SinkKinds,
+    ValueState,
+    combine_with_recorded,
+    hit_key,
+    identifier_tainted,
+    iter_assignment_writes,
+    record_state,
+    traces_to_source,
+    value_state,
+)
 from safelint.languages import java as _java
 from safelint.languages._node_utils import call_name, node_text, walk
 
@@ -163,6 +176,10 @@ class JavaTaintTracker:
         self.assume_taint_preserving = assume_taint_preserving
         self.sink_kinds = sink_kinds if sink_kinds is not None else SinkKinds()
         self.sink_hits: list[tuple[tree_sitter.Node, str, str]] = []
+        # Taint ORIGIN (#158, reasoned out in ``_taint_contract``): parameters
+        # seed ``tainted`` but deliberately NOT ``source_seeded``.
+        self.source_seeded: set[str] = set()
+        self.source_traced: set[tuple[int, str, str]] = set()
 
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
@@ -234,8 +251,8 @@ class JavaTaintTracker:
             rhs_status = self._assignment_chain_status(right)
             self._update_name(left, rhs_status, keep_existing=_is_compound_assignment(assign))
 
-    def _assignment_chain_status(self, node: tree_sitter.Node) -> frozenset[str] | None:
-        """Return the taint status of a (possibly chained) assignment RHS *value*.
+    def _assignment_chain_status(self, node: tree_sitter.Node) -> ValueState:
+        """Return the taint state of a (possibly chained) assignment RHS *value*.
 
         A plain chain ``a = b = expr`` yields ``expr``'s status. If the chain hits
         a **compound** assignment whose target is a *tracked* name
@@ -254,12 +271,13 @@ class JavaTaintTracker:
         while cur.type == _java.ASSIGNMENT_EXPRESSION:
             left = cur.child_by_field_name("left")
             if _is_compound_assignment(cur) and left is not None and left.type == _java.IDENTIFIER:
-                return self.tainted.get(node_text(left))
+                name = node_text(left)
+                return ValueState(self.tainted.get(name), name in self.source_seeded)
             inner = cur.child_by_field_name("right")
             if inner is None:  # pragma: no cover - defensive: valid assignment always has right
-                return None
+                return CLEAN_STATE
             cur = inner
-        return value_status(self._is_tainted, self._properties, cur)
+        return self._state_of(cur)
 
     def _visit_enhanced_for(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``for (T x : tainted_iterable) { ... }``.
@@ -282,7 +300,7 @@ class JavaTaintTracker:
             return
         if name_node.type != _java.IDENTIFIER:  # pragma: no cover - defensive: name field is always identifier in valid Java
             return
-        self._update_name(name_node, value_status(self._is_tainted, self._properties, value_node))
+        self._update_name(name_node, self._state_of(value_node))
 
     def _visit_var_declarator(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``Type x = value;``.
@@ -306,7 +324,7 @@ class JavaTaintTracker:
             return
         if name.type != _java.IDENTIFIER:  # pragma: no cover - defensive: variable_declarator name is always an identifier in valid Java
             return
-        self._update_name(name, value_status(self._is_tainted, self._properties, value))
+        self._update_name(name, self._state_of(value))
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink with tainted inputs.
@@ -370,8 +388,10 @@ class JavaTaintTracker:
         """Append a hit record for a tainted argument reaching *sink*."""
         arg_name = node_text(arg_node) if arg_node.type == _java.IDENTIFIER else "<expr>"
         self.sink_hits.append((call_node, arg_name, sink))
+        if traces_to_source(self._is_tainted, self.tainted, self.source_seeded, arg_node):
+            self.source_traced.add(hit_key(call_node, arg_name, sink))
 
-    def _update_name(self, target: tree_sitter.Node, status: frozenset[str] | None, *, keep_existing: bool = False) -> None:
+    def _update_name(self, target: tree_sitter.Node, state: ValueState, *, keep_existing: bool = False) -> None:
         """Record taint *status* for identifier *target* (``None`` clears).
 
         With *keep_existing* (a compound read-modify-write assignment) the prior
@@ -379,8 +399,12 @@ class JavaTaintTracker:
         """
         name = node_text(target)
         if keep_existing:
-            status = combine_status(self.tainted.get(name), status)
-        set_status(self.tainted, name, status)
+            state = combine_with_recorded(self.tainted, self.source_seeded, name, state)
+        record_state(self.tainted, self.source_seeded, name, state)
+
+    def _state_of(self, value: tree_sitter.Node) -> ValueState:
+        """Return *value*'s taint status together with the origin of that taint."""
+        return value_state(self._is_tainted, self._properties, self.tainted, self.source_seeded, value)
 
     def _is_tainted(self, node: tree_sitter.Node, required_property: str | None = None) -> bool:
         """Return True if *node* may carry data still tainted for *required_property*.
