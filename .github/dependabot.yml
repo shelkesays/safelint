@@ -7,16 +7,24 @@ version: 2
 updates:
   - package-ecosystem: "github-actions"
     directory: "/"
-    # Raise bumps against the default branch, ``main``.
+    # Raise bumps against ``development`` (the RC branch), not the default
+    # ``main`` - so action updates flow through the normal
+    # feature/* -> development -> main release path and never diverge main from
+    # development (which would conflict at the next development -> main release).
     #
-    # They used to target ``development`` so that action updates flowed through
-    # the normal feature/* -> development -> main release path. That stopped
-    # being safe when sync-development.yml became archive-then-reset: it now
-    # resets development to main after EVERY push to main, unconditionally, so
-    # a bump merged into development is discarded (recoverable from its
-    # archive/* branch, but gone from the branch) as soon as anything lands on
-    # main ahead of the next release. Targeting main instead means the bump
-    # lands once and the sync carries it into development for free.
+    # These PRs are never merged as they stand: the bump is verified, folded
+    # into a PR of ours against this same branch, and the bot's PR is commented
+    # and closed. So what this key really sets is the branch Dependabot
+    # *compares against* when deciding whether a bump is still needed, which is
+    # why it has to match where the folded work lands.
+    #
+    # This was briefly pointed at ``main`` on the grounds that
+    # sync-development.yml resets development after every push to main and
+    # would discard a bump merged there. The hazard is real but it is the sync
+    # workflow's to fix (it now refuses to reset over unshipped work); moving
+    # the target also pushed our own folded PRs straight to main, skipping the
+    # release path this comment exists to protect.
+    target-branch: "development"
     schedule:
       interval: "weekly"
     commit-message:

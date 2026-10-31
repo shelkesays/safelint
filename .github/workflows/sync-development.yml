@@ -7,14 +7,28 @@ name: Sync development with main
 # the next release branch cut from development cannot rebase onto main. Keeping
 # development identical to main after each release removes the whole class.
 #
-# Archive-then-reset: development's tip is pushed to an `archive/development-<sha>`
-# branch and only then reset. Nothing is ever unrecoverable, so the job never
-# needs to predict whether a reset is safe - and it never refuses.
+# Two safeguards, in this order:
 #
-# It USED to refuse unless it could prove development's content was already in
-# main, via patch-id (`git cherry`). That cannot work for this repository, and
-# the 2.15.0 release is the worked example - every candidate predicate was tested
-# against it and every one refused:
+#   1. A VERSION CHECK decides whether development's extra commits were already
+#      shipped. Development is reset only when it is a plain ancestor of main
+#      (nothing to lose) or carries a prerelease of a version main has already
+#      released (the rc commits of that release). Anything else - next cycle's
+#      rc, or work merged with no version bump - is left alone with a warning.
+#   2. ARCHIVE-THEN-RESET: when a reset does go ahead, development's tip is
+#      pushed to an `archive/development-<sha>` branch first, so even a wrong
+#      decision is recoverable.
+#
+# Safeguard 1 was added after the reset had been unconditional for two releases.
+# Unconditional was defensible on the grounds that nothing is unrecoverable, but
+# the recovery is manual and the loss is silent: this workflow triggers on EVERY
+# push to main, not just releases, so a docs fix or a folded dependabot bump
+# would quietly wipe whatever was on development, mid-RC work included.
+#
+# The version check works where content comparison cannot. It USED to refuse
+# unless it could prove development's content was already in main, via patch-id
+# (`git cherry`). That cannot work for this repository, and the 2.15.0 release is
+# the worked example - every candidate predicate was tested against it and every
+# one refused:
 #
 #   * `git cherry` patch-id    - 11 commits read as not-upstream. A squash merge
 #                                collapses N commits into ONE patch-id, which
@@ -33,10 +47,15 @@ name: Sync development with main
 # states. Development also legitimately holds a string main never had, the rc
 # version, so it is never literally a content subset.
 #
-# The only sound signal would be lineage - was anything pushed to development
-# after the release branch was cut - which needs the cut point recorded at
-# release time. Archiving is simpler and strictly safer than what it replaces:
-# when the old guard PASSED it force-pushed with no backup at all.
+# Lineage - was anything pushed to development after the release branch was cut -
+# would be sound but needs the cut point recorded at release time. The VERSION is
+# the next best thing and needs nothing recorded: it says what development IS
+# rather than how its content compares. A prerelease of an already-released
+# version is stale by construction, which is exactly the case the reset exists
+# for, and every other shape is left alone.
+#
+# Archiving remains, and is strictly safer than what the patch-id guard did:
+# when that guard PASSED it force-pushed with no backup at all.
 #
 # Loop safety: this force-pushes development, which triggers publish.yml on the
 # development branch. After the reset development == main (a final version), and
@@ -106,6 +125,75 @@ jobs:
             [ -n "$FINAL" ] && [ "$FINAL" = "$MAIN" ]
           }
 
+          # Split "X.Y.Z" / "X.Y.ZrcN" into "<major> <minor> <patch> <is_prerelease>".
+          # Returns non-zero for anything else, which is what makes the guard
+          # below fail closed on a version scheme it does not understand.
+          parse_version() {
+            if [[ "$1" =~ ^([0-9]+)\.([0-9]+)\.([0-9]+)(rc([0-9]+))?$ ]]; then
+              if [ -n "${BASH_REMATCH[4]}" ]; then
+                echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]} 1"
+              else
+                echo "${BASH_REMATCH[1]} ${BASH_REMATCH[2]} ${BASH_REMATCH[3]} 0"
+              fi
+              return 0
+            fi
+            return 1
+          }
+
+          # Decide whether development's extra commits are already shipped, and
+          # print the reason either way (the caller puts it in the annotation).
+          #
+          # The reset used to be unconditional, so any push to main - a docs
+          # fix, a folded dependabot bump, a security patch - wiped whatever was
+          # sitting on development, mid-RC work included. It was archived first,
+          # so nothing was unrecoverable, but recovery was manual and the loss
+          # was silent until someone noticed.
+          #
+          # Version comparison is the signal that works here. Every
+          # content-based predicate failed (see the header): after a release
+          # main is AHEAD of development in the same files, so "development's
+          # content is in main" is not computable from current state. The
+          # VERSION, though, says what development IS:
+          #
+          #   * a prerelease of a version <= main's -> the rc commits of what
+          #     main just released. Stale by construction; reset.
+          #   * a prerelease of a LATER version (2.16.0rc1 against main's
+          #     2.15.0) -> the next cycle, in flight. Skip.
+          #   * not a prerelease at all -> work merged with no version bump,
+          #     such as a folded dependabot PR. Never shipped; skip.
+          parse_failed=""
+          reset_is_safe() {
+            local dev_parsed main_parsed dev_major dev_minor dev_patch dev_is_rc main_major main_minor main_patch main_is_rc
+            if ! dev_parsed=$(parse_version "$1"); then
+              echo "development's version ($1) could not be parsed"
+              return 1
+            fi
+            if ! main_parsed=$(parse_version "$2"); then
+              echo "main's version ($2) could not be parsed"
+              return 1
+            fi
+            read -r dev_major dev_minor dev_patch dev_is_rc <<< "$dev_parsed"
+            read -r main_major main_minor main_patch main_is_rc <<< "$main_parsed"
+            if [ "$dev_is_rc" -eq 0 ]; then
+              echo "development is not a prerelease, so its commits never shipped as one"
+              return 1
+            fi
+            # Single comparable integer. Minor and patch are assumed below 1000,
+            # which has held for every release and is a safe assumption for a
+            # project that has never shipped a .1000.
+            if [ $((dev_major * 1000000 + dev_minor * 1000 + dev_patch)) -gt $((main_major * 1000000 + main_minor * 1000 + main_patch)) ]; then
+              echo "development is a prerelease of a LATER version than main has released"
+              return 1
+            fi
+            echo "development is a prerelease of what main has already released"
+            return 0
+          }
+
+          # Read project.version out of a commit without checking it out.
+          version_at() {
+            git show "$1:pyproject.toml" | python3 -c 'import sys, tomllib; print(tomllib.loads(sys.stdin.read())["project"]["version"])' 2>/dev/null || echo "<unreadable>"
+          }
+
           # Retry the archive-and-reset pair, re-reading development's tip each
           # time. --force-with-lease rejects the push if development moved between
           # the read and the write, and nothing else would retry: this workflow
@@ -126,6 +214,35 @@ jobs:
             DEV_SHORT=$(git rev-parse --short "$DEV" 2>/dev/null || echo "${DEV:0:7}")
             ARCHIVE="archive/development-${DEV_SHORT}"
 
+            # Fetch development's tip before anything reads it: the count below,
+            # the version read and the archive push all need its objects.
+            git fetch --quiet "$REPO_URL" "$DEV"
+
+            # How much of development is not reachable from main. Zero means
+            # development is a plain ancestor, the reset is provably lossless,
+            # and no version check is needed - that case gets a notice, not a
+            # warning (the first real run of this workflow hit it and the
+            # warning was pure noise). Above zero, the versions decide.
+            AHEAD=$(git rev-list --count "$MAIN..$DEV")
+            if [ "$AHEAD" -gt 0 ]; then
+              DEV_VERSION=$(version_at "$DEV")
+              MAIN_VERSION=$(version_at "$MAIN")
+              if VERDICT=$(reset_is_safe "$DEV_VERSION" "$MAIN_VERSION"); then
+                echo "::notice::development has $AHEAD commit(s) main lacks, but $VERDICT ($DEV_VERSION against $MAIN_VERSION); resetting."
+              else
+                echo "::warning::development NOT reset: it has $AHEAD commit(s) main lacks and $VERDICT ($DEV_VERSION against $MAIN_VERSION). Land that work on main, or dispatch this workflow once it has shipped."
+                {
+                  echo "### development left as it is"
+                  echo
+                  echo "- development \`$DEV_SHORT\` has \`$AHEAD\` commit(s) not reachable from main \`${MAIN:0:7}\`"
+                  echo "- version check: $VERDICT (development \`$DEV_VERSION\`, main \`$MAIN_VERSION\`)"
+                  echo "- nothing was archived or reset; this is the guard against a push to main discarding unshipped work"
+                  echo "- to sync anyway, land that work on main first, or re-run this workflow once it has shipped"
+                } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+                exit 0
+              fi
+            fi
+
             # Archive BEFORE the reset, and let a failure here abort the attempt:
             # after the force-push this branch is the only copy of the old tip.
             # The name embeds the SHA, so a re-run pushes the same commit to the
@@ -134,18 +251,7 @@ jobs:
             # No workflow triggers on `archive/*` (ci.yml and publish.yml both
             # list main / development / release/* only), so this costs no runs.
             # Safe to delete once the release is confirmed.
-            git fetch --quiet "$REPO_URL" "$DEV"
             git push "$REPO_URL" "$DEV:refs/heads/$ARCHIVE"
-
-            # How much of development is not reachable from main. Zero means
-            # development was a plain ancestor and the reset is provably
-            # lossless, so that case gets a notice, not a warning - the first
-            # real run of this workflow hit it and the warning was pure noise.
-            # After a SQUASH release the count is non-zero even though the
-            # content shipped (the rc commits live on under different SHAs),
-            # which is why the wording tells the reader when to care rather than
-            # implying every reset lost something.
-            AHEAD=$(git rev-list --count "$MAIN..$DEV")
 
             # Push main's commit straight at the remote ref rather than moving a
             # local branch first: `git branch -f development` fails outright if
