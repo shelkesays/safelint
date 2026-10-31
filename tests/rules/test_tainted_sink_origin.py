@@ -32,11 +32,27 @@ _SOURCED = "Tainted variable"
 _PARAM = "Parameter-derived value"
 
 
-def _origins(sample: Path) -> list[tuple[int, str]]:
+def _wording(message: str) -> str:
+    """Return which of the two SAFE801 wordings *message* uses.
+
+    Raises rather than defaulting. Classifying "anything that is not the
+    source wording" as the parameter wording would let a malformed or
+    unrelated message pass every case below as though it were the expected
+    one, which is the opposite of what these tests are for.
+    """
+    for wording in (_SOURCED, _PARAM):
+        if message.startswith(wording):
+            return wording
+    pytest.fail(f"SAFE801 message matches neither wording: {message!r}")
+
+
+def _origins(sample: Path, overrides: dict | None = None) -> list[tuple[int, str]]:
     """Return ``(lineno, wording)`` for each SAFE801 finding, in file order."""
-    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}}))
+    rule: dict[str, object] = {"enabled": True}
+    rule.update(overrides or {})
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"rules": {"tainted_sink": rule}}))
     found = [v for v in engine.check_file(str(sample)).violations if v.code == "SAFE801"]
-    return [(v.lineno, _SOURCED if v.message.startswith(_SOURCED) else _PARAM) for v in found]
+    return [(v.lineno, _wording(v.message)) for v in found]
 
 
 def _write(tmp_path: Path, name: str, body: str) -> Path:
@@ -152,12 +168,13 @@ def test_the_wording_follows_the_origin(tmp_path: Path, label: str, name: str, s
     assert _origins(_write(tmp_path, name, source)) == expected, label
 
 
-def test_overwriting_with_a_source_then_a_constant_clears_both(tmp_path: Path) -> None:
+def test_reassigning_a_source_to_a_parameter_downgrades_the_wording(tmp_path: Path) -> None:
     """Assignment overwrites the origin along with the status.
 
     Without that, a variable that had once held a source would stay flagged as
     source-traced for the rest of the function even after being reassigned,
-    which is the kind of stale claim this change exists to stop.
+    which is the kind of stale claim this change exists to stop. The sink still
+    reports, because ``arg`` is a seeded parameter; only the claim weakens.
     """
     sample = _write(
         tmp_path,
@@ -172,6 +189,28 @@ def test_overwriting_with_a_source_then_a_constant_clears_both(tmp_path: Path) -
         """,
     )
     assert _origins(sample) == [(6, _PARAM)]
+
+
+def test_reassigning_a_source_to_a_constant_clears_the_finding(tmp_path: Path) -> None:
+    """The companion: overwriting with a literal drops the taint, not just its origin.
+
+    Distinct from the test above, where the new value is itself tainted. Here
+    nothing is left to report at all, which is what pins that ``record_state``
+    clears the status as well as the origin rather than leaving a stale entry.
+    """
+    sample = _write(
+        tmp_path,
+        "p.py",
+        """\
+        import subprocess
+
+        def run():
+            cmd = input("cmd: ")
+            cmd = "ls -la"
+            subprocess.run(cmd)
+        """,
+    )
+    assert _origins(sample) == []
 
 
 def test_a_go_closure_capture_keeps_its_origin(tmp_path: Path) -> None:
@@ -203,3 +242,38 @@ def test_a_go_closure_capture_keeps_its_origin(tmp_path: Path) -> None:
         """,
     )
     assert _origins(sample) == [(10, _SOURCED), (14, _PARAM)]
+
+
+# The property-typed sanitiser contract and the origin question have to agree
+# on WHICH sink is being asked about, or a source the sink's own sanitiser
+# already cleared still counts as traced.
+_PROPERTY_CONFIG: dict[str, object] = {
+    "sinks": ["htmlsink"],
+    "sanitizers": [],
+    "sources": ["input"],
+    "sanitizer_properties": {"esc": ["html_escaped"], "urlenc": ["url_encoded"]},
+    "sink_properties": {"htmlsink": "html_escaped"},
+}
+
+_PROPERTY_CASES: list[tuple[str, str, str]] = [
+    ("source cleared for this sink's property", "htmlsink(esc(src) + param)", _PARAM),
+    ("source not sanitised at all", "htmlsink(src + param)", _SOURCED),
+    ("source sanitised for a DIFFERENT property", "htmlsink(urlenc(src) + param)", _SOURCED),
+]
+
+
+@pytest.mark.parametrize(["label", "expression", "expected"], _PROPERTY_CASES, ids=[case[0] for case in _PROPERTY_CASES])
+def test_the_origin_question_respects_the_sinks_required_property(tmp_path: Path, label: str, expression: str, expected: str) -> None:
+    """A source this sink's own sanitiser cleared is not evidence for this hit.
+
+    Each of these fires only because ``param`` is a seeded parameter, so the
+    question is whether the source in the same expression counts as traced.
+    It does when it reaches the sink unsanitised, and when it was sanitised for
+    some OTHER property - but not when the sink's own required property was
+    established, because then the source is not what makes this a finding.
+
+    Asking the origin question without the sink's property got the first row
+    wrong, claiming a traced source for a hit caused entirely by the parameter.
+    """
+    sample = _write(tmp_path, "prop.py", f'def f(param):\n    src = input("x")\n    {expression}\n')
+    assert _origins(sample, _PROPERTY_CONFIG) == [(3, expected)], label
