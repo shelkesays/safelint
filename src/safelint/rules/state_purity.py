@@ -1314,8 +1314,51 @@ def _read_before_declaration(references: list[tree_sitter.Node], declaration: tr
     return any(ref.start_byte < declaration.start_byte and not _function_between(ref, root) for ref in references)
 
 
-def _rebound_in_scope(declaration: tree_sitter.Node, root: tree_sitter.Node, binders: list[tree_sitter.Node]) -> bool:
-    """Return True when one of *binders* binds the declared name somewhere else in *root*.
+def _scopes_overlap(first: tree_sitter.Node | None, second: tree_sitter.Node | None) -> bool:
+    """Return True when one block scope contains the other; None means function top level.
+
+    Two bindings of a name only collide when they would live in the same
+    ``let`` scope. Sibling blocks are disjoint, so each would get its own
+    binding and nothing is observable:
+
+        for (var i = 0; i < a.length; i++) { use(a[i]); }
+        for (var i = 0; i < b.length; i++) { use(b[i]); }   // legal as `let`
+
+    A ``None`` scope is function top level, which every block sits inside, so
+    it overlaps with anything - that is Express's `lib/utils.js` shape (a
+    top-level ``var colonIndex`` plus one inside a ``while``) and the
+    ``var`` over a parameter.
+    """
+    if first is None or second is None:
+        return True
+    first_in_second = second.start_byte <= first.start_byte and first.end_byte <= second.end_byte
+    second_in_first = first.start_byte <= second.start_byte and second.end_byte <= first.end_byte
+    return first_in_second or second_in_first
+
+
+def _other_binders(declaration: tree_sitter.Node, root: tree_sitter.Node, binders: list[tree_sitter.Node]) -> list[tree_sitter.Node]:
+    """Return the bindings of *declaration*'s names that are NOT its own.
+
+    Bindings inside nested functions belong to their own scope and are
+    excluded. A nested ``function f(){}``'s own NAME does bind in this scope,
+    but is excluded along with it; that under-reports the rare
+    ``var f = 1; function f() {}`` collision, which is a documented limit
+    rather than a silent one.
+    """
+    own = {node.start_byte for node in _binding_identifiers(declaration)}
+    # The scope root's OWN name is bound in an enclosing scope, not in its body,
+    # so shadowing it is legal: `function range() { let range = 1; }` is fine,
+    # and Express has two of exactly that (`req.range = function range() { var
+    # range = this.get("Range"); }`). Counting it reported a redeclaration that
+    # no engine rejects.
+    root_name = root.child_by_field_name("name")
+    if root_name is not None:
+        own.add(root_name.start_byte)
+    return [site for site in binders if site.start_byte not in own and not _function_between(site, root)]
+
+
+def _rebound_in_scope(declaration: tree_sitter.Node, root: tree_sitter.Node, others: list[tree_sitter.Node]) -> bool:
+    """Return True when another binding of the name shares a block scope with *declaration*.
 
     ``var`` permits a name to be declared twice in one function, and to be
     declared over a parameter; ``let`` rejects both outright. Express has one of
@@ -1333,22 +1376,33 @@ def _rebound_in_scope(declaration: tree_sitter.Node, root: tree_sitter.Node, bin
     is why they must not be reported as "read before its declaration" - nothing
     is ``undefined`` there. The fix is a rename, not a keyword swap.
 
-    Bindings inside nested functions belong to their own scope and are
-    excluded. A nested ``function f(){}``'s own NAME does bind in this scope,
-    but is excluded along with it; that under-reports the rare
-    ``var f = 1; function f() {}`` collision, which is a documented limit
-    rather than a silent one.
+    The scopes must OVERLAP. Two bindings in disjoint blocks never collide:
+    ``for (var i ...) {} for (var i ...) {}`` converts to ``let`` cleanly, and
+    reporting it reintroduced exactly the noise #201 removed.
     """
-    own = {node.start_byte for node in _binding_identifiers(declaration)}
-    # The scope root's OWN name is bound in an enclosing scope, not in its body,
-    # so shadowing it is legal: `function range() { let range = 1; }` is fine,
-    # and Express has two of exactly that (`req.range = function range() { var
-    # range = this.get("Range"); }`). Counting it reported a redeclaration that
-    # no engine rejects.
-    root_name = root.child_by_field_name("name")
-    if root_name is not None:
-        own.add(root_name.start_byte)
-    return any(site.start_byte not in own and not _function_between(site, root) for site in binders)
+    mine = _enclosing_below(declaration, _BLOCK_SCOPE_TYPES, root)
+    return any(_scopes_overlap(mine, _enclosing_below(site, _BLOCK_SCOPE_TYPES, root)) for site in others)
+
+
+def _sibling_scopes(declaration: tree_sitter.Node, root: tree_sitter.Node, others: list[tree_sitter.Node]) -> list[tree_sitter.Node]:
+    """Return the blocks owned by same-named bindings disjoint from *declaration*'s."""
+    scopes = (_enclosing_below(site, _BLOCK_SCOPE_TYPES, root) for site in others)
+    mine = _enclosing_below(declaration, _BLOCK_SCOPE_TYPES, root)
+    return [scope for scope in scopes if scope is not None and not _scopes_overlap(mine, scope)]
+
+
+def _excluding_sibling_blocks(references: list[tree_sitter.Node], scopes: list[tree_sitter.Node]) -> list[tree_sitter.Node]:
+    """Drop the references a disjoint same-named binding owns.
+
+    References are matched by TEXT across the whole hoisting scope, so a second
+    ``var i`` in a sibling block pulls that block's ``i`` identifiers in as
+    uses of this one. Under ``var`` they really are one binding, but each loop
+    only touches ``i`` within itself, so converting both to ``let`` is
+    behaviour-preserving and there is nothing to report. Leaving them in
+    diagnosed the first declaration as escaping its block and the second as
+    read before its declaration - both noise, and both the wrong story.
+    """
+    return [ref for ref in references if not any(scope.start_byte <= ref.start_byte and ref.end_byte <= scope.end_byte for scope in scopes)]
 
 
 def _function_between(node: tree_sitter.Node, ancestor: tree_sitter.Node) -> bool:
@@ -1431,14 +1485,15 @@ class WideScopeDeclarationRule(BaseRule):
         names, _ = _declared_names(declaration)
         if not names:
             return None
+        others = _other_binders(declaration, root, index.binders(root, names))
         # Checked first, and before the reference guard below, for two reasons.
         # It needs no reference at all - a duplicate `var` nothing ever reads
         # still blocks a `let` conversion - and when a name is bound twice the
         # earlier reads resolve to the earlier binding, so "read before its
         # declaration" would be the wrong diagnosis for the same line.
-        if _rebound_in_scope(declaration, root, index.binders(root, names)):
+        if _rebound_in_scope(declaration, root, others):
             return self._REBOUND
-        references = index.reads(root, names)
+        references = _excluding_sibling_blocks(index.reads(root, names), _sibling_scopes(declaration, root, others))
         if not references:
             return None
         # A table rather than a chain of early returns: three independent

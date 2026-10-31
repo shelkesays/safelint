@@ -738,11 +738,22 @@ Four shapes are reported, each with its own message naming the hazard:
 | **Used outside the block** it is declared in (read or assigned) | `let` would be a ReferenceError; the hoisting is what makes the use work |
 | Read **before its declaration** in the same execution scope | `var` yields `undefined`; `let` rejects it (TDZ) |
 | Declared in a loop and **captured by a closure** inside it | every `var` closure shares one binding and sees the final value; `let` gives each iteration its own |
-| **Re-declares** a name already bound in the function (an earlier `var`, or a parameter) | at the same scope `let` / `const` reject the duplicate outright; from a nested block they bind a *separate* shadowing variable instead of the one already there, so assignments stop being visible outside the block. Either way the fix is a rename, not a keyword swap |
+| **Re-declares** a name already bound in an overlapping scope (an earlier `var`, or a parameter) | at the same scope `let` / `const` reject the duplicate outright; from a nested block they bind a *separate* shadowing variable instead of the one already there, so assignments stop being visible outside the block. Either way the fix is a rename, not a keyword swap |
 
 Deliberately silent on everything else, including a `var` at function top level used only within that function, a loop counter used only inside its loop, and a `var` declared and used in the same block. A read from inside a nested function does not count as a read-before-declaration, because the closure runs after the declaration has executed. A reference inside a nested function that binds the same name is that function's own binding and is ignored.
 
 The first three shapes need a reference to be observable, so a `var` nothing ever touches is not reported. A **redeclaration** is reported regardless: `let` rejects the duplicate whether or not anything reads the name, so it blocks the conversion either way.
+
+Two bindings of one name only count as a redeclaration when their block scopes **overlap** - one contains the other, or either is at function top level. Disjoint blocks never collide, and the name belongs to whichever block it sits in:
+
+```javascript
+function f(a, b) {
+  for (var i = 0; i < a.length; i++) { use(a[i]); }   // NOT reported
+  for (var i = 0; i < b.length; i++) { use(b[i]); }   // `let` is legal in both
+}
+```
+
+`if (c) { var x = 1; } else { var x = 2; }` is the same case. An inner block *is* contained by the outer one, so `if (c) { var x = 1; if (d) { var x = 2; } }` does report.
 
 The fix is mechanical in the first three cases: replace `var` with `let` (when the binding is reassigned later) or `const` (when it isn't). The rule fires once per `variable_declaration` node, so a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
 
@@ -1605,6 +1616,7 @@ The check is syntactic and one-directional, so anything opaque still reports:
 
 ```python
 d.get(k, None).x      # the fallback IS None
+d.get(k, (None)).x    # ...grouping does not change that
 d.get(k, fallback).x  # a name is opaque; it may well BE None
 d.get(k, compute()).x # ...as may a call's return value
 d.get(k, a or b).x    # an or-chain falls through to its last operand
@@ -1612,6 +1624,9 @@ d.get(*args).x        # a splat hides the positional count
 d.get(k, **kw).x      # ...as does a keyword splat
 d.get(k, default=f).x # a keyword argument is not positional
 ```
+
+Grouping is peeled before the check, so `d.get(k, ({})).x` is recognised as the
+dict literal it is and stays quiet.
 
 **Known limits.** A literal fallback does not prove the call cannot return
 `None`, and SAFE803 keeps no model of what values a mapping or an iterator

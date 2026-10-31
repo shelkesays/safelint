@@ -126,6 +126,7 @@ BOOLEAN_OPERATOR = "boolean_operator"
 UNARY_OPERATOR = "unary_operator"
 COMPARISON_OPERATOR = "comparison_operator"
 CONDITIONAL_EXPRESSION = "conditional_expression"
+PARENTHESIZED_EXPRESSION = "parenthesized_expression"  # ``(expr)`` - a wrapper node, not an expression kind
 
 STRING = "string"
 DICTIONARY = "dictionary"  # ``{k: v, ...}`` literal - ``pair`` named children
