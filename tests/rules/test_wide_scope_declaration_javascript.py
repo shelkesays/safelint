@@ -23,11 +23,16 @@ def _engine(overrides: dict | None = None) -> SafetyEngine:
 # ---------------------------------------------------------------------------
 
 
-def test_js_var_declaration_fires_safe305(tmp_path: Path) -> None:
-    """A simple ``var x = 1;`` fires SAFE305."""
+def test_js_var_read_outside_its_block_fires_safe305(tmp_path: Path) -> None:
+    """A ``var`` whose hoisting is OBSERVABLE fires: read outside its own block.
+
+    Rewritten in 2.16.0. This used to be ``function f() { var x = 1; return x; }``
+    and asserted a hit, which is the shape #201 is about: ``let x`` there behaves
+    identically, so there was nothing to fix and nothing to report.
+    """
     sample = tmp_path / "var.js"
     sample.write_text(
-        "function f() { var x = 1; return x; }\n",
+        "function f(c) {\n  if (c) {\n    var x = 1;\n  }\n  return x;\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -36,15 +41,20 @@ def test_js_var_declaration_fires_safe305(tmp_path: Path) -> None:
     assert "var" in safe305[0].message
 
 
-def test_js_top_level_var_fires(tmp_path: Path) -> None:
-    """Top-level ``var x = 1;`` (module scope) also fires - same hoisting hazard."""
+def test_js_top_level_var_does_not_fire(tmp_path: Path) -> None:
+    """Module-scope ``var`` is quiet: there is no block for it to hoist out of.
+
+    This is the 89% case from #201 - ``var path = require("node:path")`` at the
+    top of a pre-ES6 module, where ``const`` would behave identically. 1748 of
+    Express's 1960 default findings were this.
+    """
     sample = tmp_path / "top.js"
     sample.write_text(
-        "var x = 1;\n",
+        'var path = require("node:path");\nmodule.exports = path;\n',
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
-    assert any(v.code == "SAFE305" for v in result.violations)
+    assert not any(v.code == "SAFE305" for v in result.violations)
 
 
 def test_js_var_in_block_fires(tmp_path: Path) -> None:
@@ -72,7 +82,7 @@ def test_js_var_multi_binding_fires_once(tmp_path: Path) -> None:
     """
     sample = tmp_path / "multi.js"
     sample.write_text(
-        "function f() { var x = 1, y = 2, z = 3; return x + y + z; }\n",
+        "function f(c) {\n  if (c) {\n    var x = 1, y = 2, z = 3;\n  }\n  return x + y + z;\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
@@ -149,12 +159,15 @@ def test_js_disabled_via_config(tmp_path: Path) -> None:
     """Setting ``enabled = false`` silences the rule entirely."""
     sample = tmp_path / "var.js"
     sample.write_text(
-        "var x = 1;\n",
+        "function f(c) {\n  if (c) {\n    var x = 1;\n  }\n  return x;\n}\n",
         encoding="utf-8",
     )
     cfg = deep_merge(DEFAULTS, {"rules": {"wide_scope_declaration": {"enabled": False}}})
     result = SafetyEngine(cfg).check_file(str(sample))
     assert not any(v.code == "SAFE305" for v in result.violations)
+    # ...and the same file DOES report with the rule on, so this asserts the
+    # switch rather than a sample that was already quiet.
+    assert any(v.code == "SAFE305" for v in _engine().check_file(str(sample)).violations)
 
 
 # ---------------------------------------------------------------------------
@@ -177,7 +190,7 @@ def test_js_var_inline_suppression(tmp_path: Path) -> None:
     """``// nosafe: SAFE305`` on the same line suppresses the violation."""
     sample = tmp_path / "suppressed.js"
     sample.write_text(
-        "var legacy = 1;  // nosafe: SAFE305\n",
+        "function f(c) {\n  if (c) {\n    var legacy = 1;  // nosafe: SAFE305\n  }\n  return legacy;\n}\n",
         encoding="utf-8",
     )
     result = _engine().check_file(str(sample))
