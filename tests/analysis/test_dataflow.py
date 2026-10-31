@@ -411,14 +411,40 @@ def test_tracker_aug_assign_propagates_taint():
 
 
 def test_tainted_sink_detects_eval():
+    """A bare parameter into ``eval`` reports, worded as parameter-derived (#158).
+
+    The sink is real and still reported. What the analysis does NOT have is a
+    traced source: ``user_code`` is tainted only because seeding parameters is
+    what makes an intra-procedural analysis useful, so "tainted variable" would
+    assert attacker-controlled data that nothing here establishes.
+    """
     src = """
     def run_code(user_code):
         eval(user_code)
     """
     vs = violations(TaintedSinkRule, src)
     assert len(vs) == 1
-    assert "Tainted" in vs[0].message
+    assert "Parameter-derived" in vs[0].message
+    assert "no untrusted source is traced" in vs[0].message
     assert "eval" in vs[0].message
+
+
+def test_tainted_sink_says_tainted_when_a_source_is_traced():
+    """The companion: with a real source on the path the stronger wording returns.
+
+    Together with the test above this pins the whole point of the change - the
+    two cases must not read alike, because only one of them is a claim about
+    untrusted input.
+    """
+    src = """
+    def run_code():
+        user_code = input("code: ")
+        eval(user_code)
+    """
+    vs = violations(TaintedSinkRule, src)
+    assert len(vs) == 1
+    assert vs[0].message.startswith('Tainted variable "user_code"')
+    assert "Parameter-derived" not in vs[0].message
 
 
 def test_tainted_sink_no_violation_for_literal():

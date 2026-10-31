@@ -1362,6 +1362,30 @@ These combine AST analysis with intra-procedural taint tracking. They are more e
 
 The rule tracks data flow through assignments: if `x = user_data` then `x` is tainted. If `y = x + "_suffix"` then `y` is tainted too. Calling `eval(y)` then triggers a violation. Passing the value through a configured sanitizer (e.g. `escape(x)`) clears the taint.
 
+**Two wordings, by what the analysis actually traced.** *Changed in 2.16.0.* Taint is seeded from two
+places that are not equally good evidence, so the message now says which one a finding rests on:
+
+| Message | What it means |
+|---|---|
+| `Tainted variable "x" flows into dangerous sink "s"` | A recognised **source** was traced to the sink: `input()`, `$_GET['q']`, `os.Getenv`, a framework request accessor. Untrusted data genuinely reaches `s`. |
+| `Parameter-derived value "x" reaches dangerous sink "s"` | Only a function **parameter** was seeded. The sink is real, but nothing in this function shows a request can reach it; the question is what callers pass. |
+
+Seeding every parameter is what makes an intra-procedural analysis useful, and it is also why a
+helper that takes an argument and calls a dangerous builtin reports whether or not it is reachable
+from a request. Both kinds still report, and the parameter kind is worth reading: it is how an
+injection arrives once a caller is attacker-facing. What changed is that it no longer *claims* to
+have traced untrusted input.
+
+The distinction follows the flow rather than the spelling. A value derived from a parameter stays
+parameter-derived (`built = "sh -c " + cmd`); mixing a parameter with a source escalates to the
+stronger wording (`cmd = prefix + input()`); and reassigning overwrites the origin along with the
+taint, in both directions. A closure capturing a source-tainted local inherits the stronger wording
+through the capture.
+
+If you want to review only the traced-source findings first, filter on the message prefix in
+`--format json`; there is no separate rule code, because both are the same hazard seen with
+different amounts of evidence.
+
 **Taint propagates through projections of a tainted base**, uniformly across all languages. Request-driven web code almost never passes a bare tainted parameter to a sink; the data arrives behind an attribute, a subscript, or a method call on the request object. All three keep the taint:
 
 - **Attribute / member access** - `request.data`, `req.body`, `$request->input` stays tainted (the receiver's taint dominates; the attribute name itself is a lookup, not data).
