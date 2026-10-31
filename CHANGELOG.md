@@ -24,7 +24,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   }
   ```
 
-  Four shapes now report, each with a message naming the hazard: read outside the block it is declared in; read before its declaration in the same execution scope; declared in a loop and captured by a closure inside it; or re-declaring a name already bound in the function (an earlier `var`, or a parameter). The fourth is new and is the one `let` rejects outright, so the fix is a rename rather than a keyword swap.
+  Four shapes now report, each with a message naming the hazard: used (read or assigned) outside the block it is declared in; read before its declaration in the same execution scope; declared in a loop and captured by a closure inside it; or re-declaring a name already bound in an overlapping scope (an earlier `var`, or a parameter). The fourth is new and is the one `let` rejects or silently shadows, so the fix is a rename rather than a keyword swap.
 
   Measured on the projects the issue cites, same pinned commits, stock defaults: **Express 1748 -> 3 SAFE305** (total findings 1960 -> 214) and **Axios 186 -> 0**. All three Express survivors are genuine redeclarations - two `var colonIndex` in one function in `lib/utils.js`, and `var name` over a parameter of the same name in `examples/mvc/lib/boot.js` - and each blocks a `let` conversion until renamed.
 

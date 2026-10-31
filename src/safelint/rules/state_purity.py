@@ -1471,7 +1471,7 @@ class WideScopeDeclarationRule(BaseRule):
     # `let` rejects a same-scope duplicate outright; from a nested block it
     # would instead bind a separate shadowing variable, so the two `var`s stop
     # being one binding. Different hazard, same fix, hence one message.
-    _REBOUND = "`var` re-declares a name already bound in this function (an earlier `var`, or a parameter) - `let` / `const` would reject or shadow it; rename one of them"
+    _REBOUND = "`var` re-declares a name already bound in an overlapping scope (an earlier `var`, or a parameter) - `let` / `const` would reject or shadow it; rename one of them"
 
     def _observable_hazard(self, declaration: tree_sitter.Node, index: _ScopeIndex) -> str | None:
         """Return the message for the hazard *declaration* exhibits, or None if it has none.
