@@ -79,10 +79,16 @@ def test_typescript_file_nesting_depth_violation_fires(tmp_path: Path) -> None:
 
 
 def test_typescript_var_declaration_fires_safe305(tmp_path: Path) -> None:
-    """``var`` in TS still fires SAFE305 - TS users should prefer ``let`` / ``const``."""
+    """``var`` in TS still fires SAFE305 where the hoisting is observable.
+
+    The sample gained a block in 2.16.0: the rule now reports only a ``var``
+    whose function-scope hoisting is observable (#201), and the previous
+    ``var x: number = 1; return x;`` was not. What this test is really for is
+    unchanged - that the TS grammar reaches the JS-family rule at all.
+    """
     sample = tmp_path / "vary.ts"
     sample.write_text(
-        "function f(): number {\n  var x: number = 1;\n  return x;\n}\n",
+        "function f(c: boolean): number {\n  if (c) {\n    var x: number = 1;\n  }\n  return x;\n}\n",
         encoding="utf-8",
     )
     result = SafetyEngine(DEFAULTS).check_file(str(sample))

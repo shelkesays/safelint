@@ -13,6 +13,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SAFE305 `wide_scope_declaration`: report a `var` only where its hoisting is observable (#201).** The rule reported every `var`, which inverted its own value. On Express, 1748 of 1960 default findings (89%, across 136 of 141 files) were SAFE305, so the `var`s whose hoisting actually bites were indistinguishable from the rest and the other ten rules were drowned out. Every finding was technically true, and these two were reported identically:
+
+  ```javascript
+  var path = require("node:path");   // hoisting unobservable; `const` is the same
+
+  function f(xs) {
+    if (xs.length) { var found = xs[0]; }
+    return found;                    // hoisting is what makes this work
+  }
+  ```
+
+  Four shapes now report, each with a message naming the hazard: read outside the block it is declared in; read before its declaration in the same execution scope; declared in a loop and captured by a closure inside it; or re-declaring a name already bound in the function (an earlier `var`, or a parameter). The fourth is new and is the one `let` rejects outright, so the fix is a rename rather than a keyword swap.
+
+  Measured on the projects the issue cites, same pinned commits, stock defaults: **Express 1748 -> 3 SAFE305** (total findings 1960 -> 214) and **Axios 186 -> 0**. All three Express survivors are genuine redeclarations - two `var colonIndex` in one function in `lib/utils.js`, and `var name` over a parameter of the same name in `examples/mvc/lib/boot.js` - and each blocks a `let` conversion until renamed.
+
+  Reaching that number took four false-positive classes out, each found by running against the real projects rather than by reasoning: a named function expression's own name counted as a read of a `var` shadowing it; a nested callback's parameter counted as a read of the outer binding; a read inside a nested function counted as read-before-declaration although the closure runs afterwards; and a redeclaration was reported as read-before-declaration, which is the wrong diagnosis because the earlier reads resolve to the earlier binding. Each has a regression test named for the project it came from.
+
+  If you want every `var` reported as a codemod trigger, this rule no longer does that; `eslint no-var` is built for it.
+
 - **SAFE801 `tainted_sink`: a zero-argument call is no longer treated as a receiver-payload sink (#158).** Every tracker reported a tainted receiver when the call had no arguments, on the reasoning that a no-argument call must be carrying its payload in the receiver. It need not:
 
   ```php

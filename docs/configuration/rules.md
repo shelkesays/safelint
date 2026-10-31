@@ -725,11 +725,26 @@ function logOrder(order) {              // name contains ``log``, exempt
 
 ### SAFE305: `wide_scope_declaration`
 
-**What it flags:** JavaScript `var` declarations. **JavaScript-only**, Python has no `var` / `let` / `const` distinction.
+**What it flags:** JavaScript `var` declarations whose **function-scope hoisting is observable** - that is, where replacing `var` with `let` would change what the code does. **JavaScript-only**, Python has no `var` / `let` / `const` distinction.
 
 `var` is **function-scoped**: a `var` declared inside one branch of an `if` is visible throughout the entire enclosing function (and at module top, throughout the module), because the declaration is hoisted to the top of its containing function. `let` and `const` are **block-scoped**: they only exist inside the `{ ... }` they're declared in. The rule's intent matches Holzmann Power-of-Ten Rule 6 ("declare variables at the smallest possible scope") translated to JS's actual scope-control mechanism.
 
-The fix is mechanical: replace `var` with `let` (when the binding is reassigned later) or `const` (when it isn't). The rule fires once per `variable_declaration` node, a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
+*Changed in 2.16.0.* The rule used to report **every** `var`. That inverted its own value: on Express 1748 of 1960 default findings (89%, across 136 of 141 files) were SAFE305, so the handful of `var`s whose hoisting actually bites were indistinguishable from the rest, and the other ten rules were drowned out ([#201](https://github.com/shelkesays/safelint/issues/201)). A module-scope `var path = require("node:path")` has no observable difference from `const`; there is nothing to fix, so there is nothing to report.
+
+Four shapes are reported, each with its own message naming the hazard:
+
+| Shape | Why `let` differs |
+|---|---|
+| Read **outside the block** it is declared in | `let` would be a ReferenceError; the hoisting is what makes the read work |
+| Read **before its declaration** in the same execution scope | `var` yields `undefined`; `let` rejects it (TDZ) |
+| Declared in a loop and **captured by a closure** inside it | every `var` closure shares one binding and sees the final value; `let` gives each iteration its own |
+| **Re-declares** a name already bound in the function (an earlier `var`, or a parameter) | `let` / `const` reject the redeclaration outright; the fix is a rename, not a keyword swap |
+
+Deliberately silent on everything else, including a `var` at function top level used only within that function, a loop counter used only inside its loop, and a `var` declared and used in the same block. A read from inside a nested function does not count as a read-before-declaration, because the closure runs after the declaration has executed. A reference inside a nested function that binds the same name is that function's own binding and is ignored.
+
+The fix is mechanical in the first three cases: replace `var` with `let` (when the binding is reassigned later) or `const` (when it isn't). The rule fires once per `variable_declaration` node, so a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
+
+If you want the old behaviour - every `var` reported, as a codemod trigger for a "modernise this codebase" pass - the rule does not provide it; use a linter rule built for that (`eslint no-var`), which is what it was competing with.
 
 | Option | Default | Description |
 |---|---|---|
@@ -745,11 +760,24 @@ severity = "warning"
 **Bad:**
 
 ```javascript
+var path = require("node:path");   // NOT reported - `const` behaves identically
+
 function f(items) {
   if (items.length > 0) {
-    var first = items[0];   // SAFE305 - hoists; visible after the if
+    var first = items[0];   // SAFE305 - read outside its block, below
   }
   return first;             // accidentally accessible, exactly the bug
+}
+
+function g(items) {
+  items.forEach(function (item) {
+    setTimeout(function () {
+      console.log(i);       // every closure sees the final i
+    });
+  });
+  for (var i = 0; i < items.length; i++) {   // SAFE305 - captured in a loop
+    console.log(i);
+  }
 }
 
 function doubleAndReturnLastIndex(arr) {

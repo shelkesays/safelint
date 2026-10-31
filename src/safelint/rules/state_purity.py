@@ -1055,6 +1055,279 @@ class GlobalMutationRule(BaseRule):
         return violations
 
 
+# SAFE305: the node kinds that bound a ``let`` / ``const`` binding, so a ``var``
+# inside one of these is visible where a lexical declaration would not be.
+# ``if`` / ``while`` are absent on purpose: a braceless ``if (x) let y = 1`` is a
+# syntax error, so their braces are already a STATEMENT_BLOCK.
+_BLOCK_SCOPE_TYPES = frozenset(
+    {
+        _js.STATEMENT_BLOCK,
+        _js.FOR_STATEMENT,  # the loop HEAD: `for (var i = 0; ...)`
+        _js.FOR_IN_STATEMENT,  # covers for-of too (one grammar node)
+        _js.SWITCH_CASE,
+        _js.CATCH_CLAUSE,
+    }
+)
+
+# Where a ``var`` hoists TO. A class static block is its own scope, so a ``var``
+# inside one does not hoist out of it.
+_HOIST_SCOPE_ROOTS = _js.FUNCTION_TYPES | frozenset({_js.PROGRAM, _js.CLASS_STATIC_BLOCK})
+
+_LOOP_TYPES = frozenset({_js.FOR_STATEMENT, _js.FOR_IN_STATEMENT, _js.WHILE_STATEMENT, _js.DO_STATEMENT})
+
+# Identifier-bearing nodes inside a binding pattern. `var {a, b} = o` binds
+# through SHORTHAND_PROPERTY_IDENTIFIER_PATTERN; later reads of `a` are plain
+# identifiers, so names are compared by text rather than by node identity.
+_PATTERN_NAME_TYPES = frozenset({_js.IDENTIFIER, _js.SHORTHAND_PROPERTY_IDENTIFIER_PATTERN})
+
+
+# Fields whose subtree INTRODUCES a name rather than reading one. In
+# tree-sitter-javascript these three cover every binding form: ``name``
+# (variable_declarator, function / class declarations and named function
+# expressions, import specifiers), ``parameters`` (a formal_parameters list,
+# patterns included) and ``parameter`` (a lone arrow parameter, a catch
+# parameter).
+#
+# Without this, three kinds of false positive appeared on Express: a named
+# function expression whose own name matched (``req.range = function range()
+# { var range = ... }``), a nested callback's PARAMETER shadowing the name
+# (``forEach(function (name) {...})``), and an earlier declaration of the same
+# name. The last of those is a genuine ``var`` hazard - redeclaration, which
+# ``let`` rejects outright - but it is a different hazard with a different fix,
+# so reporting it under "read before its declaration" was simply the wrong
+# diagnosis.
+_BINDING_FIELDS = ("name", "parameters", "parameter")
+
+
+def _binding_targets(node: tree_sitter.Node) -> list[tree_sitter.Node]:
+    """Return the subtrees of *node* that introduce names rather than read them."""
+    targets = [node.child_by_field_name(field) for field in _BINDING_FIELDS]
+    return [target for target in targets if target is not None]
+
+
+def _binding_sites(root: tree_sitter.Node) -> set[int]:
+    """Return the byte offsets of every identifier inside *root* that binds a name."""
+    sites: set[int] = set()
+    for node in walk(root):
+        for target in _binding_targets(node):
+            sites.update(name.start_byte for name in walk(target) if name.type in _PATTERN_NAME_TYPES)
+    return sites
+
+
+def _hoist_scope_root(node: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the function / program / static block *node* hoists to."""
+    current = node.parent
+    while current is not None:
+        if current.type in _HOIST_SCOPE_ROOTS:
+            return current
+        current = current.parent
+    return None
+
+
+def _enclosing_below(node: tree_sitter.Node, types: frozenset[str], root: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the nearest ancestor of *node* in *types*, searching strictly inside *root*.
+
+    None when the only candidate is *root* itself or its own body: a declaration
+    already at function top level has no block to escape from.
+    """
+    body = root.child_by_field_name("body")
+    current = node.parent
+    while current is not None:
+        if current == root:
+            return None
+        if current.type in types and current != body:
+            return current
+        current = current.parent
+    return None
+
+
+def _binding_identifiers(declaration: tree_sitter.Node) -> list[tree_sitter.Node]:
+    """Return every identifier node bound by *declaration*'s declarators.
+
+    Covers the multi-binding form (``var x = 1, y = 2``) and destructuring
+    (``var {a, b} = o`` / ``var [a] = o``), whose names arrive as pattern nodes
+    rather than plain identifiers.
+    """
+    found: list[tree_sitter.Node] = []
+    for declarator in walk(declaration):
+        target = declarator.child_by_field_name("name") if declarator.type == _js.VARIABLE_DECLARATOR else None
+        if target is not None:
+            found.extend(node for node in walk(target) if node.type in _PATTERN_NAME_TYPES)
+    return found
+
+
+def _declared_names(declaration: tree_sitter.Node) -> tuple[list[str], set[int]]:
+    """Return the names *declaration* binds, and the byte offsets of its own name nodes.
+
+    The offsets let the reference scan skip the declaration site itself, which
+    would otherwise look like a use of the name it declares.
+    """
+    bound = _binding_identifiers(declaration)
+    return [node_text(node) for node in bound], {node.start_byte for node in bound}
+
+
+def _bound_names(scope: tree_sitter.Node) -> set[str]:
+    """Return every name bound anywhere inside *scope*."""
+    names: set[str] = set()
+    for node in walk(scope):
+        for target in _binding_targets(node):
+            names.update(node_text(name) for name in walk(target) if name.type in _PATTERN_NAME_TYPES)
+    return names
+
+
+def _bound_names_cached(scope: tree_sitter.Node, cache: dict[int, set[str]]) -> set[str]:
+    """Memoised :func:`_bound_names` - the same nested function is tested per reference."""
+    if scope.id not in cache:
+        cache[scope.id] = _bound_names(scope)
+    return cache[scope.id]
+
+
+def _shadowed_by_nested_scope(ref: tree_sitter.Node, root: tree_sitter.Node, wanted: set[str], cache: dict[int, set[str]]) -> bool:
+    """Return True when a function between *ref* and *root* binds the name itself.
+
+    Then the identifier reads THAT binding, not the ``var`` under test. Axios
+    had the shape that makes this matter:
+
+        .then(function () { ... }, function (error) { return error; });
+        try { ... var error = await pending; assert(error.code); }
+
+    Both earlier ``error`` identifiers are parameters of nested callbacks. Taken
+    as reads of the later ``var error`` they made it look like a binding used
+    outside its block, which was the single SAFE305 finding left on Axios and
+    was wrong.
+
+    Deliberately over-approximate: any binding of the name ANYWHERE in the
+    nested function shadows, even one in a deeper block that a ``let`` would
+    scope more tightly. Over-approximating here drops a reference, so the error
+    is a missed finding rather than a false one.
+    """
+    current = ref.parent
+    while current is not None:
+        if current == root:
+            return False
+        if current.type in _js.FUNCTION_TYPES and wanted & _bound_names_cached(current, cache):
+            return True
+        current = current.parent
+    return False
+
+
+def _references(root: tree_sitter.Node, names: list[str], bindings: set[int]) -> list[tree_sitter.Node]:
+    """Return every identifier inside *root* that READS one of *names*.
+
+    Member properties and object keys are a different node type
+    (``property_identifier``), so ``obj.i`` is not mistaken for a read of ``i``.
+    Every binding position is excluded via *bindings* - a name being declared,
+    a parameter, a function's own name - so only actual uses remain.
+
+    Nested functions are deliberately NOT skipped wholesale: a closure reading
+    the binding is what makes a loop ``var`` observable, and a read from a
+    function defined outside the declaring block is what makes an escape
+    observable. Whether a nested read counts differs per hazard, so each
+    predicate decides for itself. A nested function that binds the same name
+    IS skipped, via :func:`_shadowed_by_nested_scope` - those identifiers read
+    the inner binding and say nothing about this one.
+    """
+    wanted = set(names)
+    cache: dict[int, set[str]] = {}
+    candidates = [node for node in walk(root) if node.type == _js.IDENTIFIER and node.start_byte not in bindings and node_text(node) in wanted]
+    return [node for node in candidates if not _shadowed_by_nested_scope(node, root, wanted, cache)]
+
+
+def _escapes_block(references: list[tree_sitter.Node], block: tree_sitter.Node | None) -> bool:
+    """Return True when a reference sits outside the block the declaration is in."""
+    if block is None:
+        return False
+    return any(ref.start_byte < block.start_byte or ref.end_byte > block.end_byte for ref in references)
+
+
+def _read_before_declaration(references: list[tree_sitter.Node], declaration: tree_sitter.Node, root: tree_sitter.Node) -> bool:
+    """Return True when a reference precedes the declaration in the same execution scope.
+
+    Under ``var`` such a read yields ``undefined``; under ``let`` it is a
+    ReferenceError. The read is the bug either way, and hoisting is what hides
+    it.
+
+    A read inside a NESTED function does not count, even when it appears
+    earlier in the file, because the closure runs after the declaration has
+    executed - ``let`` behaves identically there and there is nothing to report.
+    Five of Express's ten remaining findings were this: a callback reading
+    ``test`` or ``users`` declared further down, which works under both forms.
+    """
+    return any(ref.start_byte < declaration.start_byte and not _function_between(ref, root) for ref in references)
+
+
+def _rebound_in_scope(declaration: tree_sitter.Node, root: tree_sitter.Node, names: list[str], bindings: set[int]) -> bool:
+    """Return True when one of *names* is also bound elsewhere in the same scope.
+
+    ``var`` permits a name to be declared twice in one function, and to be
+    declared over a parameter; ``let`` rejects both outright. Express has one of
+    each:
+
+        function acceptParams(str) {
+          var colonIndex = str.indexOf(';');       // ...and again inside the
+          while (index < length) {                 //    loop below, same scope
+            var colonIndex = str.indexOf(';', index);
+
+        fs.readdirSync(dir).forEach(function (name) {
+          var name = obj.name || name;             // shadows the parameter
+
+    Both are reads of a DIFFERENT binding that happens to share the name, which
+    is why they must not be reported as "read before its declaration" - nothing
+    is ``undefined`` there. The fix is a rename, not a keyword swap.
+
+    Bindings inside nested functions belong to their own scope and are
+    excluded. A nested ``function f(){}``'s own NAME does bind in this scope,
+    but is excluded along with it; that under-reports the rare
+    ``var f = 1; function f() {}`` collision, which is a documented limit
+    rather than a silent one.
+    """
+    own = {node.start_byte for node in _binding_identifiers(declaration)}
+    # The scope root's OWN name is bound in an enclosing scope, not in its body,
+    # so shadowing it is legal: `function range() { let range = 1; }` is fine,
+    # and Express has two of exactly that (`req.range = function range() { var
+    # range = this.get("Range"); }`). Counting it reported a redeclaration that
+    # no engine rejects.
+    root_name = root.child_by_field_name("name")
+    if root_name is not None:
+        own.add(root_name.start_byte)
+    wanted = set(names)
+    for site in walk(root):
+        if site.start_byte not in bindings or site.start_byte in own:
+            continue
+        if site.type in _PATTERN_NAME_TYPES and node_text(site) in wanted and not _function_between(site, root):
+            return True
+    return False
+
+
+def _function_between(node: tree_sitter.Node, ancestor: tree_sitter.Node) -> bool:
+    """Return True when a function node sits between *node* and *ancestor*."""
+    current = node.parent
+    while current is not None:
+        if current == ancestor:
+            return False
+        if current.type in _js.FUNCTION_TYPES:
+            return True
+        current = current.parent
+    return False
+
+
+def _captured_in_loop(references: list[tree_sitter.Node], loop: tree_sitter.Node | None) -> bool:
+    """Return True when a function defined inside *loop* reads the binding.
+
+    The per-iteration-binding hazard: with ``var`` every closure shares one
+    binding and sees the final value, which is the ``setTimeout``-in-a-``for``
+    classic. ``let`` gives each iteration its own.
+    """
+    if loop is None:
+        return False
+    # Only references INSIDE the loop can be per-iteration captures. Without
+    # this filter, walking up from a reference that sits after the loop reaches
+    # the enclosing function before it reaches the loop, and every
+    # `for (var i...) { } return i;` was reported as a closure capture.
+    inside = [ref for ref in references if loop.start_byte <= ref.start_byte and ref.end_byte <= loop.end_byte]
+    return any(_function_between(ref, loop) for ref in inside)
+
+
 class WideScopeDeclarationRule(BaseRule):
     """Reject ``var`` declarations - prefer ``let`` / ``const`` for narrower scope.
 
@@ -1086,17 +1359,56 @@ class WideScopeDeclarationRule(BaseRule):
     code = "SAFE305"
     language = (_js.EXTRA_NAME, _ts.EXTRA_NAME)
 
+    _ESCAPES_BLOCK = "`var` is read outside the block it is declared in - function-scope hoisting is what makes that work; `let` / `const` would be a ReferenceError"
+    _READ_BEFORE = "`var` is read before its declaration - hoisting makes that `undefined` instead of an error; `let` / `const` would reject it"
+    _LOOP_CAPTURE = "`var` declared in a loop is captured by a function inside it - every closure shares one binding and sees the final value; `let` gives each iteration its own"
+    _REBOUND = "`var` re-declares a name already bound in this function (an earlier `var`, or a parameter) - `let` / `const` reject that outright; rename one of them"
+
+    def _observable_hazard(self, declaration: tree_sitter.Node) -> str | None:
+        """Return the message for the hazard *declaration* exhibits, or None if it has none.
+
+        Order matters only for which message is shown; any one of the three is
+        enough to report.
+        """
+        root = _hoist_scope_root(declaration)
+        if root is None:
+            return None
+        names, _ = _declared_names(declaration)
+        if not names:
+            return None
+        bindings = _binding_sites(root)
+        references = _references(root, names, bindings)
+        if not references:
+            return None
+        # Checked as a table rather than a chain of early returns: three
+        # independent hazards, any one of which is enough, and the first match
+        # supplies the message.
+        hazards = (
+            # Before READ_BEFORE: when a name is bound twice, the earlier reads
+            # resolve to the earlier binding, so "read before its declaration"
+            # would be the wrong diagnosis for the same line.
+            (_rebound_in_scope(declaration, root, names, bindings), self._REBOUND),
+            (_read_before_declaration(references, declaration, root), self._READ_BEFORE),
+            (_captured_in_loop(references, _enclosing_below(declaration, _LOOP_TYPES, root)), self._LOOP_CAPTURE),
+            (_escapes_block(references, _enclosing_below(declaration, _BLOCK_SCOPE_TYPES, root)), self._ESCAPES_BLOCK),
+        )
+        return next((message for observable, message in hazards if observable), None)
+
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Flag every ``var`` declaration in the file."""
+        """Flag a ``var`` only where its function-scope hoisting is observable.
+
+        The rule used to report every ``var``, which inverted its own value: on
+        Express, 1748 of 1960 default findings (89%) were SAFE305, so the one
+        ``var`` whose hoisting actually bites was indistinguishable from the 1747
+        where ``const`` would behave identically (#201). A module-scope
+        ``var path = require("node:path")`` has no observable difference from
+        ``const``; there is nothing to fix and nothing to report.
+        """
         violations: list[Violation] = []
         for node in walk(tree.root_node):
             if node.type != _js.VARIABLE_DECLARATION:
                 continue
-            violations.append(
-                self._make_violation_for_node(
-                    filepath,
-                    node,
-                    "`var` declaration uses function-scope hoisting - replace with `let` or `const` for block scope",
-                )
-            )
+            message = self._observable_hazard(node)
+            if message is not None:
+                violations.append(self._make_violation_for_node(filepath, node, message))
         return violations
