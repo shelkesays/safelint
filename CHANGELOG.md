@@ -7,7 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **SAFE601 `missing_assertions`: `extend_assertion_calls` appends instead of replacing (#220).** `assertion_calls` replaces the default list, so a project that wanted to add one helper had to copy all 66 default names into its config and then keep them in step with future releases. The new key is appended to whatever the base list resolves to, and works per language through the same key chain (`extend_assertion_calls_javascript` and friends, with TypeScript inheriting the JavaScript one). Mirrors `resource_lifecycle`'s `extend_tracked_functions`. `assertion_calls` keeps its replace semantics, because narrowing the list is a supported thing to want.
+
 ### Fixed
+
+- **SAFE601 `missing_assertions`: `unittest.mock` and Django `TestCase` assertions now count (#220).** With `test_functions_only = true`, a Django codebase of about 3,300 files still reported 100 test functions as assertion-free. 55 of them asserted only through `unittest.mock` (`assert_called_once_with` and friends) and several more through Django's `TestCase` API, so the rule was reporting "this test asserts nothing" about tests that assert.
+
+  `mock` is in the standard library, so its assertions are as standard as `assertEqual`. Added: the `assert_called*` / `assert_any_call` / `assert_has_calls` / `assert_not_called` family and its `assert_awaited*` async mirrors, plus Django's `assertContains`, `assertRedirects`, `assertTemplateUsed`, `assertNumQueries`, `assertRaisesMessage`, `assertFormError`, `assertJSONEqual`, `assertHTMLEqual`, `assertInHTML`, `assertQuerySetEqual` and the rest of that API.
+
+  The Django names are unconditional rather than gated behind `[python] framework = "django"`. Every one is spelled `assert*` and nothing else defines them, so counting one as an assertion is right in any project, and a false-positive fix should not depend on the preset being configured. Adding a name here can only ever suppress a finding, never raise one, which is also why the change ships with a control test asserting that a test with no assertion at all still reports.
 
 - **SAFE803 `null_dereference`: a call that passes a fallback cannot return `None` (#155).** `d.get(k, default)` returns `default` when the key is absent, so it cannot return `None` unless the fallback itself is `None`. The rule matched on the call name alone and never looked at the arguments, so it reported `config.get("connector", {}).get("timezone", "UTC").strip()` - which is *the* Python safe-navigation idiom. The rule fired hardest on the code written to be safe; on the project where this was found, the defaulting form was the large majority of the 31 SAFE803 findings.
 
