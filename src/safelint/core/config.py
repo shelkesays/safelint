@@ -859,6 +859,54 @@ DEFAULTS: dict[str, Any] = {
                 # bareword suffices.
                 "raises",
                 "warns",
+                # ``unittest.mock`` assertions (#220). ``mock`` is in the
+                # standard library, so these are as standard as ``assertEqual``;
+                # omitting them made a test whose only assertion is
+                # ``client.get.assert_called_once_with(...)`` read as
+                # assertion-free. On the Django codebase this was measured
+                # against, 55 of 100 flagged test functions asserted only this
+                # way.
+                "assert_called",
+                "assert_called_once",
+                "assert_called_with",
+                "assert_called_once_with",
+                "assert_any_call",
+                "assert_has_calls",
+                "assert_not_called",
+                # ...and the async mirrors, same names with ``awaited``.
+                "assert_awaited",
+                "assert_awaited_once",
+                "assert_awaited_with",
+                "assert_awaited_once_with",
+                "assert_any_await",
+                "assert_has_awaits",
+                "assert_not_awaited",
+                # Django ``SimpleTestCase`` / ``TestCase`` assertions (#220).
+                # Unconditional rather than gated behind
+                # ``[python] framework = "django"``: every name is spelled
+                # ``assert*`` and nothing else defines them, so counting one as
+                # an assertion is right in any project, and a false-positive fix
+                # should not depend on the preset being configured. Adding a
+                # name here can only ever suppress a finding, never raise one.
+                "assertContains",
+                "assertNotContains",
+                "assertRedirects",
+                "assertTemplateUsed",
+                "assertTemplateNotUsed",
+                "assertFormError",
+                "assertJSONEqual",
+                "assertJSONNotEqual",
+                "assertHTMLEqual",
+                "assertHTMLNotEqual",
+                "assertInHTML",
+                "assertXMLEqual",
+                "assertXMLNotEqual",
+                "assertURLEqual",
+                "assertQuerySetEqual",
+                "assertNumQueries",
+                "assertRaisesMessage",
+                "assertWarnsMessage",
+                "assertFieldOutput",
             ],
             # JavaScript assertion-function names. Python uses the
             # built-in ``assert`` keyword (plus the ``assertion_calls``

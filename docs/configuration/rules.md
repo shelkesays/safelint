@@ -1140,7 +1140,12 @@ Based on Holzmann rule 5: the paper asks for an assertion density averaging a mi
 
 Two further clauses of the paper's rule 5 are intentionally out of scope: assertions must be **side-effect free** (safelint does not analyse assertion expressions for effects), and a trivially-true assertion (`assert True`) **counts toward the threshold** even though the paper disallows assertions a static checker can prove never fail. Both need analysis machinery (effect inference, constant propagation) that does not fit a structural rule; review remains the guard there.
 
-Python counts the AST `assert_statement` (built-in keyword) **and** *calls* to a configured set of assertion-method names (`assertion_calls`), so unittest / Django `TestCase` bodies that assert only via `self.assertEqual(...)` / `self.assertRaises(...)` and pytest bodies using `pytest.raises(...)` / `pytest.warns(...)` are recognised instead of being flagged as assertion-less. The default set covers the unittest `assert*` surface (`assertEqual`, `assertTrue`, `assertRaises`, `assertIn`, `assertIsNone`, `fail`, ...) plus pytest's `raises` / `warns`; `call_name` strips the receiver, so `self.assertEqual` and `pytest.raises` match on the bareword. Add project-specific assertion helpers by extending `assertion_calls`.
+Python counts the AST `assert_statement` (built-in keyword) **and** *calls* to a configured set of assertion-method names (`assertion_calls`), so unittest / Django `TestCase` bodies that assert only via `self.assertEqual(...)` / `self.assertRaises(...)` and pytest bodies using `pytest.raises(...)` / `pytest.warns(...)` are recognised instead of being flagged as assertion-less. The default set covers the unittest `assert*` surface (`assertEqual`, `assertTrue`, `assertRaises`, `assertIn`, `assertIsNone`, `fail`, ...) plus pytest's `raises` / `warns`; `call_name` strips the receiver, so `self.assertEqual` and `pytest.raises` match on the bareword. Add project-specific assertion helpers through `extend_assertion_calls`.
+
+*Since 2.16.0* the default also covers two families that are not unittest's but are just as standard:
+
+- **`unittest.mock`** - `assert_called`, `assert_called_once`, `assert_called_with`, `assert_called_once_with`, `assert_any_call`, `assert_has_calls`, `assert_not_called`, and the `assert_awaited*` mirrors. `mock` is in the standard library, so a test whose only assertion is `client.get.assert_called_once_with(...)` is asserting; it used to read as assertion-free. On the Django codebase this was measured against, 55 of 100 flagged test functions asserted only this way.
+- **Django `SimpleTestCase` / `TestCase`** - `assertContains`, `assertRedirects`, `assertTemplateUsed`, `assertNumQueries`, `assertRaisesMessage`, `assertFormError`, `assertJSONEqual`, `assertHTMLEqual`, `assertInHTML`, `assertQuerySetEqual` and the rest of that API. Unconditional rather than gated behind `[python] framework = "django"`: every name is spelled `assert*` and nothing else defines them, so counting one as an assertion is right in any project, and a false-positive fix should not depend on the preset being set. A name added here can only ever suppress a finding, never raise one.
 
 Matching is by call name only (receiver stripped) - the same allowlist approach every other language's SAFE601 detector and `tainted_sink.sanitizers` use, and the reason a *bare* project helper (`verify_invariant(x)`) counts. The tradeoff: a production call whose name coincides with a configured entry (a helper literally named `fail` / `raises`) is also credited, so SAFE601 may under-report an assertion-less function. This is a false-negative on an opt-in advisory rule; enable `test_functions_only` (below) to confine the rule to test functions, where these names are unambiguously assertions.
 
@@ -1153,7 +1158,8 @@ JavaScript has no built-in `assert` keyword, so the rule walks for *calls* to a 
 | `enabled` | `false` | Disabled by default, opt-in |
 | `severity` | `"warning"` | `"error"` or `"warning"` |
 | `min_assertions` | `1` | Minimum assertions per function; set `2` for the paper's density. *Added in 2.4.0.* |
-| `assertion_calls` | (see default Python list above) | (Python only.) Assertion-method call names counted *in addition* to the `assert` keyword. *Added in 2.12.0.* |
+| `assertion_calls` | (see default Python list above) | (Python only.) Assertion-method call names counted *in addition* to the `assert` keyword. **Replaces** the default list. *Added in 2.12.0.* |
+| `extend_assertion_calls` | `[]` | Names **appended** to the resolved list instead of replacing it, so a project adding one helper does not have to copy the defaults and then maintain them against future releases. Per language through the same key chain (`extend_assertion_calls_javascript`, ..., and TypeScript inherits the JavaScript one). Mirrors `resource_lifecycle`'s `extend_tracked_functions`. *Added in 2.16.0.* |
 | `assertion_calls_javascript` | (see default JS list above) | (JavaScript only.) Call names that satisfy the assertion check. *Added in 1.13.0.* |
 | `test_functions_only` | `false` | Restrict the rule to test-named functions in test files (see above). *Added in 2.12.0.* |
 | `test_function_prefixes` | `["test"]` | Name prefixes marking a function as a test (used only when `test_functions_only` is on). *Added in 2.12.0.* |
@@ -1169,7 +1175,8 @@ Java, Rust, PHP, C, and C++ have their own `assertion_calls_<lang>` lists (see e
 enabled = true
 severity = "warning"
 min_assertions = 2                # Holzmann rule 5 density; default is 1
-assertion_calls = ["assertEqual", "assertTrue", "verify_invariant"]   # Python; extends the built-in assert keyword
+assertion_calls = ["assertEqual", "assertTrue", "verify_invariant"]   # Python; REPLACES the default list
+extend_assertion_calls = ["verify_invariant"]                        # ...or append to it and keep the defaults
 assertion_calls_javascript = ["assert", "expect", "should"]
 # Treat SAFE601 as a "tests must assert" guard (skips production / fixtures / setUp):
 test_functions_only = true
