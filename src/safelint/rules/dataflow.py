@@ -1301,6 +1301,24 @@ def _null_dereference_message(method: str, lang_name: str) -> str:
     return f'Result of "{method}()" is immediately dereferenced without a None check - guard with "if result is not None"'
 
 
+def _unwrap_parens(node: tree_sitter.Node) -> tree_sitter.Node:
+    """Return *node* with any ``(...)`` wrappers peeled off.
+
+    ``parenthesized_expression`` is a wrapper node rather than an expression
+    kind, so a literal written as ``d.get(k, ({}))`` presents as the wrapper
+    and matched no entry in the literal allow-list. Bounded loop rather than
+    recursion (SAFE105 polices this file), and ``(None)`` still peels to
+    ``none``, which is not in the allow-list and so stays reportable.
+    """
+    current = node
+    while current.type == _py.PARENTHESIZED_EXPRESSION:
+        inner = next((child for child in current.named_children if not child.is_extra), None)
+        if inner is None:
+            return current
+        current = inner
+    return current
+
+
 class NullDereferenceRule(BaseRule):
     """Flag chained attribute or subscript access on calls that can return None."""
 
@@ -1401,7 +1419,7 @@ class NullDereferenceRule(BaseRule):
             return False
         if any(child.type in self._PYTHON_UNPOSITIONABLE_ARGS for child in passed[: index + 1]):
             return False
-        return passed[index].type in self._PYTHON_NON_NONE_LITERALS
+        return _unwrap_parens(passed[index]).type in self._PYTHON_NON_NONE_LITERALS
 
     def _python_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
         """Return the method name if *node* is an unsafe Python dereference, else None."""

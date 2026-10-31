@@ -454,3 +454,70 @@ def test_one_scope_is_indexed_once_for_many_declarations(tmp_path: Path) -> None
     messages = _safe305(sample)
     assert len(messages) == 1
     assert "is used outside the block" in messages[0]
+
+
+_DISJOINT_SCOPES: list[tuple[str, str]] = [
+    (
+        "two sibling for loops reusing the counter",
+        """\
+        function f(a, b) {
+          for (var i = 0; i < a.length; i++) { use(a[i]); }
+          for (var i = 0; i < b.length; i++) { use(b[i]); }
+        }
+        """,
+    ),
+    (
+        "both branches of an if/else declaring the same name",
+        """\
+        function g(c) {
+          if (c) { var x = 1; use(x); } else { var x = 2; use(x); }
+        }
+        """,
+    ),
+]
+
+
+@pytest.mark.parametrize(["label", "source"], _DISJOINT_SCOPES, ids=[case[0] for case in _DISJOINT_SCOPES])
+def test_same_name_in_disjoint_blocks_is_quiet(tmp_path: Path, label: str, source: str) -> None:
+    """Two bindings in blocks that do not contain one another never collide.
+
+    `let` is legal in each of these, and each block only touches the name
+    within itself, so converting both is behaviour-preserving - there is
+    nothing to fix and nothing to report. Repeated `for (var i ...)` is common
+    in the legacy code the rule is aimed at, so reporting it put back a slice of
+    exactly the noise #201 removed.
+
+    Both halves of the rule had to learn this. The redeclaration check saw two
+    binders of one name and called it a collision; the reference scan matches by
+    text across the whole hoisting scope, so with that fixed the second loop's
+    `i` read as the first one's escaping its block, and the first loop's as the
+    second being read before its declaration. Same noise, different story.
+    """
+    assert _safe305(_write(tmp_path, "disjoint.js", source)) == [], label
+
+
+def test_a_nested_redeclaration_still_collides(tmp_path: Path) -> None:
+    """The control for the test above: nesting is not disjointness.
+
+    An inner block sits INSIDE the outer one, so both bindings would share a
+    `let` scope and the duplicate is rejected. Without this, "scopes must
+    overlap" could degenerate into "a second binder anywhere else is fine",
+    which would drop the Express findings the rule was built to keep.
+    """
+    sample = _write(
+        tmp_path,
+        "nested_redeclare.js",
+        """\
+        function f(c, d) {
+          if (c) {
+            var x = 1;
+            if (d) { var x = 2; }
+            return x;
+          }
+          return 0;
+        }
+        """,
+    )
+    messages = _safe305(sample)
+    assert len(messages) == 2
+    assert all("re-declares" in message for message in messages)
