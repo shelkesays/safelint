@@ -204,7 +204,16 @@ jobs:
             # Single comparable integer. Minor and patch are assumed below 1000,
             # which has held for every release and is a safe assumption for a
             # project that has never shipped a .1000.
-            if [ $((dev_major * 1000000 + dev_minor * 1000 + dev_patch)) -gt $((main_major * 1000000 + main_minor * 1000 + main_patch)) ]; then
+            #
+            # Every component is forced to base 10 with `10#`. Bash reads a
+            # leading-zero literal as OCTAL, so `2.010.0` compared as 2.8.0 and
+            # sorted BELOW main's 2.9.0 - the guard would then call a later
+            # prerelease "already released" and reset over it. `08` and `09` are
+            # worse than wrong: they are not valid octal at all and abort the
+            # arithmetic ("value too great for base"). PEP 440 permits leading
+            # zeroes in a release segment and normalises them away, so decimal
+            # is the reading that matches what pip would install.
+            if [ $((10#$dev_major * 1000000 + 10#$dev_minor * 1000 + 10#$dev_patch)) -gt $((10#$main_major * 1000000 + 10#$main_minor * 1000 + 10#$main_patch)) ]; then
               echo "development is a prerelease of a LATER version than main has released"
               return 1
             fi
