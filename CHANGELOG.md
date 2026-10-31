@@ -13,6 +13,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SAFE801 `tainted_sink`: a zero-argument call is no longer treated as a receiver-payload sink (#158).** Every tracker reported a tainted receiver when the call had no arguments, on the reasoning that a no-argument call must be carrying its payload in the receiver. It need not:
+
+  ```php
+  $messages = $folder->query()->unseen()->since(now()->subDays(1))->get();
+  ```
+
+  `$folder` is a webklex/php-imap folder, `query()` builds an IMAP search rather than SQL, and it takes no arguments, so there was neither an argument nor a receiver carrying user data. Against FreeScout, **0 of 10** SAFE801 findings substantiated the claim that user input reaches a dangerous sink, and 6 were this one shape. Membership in `receiver_sinks` is now the only accepted evidence, which is what that list has always been documented to mean. Java's `openConnection` / `openStream` SSRF defaults are unaffected (they are declared), and an end-to-end test pins that the shipped config still catches URL SSRF.
+
+  If you relied on the old behaviour for a sink whose payload genuinely is its receiver, add it to `receiver_sinks_<lang>`. The decision now lives in one place, `SinkKinds.receiver_is_payload`, rather than being repeated in all seven trackers.
+
+- **Not changed: the bareword `query` stays in the default `sinks_php`.** #158 also recommended dropping it, because as a bareword it matches php-imap's `Folder::query()`, Eloquent's `Model::query()` and Laravel's `DB::query()`. Measured after the receiver fix above, all three are silent already - every one of them is a zero-argument call - while `$db->query('SELECT '.$_GET['id'])` still reports. Dropping the name would have cost that true positive, the commonest PHP SQL injection there is, to fix false positives that were already gone. Tests pin all four shapes.
+
 - **SAFE601 `missing_assertions`: `unittest.mock` and Django `TestCase` assertions now count (#220).** With `test_functions_only = true`, a Django codebase of about 3,300 files still reported 100 test functions as assertion-free. 55 of them asserted only through `unittest.mock` (`assert_called_once_with` and friends) and several more through Django's `TestCase` API, so the rule was reporting "this test asserts nothing" about tests that assert.
 
   `mock` is in the standard library, so its assertions are as standard as `assertEqual`. Added: the `assert_called*` / `assert_any_call` / `assert_has_calls` / `assert_not_called` family and its `assert_awaited*` async mirrors, plus Django's `assertContains`, `assertRedirects`, `assertTemplateUsed`, `assertNumQueries`, `assertRaisesMessage`, `assertFormError`, `assertJSONEqual`, `assertHTMLEqual`, `assertInHTML`, `assertQuerySetEqual` and the rest of that API.

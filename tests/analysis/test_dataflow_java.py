@@ -316,13 +316,49 @@ def test_method_invocation_receiver_propagates_taint_through_unknown_call() -> N
     assert len(tracker.sink_hits) == 1
 
 
-def test_sink_fires_on_tainted_receiver_with_no_arguments() -> None:
-    """``url.openStream()`` on a tainted ``url`` fires the sink with zero args.
+def test_sink_fires_on_tainted_receiver_declared_as_a_receiver_sink() -> None:
+    """``url.openStream()`` on a tainted ``url`` fires: it is a DECLARED receiver sink.
 
     Canonical Java SSRF pattern: ``URL url = new URL(userInput);
-    url.openStream();``. ``openStream`` has no arguments, so a
-    args-only sink check would miss the hit entirely. The
-    receiver-as-input check fires correctly.
+    url.openStream();``. ``openStream`` has no arguments, so an args-only sink
+    check would miss the hit entirely, and the receiver-as-payload check is
+    what catches it.
+
+    ``openStream`` is a shipped ``receiver_sinks_java`` default, so this
+    declares what production already declares. Before #158 the declaration was
+    not needed, because any no-argument call on a tainted receiver fired - which
+    is what made ``$folder->query()`` report an injection that could not exist.
+    ``test_java_url_ssrf_still_fires_with_the_shipped_defaults`` covers the
+    end-to-end path through the real config.
+    """
+    tree = _parse(
+        """
+        class C {
+            void m(Url url) {
+                url.openStream();
+            }
+        }
+        """
+    )
+    tracker = JavaTaintTracker(
+        params={"url"},
+        sinks=frozenset({"openStream"}),
+        sanitizers=frozenset(),
+        sources=frozenset(),
+        sink_kinds=SinkKinds(receiver=frozenset({"openStream"})),
+    )
+    tracker.visit(_find_method(tree, "m"))
+    assert len(tracker.sink_hits) == 1
+    # The recorded "tainted variable" is the receiver identifier.
+    assert tracker.sink_hits[0][1] == "url"
+
+
+def test_sink_does_not_fire_on_an_undeclared_no_argument_sink() -> None:
+    """The same call, without the ``receiver_sinks`` declaration, reports nothing.
+
+    This is the half #158 removed. A no-argument call conveys no payload on its
+    own; treating it as one is how a php-imap ``query()`` builder became a SQL
+    injection finding.
     """
     tree = _parse(
         """
@@ -340,9 +376,34 @@ def test_sink_fires_on_tainted_receiver_with_no_arguments() -> None:
         sources=frozenset(),
     )
     tracker.visit(_find_method(tree, "m"))
-    assert len(tracker.sink_hits) == 1
-    # The recorded "tainted variable" is the receiver identifier.
-    assert tracker.sink_hits[0][1] == "url"
+    assert tracker.sink_hits == []
+
+
+def test_java_url_ssrf_still_fires_with_the_shipped_defaults() -> None:
+    """End-to-end control: the shipped config still catches URL SSRF.
+
+    The tracker-level tests pass ``sink_kinds`` by hand, so on their own they
+    could not tell whether the real defaults still declare these. If
+    ``receiver_sinks_java`` were ever dropped, this is the test that fails.
+    """
+    with TemporaryDirectory() as tmp:
+        sample = Path(tmp) / "Ssrf.java"
+        sample.write_text(
+            textwrap.dedent(
+                """\
+                class Ssrf {
+                    void fetch(String userInput) throws Exception {
+                        java.net.URL url = new java.net.URL(userInput);
+                        url.openStream();
+                    }
+                }
+                """
+            ),
+            encoding="utf-8",
+        )
+        config = deep_merge(DEFAULTS, {"rules": {"tainted_sink": {"enabled": True}}})
+        violations = SafetyEngine(config).check_file(str(sample)).violations
+        assert any(v.code == "SAFE801" and "openStream" in v.message for v in violations)
 
 
 def test_sink_does_not_fire_on_tainted_receiver_with_constant_argument() -> None:

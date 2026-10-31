@@ -131,11 +131,23 @@ def test_php_nullsafe_chain_is_clean(tmp_path: Path) -> None:
     assert not any(v.code == "SAFE803" for v in _engine(_SAFE803).check_file(str(sample)).violations)
 
 
-def test_php_sink_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> None:
-    """A sink method on a tainted receiver (``$req->runQuery()``) fires even with no arguments."""
+def test_php_undeclared_sink_method_on_tainted_receiver_does_not_fire(tmp_path: Path) -> None:
+    """``$req->runQuery()`` with no arguments reports nothing (#158).
+
+    A no-argument call conveys no payload, and nothing declares this sink's
+    payload to be its receiver. The companion test declares it.
+    """
     sample = tmp_path / "recv.php"
     sample.write_text("<?php\nfunction f($req) {\n    $req->runQuery();\n}\n", encoding="utf-8")
     eng = _engine({"rules": {"tainted_sink": {"enabled": True, "sinks_php": ["runQuery"]}}})
+    assert not any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
+
+
+def test_php_declared_receiver_sink_on_tainted_receiver_fires(tmp_path: Path) -> None:
+    """The same call fires once ``runQuery`` is in ``receiver_sinks_php``."""
+    sample = tmp_path / "recv_declared.php"
+    sample.write_text("<?php\nfunction f($req) {\n    $req->runQuery();\n}\n", encoding="utf-8")
+    eng = _engine({"rules": {"tainted_sink": {"enabled": True, "sinks_php": ["runQuery"], "receiver_sinks_php": ["runQuery"]}}})
     assert any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
 
 

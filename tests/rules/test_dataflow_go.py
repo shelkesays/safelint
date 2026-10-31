@@ -215,11 +215,23 @@ def test_go_blank_assignment_discard_is_clean(tmp_path: Path) -> None:
     assert not any(v.code == "SAFE802" for v in _engine(_SAFE802).check_file(str(sample)).violations)
 
 
-def test_go_sink_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> None:
-    """A sink method on a tainted receiver (``req.RunQuery()``) fires even with no arguments."""
+def test_go_undeclared_sink_method_on_tainted_receiver_does_not_fire(tmp_path: Path) -> None:
+    """``req.RunQuery()`` with no arguments reports nothing (#158).
+
+    A no-argument call conveys no payload, and nothing declares this sink's
+    payload to be its receiver. The companion test declares it.
+    """
     sample = tmp_path / "recv.go"
     sample.write_text("package main\nfunc h(req Req) {\n\treq.RunQuery()\n}\n", encoding="utf-8")
     eng = _engine({"rules": {"tainted_sink": {"enabled": True, "sinks_go": ["RunQuery"]}}})
+    assert not any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
+
+
+def test_go_declared_receiver_sink_on_tainted_receiver_fires(tmp_path: Path) -> None:
+    """The same call fires once ``RunQuery`` is in ``receiver_sinks_go``."""
+    sample = tmp_path / "recv_declared.go"
+    sample.write_text("package main\nfunc h(req Req) {\n\treq.RunQuery()\n}\n", encoding="utf-8")
+    eng = _engine({"rules": {"tainted_sink": {"enabled": True, "sinks_go": ["RunQuery"], "receiver_sinks_go": ["RunQuery"]}}})
     assert any(v.code == "SAFE801" for v in eng.check_file(str(sample)).violations)
 
 

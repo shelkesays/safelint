@@ -758,14 +758,34 @@ def test_tainted_sink_receiver_taint_gated_by_assume_taint_preserving():
     assert not any("eval" in v.message for v in vs)
 
 
-def test_tainted_sink_method_sink_on_tainted_receiver_fires():
-    """``request.execute()`` - a sink method on a tainted receiver fires even with no arguments."""
+def test_tainted_sink_undeclared_method_on_tainted_receiver_does_not_fire():
+    """``request.execute()`` with no arguments reports nothing (#158).
+
+    A no-argument call conveys no payload: there is no argument, and nothing
+    says this sink's payload is its receiver. Declaring it in
+    ``receiver_sinks`` is the way to say so, which the companion test does.
+    Before #158 this fired, which is how a php-imap ``$folder->query()``
+    builder became a SQL-injection finding (6 of 10 SAFE801 findings on
+    FreeScout, none substantiated).
+    """
     src = """
     def view(request):
         request.execute()
     """
-    vs = violations(TaintedSinkRule, src)
-    assert any("execute" in v.message for v in vs)
+    vs = [v for v in violations(TaintedSinkRule, src) if v.code == "SAFE801"]
+    assert vs == []
+
+
+def test_tainted_sink_declared_receiver_sink_on_tainted_receiver_fires():
+    """The same call fires once ``execute`` is declared a receiver sink."""
+    src = """
+    def view(request):
+        request.execute()
+    """
+    config = {"enabled": True, "severity": "error", "receiver_sinks": ["execute"]}
+    vs = [v for v in violations(TaintedSinkRule, src, config) if v.code == "SAFE801"]
+    assert len(vs) == 1
+    assert "execute" in vs[0].message
 
 
 def test_tainted_sink_receiver_not_double_counted_with_tainted_arg():

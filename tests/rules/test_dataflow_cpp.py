@@ -47,10 +47,25 @@ def test_cpp_method_on_tainted_receiver_fires_safe801(tmp_path: Path) -> None:
     assert "SAFE801" in _codes(src, tmp_path, enable=["tainted_sink"])
 
 
-def test_cpp_sink_method_on_tainted_receiver_fires(tmp_path: Path) -> None:
-    """A sink C++ method on a tainted receiver (``req->runCommand()``) fires even with no arguments."""
+def test_cpp_undeclared_sink_method_on_tainted_receiver_does_not_fire(tmp_path: Path) -> None:
+    """``req->runCommand()`` with no arguments reports nothing (#158).
+
+    A no-argument call conveys no payload, and nothing declares this sink's
+    payload to be its receiver. The companion test declares it.
+    """
     src = "void run(Req* req) {\n    req->runCommand();\n}\n"
     codes = _codes(src, tmp_path, config={"tainted_sink": {"enabled": True, "sinks_cpp": ["runCommand"]}})
+    assert "SAFE801" not in codes
+
+
+def test_cpp_declared_receiver_sink_on_tainted_receiver_fires(tmp_path: Path) -> None:
+    """The same call fires once ``runCommand`` is in ``receiver_sinks_cpp``."""
+    src = "void run(Req* req) {\n    req->runCommand();\n}\n"
+    codes = _codes(
+        src,
+        tmp_path,
+        config={"tainted_sink": {"enabled": True, "sinks_cpp": ["runCommand"], "receiver_sinks_cpp": ["runCommand"]}},
+    )
     assert "SAFE801" in codes
 
 
