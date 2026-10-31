@@ -1544,6 +1544,26 @@ username = config.get("username")
 name = username.strip() if username is not None else ""
 ```
 
+```python
+# Or supply a fallback. Not reported: with a second argument, `get` cannot
+# return None, so the dereference is safe.
+name = config.get("username", "").strip()
+```
+
+**Python fallback arguments.** `get`, `pop` and `next` take a fallback as their
+second argument (`getattr` as its third, if you add it to `nullable_methods`).
+When one is passed and it is not the literal `None`, the result cannot be
+`None`, so the dereference is not reported - `d.get(k, {}).x` is the Python
+safe-navigation idiom and reporting it fired the rule hardest on the code
+written to be safe. The suppression needs positive proof: `d.get(k, None)` still
+reports (the fallback *is* `None`), and so do `d.get(*args)` and
+`d.get(k, **kw)`, where nothing in the syntax says what landed in the fallback
+slot. It is scoped to those names, not to any call with two arguments:
+`session.find("Model", 42).name` and `cursor.fetchone(1, 2).value` take
+arguments that are not fallbacks and still report. JavaScript is unaffected -
+`Map.prototype.get` ignores a second argument rather than returning it, so
+treating it as a fallback there would hide a real null dereference.
+
 **JavaScript, Bad:**
 
 ```javascript

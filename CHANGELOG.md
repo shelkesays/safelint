@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **SAFE803 `null_dereference`: a call that passes a fallback cannot return `None` (#155).** `d.get(k, default)` returns `default` when the key is absent, so it cannot return `None` unless the fallback itself is `None`. The rule matched on the call name alone and never looked at the arguments, so it reported `config.get("connector", {}).get("timezone", "UTC").strip()` - which is *the* Python safe-navigation idiom. The rule fired hardest on the code written to be safe; on the project where this was found, the defaulting form was the large majority of the 31 SAFE803 findings.
+
+  The fallback slot is now checked for the four default `nullable_methods` names that have one: `get`, `pop` and `next` take it second, `getattr` third (not a default entry, but handled for anyone who adds it). The suppression requires positive proof, so these all still report:
+
+  ```python
+  d.get(k, None).x      # the fallback IS None
+  d.get(*args).x        # a splat hides the positional count
+  d.get(k, **kw).x      # ...as does a keyword splat
+  d.get(k, default=f).x # a keyword argument is not positional
+  ```
+
+  It is scoped to those names rather than "any call with two arguments": `session.find("Model", 42).name` and `cursor.fetchone(1, 2).value` take arguments that are not fallbacks and still report. JavaScript is unchanged, deliberately - `Map.prototype.get` ignores a second argument rather than returning it, so treating one as a fallback there would hide a real null dereference.
+
+  Not changed: the duplicate-looking findings reported alongside this. `config.get(a, {}).get(b, "x")` produced two SAFE803 on one line, and four wild cases looked like exact duplicates. They are two *different* dereferences, differing by column; the rule makes a single pass and visits each node once. What makes them look identical is that the CLI gutter is line-addressed.
+
 ### Security
 
 - **Dev lockfile: `certifi` and `filelock` bumped to clear four Dependabot advisories.** `certifi` 2026.7.22 -> 2026.10.23 (critical: the previous releases bundle emSign root CAs whose intermediate CA keys were compromised; fixed upstream in 2026.10.18) and `filelock` 3.32.2 -> 4.2.4 (one high and two low, all fixed in 4.2.1; the high one is a `ReadWriteLock` symlink-planting issue on the SQLite lock database). Both are **transitive dev dependencies** - the published wheel's only runtime dependency is `tree-sitter`, so no released artefact is affected and no version bump is needed. Lock-only change, so `publish.yml`'s version gate skips it.

@@ -1318,6 +1318,55 @@ class NullDereferenceRule(BaseRule):
         }
     )
 
+    _PYTHON_FALLBACK_ARG_INDEX: ClassVar[dict[str, int]] = {
+        # Positional index of the "return this instead of failing" argument, for
+        # the nullable_methods names that have one. Supplying it makes ``None``
+        # impossible unless the fallback itself is ``None``, so the dereference
+        # that follows is safe - and ``d.get(k, {}).x`` is *the* Python
+        # safe-navigation idiom, so without this the rule fires hardest on the
+        # code written to be safe (#155).
+        #
+        # ``getattr``'s fallback is third, not second. The remaining defaults
+        # (``find``, ``first``, ``scalar``, ``scalar_one_or_none``, ``fetchone``)
+        # have no defaulting form and are deliberately absent.
+        "get": 1,  # d.get(key, fallback)
+        "pop": 1,  # d.pop(key, fallback) - list.pop takes no fallback, so a second arg means dict
+        "next": 1,  # next(iterator, fallback)
+        "getattr": 2,  # getattr(obj, name, fallback)
+    }
+
+    # Argument shapes that destroy the positional count: either could stand for
+    # any number of positional arguments, so neither proves what landed in the
+    # fallback slot.
+    _PYTHON_UNPOSITIONABLE_ARGS: ClassVar[frozenset[str]] = frozenset(
+        {
+            _py.LIST_SPLAT,
+            _py.DICTIONARY_SPLAT,
+            _py.KEYWORD_ARGUMENT,
+        }
+    )
+
+    def _python_fallback_rules_out_none(self, call: tree_sitter.Node, name: str) -> bool:
+        """Return True when *call* passes a fallback that cannot be ``None``.
+
+        Deliberately one-directional: it only suppresses on positive proof that
+        a non-``None`` fallback occupies the fallback slot. An unknown shape
+        keeps the finding, so ``d.get(*args)`` and ``d.get(k, **kw)`` still
+        report, as does the explicit ``d.get(k, None)``.
+        """
+        index = self._PYTHON_FALLBACK_ARG_INDEX.get(name)
+        if index is None:
+            return False
+        args = call.child_by_field_name("arguments")
+        if args is None:
+            return False
+        passed = [child for child in args.named_children if not child.is_extra]
+        if len(passed) <= index:
+            return False
+        if any(child.type in self._PYTHON_UNPOSITIONABLE_ARGS for child in passed[: index + 1]):
+            return False
+        return passed[index].type != _py.NONE
+
     def _python_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
         """Return the method name if *node* is an unsafe Python dereference, else None."""
         if node.type not in (_py.ATTRIBUTE, _py.SUBSCRIPT):
@@ -1328,7 +1377,11 @@ class NullDereferenceRule(BaseRule):
         if obj is None or obj.type != _py.CALL:
             return None
         name = call_name(obj)
-        return name if name and name in nullable else None
+        if name is None or name not in nullable:
+            return None
+        if self._python_fallback_rules_out_none(obj, name):
+            return None
+        return name
 
     _JAVA_DEREF_RECEIVER_FIELDS: ClassVar[dict[str, str]] = {
         # The Tree-sitter field name to look up for "the value being
