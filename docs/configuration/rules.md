@@ -725,7 +725,7 @@ function logOrder(order) {              // name contains ``log``, exempt
 
 ### SAFE305: `wide_scope_declaration`
 
-**What it flags:** JavaScript `var` declarations whose **function-scope hoisting is observable** - that is, where replacing `var` with `let` would change what the code does. **JavaScript-only**, Python has no `var` / `let` / `const` distinction.
+**What it flags:** `var` declarations whose **function-scope hoisting is observable** - that is, where replacing `var` with `let` would change what the code does. **JS-family only** (JavaScript and TypeScript, including `.tsx` / `.as`): `var` carries the same hazard in TypeScript, while Python has no `var` / `let` / `const` distinction.
 
 `var` is **function-scoped**: a `var` declared inside one branch of an `if` is visible throughout the entire enclosing function (and at module top, throughout the module), because the declaration is hoisted to the top of its containing function. `let` and `const` are **block-scoped**: they only exist inside the `{ ... }` they're declared in. The rule's intent matches Holzmann Power-of-Ten Rule 6 ("declare variables at the smallest possible scope") translated to JS's actual scope-control mechanism.
 
@@ -735,12 +735,14 @@ Four shapes are reported, each with its own message naming the hazard:
 
 | Shape | Why `let` differs |
 |---|---|
-| Read **outside the block** it is declared in | `let` would be a ReferenceError; the hoisting is what makes the read work |
+| **Used outside the block** it is declared in (read or assigned) | `let` would be a ReferenceError; the hoisting is what makes the use work |
 | Read **before its declaration** in the same execution scope | `var` yields `undefined`; `let` rejects it (TDZ) |
 | Declared in a loop and **captured by a closure** inside it | every `var` closure shares one binding and sees the final value; `let` gives each iteration its own |
-| **Re-declares** a name already bound in the function (an earlier `var`, or a parameter) | `let` / `const` reject the redeclaration outright; the fix is a rename, not a keyword swap |
+| **Re-declares** a name already bound in the function (an earlier `var`, or a parameter) | at the same scope `let` / `const` reject the duplicate outright; from a nested block they bind a *separate* shadowing variable instead of the one already there, so assignments stop being visible outside the block. Either way the fix is a rename, not a keyword swap |
 
 Deliberately silent on everything else, including a `var` at function top level used only within that function, a loop counter used only inside its loop, and a `var` declared and used in the same block. A read from inside a nested function does not count as a read-before-declaration, because the closure runs after the declaration has executed. A reference inside a nested function that binds the same name is that function's own binding and is ignored.
+
+The first three shapes need a reference to be observable, so a `var` nothing ever touches is not reported. A **redeclaration** is reported regardless: `let` rejects the duplicate whether or not anything reads the name, so it blocks the conversion either way.
 
 The fix is mechanical in the first three cases: replace `var` with `let` (when the binding is reassigned later) or `const` (when it isn't). The rule fires once per `variable_declaration` node, so a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
 
@@ -770,13 +772,10 @@ function f(items) {
 }
 
 function g(items) {
-  items.forEach(function (item) {
-    setTimeout(function () {
-      console.log(i);       // every closure sees the final i
-    });
-  });
   for (var i = 0; i < items.length; i++) {   // SAFE305 - captured in a loop
-    console.log(i);
+    setTimeout(function () {
+      console.log(i);       // every closure shares one `i` and logs items.length
+    });
   }
 }
 
@@ -1188,6 +1187,13 @@ JavaScript has no built-in `assert` keyword, so the rule walks for *calls* to a 
 | `min_assertions` | `1` | Minimum assertions per function; set `2` for the paper's density. *Added in 2.4.0.* |
 | `assertion_calls` | (see default Python list above) | (Python only.) Assertion-method call names counted *in addition* to the `assert` keyword. **Replaces** the default list. *Added in 2.12.0.* |
 | `extend_assertion_calls` | `[]` | Names **appended** to the resolved list instead of replacing it, so a project adding one helper does not have to copy the defaults and then maintain them against future releases. Per language through the same key chain (`extend_assertion_calls_javascript`, ..., and TypeScript inherits the JavaScript one). Mirrors `resource_lifecycle`'s `extend_tracked_functions`. *Added in 2.16.0.* |
+
+The two keys are alternatives in practice. They are not mutually exclusive, but
+setting both appends to the **replaced** list, not to the defaults: with
+`assertion_calls = ["assertEqual"]` and
+`extend_assertion_calls = ["verify_invariant"]` the resolved list is exactly
+those two names, and the other 64 defaults are gone. Pick `extend_*` to add to
+the defaults, or `assertion_calls` to state the whole list yourself.
 | `assertion_calls_javascript` | (see default JS list above) | (JavaScript only.) Call names that satisfy the assertion check. *Added in 1.13.0.* |
 | `test_functions_only` | `false` | Restrict the rule to test-named functions in test files (see above). *Added in 2.12.0.* |
 | `test_function_prefixes` | `["test"]` | Name prefixes marking a function as a test (used only when `test_functions_only` is on). *Added in 2.12.0.* |
@@ -1203,8 +1209,8 @@ Java, Rust, PHP, C, and C++ have their own `assertion_calls_<lang>` lists (see e
 enabled = true
 severity = "warning"
 min_assertions = 2                # Holzmann rule 5 density; default is 1
-assertion_calls = ["assertEqual", "assertTrue", "verify_invariant"]   # Python; REPLACES the default list
-extend_assertion_calls = ["verify_invariant"]                        # ...or append to it and keep the defaults
+extend_assertion_calls = ["verify_invariant"]   # Python; APPENDS, so the 66 defaults stay
+# assertion_calls = ["assertEqual", "assertTrue"]  # ...or REPLACE them with exactly this list
 assertion_calls_javascript = ["assert", "expect", "should"]
 # Treat SAFE601 as a "tests must assert" guard (skips production / fixtures / setUp):
 test_functions_only = true
@@ -1217,7 +1223,7 @@ test_dirs = ["tests"]
 [rules.missing_assertions]
 enabled = true
 min_assertions = 2
-assertion_calls = ["assertEqual", "assertTrue", "verify_invariant"]
+extend_assertion_calls = ["verify_invariant"]
 test_functions_only = true
 ```
 
@@ -1582,23 +1588,48 @@ name = username.strip() if username is not None else ""
 ```
 
 ```python
-# Or supply a fallback. Not reported: with a second argument, `get` cannot
-# return None, so the dereference is safe.
+# Or supply a literal fallback. Not reported: the key being absent now yields
+# the fallback rather than None, so the common dereference is safe.
 name = config.get("username", "").strip()
 ```
 
 **Python fallback arguments.** `get`, `pop` and `next` take a fallback as their
 second argument (`getattr` as its third, if you add it to `nullable_methods`).
-When one is passed and it is not the literal `None`, the result cannot be
-`None`, so the dereference is not reported - `d.get(k, {}).x` is the Python
-safe-navigation idiom and reporting it fired the rule hardest on the code
-written to be safe. The suppression needs positive proof: `d.get(k, None)` still
-reports (the fallback *is* `None`), and so do `d.get(*args)` and
-`d.get(k, **kw)`, where nothing in the syntax says what landed in the fallback
-slot. It is scoped to those names, not to any call with two arguments:
-`session.find("Model", 42).name` and `cursor.fetchone(1, 2).value` take
-arguments that are not fallbacks and still report. JavaScript is unaffected -
-`Map.prototype.get` ignores a second argument rather than returning it, so
+The finding is dropped when that slot holds a **literal** whose value is
+non-`None` by construction: a dict, list, set or tuple display, a string, a
+number, a bool, `...`, a comprehension, a generator expression or a lambda.
+`d.get(k, {}).x` is the Python safe-navigation idiom, and reporting it fired the
+rule hardest on the code written to be safe.
+
+The check is syntactic and one-directional, so anything opaque still reports:
+
+```python
+d.get(k, None).x      # the fallback IS None
+d.get(k, fallback).x  # a name is opaque; it may well BE None
+d.get(k, compute()).x # ...as may a call's return value
+d.get(k, a or b).x    # an or-chain falls through to its last operand
+d.get(*args).x        # a splat hides the positional count
+d.get(k, **kw).x      # ...as does a keyword splat
+d.get(k, default=f).x # a keyword argument is not positional
+```
+
+**Known limits.** A literal fallback does not prove the call cannot return
+`None`, and SAFE803 keeps no model of what values a mapping or an iterator
+holds:
+
+- a mapping that stores `None` under the key returns `None` whatever the default
+  is, so `d.get(k, {}).x` on `{"k": None}` raises and is not reported;
+- `next(it, {})` yields whatever the iterator produced, which may be `None`.
+
+Deciding either needs value tracking the rule does not do. The alternative is to
+report every defaulting lookup, which is the noise this behaviour exists to
+remove, so both misses are accepted deliberately. Guard with an explicit
+comparison where the values themselves may be `None`.
+
+The suppression is scoped to the names above, not to any call with two
+arguments: `session.find("Model", 42).name` and `cursor.fetchone(1, 2).value`
+take arguments that are not fallbacks and still report. JavaScript is unaffected
+- `Map.prototype.get` ignores a second argument rather than returning it, so
 treating it as a fallback there would hide a real null dereference.
 
 **JavaScript, Bad:**

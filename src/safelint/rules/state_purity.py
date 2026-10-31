@@ -1105,13 +1105,39 @@ def _binding_targets(node: tree_sitter.Node) -> list[tree_sitter.Node]:
     return [target for target in targets if target is not None]
 
 
-def _binding_sites(root: tree_sitter.Node) -> set[int]:
-    """Return the byte offsets of every identifier inside *root* that binds a name."""
-    sites: set[int] = set()
+def _pattern_names(root: tree_sitter.Node) -> Iterator[tree_sitter.Node]:
+    """Yield every name node inside *root* that sits at a binding position.
+
+    The one owner of "what counts as a binding": a declarator's name, a
+    parameter list, a function's own name, and the identifiers inside a
+    destructuring pattern. Both the offset set and the name set below are
+    projections of this, and the reference scan excludes exactly these.
+    """
     for node in walk(root):
         for target in _binding_targets(node):
-            sites.update(name.start_byte for name in walk(target) if name.type in _PATTERN_NAME_TYPES)
-    return sites
+            yield from (name for name in walk(target) if name.type in _PATTERN_NAME_TYPES)
+
+
+def _binding_sites(root: tree_sitter.Node) -> set[int]:
+    """Return the byte offsets of every identifier inside *root* that binds a name."""
+    return {name.start_byte for name in _pattern_names(root)}
+
+
+def _reads_by_name(root: tree_sitter.Node, bindings: set[int]) -> dict[str, list[tree_sitter.Node]]:
+    """Group every non-binding identifier inside *root* by its text."""
+    reads: dict[str, list[tree_sitter.Node]] = {}
+    for node in walk(root):
+        if node.type == _js.IDENTIFIER and node.start_byte not in bindings:
+            reads.setdefault(node_text(node), []).append(node)
+    return reads
+
+
+def _binders_by_name(root: tree_sitter.Node) -> dict[str, list[tree_sitter.Node]]:
+    """Group every binding name node inside *root* by its text."""
+    binders: dict[str, list[tree_sitter.Node]] = {}
+    for name in _pattern_names(root):
+        binders.setdefault(node_text(name), []).append(name)
+    return binders
 
 
 def _hoist_scope_root(node: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -1168,11 +1194,7 @@ def _declared_names(declaration: tree_sitter.Node) -> tuple[list[str], set[int]]
 
 def _bound_names(scope: tree_sitter.Node) -> set[str]:
     """Return every name bound anywhere inside *scope*."""
-    names: set[str] = set()
-    for node in walk(scope):
-        for target in _binding_targets(node):
-            names.update(node_text(name) for name in walk(target) if name.type in _PATTERN_NAME_TYPES)
-    return names
+    return {node_text(name) for name in _pattern_names(scope)}
 
 
 def _bound_names_cached(scope: tree_sitter.Node, cache: dict[int, set[str]]) -> set[str]:
@@ -1211,26 +1233,62 @@ def _shadowed_by_nested_scope(ref: tree_sitter.Node, root: tree_sitter.Node, wan
     return False
 
 
-def _references(root: tree_sitter.Node, names: list[str], bindings: set[int]) -> list[tree_sitter.Node]:
-    """Return every identifier inside *root* that READS one of *names*.
+class _ScopeIndex:
+    """Per-hoisting-scope tables, built once per scope rather than once per ``var``.
 
-    Member properties and object keys are a different node type
-    (``property_identifier``), so ``obj.i`` is not mistaken for a read of ``i``.
-    Every binding position is excluded via *bindings* - a name being declared,
-    a parameter, a function's own name - so only actual uses remain.
-
-    Nested functions are deliberately NOT skipped wholesale: a closure reading
-    the binding is what makes a loop ``var`` observable, and a read from a
-    function defined outside the declaring block is what makes an escape
-    observable. Whether a nested read counts differs per hazard, so each
-    predicate decides for itself. A nested function that binds the same name
-    IS skipped, via :func:`_shadowed_by_nested_scope` - those identifiers read
-    the inner binding and say nothing about this one.
+    The three questions each declaration asks - where does this scope bind
+    names, which identifiers read them, which other sites bind them - are
+    properties of the SCOPE, not of the declaration. Answering them with a
+    fresh ``walk`` per declaration made SAFE305 quadratic in the number of
+    ``var``s sharing a function: a module with 200 declarations at program
+    scope walked the whole program 200 times over. Keyed by node id, which is
+    unique per tree, and built lazily so a file with no ``var`` pays nothing.
     """
-    wanted = set(names)
-    cache: dict[int, set[str]] = {}
-    candidates = [node for node in walk(root) if node.type == _js.IDENTIFIER and node.start_byte not in bindings and node_text(node) in wanted]
-    return [node for node in candidates if not _shadowed_by_nested_scope(node, root, wanted, cache)]
+
+    def __init__(self) -> None:
+        self._bindings: dict[int, set[int]] = {}
+        self._reads: dict[int, dict[str, list[tree_sitter.Node]]] = {}
+        self._binders: dict[int, dict[str, list[tree_sitter.Node]]] = {}
+        # Shared across scopes: keyed by the NESTED function being tested, so
+        # the same callback is never re-scanned for a second declaration.
+        self._bound: dict[int, set[str]] = {}
+
+    def binding_sites(self, root: tree_sitter.Node) -> set[int]:
+        """Byte offsets of every binding name node inside *root*."""
+        if root.id not in self._bindings:
+            self._bindings[root.id] = _binding_sites(root)
+        return self._bindings[root.id]
+
+    def reads(self, root: tree_sitter.Node, names: list[str]) -> list[tree_sitter.Node]:
+        """Return every identifier inside *root* that READS one of *names*.
+
+        Member properties and object keys are a different node type
+        (``property_identifier``), so ``obj.i`` is not mistaken for a read of
+        ``i``. Every binding position is excluded, so only actual uses remain -
+        a plain assignment target (``state = 2``) is one of them, which is why
+        the escape message says "used" rather than "read".
+
+        Nested functions are deliberately NOT skipped wholesale: a closure
+        reading the binding is what makes a loop ``var`` observable, and a read
+        from a function defined outside the declaring block is what makes an
+        escape observable. Whether a nested read counts differs per hazard, so
+        each predicate decides for itself. A nested function that binds the
+        same name IS skipped, via :func:`_shadowed_by_nested_scope` - those
+        identifiers read the inner binding and say nothing about this one.
+        """
+        if root.id not in self._reads:
+            self._reads[root.id] = _reads_by_name(root, self.binding_sites(root))
+        table = self._reads[root.id]
+        wanted = set(names)
+        candidates = sorted((node for name in wanted for node in table.get(name, ())), key=lambda node: node.start_byte)
+        return [node for node in candidates if not _shadowed_by_nested_scope(node, root, wanted, self._bound)]
+
+    def binders(self, root: tree_sitter.Node, names: list[str]) -> list[tree_sitter.Node]:
+        """Return every binding name node inside *root* that binds one of *names*."""
+        if root.id not in self._binders:
+            self._binders[root.id] = _binders_by_name(root)
+        table = self._binders[root.id]
+        return [node for name in set(names) for node in table.get(name, ())]
 
 
 def _escapes_block(references: list[tree_sitter.Node], block: tree_sitter.Node | None) -> bool:
@@ -1256,8 +1314,8 @@ def _read_before_declaration(references: list[tree_sitter.Node], declaration: tr
     return any(ref.start_byte < declaration.start_byte and not _function_between(ref, root) for ref in references)
 
 
-def _rebound_in_scope(declaration: tree_sitter.Node, root: tree_sitter.Node, names: list[str], bindings: set[int]) -> bool:
-    """Return True when one of *names* is also bound elsewhere in the same scope.
+def _rebound_in_scope(declaration: tree_sitter.Node, root: tree_sitter.Node, binders: list[tree_sitter.Node]) -> bool:
+    """Return True when one of *binders* binds the declared name somewhere else in *root*.
 
     ``var`` permits a name to be declared twice in one function, and to be
     declared over a parameter; ``let`` rejects both outright. Express has one of
@@ -1290,13 +1348,7 @@ def _rebound_in_scope(declaration: tree_sitter.Node, root: tree_sitter.Node, nam
     root_name = root.child_by_field_name("name")
     if root_name is not None:
         own.add(root_name.start_byte)
-    wanted = set(names)
-    for site in walk(root):
-        if site.start_byte not in bindings or site.start_byte in own:
-            continue
-        if site.type in _PATTERN_NAME_TYPES and node_text(site) in wanted and not _function_between(site, root):
-            return True
-    return False
+    return any(site.start_byte not in own and not _function_between(site, root) for site in binders)
 
 
 def _function_between(node: tree_sitter.Node, ancestor: tree_sitter.Node) -> bool:
@@ -1359,15 +1411,18 @@ class WideScopeDeclarationRule(BaseRule):
     code = "SAFE305"
     language = (_js.EXTRA_NAME, _ts.EXTRA_NAME)
 
-    _ESCAPES_BLOCK = "`var` is read outside the block it is declared in - function-scope hoisting is what makes that work; `let` / `const` would be a ReferenceError"
+    _ESCAPES_BLOCK = "`var` is used outside the block it is declared in - function-scope hoisting is what makes that work; `let` / `const` would be a ReferenceError"
     _READ_BEFORE = "`var` is read before its declaration - hoisting makes that `undefined` instead of an error; `let` / `const` would reject it"
     _LOOP_CAPTURE = "`var` declared in a loop is captured by a function inside it - every closure shares one binding and sees the final value; `let` gives each iteration its own"
-    _REBOUND = "`var` re-declares a name already bound in this function (an earlier `var`, or a parameter) - `let` / `const` reject that outright; rename one of them"
+    # `let` rejects a same-scope duplicate outright; from a nested block it
+    # would instead bind a separate shadowing variable, so the two `var`s stop
+    # being one binding. Different hazard, same fix, hence one message.
+    _REBOUND = "`var` re-declares a name already bound in this function (an earlier `var`, or a parameter) - `let` / `const` would reject or shadow it; rename one of them"
 
-    def _observable_hazard(self, declaration: tree_sitter.Node) -> str | None:
+    def _observable_hazard(self, declaration: tree_sitter.Node, index: _ScopeIndex) -> str | None:
         """Return the message for the hazard *declaration* exhibits, or None if it has none.
 
-        Order matters only for which message is shown; any one of the three is
+        Order matters only for which message is shown; any one of the four is
         enough to report.
         """
         root = _hoist_scope_root(declaration)
@@ -1376,18 +1431,19 @@ class WideScopeDeclarationRule(BaseRule):
         names, _ = _declared_names(declaration)
         if not names:
             return None
-        bindings = _binding_sites(root)
-        references = _references(root, names, bindings)
+        # Checked first, and before the reference guard below, for two reasons.
+        # It needs no reference at all - a duplicate `var` nothing ever reads
+        # still blocks a `let` conversion - and when a name is bound twice the
+        # earlier reads resolve to the earlier binding, so "read before its
+        # declaration" would be the wrong diagnosis for the same line.
+        if _rebound_in_scope(declaration, root, index.binders(root, names)):
+            return self._REBOUND
+        references = index.reads(root, names)
         if not references:
             return None
-        # Checked as a table rather than a chain of early returns: three
-        # independent hazards, any one of which is enough, and the first match
-        # supplies the message.
+        # A table rather than a chain of early returns: three independent
+        # hazards, any one of which is enough, first match supplies the message.
         hazards = (
-            # Before READ_BEFORE: when a name is bound twice, the earlier reads
-            # resolve to the earlier binding, so "read before its declaration"
-            # would be the wrong diagnosis for the same line.
-            (_rebound_in_scope(declaration, root, names, bindings), self._REBOUND),
             (_read_before_declaration(references, declaration, root), self._READ_BEFORE),
             (_captured_in_loop(references, _enclosing_below(declaration, _LOOP_TYPES, root)), self._LOOP_CAPTURE),
             (_escapes_block(references, _enclosing_below(declaration, _BLOCK_SCOPE_TYPES, root)), self._ESCAPES_BLOCK),
@@ -1405,10 +1461,11 @@ class WideScopeDeclarationRule(BaseRule):
         ``const``; there is nothing to fix and nothing to report.
         """
         violations: list[Violation] = []
+        index = _ScopeIndex()
         for node in walk(tree.root_node):
             if node.type != _js.VARIABLE_DECLARATION:
                 continue
-            message = self._observable_hazard(node)
+            message = self._observable_hazard(node, index)
             if message is not None:
                 violations.append(self._make_violation_for_node(filepath, node, message))
         return violations

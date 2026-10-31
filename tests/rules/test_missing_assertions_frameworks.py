@@ -55,8 +55,10 @@ _ASSERTION_FORMS: list[tuple[str, str]] = [
     ("django assertContains", 'self.assertContains(response, "ok")'),
     ("django assertRedirects", 'self.assertRedirects(response, "/next/")'),
     ("django assertTemplateUsed", 'self.assertTemplateUsed(response, "a.html")'),
-    ("django assertNumQueries", "self.assertNumQueries(1)"),
-    ("django assertRaisesMessage", 'self.assertRaisesMessage(ValueError, "no")'),
+    # Two of the Django names are context managers: a bare call builds one and
+    # asserts nothing, so the samples use the form that actually asserts.
+    ("django assertNumQueries", 'with self.assertNumQueries(1):\n        client.get("/x")'),
+    ("django assertRaisesMessage", 'with self.assertRaisesMessage(ValueError, "no"):\n        client.get("/x")'),
     ("django assertFormError", 'self.assertFormError(form, "field", "bad")'),
     ("django assertJSONEqual", 'self.assertJSONEqual(response.content, "{}")'),
     ("django assertHTMLEqual", 'self.assertHTMLEqual(a, "<p>x</p>")'),

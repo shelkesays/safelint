@@ -143,6 +143,13 @@ FALSE = "false"
 NONE = "none"
 INTEGER = "integer"
 FLOAT = "float"
+ELLIPSIS = "ellipsis"
+
+LAMBDA = "lambda"
+LIST_COMPREHENSION = "list_comprehension"
+DICTIONARY_COMPREHENSION = "dictionary_comprehension"
+SET_COMPREHENSION = "set_comprehension"
+GENERATOR_EXPRESSION = "generator_expression"
 
 FOR_IN_CLAUSE = "for_in_clause"
 IF_CLAUSE = "if_clause"

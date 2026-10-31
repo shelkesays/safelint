@@ -1346,13 +1346,49 @@ class NullDereferenceRule(BaseRule):
         }
     )
 
+    # Fallback expressions whose VALUE is non-``None`` by construction, read off
+    # the syntax alone. An allow-list rather than "anything but the ``None``
+    # literal": a bare name, a call or a ``x or y`` chain is opaque here, and
+    # ``d.get(k, fallback)`` where ``fallback`` happens to be ``None`` is a real
+    # dereference the rule has no business silencing. Narrowing to the literal
+    # forms keeps the idiom that #155 was about (``d.get(k, {}).x`` and friends)
+    # quiet without claiming to have proved anything about an opaque expression.
+    _PYTHON_NON_NONE_LITERALS: ClassVar[frozenset[str]] = frozenset(
+        {
+            _py.DICTIONARY,
+            _py.LIST,
+            _py.SET,
+            _py.TUPLE,
+            _py.STRING,
+            _py.CONCATENATED_STRING,
+            _py.INTEGER,
+            _py.FLOAT,
+            _py.TRUE,
+            _py.FALSE,
+            _py.ELLIPSIS,
+            _py.LAMBDA,
+            _py.LIST_COMPREHENSION,
+            _py.DICTIONARY_COMPREHENSION,
+            _py.SET_COMPREHENSION,
+            _py.GENERATOR_EXPRESSION,
+        }
+    )
+
     def _python_fallback_rules_out_none(self, call: tree_sitter.Node, name: str) -> bool:
-        """Return True when *call* passes a fallback that cannot be ``None``.
+        """Return True when *call* passes a literal fallback that cannot be ``None``.
 
         Deliberately one-directional: it only suppresses on positive proof that
-        a non-``None`` fallback occupies the fallback slot. An unknown shape
-        keeps the finding, so ``d.get(*args)`` and ``d.get(k, **kw)`` still
-        report, as does the explicit ``d.get(k, None)``.
+        a non-``None`` literal occupies the fallback slot. Every unknown shape
+        keeps the finding, so ``d.get(*args)``, ``d.get(k, **kw)``,
+        ``d.get(k, fallback)`` and ``d.get(k, compute())`` all still report, as
+        does the explicit ``d.get(k, None)``.
+
+        What this does NOT prove is that the CALL cannot return ``None``: a
+        mapping that stores ``None`` under the key returns it regardless of the
+        default, and nothing in the syntax says whether it does. Deciding that
+        needs value tracking the rule does not have, so it accepts the miss
+        rather than firing on every defaulting lookup; see the SAFE803 limits in
+        ``docs/configuration/rules.md``.
         """
         index = self._PYTHON_FALLBACK_ARG_INDEX.get(name)
         if index is None:
@@ -1365,7 +1401,7 @@ class NullDereferenceRule(BaseRule):
             return False
         if any(child.type in self._PYTHON_UNPOSITIONABLE_ARGS for child in passed[: index + 1]):
             return False
-        return passed[index].type != _py.NONE
+        return passed[index].type in self._PYTHON_NON_NONE_LITERALS
 
     def _python_deref_hit(self, node: tree_sitter.Node, nullable: frozenset[str]) -> str | None:
         """Return the method name if *node* is an unsafe Python dereference, else None."""

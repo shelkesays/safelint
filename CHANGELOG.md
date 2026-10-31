@@ -32,6 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   If you want every `var` reported as a codemod trigger, this rule no longer does that; `eslint no-var` is built for it.
 
+  Review follow-ups on the fix itself, all on PR #248. The scope tables the rule needs - where this scope binds names, which identifiers read them, which other sites bind them - are properties of the scope, not of the declaration, but were rebuilt with a fresh tree walk for every `var`. That made the rule quadratic in the number of declarations sharing a function, which bites hardest on exactly the legacy files it is aimed at: a synthetic 1000-`var` function took **11.1s**, and 2000 took **45.1s** (4x per doubling). They are now built once per scope and cached, which is linear: the same files take **0.075s** and **0.160s**. Express and Axios report identically before and after (3 and 0 SAFE305), so this is a pure cost change.
+
+  Two behaviour corrections from the same review. A redeclaration is now reported even when nothing reads the name - the other three shapes need a reference to be observable, but `let` rejects a duplicate binding whether or not it is ever read, so bailing out early was wrong. And the escape message said a `var` is "read" outside its block when a plain assignment (`state = 2`) triggers it just as much; it now says "used". The redeclaration message no longer claims `let` rejects every such case either: at the same scope it does, but from a nested block `let` would quietly bind a *separate* shadowing variable instead, which is a different hazard with the same fix (rename one of them).
+
 - **SAFE801 `tainted_sink`: a zero-argument call is no longer treated as a receiver-payload sink (#158).** Every tracker reported a tainted receiver when the call had no arguments, on the reasoning that a no-argument call must be carrying its payload in the receiver. It need not:
 
   ```php
@@ -50,16 +54,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
   The Django names are unconditional rather than gated behind `[python] framework = "django"`. Every one is spelled `assert*` and nothing else defines them, so counting one as an assertion is right in any project, and a false-positive fix should not depend on the preset being configured. Adding a name here can only ever suppress a finding, never raise one, which is also why the change ships with a control test asserting that a test with no assertion at all still reports.
 
-- **SAFE803 `null_dereference`: a call that passes a fallback cannot return `None` (#155).** `d.get(k, default)` returns `default` when the key is absent, so it cannot return `None` unless the fallback itself is `None`. The rule matched on the call name alone and never looked at the arguments, so it reported `config.get("connector", {}).get("timezone", "UTC").strip()` - which is *the* Python safe-navigation idiom. The rule fired hardest on the code written to be safe; on the project where this was found, the defaulting form was the large majority of the 31 SAFE803 findings.
+- **SAFE803 `null_dereference`: a literal fallback argument stops the finding (#155).** `d.get(k, default)` returns `default` when the key is absent, so the defaulting form is *the* Python safe-navigation idiom. The rule matched on the call name alone and never looked at the arguments, so it reported `config.get("connector", {}).get("timezone", "UTC").strip()`: it fired hardest on the code written to be safe. On the project where this was found, the defaulting form was the large majority of the 31 SAFE803 findings.
 
-  The fallback slot is now checked for the four default `nullable_methods` names that have one: `get`, `pop` and `next` take it second, `getattr` third (not a default entry, but handled for anyone who adds it). The suppression requires positive proof, so these all still report:
+  The fallback slot is now checked for the three default `nullable_methods` names that have one - `get`, `pop` and `next`, all taking it second - plus `getattr`, which takes it third and is handled for anyone who adds it (it is not a default entry). The fallback must be a **literal** whose value is non-`None` by construction - a dict, list, set or tuple display, a string, a number, a bool, `...`, a comprehension, a generator expression or a lambda. Everything else still reports:
 
   ```python
   d.get(k, None).x      # the fallback IS None
+  d.get(k, fallback).x  # a name is opaque; it may well BE None
+  d.get(k, compute()).x # ...as may a call's return value
+  d.get(k, a or b).x    # an or-chain falls through to its last operand
   d.get(*args).x        # a splat hides the positional count
   d.get(k, **kw).x      # ...as does a keyword splat
   d.get(k, default=f).x # a keyword argument is not positional
   ```
+
+  Two limits worth stating, because the suppression is syntactic and does not prove the call cannot return `None`. A mapping that stores `None` under the key returns it whatever the default is, and `next(it, {})` yields whatever the iterator produced if it produced `None`; neither is visible in the syntax. Deciding those needs value tracking the rule does not have, so it takes the miss instead of firing on every defaulting lookup, which is the noise the issue was filed about. Both are pinned by tests so the gap is recorded rather than discovered.
 
   It is scoped to those names rather than "any call with two arguments": `session.find("Model", 42).name` and `cursor.fetchone(1, 2).value` take arguments that are not fallbacks and still report. JavaScript is unchanged, deliberately - `Map.prototype.get` ignores a second argument rather than returning it, so treating one as a fallback there would hide a real null dereference.
 
