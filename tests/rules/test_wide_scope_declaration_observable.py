@@ -379,3 +379,78 @@ def test_shadowing_a_named_function_expressions_own_name_is_legal(tmp_path: Path
         """,
     )
     assert _safe305(sample) == []
+
+
+def test_a_redeclaration_nothing_reads_still_reports(tmp_path: Path) -> None:
+    """A duplicate `var` with no reads at all is still a blocker for `let`.
+
+    The other three hazards all need a reference to be observable, so the rule
+    bails early when a declaration has none; a redeclaration does not. `let x`
+    twice in one scope is rejected by the engine whether or not anything ever
+    reads `x`, so the check runs before that guard.
+    """
+    sample = _write(
+        tmp_path,
+        "unread_redeclare.js",
+        """\
+        function f() {
+          var only = 1;
+          var only = 2;
+        }
+        """,
+    )
+    messages = _safe305(sample)
+    assert len(messages) == 2
+    assert all("re-declares" in message for message in messages)
+
+
+def test_the_escape_message_covers_a_write_not_only_a_read(tmp_path: Path) -> None:
+    """`state = 2` outside the block is a use, so the message must not say "read".
+
+    An assignment target is not a binding position, so it counts as a reference
+    like any other identifier; saying "read" about it was simply wrong.
+    """
+    sample = _write(
+        tmp_path,
+        "write_outside.js",
+        """\
+        function f(c) {
+          if (c) {
+            var state = 1;
+          }
+          state = 2;
+          return c;
+        }
+        """,
+    )
+    messages = _safe305(sample)
+    assert len(messages) == 1
+    assert "is used outside the block" in messages[0]
+
+
+def test_one_scope_is_indexed_once_for_many_declarations(tmp_path: Path) -> None:
+    """Many `var`s in one scope must not cost a full scope walk each (#248 review).
+
+    The per-declaration walks made the rule quadratic in the declaration count.
+    Timing is too machine-dependent to assert on, so this pins the observable
+    consequence instead: a file with many quiet declarations is analysed, stays
+    quiet, and the one genuine hazard among them is still found.
+    """
+    quiet = "\n".join(f"  var v{n} = {n};\n  total += v{n};" for n in range(200))
+    sample = _write(
+        tmp_path,
+        "many.js",
+        f"""\
+        function f(c) {{
+          var total = 0;
+        {quiet}
+          if (c) {{
+            var found = 1;
+          }}
+          return total + found;
+        }}
+        """,
+    )
+    messages = _safe305(sample)
+    assert len(messages) == 1
+    assert "is used outside the block" in messages[0]
