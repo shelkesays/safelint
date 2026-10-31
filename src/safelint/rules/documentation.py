@@ -225,7 +225,16 @@ class MissingAssertionsRule(BaseRule):
         Python uses the bare key, every other language the ``_<lang>`` suffix.
         """
         raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", lang_name, default=[])
-        return frozenset(_validated_string_list(raw, error_key))
+        names = _validated_string_list(raw, error_key)
+        # ``extend_assertion_calls`` appends instead of replacing, so a project
+        # adding one helper does not have to copy the 66-name default list and
+        # then maintain it against future releases (#220). Same split as
+        # ``resource_lifecycle``'s ``extend_tracked_functions``, and per
+        # language through the same key chain, so a TS file picks up
+        # ``extend_assertion_calls_javascript`` exactly as it inherits the base
+        # list. Absent from DEFAULTS by design: an extension defaults to empty.
+        extra_raw, extra_key = resolve_lang_config_lookup(self.config, "extend_assertion_calls", lang_name, default=[])
+        return frozenset(names + _validated_string_list(extra_raw, extra_key))
 
     @staticmethod
     def _assertion_count(func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str], assertion_calls: frozenset[str], minimum: int) -> int:
