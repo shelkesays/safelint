@@ -120,33 +120,46 @@ jobs:
             # which is why the wording tells the reader when to care rather than
             # implying every reset lost something.
             AHEAD=$(git rev-list --count "$MAIN..$DEV")
-            if [ "$AHEAD" -eq 0 ]; then
-              echo "::notice::development was an ancestor of main ($AHEAD commits ahead); reset is lossless. Previous tip archived at $ARCHIVE."
-            else
-              echo "::warning::development had $AHEAD commit(s) not reachable from main; they are preserved at $ARCHIVE - recover from there if the release did not just ship them"
-            fi
-            {
-              echo "### development synced to main"
-              echo
-              echo "- previous tip \`$DEV_SHORT\` archived to \`$ARCHIVE\`"
-              if [ "$AHEAD" -eq 0 ]; then
-                echo "- development was an ancestor of main, so nothing was unreachable; the reset is lossless"
-              else
-                echo "- \`$AHEAD\` commit(s) were not reachable from main (expected after a squash release)"
-                echo "- recover with \`git fetch origin $ARCHIVE\` if that work had not been released"
-              fi
-            } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
             # Push main's commit straight at the remote ref rather than moving a
             # local branch first: `git branch -f development` fails outright if
             # that branch happens to be checked out, and nothing here needs a
             # local branch.
+            #
+            # Everything is reported AFTER this push succeeds, never before: an
+            # attempt that loses the lease retries with a different tip, so a
+            # report written ahead of the push would be duplicated per attempt
+            # and - if all three attempts failed - would claim a sync that never
+            # happened.
             if git push --force-with-lease=development:"$DEV" "$REPO_URL" "$MAIN:refs/heads/development"; then
+              if [ "$AHEAD" -eq 0 ]; then
+                echo "::notice::development was an ancestor of main ($AHEAD commits ahead); reset is lossless. Previous tip archived at $ARCHIVE."
+              else
+                echo "::warning::development had $AHEAD commit(s) not reachable from main; they are preserved at $ARCHIVE - recover from there if the release did not just ship them"
+              fi
+              {
+                echo "### development synced to main"
+                echo
+                echo "- previous tip \`$DEV_SHORT\` archived to \`$ARCHIVE\`"
+                if [ "$AHEAD" -eq 0 ]; then
+                  echo "- development was an ancestor of main, so nothing was unreachable; the reset is lossless"
+                else
+                  echo "- \`$AHEAD\` commit(s) were not reachable from main (expected after a squash release)"
+                  echo "- recover with \`git fetch origin $ARCHIVE\` if that work had not been released"
+                fi
+              } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
               echo "::notice::development reset to main ($(git rev-parse --short "$MAIN")); previous tip kept at $ARCHIVE"
               exit 0
             fi
             echo "::warning::development moved during attempt $attempt (lease rejected); re-reading and retrying"
+            FAILED_ARCHIVES="${FAILED_ARCHIVES:+$FAILED_ARCHIVES, }$ARCHIVE"
           done
 
-          echo "::error::could not reset development after 3 attempts - it kept moving. Re-run this workflow once pushes to development have settled."
+          {
+            echo "### development was NOT synced to main"
+            echo
+            echo "- development kept moving; the reset was abandoned after 3 attempts"
+            echo "- development is unchanged, and each tip seen along the way is archived: ${FAILED_ARCHIVES:-none}"
+          } >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+          echo "::error::could not reset development after 3 attempts - it kept moving. development is unchanged; re-run this workflow once pushes to development have settled."
           exit 1
