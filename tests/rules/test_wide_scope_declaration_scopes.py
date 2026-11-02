@@ -176,6 +176,30 @@ _SHADOWING_BINDINGS: list[tuple[str, str]] = [
         """,
     ),
     (
+        "a named class expression in the initialiser",
+        # The inner `Foo` is scoped to the class body, so `let Foo = class Foo
+        # {}` parses and there is nothing to rename. Found by review on the fix
+        # above: testing for "somewhere inside a `var` declaration" counted
+        # bindings in the INITIALISER, which belong to their own construct.
+        """\
+        function f() {
+          var Foo = class Foo {};
+          return Foo;
+        }
+        """,
+    ),
+    (
+        "a named function expression in the initialiser",
+        # The same shape, already excluded by the nested-function filter rather
+        # than by the declarator test; here as a control that it stays quiet.
+        """\
+        function f() {
+          var bar = function bar() {};
+          return bar;
+        }
+        """,
+    ),
+    (
         "a class declaration of the same name",
         """\
         function i(c) {
