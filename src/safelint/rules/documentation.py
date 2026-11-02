@@ -256,9 +256,11 @@ def _counts_as_go_assertion(call_node: tree_sitter.Node, spec: _AssertionSpec, t
     The receiver decides, because the shipped names are METHODS on
     ``testing.T`` and ``call_name`` strips the receiver before matching:
 
-    * **No receiver** - a bare call, matched on name alone exactly as every
-      other language does, which is what lets a project add its own helper to
-      ``assertion_calls_go``.
+    * **A bare call** - matched on name alone exactly as every other language
+      does, which is what lets a project add its own helper to
+      ``assertion_calls_go``. The callee has to be a plain identifier to
+      qualify; a receiver safelint cannot read is not the same thing as no
+      receiver at all.
     * **A receiver in ``assertion_receivers_go``** - testify's ``assert.`` /
       ``require.``, where the package is the signal and the function name is
       one of dozens.
@@ -267,14 +269,35 @@ def _counts_as_go_assertion(call_node: tree_sitter.Node, spec: _AssertionSpec, t
       ``fmt.Errorf("...")`` and ``err.Error()`` counted as assertions, which is
       not an edge case in Go: either one inside a test silenced the finding
       completely.
+
+    Anything else does not count. A chained or computed receiver
+    (``s.logger.Errorf(...)``, ``newLogger().Fatal(...)``) reaches no shape: it
+    is not a bare call, and nothing identifies it as ``testing``-typed or as a
+    testify package.
     """
     name = call_name(call_node)
+    if _is_bare_go_call(call_node):
+        return name in spec.calls
     receiver = _go_receiver_name(call_node)
     if receiver is None:
-        return name in spec.calls
+        return False
     if receiver in spec.receivers:
         return True
     return receiver in testing_receivers and name in spec.calls
+
+
+def _is_bare_go_call(call_node: tree_sitter.Node) -> bool:
+    """Return True when *call_node*'s callee is a plain identifier.
+
+    ``mustEqual(...)`` is bare; ``t.Fatalf(...)``, ``s.logger.Errorf(...)`` and
+    ``newLogger().Fatal(...)`` are not. Asking this separately is what keeps
+    "safelint found no receiver" apart from "this call has a receiver safelint
+    declined to resolve": ``_go_receiver_name`` answers ``None`` to both, and
+    reading that as a bare call credited every nested-selector call whose
+    trailing name happened to be configured.
+    """
+    callee = call_node.child_by_field_name("function")
+    return callee is not None and callee.type == _go.IDENTIFIER
 
 
 def _go_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], spec: _AssertionSpec, minimum: int) -> int:

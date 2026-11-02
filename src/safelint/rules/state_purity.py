@@ -1064,7 +1064,13 @@ _BLOCK_SCOPE_TYPES = frozenset(
         _js.STATEMENT_BLOCK,
         _js.FOR_STATEMENT,  # the loop HEAD: `for (var i = 0; ...)`
         _js.FOR_IN_STATEMENT,  # covers for-of too (one grammar node)
-        _js.SWITCH_CASE,
+        # The whole switch body, NOT the individual ``switch_case``: a case
+        # clause is not a lexical scope, so every case and the ``default``
+        # share one. Scoping per case made two ``var y`` in different cases
+        # read as disjoint, so the redeclaration that `let` rejects outright
+        # went unreported, and put ``default:`` on a different scope from its
+        # siblings (it has its own node type, which was in no table at all).
+        _js.SWITCH_BODY,
         _js.CATCH_CLAUSE,
     }
 )
@@ -1354,7 +1360,64 @@ def _other_binders(declaration: tree_sitter.Node, root: tree_sitter.Node, binder
     root_name = root.child_by_field_name("name")
     if root_name is not None:
         own.add(root_name.start_byte)
-    return [site for site in binders if site.start_byte not in own and not _function_between(site, root)]
+    return [site for site in binders if site.start_byte not in own and not _function_between(site, root) and _merges_with_var(site, root)]
+
+
+# Declaration wrappers that decide whether a binding MERGES with a ``var`` of
+# the same name or SHADOWS it. ``var`` hoists to the function, so a second
+# ``var`` is the same binding and `let` rejects the pair; a `let` / `const`, a
+# catch parameter and a class name each create their own, which `let` is free
+# to shadow. A parameter also merges, but is recognised by position rather than
+# by a wrapper type (see ``_merges_with_var``).
+_SHADOWING_WRAPPERS = frozenset({_js.LEXICAL_DECLARATION, _js.CATCH_CLAUSE, _js.CLASS_DECLARATION})
+
+
+def _merges_with_var(site: tree_sitter.Node, root: tree_sitter.Node) -> bool:
+    """Return True when *site* binds the name in the same binding as a ``var`` would.
+
+    Only another ``var`` declarator or one of *root*'s own parameters does.
+    Everything else is a separate, legally shadowing binding, so reporting it
+    asked for a rename that nothing requires:
+
+        function f() {
+          var err = null;
+          try { run(); } catch (err) { log(err); }   // its own binding
+          return err;
+        }
+
+        function g(c) {
+          var x = 1;
+          if (c) { const x = 2; use(x); }            // ...so is this
+          return x;
+        }
+
+    Converting either ``var`` to ``let`` parses and behaves identically, which
+    is the test for whether this rule has anything to say. Counting them
+    brought back a slice of exactly the noise #201 removed.
+
+    A ``let`` at the SAME scope as the ``var`` is a genuine collision, but it
+    is also an unconditional SyntaxError, so no running codebase contains one
+    and there is nothing to warn anybody about.
+
+    *root*'s parameters are recognised through ``_binding_targets``, the same
+    owner the binding scan itself uses, rather than by naming the parameter-list
+    node types here; that keeps the TypeScript wrappers and the
+    unparenthesised arrow form (``x => { var x = 1; }``) working without a
+    second list to maintain.
+    """
+    parameters = [target for target in _binding_targets(root) if target != root.child_by_field_name("name")]
+    if any(target.start_byte <= site.start_byte and site.end_byte <= target.end_byte for target in parameters):
+        return True
+    current = site.parent
+    while current is not None:
+        if current == root:
+            break
+        if current.type == _js.VARIABLE_DECLARATION:
+            return True
+        if current.type in _SHADOWING_WRAPPERS:
+            return False
+        current = current.parent
+    return False
 
 
 def _rebound_in_scope(declaration: tree_sitter.Node, root: tree_sitter.Node, others: list[tree_sitter.Node]) -> bool:

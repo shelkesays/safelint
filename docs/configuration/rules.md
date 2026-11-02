@@ -754,6 +754,26 @@ function f(a, b) {
 
 `if (c) { var x = 1; } else { var x = 2; }` is the same case. An inner block *is* contained by the outer one, so `if (c) { var x = 1; if (d) { var x = 2; } }` does report.
 
+A `switch` is **one** scope, not one per case: the braces of the `switch` open the scope that every `case` and the `default` share. So two `var y` in different cases of the same switch are a redeclaration (as `let` they are a `SyntaxError`), while two different names across cases are not.
+
+Only a binding that **merges** with the `var` counts as a redeclaration: another `var` declarator, or one of the function's own parameters. A `let` / `const` in a nested block, a catch parameter and a class name each create their own binding that `let` is free to shadow, so none of these is reported:
+
+```javascript
+function f() {
+  var err = null;
+  try { run(); } catch (err) { log(err); }   // catch binds its own `err`
+  return err;                                // `let err` above parses fine
+}
+
+function g(c) {
+  var x = 1;
+  if (c) { const x = 2; use(x); }            // ...and so does this
+  return x;
+}
+```
+
+**Known limit.** A `var` declared in one `case` and read from a **later** `case` is not reported. It works as `var` and throws `Cannot access 'w' before initialization` as `let`, so it does block the conversion, but it is none of the four shapes: the declaration comes first in source order, and both sites are in the one switch scope.
+
 The fix is mechanical in the first three cases: replace `var` with `let` (when the binding is reassigned later) or `const` (when it isn't). The rule fires once per `variable_declaration` node, so a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
 
 If you want the old behaviour - every `var` reported, as a codemod trigger for a "modernise this codebase" pass - the rule does not provide it; use a linter rule built for that (`eslint no-var`), which is what it was competing with.
@@ -1220,7 +1240,7 @@ It was off until 2.16.0, which enforced the paper's intent literally (assertions
 | `test_markers` | `["test", "rstest"]` (Rust), `["Test", "ParameterizedTest", "RepeatedTest", "TestTemplate"]` (Java), `[]` elsewhere | Attributes / annotations that mark a function as a test case, whatever it is named and wherever it lives. *Added in 2.16.0.* |
 | `test_dirs` | `["tests", "test", "__tests__", "spec"]` | Directories marking a file as a test file, matched as a path-component subsequence (same key and default as SAFE701 / 702). *Added in 2.12.0.* |
 
-`assertion_calls` and `extend_assertion_calls` are alternatives in practice. They are not mutually exclusive, but setting both appends to the **replaced** list, not to the defaults: with `assertion_calls = ["assertEqual"]` and `extend_assertion_calls = ["verify_invariant"]` the resolved list is exactly those two names, and the other 64 defaults are gone. Pick `extend_*` to add to the defaults, or `assertion_calls` to state the whole list yourself.
+`assertion_calls` and `extend_assertion_calls` are alternatives in practice. They are not mutually exclusive, but setting both appends to the **replaced** list, not to the defaults: with `assertion_calls = ["assertEqual"]` and `extend_assertion_calls = ["verify_invariant"]` the resolved list is exactly those two names, and the other 65 defaults are gone. Pick `extend_*` to add to the defaults, or `assertion_calls` to state the whole list yourself.
 
 A relative `test_dirs` entry is anchored at the file's own project root (the nearest directory above it holding a `safelint.toml` or a `pyproject.toml` with a `[tool.safelint]` section), falling back to the working directory when there is none. So `["tests"]` matches a monorepo's per-package test trees at any depth, while a checkout that happens to live under `~/tests/` is not read as all test code. A project with no safelint config of its own therefore needs safelint run from its root for a relative entry to match; an absolute entry is always anchored exactly as given.
 
