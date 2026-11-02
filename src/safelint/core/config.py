@@ -1023,6 +1023,31 @@ DEFAULTS: dict[str, Any] = {
                 "assertInstanceOf",
                 # AssertJ / Hamcrest entry point
                 "assertThat",
+                # AssertJ's exception entry points: the assertion IS the call,
+                # and none of them routes through ``assertThat``.
+                "assertThatThrownBy",
+                "assertThatExceptionOfType",
+                "assertThatNoException",
+                "assertThatCode",
+                # Truth's message form. ``assertWithMessage("...").that(x)``
+                # never calls ``assertThat``, so a Truth test written this way
+                # read as assertion-free (seen throughout Guava's own tests).
+                "assertWithMessage",
+                # Spring MVC test: ``mockMvc.perform(...).andExpect(status().isOk())``
+                # is THE assertion in a @WebMvcTest, and ``call_name`` resolves
+                # the chained call to ``andExpect``. Without it every MockMvc
+                # test reads as assertion-free: on spring-petclinic that was all
+                # 45 of the remaining SAFE601 findings. Kept in the base Java
+                # list rather than the spring-boot preset because the name
+                # belongs to spring-test, which a project can use without the
+                # preset, and nothing else defines it.
+                "andExpect",
+                "andExpectAll",
+                # Mockito: a verification IS the assertion in an interaction
+                # test, and such a test often has no other.
+                "verify",
+                "verifyNoInteractions",
+                "verifyNoMoreInteractions",
                 # Common short forms
                 "fail",
             ],
