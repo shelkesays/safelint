@@ -138,11 +138,20 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
     Purely lexical (``.absolute()``, never ``.resolve()``, so no symlink is
     followed and the filesystem is not probed).
     """
-    # Normalise both sides to absolute paths before the parts comparison.
-    # Without this, a relative ``filepath`` (``tests/conftest.js``) wouldn't
-    # match against an absolute ``test_dirs`` entry (``/abs/project/tests``)
-    # and helper files under the test root would be misclassified as source.
-    # ``.absolute()`` (not ``.resolve()``) avoids following symlinks.
+    # Absolute entries are matched against the file's absolute path, so a
+    # relative ``filepath`` (``tests/conftest.js``) still matches an absolute
+    # ``test_dirs`` entry (``/abs/project/tests``) and helper files under the
+    # test root are not misclassified as source. ``.absolute()`` (not
+    # ``.resolve()``) avoids following symlinks.
+    #
+    # A RELATIVE entry is anchored at the file's own project root, the same way
+    # ``_under_test_dir`` anchors the exclusion side. Absolutising the entry
+    # against the working directory instead meant that ``safelint check
+    # /abs/project`` run from anywhere else matched nothing: every relative
+    # ``test_dirs`` entry silently failed, so a whole project's tests read as
+    # production code. That is an ordinary CI invocation, and since
+    # ``test_functions_only`` became the default it costs the entire rule for
+    # the languages with no marker route rather than merely mis-scoping it.
     #
     # Deliberately NOT normalised, unlike the exclusion path in
     # ``_under_test_dir``. Leaving ``..`` in place is what contains a
@@ -154,9 +163,11 @@ def _is_test_file(filepath: str, test_dirs: list[str], lang_name: str) -> bool:
     # here; that errs toward scoping SAFE601/701/702 INTO a file, which is the
     # safe direction for rules that look for tests.
     path_parts = Path(filepath).absolute().parts
+    within_project = _project_relative_parts(path_parts)
     for td in test_dirs:
-        td_parts = Path(td).absolute().parts
-        if _path_components_contain(path_parts, td_parts):
+        entry = Path(td)
+        haystack = path_parts if entry.is_absolute() else within_project
+        if _path_components_contain(haystack, entry.parts):
             return True
     return _filename_matches_test_pattern(filepath, lang_name)
 
@@ -267,8 +278,13 @@ def _under_test_dir(filepath: str, test_dirs: list[str]) -> bool:
     return False
 
 
-def _project_relative_parts(normalised_parts: tuple[str, ...]) -> tuple[str, ...]:
+def _project_relative_parts(absolute_parts: tuple[str, ...]) -> tuple[str, ...]:
     """Return the components below the file's PROJECT root, or ``()``.
+
+    Called from both directions. The exclusion path passes NORMALISED parts; the
+    inclusion path passes absolute-but-unnormalised ones, deliberately, so a
+    ``tests/../src/foo.py`` keeps its ``tests`` component and stays classified
+    as a test file. Everything here is lexical, so either input works.
 
     The project root is the directory holding the active config, discovered by
     walking up from the file itself - the same anchor the cache-dir resolver
@@ -290,7 +306,7 @@ def _project_relative_parts(normalised_parts: tuple[str, ...]) -> tuple[str, ...
     so the normal case is not an exception path - and so this helper does not
     itself trip SAFE202 / SAFE203 on an ``except`` that returns a value.
     """
-    path = Path(*normalised_parts) if normalised_parts else Path()
+    path = Path(*absolute_parts) if absolute_parts else Path()
     root = _project_root_for(path)
     if not path.is_relative_to(root):
         return ()
