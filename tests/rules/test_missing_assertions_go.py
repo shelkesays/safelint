@@ -249,3 +249,41 @@ def test_a_bare_configured_helper_still_counts_without_a_receiver(tmp_path: Path
     assert _safe601(_engine(), sample) == ['Function "TestX" has no assertions']
     engine = _engine({"rules": {"missing_assertions": {"extend_assertion_calls_go": ["mustEqual"]}}})
     assert _safe601(engine, sample) == []
+
+
+# (label, call) - a receiver safelint cannot resolve, whose trailing name IS a
+# configured failure method. The chained-receiver test above uses `Equal`, which
+# is not in `assertion_calls_go`, so it passed on name matching alone and left
+# this gap uncovered.
+_UNRESOLVED_RECEIVERS: list[tuple[str, str]] = [
+    ("a nested selector receiver", 's.logger.Errorf("something happened")'),
+    ("a field on a struct field", 'suite.deps.log.Fatalf("boom")'),
+    ("a receiver returned by a call", 'newLogger().Fatal("boom")'),
+    ("an indexed receiver", 'loggers[0].Error("boom")'),
+]
+
+
+@pytest.mark.parametrize(["label", "call"], _UNRESOLVED_RECEIVERS, ids=[case[0] for case in _UNRESOLVED_RECEIVERS])
+def test_an_unresolved_receiver_is_not_a_bare_call(tmp_path: Path, label: str, call: str) -> None:
+    """A receiver safelint declined to resolve is not the same as no receiver at all.
+
+    ``_go_receiver_name`` answers ``None`` to both a genuinely bare call and a
+    selector whose operand is not a plain identifier. Reading that as "bare" put
+    these calls on the name-only path, so ``s.logger.Errorf("...")`` in an
+    otherwise assertion-free test counted as an assertion - the very failure the
+    receiver rule exists to prevent, arriving through the other branch.
+    """
+    sample = _write(tmp_path, f"func TestX(t *testing.T) {{\n\t{call}\n}}\n")
+    assert _safe601(_engine(), sample) == ['Function "TestX" has no assertions'], label
+
+
+def test_a_configured_receiver_still_wins_over_the_bare_path(tmp_path: Path) -> None:
+    """Narrowing the bare-call path must not cost testify or the ``testing`` receiver.
+
+    Both of these have a receiver and must still count, so the fix is a
+    narrowing of one branch rather than a change to what an assertion is.
+    """
+    testify = _write(tmp_path, "func TestX(t *testing.T) {\n\tassert.Equal(t, 1, 1)\n}\n")
+    assert _safe601(_engine(), testify) == []
+    testing_param = _write(tmp_path, 'func TestY(t *testing.T) {\n\tt.Fatalf("real failure")\n}\n', name="y_test.go")
+    assert _safe601(_engine(), testing_param) == []

@@ -121,6 +121,7 @@ FOR_OF_STATEMENT = "for_of_statement"  # not actually emitted by the grammar - f
 WHILE_STATEMENT = "while_statement"
 DO_STATEMENT = "do_statement"
 SWITCH_STATEMENT = "switch_statement"
+SWITCH_BODY = "switch_body"  # the ``{ ... }`` holding every case; ONE lexical scope
 SWITCH_CASE = "switch_case"
 TRY_STATEMENT = "try_statement"
 CATCH_CLAUSE = "catch_clause"
