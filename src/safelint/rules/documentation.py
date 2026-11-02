@@ -16,7 +16,7 @@ from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
 from safelint.rules._test_files import _DEFAULT_TEST_DIRS, _is_test_file
-from safelint.rules._test_identity import describe_function, marked_as_test, registers_tests
+from safelint.rules._test_identity import describe_function, is_harness, marked_as_test, registers_tests
 from safelint.rules.base import BaseRule
 
 
@@ -226,13 +226,65 @@ def _go_receiver_name(call_node: tree_sitter.Node) -> str | None:
     return node_text(operand)
 
 
+def _go_testing_receivers(func_node: tree_sitter.Node) -> frozenset[str]:
+    """Return the parameter names *func_node* declares with a ``testing`` type.
+
+    ``func TestX(t *testing.T)`` yields ``{"t"}``, ``func(b *testing.B)``
+    ``{"b"}``, and a shared helper taking ``tb testing.TB`` ``{"tb"}``. A
+    subtest literal declares its own, so each is resolved against the function
+    being counted rather than the outermost test.
+
+    Matched on the type's source text containing ``testing.``, which covers the
+    pointer, value and interface forms without enumerating them.
+    """
+    parameters = func_node.child_by_field_name("parameters")
+    if parameters is None:  # pragma: no cover - defensive: every Go function has a parameter list
+        return frozenset()
+    names = set()
+    for declaration in parameters.named_children:
+        name = declaration.child_by_field_name("name")
+        type_node = declaration.child_by_field_name("type")
+        if name is None or type_node is None or "testing." not in node_text(type_node):
+            continue
+        names.add(node_text(name))
+    return frozenset(names)
+
+
+def _counts_as_go_assertion(call_node: tree_sitter.Node, spec: _AssertionSpec, testing_receivers: frozenset[str]) -> bool:
+    """Return True when *call_node* is an assertion, by one of Go's three shapes.
+
+    The receiver decides, because the shipped names are METHODS on
+    ``testing.T`` and ``call_name`` strips the receiver before matching:
+
+    * **No receiver** - a bare call, matched on name alone exactly as every
+      other language does, which is what lets a project add its own helper to
+      ``assertion_calls_go``.
+    * **A receiver in ``assertion_receivers_go``** - testify's ``assert.`` /
+      ``require.``, where the package is the signal and the function name is
+      one of dozens.
+    * **Any other receiver** - the name must be configured AND the receiver must
+      be a ``testing``-typed parameter of this function. Without that condition
+      ``fmt.Errorf("...")`` and ``err.Error()`` counted as assertions, which is
+      not an edge case in Go: either one inside a test silenced the finding
+      completely.
+    """
+    name = call_name(call_node)
+    receiver = _go_receiver_name(call_node)
+    if receiver is None:
+        return name in spec.calls
+    if receiver in spec.receivers:
+        return True
+    return receiver in testing_receivers and name in spec.calls
+
+
 def _go_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], spec: _AssertionSpec, minimum: int) -> int:
     """Count assertions in the Go function body, stopping at *minimum*.
 
     Go has no assertion keyword and no production assertion idiom; a test fails
     by calling a failure method on its ``*testing.T`` / ``B`` / ``F``
     (``t.Fatalf("...")``, ``t.Errorf("...")``), so those names make up
-    ``assertion_calls_go``.
+    ``assertion_calls_go`` and are counted only on a ``testing``-typed receiver
+    (see :func:`_counts_as_go_assertion`).
 
     Testify is matched by RECEIVER instead. ``assert`` and ``require`` each
     expose dozens of assertion functions (``Equal``, ``NoError``, ``Len``,
@@ -246,10 +298,11 @@ def _go_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[s
     :func:`registers_tests` is what keeps that parent from reporting.
     """
     count = 0
+    testing_receivers = _go_testing_receivers(func_node)
     for c in walk(func_node, skip_types=tuple(function_types)):
         if c is func_node or c.type not in CALL_TYPES:
             continue
-        if call_name(c) not in spec.calls and _go_receiver_name(c) not in spec.receivers:
+        if not _counts_as_go_assertion(c, spec, testing_receivers):
             continue
         count += 1
         if count >= minimum:
@@ -456,11 +509,13 @@ class MissingAssertionsRule(BaseRule):
         The marker route stands alone; the prefix and registration routes also
         need the function to live in a test file, because a production
         ``test_connection()`` helper is not a test and neither is a
-        ``runner.test(...)`` callback in application code.
+        ``runner.test(...)`` callback in application code. A name the language's
+        own toolchain reserves for a harness (Go's ``TestMain``) is excluded
+        from those two routes: it matches the prefix but has nothing to assert.
         """
         if marked_as_test(node, scope.lang_name, scope.markers):
             return True
-        if not scope.file_is_test:
+        if not scope.file_is_test or is_harness(scope.lang_name, func_name):
             return False
         return subject.is_registered_test or func_name.startswith(scope.prefixes)
 

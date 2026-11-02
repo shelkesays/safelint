@@ -211,6 +211,17 @@ def _has_function_argument(call_node: tree_sitter.Node, function_types: frozense
     return any(child.type in function_types for child in arguments.named_children)
 
 
+#: Names that match a test-name prefix but are not test cases, per language.
+#:
+#: Go's ``TestMain(m *testing.M)`` is the package's setup harness: the toolchain
+#: calls it instead of running the tests directly, and it ends in ``m.Run()``.
+#: It matches the ``Test`` prefix, takes no ``*testing.T`` and has nothing to
+#: assert, so without this it reported on every Go package that has one. The
+#: ``m.Run()`` call cannot excuse it either - the delegation guard needs a
+#: callback argument, and ``m.Run()`` takes none.
+_NOT_TEST_CASES_BY_LANG: dict[str, frozenset[str]] = {"go": frozenset({"TestMain"})}
+
+
 #: Node types that carry a test marker for *func_node*, per language. Rust puts
 #: its attributes on preceding siblings (``#[test]`` then ``fn``); Java nests
 #: its annotations in the method's own ``modifiers`` child.
@@ -243,11 +254,18 @@ def _rust_attribute_names(func_node: tree_sitter.Node) -> set[str]:
 
     Attributes are preceding siblings, and they stack: ``#[test]`` followed by
     ``#[should_panic]`` are two ``attribute_item`` nodes before the
-    ``function_item``, so the walk continues past the first one it sees.
+    ``function_item``, so the walk continues past the first one it sees. It also
+    walks past comments, which tree-sitter puts in the same sibling chain.
     """
     names: set[str] = set()
     sibling = func_node.prev_named_sibling
     while sibling is not None:
+        # Comments are extra nodes and sit in the sibling chain, so
+        # ``#[ignore] // flaky`` or a comment line above ``fn`` would otherwise
+        # end the walk before ``#[test]`` is reached and silently drop the test.
+        if sibling.is_extra:
+            sibling = sibling.prev_named_sibling
+            continue
         if sibling.type != _rust.ATTRIBUTE_ITEM:
             break
         name = _marker_name(_rust_attribute_path(sibling))
@@ -305,3 +323,13 @@ def _marker_name(node: tree_sitter.Node | None) -> str | None:
         return None
     trailing = node.child_by_field_name("name")
     return node_text(trailing if trailing is not None else node)
+
+
+def is_harness(lang_name: str, func_name: str) -> bool:
+    """Return True when *func_name* matches a test prefix but is not a test case.
+
+    See :data:`_NOT_TEST_CASES_BY_LANG`. Deliberately a fixed list rather than a
+    config key: the names come from a language's own testing toolchain, not from
+    anything a project chooses.
+    """
+    return func_name in _NOT_TEST_CASES_BY_LANG.get(lang_name, frozenset())
