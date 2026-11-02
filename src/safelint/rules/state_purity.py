@@ -1372,52 +1372,72 @@ def _other_binders(declaration: tree_sitter.Node, root: tree_sitter.Node, binder
 _SHADOWING_WRAPPERS = frozenset({_js.LEXICAL_DECLARATION, _js.CATCH_CLAUSE, _js.CLASS_DECLARATION})
 
 
+# Why only a ``var`` declarator or a parameter counts as a redeclaration. Both
+# of these report nothing, because each inner binding is its own and `let` is
+# free to shadow it, so asking for a rename would be asking for nothing:
+#
+#     function f() {
+#       var err = null;
+#       try { run(); } catch (err) { log(err); }   // catch binds its own `err`
+#       return err;
+#     }
+#
+#     function g(c) {
+#       var x = 1;
+#       if (c) { const x = 2; use(x); }            // ...and so does this
+#       return x;
+#     }
+#
+# Converting either ``var`` to ``let`` parses and behaves identically, which is
+# the test for whether this rule has anything to say; counting them brought back
+# a slice of exactly the noise #201 removed. A ``let`` at the SAME scope as the
+# ``var`` IS a genuine collision, but also an unconditional SyntaxError, so no
+# running codebase holds one and there is nothing to warn anybody about.
+#
+# It is the declarator's NAME that has to hold the binding, not merely the
+# declaration somewhere above it, because a binding in the INITIALISER belongs
+# to its own construct:
+#
+#     var Foo = class Foo {};   // the inner `Foo` is scoped to the class body
+#
+# ``let Foo = class Foo {}`` parses too. A named function expression is the same
+# shape, already excluded by the nested-function filter rather than by this test.
 def _merges_with_var(site: tree_sitter.Node, root: tree_sitter.Node) -> bool:
     """Return True when *site* binds the name in the same binding as a ``var`` would.
 
-    Only another ``var`` declarator or one of *root*'s own parameters does.
-    Everything else is a separate, legally shadowing binding, so reporting it
-    asked for a rename that nothing requires:
-
-        function f() {
-          var err = null;
-          try { run(); } catch (err) { log(err); }   // its own binding
-          return err;
-        }
-
-        function g(c) {
-          var x = 1;
-          if (c) { const x = 2; use(x); }            // ...so is this
-          return x;
-        }
-
-    Converting either ``var`` to ``let`` parses and behaves identically, which
-    is the test for whether this rule has anything to say. Counting them
-    brought back a slice of exactly the noise #201 removed.
-
-    A ``let`` at the SAME scope as the ``var`` is a genuine collision, but it
-    is also an unconditional SyntaxError, so no running codebase contains one
-    and there is nothing to warn anybody about.
-
-    *root*'s parameters are recognised through ``_binding_targets``, the same
-    owner the binding scan itself uses, rather than by naming the parameter-list
-    node types here; that keeps the TypeScript wrappers and the
-    unparenthesised arrow form (``x => { var x = 1; }``) working without a
-    second list to maintain.
+    Only another ``var`` declarator or one of *root*'s own parameters does;
+    everything else shadows legally (see the comment above). *root*'s parameters
+    are recognised through ``_binding_targets``, the same owner the binding scan
+    itself uses, rather than by naming the parameter-list node types here; that
+    keeps the TypeScript wrappers and the unparenthesised arrow form
+    (``x => { var x = 1; }``) working without a second list to maintain.
     """
-    parameters = [target for target in _binding_targets(root) if target != root.child_by_field_name("name")]
-    if any(target.start_byte <= site.start_byte and site.end_byte <= target.end_byte for target in parameters):
+    own_name = root.child_by_field_name("name")
+    parameters = [target for target in _binding_targets(root) if target != own_name]
+    if any(_within(site, target) for target in parameters):
         return True
     current = site.parent
     while current is not None:
         if current == root:
             break
+        # A declarator reached from its initialiser rather than its name is some
+        # other construct's binding. The wrapper below still decides `var`
+        # against `let`, because both spell their declarator the same way.
+        if current.type == _js.VARIABLE_DECLARATOR and not _within(site, current.child_by_field_name("name")):
+            return False
         if current.type == _js.VARIABLE_DECLARATION:
             return True
         if current.type in _SHADOWING_WRAPPERS:
             return False
         current = current.parent
     return False
+
+
+def _within(site: tree_sitter.Node, target: tree_sitter.Node | None) -> bool:
+    """Return True when *site* sits inside *target*'s byte range."""
+    if target is None:  # pragma: no cover - defensive: a declarator always has a name
+        return False
+    return target.start_byte <= site.start_byte and site.end_byte <= target.end_byte
 
 
 def _rebound_in_scope(declaration: tree_sitter.Node, root: tree_sitter.Node, others: list[tree_sitter.Node]) -> bool:
