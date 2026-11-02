@@ -66,7 +66,10 @@ def test_a_test_dir_component_above_the_project_root_does_not_match(tmp_path: Pa
 
     This is why the entry is anchored rather than matched anywhere in the path:
     the project is at ``tests/myproj``, and ``src/service.py`` inside it is
-    production code whose ``test_connection`` helper is a real finding.
+    production code. Its ``test_connection`` helper is not a test, so with the
+    scoping on the file is skipped and nothing is reported - whereas matching
+    ``tests`` anywhere in the path would have classified the whole project as
+    test code.
     """
     root = tmp_path / "tests" / "myproj"
     (root / "src").mkdir(parents=True, exist_ok=True)

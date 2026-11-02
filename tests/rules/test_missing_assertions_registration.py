@@ -201,3 +201,22 @@ def test_python_scoping_is_unchanged(tmp_path: Path) -> None:
         encoding="utf-8",
     )
     assert _safe601(_engine(), sample) == ['Function "test_nothing" has no assertions']
+
+
+def test_an_interpolated_template_title_is_treated_as_computed(tmp_path: Path) -> None:
+    """``it(`case ${name} runs`, ...)`` must not print a literal ``${name}``.
+
+    The title is computed at runtime, so quoting the source text would send the
+    reader looking for a test by a name that does not exist. Same fallback as
+    Go's table-driven ``t.Run(c.name, ...)``.
+    """
+    sample = tmp_path / "a.test.js"
+    sample.write_text("it(`case ${name} runs`, () => { const x = 1; });\n", encoding="utf-8")
+    assert _safe601(_engine(), sample) == ['Function "<anonymous>" has no assertions']
+
+
+def test_a_plain_template_title_is_still_used(tmp_path: Path) -> None:
+    """A backtick title with no interpolation is a perfectly good title."""
+    sample = tmp_path / "a.test.js"
+    sample.write_text("it(`plain tagged title`, () => { const x = 1; });\n", encoding="utf-8")
+    assert _safe601(_engine(), sample) == ['Test "plain tagged title" has no assertions']

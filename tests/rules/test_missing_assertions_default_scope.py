@@ -197,13 +197,16 @@ def test_a_junit_fixture_and_a_helper_are_not_tests(tmp_path: Path) -> None:
         "@Test",
         "@ParameterizedTest",
         "@RepeatedTest(3)",
-        "@TestFactory",
         "@TestTemplate",
         "@org.junit.jupiter.api.Test",
     ),
 )
 def test_every_junit_test_annotation_shape_is_recognised(tmp_path: Path, annotation: str) -> None:
-    """Both annotation shapes count, and a fully qualified one keeps its trailing name."""
+    """Both annotation shapes count, and a fully qualified one keeps its trailing name.
+
+    ``@TestFactory`` is not in this list on purpose; see
+    :func:`test_a_test_factory_is_not_a_marker`.
+    """
     sample = _write(tmp_path, "Thing.java", f"class Thing {{\n    {annotation}\n    void checksNothing() {{\n        int x = 1;\n    }}\n}}\n")
     assert _safe601(sample) == ['Function "checksNothing" has no assertions']
 
@@ -251,3 +254,19 @@ def test_a_comment_line_directly_above_the_fn_does_not_lose_the_marker(tmp_path:
     """The same chain, with the comment on its own line between attribute and ``fn``."""
     sample = _write(tmp_path, "src/lib.rs", "#[test]\n// what this covers\nfn checks_nothing() {\n    let _ = 1;\n}\n")
     assert _safe601(sample) == ['Function "checks_nothing" has no assertions']
+
+
+def test_a_test_factory_is_not_a_marker(tmp_path: Path) -> None:
+    """``@TestFactory`` is deliberately not in the shipped markers.
+
+    A factory returns a stream of ``DynamicTest``s and its assertions live
+    inside those lambdas. ``lambda_expression`` is a Java function type, so the
+    counter stops at it by design, and treating the factory as a test reported
+    every well-written one as assertion-free. #252 is the general case.
+    """
+    sample = _write(
+        tmp_path,
+        "FactoryTest.java",
+        'class FactoryTest {\n    @TestFactory\n    Stream<DynamicTest> dynamicTests() {\n        return Stream.of(dynamicTest("1st", () -> assertTrue(true)));\n    }\n}\n',
+    )
+    assert _safe601(sample) == []

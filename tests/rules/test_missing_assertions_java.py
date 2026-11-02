@@ -70,7 +70,7 @@ def test_a_java_test_with_no_assertion_still_reports(tmp_path: Path) -> None:
 
 
 def test_a_project_assertion_helper_is_not_recognised_by_default(tmp_path: Path) -> None:
-    """A project's own ``assert*`` helper does not count, and ``extend_assertion_calls`` is the answer.
+    """A project's own ``assert*`` helper does not count, and ``extend_assertion_calls_java`` is the answer.
 
     Matching is by exact name, not by an ``assert`` prefix, so
     ``assertIllegalArgumentException(...)`` (commons-lang's own helper) reads as
