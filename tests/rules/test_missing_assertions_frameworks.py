@@ -70,7 +70,7 @@ _ASSERTION_FORMS: list[tuple[str, str]] = [
 @pytest.mark.parametrize(["label", "call"], _ASSERTION_FORMS, ids=[case[0] for case in _ASSERTION_FORMS])
 def test_stdlib_mock_and_django_assertions_count(tmp_path: Path, label: str, call: str) -> None:
     """A test whose only assertion is one of these is not assertion-free."""
-    sample = _write(tmp_path, "t.py", f"def test_it(self, client, response, form, qs, html, a):\n    {call}\n")
+    sample = _write(tmp_path, "test_t.py", f"def test_it(self, client, response, form, qs, html, a):\n    {call}\n")
     assert _safe601(sample) == [], label
 
 
@@ -82,7 +82,7 @@ def test_a_test_with_no_assertion_at_all_still_reports(tmp_path: Path) -> None:
     """
     sample = _write(
         tmp_path,
-        "t.py",
+        "test_t.py",
         """\
         def test_calls_without_asserting(client):
             client.get("/x")
@@ -103,7 +103,7 @@ def test_a_mock_call_that_is_not_an_assertion_does_not_count(tmp_path: Path) -> 
     """
     sample = _write(
         tmp_path,
-        "t.py",
+        "test_t.py",
         """\
         def test_resets(client):
             client.get.reset_mock()
@@ -122,7 +122,7 @@ def test_extend_assertion_calls_appends_to_the_defaults(tmp_path: Path) -> None:
     """
     sample = _write(
         tmp_path,
-        "t.py",
+        "test_t.py",
         """\
         def test_helper_only(state):
             verify_invariant(state)
@@ -145,7 +145,7 @@ def test_assertion_calls_still_replaces(tmp_path: Path) -> None:
     """
     sample = _write(
         tmp_path,
-        "t.py",
+        "test_t.py",
         """\
         def test_django_only(self, response):
             self.assertContains(response, "ok")
@@ -160,8 +160,8 @@ def test_extend_assertion_calls_is_per_language_and_typescript_inherits(tmp_path
     A TS file reads ``extend_assertion_calls_javascript`` when no
     ``_typescript`` key is set, exactly as it inherits ``assertion_calls``.
     """
-    js = _write(tmp_path, "a.js", "function test_it(state) {\n  verifyInvariant(state);\n}\n")
-    ts = _write(tmp_path, "a.ts", "function test_it(state: State) {\n  verifyInvariant(state);\n}\n")
+    js = _write(tmp_path, "a.test.js", "function test_it(state) {\n  verifyInvariant(state);\n}\n")
+    ts = _write(tmp_path, "a.test.ts", "function test_it(state: State) {\n  verifyInvariant(state);\n}\n")
     overrides = {"extend_assertion_calls_javascript": ["verifyInvariant"]}
     assert _safe601(js, overrides) == []
     assert _safe601(ts, overrides) == []
@@ -175,6 +175,6 @@ def test_a_mistyped_extend_value_fails_loud(tmp_path: Path) -> None:
     ``v``, ``e``, ``r``, ``i``, ``f``, ``y`` and silently credit any one-letter
     call as an assertion.
     """
-    sample = _write(tmp_path, "t.py", "def test_it(state):\n    verify(state)\n")
+    sample = _write(tmp_path, "test_t.py", "def test_it(state):\n    verify(state)\n")
     with pytest.raises(TypeError, match="extend_assertion_calls"):
         _safe601(sample, {"extend_assertion_calls": "verify"})

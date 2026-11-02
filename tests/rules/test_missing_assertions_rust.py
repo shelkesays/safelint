@@ -32,8 +32,14 @@ from safelint.core.engine import SafetyEngine
 
 
 def _enabled_engine(overrides: dict | None = None) -> SafetyEngine:
-    """SafetyEngine with ``missing_assertions`` enabled (it's off by default)."""
-    base = {"rules": {"missing_assertions": {"enabled": True}}}
+    """SafetyEngine with ``missing_assertions`` enabled and scoping OFF.
+
+    ``test_functions_only`` ships ON since 2.16.0 (#163), so it is pinned off
+    here: these tests exercise the assertion COUNTERS, and without the pin a
+    production-file sample would be skipped before any counting happened - the
+    clean cases would then pass for the wrong reason.
+    """
+    base = {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False}}}
     if overrides:
         base = deep_merge(base, overrides)
     config = deep_merge(DEFAULTS, base)
@@ -179,7 +185,7 @@ def test_rust_min_assertions_two_single_assert_fires(tmp_path: Path) -> None:
     """With ``min_assertions = 2``, a single ``assert!`` is below threshold."""
     sample = tmp_path / "one.rs"
     sample.write_text("fn f(x: i32) -> i32 {\n    assert!(x > 0);\n    x\n}\n", encoding="utf-8")
-    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 2}}})
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False, "min_assertions": 2}}})
     result = SafetyEngine(config).check_file(str(sample))
     hits = [v for v in result.violations if v.code == "SAFE601"]
     assert len(hits) == 1
@@ -189,6 +195,6 @@ def test_rust_min_assertions_two_clean_with_two(tmp_path: Path) -> None:
     """Two assertion macros satisfy ``min_assertions = 2``."""
     sample = tmp_path / "two.rs"
     sample.write_text("fn f(x: i32) -> i32 {\n    assert!(x > 0);\n    assert!(x < 100);\n    x\n}\n", encoding="utf-8")
-    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 2}}})
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False, "min_assertions": 2}}})
     result = SafetyEngine(config).check_file(str(sample))
     assert [v for v in result.violations if v.code == "SAFE601"] == []

@@ -44,7 +44,9 @@ def _cd(path: Path) -> Iterator[None]:
 
 # --- SAFE601 missing_assertions (opt-in) ---------------------------------------
 
-_ASSERT_ON = {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 1}}}
+# Scoping pinned off: ``test_functions_only`` ships on since 2.16.0 (#163) and
+# these samples are production files, which it would skip before counting.
+_ASSERT_ON = {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 1, "test_functions_only": False}}}
 
 
 def test_c_function_without_assert_fires_safe601(tmp_path: Path) -> None:

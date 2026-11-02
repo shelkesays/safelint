@@ -15,8 +15,14 @@ from safelint.core.engine import SafetyEngine
 
 
 def _enabled_engine(overrides: dict | None = None) -> SafetyEngine:
-    """SafetyEngine with ``missing_assertions`` enabled (it's off by default)."""
-    base = {"rules": {"missing_assertions": {"enabled": True}}}
+    """SafetyEngine with ``missing_assertions`` enabled and scoping OFF.
+
+    ``test_functions_only`` ships ON since 2.16.0 (#163), so it is pinned off
+    here: these tests exercise the assertion COUNTERS, and without the pin a
+    production-file sample would be skipped before any counting happened - the
+    clean cases would then pass for the wrong reason.
+    """
+    base = {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False}}}
     if overrides:
         base = deep_merge(base, overrides)
     config = deep_merge(DEFAULTS, base)
@@ -127,7 +133,7 @@ def test_js_assertion_calls_javascript_must_be_list_not_string(tmp_path: Path) -
     """
     sample = tmp_path / "anything.js"
     sample.write_text("function f(a) { return a + 1; }\n", encoding="utf-8")
-    cfg = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "assertion_calls_javascript": "assert"}}})
+    cfg = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False, "assertion_calls_javascript": "assert"}}})
     with pytest.raises(TypeError, match="assertion_calls_javascript"):
         SafetyEngine(cfg).check_file(str(sample))
 
@@ -136,7 +142,7 @@ def test_js_assertion_calls_javascript_rejects_non_string_entries(tmp_path: Path
     """Lists with non-string entries also fail clearly."""
     sample = tmp_path / "anything.js"
     sample.write_text("function f(a) { return a + 1; }\n", encoding="utf-8")
-    cfg = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "assertion_calls_javascript": ["assert", 42]}}})
+    cfg = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False, "assertion_calls_javascript": ["assert", 42]}}})
     with pytest.raises(TypeError, match="assertion_calls_javascript"):
         SafetyEngine(cfg).check_file(str(sample))
 
@@ -145,7 +151,7 @@ def test_js_min_assertions_two_single_expect_fires(tmp_path: Path) -> None:
     """With ``min_assertions = 2``, a single assertion call is below threshold."""
     sample = tmp_path / "one.js"
     sample.write_text("function f(x) {\n  expect(x);\n  return x;\n}\n", encoding="utf-8")
-    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 2}}})
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False, "min_assertions": 2}}})
     result = SafetyEngine(config).check_file(str(sample))
     hits = [v for v in result.violations if v.code == "SAFE601"]
     assert len(hits) == 1
@@ -156,6 +162,6 @@ def test_js_min_assertions_two_clean_with_two(tmp_path: Path) -> None:
     """Two assertion calls satisfy ``min_assertions = 2``."""
     sample = tmp_path / "two.js"
     sample.write_text("function f(x) {\n  expect(x);\n  expect(x > 0);\n  return x;\n}\n", encoding="utf-8")
-    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 2}}})
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False, "min_assertions": 2}}})
     result = SafetyEngine(config).check_file(str(sample))
     assert [v for v in result.violations if v.code == "SAFE601"] == []

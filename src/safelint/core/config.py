@@ -791,16 +791,26 @@ DEFAULTS: dict[str, Any] = {
             # Holzmann's rule 5 asks for a density of two per function, so
             # paper-strict projects set ``min_assertions = 2``.
             "min_assertions": 1,
-            # Scope the rule to test functions only. Default ``false`` keeps
-            # Holzmann rule 5's production-assertion intent (every function is
-            # checked). Set ``true`` to treat SAFE601 as a "tests must assert
-            # something" guard: production code that validates by raising, and
-            # fixtures / ``setUp`` / helper methods that legitimately have no
-            # assertions, are then skipped. When on, a function is checked only
-            # if it is named for a ``test_function_prefixes`` entry AND lives in
-            # a test file (under ``test_dirs`` or matching the language's
-            # test-filename convention - the SAFE701/702 definition).
-            "test_functions_only": False,
+            # Scope the rule to test functions only. ``true`` since 2.16.0
+            # (#163): the rule reads SAFE601 as "tests must assert something".
+            # A function is checked only if it is named for a
+            # ``test_function_prefixes`` entry, or registered as a test through
+            # a ``test_registration_calls`` entry, AND lives in a test file
+            # (under ``test_dirs`` or matching the language's test-filename
+            # convention - the SAFE701/702 definition).
+            #
+            # The default was ``false``, which demanded assertions in every
+            # function, production code included, and on four real codebases
+            # that made SAFE601 56-92% of all output: 557 of 987 findings on a
+            # Python service (every one in a non-test file, across 126 modules),
+            # 157 of 233 on spring-petclinic, 154 of 232 on a JS app, 624 of 679
+            # on a Rust binary. A getter, a trait conversion and an alembic
+            # migration hook asserting nothing is correct design, so the signal
+            # that remained was unusable on a first run. Holzmann's rule 5 does
+            # ask for production assertions, and a project that wants the paper
+            # reading verbatim sets this back to ``false``; the shipped default
+            # is the reading that a new user can act on.
+            "test_functions_only": True,
             # Name prefixes that mark a function as a test (used only when
             # ``test_functions_only`` is on). Default ``["test"]`` matches the
             # unittest / pytest convention (``test_*`` / ``testFoo``); ``setUp``
@@ -820,6 +830,28 @@ DEFAULTS: dict[str, Any] = {
             # names. ``describe`` is deliberately absent: its callback is a
             # grouping block whose assertions live in the tests inside it.
             "test_registration_calls_javascript": ["it", "test"],
+            # Attributes / annotations that mark a function as a test case,
+            # whatever it is named and whatever file it lives in. Rust and Java
+            # are the two languages where test identity is neither a name nor a
+            # callback: ``#[test] fn empty_input_is_zero()`` and
+            # ``@Test void shouldRejectShortPassword()`` are the conventions, and
+            # Rust puts those tests inside the production file under
+            # ``#[cfg(test)] mod tests``, so the file is not a test file either.
+            # Without this route ``test_functions_only`` found no Rust test at
+            # all and only the ``test``-prefixed Java ones.
+            #
+            # A qualified marker is matched on its trailing segment, so
+            # ``#[tokio::test]`` / ``#[actix_web::test]`` / ``#[rstest::rstest]``
+            # and ``@org.junit.jupiter.api.Test`` need no entry of their own.
+            # ``#[cfg(test)]`` is deliberately absent: it marks test *context*,
+            # and a ``#[cfg(test)] fn helper()`` is test support, not a test.
+            # The same names (minus the ``cfg`` branch) drive SAFE204 / SAFE208
+            # through ``rules/_rust_test_attribute.py``.
+            "test_markers_rust": ["test", "rstest"],
+            # JUnit 5's test-declaring annotations plus JUnit 4 / TestNG
+            # ``@Test``. ``@BeforeEach`` / ``@AfterEach`` are not here: a
+            # fixture method legitimately asserts nothing.
+            "test_markers_java": ["Test", "ParameterizedTest", "RepeatedTest", "TestFactory", "TestTemplate"],
             # Go's registration callbacks: ``t.Run(name, func(t *testing.T){})``
             # subtests and ``f.Fuzz(func(t *testing.T, ...){})`` fuzz targets.
             # Matched anywhere in the callee chain, so the ``t.`` / ``f.``
