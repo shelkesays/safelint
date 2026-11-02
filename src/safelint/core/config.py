@@ -820,6 +820,18 @@ DEFAULTS: dict[str, Any] = {
             # names. ``describe`` is deliberately absent: its callback is a
             # grouping block whose assertions live in the tests inside it.
             "test_registration_calls_javascript": ["it", "test"],
+            # Go's registration callbacks: ``t.Run(name, func(t *testing.T){})``
+            # subtests and ``f.Fuzz(func(t *testing.T, ...){})`` fuzz targets.
+            # Matched anywhere in the callee chain, so the ``t.`` / ``f.``
+            # receiver does not have to be named.
+            "test_registration_calls_go": ["Run", "Fuzz"],
+            # Go's test-function prefixes. Capitalised because the toolchain
+            # requires it: ``go test`` runs ``TestXxx`` and ``FuzzXxx`` only, so
+            # the lowercase default would match nothing. ``BenchmarkXxx`` and
+            # ``ExampleXxx`` are deliberately absent - a benchmark has no
+            # assertion to make, and an example asserts through its
+            # ``// Output:`` comment, which is not a call.
+            "test_function_prefixes_go": ["Test", "Fuzz"],
             # Directories that mark a file as a test file, matched as a
             # path-component subsequence (same semantics + default as SAFE701 /
             # SAFE702). Only consulted when ``test_functions_only`` is on.
@@ -1051,6 +1063,33 @@ DEFAULTS: dict[str, Any] = {
                 "expectException",
                 "expectExceptionMessage",
                 "fail",
+            ],
+            # Go has no assertion keyword and no production assertion idiom: a
+            # test fails by calling a failure method on its ``*testing.T`` /
+            # ``*testing.B`` / ``*testing.F``. ``call_name`` resolves
+            # ``t.Fatalf(...)`` to ``"Fatalf"``, so the receiver is not named
+            # here. ``Skip`` / ``SkipNow`` / ``Log`` are deliberately absent:
+            # skipping or logging is not asserting. Note the collision the
+            # name-only match carries, shared with every other language here:
+            # a ``log.Fatal(...)`` inside a test counts as an assertion.
+            "assertion_calls_go": [
+                "Error",
+                "Errorf",
+                "Fatal",
+                "Fatalf",
+                "Fail",
+                "FailNow",
+            ],
+            # Testify is matched by RECEIVER rather than by name: ``assert`` and
+            # ``require`` each expose dozens of assertion functions (``Equal``,
+            # ``NoError``, ``Len``, ``ErrorIs``, ...), so a name list would be
+            # long, would go stale against the library, and would collide with
+            # ordinary method names. "Any call on this package counts" is both
+            # shorter and more accurate. Only Go ships a non-empty list; every
+            # other language resolves this to empty and matches on names alone.
+            "assertion_receivers_go": [
+                "assert",
+                "require",
             ],
             # C: the literal ``assert(...)`` macro from ``<assert.h>`` - the
             # paper's own example language finally gets rule 5 verbatim. Parses
