@@ -234,3 +234,20 @@ def test_a_quoted_boolean_opt_out_fails_loud(tmp_path: Path) -> None:
     sample = _write(tmp_path, "src/service.py", "def process(x):\n    return x + 1\n")
     with pytest.raises(TypeError, match="test_functions_only"):
         _engine({"rules": {"missing_assertions": {"test_functions_only": "false"}}}).check_file(str(sample))
+
+
+def test_a_comment_between_the_attribute_and_the_fn_does_not_lose_the_marker(tmp_path: Path) -> None:
+    """``#[ignore] // flaky`` sits in the sibling chain as an extra node.
+
+    tree-sitter puts comments among the preceding siblings, so a walk that stops
+    at the first non-attribute sibling never reaches ``#[test]`` and the test is
+    silently left out of the rule.
+    """
+    sample = _write(tmp_path, "src/lib.rs", "#[test]\n#[ignore] // flaky in CI\nfn checks_nothing() {\n    let _ = 1;\n}\n")
+    assert _safe601(sample) == ['Function "checks_nothing" has no assertions']
+
+
+def test_a_comment_line_directly_above_the_fn_does_not_lose_the_marker(tmp_path: Path) -> None:
+    """The same chain, with the comment on its own line between attribute and ``fn``."""
+    sample = _write(tmp_path, "src/lib.rs", "#[test]\n// what this covers\nfn checks_nothing() {\n    let _ = 1;\n}\n")
+    assert _safe601(sample) == ['Function "checks_nothing" has no assertions']
