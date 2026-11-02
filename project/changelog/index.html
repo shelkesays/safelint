@@ -2090,7 +2090,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2160-2026-11-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.16.0 - 2026-11-02
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.16.0 - 2026-11-02">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4435,7 +4446,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2160-2026-11-02" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.16.0 - 2026-11-02
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.16.0 - 2026-11-02">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6674,7 +6696,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.15.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.16.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="2160-2026-11-02"><a href="https://github.com/shelkesays/safelint/compare/v2.15.0...v2.16.0">2.16.0</a> - 2026-11-02<a class="headerlink" href="#2160-2026-11-02" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>SAFE601 <code>missing_assertions</code>: registered for Go (#221).</strong> The rule's <code>language</code> tuple omitted Go and <code>_FUNCTION_TYPES_BY_LANG</code> had no Go entry, so every <code>.go</code> file was skipped; on the codebase this was found on, 66 <code>_test.go</code> files with about 1,600 <code>t.Fatal</code> / <code>t.Fatalf</code> calls, the rule checked the Python tests beside them and none of the Go ones. Go has no production assertion idiom, which is why it was left out, and that reasoning holds: the rule is meaningful there only as the "tests must assert something" guard that <code>test_functions_only</code> now gives by default. <code>assertion_calls_go</code> is the <code>*testing.T</code> / <code>B</code> / <code>F</code> failure API (<code>Error</code>, <code>Errorf</code>, <code>Fatal</code>, <code>Fatalf</code>, <code>Fail</code>, <code>FailNow</code>); <code>Skip</code> and <code>Log</code> are deliberately absent, because skipping or logging is not asserting.</li>
