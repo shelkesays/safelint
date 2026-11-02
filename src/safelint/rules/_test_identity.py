@@ -187,13 +187,19 @@ def _first_title_argument(call_node: tree_sitter.Node, lang_name: str) -> str | 
     Only the first argument, because that is where every framework in scope puts
     the title. A computed title yields None rather than the expression's source
     text, which would read as a quoted literal in the message and send the
-    developer looking for a test by the wrong name.
+    developer looking for a test by the wrong name. An interpolated template
+    literal counts as computed; a plain one (no ``${...}``) is a usable title.
     """
     arguments = call_node.child_by_field_name("arguments")
     if arguments is None:  # pragma: no cover - defensive: a call always has an arguments field
         return None
     first = next((child for child in arguments.named_children if not child.is_extra), None)
     if first is None or first.type not in _TITLE_TYPES_BY_LANG[lang_name]:
+        return None
+    if any(child.type == _js.TEMPLATE_SUBSTITUTION for child in first.named_children):
+        # ``it(`case ${name} runs`, ...)`` is a computed title like any other:
+        # printing it verbatim puts a literal ``${name}`` in the finding and
+        # sends the reader looking for a test by a name that does not exist.
         return None
     return node_text(first).strip(_QUOTES)
 

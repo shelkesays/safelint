@@ -851,7 +851,15 @@ DEFAULTS: dict[str, Any] = {
             # JUnit 5's test-declaring annotations plus JUnit 4 / TestNG
             # ``@Test``. ``@BeforeEach`` / ``@AfterEach`` are not here: a
             # fixture method legitimately asserts nothing.
-            "test_markers_java": ["Test", "ParameterizedTest", "RepeatedTest", "TestFactory", "TestTemplate"],
+            #
+            # ``@TestFactory`` is deliberately absent too, for a structural
+            # reason rather than a stylistic one: a factory returns a stream of
+            # ``DynamicTest``s and its assertions live inside those lambdas, so
+            # its own body never asserts. The assertion counters stop at nested
+            # functions (``lambda_expression`` is one), so including it reported
+            # every well-written factory as assertion-free. Tracked as #252,
+            # which is the general case of an assertion inside a callback.
+            "test_markers_java": ["Test", "ParameterizedTest", "RepeatedTest", "TestTemplate"],
             # Go's registration callbacks: ``t.Run(name, func(t *testing.T){})``
             # subtests and ``f.Fuzz(func(t *testing.T, ...){})`` fuzz targets.
             # Matched anywhere in the callee chain, so the ``t.`` / ``f.``
