@@ -807,6 +807,19 @@ DEFAULTS: dict[str, Any] = {
             # / ``tearDown`` / ``_helper`` / pytest fixtures do not start with
             # it and are skipped.
             "test_function_prefixes": ["test"],
+            # Calls that register a test by taking its body as a callback. A
+            # function passed to one of these is treated as a test whatever it
+            # is named, which is the only way ``test_functions_only`` can see a
+            # JS-family test at all: ``it("...", () => {})`` is anonymous, so no
+            # name prefix can ever match it and the option used to turn the rule
+            # off for Jest / Vitest / Mocha / node:test rather than scope it
+            # (#222). Matched anywhere in the callee chain, so the modifier
+            # forms (``it.only`` / ``test.skip`` / ``it.concurrent`` /
+            # ``it.failing``), the parametrised ``it.each(table)(...)`` and
+            # node:test's ``t.test(...)`` subtests are all covered by these two
+            # names. ``describe`` is deliberately absent: its callback is a
+            # grouping block whose assertions live in the tests inside it.
+            "test_registration_calls_javascript": ["it", "test"],
             # Directories that mark a file as a test file, matched as a
             # path-component subsequence (same semantics + default as SAFE701 /
             # SAFE702). Only consulted when ``test_functions_only`` is on.

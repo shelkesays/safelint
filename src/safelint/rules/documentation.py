@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, NamedTuple
 
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages import c as _c
@@ -14,7 +14,8 @@ from safelint.languages import python as _py
 from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
-from safelint.rules._test_files import _is_test_file
+from safelint.rules._test_files import _DEFAULT_TEST_DIRS, _is_test_file
+from safelint.rules._test_registration import describe_function, registers_tests
 from safelint.rules.base import BaseRule
 
 
@@ -34,6 +35,37 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "c": _c.FUNCTION_TYPES,
     "cpp": _cpp.FUNCTION_TYPES,
 }
+
+
+class _AssertionSpec(NamedTuple):
+    """The resolved per-language vocabulary an assertion counter matches against.
+
+    *calls* are bareword call names (the receiver is already stripped by
+    ``call_name``). *receivers* match a call by its receiver instead, which is
+    how Go covers testify: ``assert`` and ``require`` expose dozens of
+    assertion functions each, and listing every one of them in ``assertion_calls_go``
+    would be a maintenance burden that still went stale. Empty for every other
+    language, where name matching alone is enough.
+    """
+
+    calls: frozenset[str]
+    receivers: frozenset[str]
+
+
+class _FileScope(NamedTuple):
+    """Everything resolved once per file, so no per-function work repeats it.
+
+    Carried as one value because the per-function check needs all six and
+    threading them individually would push the helper past the argument limit
+    the project holds itself to.
+    """
+
+    lang_name: str
+    function_types: frozenset[str]
+    prefixes: tuple[str, ...] | None
+    assertions: _AssertionSpec
+    registrations: frozenset[str]
+    minimum: int
 
 
 def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str], minimum: int) -> int:
@@ -213,46 +245,65 @@ class MissingAssertionsRule(BaseRule):
     code = "SAFE601"
     language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _rust.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
 
-    def _resolve_assertion_calls(self, lang_name: str) -> frozenset[str]:
-        """Resolve + validate the per-language ``assertion_calls`` list once (frozenset).
+    def _resolve_list(self, base_key: str, lang_name: str, default: list[str] | None = None) -> list[str]:
+        """Resolve + validate one per-language string-list option.
 
-        Called once per file in :meth:`check_file` (not per function), so the
-        config lookup and frozenset construction are not repeated for every
-        function node. Validates as strings so a bare-string typo
+        Validates as strings so a bare-string typo
         (``assertion_calls_javascript = "assert"``) fails loud instead of
         silently degrading into a set of single characters. TypeScript inherits
-        the JS list via the TS→JS fallback in :func:`resolve_lang_config_lookup`;
-        Python uses the bare key, every other language the ``_<lang>`` suffix.
+        the JavaScript list via the TS→JS fallback in
+        :func:`resolve_lang_config_lookup`; Python uses the bare key, every
+        other language the ``_<lang>`` suffix. The error is reported against the
+        key the value actually came from, not the key for this file's language.
+
+        One owner for the lookup because the rule now reads five such lists
+        (``assertion_calls``, ``extend_assertion_calls``,
+        ``assertion_receivers``, ``test_registration_calls``,
+        ``test_function_prefixes``) and each repetition was a chance for one of
+        them to skip the validation.
         """
-        raw, error_key = resolve_lang_config_lookup(self.config, "assertion_calls", lang_name, default=[])
-        names = _validated_string_list(raw, error_key)
-        # ``extend_assertion_calls`` appends instead of replacing, so a project
-        # adding one helper does not have to copy the 66-name default list and
-        # then maintain it against future releases (#220). Same split as
-        # ``resource_lifecycle``'s ``extend_tracked_functions``, and per
-        # language through the same key chain, so a TS file picks up
-        # ``extend_assertion_calls_javascript`` exactly as it inherits the base
-        # list. Absent from DEFAULTS by design: an extension defaults to empty.
-        extra_raw, extra_key = resolve_lang_config_lookup(self.config, "extend_assertion_calls", lang_name, default=[])
-        return frozenset(names + _validated_string_list(extra_raw, extra_key))
+        raw, error_key = resolve_lang_config_lookup(self.config, base_key, lang_name, default=default if default is not None else [])
+        return _validated_string_list(raw, error_key)
+
+    def _resolve_assertions(self, lang_name: str) -> _AssertionSpec:
+        """Resolve the per-language assertion vocabulary once (names + receivers).
+
+        Called once per file in :meth:`check_file` (not per function), so the
+        config lookups and frozenset construction are not repeated for every
+        function node.
+
+        ``extend_assertion_calls`` appends instead of replacing, so a project
+        adding one helper does not have to copy the 66-name default list and
+        then maintain it against future releases (#220). Same split as
+        ``resource_lifecycle``'s ``extend_tracked_functions``, and per language
+        through the same key chain, so a TS file picks up
+        ``extend_assertion_calls_javascript`` exactly as it inherits the base
+        list. Absent from DEFAULTS by design: an extension defaults to empty.
+
+        ``assertion_receivers`` matches a call by its receiver rather than its
+        name, which is how Go recognises testify (#221). Empty everywhere else.
+        """
+        names = self._resolve_list("assertion_calls", lang_name)
+        extra = self._resolve_list("extend_assertion_calls", lang_name)
+        return _AssertionSpec(frozenset(names + extra), frozenset(self._resolve_list("assertion_receivers", lang_name)))
 
     @staticmethod
-    def _assertion_count(func_node: tree_sitter.Node, lang_name: str, function_types: frozenset[str], assertion_calls: frozenset[str], minimum: int) -> int:
+    def _assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], spec: _AssertionSpec, minimum: int, lang_name: str) -> int:
         """Dispatch to the language-appropriate assertion counter (early-exits at *minimum*).
 
         Python / Java count the built-in ``assert`` keyword AND *calls* in
-        *assertion_calls*; Rust matches assertion macros; PHP and the JS family
-        use the generic call-name counter. *assertion_calls* is pre-resolved by
-        :meth:`_resolve_assertion_calls`.
+        *spec*; Rust matches assertion macros; PHP and the JS family use the
+        generic call-name counter.
+        *spec* is pre-resolved by :meth:`_resolve_assertions`.
         """
         if lang_name == "python":
-            return _python_assertion_count(func_node, function_types, assertion_calls, minimum)
+            return _python_assertion_count(func_node, function_types, spec.calls, minimum)
         if lang_name == "java":
-            return _java_assertion_count(func_node, function_types, assertion_calls, minimum)
+            return _java_assertion_count(func_node, function_types, spec.calls, minimum)
         if lang_name == "rust":
-            return _rust_assertion_count(func_node, function_types, assertion_calls, minimum)
+            return _rust_assertion_count(func_node, function_types, spec.calls, minimum)
         # PHP + JS-family (JS / TS): the generic call-name counter.
-        return _javascript_assertion_count(func_node, function_types, assertion_calls, minimum)
+        return _javascript_assertion_count(func_node, function_types, spec.calls, minimum)
 
     def _resolve_min_assertions(self) -> int:
         """Read and validate the ``min_assertions`` config knob.
@@ -271,11 +322,17 @@ class MissingAssertionsRule(BaseRule):
         return value
 
     @staticmethod
-    def _below_minimum_message(func_name: str, count: int, minimum: int) -> str:
-        """Render the violation message for a function below the assertion threshold."""
+    def _below_minimum_message(label: str, count: int, minimum: int) -> str:
+        """Render the violation message for a subject below the assertion threshold.
+
+        *label* is the complete subject, already decided by
+        :func:`describe_function` - ``Function "parse"`` for a named function,
+        ``Test "rejects a short password"`` for a registered test callback. The
+        noun is chosen there rather than here so one owner decides it.
+        """
         if count == 0 and minimum == 1:
-            return f'Function "{func_name}" has no assertions'
-        return f'Function "{func_name}" has {count} assertion(s), minimum is {minimum} (Holzmann rule 5 asks for two per function)'
+            return f"{label} has no assertions"
+        return f"{label} has {count} assertion(s), minimum is {minimum} (Holzmann rule 5 asks for two per function)"
 
     def _test_scope(self, filepath: str, lang_name: str) -> tuple[bool, tuple[str, ...] | None]:
         """Resolve the ``test_functions_only`` scoping for *filepath*.
@@ -303,37 +360,62 @@ class MissingAssertionsRule(BaseRule):
         # Validate as a string list so a scalar typo (``test_dirs = "mytests"``)
         # fails loud rather than iterating characters and silently skipping the
         # whole file - matching the fail-loud guard on every other list key.
-        test_dirs = _validated_string_list(self.config.get("test_dirs", ["tests"]), "test_dirs")
+        # The fallback is the shared default, not a local copy: SAFE601, 701,
+        # 702 and every ``skip_test_code`` rule must agree on where tests live.
+        test_dirs = _validated_string_list(self.config.get("test_dirs", _DEFAULT_TEST_DIRS), "test_dirs")
         if not _is_test_file(filepath, test_dirs, lang_name):
             return True, None
-        prefixes = tuple(_validated_string_list(self.config.get("test_function_prefixes", ["test"]), "test_function_prefixes"))
-        return False, prefixes
+        # Per language, because the conventions differ in case as well as shape:
+        # Python and PHP use ``test_*``, Go's toolchain requires ``TestXxx``.
+        return False, tuple(self._resolve_list("test_function_prefixes", lang_name, default=["test"]))
 
-    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Flag functions with fewer than ``min_assertions`` assertions."""
+    def _resolve_scope(self, filepath: str) -> _FileScope | None:
+        """Resolve everything the per-function check needs, or None to skip the file.
+
+        ``min_assertions`` is validated before the test-file question so a
+        mistyped threshold fails loud on every run rather than only on the files
+        the scoping happens to keep.
+        """
         lang_name = resolve_lang_name(filepath)
-        function_types = _FUNCTION_TYPES_BY_LANG[lang_name]
         minimum = self._resolve_min_assertions()
         skip_file, prefixes = self._test_scope(filepath, lang_name)
         if skip_file:
+            return None
+        return _FileScope(
+            lang_name=lang_name,
+            function_types=_FUNCTION_TYPES_BY_LANG[lang_name],
+            prefixes=prefixes,
+            assertions=self._resolve_assertions(lang_name),
+            registrations=frozenset(self._resolve_list("test_registration_calls", lang_name)),
+            minimum=minimum,
+        )
+
+    def _check_function(self, filepath: str, node: tree_sitter.Node, scope: _FileScope) -> Violation | None:
+        """Return the violation for one function node, or None when it is in the clear."""
+        name_node = function_name_node(node, scope.lang_name)
+        func_name = node_text(name_node) if name_node else "<anonymous>"
+        subject = describe_function(node, scope.lang_name, scope.registrations, func_name)
+        # A registered test callback is in scope whatever it is called: its name
+        # is the registration call's title, not an identifier a prefix could match.
+        if scope.prefixes is not None and not subject.is_registered_test and not func_name.startswith(scope.prefixes):
+            return None
+        if registers_tests(node, scope.lang_name, scope.registrations, scope.function_types):
+            return None
+        count = self._assertion_count(node, scope.function_types, scope.assertions, scope.minimum, scope.lang_name)
+        if count >= scope.minimum:
+            return None
+        return self._make_violation_for_node(filepath, node, self._below_minimum_message(subject.label, count, scope.minimum))
+
+    def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
+        """Flag functions with fewer than ``min_assertions`` assertions."""
+        scope = self._resolve_scope(filepath)
+        if scope is None:
             return []
-        assertion_calls = self._resolve_assertion_calls(lang_name)  # resolved once per file, not per function
         violations = []
         for node in walk(tree.root_node):
-            if node.type not in function_types:
+            if node.type not in scope.function_types:
                 continue
-            name_node = function_name_node(node, lang_name)
-            func_name = node_text(name_node) if name_node else "<anonymous>"
-            if prefixes is not None and not func_name.startswith(prefixes):
-                continue
-            count = self._assertion_count(node, lang_name, function_types, assertion_calls, minimum)
-            if count >= minimum:
-                continue
-            violations.append(
-                self._make_violation_for_node(
-                    filepath,
-                    node,
-                    self._below_minimum_message(func_name, count, minimum),
-                )
-            )
+            violation = self._check_function(filepath, node, scope)
+            if violation is not None:
+                violations.append(violation)
         return violations
