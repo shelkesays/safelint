@@ -457,8 +457,10 @@ Later   - enable opt-in rules as needed:
                         nonlocal_jumps is already on at warning severity)
           - C++:        the C-family rules above (widened) plus raw_new_delete
                         and dangerous_casts (modern-ownership / cast safety)
-          - test discipline: missing_assertions (set min_assertions = 2 for the
-                        Holzmann density), test_existence, test_coupling
+          - test discipline: missing_assertions (scoped to tests by default
+                        since 2.16.0; set test_functions_only = false to require
+                        assertions in every function, and min_assertions = 2 for
+                        the Holzmann density), test_existence, test_coupling
 ```
 
 All of the opt-in rules listed above are off by default; see the [Rules reference](rules.md) for each rule's config knobs. `no_recursion` (SAFE105) and the C-family `nonlocal_jumps` (SAFE106) are the rules that are **on by default** (at `warning` severity), so no opt-in step is needed for them.

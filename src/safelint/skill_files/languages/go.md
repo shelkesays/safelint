@@ -36,7 +36,7 @@ safelint lints `.go` files. The skill doesn't need to filter by extension - `saf
 
 ## Rule count
 
-Go is in scope for the cross-language rules (SAFE101-105, SAFE302, SAFE303-304, SAFE309, SAFE401, SAFE501, SAFE603, SAFE701-702, SAFE801-802) plus two Go-specific rules: **SAFE209 `empty_error_check`** and **SAFE211 `panic_calls_outside_tests`**. The rules deliberately skipped for Go (SAFE201, SAFE202, SAFE203, SAFE301, SAFE305, SAFE601, SAFE803) are listed in the "Deliberately skipped" section below. Like the other languages' optional rules, every Go-only rule and every dataflow rule is disabled by default.
+Go is in scope for the cross-language rules (SAFE101-105, SAFE302, SAFE303-304, SAFE309, SAFE401, SAFE501, SAFE601, SAFE603, SAFE701-702, SAFE801-802) plus two Go-specific rules: **SAFE209 `empty_error_check`** and **SAFE211 `panic_calls_outside_tests`**. SAFE601 was registered for Go in 2.16.0. The rules deliberately skipped for Go (SAFE201, SAFE202, SAFE203, SAFE301, SAFE305, SAFE803) are listed in the "Deliberately skipped" section below. Like the other languages' optional rules, every Go-only rule and every dataflow rule is disabled by default.
 
 ## Go shapes worth knowing
 
@@ -84,7 +84,6 @@ These rules are NOT registered for Go because Python / JS-family / Java semantic
 | SAFE203 | logging_on_error | Same as SAFE202 - no catch blocks. Unlogged-error handling is partially covered by SAFE209 / SAFE802. |
 | SAFE301 | global_state | Go has no `global` keyword; package-level shared state is covered by the **SAFE302** port (declaration-site on package `var`). |
 | SAFE305 | wide_scope_declaration | Go has no `var` hoisting; `:=` is block-scoped, so there is no narrow-the-scope hazard to flag. |
-| SAFE601 | missing_assertions | Go has no production assertion idiom (no `assert` keyword or stdlib macro; testify is test-only). Registering a heuristic would be noisy; revisit if demand appears. |
 | SAFE803 | null_dereference | Go has no chained-nullable idiom to anchor on - nil-pointer analysis needs type information, and map reads return zero values rather than nil. Documented gap. |
 
 ## Idiomatic fix patterns

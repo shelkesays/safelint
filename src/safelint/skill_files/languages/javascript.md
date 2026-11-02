@@ -85,7 +85,7 @@ JavaScript is in scope for the cross-language rules plus SAFE302 (`global_mutati
 | SAFE305 | wide_scope_declaration | JavaScript `var` is function-scoped (hoisted across blocks); `let` / `const` are block-scoped. Since 2.16.0 the rule fires only where the hoisting is OBSERVABLE, and the message names which of four shapes it is: used (read OR assigned) outside its block, read before its declaration, captured by a closure in a loop, or re-declaring a name already bound in an overlapping scope (an earlier `var` or a parameter). The first three are a mechanical fix (`let` if reassigned, `const` otherwise); the fourth needs a rename: at the same scope `let` rejects the duplicate, and from a nested block it would silently bind a separate shadowing variable. A `var` that `let` would behave identically for is NOT reported, so do not suggest converting one the rule stayed quiet about unless the user asked for a blanket modernisation. JS-family only (JavaScript and TypeScript), no Python equivalent. |
 | SAFE401 | resource_lifecycle | A call to a configured acquirer name fires unless wrapped in a `try { ... } finally { ... }` somewhere up the AST ancestor chain. Default JS acquirers: `createReadStream`, `createWriteStream`, `openSync`, `createServer`, `createConnection`, `connect`, `createWorker`. **Heuristic only:** the rule doesn't verify that the `finally` block actually closes the resource, only that *some* finally exists. Catches the most common "I created a stream and didn't think about cleanup at all" leak. The newer `using` declarations (Stage 3 / Node 22+) aren't yet recognised; for now, wrap the call inside `try / finally`. Per-language config: `tracked_functions_javascript`. |
 | SAFE501 | unbounded_loops | `while (true)` without a `break` fires the same as Python `while True:`. The "non-comparison condition" heuristic is *Python-only*, JS idioms like `while (queue.length)` / `while (token = stream.next())` / `while (cursor)` are entirely valid and bounded; firing on every non-comparison would flood with false positives. Break-scope boundaries: `for_statement`, `for_in_statement`, `while_statement`, `do_statement`, `switch_statement`, plus all function types. |
-| SAFE601 | missing_assertions | JS has no built-in `assert` keyword, the rule walks for *calls* to a configured set of assertion function names. Default set covers Node's `assert` module helpers (`assert`, `ok`, `equal`, `strictEqual`, `deepEqual`, `deepStrictEqual`, `notEqual`, `notStrictEqual`, `rejects`, `throws`, `doesNotThrow`, `doesNotReject`, `fail`, `ifError`, `match`), `console.assert`, plus test framework entry points (`expect` for Jest / Chai / Vitest, `should` for Should.js). Disabled by default like in Python, opt in with `[tool.safelint.rules.missing_assertions]` `enabled = true`. |
+| SAFE601 | missing_assertions | JS has no built-in `assert` keyword, the rule walks for *calls* to a configured set of assertion function names. Default set covers Node's `assert` module helpers (`assert`, `ok`, `equal`, `strictEqual`, `deepEqual`, `deepStrictEqual`, `notEqual`, `notStrictEqual`, `rejects`, `throws`, `doesNotThrow`, `doesNotReject`, `fail`, `ifError`, `match`), `console.assert`, plus test framework entry points (`expect` for Jest / Chai / Vitest, `should` for Should.js). Disabled by default like in Python, opt in with `[tool.safelint.rules.missing_assertions]` `enabled = true`. *Since 2.16.0* the rule is scoped to tests by default (`test_functions_only = true`) and a test registered through a callback counts as a test: `it("...", () => {})` is anonymous, so no name prefix could match it and the option used to turn the rule off for Jest / Vitest / Mocha / node:test rather than scope it. `test_registration_calls_javascript` (`it`, `test`) matches the whole callee chain, so `it.only`, `test.skip`, `it.concurrent`, `it.failing`, `it.each(table)(...)` and node:test's `t.test(...)` are covered, and the finding is named by the test's title (`Test "rejects a short password" has no assertions`). A `describe` block is not reported: its assertions live in the tests it registers. |
 | SAFE603 | blanket_suppression | Flags rule-less `eslint-disable` / `eslint-disable-line` / `eslint-disable-next-line`, plus `@ts-nocheck` / `@ts-ignore` (Holzmann rule 10). Rule-listed disables and `@ts-expect-error` are clean. Disabled by default. |
 | SAFE701 | test_existence | JS source pairs with any of `<stem>.test.{js,mjs,cjs}` (Jest convention) or `<stem>.spec.{js,mjs,cjs}` (Mocha / Karma convention) under `test_dirs` (default `["tests"]`). The "expected" filename in violation messages surfaces the Jest-style `.test.<source-extension>` form as the canonical suggestion. |
 | SAFE702 | test_coupling | Same filename patterns as SAFE701. Coupling is satisfied when *any* candidate test filename for the source file appears in the changed-files set, `foo.test.js` *or* `foo.spec.js` both count. |
@@ -252,7 +252,26 @@ while (true) {
 
 ### SAFE601 (missing assertions)
 
-If your project uses Node's built-in `assert` module, the rule recognises every helper out of the box. For test-framework code, `expect(...)` (Jest, Chai, Vitest) is also recognised. The fix is usually to add a guard / sanity check at the function's entry:
+Scoped to tests by default since 2.16.0, so what fires is a test that asserts nothing:
+
+```javascript
+// Before - SAFE601: Test "accepts just a callback" has no assertions
+it('accepts just a callback', function (done) {
+  const server = app.listen();
+  server.close(done);
+});
+
+// After
+it('accepts just a callback', function (done) {
+  const server = app.listen();
+  assert.ok(server.listening);
+  server.close(done);
+});
+```
+
+Note that an assertion inside a callback the test passes to something else (a route handler, a promise continuation) is not counted: the assertion counter stops at nested functions, or an outer function would be credited for a closure's asserts.
+
+With `test_functions_only = false` the rule checks every function, and the fix is usually a guard at the function's entry. If your project uses Node's built-in `assert` module, every helper is recognised out of the box; for test-framework code, `expect(...)` (Jest, Chai, Vitest) is recognised too:
 
 ```javascript
 // Before

@@ -48,6 +48,7 @@ When the user asks "why is this flagged?", the universal rationale in the per-cl
 | SAFE304 | side_effects | Fires when *any* function calls I/O primitives at unexpected sites, distinct from SAFE303 in that it doesn't require a pure-named caller. Suppress with `# nosafe: SAFE304` for intentional I/O wrappers. |
 | SAFE309 | dynamic_code_execution | Structural detection of `eval` / `exec` / `compile` / `__import__` (bare or `builtins.`-qualified; `model.eval()` does not fire). Holzmann rule 8; complements SAFE801. Disabled by default. |
 | SAFE501 | unbounded_loops | Fires on `while True:` without a `break`. Any loop without a clear termination condition triggers this. |
+| SAFE601 | missing_assertions | Counts the `assert` keyword AND calls in `assertion_calls` (unittest's `assert*` surface, `pytest.raises` / `warns`, `unittest.mock`'s `assert_called*` and Django's `TestCase` assertions). *Since 2.16.0* the rule is scoped to tests by default (`test_functions_only = true`): a `test_*` function in a test file is checked, production code and `setUp` / fixtures are not. Set it to `false` for Holzmann rule 5's reading, which asks every function to assert. Add a project helper with `extend_assertion_calls` (appends) rather than `assertion_calls` (replaces all 66 defaults). Disabled by default. |
 | SAFE603 | blanket_suppression | Flags bare `# noqa`, `# type: ignore` without a `[code]`, and `# pylint: disable=all` (Holzmann rule 10). Scoped suppressions and safelint's own `# nosafe` are clean. Disabled by default. |
 
 ## Idiomatic fix patterns
