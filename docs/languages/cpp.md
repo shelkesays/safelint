@@ -42,6 +42,10 @@ SAFE106 (`nonlocal_jumps`), SAFE310 (`dynamic_allocation`), SAFE311 (`complex_ma
 
 Two of them take `_cpp`-suffixed config lists so a project can diverge its C and C++ knobs: SAFE106 (`nonlocal_jump_calls_cpp`) and SAFE310 (`allocation_calls_cpp`). SAFE311, SAFE312 and SAFE313 have no configurable name list - they match on syntax alone. The try/catch rules below (SAFE201-SAFE203) share the cross-language error-handling options rather than taking `_cpp` keys.
 
+### Assertions (SAFE601)
+
+C++ reuses C's `assert` macro (`<cassert>`) through `assertion_calls_cpp`. *Since 2.16.0* the rule is scoped to tests by default (`test_functions_only = true`), which for C++ means a `<stem>_test.cpp` / `test_<stem>.cpp` file or one under `test_dirs`, and a function named for a `test_function_prefixes` entry. A GoogleTest `TEST(Suite, Name)` or Catch2 `TEST_CASE("...")` body is a macro invocation rather than a function declaration and is not recognised as a test, so a project testing that way wants either `test_functions_only = false` or a project-specific `extend_assertion_calls_cpp` (`REQUIRE`, `CHECK`, `ASSERT_TRUE`, ...) alongside it.
+
 ### Error handling (`try` / `catch` / `throw`)
 
 C++ is the first non-Python home for **SAFE201 `bare_except`**: it flags the `catch (...)` catch-all, which swallows every exception with no binding to inspect or re-raise - the same hazard as Python's bare `except:`. A typed `catch (const E& e)` is clean. **SAFE202** fires on empty / comment-only / literal-only catch bodies; **SAFE203** requires a swallowing catch to log. A `std::cerr << ...` stream insertion counts as logging (it is a `<<` operator, not a call, so it is recognised specially), as does an `spdlog::error(...)`-style call; a bare `throw;` or `throw e;` counts as a re-raise.

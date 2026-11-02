@@ -90,7 +90,9 @@ TypeScript inherits the `_javascript`-suffixed config keys by default:
 - `tracked_functions_javascript` (SAFE401)
 - `global_namespaces_javascript` (SAFE302)
 - `io_functions_javascript` (SAFE303 / SAFE304)
-- `assertion_calls_javascript` (SAFE601)
+- `assertion_calls_javascript`, `extend_assertion_calls_javascript`,
+  `test_registration_calls_javascript` (SAFE601; a `.test.ts` file's `it(...)` tests
+  are recognised and named by their titles since 2.16.0)
 - `nullable_methods_javascript` (SAFE803)
 - `flagged_calls_javascript` (SAFE802)
 
