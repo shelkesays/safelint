@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.16.0] - 2026-11-02
+
 ### Added
 
 - **SAFE601 `missing_assertions`: registered for Go (#221).** The rule's `language` tuple omitted Go and `_FUNCTION_TYPES_BY_LANG` had no Go entry, so every `.go` file was skipped; on the codebase this was found on, 66 `_test.go` files with about 1,600 `t.Fatal` / `t.Fatalf` calls, the rule checked the Python tests beside them and none of the Go ones. Go has no production assertion idiom, which is why it was left out, and that reasoning holds: the rule is meaningful there only as the "tests must assert something" guard that `test_functions_only` now gives by default. `assertion_calls_go` is the `*testing.T` / `B` / `F` failure API (`Error`, `Errorf`, `Fatal`, `Fatalf`, `Fail`, `FailNow`); `Skip` and `Log` are deliberately absent, because skipping or logging is not asserting.
@@ -1577,7 +1579,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.15.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.16.0...HEAD
+[2.16.0]: https://github.com/shelkesays/safelint/compare/v2.15.0...v2.16.0
 [2.15.0]: https://github.com/shelkesays/safelint/compare/v2.14.3...v2.15.0
 [2.14.3]: https://github.com/shelkesays/safelint/compare/v2.14.2...v2.14.3
 [2.14.2]: https://github.com/shelkesays/safelint/compare/v2.14.1...v2.14.2
