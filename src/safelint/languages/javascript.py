@@ -135,6 +135,7 @@ EXPRESSION_STATEMENT = "expression_statement"
 
 # Expressions.
 CALL_EXPRESSION = "call_expression"
+ARGUMENTS = "arguments"  # the ``(...)`` argument list of a call
 NEW_EXPRESSION = "new_expression"
 MEMBER_EXPRESSION = "member_expression"
 SUBSCRIPT_EXPRESSION = "subscript_expression"
