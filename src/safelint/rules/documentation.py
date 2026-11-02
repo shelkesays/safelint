@@ -7,6 +7,7 @@ from typing import TYPE_CHECKING, NamedTuple
 from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
 from safelint.languages import c as _c
 from safelint.languages import cpp as _cpp
+from safelint.languages import go as _go
 from safelint.languages import java as _java
 from safelint.languages import javascript as _js
 from safelint.languages import php as _php
@@ -31,6 +32,7 @@ _FUNCTION_TYPES_BY_LANG: dict[str, frozenset[str]] = {
     "typescript": _js.FUNCTION_TYPES,
     "java": _java.FUNCTION_TYPES,
     "rust": _rust.FUNCTION_TYPES,
+    "go": _go.FUNCTION_TYPES,
     "php": _php.FUNCTION_TYPES,
     "c": _c.FUNCTION_TYPES,
     "cpp": _cpp.FUNCTION_TYPES,
@@ -196,6 +198,56 @@ def _rust_assertion_count(func_node: tree_sitter.Node, function_types: frozenset
     return count
 
 
+def _go_receiver_name(call_node: tree_sitter.Node) -> str | None:
+    """Return the receiver bareword of a Go method or package call, or None.
+
+    ``assert.Equal(t, a, b)`` has its callee on a ``selector_expression`` whose
+    ``operand`` is the receiver (``assert``) and whose ``field`` is the method
+    (``Equal``). Only an identifier operand is returned: a chained or indexed
+    receiver (``s.deps.assert.Equal``) is not a package-qualified assertion
+    helper, and treating its trailing name as one would credit arbitrary method
+    calls.
+    """
+    callee = call_node.child_by_field_name("function")
+    if callee is None or callee.type != _go.SELECTOR_EXPRESSION:
+        return None
+    operand = callee.child_by_field_name("operand")
+    if operand is None or operand.type not in (_go.IDENTIFIER, _go.PACKAGE_IDENTIFIER):
+        return None
+    return node_text(operand)
+
+
+def _go_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], spec: _AssertionSpec, minimum: int) -> int:
+    """Count assertions in the Go function body, stopping at *minimum*.
+
+    Go has no assertion keyword and no production assertion idiom; a test fails
+    by calling a failure method on its ``*testing.T`` / ``B`` / ``F``
+    (``t.Fatalf("...")``, ``t.Errorf("...")``), so those names make up
+    ``assertion_calls_go``.
+
+    Testify is matched by RECEIVER instead. ``assert`` and ``require`` each
+    expose dozens of assertion functions (``Equal``, ``NoError``, ``Len``,
+    ``ErrorIs``, ...), so a name list would be long, would go stale against the
+    library, and would collide with ordinary method names. ``assertion_receivers_go``
+    says "any call on this package counts", which is both shorter and more
+    accurate.
+
+    Skips nested function / closure bodies, so a table-driven test is not
+    credited for the asserts inside its subtests; the delegation guard in
+    :func:`registers_tests` is what keeps that parent from reporting.
+    """
+    count = 0
+    for c in walk(func_node, skip_types=tuple(function_types)):
+        if c is func_node or c.type not in CALL_TYPES:
+            continue
+        if call_name(c) not in spec.calls and _go_receiver_name(c) not in spec.receivers:
+            continue
+        count += 1
+        if count >= minimum:
+            return count
+    return count
+
+
 def _javascript_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str], minimum: int) -> int:
     """Count calls to configured assertion functions, stopping at *minimum*.
 
@@ -243,7 +295,7 @@ class MissingAssertionsRule(BaseRule):
 
     name = "missing_assertions"
     code = "SAFE601"
-    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _rust.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
+    language = (_py.EXTRA_NAME, _js.EXTRA_NAME, _ts.EXTRA_NAME, _java.EXTRA_NAME, _rust.EXTRA_NAME, _go.EXTRA_NAME, _php.EXTRA_NAME, _c.EXTRA_NAME, _cpp.EXTRA_NAME)
 
     def _resolve_list(self, base_key: str, lang_name: str, default: list[str] | None = None) -> list[str]:
         """Resolve + validate one per-language string-list option.
@@ -292,8 +344,9 @@ class MissingAssertionsRule(BaseRule):
         """Dispatch to the language-appropriate assertion counter (early-exits at *minimum*).
 
         Python / Java count the built-in ``assert`` keyword AND *calls* in
-        *spec*; Rust matches assertion macros; PHP and the JS family use the
-        generic call-name counter.
+        *spec*; Rust matches assertion macros; Go adds receiver matching so
+        testify is covered without listing its API; PHP and the JS family use
+        the generic call-name counter.
         *spec* is pre-resolved by :meth:`_resolve_assertions`.
         """
         if lang_name == "python":
@@ -302,6 +355,8 @@ class MissingAssertionsRule(BaseRule):
             return _java_assertion_count(func_node, function_types, spec.calls, minimum)
         if lang_name == "rust":
             return _rust_assertion_count(func_node, function_types, spec.calls, minimum)
+        if lang_name == "go":
+            return _go_assertion_count(func_node, function_types, spec, minimum)
         # PHP + JS-family (JS / TS): the generic call-name counter.
         return _javascript_assertion_count(func_node, function_types, spec.calls, minimum)
 

@@ -545,10 +545,12 @@ _EXPECTED_LANGUAGES: dict[str, tuple[str, ...]] = {
     # analysis; C's allocation discipline is SAFE310's job, C++'s is RAII -
     # same rationale as Rust - documented gap).
     "ResourceLifecycleRule": ("python", "javascript", "typescript", "java", "go", "php"),  # SAFE401
-    # Ported everywhere EXCEPT Go (no production assertion idiom). C / C++ are
-    # included (the ``assert`` macro). SAFE803 stays without C / C++ / Go (nil
+    # SAFE601 is now on every language (#221). Go has no production assertion
+    # idiom, which is why it was left out; its tests assert through the
+    # ``*testing.T`` failure methods, so the rule is meaningful there as a
+    # "tests must assert" guard. SAFE803 stays without C / C++ / Go (nil
     # analysis needs types).
-    "MissingAssertionsRule": ("python", "javascript", "typescript", "java", "rust", "php", "c", "cpp"),  # SAFE601
+    "MissingAssertionsRule": _ALL_NINE,  # SAFE601
     "NullDereferenceRule": ("python", "javascript", "typescript", "java", "rust", "php"),  # SAFE803
     # try/catch rules: the languages with try/catch (Rust / Go have neither;
     # their analogues SAFE206/207 / SAFE209 are separate rule designs). C++
