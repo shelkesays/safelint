@@ -36,8 +36,7 @@ Originally designed for mission-critical systems, these principles apply to any 
 
 | Applies to | # | Rules |
 |---|---|---|
-| **All nine** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, C++) | 13 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
-| Python / JS / TS / Java / Rust / PHP / C / C++ (not Go) | 1 | `missing_assertions` |
+| **All nine** (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, C++) | 14 | the cross-language core: `function_length`, `nesting_depth`, `max_arguments`, `complexity`, `no_recursion`, `side_effects_hidden`, `side_effects`, `unbounded_loops`, `missing_assertions` (Go added in v2.16.0), `blanket_suppression`, `test_existence`, `test_coupling`, `tainted_sink`, `return_value_ignored` |
 | Python / JS / TS / Java / Rust / PHP (not Go, not C, not C++) | 1 | `null_dereference` |
 | Python / JS / TS / Java / Go / PHP / C / C++ (not Rust) | 2 | `global_mutation`, `dynamic_code_execution` |
 | Python / JS / TS / Java / Go / PHP (not Rust, not C, not C++) | 1 | `resource_lifecycle` |
