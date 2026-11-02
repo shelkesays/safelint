@@ -21,8 +21,14 @@ from safelint.core.engine import SafetyEngine
 
 
 def _enabled_engine(overrides: dict | None = None) -> SafetyEngine:
-    """SafetyEngine with ``missing_assertions`` enabled (it's off by default)."""
-    base = {"rules": {"missing_assertions": {"enabled": True}}}
+    """SafetyEngine with ``missing_assertions`` enabled and scoping OFF.
+
+    ``test_functions_only`` ships ON since 2.16.0 (#163), so it is pinned off
+    here: these tests exercise the assertion COUNTERS, and without the pin a
+    production-file sample would be skipped before any counting happened - the
+    clean cases would then pass for the wrong reason.
+    """
+    base = {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False}}}
     if overrides:
         base = deep_merge(base, overrides)
     config = deep_merge(DEFAULTS, base)
@@ -114,8 +120,10 @@ def test_assertion_calls_scalar_typo_raises(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# test_functions_only scoping (2.12.0): only test_* functions in test files
-# are required to assert; production code / fixtures / setUp are skipped.
+# test_functions_only scoping (2.12.0, on by default since 2.16.0): only
+# functions identifiable as tests are required to assert; production code,
+# fixtures and setUp are skipped. ``_scoped_engine`` sets it explicitly rather
+# than relying on the default, so these tests keep documenting the knob.
 # ---------------------------------------------------------------------------
 
 
@@ -141,8 +149,13 @@ def test_scope_skips_production_file_entirely(tmp_path: Path) -> None:
     assert _safe601(_scoped_engine(), str(sample)) == []
 
 
-def test_scope_off_by_default_still_checks_production(tmp_path: Path) -> None:
-    """Without scoping, production functions are still checked (Holzmann default)."""
+def test_scope_explicitly_off_still_checks_production(tmp_path: Path) -> None:
+    """``test_functions_only = false`` restores the whole-codebase reading.
+
+    Holzmann rule 5 read verbatim. It was the shipped default until 2.16.0 and
+    is still one config line away; see
+    ``test_missing_assertions_default_scope.py`` for what the default now does.
+    """
     sample = _write(tmp_path, "src/service.py", "def process(x):\n    return x + 1\n")
     assert len(_safe601(_enabled_engine(), str(sample))) == 1
 

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, NamedTuple
 
-from safelint.core._validators import _validated_string_list, resolve_lang_config_lookup
+from safelint.core._validators import _validated_bool, _validated_string_list, resolve_lang_config_lookup
 from safelint.languages import c as _c
 from safelint.languages import cpp as _cpp
 from safelint.languages import go as _go
@@ -16,13 +16,14 @@ from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
 from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
 from safelint.rules._test_files import _DEFAULT_TEST_DIRS, _is_test_file
-from safelint.rules._test_registration import describe_function, registers_tests
+from safelint.rules._test_identity import describe_function, marked_as_test, registers_tests
 from safelint.rules.base import BaseRule
 
 
 if TYPE_CHECKING:
     import tree_sitter
 
+    from safelint.rules._test_identity import TestSubject
     from safelint.rules.base import Violation
 
 
@@ -57,14 +58,22 @@ class _AssertionSpec(NamedTuple):
 class _FileScope(NamedTuple):
     """Everything resolved once per file, so no per-function work repeats it.
 
-    Carried as one value because the per-function check needs all six and
-    threading them individually would push the helper past the argument limit
-    the project holds itself to.
+    Carried as one value because the per-function check needs all of it and
+    threading the pieces individually would push the helper past the argument
+    limit the project holds itself to.
+
+    *scoped* is ``test_functions_only``. *file_is_test* is only meaningful when
+    *scoped*; it gates the two identity routes that need the function to live in
+    a test file (a name prefix, a registration callback) and not the marker
+    route, which stands on its own.
     """
 
     lang_name: str
     function_types: frozenset[str]
-    prefixes: tuple[str, ...] | None
+    scoped: bool
+    file_is_test: bool
+    prefixes: tuple[str, ...]
+    markers: frozenset[str]
     assertions: _AssertionSpec
     registrations: frozenset[str]
     minimum: int
@@ -389,70 +398,78 @@ class MissingAssertionsRule(BaseRule):
             return f"{label} has no assertions"
         return f"{label} has {count} assertion(s), minimum is {minimum} (Holzmann rule 5 asks for two per function)"
 
-    def _test_scope(self, filepath: str, lang_name: str) -> tuple[bool, tuple[str, ...] | None]:
-        """Resolve the ``test_functions_only`` scoping for *filepath*.
-
-        By default the rule checks *every* function (Holzmann rule 5's
-        production-assertion intent). Projects that instead treat SAFE601 as a
-        "tests must assert something" guard - where production code validates by
-        raising and fixtures / setup helpers legitimately have no assertions -
-        set ``test_functions_only = true`` to restrict firing to functions that
-        look like tests: named for a ``test_function_prefixes`` entry (default
-        ``["test"]``) **and** living in a file safelint recognises as a test
-        file (under ``test_dirs``, or matching the language's test-filename
-        convention - the same definition SAFE701/702 use).
-
-        Returns ``(skip_file, prefixes)``:
-
-        * ``(False, None)`` - scoping off; check every function.
-        * ``(True, None)`` - scoping on but *filepath* is not a test file; the
-          caller skips the whole file.
-        * ``(False, prefixes)`` - scoping on and this is a test file; the caller
-          checks only functions whose name starts with one of *prefixes*.
-        """
-        if not self.config.get("test_functions_only", False):
-            return False, None
+    def _file_is_test(self, filepath: str, lang_name: str) -> bool:
+        """Return True when *filepath* is a file safelint recognises as holding tests."""
         # Validate as a string list so a scalar typo (``test_dirs = "mytests"``)
         # fails loud rather than iterating characters and silently skipping the
         # whole file - matching the fail-loud guard on every other list key.
         # The fallback is the shared default, not a local copy: SAFE601, 701,
         # 702 and every ``skip_test_code`` rule must agree on where tests live.
         test_dirs = _validated_string_list(self.config.get("test_dirs", _DEFAULT_TEST_DIRS), "test_dirs")
-        if not _is_test_file(filepath, test_dirs, lang_name):
-            return True, None
-        # Per language, because the conventions differ in case as well as shape:
-        # Python and PHP use ``test_*``, Go's toolchain requires ``TestXxx``.
-        return False, tuple(self._resolve_list("test_function_prefixes", lang_name, default=["test"]))
+        return _is_test_file(filepath, test_dirs, lang_name)
 
     def _resolve_scope(self, filepath: str) -> _FileScope | None:
         """Resolve everything the per-function check needs, or None to skip the file.
 
-        ``min_assertions`` is validated before the test-file question so a
-        mistyped threshold fails loud on every run rather than only on the files
-        the scoping happens to keep.
+        ``test_functions_only`` is on by default since 2.16.0 (#163): the rule
+        fires only on functions it can identify as tests. Setting it to ``false``
+        checks *every* function, which is Holzmann rule 5's production-assertion
+        intent read verbatim; that was the shipped default until 2.16.0 and it
+        made SAFE601 56-92% of all output on four real codebases, because a
+        getter, a trait conversion and a migration hook assert nothing by design.
+
+        The whole file is skipped only when nothing in it could be identified as
+        a test: the scoping is on, the file is not a test file, and the language
+        has no marker route. Rust and Java do have one, and ``#[test]`` /
+        ``@Test`` are unambiguous wherever they appear, so their files are
+        walked whatever they are called.
+
+        ``min_assertions`` is validated before all of this so a mistyped
+        threshold fails loud on every run rather than only on the files the
+        scoping happens to keep.
         """
         lang_name = resolve_lang_name(filepath)
         minimum = self._resolve_min_assertions()
-        skip_file, prefixes = self._test_scope(filepath, lang_name)
-        if skip_file:
+        scoped = _validated_bool(self.config.get("test_functions_only", True), "test_functions_only")
+        markers = frozenset(self._resolve_list("test_markers", lang_name))
+        file_is_test = scoped and self._file_is_test(filepath, lang_name)
+        if scoped and not file_is_test and not markers:
             return None
         return _FileScope(
             lang_name=lang_name,
             function_types=_FUNCTION_TYPES_BY_LANG[lang_name],
-            prefixes=prefixes,
+            scoped=scoped,
+            file_is_test=file_is_test,
+            # Per language, because the conventions differ in case as well as
+            # shape: Python and PHP use ``test_*``, Go requires ``TestXxx``.
+            prefixes=tuple(self._resolve_list("test_function_prefixes", lang_name, default=["test"])),
+            markers=markers,
             assertions=self._resolve_assertions(lang_name),
             registrations=frozenset(self._resolve_list("test_registration_calls", lang_name)),
             minimum=minimum,
         )
+
+    @staticmethod
+    def _is_test_function(node: tree_sitter.Node, func_name: str, subject: TestSubject, scope: _FileScope) -> bool:
+        """Return True when *node* is a test, by any of the three identity routes.
+
+        The marker route stands alone; the prefix and registration routes also
+        need the function to live in a test file, because a production
+        ``test_connection()`` helper is not a test and neither is a
+        ``runner.test(...)`` callback in application code.
+        """
+        if marked_as_test(node, scope.lang_name, scope.markers):
+            return True
+        if not scope.file_is_test:
+            return False
+        return subject.is_registered_test or func_name.startswith(scope.prefixes)
 
     def _check_function(self, filepath: str, node: tree_sitter.Node, scope: _FileScope) -> Violation | None:
         """Return the violation for one function node, or None when it is in the clear."""
         name_node = function_name_node(node, scope.lang_name)
         func_name = node_text(name_node) if name_node else "<anonymous>"
         subject = describe_function(node, scope.lang_name, scope.registrations, func_name)
-        # A registered test callback is in scope whatever it is called: its name
-        # is the registration call's title, not an identifier a prefix could match.
-        if scope.prefixes is not None and not subject.is_registered_test and not func_name.startswith(scope.prefixes):
+        if scope.scoped and not self._is_test_function(node, func_name, subject, scope):
             return None
         if registers_tests(node, scope.lang_name, scope.registrations, scope.function_types):
             return None
