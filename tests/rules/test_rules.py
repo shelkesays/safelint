@@ -668,7 +668,7 @@ def test_missing_assertions_fires_when_enabled(tmp_path: Path) -> None:
     sample = tmp_path / "noassert.py"
     sample.write_text(source, encoding="utf-8")
 
-    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True}}})
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False}}})
     engine = SafetyEngine(config)
     violations = engine.check_file(str(sample)).violations
 
@@ -1382,7 +1382,7 @@ def test_missing_assertions_does_not_credit_outer_for_inner_assert(tmp_path: Pat
     sample = tmp_path / "nested_assert.py"
     sample.write_text(source, encoding="utf-8")
 
-    cfg = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True}}})
+    cfg = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False}}})
     violations = SafetyEngine(cfg).check_file(str(sample)).violations
     flagged = [v for v in violations if v.rule == "missing_assertions"]
     # `outer` has no assert of its own; `inner` does.
@@ -2384,7 +2384,7 @@ def test_missing_assertions_no_violation_when_assert_present(tmp_path: Path) -> 
     sample = tmp_path / "with_assert.py"
     sample.write_text(source, encoding="utf-8")
 
-    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True}}})
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False}}})
     violations = SafetyEngine(config).check_file(str(sample)).violations
     assert not any(v.rule == "missing_assertions" for v in violations)
 
@@ -2589,7 +2589,7 @@ def test_missing_assertions_min_two_fires_on_single_assert(tmp_path) -> None:
     """With ``min_assertions = 2`` (Holzmann rule 5), one assertion is not enough."""
     sample = tmp_path / "one.py"
     sample.write_text("def f(x):\n    assert x > 0\n    return x\n", encoding="utf-8")
-    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 2}}})
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False, "min_assertions": 2}}})
     result = SafetyEngine(config).check_file(str(sample))
     hits = [v for v in result.violations if v.code == "SAFE601"]
     assert len(hits) == 1
@@ -2600,7 +2600,7 @@ def test_missing_assertions_min_two_clean_with_two_asserts(tmp_path) -> None:
     """Two assertions satisfy ``min_assertions = 2``."""
     sample = tmp_path / "two.py"
     sample.write_text("def f(x):\n    assert x > 0\n    assert x < 100\n    return x\n", encoding="utf-8")
-    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": 2}}})
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False, "min_assertions": 2}}})
     result = SafetyEngine(config).check_file(str(sample))
     assert [v for v in result.violations if v.code == "SAFE601"] == []
 
@@ -2609,6 +2609,6 @@ def test_missing_assertions_min_assertions_typo_raises(tmp_path) -> None:
     """A non-integer ``min_assertions`` fails loud instead of silently misbehaving."""
     sample = tmp_path / "t.py"
     sample.write_text("def f():\n    return 1\n", encoding="utf-8")
-    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "min_assertions": "2"}}})
+    config = deep_merge(DEFAULTS, {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False, "min_assertions": "2"}}})
     with pytest.raises(TypeError):
         SafetyEngine(config).check_file(str(sample))

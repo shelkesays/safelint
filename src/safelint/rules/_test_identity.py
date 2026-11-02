@@ -1,15 +1,25 @@
-"""Shared recognition of tests whose body is passed to a registration call.
+"""Shared recognition of what each language calls a test.
 
-Python, Java, Rust, PHP and C declare a test as a named function, so a name
-prefix identifies it. JavaScript, TypeScript and Go do not: the body is a
-callback handed to a registration function.
+``test_functions_only`` scopes SAFE601 to tests, so it needs to know which
+functions are tests. Only three languages say so with a name:
 
-    it("rejects a short password", () => { ... })   // Jest / Vitest / Mocha
-    t.Run("short password", func(t *testing.T) { ... })  // Go subtest
+* **Python, PHP, C / C++** - a name prefix (``test_foo``), which
+  ``test_function_prefixes`` already covers.
+* **JavaScript, TypeScript, Go** - the body is a callback handed to a
+  registration call, so it has no name of its own::
 
-Both forms are anonymous, so ``test_functions_only`` used to skip every one of
-them: for the JS family the option did not scope SAFE601 to tests, it turned
-the rule off for them (#222). This module answers the two questions that costs:
+      it("rejects a short password", () => { ... })        // Jest / Vitest
+      t.Run("short password", func(t *testing.T) { ... })  // Go subtest
+
+* **Rust, Java** - an attribute or annotation marks the function, and the name
+  is free prose: ``#[test] fn empty_input_is_zero()``,
+  ``@Test void shouldRejectShortPassword()``. Rust's dominant idiom also puts
+  those tests inside the production file, under ``#[cfg(test)] mod tests``, so
+  the file is not a test file either.
+
+Reading test identity from the name alone therefore turned the option off for
+five of the nine languages rather than scoping it (#222 for the JS family). This
+module owns the other two routes:
 
 * :func:`describe_function` - is this function a registered test, and what
   should the finding call it? An anonymous callback reported as
@@ -23,9 +33,14 @@ the rule off for them (#222). This module answers the two questions that costs:
   credited for a closure's asserts). Without this question the parent reports
   as assertion-free while every one of its subtests asserts. The same answer
   covers a Mocha / Jest ``describe`` block.
+* :func:`marked_as_test` - is this function marked as a test by an attribute or
+  annotation? Unlike the other two routes this one does not care where the
+  function lives: ``#[test]`` and ``@Test`` are unambiguous wherever they
+  appear, which is what lets Rust's colocated tests be found inside a
+  production file.
 
 Lives in ``rules/`` beside :mod:`rules._test_files` as a private shared helper
-so the registration vocabulary has one definition rather than one per rule.
+so the vocabulary has one definition rather than one per rule.
 """
 
 from __future__ import annotations
@@ -33,7 +48,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, NamedTuple
 
 from safelint.languages import go as _go
+from safelint.languages import java as _java
 from safelint.languages import javascript as _js
+from safelint.languages import rust as _rust
 from safelint.languages._node_utils import CALL_TYPES, node_text, walk
 
 
@@ -192,3 +209,99 @@ def _has_function_argument(call_node: tree_sitter.Node, function_types: frozense
     if arguments is None:  # pragma: no cover - defensive: a call always has an arguments field
         return False
     return any(child.type in function_types for child in arguments.named_children)
+
+
+#: Node types that carry a test marker for *func_node*, per language. Rust puts
+#: its attributes on preceding siblings (``#[test]`` then ``fn``); Java nests
+#: its annotations in the method's own ``modifiers`` child.
+_MARKER_LANGUAGES: frozenset[str] = frozenset({"rust", "java"})
+
+
+def marked_as_test(func_node: tree_sitter.Node, lang_name: str, markers: frozenset[str]) -> bool:
+    """Return True when an attribute or annotation marks *func_node* as a test.
+
+    Deliberately independent of the file: ``#[test]`` and ``@Test`` say "this is
+    a test case" wherever they appear, and Rust's convention is to put them in
+    the production file under ``#[cfg(test)] mod tests``. Requiring a test
+    *file* as well would leave Rust's dominant idiom unreachable.
+
+    ``#[cfg(test)]`` is NOT a marker here, although
+    :mod:`rules._rust_test_attribute` counts it as one for its own two callers.
+    The question there is "is this file or node in test context"; the question
+    here is "is this function a test case", and a ``#[cfg(test)] fn helper()``
+    is test support, not a test.
+    """
+    if not markers or lang_name not in _MARKER_LANGUAGES:
+        return False
+    if lang_name == "rust":
+        return any(name in markers for name in _rust_attribute_names(func_node))
+    return any(name in markers for name in _java_annotation_names(func_node))
+
+
+def _rust_attribute_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return the names of the attributes attached to a Rust function item.
+
+    Attributes are preceding siblings, and they stack: ``#[test]`` followed by
+    ``#[should_panic]`` are two ``attribute_item`` nodes before the
+    ``function_item``, so the walk continues past the first one it sees.
+    """
+    names: set[str] = set()
+    sibling = func_node.prev_named_sibling
+    while sibling is not None:
+        if sibling.type != _rust.ATTRIBUTE_ITEM:
+            break
+        name = _marker_name(_rust_attribute_path(sibling))
+        if name is not None:
+            names.add(name)
+        sibling = sibling.prev_named_sibling
+    return names
+
+
+def _rust_attribute_path(attribute_item: tree_sitter.Node) -> tree_sitter.Node | None:
+    """Return the path node naming the attribute inside an ``attribute_item``.
+
+    Two hops: the item wraps an ``attribute``, whose first named child is the
+    path (``identifier`` for ``#[test]``, ``scoped_identifier`` for
+    ``#[tokio::test]``). Reading the ``attribute`` node's own text instead would
+    give ``tokio::test`` for the qualified form, which matches no configured
+    bareword - the same two-hop descent ``rules/_rust_test_attribute.py`` makes.
+    """
+    attribute = next((child for child in attribute_item.named_children if child.type == _rust.ATTRIBUTE), None)
+    if attribute is None:  # pragma: no cover - defensive: every attribute_item wraps an attribute
+        return None
+    children = attribute.named_children
+    return children[0] if children else None
+
+
+def _java_annotation_names(func_node: tree_sitter.Node) -> set[str]:
+    """Return the names of the annotations on a Java method declaration.
+
+    Both annotation shapes count: the bare ``marker_annotation`` (``@Test``) and
+    the ``annotation`` that takes arguments (``@ValueSource(...)``), because
+    ``@ParameterizedTest`` is one and its ``@ValueSource`` sibling is the other.
+    """
+    modifiers = next((child for child in func_node.named_children if child.type == _java.MODIFIERS), None)
+    if modifiers is None:
+        return set()
+    names: set[str] = set()
+    for child in modifiers.named_children:
+        if child.type not in (_java.MARKER_ANNOTATION, _java.ANNOTATION):
+            continue
+        name = _marker_name(child.child_by_field_name("name"))
+        if name is not None:
+            names.add(name)
+    return names
+
+
+def _marker_name(node: tree_sitter.Node | None) -> str | None:
+    """Return the bareword name of an attribute or annotation node.
+
+    A qualified marker keeps only its trailing segment, so ``#[tokio::test]``
+    reads as ``test`` and ``@org.junit.jupiter.api.Test`` as ``Test``; a user
+    configuring ``test_markers_rust`` should not have to enumerate every
+    framework's path, and the trailing name is what identifies the marker.
+    """
+    if node is None:
+        return None
+    trailing = node.child_by_field_name("name")
+    return node_text(trailing if trailing is not None else node)

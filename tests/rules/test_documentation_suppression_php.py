@@ -41,8 +41,12 @@ def _engine(overrides: dict | None = None) -> SafetyEngine:
 
 
 def _cfg601() -> dict:
-    """Config with missing_assertions enabled (off by default)."""
-    return {"rules": {"missing_assertions": {"enabled": True}}}
+    """Config with missing_assertions enabled, and scoping pinned off.
+
+    ``test_functions_only`` ships on since 2.16.0 (#163); these samples are
+    plain ``.php`` files, which it would skip before counting anything.
+    """
+    return {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False}}}
 
 
 def test_php_function_without_assertions_fires_safe601(tmp_path: Path) -> None:
