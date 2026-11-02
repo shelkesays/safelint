@@ -186,3 +186,66 @@ def test_a_mistyped_receiver_list_fails_loud(tmp_path: Path) -> None:
     engine = _engine({"rules": {"missing_assertions": {"assertion_receivers_go": "assert"}}})
     with pytest.raises(TypeError, match="assertion_receivers_go"):
         engine.check_file(str(sample))
+
+
+def test_test_main_is_not_a_test_case(tmp_path: Path) -> None:
+    """``TestMain(m *testing.M)`` is the package harness, not a test.
+
+    It matches the ``Test`` prefix and has nothing to assert, and its ``m.Run()``
+    cannot excuse it either: the delegation guard needs a callback argument and
+    ``m.Run()`` takes none. Without the exclusion it reported on every Go
+    package that has one.
+    """
+    sample = _write(tmp_path, "func TestMain(m *testing.M) {\n\tos.Exit(m.Run())\n}\n")
+    assert _safe601(_engine(), sample) == []
+
+
+_NON_TESTING_RECEIVERS: list[tuple[str, str]] = [
+    ("fmt.Errorf builds an error", '_ = fmt.Errorf("built %d", 1)'),
+    ("err.Error reads a message", "_ = err.Error()"),
+    ("log.Fatalf is not a test failure", 'log.Fatalf("boom")'),
+]
+
+
+@pytest.mark.parametrize(["label", "call"], _NON_TESTING_RECEIVERS, ids=[case[0] for case in _NON_TESTING_RECEIVERS])
+def test_a_failure_name_on_a_non_testing_receiver_is_not_an_assertion(tmp_path: Path, label: str, call: str) -> None:
+    """The shipped names are METHODS on ``testing.T``, so the receiver decides.
+
+    ``call_name`` strips the receiver, so matching on the name alone credited
+    `fmt.Errorf` and `err.Error()` - neither an edge case in Go. Either one
+    inside a test silenced the finding completely.
+    """
+    sample = _write(tmp_path, f"func TestX(t *testing.T) {{\n\t{call}\n}}\n")
+    assert _safe601(_engine(), sample) == ['Function "TestX" has no assertions'], label
+
+
+def test_a_testing_receiver_under_any_name_counts(tmp_path: Path) -> None:
+    """The receiver is matched against this function's own ``testing``-typed parameters.
+
+    A project that names it something other than ``t`` still asserts, and a
+    shared helper taking ``testing.TB`` is the same shape.
+    """
+    sample = _write(tmp_path, 'func TestX(tb testing.TB) {\n\ttb.Errorf("real failure")\n}\n')
+    assert _safe601(_engine(), sample) == []
+
+
+def test_a_subtest_resolves_its_own_testing_parameter(tmp_path: Path) -> None:
+    """The subtest literal declares its own ``t``, so it is counted against that."""
+    sample = _write(
+        tmp_path,
+        'func TestOuter(t *testing.T) {\n\tt.Run("inner", func(t *testing.T) {\n\t\tt.Errorf("real failure")\n\t})\n}\n',
+    )
+    assert _safe601(_engine(), sample) == []
+
+
+def test_a_bare_configured_helper_still_counts_without_a_receiver(tmp_path: Path) -> None:
+    """A bare call is matched on name alone, as in every other language.
+
+    This is what lets a project add its own assertion helper to
+    ``assertion_calls_go``; the receiver condition applies only to calls that
+    have a receiver.
+    """
+    sample = _write(tmp_path, "func TestX(t *testing.T) {\n\tmustEqual(1, 1)\n}\n")
+    assert _safe601(_engine(), sample) == ['Function "TestX" has no assertions']
+    engine = _engine({"rules": {"missing_assertions": {"extend_assertion_calls_go": ["mustEqual"]}}})
+    assert _safe601(engine, sample) == []
