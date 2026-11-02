@@ -2356,7 +2356,7 @@
 <tr>
 <td><strong>Go</strong></td>
 <td><code>.go</code></td>
-<td>16 cross-language rules apply (the 13 all-language core plus <code>global_mutation</code> / <code>dynamic_code_execution</code> / <code>resource_lifecycle</code>); 2 Go-only rules cover Go-idiom patterns: <code>empty_error_check</code> (the empty <code>if err != nil {}</code> swallow) and <code>panic_calls_outside_tests</code> (18 rules total for Go). Headline adaptations: the bare <code>for {}</code> infinite loop, the sibling <code>foo_test.go</code> convention, the <code>_ = f()</code> explicit-discard exemption, and the <code>defer x.Close()</code> resource form. See <a href="languages/go/">Go</a>. New in v2.5.0.</td>
+<td>17 cross-language rules apply (the 14 all-language core plus <code>global_mutation</code> / <code>dynamic_code_execution</code> / <code>resource_lifecycle</code>); 2 Go-only rules cover Go-idiom patterns: <code>empty_error_check</code> (the empty <code>if err != nil {}</code> swallow) and <code>panic_calls_outside_tests</code> (19 rules total for Go). <code>missing_assertions</code> joined in v2.16.0 as a tests-must-assert guard, counting the <code>*testing.T</code> failure API and testify by receiver. Headline adaptations: the bare <code>for {}</code> infinite loop, the sibling <code>foo_test.go</code> convention, the <code>_ = f()</code> explicit-discard exemption, and the <code>defer x.Close()</code> resource form. See <a href="languages/go/">Go</a>. New in v2.5.0.</td>
 </tr>
 <tr>
 <td><strong>PHP</strong></td>
@@ -2387,13 +2387,8 @@
 <tbody>
 <tr>
 <td><strong>All nine</strong> (Python, JavaScript, TypeScript, Java, Rust, Go, PHP, C, C++)</td>
-<td>13</td>
-<td>the cross-language core: <code>function_length</code>, <code>nesting_depth</code>, <code>max_arguments</code>, <code>complexity</code>, <code>no_recursion</code>, <code>side_effects_hidden</code>, <code>side_effects</code>, <code>unbounded_loops</code>, <code>blanket_suppression</code>, <code>test_existence</code>, <code>test_coupling</code>, <code>tainted_sink</code>, <code>return_value_ignored</code></td>
-</tr>
-<tr>
-<td>Python / JS / TS / Java / Rust / PHP / C / C++ (not Go)</td>
-<td>1</td>
-<td><code>missing_assertions</code></td>
+<td>14</td>
+<td>the cross-language core: <code>function_length</code>, <code>nesting_depth</code>, <code>max_arguments</code>, <code>complexity</code>, <code>no_recursion</code>, <code>side_effects_hidden</code>, <code>side_effects</code>, <code>unbounded_loops</code>, <code>missing_assertions</code> (Go added in v2.16.0), <code>blanket_suppression</code>, <code>test_existence</code>, <code>test_coupling</code>, <code>tainted_sink</code>, <code>return_value_ignored</code></td>
 </tr>
 <tr>
 <td>Python / JS / TS / Java / Rust / PHP (not Go, not C, not C++)</td>

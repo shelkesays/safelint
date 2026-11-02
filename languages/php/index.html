@@ -2636,7 +2636,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
 <td><code>missing_assertions</code></td>
-<td>Counts assertion calls per function. Default <code>assertion_calls_php</code> covers <code>assert</code> plus the PHPUnit family (<code>assertSame</code> / <code>assertEquals</code> / <code>assertTrue</code> / <code>assertNull</code> / <code>assertCount</code> / <code>assertInstanceOf</code> / <code>assertThat</code> / <code>expectException</code> / <code>fail</code> etc.). <code>min_assertions</code> defaults to 1; set 2 to match the paper. Disabled by default.</td>
+<td><em>Since 2.16.0</em> scoped to tests by default (<code>test_functions_only = true</code>): a <code>test*</code> method in a <code>&lt;Class&gt;Test.php</code> file is checked and production code is not. PHPUnit's <code>#[Test]</code> attribute and <code>@test</code> annotation are not yet read as test markers, so a test named without the prefix needs <code>test_function_prefixes_php</code>. Counts assertion calls per function. Default <code>assertion_calls_php</code> covers <code>assert</code> plus the PHPUnit family (<code>assertSame</code> / <code>assertEquals</code> / <code>assertTrue</code> / <code>assertNull</code> / <code>assertCount</code> / <code>assertInstanceOf</code> / <code>assertThat</code> / <code>expectException</code> / <code>fail</code> etc.). <code>min_assertions</code> defaults to 1; set 2 to match the paper. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe603-blanket_suppression">SAFE603</a></td>

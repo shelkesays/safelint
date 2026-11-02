@@ -2542,7 +2542,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
 <td><code>missing_assertions</code></td>
-<td>Functions with fewer than <code>min_assertions</code> assertions - the <code>assert</code> keyword plus <code>assertion_calls</code> method calls (<code>self.assertEqual(...)</code> / <code>pytest.raises(...)</code>; default 1, set 2 for Holzmann rule 5's density). Disabled by default.</td>
+<td><em>Since 2.16.0</em> scoped to tests by default (<code>test_functions_only = true</code>), so a <code>test_*</code> function in a test file is checked and production code is not; set it to <code>false</code> for Holzmann rule 5's reading. Functions with fewer than <code>min_assertions</code> assertions - the <code>assert</code> keyword plus <code>assertion_calls</code> method calls (<code>self.assertEqual(...)</code> / <code>pytest.raises(...)</code> / <code>mock.assert_called_once_with(...)</code> / Django's <code>assertContains(...)</code>; default 1, set 2 for Holzmann rule 5's density). Add project helpers with <code>extend_assertion_calls</code>. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe603-blanket_suppression">SAFE603</a></td>

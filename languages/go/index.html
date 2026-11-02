@@ -2538,7 +2538,7 @@
 <p>safelint is a Python package, not a Go module. A <code>go.mod</code> is not required; safelint walks the source tree directly and auto-detects by file extension. Run it from the module / repository root. If your Go project has no Python tool chain, <code>pipx install 'safelint[go]'</code> isolates the install.</p>
 <p>v2.0.0+ ships every language grammar as an opt-in extra. Plain <code>pip install safelint</code> installs only the engine and would skip every <code>.go</code> file with an install hint (<code>safelint: warning: skipping .go files, install with: pip install 'safelint[go]'</code>) on first run. The exit code is 2 only when EVERY candidate file is skipped (the typical Go-only project); in a mixed Python + Go repo, safelint emits the <code>.go</code> skip warning and continues linting the supported files normally.</p>
 <h2 id="rules-that-fire-on-go">Rules that fire on Go<a class="headerlink" href="#rules-that-fire-on-go" title="Permanent link">#</a></h2>
-<p>Go is in scope for 16 cross-language rules plus 2 Go-only rules (18 rules total for Go). 7 cross-language rules are deliberately skipped, see the next section. Like the other languages' optional rules, every dataflow rule and both Go-only rules are disabled by default.</p>
+<p>Go is in scope for 17 cross-language rules plus 2 Go-only rules (19 rules total for Go). 6 cross-language rules are deliberately skipped, see the next section. Like the other languages' optional rules, every dataflow rule and both Go-only rules are disabled by default.</p>
 <h3 id="cross-language-rules">Cross-language rules<a class="headerlink" href="#cross-language-rules" title="Permanent link">#</a></h3>
 <table>
 <thead>
@@ -2608,6 +2608,11 @@
 <td><a href="../../configuration/rules/#safe603-blanket_suppression">SAFE603</a></td>
 <td><code>blanket_suppression</code></td>
 <td>Flags blanket golangci-lint / Staticcheck directives (Holzmann rule 10): golangci-lint's bare <code>//nolint</code> (all linters) and Staticcheck's bare <code>//lint:ignore</code> (no checks). Scoped forms (<code>//nolint:errcheck</code>, <code>//lint:ignore SA1000 reason</code>) are clean. Both are machine-readable directives recognised only with no space after <code>//</code>, so a prose <code>// nolint here</code> comment is not flagged. Disabled by default.</td>
+</tr>
+<tr>
+<td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
+<td><code>missing_assertions</code></td>
+<td><em>Registered in 2.16.0.</em> Go has no production assertion idiom - no <code>assert</code> keyword, nothing to count in production code - so the rule is only meaningful here as a "tests must assert something" guard, which is what the default <code>test_functions_only = true</code> gives. A test fails through the <code>*testing.T</code> / <code>B</code> / <code>F</code> failure API, so <code>assertion_calls_go</code> is <code>Error</code> / <code>Errorf</code> / <code>Fatal</code> / <code>Fatalf</code> / <code>Fail</code> / <code>FailNow</code>; <code>Skip</code> and <code>Log</code> are excluded, because skipping or logging is not asserting. Testify is matched by RECEIVER instead (<code>assertion_receivers_go = ["assert", "require"]</code>): each package exposes dozens of assertion functions, so a name list would go stale and collide with ordinary method names. Only an identifier receiver counts, so <code>s.deps.assert.Equal(...)</code> is not credited. <code>test_function_prefixes_go</code> is <code>["Test", "Fuzz"]</code> because the toolchain requires the capital; <code>Benchmark</code> and <code>Example</code> are out (a benchmark has no assertion to make, an example asserts through its <code>// Output:</code> comment). <code>test_registration_calls_go = ["Run", "Fuzz"]</code> makes a <code>t.Run(name, func(t *testing.T){...})</code> subtest a test in its own right, named by its title (<code>Test "the empty one" has no assertions</code>), and keeps the table-driven parent quiet: its assertions live in the subtests, and the counter stops at nested functions. The same applies to a <code>FuzzXxx</code> seed function and its <code>f.Fuzz</code> target. Known limit: matching is name-only with the receiver stripped, so a <code>log.Fatal(...)</code> inside a test counts as an assertion. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe701-test_existence">SAFE701</a></td>
@@ -2687,11 +2692,6 @@
 <td><a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305</a></td>
 <td><code>wide_scope_declaration</code></td>
 <td>Go has no <code>var</code> hoisting; <code>:=</code> is block-scoped, so there is no narrow-the-scope hazard to flag.</td>
-</tr>
-<tr>
-<td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
-<td><code>missing_assertions</code></td>
-<td>Go has no production assertion idiom (no <code>assert</code> keyword or stdlib macro; testify is test-only). Registering a heuristic would be noisy; revisit if demand appears.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe803-null_dereference">SAFE803</a></td>

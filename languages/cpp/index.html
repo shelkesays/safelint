@@ -965,6 +965,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#assertions-safe601" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assertions (SAFE601)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#error-handling-try-catch-throw" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2408,6 +2419,17 @@
 </li>
         
           <li class="md-nav__item">
+  <a href="#assertions-safe601" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Assertions (SAFE601)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
   <a href="#error-handling-try-catch-throw" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -2527,6 +2549,8 @@
 <li><strong>SAFE313</strong> naturally exempts smart pointers: <code>std::unique_ptr&lt;T&gt;</code> is a class template, not a <code>pointer_declarator</code>, so it never trips the raw multi-level-pointer check.</li>
 </ul>
 <p>Two of them take <code>_cpp</code>-suffixed config lists so a project can diverge its C and C++ knobs: SAFE106 (<code>nonlocal_jump_calls_cpp</code>) and SAFE310 (<code>allocation_calls_cpp</code>). SAFE311, SAFE312 and SAFE313 have no configurable name list - they match on syntax alone. The try/catch rules below (SAFE201-SAFE203) share the cross-language error-handling options rather than taking <code>_cpp</code> keys.</p>
+<h3 id="assertions-safe601">Assertions (SAFE601)<a class="headerlink" href="#assertions-safe601" title="Permanent link">#</a></h3>
+<p>C++ reuses C's <code>assert</code> macro (<code>&lt;cassert&gt;</code>) through <code>assertion_calls_cpp</code>. <em>Since 2.16.0</em> the rule is scoped to tests by default (<code>test_functions_only = true</code>), which for C++ means a <code>&lt;stem&gt;_test.cpp</code> / <code>test_&lt;stem&gt;.cpp</code> file or one under <code>test_dirs</code>, and a function named for a <code>test_function_prefixes</code> entry. Macro-based test frameworks need more than an assertion list, and the two common ones differ. A GoogleTest <code>TEST(Suite, Name) { ... }</code> happens to parse as a <code>function_definition</code> <em>named</em> <code>TEST</code>, so it is reachable: add <code>test_function_prefixes_cpp = ["TEST"]</code> (or set <code>test_functions_only = false</code>), and add the framework's assertion macros with <code>extend_assertion_calls_cpp = ["ASSERT_TRUE", "EXPECT_EQ", ...]</code> - note the finding is then reported as <code>Function "TEST"</code>, since that is the name in the source. A Catch2 <code>TEST_CASE("...") { ... }</code> does <strong>not</strong> parse as a function declaration at all, so no configuration reaches it; <code>extend_assertion_calls_cpp</code> alone cannot help either framework, because it only adds names counted inside functions the rule has already found.</p>
 <h3 id="error-handling-try-catch-throw">Error handling (<code>try</code> / <code>catch</code> / <code>throw</code>)<a class="headerlink" href="#error-handling-try-catch-throw" title="Permanent link">#</a></h3>
 <p>C++ is the first non-Python home for <strong>SAFE201 <code>bare_except</code></strong>: it flags the <code>catch (...)</code> catch-all, which swallows every exception with no binding to inspect or re-raise - the same hazard as Python's bare <code>except:</code>. A typed <code>catch (const E&amp; e)</code> is clean. <strong>SAFE202</strong> fires on empty / comment-only / literal-only catch bodies; <strong>SAFE203</strong> requires a swallowing catch to log. A <code>std::cerr &lt;&lt; ...</code> stream insertion counts as logging (it is a <code>&lt;&lt;</code> operator, not a call, so it is recognised specially), as does an <code>spdlog::error(...)</code>-style call; a bare <code>throw;</code> or <code>throw e;</code> counts as a re-raise.</p>
 <h2 id="configuration">Configuration<a class="headerlink" href="#configuration" title="Permanent link">#</a></h2>

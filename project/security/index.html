@@ -2401,7 +2401,7 @@
 <h1 id="security-policy">Security policy<a class="headerlink" href="#security-policy" title="Permanent link">#</a></h1>
 <p>SafeLint is a static-analysis CLI that parses source code via Tree-sitter and walks the resulting trees. It does not execute the code it lints, make network requests, or open sockets. The threat surface is therefore narrow but not zero - see the <a href="#in-scope">in-scope</a> section below for what counts as a vulnerability.</p>
 <h2 id="supported-versions">Supported versions<a class="headerlink" href="#supported-versions" title="Permanent link">#</a></h2>
-<p>Security fixes ship to the supported lines below. Lines marked ❌ receive no security backports; the recommended action is to upgrade. C++ (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>) is the most recent language addition (2.8.x); the current 2.15.x line is a precision release - eighteen validated false-positive classes closed across all nine languages, the largest of them SAFE102 <code>nesting_depth</code> no longer counting the resource and error-handling wrappers (<code>with</code>, <code>try</code>, and an <code>else if</code> chain's arms) as branches, while <code>switch</code> / <code>match</code> still count, SAFE203 <code>logging_on_error</code> recognising a handler that re-raises, and SAFE105 <code>no_recursion</code> resolving Java overloads and Rust shadowing from the source text; it builds on 2.14.x, which made SAFE801 <code>tainted_sink</code> report <strong>assignment-side sinks</strong> in every supported language (<code>element.innerHTML = tainted</code>, the canonical DOM-XSS shape, which the shipped <code>innerHTML</code> default previously never matched, plus the equivalent member-write in Python, Java, Rust, Go, PHP, C and C++), and on the 2.13.x property-typed sanitisers (<code>sanitizer_properties</code> / <code>sink_properties</code>, path-sensitive, opt-in), the 2.12.x precision work (SAFE601 <code>assertion_calls</code> + <code>test_functions_only</code>, SAFE907 <code>request_validators</code>, SAFE801 <code>receiver_sinks</code>) and the 2.11.x framework presets (SAFE908/909) and cross-language taint-projection parity.</p>
+<p>Security fixes ship to the supported lines below. Lines marked ❌ receive no security backports; the recommended action is to upgrade. C++ (<code>.cpp</code>, <code>.cxx</code>, <code>.cc</code>, <code>.hpp</code>, <code>.hxx</code>, <code>.hh</code>) is the most recent language addition (2.8.x); the current 2.16.x line scopes SAFE601 <code>missing_assertions</code> to test functions by default and teaches it the three ways a test is actually identified (a name prefix, a registration callback such as <code>it()</code> / <code>t.Run()</code>, and a marker such as <code>#[test]</code> / <code>@Test</code>), registers it for Go, and reports a SAFE801 <code>tainted_sink</code> finding seeded only from a parameter in wording distinct from one with a traced source; it builds on 2.15.x, a precision release that closed eighteen validated false-positive classes across all nine languages (SAFE102 <code>nesting_depth</code> no longer counting the resource and error-handling wrappers (<code>with</code>, <code>try</code>, and an <code>else if</code> chain's arms) as branches, while <code>switch</code> / <code>match</code> still count, SAFE203 <code>logging_on_error</code> recognising a handler that re-raises, and SAFE105 <code>no_recursion</code> resolving Java overloads and Rust shadowing from the source text), and on 2.14.x, which made SAFE801 <code>tainted_sink</code> report <strong>assignment-side sinks</strong> in every supported language (<code>element.innerHTML = tainted</code>, the canonical DOM-XSS shape, which the shipped <code>innerHTML</code> default previously never matched, plus the equivalent member-write in Python, Java, Rust, Go, PHP, C and C++), and on the 2.13.x property-typed sanitisers (<code>sanitizer_properties</code> / <code>sink_properties</code>, path-sensitive, opt-in), the 2.12.x precision work (SAFE601 <code>assertion_calls</code> + <code>test_functions_only</code>, SAFE907 <code>request_validators</code>, SAFE801 <code>receiver_sinks</code>) and the 2.11.x framework presets (SAFE908/909) and cross-language taint-projection parity.</p>
 <table>
 <thead>
 <tr>
@@ -2411,7 +2411,11 @@
 </thead>
 <tbody>
 <tr>
-<td><strong>2.15.x</strong> (current; false-positive precision across nine languages)</td>
+<td><strong>2.16.x</strong> (current; SAFE601 test scoping and identity, Go support, SAFE801 evidence wording)</td>
+<td>✅ Security fixes</td>
+</tr>
+<tr>
+<td><strong>2.15.x</strong> (false-positive precision across nine languages)</td>
 <td>✅ Security fixes</td>
 </tr>
 <tr>
@@ -2419,11 +2423,7 @@
 <td>✅ Security fixes</td>
 </tr>
 <tr>
-<td><strong>2.13.x</strong> (SAFE801 property-typed sanitisers)</td>
-<td>✅ Security fixes</td>
-</tr>
-<tr>
-<td><strong>2.2.x - 2.12.x</strong> (Rust in 2.2.x-2.4.x; Go in 2.5.x; PHP in 2.6.x; C in 2.7.x; C++ in 2.8.x; framework presets in 2.9.x; multi-path <code>check</code> in 2.10.x; framework-rule fast-follows in 2.11.x; SAFE601/907 precision in 2.12.x)</td>
+<td><strong>2.2.x - 2.13.x</strong> (Rust in 2.2.x-2.4.x; Go in 2.5.x; PHP in 2.6.x; C in 2.7.x; C++ in 2.8.x; framework presets in 2.9.x; multi-path <code>check</code> in 2.10.x; framework-rule fast-follows in 2.11.x; SAFE601/907 precision in 2.12.x; SAFE801 property-typed sanitisers in 2.13.x)</td>
 <td>✅ Security fixes through ~6 months after the next minor lands</td>
 </tr>
 <tr>

@@ -2505,7 +2505,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305</a></td>
 <td><code>wide_scope_declaration</code></td>
-<td><strong>JavaScript-only.</strong> Fires on every <code>var</code> declaration, <code>var</code> is function-scoped (hoisted), <code>let</code> / <code>const</code> are block-scoped.</td>
+<td><strong>JS-family only</strong> (JavaScript and TypeScript; no Python equivalent). <code>var</code> is function-scoped (hoisted), <code>let</code> / <code>const</code> are block-scoped. <em>Since 2.16.0</em> fires only where the hoisting is <strong>observable</strong>: read or written outside its block, read before its declaration, captured by a closure in a loop, or re-declaring a name already bound in an overlapping scope. A <code>var</code> that <code>let</code> would behave identically for is not reported.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe309-dynamic_code_execution">SAFE309</a></td>
@@ -2525,7 +2525,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
 <td><code>missing_assertions</code></td>
-<td>Functions with fewer than <code>min_assertions</code> assertion calls (default 1; set 2 for Holzmann rule 5's density). JS configures the recognised call names via <code>assertion_calls_javascript</code> (default: <code>assert</code>, <code>ok</code>, <code>equal</code>, <code>expect</code>, <code>should</code>, <code>console.assert</code>, …). Disabled by default.</td>
+<td><em>Since 2.16.0</em> a test registered through a callback is recognised as a test: <code>it("...", () =&gt; {})</code> is anonymous, so no name prefix could ever match it and <code>test_functions_only</code> used to turn the rule off for Jest / Vitest / Mocha / node:test rather than scope it. <code>test_registration_calls_javascript</code> (<code>it</code>, <code>test</code>) matches the whole callee chain, so the modifiers (<code>it.only</code> / <code>test.skip</code> / <code>it.concurrent</code> / <code>it.failing</code>), the parametrised <code>it.each(table)(...)</code> and node:test's <code>t.test(...)</code> are covered, and the finding is named by the test's own title (<code>Test "rejects a short password" has no assertions</code>). A <code>describe</code> block is not reported: its assertions live in the tests it registers. Functions with fewer than <code>min_assertions</code> assertion calls (default 1; set 2 for Holzmann rule 5's density). JS configures the recognised call names via <code>assertion_calls_javascript</code> (default: <code>assert</code>, <code>ok</code>, <code>equal</code>, <code>expect</code>, <code>should</code>, <code>console.assert</code>, …). Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe603-blanket_suppression">SAFE603</a></td>

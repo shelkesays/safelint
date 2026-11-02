@@ -2544,7 +2544,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe305-wide_scope_declaration">SAFE305</a></td>
 <td><code>wide_scope_declaration</code></td>
-<td><strong>JavaScript-family only</strong>, but applies to TS too. <code>var</code> is legal in TS and still hazardous (function-scoped, hoisted); the rule fires identically on <code>.ts</code> / <code>.tsx</code> / <code>.as</code> files. Migration: replace with <code>let</code> (if reassigned) or <code>const</code> (if not).</td>
+<td><strong>JavaScript-family only</strong>, but applies to TS too. <code>var</code> is legal in TS and still hazardous (function-scoped, hoisted); the rule fires identically on <code>.ts</code> / <code>.tsx</code> / <code>.as</code> files. <em>Since 2.16.0</em> only where the hoisting is observable - used outside its block, read before its declaration, captured by a closure in a loop, or re-declaring a name already bound in an overlapping scope (see the <a href="../../configuration/rules/#safe305-wide_scope_declaration">rule reference</a>). Migration: replace with <code>let</code> (if reassigned) or <code>const</code> (if not).</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe309-dynamic_code_execution">SAFE309</a></td>
@@ -2564,7 +2564,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
 <td><code>missing_assertions</code></td>
-<td>Same as JS. Uses <code>assertion_calls_javascript</code> by default, TS frameworks like Vitest / Jest typically configure the same call names, so no <code>_typescript</code> override is needed. Disabled by default.</td>
+<td>Same as JS, including the 2.16.0 registration-callback recognition: a <code>.test.ts</code> file's <code>it(...)</code> tests are checked and named by their titles, and <code>test_registration_calls_javascript</code> is inherited through the TS to JS key chain. Uses <code>assertion_calls_javascript</code> by default, TS frameworks like Vitest / Jest typically configure the same call names, so no <code>_typescript</code> override is needed. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe603-blanket_suppression">SAFE603</a></td>

@@ -3294,8 +3294,10 @@
 <a id="__codelineno-25-12" name="__codelineno-25-12" href="#__codelineno-25-12"></a>                        nonlocal_jumps is already on at warning severity)
 <a id="__codelineno-25-13" name="__codelineno-25-13" href="#__codelineno-25-13"></a>          - C++:        the C-family rules above (widened) plus raw_new_delete
 <a id="__codelineno-25-14" name="__codelineno-25-14" href="#__codelineno-25-14"></a>                        and dangerous_casts (modern-ownership / cast safety)
-<a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a>          - test discipline: missing_assertions (set min_assertions = 2 for the
-<a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a>                        Holzmann density), test_existence, test_coupling
+<a id="__codelineno-25-15" name="__codelineno-25-15" href="#__codelineno-25-15"></a>          - test discipline: missing_assertions (scoped to tests by default
+<a id="__codelineno-25-16" name="__codelineno-25-16" href="#__codelineno-25-16"></a>                        since 2.16.0; set test_functions_only = false to require
+<a id="__codelineno-25-17" name="__codelineno-25-17" href="#__codelineno-25-17"></a>                        assertions in every function, and min_assertions = 2 for
+<a id="__codelineno-25-18" name="__codelineno-25-18" href="#__codelineno-25-18"></a>                        the Holzmann density), test_existence, test_coupling
 </code></pre></div>
 <p>All of the opt-in rules listed above are off by default; see the <a href="../rules/">Rules reference</a> for each rule's config knobs. <code>no_recursion</code> (SAFE105) and the C-family <code>nonlocal_jumps</code> (SAFE106) are the rules that are <strong>on by default</strong> (at <code>warning</code> severity), so no opt-in step is needed for them.</p>
 

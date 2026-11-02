@@ -2622,7 +2622,7 @@
 <tr>
 <td><a href="../../configuration/rules/#safe601-missing_assertions">SAFE601</a></td>
 <td>missing_assertions</td>
-<td>The <code>assert(...)</code> macro. Disabled by default.</td>
+<td>The <code>assert(...)</code> macro. <em>Since 2.16.0</em> scoped to tests by default (<code>test_functions_only = true</code>), which for C means a <code>&lt;stem&gt;_test.c</code> / <code>test_&lt;stem&gt;.c</code> file or one under <code>test_dirs</code>, and a function named for a <code>test_function_prefixes</code> entry. A Unity / Check / CMocka <code>TEST(Suite, Name) { ... }</code> macro body does <strong>not</strong> parse under <code>tree-sitter-c</code> (the file surfaces a <code>SAFE000</code> parse error and is dropped from analysis, the class tracked in #206), so no configuration reaches it. The same source compiled as C++ does parse, as a function named <code>TEST</code>; see the <a href="../cpp/#assertions-safe601">C++ page</a>. Disabled by default.</td>
 </tr>
 <tr>
 <td><a href="../../configuration/rules/#safe603-blanket_suppression">SAFE603</a></td>
