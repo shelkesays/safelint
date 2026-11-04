@@ -49,10 +49,19 @@ class _AssertionSpec(NamedTuple):
     assertion functions each, and listing every one of them in ``assertion_calls_go``
     would be a maintenance burden that still went stale. Empty for every other
     language, where name matching alone is enough.
+
+    *call_prefixes* match a call by how its name STARTS, which is how a
+    project's own helper counts without being enumerated (#251): a test whose
+    only assertion goes through ``assertIllegalArgumentException(...)`` asserts,
+    and exact-name matching read it as assertion-free. It is populated only when
+    the function being counted was identified as a test, so a production method
+    named ``assertValid()`` is never credited outside one; see
+    :meth:`MissingAssertionsRule._check_function`.
     """
 
     calls: frozenset[str]
     receivers: frozenset[str]
+    call_prefixes: tuple[str, ...]
 
 
 class _FileScope(NamedTuple):
@@ -62,10 +71,14 @@ class _FileScope(NamedTuple):
     threading the pieces individually would push the helper past the argument
     limit the project holds itself to.
 
-    *scoped* is ``test_functions_only``. *file_is_test* is only meaningful when
-    *scoped*; it gates the two identity routes that need the function to live in
-    a test file (a name prefix, a registration callback) and not the marker
-    route, which stands on its own.
+    *scoped* is ``test_functions_only``. *file_is_test* gates the two identity
+    routes that need the function to live in a test file (a name prefix, a
+    registration callback) and not the marker route, which stands on its own.
+    It is resolved whatever *scoped* says, because test identity decides more
+    than whether a function is checked: it also decides whether an ``assert*``
+    helper counts and whether a callback's assertions do (#251, #252). Reading
+    it only under *scoped* left both off for genuine tests under
+    ``test_functions_only = false``.
     """
 
     lang_name: str
@@ -79,7 +92,39 @@ class _FileScope(NamedTuple):
     minimum: int
 
 
-def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str], minimum: int) -> int:
+def _matches_assertion_name(name: str | None, calls: frozenset[str], call_prefixes: tuple[str, ...]) -> bool:
+    """Return True when *name* is an assertion by exact name or by prefix.
+
+    Exact matching is the allowlist the rule has always used. The prefix route
+    is what recognises a project's own helper: ``assertEqualCharNodes``,
+    ``assertNullPointerException`` and the hundreds of others a large test suite
+    grows are all assertions, and enumerating them per project does not scale
+    (commons-lang alone needed eight entries to clear half its findings).
+
+    *call_prefixes* is empty unless the enclosing function was identified as a
+    test, which is what bounds the obvious risk: inside a test an
+    ``assert``-prefixed call is an assertion, and outside one it is not
+    credited at all.
+    """
+    if not name:
+        return False
+    return name in calls or _matches_prefix(name, call_prefixes)
+
+
+def _matches_prefix(name: str | None, call_prefixes: tuple[str, ...]) -> bool:
+    """Return True when *name* starts with one of *call_prefixes*.
+
+    One owner for the prefix test, because Rust asks it of a plain call while
+    every other language folds it into
+    :func:`_matches_assertion_name`. An empty *call_prefixes* never matches,
+    which is how the whole route switches off outside a test.
+    """
+    if not name or len(call_prefixes) == 0:
+        return False
+    return name.startswith(call_prefixes)
+
+
+def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], spec: _AssertionSpec, minimum: int) -> int:
     """Count assertions in the Python function body, stopping at *minimum*.
 
     Two recognised forms, OR'd together:
@@ -96,8 +141,8 @@ def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozens
       unittest-style test reads as assertion-less and forces a file-wide
       SAFE601 ignore.
 
-    Matching is deliberately by call NAME only (receiver stripped), the
-    same allowlist approach as the other languages' detectors and
+    Matching is by call NAME only (receiver stripped), the same allowlist
+    approach as the other languages' detectors and
     ``tainted_sink.sanitizers`` - and what lets a *bare* project helper
     (``verify_invariant(x)``) count when added to ``assertion_calls``.
     Requiring a specific receiver (``self`` / ``pytest``) to reduce the
@@ -105,18 +150,22 @@ def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozens
     ``fail`` / ``raises`` credited as an assertion) would break that
     configurability and newly false-positive on assertions written with
     an unrecognised receiver, so it is intentionally not done;
-    ``test_functions_only`` scopes the rule to test functions instead.
+    ``test_functions_only`` scopes the rule to test functions instead. Inside
+    a test an ``assert``-prefixed name also counts, so a project's own helper
+    needs no entry (see :func:`_matches_assertion_name`).
 
-    Skips nested function bodies so the outer function isn't credited
-    for asserts that live inside an inner ``def``. Counting stops as
-    soon as *minimum* is reached - the rule only needs to know whether
-    the threshold is met, not the exact total of a heavily-asserted body.
+    *function_types* is empty when the function being counted is itself a
+    test, which is what lets a callback's assertions count (#252); the caller
+    decides, so the walk here simply honours what it is given. Counting stops
+    as soon as *minimum* is reached - the rule only needs to know whether the
+    threshold is met, not the exact total of a heavily-asserted body.
     """
     count = 0
     for c in walk(func_node, skip_types=tuple(function_types)):
         if c is func_node:
             continue
-        is_assert = c.type == _py.ASSERT_STATEMENT or (c.type in CALL_TYPES and call_name(c) in assertion_calls)
+        is_call = c.type in CALL_TYPES and _matches_assertion_name(call_name(c), spec.calls, spec.call_prefixes)
+        is_assert = c.type == _py.ASSERT_STATEMENT or is_call
         if not is_assert:
             continue
         count += 1
@@ -125,7 +174,7 @@ def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozens
     return count
 
 
-def _java_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str], minimum: int) -> int:
+def _java_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], spec: _AssertionSpec, minimum: int) -> int:
     """Count assertions in the Java method body, stopping at *minimum*.
 
     Two recognised forms, OR'd together:
@@ -139,15 +188,22 @@ def _java_assertion_count(func_node: tree_sitter.Node, function_types: frozenset
       ``assertion_calls_java`` set; ``call_name`` already strips the
       receiver (``Assertions.assertEquals`` and ``assertEquals``
       both resolve to ``"assertEquals"``).
+    * **A project's own ``assert*`` helper**, inside a test, by prefix.
+      Java test suites grow these by the hundred
+      (``assertIllegalArgumentException``, ``assertEqualCharNodes``), and they
+      were the single largest class of SAFE601 finding on commons-lang and
+      Guava once the rule was scoped to tests (#251).
 
-    Skips nested function bodies (inner class methods, lambdas) so the
-    outer method isn't credited for asserts that live in a closure body.
+    Skips nested function bodies (inner class methods, lambdas) unless the
+    method being counted is itself a test, in which case an assertion inside a
+    lambda it hands to someone else still counts (#252).
     """
     count = 0
     for c in walk(func_node, skip_types=tuple(function_types)):
         if c is func_node:
             continue
-        is_assert = c.type == _java.ASSERT_STATEMENT or (c.type in CALL_TYPES and call_name(c) in assertion_calls)
+        is_call = c.type in CALL_TYPES and _matches_assertion_name(call_name(c), spec.calls, spec.call_prefixes)
+        is_assert = c.type == _java.ASSERT_STATEMENT or is_call
         if not is_assert:
             continue
         count += 1
@@ -179,27 +235,43 @@ def _rust_macro_name(macro_node: tree_sitter.Node) -> str | None:
     return None
 
 
-def _rust_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str], minimum: int) -> int:
-    """Count assertion macros in the Rust function body, stopping at *minimum*.
+def _counts_as_rust_assertion(node: tree_sitter.Node, spec: _AssertionSpec) -> bool:
+    """Return True when *node* is a Rust assertion, by macro name or helper prefix.
 
-    Rust expresses assertions exclusively through macros (``assert!``,
-    ``assert_eq!``, ``assert_ne!``, ``debug_assert!``, etc.), NOT
-    function calls. tree-sitter-rust parses these as
-    ``macro_invocation`` with a ``macro`` field carrying the bareword
-    or qualified macro name.
+    The standard library's assertions are all macros, which is why
+    ``assertion_calls_rust`` is a macro-name list and is matched against nothing
+    else: a plain function literally named ``panic`` or ``unreachable`` is not
+    an assertion, and the names in that list only mean what they mean with the
+    ``!``.
 
-    Skips nested function / closure bodies so the outer function
-    isn't credited for asserts that live in a closure body.
+    A project's own helper is the exception, because it is ordinarily a
+    function: ``fn assert_roundtrip(a: &Foo)`` called from a test asserts, and
+    counting only macros read every such test as assertion-free. Only the
+    PREFIX route reaches a call, so this stays off outside a test and no
+    configured macro name leaks into call matching (#251).
+    """
+    if node.type == _rust.MACRO_INVOCATION:
+        macro = node.child_by_field_name("macro")
+        if macro is None:
+            return False
+        return _matches_assertion_name(_rust_macro_name(macro), spec.calls, spec.call_prefixes)
+    return node.type in CALL_TYPES and _matches_prefix(call_name(node), spec.call_prefixes)
+
+
+def _rust_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], spec: _AssertionSpec, minimum: int) -> int:
+    """Count assertions in the Rust function body, stopping at *minimum*.
+
+    tree-sitter-rust parses an assertion macro as ``macro_invocation`` with a
+    ``macro`` field carrying the bareword or qualified name;
+    :func:`_counts_as_rust_assertion` decides what qualifies.
+
+    Skips nested function / closure bodies unless the function being counted is
+    itself a test, in which case a closure's assertions are the test's own
+    (#252).
     """
     count = 0
     for c in walk(func_node, skip_types=tuple(function_types)):
-        if c is func_node or c.type != _rust.MACRO_INVOCATION:
-            continue
-        macro = c.child_by_field_name("macro")
-        if macro is None:
-            continue
-        name = _rust_macro_name(macro)
-        if name is None or name not in assertion_calls:
+        if c is func_node or not _counts_as_rust_assertion(c, spec):
             continue
         count += 1
         if count >= minimum:
@@ -274,8 +346,18 @@ def _counts_as_go_assertion(call_node: tree_sitter.Node, spec: _AssertionSpec, t
     (``s.logger.Errorf(...)``, ``newLogger().Fatal(...)``) reaches no shape: it
     is not a bare call, and nothing identifies it as ``testing``-typed or as a
     testify package.
+
+    The prefix route sits ahead of all three, because a helper's receiver is
+    not predictable: ``assertEqual(t, a, b)``, ``h.assertEqual(...)`` and
+    ``testutil.assertEqual(...)`` are the same helper written three ways, and
+    none is a ``testing``-typed receiver or a testify package. It is live only
+    inside a test (#251), and the names that forced the receiver condition in
+    the first place (``fmt.Errorf``, ``err.Error``) do not start with
+    ``assert``, so the tightening it bypasses still holds.
     """
     name = call_name(call_node)
+    if _matches_prefix(name, spec.call_prefixes):
+        return True
     if _is_bare_go_call(call_node):
         return name in spec.calls
     receiver = _go_receiver_name(call_node)
@@ -316,9 +398,12 @@ def _go_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[s
     says "any call on this package counts", which is both shorter and more
     accurate.
 
-    Skips nested function / closure bodies, so a table-driven test is not
-    credited for the asserts inside its subtests; the delegation guard in
-    :func:`registers_tests` is what keeps that parent from reporting.
+    Skips nested function / closure bodies when the function being counted is
+    not a test, so an ordinary function is not credited for a closure's
+    asserts. A table-driven ``TestXxx`` never reaches the counter at all: the
+    delegation guard in :func:`registers_tests` returns before it, which is
+    what keeps a parent whose assertions all live in ``t.Run`` subtests from
+    reporting.
     """
     count = 0
     testing_receivers = _go_testing_receivers(func_node)
@@ -333,22 +418,21 @@ def _go_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[s
     return count
 
 
-def _javascript_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], assertion_calls: frozenset[str], minimum: int) -> int:
+def _javascript_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], spec: _AssertionSpec, minimum: int) -> int:
     """Count calls to configured assertion functions, stopping at *minimum*.
 
-    JS doesn't have a built-in ``assert`` keyword (``assert`` is just a
-    function from the ``assert`` module). The rule looks for *calls* to
-    any name in *assertion_calls* - covering Node's ``assert(...)`` /
-    ``assert.equal(...)`` and test-framework idioms like
-    ``expect(x).toBe(y)`` (Jest, where ``expect`` is the call name) and
-    ``console.assert(...)``.
+    Shared by the JS family, PHP, C and C++: none of them has an ``assert``
+    keyword the grammar reports as its own statement, so every assertion is a
+    call and the name is all there is to go on. Covers Node's ``assert(...)`` /
+    ``assert.equal(...)``, test-framework idioms like ``expect(x).toBe(y)``
+    (Jest, where ``expect`` is the call name), ``console.assert(...)``, and a
+    project's own ``assert*`` helper inside a test.
     """
     count = 0
     for c in walk(func_node, skip_types=tuple(function_types)):
         if c is func_node or c.type not in CALL_TYPES:
             continue
-        name = call_name(c)
-        if not name or name not in assertion_calls:
+        if not _matches_assertion_name(call_name(c), spec.calls, spec.call_prefixes):
             continue
         count += 1
         if count >= minimum:
@@ -376,6 +460,13 @@ class MissingAssertionsRule(BaseRule):
     ``vi.expect`` for Vitest - ``vi`` is the receiver, ``expect`` is
     the call name). User can override via ``assertion_calls_javascript``
     in TOML config.
+
+    Inside a function identified as a test, two further things count in every
+    language: a call whose name starts with an ``assertion_call_prefixes``
+    entry (``assert`` by default), so a project's own helper needs no entry of
+    its own, and an assertion inside a callback the test hands to someone else.
+    Neither applies to a function that is not a test, so an ordinary function is
+    still answerable for its own body alone.
     """
 
     name = "missing_assertions"
@@ -393,11 +484,11 @@ class MissingAssertionsRule(BaseRule):
         other language the ``_<lang>`` suffix. The error is reported against the
         key the value actually came from, not the key for this file's language.
 
-        One owner for the lookup because the rule now reads five such lists
+        One owner for the lookup because the rule now reads six such lists
         (``assertion_calls``, ``extend_assertion_calls``,
-        ``assertion_receivers``, ``test_registration_calls``,
-        ``test_function_prefixes``) and each repetition was a chance for one of
-        them to skip the validation.
+        ``assertion_receivers``, ``assertion_call_prefixes``,
+        ``test_registration_calls``, ``test_function_prefixes``) and each
+        repetition was a chance for one of them to skip the validation.
         """
         raw, error_key = resolve_lang_config_lookup(self.config, base_key, lang_name, default=default if default is not None else [])
         return _validated_string_list(raw, error_key)
@@ -419,10 +510,20 @@ class MissingAssertionsRule(BaseRule):
 
         ``assertion_receivers`` matches a call by its receiver rather than its
         name, which is how Go recognises testify (#221). Empty everywhere else.
+
+        ``assertion_call_prefixes`` matches a call by how its name starts, so a
+        project's own helper counts without being enumerated (#251). Resolved
+        here for the whole file; which functions it is actually applied to is
+        :meth:`_check_function`'s decision, because it is live only inside a
+        test.
         """
         names = self._resolve_list("assertion_calls", lang_name)
         extra = self._resolve_list("extend_assertion_calls", lang_name)
-        return _AssertionSpec(frozenset(names + extra), frozenset(self._resolve_list("assertion_receivers", lang_name)))
+        return _AssertionSpec(
+            frozenset(names + extra),
+            frozenset(self._resolve_list("assertion_receivers", lang_name)),
+            tuple(self._resolve_list("assertion_call_prefixes", lang_name, default=["assert"])),
+        )
 
     @staticmethod
     def _assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], spec: _AssertionSpec, minimum: int, lang_name: str) -> int:
@@ -435,15 +536,15 @@ class MissingAssertionsRule(BaseRule):
         *spec* is pre-resolved by :meth:`_resolve_assertions`.
         """
         if lang_name == "python":
-            return _python_assertion_count(func_node, function_types, spec.calls, minimum)
+            return _python_assertion_count(func_node, function_types, spec, minimum)
         if lang_name == "java":
-            return _java_assertion_count(func_node, function_types, spec.calls, minimum)
+            return _java_assertion_count(func_node, function_types, spec, minimum)
         if lang_name == "rust":
-            return _rust_assertion_count(func_node, function_types, spec.calls, minimum)
+            return _rust_assertion_count(func_node, function_types, spec, minimum)
         if lang_name == "go":
             return _go_assertion_count(func_node, function_types, spec, minimum)
-        # PHP + JS-family (JS / TS): the generic call-name counter.
-        return _javascript_assertion_count(func_node, function_types, spec.calls, minimum)
+        # PHP, C, C++ and the JS family: the generic call-name counter.
+        return _javascript_assertion_count(func_node, function_types, spec, minimum)
 
     def _resolve_min_assertions(self) -> int:
         """Read and validate the ``min_assertions`` config knob.
@@ -508,7 +609,7 @@ class MissingAssertionsRule(BaseRule):
         minimum = self._resolve_min_assertions()
         scoped = _validated_bool(self.config.get("test_functions_only", True), "test_functions_only")
         markers = frozenset(self._resolve_list("test_markers", lang_name))
-        file_is_test = scoped and self._file_is_test(filepath, lang_name)
+        file_is_test = self._file_is_test(filepath, lang_name)
         if scoped and not file_is_test and not markers:
             return None
         return _FileScope(
@@ -543,15 +644,27 @@ class MissingAssertionsRule(BaseRule):
         return subject.is_registered_test or func_name.startswith(scope.prefixes)
 
     def _check_function(self, filepath: str, node: tree_sitter.Node, scope: _FileScope) -> Violation | None:
-        """Return the violation for one function node, or None when it is in the clear."""
+        """Return the violation for one function node, or None when it is in the clear.
+
+        Test identity decides three things rather than one: whether the function
+        is checked at all under ``test_functions_only``, whether an ``assert*``
+        helper counts (#251), and whether an assertion inside a callback the
+        function hands to someone else counts (#252). Inside a test there is no
+        nested function being credited unfairly, because whatever a test's
+        callbacks assert the test asserts, so the skip that protects an ordinary
+        function from a closure's asserts is dropped for one.
+        """
         name_node = function_name_node(node, scope.lang_name)
         func_name = node_text(name_node) if name_node else "<anonymous>"
         subject = describe_function(node, scope.lang_name, scope.registrations, func_name)
-        if scope.scoped and not self._is_test_function(node, func_name, subject, scope):
+        is_test = self._is_test_function(node, func_name, subject, scope)
+        if scope.scoped and not is_test:
             return None
         if registers_tests(node, scope.lang_name, scope.registrations, scope.function_types):
             return None
-        count = self._assertion_count(node, scope.function_types, scope.assertions, scope.minimum, scope.lang_name)
+        spec = scope.assertions if is_test else scope.assertions._replace(call_prefixes=())
+        counted_types = frozenset() if is_test else scope.function_types
+        count = self._assertion_count(node, counted_types, spec, scope.minimum, scope.lang_name)
         if count >= scope.minimum:
             return None
         return self._make_violation_for_node(filepath, node, self._below_minimum_message(subject.label, count, scope.minimum))
