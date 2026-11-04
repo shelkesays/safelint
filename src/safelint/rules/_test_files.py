@@ -231,8 +231,11 @@ def skips_test_code(rule_config: dict[str, Any], filepath: str, lang_name: str) 
     Matching individual ``test_``-prefixed *functions* instead would have skipped
     a production ``test_connection()`` helper, which is a real finding.
 
-    ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702 read, so a project
-    that has already told safelint where its tests live does not say it twice.
+    ``test_dirs`` is the same key SAFE601 / SAFE701 / SAFE702 read, with the same
+    meaning, so a reader who knows one knows them all. It is resolved **per rule**
+    though - the engine hands each rule only its own config section and there is no
+    project-wide ``test_dirs`` - so a project with non-standard test directories
+    does have to set it under each rule it wants it to apply to.
     The filename half is **stricter** than theirs: see
     :func:`_filename_is_unambiguously_test`.
     """

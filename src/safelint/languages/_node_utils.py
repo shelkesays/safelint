@@ -15,6 +15,7 @@ from safelint.languages import javascript as _js
 from safelint.languages import php as _php
 from safelint.languages import python as _py
 from safelint.languages import rust as _rust
+from safelint.languages import typescript as _ts
 
 
 if TYPE_CHECKING:
@@ -206,15 +207,40 @@ def function_name_node(func_node: tree_sitter.Node, lang_name: str) -> tree_sitt
 ANONYMOUS_FUNCTION_LABEL = "<anonymous>"
 
 # Parent node types that bind an otherwise-nameless function expression to a
-# name, mapped to the field carrying that name. ``variable_declarator`` covers
-# ``const f = () => {}`` / ``let f = function () {}`` in JS and TS and
-# ``Runnable r = () -> {}`` in Java (the node type string is the same in both
-# grammars, which is why one entry serves both). ``pair`` covers an
-# object-literal entry, ``{ f: () => {} }``, whose name is on ``key``.
-_FUNCTION_NAME_BINDERS: dict[str, str] = {
-    _js.VARIABLE_DECLARATOR: "name",
-    _js.PAIR: "key",
+# name, mapped to the field carrying that name and the node types that field is
+# allowed to be. ``variable_declarator`` covers ``const f = () => {}`` /
+# ``let f = function () {}`` in JS and TS and ``Runnable r = () -> {}`` in Java
+# (the node type string is the same in both grammars, which is why one entry
+# serves both). ``pair`` covers an object-literal entry, ``{ f: () => {} }``,
+# whose name is on ``key``.
+#
+# The node-type allow-list is load-bearing, not defensive. A ``pair`` key may
+# also be a ``computed_property_name`` (``{ [readFile]: () => ... }``), a
+# ``string`` (``{ 'readFile': ... }``) or a ``number``, and the raw text of
+# those is ``[readFile]`` / ``'readFile'`` / ``123`` - not a name. Returning it
+# breaks name matching in BOTH directions: ``[readFile]`` contains ``read``, so
+# SAFE304 would exempt the function as I/O-signalling although ``readFile`` is
+# a variable whose value is unknown and may be anything; and ``[compute]`` does
+# not START with ``compute``, so SAFE303's ``pure_prefixes`` check would stop
+# matching a name it used to match. Only a statically spelled identifier is a
+# name, so everything else stays anonymous.
+_FUNCTION_NAME_BINDERS: dict[str, tuple[str, tuple[str, ...]]] = {
+    _js.VARIABLE_DECLARATOR: ("name", (_js.IDENTIFIER,)),
+    _js.PAIR: ("key", (_js.PROPERTY_IDENTIFIER,)),
 }
+
+# Wrappers that may sit between a function expression and the node that binds
+# it, and which say nothing about the function itself. Peeled before looking for
+# a binder, the way the dataflow rules peel the same shapes before reading a
+# receiver. ``const handler = (() => {}) as RequestHandler`` is ordinary
+# TypeScript and parses as ``as_expression > parenthesized_expression >
+# arrow_function``, so without the peel it kept reporting ``<anonymous>``.
+_NAME_PASS_THROUGH_TYPES: tuple[str, ...] = (
+    _js.PARENTHESIZED_EXPRESSION,
+    _ts.AS_EXPRESSION,
+    _ts.SATISFIES_EXPRESSION,
+    _ts.TYPE_ASSERTION,
+)
 
 
 def function_display_name(func_node: tree_sitter.Node, lang_name: str) -> str:
@@ -232,25 +258,41 @@ def function_display_name(func_node: tree_sitter.Node, lang_name: str) -> str:
     what is being reported.
 
     Genuinely nameless functions keep ``<anonymous>``: an IIFE, a callback
-    passed inline, ``export default () => {}``. The label is deliberately not
-    invented for those, because a wrong name is worse than an honest absence.
+    passed inline, ``export default () => {}``, and a key that is not
+    statically spelled (see ``_FUNCTION_NAME_BINDERS``). The label is
+    deliberately not invented for those, because a wrong name is worse than an
+    honest absence.
 
-    Not display-only. ``SAFE303``'s ``pure_prefixes`` check and ``SAFE601``'s
-    ``test_function_prefixes`` check both match against this name, so a named
+    Not display-only. ``SAFE303``'s ``pure_prefixes`` check and ``SAFE304``'s
+    ``io_name_keywords`` exemption both match against this name, so a named
     arrow binding that reads ``<anonymous>`` also escapes the matching those
-    rules exist to do.
+    rules exist to do - and a name invented from a computed key would make
+    SAFE304 exempt a function on evidence that is not there.
     """
     name_node = function_name_node(func_node, lang_name)
     if name_node is not None:
         return node_text(name_node)
     parent = func_node.parent
+    # Iterative, never recursion - SAFE105 polices this codebase. The parent
+    # chain is finite and acyclic and each hop strictly ascends it, so this
+    # terminates without a fixed cap; a cap would silently stop peeling on a
+    # legal-but-deeply-wrapped binding and lose the name. The type test is
+    # inside the body rather than in the condition so the condition stays a
+    # comparison, which is SAFE501's requirement for a bounded loop.
+    while parent is not None:
+        if parent.type not in _NAME_PASS_THROUGH_TYPES:
+            break
+        parent = parent.parent
     if parent is None:
         return ANONYMOUS_FUNCTION_LABEL
-    field = _FUNCTION_NAME_BINDERS.get(parent.type)
-    if field is None:
+    binder = _FUNCTION_NAME_BINDERS.get(parent.type)
+    if binder is None:
         return ANONYMOUS_FUNCTION_LABEL
+    field, allowed_types = binder
     binding = parent.child_by_field_name(field)
-    return node_text(binding) if binding is not None else ANONYMOUS_FUNCTION_LABEL
+    if binding is None or binding.type not in allowed_types:
+        return ANONYMOUS_FUNCTION_LABEL
+    return node_text(binding)
 
 
 def _last_type_identifier(type_node: tree_sitter.Node) -> tree_sitter.Node | None:
