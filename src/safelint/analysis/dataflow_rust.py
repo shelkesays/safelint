@@ -37,9 +37,11 @@ from typing import TYPE_CHECKING
 from safelint.analysis._taint_contract import (
     CLEAN_STATE,
     AssignmentShapes,
+    BlockScopes,
     PropertyContract,
     SinkKinds,
     combine_with_recorded,
+    enclosing_block_end,
     hit_key,
     identifier_tainted,
     iter_assignment_writes,
@@ -98,6 +100,13 @@ _ASSIGNMENT_SHAPES = AssignmentShapes(
     fields={_rust.FIELD_EXPRESSION: ("field", False)},
     chains=frozenset({_rust.ASSIGNMENT_EXPRESSION}),
 )
+
+
+#: Where a Rust ``let`` goes out of scope. Only the generic ``block``: a
+#: ``match_block`` holds arms rather than statements, and ``unsafe`` / ``async``
+#: / ``const`` blocks each wrap a ``block`` of their own, so the inner one is
+#: found first and is the right boundary.
+_BLOCK_TYPES = frozenset({_rust.BLOCK})
 
 
 def _rust_binding_scope(let_node: tree_sitter.Node) -> tuple[int, int] | None:
@@ -162,6 +171,10 @@ class RustTaintTracker:
         # ``_callee_is_local_binding``.
         self._param_names: frozenset[str] = frozenset(params)
         self._let_spans: dict[str, list[tuple[int, int]]] = {}
+        # A ``let`` binds only its enclosing block, so the taint it records has
+        # to be undone when that block closes (#250). Rust also allows
+        # same-scope shadowing, which the stack handles for free.
+        self._block_scopes = BlockScopes()
 
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
@@ -175,6 +188,7 @@ class RustTaintTracker:
 
     def _visit_node(self, node: tree_sitter.Node) -> None:
         """Dispatch *node* to the right per-shape handler."""
+        self._block_scopes.expire(self.tainted, self.source_seeded, node.start_byte)
         if node.type == _rust.LET_DECLARATION:
             self._visit_let(node)
         elif node.type == _rust.ASSIGNMENT_EXPRESSION:
@@ -270,9 +284,13 @@ class RustTaintTracker:
         value = node.child_by_field_name("value")
         state = self._state_of(value) if value is not None else CLEAN_STATE
         scope = _rust_binding_scope(node)
+        block_end = enclosing_block_end(node, _BLOCK_TYPES)
         for ident in self._iter_pattern_identifiers(pattern):
+            name = node_text(ident)
             if scope is not None:
-                self._let_spans.setdefault(node_text(ident), []).append(scope)
+                self._let_spans.setdefault(name, []).append(scope)
+            if block_end is not None:
+                self._block_scopes.rebind(self.tainted, self.source_seeded, name, block_end)
             self._update_name(ident, state)
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:

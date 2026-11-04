@@ -9,6 +9,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SAFE801 `tainted_sink`: a binding's taint is scoped to the block that declares it (#250).** Every tracker kept one flat `name -> status` map per function, so a nested block that rebound a name overwrote the function-wide entry and the outer binding came back without its taint:
+
+  ```rust
+  let input = std::env::var("CMD").unwrap();   // tainted
+  { let input = "safe"; }                      // cleared the entry
+  cmd.arg(input);                              // tainted - was NOT reported
+  ```
+
+  A false negative in a security rule, which is the worse direction. Probing it turned up two things the issue did not report. The flat map was wrong **in both directions** - with the outer binding clean and the inner block's shadow tainted, the rule reported a sink reading a value that is clean - and the bug was not limited to the two languages named: **C, C++ and Go are affected as well**, which the issue asked to be checked rather than assumed.
+
+  Fixed in all five (Rust, JavaScript / TypeScript, C, C++, Go) by one shared mechanism. A block-scoped declaration now pushes the name's prior state onto a stack and the tracker restores it on the first node at or past the block's end. That works because every tracker walks its function once in pre-order, so `start_byte` never goes backwards - an invariant the whole design rests on, now asserted by a test in four grammars rather than assumed.
+
+  Three languages are deliberately untouched, for reasons worth recording because extending the fix to them would introduce the very bug it removes: Python has no block scope; PHP's locals are function-scoped, so an inner `{ $c = "safe"; }` genuinely overwrites the outer `$c`; and shadowing a local in a nested block is a compile error in Java. JavaScript `var` is excluded for the same reason - it is function-scoped and hoisted, so an inner-block `var` really does rebind the function-wide name, and scoping it would turn a true positive into a false negative. Only **declaring** forms are scoped, so a plain `x = value` inside a block still writes through to the binding in scope.
+
+  **Measured across 14 corpora in five languages (761 SAFE801 findings): zero changed.** Not one finding gained or lost on axios, vue core, elysia, express, zod, cloudflare templates, ripgrep, rust std, fmt, leveldb, redis, curl, cobra or fzf. For a change touching five trackers and the shared contract, that is the result worth having: the repros are fixed and nothing else moved. The shape it closes is narrow in real code, which is also why it survived this long.
+
 - **SAFE305: the documented fix was a keyword swap for only one of the five shapes.** The rule's docs, the JavaScript and TypeScript pages, the JavaScript addendum and all 14 client files said the first three shapes were "a mechanical fix: replace `var` with `let`". Run against `node`, two of those three throw when the keyword is swapped where it stands: a block escape becomes `ReferenceError: w is not defined`, because the binding no longer exists at the use, and a read before the declaration becomes `ReferenceError: Cannot access 'w' before initialization`, which makes the hazard visible rather than fixing it. Only the loop-capture shape is a true one-token swap (`3,3,3` becomes `0,1,2`, and that change is the fix). Each shape now states its own fix: move the declaration above the block, move the read, swap the keyword, rename, or declare above the `switch`. Found by CodeAnt as three Major findings; the wrong advice mattered most in the bundled skill files, which agents act on directly.
 
 - **SAFE305 `wide_scope_declaration`: a `var` read from a later `switch` clause is now reported (#255).** The fifth shape, and the one each of the other four misses for a different reason. It is not an escape, because a case clause is not a lexical scope and both sites share the one the switch's braces open; and it is not a read before the declaration, because that compares *source* order and the declaration comes first. What makes it a hazard is *execution* order, since a switch may be entered at any of its clauses:
