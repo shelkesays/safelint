@@ -908,10 +908,19 @@ DEFAULTS: dict[str, Any] = {
             # ``assert``-prefixed call IS an assertion, while a production
             # method named ``assertValid()`` is nobody's assertion and is never
             # credited (which it would be if the prefix applied everywhere and
-            # ``test_functions_only`` were off). Set to ``[]`` to switch the
-            # route off and go back to exact names alone. Per language through
-            # the usual key chain, so ``assertion_call_prefixes_go = ["assert",
-            # "must"]`` covers a project that also writes ``mustEqual``.
+            # ``test_functions_only`` were off).
+            #
+            # Per language through the usual key chain, so
+            # ``assertion_call_prefixes_go = ["assert", "must"]`` covers a
+            # project that also writes ``mustEqual``. That chain excludes the
+            # bare key for every language but Python
+            # (``lang_config_key_chain``), so THIS key switches the route off
+            # for Python alone: a Java or Rust project wanting exact names
+            # again sets ``assertion_call_prefixes_java = []`` /
+            # ``_rust = []``, and TypeScript either its own key or the
+            # JavaScript one it inherits. An empty-string entry is dropped
+            # rather than honoured - it is a prefix of every name, so it would
+            # credit every call in every test.
             "assertion_call_prefixes": ["assert"],
             "assertion_calls": [
                 "assertEqual",
@@ -1092,9 +1101,12 @@ DEFAULTS: dict[str, Any] = {
                 # Common short forms
                 "fail",
             ],
-            # Rust assertion-macro names. Rust expresses assertions
-            # exclusively through macros (no ``assert`` keyword like
-            # Python / Java). ``call_name`` doesn't help here - the
+            # Rust assertion-macro names. Rust's own assertion facility is
+            # macros throughout (there is no ``assert`` keyword as in
+            # Python / Java), so THIS list takes macro names only; a
+            # project's own ``assert``-prefixed helper FUNCTION is counted
+            # since 2.17.0 by ``assertion_call_prefixes`` instead.
+            # ``call_name`` doesn't help here - the
             # rule walks ``macro_invocation`` nodes and matches the
             # bareword macro name (with ``std::`` / ``core::`` qualifiers
             # stripped). Defaults cover the standard library's three
