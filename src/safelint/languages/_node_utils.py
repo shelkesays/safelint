@@ -212,7 +212,12 @@ ANONYMOUS_FUNCTION_LABEL = "<anonymous>"
 # ``let f = function () {}`` in JS and TS and ``Runnable r = () -> {}`` in Java
 # (the node type string is the same in both grammars, which is why one entry
 # serves both). ``pair`` covers an object-literal entry, ``{ f: () => {} }``,
-# whose name is on ``key``.
+# whose name is on ``key``. A class field - ``class Store { readFile = () =>
+# fs.readFileSync(p) }``, the standard shape for an auto-bound method - is a
+# third binder, and the two grammars disagree about both the node type and the
+# field: JavaScript spells it ``field_definition`` with the name on
+# ``property``, TypeScript ``public_field_definition`` with the name on
+# ``name``. The accessibility and ``readonly`` modifiers change neither.
 #
 # The node-type allow-list is load-bearing, not defensive. A ``pair`` key may
 # also be a ``computed_property_name`` (``{ [readFile]: () => ... }``), a
@@ -227,6 +232,8 @@ ANONYMOUS_FUNCTION_LABEL = "<anonymous>"
 _FUNCTION_NAME_BINDERS: dict[str, tuple[str, tuple[str, ...]]] = {
     _js.VARIABLE_DECLARATOR: ("name", (_js.IDENTIFIER,)),
     _js.PAIR: ("key", (_js.PROPERTY_IDENTIFIER,)),
+    _js.FIELD_DEFINITION: ("property", (_js.PROPERTY_IDENTIFIER,)),
+    _ts.PUBLIC_FIELD_DEFINITION: ("name", (_js.PROPERTY_IDENTIFIER,)),
 }
 
 # Wrappers that may sit between a function expression and the node that binds

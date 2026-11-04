@@ -203,6 +203,10 @@ SPREAD_ELEMENT = "spread_element"  # ``foo(...args)`` in call positions
 ARRAY = "array"
 OBJECT = "object"
 PAIR = "pair"  # ``key: value`` entry inside an object literal
+# ``class C { f = () => {} }`` - a class field. The name is on the
+# ``property`` field, not ``name`` (TypeScript spells the same shape
+# ``public_field_definition`` and puts the name on ``name``).
+FIELD_DEFINITION = "field_definition"
 
 # Field name on a member_expression marking optional chaining (``foo?.bar``).
 # When present, the chained access is null-safe by construction - null_dereference

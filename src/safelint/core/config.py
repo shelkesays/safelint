@@ -2078,8 +2078,20 @@ DEFAULTS: dict[str, Any] = {
             # filename convention alone (``*Test.java`` / ``*Tests.java`` /
             # ``*IT.java``) resolves every one, so no annotation detection is
             # needed. Set ``skip_test_code = false`` for the strict reading.
+            #
+            # ``test_dirs`` is deliberately NARROWER than the shared five's
+            # ``["tests", "test", "__tests__", "spec"]``. SAFE901 is Java-only,
+            # and ``test_dirs`` is matched as a PATH COMPONENT anywhere in the
+            # path, so ``spec`` would skip every class under a production
+            # package named ``spec`` - ``src/main/java/com/acme/spec/`` is an
+            # ordinary place to keep an API specification, and its
+            # ``@Autowired`` fields would then go unreported. ``__tests__`` is
+            # a JavaScript convention that cannot appear in a Maven or Gradle
+            # source root. Both buy this rule nothing and only widen what it
+            # misses, so only the two JVM spellings ship; a project using
+            # another layout sets the key, as it does for every rule option.
             "skip_test_code": True,
-            "test_dirs": ["tests", "test", "__tests__", "spec"],
+            "test_dirs": ["test", "tests"],
         },
         "spring_missing_transactional": {"enabled": False, "severity": "error"},
         "spring_unvalidated_input": {"enabled": False, "severity": "error"},
