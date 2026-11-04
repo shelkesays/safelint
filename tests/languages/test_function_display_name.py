@@ -239,3 +239,54 @@ def test_safe601_still_labels_a_reported_binding_by_name(tmp_path: Path) -> None
     sample.write_text("const addNumbers = (a, b) => {\n  return a + b;\n};\n", encoding="utf-8")
     overrides = {"rules": {"missing_assertions": {"enabled": True, "test_functions_only": False}}}
     assert _messages(sample, overrides) == ['Function "addNumbers" has no assertions']
+
+
+_CLASS_FIELD_BINDINGS: list[tuple[str, str, str]] = [
+    ("JavaScript arrow field", "store.js", "class Store {{\n  loadAll = () => {{\n{body}\n  }};\n}}\n"),
+    ("JavaScript static field", "store.js", "class Store {{\n  static loadAll = function () {{\n{body}\n  }};\n}}\n"),
+    ("TypeScript arrow field", "store.ts", "class Store {{\n  public loadAll = (): void => {{\n{body}\n  }};\n}}\n"),
+    ("TypeScript readonly field", "store.ts", "class Store {{\n  private readonly loadAll = async () => {{\n{body}\n  }};\n}}\n"),
+]
+
+
+@pytest.mark.parametrize(["label", "filename", "template"], _CLASS_FIELD_BINDINGS, ids=[case[0] for case in _CLASS_FIELD_BINDINGS])
+def test_a_class_field_binding_names_its_function(tmp_path: Path, label: str, filename: str, template: str) -> None:
+    """A class field is the third binder, and the two grammars spell it differently.
+
+    ``class Store { loadAll = () => {} }`` is the standard shape for an
+    auto-bound method, and it is neither a ``variable_declarator`` nor a
+    ``pair``: JavaScript parses it as ``field_definition`` with the name on
+    ``property``, TypeScript as ``public_field_definition`` with the name on
+    ``name``. Covering only one grammar would leave the other reporting
+    ``<anonymous>``, so both are pinned here.
+    """
+    sample = tmp_path / filename
+    sample.write_text(template.format(body=_long_body("doWork();")), encoding="utf-8")
+    assert _messages(sample) == ['Function "loadAll" is 72 lines (max 60)'], label
+
+
+def test_an_io_named_class_field_is_exempt_from_safe304(tmp_path: Path) -> None:
+    """The verdict-changing half: a field name signals I/O the same way a binding does.
+
+    SAFE304 exempts a function whose name already signals I/O. While the class
+    field resolved to ``<anonymous>`` the exemption could not match, so the rule
+    asked ``readFile`` to be renamed to signal what it plainly signals.
+    """
+    exempt = tmp_path / "store.js"
+    exempt.write_text("class Store {\n  readFile = (p) => nodeFs.readFileSync(p);\n}\n", encoding="utf-8")
+    assert _messages(exempt) == []
+    reported = tmp_path / "other.js"
+    reported.write_text("class Store {\n  grabThing = (p) => nodeFs.readFileSync(p);\n}\n", encoding="utf-8")
+    assert _messages(reported) == ['Function "grabThing" calls I/O primitive "readFileSync" - rename to signal intent or use dependency injection']
+
+
+def test_a_computed_class_field_name_stays_anonymous(tmp_path: Path) -> None:
+    """A field name may be computed too, and ``[readFile]`` is not a name.
+
+    Same reasoning as the object-literal key: the text is ``[readFile]``, which
+    contains ``read``, so honouring it would let SAFE304 exempt the function on
+    the strength of a variable whose value is unknown.
+    """
+    sample = tmp_path / "store.ts"
+    sample.write_text("class Store {\n  [readFile] = (p: string) => nodeFs.readFileSync(p);\n}\n", encoding="utf-8")
+    assert _messages(sample) == ['Function "<anonymous>" calls I/O primitive "readFileSync" - rename to signal intent or use dependency injection']

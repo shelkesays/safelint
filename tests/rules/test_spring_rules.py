@@ -151,10 +151,63 @@ def test_safe901_test_scoping_is_configurable() -> None:
 
 
 def test_safe901_defaults_carry_the_test_scoping_keys() -> None:
-    """Pinned against DEFAULTS, because the behaviour above rides on them."""
+    """Pinned against DEFAULTS, because the behaviour above rides on them.
+
+    The list is deliberately narrower than the five #198 rules share. SAFE901
+    is Java-only, and ``test_dirs`` is matched as a path component anywhere in
+    the path, so their ``spec`` and ``__tests__`` entries would only widen what
+    this rule misses; see the production-package test below.
+    """
     defaults = DEFAULTS["rules"]["spring_field_injection"]
     assert defaults["skip_test_code"] is True
-    assert defaults["test_dirs"] == ["tests", "test", "__tests__", "spec"]
+    assert defaults["test_dirs"] == ["test", "tests"]
+
+
+def test_safe901_still_fires_in_a_production_package_named_spec() -> None:
+    """``spec`` must not be a default test dir for a Java-only rule.
+
+    ``test_dirs`` is a path-COMPONENT match, so shipping the JavaScript
+    convention ``spec`` would skip every class under an ordinary production
+    package such as ``src/main/java/com/acme/spec/`` - a normal place to keep
+    an API specification - and its ``@Autowired`` fields would go unreported.
+    ``__tests__`` cannot appear in a Maven or Gradle source root at all.
+
+    Built from DEFAULTS rather than a bare dict, because that is the config the
+    engine hands the rule: with ``test_dirs`` absent the helper falls back to
+    the shared module default, which still carries both entries for the five
+    #198 rules that want them.
+    """
+    tree = _parse(
+        """
+        class OrderService {
+            @Autowired
+            private OrderRepository orders;
+        }
+        """
+    )
+    rule = SpringFieldInjectionRule({**DEFAULTS["rules"]["spring_field_injection"], "enabled": True})
+    for package in ("spec", "__tests__"):
+        path = f"src/main/java/com/acme/{package}/OrderService.java"
+        assert len(rule.check_file(path, tree)) == 1, package
+
+
+def test_safe901_still_skips_the_maven_test_source_root() -> None:
+    """The control for the narrowing: ``src/test/java`` is what PetClinic uses.
+
+    Every one of PetClinic's 17 findings lives under ``src/test/java``, so the
+    two retained entries have to keep resolving it even for a filename that
+    follows no test-naming convention.
+    """
+    tree = _parse(
+        """
+        class ClinicServiceBean {
+            @Autowired
+            private VetRepository vets;
+        }
+        """
+    )
+    rule = SpringFieldInjectionRule({**DEFAULTS["rules"]["spring_field_injection"], "enabled": True})
+    assert rule.check_file("src/test/java/org/example/ClinicServiceBean.java", tree) == []
 
 
 # ---------------------------------------------------------------------------

@@ -83,6 +83,11 @@ AS_EXPRESSION = "as_expression"
 SATISFIES_EXPRESSION = "satisfies_expression"
 NON_NULL_EXPRESSION = "non_null_expression"
 TYPE_ASSERTION = "type_assertion"
+# TypeScript's spelling of a class field (``class C { f = () => {} }``),
+# including the accessibility and ``readonly`` forms. A separate node type
+# from JavaScript's ``field_definition``, and it carries the name on
+# ``name`` rather than ``property``.
+PUBLIC_FIELD_DEFINITION = "public_field_definition"
 # added for node-constant refactor
 THIS = "this"
 
