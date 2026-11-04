@@ -19,7 +19,7 @@ from safelint.languages import typescript as _ts
 
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Iterator
+    from collections.abc import Callable, Iterable, Iterator, Mapping
 
     import tree_sitter
 
@@ -279,6 +279,18 @@ def function_display_name(func_node: tree_sitter.Node, lang_name: str) -> str:
     name_node = function_name_node(func_node, lang_name)
     if name_node is not None:
         return node_text(name_node)
+    bound = _bound_name(func_node, _FUNCTION_NAME_BINDERS)
+    return bound if bound is not None else ANONYMOUS_FUNCTION_LABEL
+
+
+def _bound_name(func_node: tree_sitter.Node, binders: Mapping[str, tuple[str, tuple[str, ...]]]) -> str | None:
+    """Return the name *binders* gives *func_node*, or None.
+
+    Shared by :func:`function_display_name`, which accepts every binder, and
+    :func:`lexical_binding_name`, which accepts only the one that creates a
+    binding callable by bare name. One peel implementation, because the peel is
+    the part that is easy to get subtly wrong.
+    """
     parent = func_node.parent
     # Iterative, never recursion - SAFE105 polices this codebase. The parent
     # chain is finite and acyclic and each hop strictly ascends it, so this
@@ -291,15 +303,53 @@ def function_display_name(func_node: tree_sitter.Node, lang_name: str) -> str:
             break
         parent = parent.parent
     if parent is None:
-        return ANONYMOUS_FUNCTION_LABEL
-    binder = _FUNCTION_NAME_BINDERS.get(parent.type)
+        return None
+    binder = binders.get(parent.type)
     if binder is None:
-        return ANONYMOUS_FUNCTION_LABEL
+        return None
     field, allowed_types = binder
     binding = parent.child_by_field_name(field)
     if binding is None or binding.type not in allowed_types:
-        return ANONYMOUS_FUNCTION_LABEL
+        return None
     return node_text(binding)
+
+
+#: The subset of :data:`_FUNCTION_NAME_BINDERS` that creates a binding reachable
+#: by BARE name. Only a variable declarator does. Verified against ``node``
+#: rather than reasoned about, because the three forms look alike and do not
+#: behave alike:
+#:
+#: * ``const fact = (n) => n * fact(n - 1)`` returns 24 for ``fact(4)`` - the
+#:   declarator is a lexical binding and the bare call is genuine recursion;
+#: * ``{ walk: (n) => walk(n - 1) }`` raises ``ReferenceError: walk is not
+#:   defined`` - an object property is not a lexical binding;
+#: * ``class T { fact = (n) => fact(n - 1) }`` raises the same - nor is a class
+#:   field, whose own route is ``this.fact(...)``.
+#:
+#: So a rule that draws a verdict from a bare call (SAFE105, #259) must use
+#: this map and not the display one, or it reports two shapes that cannot
+#: recurse and misses the one that can.
+_LEXICAL_BINDERS: dict[str, tuple[str, tuple[str, ...]]] = {
+    _js.VARIABLE_DECLARATOR: _FUNCTION_NAME_BINDERS[_js.VARIABLE_DECLARATOR],
+}
+
+
+def lexical_binding_name(func_node: tree_sitter.Node, lang_name: str) -> str | None:
+    """Return the name *func_node* is callable by in its own scope, or None.
+
+    Narrower than :func:`function_display_name` on purpose: that one answers
+    "what should the message call this function", which an object key and a
+    class field both answer usefully, while this one answers "what bare name
+    reaches this function", which only a variable declarator does. See
+    :data:`_LEXICAL_BINDERS`.
+
+    Returns the function's own name when it has one, so a caller gets the same
+    answer for ``function fact()`` and ``const fact = () => ...``.
+    """
+    name_node = function_name_node(func_node, lang_name)
+    if name_node is not None:
+        return node_text(name_node)
+    return _bound_name(func_node, _LEXICAL_BINDERS)
 
 
 def _last_type_identifier(type_node: tree_sitter.Node) -> tree_sitter.Node | None:

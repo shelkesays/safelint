@@ -251,9 +251,35 @@ max_complexity = 10
 
 Holzmann's Power of Ten rule 1 ("restrict all code to very simple control flow constructs") bans recursion outright: recursion without a guaranteed bound makes the call stack an unbounded resource, so worst-case depth (and therefore termination and memory behaviour) cannot be proven by inspection. An explicit loop with a worklist makes the bound visible.
 
-The rule fires on **direct self-recursion** - a function whose body contains a call to its own name, either bare (`fact(n - 1)`) or self-qualified (`self.walk(...)` in Python / Rust, `this.walk(...)` in JS / TS / Java). A call on a different receiver (`other.walk(...)`) does not fire. Two cases are intentionally out of scope and documented as blind spots: **indirect / mutual recursion** (`a` calls `b` calls `a`), which needs a call graph, and **anonymous-function recursion** through a binding (`const f = () => f()`), since the function has no name to match.
+The rule fires on **direct self-recursion** - a function whose body contains a call to its own name, either bare (`fact(n - 1)`) or self-qualified (`self.walk(...)` in Python / Rust, `this.walk(...)` in JS / TS / Java). A call on a different receiver (`other.walk(...)`) does not fire. In JavaScript and TypeScript the name may come from the `const` / `let` / `var` binding holding a function expression, so `const fact = (n) => n * fact(n - 1)` reports since 2.17.1 (see below). **Indirect / mutual recursion** (`a` calls `b` calls `a`) stays out of scope: it needs a call graph.
 
 Enabled by default at `warning` severity (mirrors `unbounded_loops`), so intentional recursion (tree walks, divide-and-conquer) does not block a local run. Annotate deliberate recursion with `# nosafe: SAFE105` (or the language's comment form) and a one-line justification.
+
+#### JavaScript and TypeScript: recursion through a binding
+
+An `arrow_function` has no name of its own; the name sits on the binding that holds it. Until 2.17.1 the rule matched only the function's own name, so it was silent on the form most of the ecosystem uses to declare a function while firing correctly on `function fact() {}` beside it:
+
+```javascript
+const fact = (n) => (n <= 1 ? 1 : n * fact(n - 1));   // reports since 2.17.1
+function fact(n) { return n <= 1 ? 1 : n * fact(n - 1); }  // always reported
+```
+
+Only a **variable declarator** lends its name to this route, and only for a **bare** call. The three binding forms look alike and do not behave alike, which is why the distinction is drawn rather than assumed:
+
+| Shape | Bare call | `this.`-qualified call |
+|---|---|---|
+| `const fact = (n) => ...` | **reported** - a lexical binding, so `fact(...)` is the function | not a self-call: an arrow does not bind its own `this` |
+| `{ walk: (n) => ... }` | not reported - an object property is not a lexical binding, so a bare `walk(...)` raises `ReferenceError` | not a self-call, same reason as above |
+| `class T { fact = (n) => ... }` | not reported - nor is a class field a lexical binding | **genuine recursion, and not yet reported**; see the note below |
+
+!!! note "A class field's `this.`-qualified recursion is a known gap"
+    `class T { fact = (n) => n * this.fact(n - 1) }` really does recurse, and the rule does not report it. Reaching it means matching the enclosing class against the receiver, so that a sibling object's `this.fact(...)` is not mistaken for it; that is a separate piece of work from naming the function. Recorded rather than left to be rediscovered.
+
+The ordinary guards still apply, and they are what keeps the widening honest: a call whose callee is a member access is never a bare call, so `const trim = (s) => s.trim()` and `const getComputedStyle = (el) => window.getComputedStyle(el)` stay clean although the names match. A nested binding of the same name shadows the outer one, so `const walk = (n) => { const walk = (m) => m; return walk(n); }` is clean too. A key that is not statically spelled (`{ [walk]: ... }`) lends no name at all, since the verdict would rest on a variable whose value is unknown.
+
+Measured across the JavaScript and TypeScript validation corpora: **91 new findings across 35 functions**, none removed. The functions are what the rule exists to find, among them `mergeDeep` (a deep merge whose depth is its input's), `hasAdditionalProperties` (a recursive JSON-schema walk), Vue's `setScopeId` and `recursiveGetSubtree` over the vnode tree, and axios's `visit` over an arbitrarily nested object. Note the two units: the rule reports one finding per **call site**, so a function with four self-calls is four findings.
+
+Only JavaScript and TypeScript. Java puts a lambda in a `variable_declarator` too, and the node type is spelled the same in both grammars, so the route is gated by language rather than left to match for free: a Java lambda cannot call its own variable before the assignment completes, which would be a different claim needing its own evidence.
 
 #### What counts as "its own name"
 
