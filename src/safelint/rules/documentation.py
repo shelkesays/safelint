@@ -124,6 +124,23 @@ def _matches_prefix(name: str | None, call_prefixes: tuple[str, ...]) -> bool:
     return name.startswith(call_prefixes)
 
 
+def _prefix_tuple(values: list[str]) -> tuple[str, ...]:
+    """Return *values* as a prefix tuple, dropping any empty entry.
+
+    ``"name".startswith("")`` is True for every name, so a single empty entry
+    would credit every call in every test as an assertion and silently disable
+    the rule wherever it is scoped to tests. Nobody means that, and the two
+    plausible intentions both land on the right answer once it is dropped:
+    ``[""]`` becomes the empty tuple, which is how the route is switched off,
+    and ``["assert", ""]`` keeps ``assert``.
+
+    Not a loud failure, because the shape is valid (it is a list of strings,
+    which is what :func:`_validated_string_list` polices) and the result is
+    what the user asked for either way.
+    """
+    return tuple(value for value in values if value)
+
+
 def _python_assertion_count(func_node: tree_sitter.Node, function_types: frozenset[str], spec: _AssertionSpec, minimum: int) -> int:
     """Count assertions in the Python function body, stopping at *minimum*.
 
@@ -522,7 +539,7 @@ class MissingAssertionsRule(BaseRule):
         return _AssertionSpec(
             frozenset(names + extra),
             frozenset(self._resolve_list("assertion_receivers", lang_name)),
-            tuple(self._resolve_list("assertion_call_prefixes", lang_name, default=["assert"])),
+            _prefix_tuple(self._resolve_list("assertion_call_prefixes", lang_name, default=["assert"])),
         )
 
     @staticmethod
