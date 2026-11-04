@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.17.0] - 2026-11-04
+
 ### Added
 
 - **SAFE601 `missing_assertions`: `assertion_call_prefixes`, so a project's own `assert*` helper counts (#251).** Matching was by exact call name, so a test whose only assertion went through the project's own helper read as assertion-free. A call whose name starts with an entry in this list (`["assert"]` by default) now counts, and enumerating helpers per project is no longer the only option: commons-lang alone would have needed eight `extend_assertion_calls_java` entries to clear half of its findings.
@@ -1621,7 +1623,8 @@ This release adds the foundations needed by editor integrations and the upcoming
 - Pre-commit hook integration.
 - `--mode=ci` and `--fail-on` CLI flags.
 
-[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.16.0...HEAD
+[Unreleased]: https://github.com/shelkesays/safelint/compare/v2.17.0...HEAD
+[2.17.0]: https://github.com/shelkesays/safelint/compare/v2.16.0...v2.17.0
 [2.16.0]: https://github.com/shelkesays/safelint/compare/v2.15.0...v2.16.0
 [2.15.0]: https://github.com/shelkesays/safelint/compare/v2.14.3...v2.15.0
 [2.14.3]: https://github.com/shelkesays/safelint/compare/v2.14.2...v2.14.3
