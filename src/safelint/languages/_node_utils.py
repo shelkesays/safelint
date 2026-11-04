@@ -247,6 +247,11 @@ _NAME_PASS_THROUGH_TYPES: tuple[str, ...] = (
     _ts.AS_EXPRESSION,
     _ts.SATISFIES_EXPRESSION,
     _ts.TYPE_ASSERTION,
+    # ``const handler = (() => {})!`` - a non-null assertion is a type-level
+    # claim about the value and says nothing about the function, exactly like
+    # the three above it. It was missing, so the name was lost; the shapes
+    # compose, so ``(((...) as Fn)!)`` needs every one of them peeled.
+    _ts.NON_NULL_EXPRESSION,
 )
 
 
@@ -322,9 +327,11 @@ def _bound_name(func_node: tree_sitter.Node, binders: Mapping[str, tuple[str, tu
 #: * ``const fact = (n) => n * fact(n - 1)`` returns 24 for ``fact(4)`` - the
 #:   declarator is a lexical binding and the bare call is genuine recursion;
 #: * ``{ walk: (n) => walk(n - 1) }`` raises ``ReferenceError: walk is not
-#:   defined`` - an object property is not a lexical binding;
-#: * ``class T { fact = (n) => fact(n - 1) }`` raises the same - nor is a class
-#:   field, whose own route is ``this.fact(...)``.
+#:   defined`` - an object property is not a lexical binding, so the bare call
+#:   never reaches it; with an outer ``walk`` in scope it would quietly call
+#:   that one instead, which is not recursion either;
+#: * ``class T { fact = (n) => fact(n - 1) }`` behaves the same - nor is a class
+#:   field a lexical binding, and its own route is ``this.fact(...)``.
 #:
 #: So a rule that draws a verdict from a bare call (SAFE105, #259) must use
 #: this map and not the display one, or it reports two shapes that cannot

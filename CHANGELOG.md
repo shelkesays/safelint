@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **A TypeScript non-null assertion no longer hides a function's name.** `const handler = (() => {})!` parses as `non_null_expression > parenthesized_expression > arrow_function`, and that wrapper was missing from the pass-through list added in 2.17.0, so every per-function rule reported `Function "<anonymous>"` for a function the source names. A non-null assertion is a type-level claim about the value and says nothing about the function, exactly like the `as` / `satisfies` / angle-assertion forms beside it. The wrappers compose, so `(((...) as Fn)!)` needs all of them peeled; both orders are pinned. Found by CodeAnt on the SAFE105 change below, where the same gap cost the new route a genuine recursion finding.
+
 - **SAFE105 `no_recursion`: recursion through a `const` / `let` / `var`-bound function is now detected (#259).** An `arrow_function` has no name of its own; the name sits on the binding holding it. The rule matched only the function's own name, so it was silent on the declaration form most of the JavaScript and TypeScript ecosystem uses, while firing correctly on `function fact() {}` beside it:
 
   ```javascript

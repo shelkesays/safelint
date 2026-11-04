@@ -14,12 +14,15 @@ each is a shape that LOOKS like recursion and is not:
 
 * only a **variable declarator** licenses a bare self-call. An object-literal
   entry and a class field are not lexical bindings, so a bare call to their
-  name raises ``ReferenceError`` rather than recursing. Verified against
-  ``node`` rather than reasoned about.
-* a name taken from a binding licenses only **bare** calls. An arrow does not
-  bind its own ``this``, so ``this.walk(...)`` inside an object-literal arrow
-  is not a self-call; inside a class field it is, and telling those apart is
-  the half #259 leaves for later.
+  name cannot reach them: it resolves to an outer binding of that name, or
+  raises ``ReferenceError`` if there is none. Neither is recursion. Verified
+  against ``node`` rather than reasoned about.
+* a name taken from a binding licenses only **bare** calls. An arrow takes
+  ``this`` from the enclosing scope, so ``this.walk(...)`` inside an
+  object-literal arrow reaches some other object's property; inside a class
+  field it does reach the field, and telling those apart means matching the
+  enclosing class against the receiver, which is the half #259 leaves for
+  later.
 """
 
 from __future__ import annotations
@@ -62,6 +65,18 @@ _NOW_REPORTED: list[tuple[str, str, str, str]] = [
         "TypeScript arrow behind a cast",
         "r.ts",
         "const fact = ((n: number): number => (n <= 1 ? 1 : n * fact(n - 1))) as Fn;\n",
+        "fact",
+    ),
+    (
+        "TypeScript arrow behind a non-null assertion",
+        "r.ts",
+        "const fact = ((n: number): number => (n <= 1 ? 1 : n * fact(n - 1)))!;\n",
+        "fact",
+    ),
+    (
+        "TypeScript arrow behind a cast and a non-null assertion",
+        "r.ts",
+        "const fact = (((n: number): number => (n <= 1 ? 1 : n * fact(n - 1))) as Fn)!;\n",
         "fact",
     ),
 ]
@@ -125,6 +140,13 @@ _NOT_RECURSION: list[tuple[str, str, str]] = [
     # An inner binding of the same name is what a bare call resolves to.
     ("nested binding shadows the outer", "r.js", "const walk = (n) => {\n  const walk = (m) => m;\n  return walk(n);\n};\n"),
     ("calls a different function", "r.js", "const walk = (n) => visit(n);\n"),
+    # An outer binding of the same name is what the bare call actually reaches,
+    # so the object entry is not recursion even where it resolves.
+    (
+        "outer binding of the same name, object entry",
+        "r.js",
+        "const walk = (n) => n;\nconst api = {\n  walk: (n) => (n ? walk(n - 1) : 0),\n};\n",
+    ),
     ("iterative equivalent", "r.js", "const fact = (n) => {\n  let acc = 1;\n  for (let i = 2; i <= n; i += 1) acc *= i;\n  return acc;\n};\n"),
 ]
 

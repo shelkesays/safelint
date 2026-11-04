@@ -268,9 +268,9 @@ Only a **variable declarator** lends its name to this route, and only for a **ba
 
 | Shape | Bare call | `this.`-qualified call |
 |---|---|---|
-| `const fact = (n) => ...` | **reported** - a lexical binding, so `fact(...)` is the function | not a self-call: an arrow does not bind its own `this` |
-| `{ walk: (n) => ... }` | not reported - an object property is not a lexical binding, so a bare `walk(...)` raises `ReferenceError` | not a self-call, same reason as above |
-| `class T { fact = (n) => ... }` | not reported - nor is a class field a lexical binding | **genuine recursion, and not yet reported**; see the note below |
+| `const fact = (n) => ...` | **reported** - a lexical binding, so `fact(...)` is the function | not reported - an arrow takes `this` from the enclosing scope, so `this.fact` is some other object's property |
+| `{ walk: (n) => ... }` | not reported - an object property is not a lexical binding, so a bare `walk(...)` cannot reach it; it resolves to an outer binding of that name, or raises `ReferenceError` if there is none | not reported - an arrow takes `this` from the enclosing scope, so the receiver is not the object being built and cannot be shown to be this function |
+| `class T { fact = (n) => ... }` | not reported - nor is a class field a lexical binding, so the same resolution applies as for an object property | **genuine recursion, and not yet reported**; see the note below |
 
 !!! note "A class field's `this.`-qualified recursion is a known gap"
     `class T { fact = (n) => n * this.fact(n - 1) }` really does recurse, and the rule does not report it. Reaching it means matching the enclosing class against the receiver, so that a sibling object's `this.fact(...)` is not mistaken for it; that is a separate piece of work from naming the function. Recorded rather than left to be rediscovered.
