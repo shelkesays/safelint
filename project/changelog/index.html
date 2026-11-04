@@ -2090,7 +2090,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2170-2026-11-04" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.17.0 - 2026-11-04
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.17.0 - 2026-11-04">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -4485,7 +4496,18 @@
     </span>
   </a>
   
-    <nav class="md-nav" aria-label="Unreleased">
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2170-2026-11-04" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.17.0 - 2026-11-04
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="2.17.0 - 2026-11-04">
       <ul class="md-nav__list">
         
           <li class="md-nav__item">
@@ -6774,7 +6796,8 @@
 <p>All notable changes to this project will be documented in this file.</p>
 <p>The format is based on <a href="https://keepachangelog.com/en/1.1.0/">Keep a Changelog</a>,
 and this project adheres to <a href="https://semver.org/spec/v2.0.0.html">Semantic Versioning</a>.</p>
-<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.16.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="unreleased"><a href="https://github.com/shelkesays/safelint/compare/v2.17.0...HEAD">Unreleased</a><a class="headerlink" href="#unreleased" title="Permanent link">#</a></h2>
+<h2 id="2170-2026-11-04"><a href="https://github.com/shelkesays/safelint/compare/v2.16.0...v2.17.0">2.17.0</a> - 2026-11-04<a class="headerlink" href="#2170-2026-11-04" title="Permanent link">#</a></h2>
 <h3 id="added">Added<a class="headerlink" href="#added" title="Permanent link">#</a></h3>
 <ul>
 <li><strong>SAFE601 <code>missing_assertions</code>: <code>assertion_call_prefixes</code>, so a project's own <code>assert*</code> helper counts (#251).</strong> Matching was by exact call name, so a test whose only assertion went through the project's own helper read as assertion-free. A call whose name starts with an entry in this list (<code>["assert"]</code> by default) now counts, and enumerating helpers per project is no longer the only option: commons-lang alone would have needed eight <code>extend_assertion_calls_java</code> entries to clear half of its findings.</li>
