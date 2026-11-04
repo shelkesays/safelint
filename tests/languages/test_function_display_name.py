@@ -127,6 +127,83 @@ def test_an_io_named_binding_is_now_exempt_from_safe304(tmp_path: Path) -> None:
     assert _messages(reported) == ['Function "grabThing" calls I/O primitive "readFileSync" - rename to signal intent or use dependency injection']
 
 
+_WRAPPED_BINDINGS: list[tuple[str, str, str]] = [
+    ("parenthesised", "component.js", "const Footer = (() => {{\n{body}\n}});\n"),
+    ("doubly parenthesised", "component.js", "const Footer = ((() => {{\n{body}\n}}));\n"),
+    ("TypeScript as", "component.ts", "const Footer = (() => {{\n{body}\n}}) as Handler;\n"),
+    ("TypeScript satisfies", "component.ts", "const Footer = (() => {{\n{body}\n}}) satisfies Handler;\n"),
+    ("TypeScript angle assertion", "component.ts", "const Footer = <Handler>(() => {{\n{body}\n}});\n"),
+]
+
+
+@pytest.mark.parametrize(["label", "filename", "template"], _WRAPPED_BINDINGS, ids=[case[0] for case in _WRAPPED_BINDINGS])
+def test_a_wrapper_between_the_function_and_its_binding_is_peeled(tmp_path: Path, label: str, filename: str, template: str) -> None:
+    """A cast or a pair of brackets says nothing about the function's name.
+
+    ``const handler = (() => {}) as RequestHandler`` is ordinary TypeScript and
+    parses as ``as_expression > parenthesized_expression > arrow_function``, so
+    the binder is two levels up rather than one. Peeled the way the dataflow
+    rules peel the same shapes before reading a receiver.
+    """
+    sample = tmp_path / filename
+    sample.write_text(template.format(body=_long_body("doWork();")), encoding="utf-8")
+    assert _messages(sample) == ['Function "Footer" is 72 lines (max 60)'], label
+
+
+def test_a_wrapped_inline_callback_is_still_anonymous(tmp_path: Path) -> None:
+    """Peeling finds a binder or it does not; it must not invent one.
+
+    ``register((() => {}))`` has brackets but nothing binding the function, so
+    the honest answer is still ``<anonymous>``.
+    """
+    sample = tmp_path / "handler.js"
+    sample.write_text(f"register((() => {{\n{_long_body('doWork();')}\n}}));\n", encoding="utf-8")
+    assert _messages(sample) == ['Function "<anonymous>" is 72 lines (max 60)']
+
+
+_NOT_A_STATIC_NAME: list[tuple[str, str]] = [
+    ("computed key naming a variable", "export const fs = {\n  [readFile]: (file) => nodeFs.readFileSync(file),\n};\n"),
+    ("computed key wrapping a string", "export const fs = {\n  ['readFile']: (file) => nodeFs.readFileSync(file),\n};\n"),
+    ("quoted key", "export const fs = {\n  'readFile': (file) => nodeFs.readFileSync(file),\n};\n"),
+    ("numeric key", "export const fs = {\n  7: (file) => nodeFs.readFileSync(file),\n};\n"),
+]
+
+
+@pytest.mark.parametrize(["label", "source"], _NOT_A_STATIC_NAME, ids=[case[0] for case in _NOT_A_STATIC_NAME])
+def test_a_key_that_is_not_statically_spelled_stays_anonymous(tmp_path: Path, label: str, source: str) -> None:
+    """Only a statically spelled identifier is a name, because the name decides verdicts.
+
+    A ``pair`` key may be a ``computed_property_name``, a ``string`` or a
+    ``number``, and the raw text of those is ``[readFile]`` / ``'readFile'`` /
+    ``7``. Returning it breaks matching in both directions: ``[readFile]``
+    contains ``read``, so SAFE304 would exempt the function as I/O-signalling
+    on the strength of a variable whose value is unknown and may be anything;
+    and ``[compute]`` does not START with ``compute``, so SAFE303's
+    ``pure_prefixes`` check would stop matching a name it used to match.
+
+    So each of these must still be REPORTED, which is what the exemption not
+    firing means.
+    """
+    sample = tmp_path / "config.js"
+    sample.write_text(source, encoding="utf-8")
+    assert _messages(sample) == ['Function "<anonymous>" calls I/O primitive "readFileSync" - rename to signal intent or use dependency injection'], label
+
+
+def test_a_computed_key_does_not_lose_a_pure_prefix_match(tmp_path: Path) -> None:
+    """The other direction: an invented name must not suppress SAFE303 either.
+
+    ``[compute]`` would have read as a name starting with nothing in
+    ``pure_prefixes``, so a genuinely pure-named function behind a computed key
+    is reported by SAFE304 alone rather than silently losing SAFE303 on a
+    technicality of how the key is spelled.
+    """
+    sample = tmp_path / "config.js"
+    sample.write_text("export const fs = {\n  [compute]: (file) => nodeFs.readFileSync(file),\n};\n", encoding="utf-8")
+    codes = {"SAFE303", "SAFE304"}
+    engine_codes = {v.code for v in SafetyEngine(deep_merge(DEFAULTS, {})).check_file(str(sample)).violations}
+    assert engine_codes & codes == {"SAFE304"}
+
+
 def test_safe601_identifies_a_test_by_the_declared_name_not_the_binding(tmp_path: Path) -> None:
     """A binding starting with ``test`` is a variable, not a test case.
 
