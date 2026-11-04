@@ -196,3 +196,45 @@ def test_a_mistyped_prefix_list_fails_loud(tmp_path: Path) -> None:
     sample.write_text("def test_rejects():\n    nothing()\n", encoding="utf-8")
     with pytest.raises(TypeError, match="assertion_call_prefixes"):
         _safe601(sample, {"assertion_call_prefixes": "assert"})
+
+
+def test_an_empty_prefix_entry_is_dropped_rather_than_matching_everything(tmp_path: Path) -> None:
+    """``""`` is a prefix of every name, so it would credit every call in every test.
+
+    ``"compute".startswith("")`` is True, so one empty entry turned the rule
+    off wherever it is scoped to tests - the worst shape for a safety rule,
+    because the run stays green and says nothing. Dropping the entry lands on
+    whichever of the two plausible intentions the user had: on its own it
+    leaves the empty tuple, which is how the route is switched off, and beside
+    a real prefix it leaves that prefix doing its job.
+    """
+    sample = tmp_path / "test_thing.py"
+    sample.write_text("def test_computes():\n    compute(1)\n", encoding="utf-8")
+    reported = ['Function "test_computes" has no assertions']
+    assert _safe601(sample) == reported
+    assert _safe601(sample, {"assertion_call_prefixes": [""]}) == reported
+    assert _safe601(sample, {"assertion_call_prefixes": ["assert", ""]}) == reported
+    # The surviving prefix still counts what it should.
+    helper = tmp_path / "test_helper.py"
+    helper.write_text("def test_computes():\n    assert_computed(1)\n", encoding="utf-8")
+    assert _safe601(helper, {"assertion_call_prefixes": ["assert", ""]}) == []
+
+
+def test_the_bare_key_switches_the_route_off_for_python_only(tmp_path: Path) -> None:
+    """The bare key is Python's, so every other language needs its own suffixed key.
+
+    ``lang_config_key_chain`` deliberately keeps the bare key out of the chain
+    for non-Python languages: in a user's TOML it is Python's key, and letting
+    a ``.java`` file inherit a bare list would silently widen every language at
+    once. So ``assertion_call_prefixes = []`` is NOT a global off switch, which
+    is what the 2.17.0 docs claimed. Pinned here because the claim is easy to
+    reintroduce and nothing else would catch it.
+    """
+    python_sample = tmp_path / "test_thing.py"
+    python_sample.write_text("def test_computes():\n    assert_computed(1)\n", encoding="utf-8")
+    java_sample = tmp_path / "ThingTest.java"
+    java_sample.write_text("class ThingTest {\n    @Test\n    void checks() {\n        assertComputed(1);\n    }\n}\n", encoding="utf-8")
+    bare_off: dict[str, object] = {"assertion_call_prefixes": []}
+    assert _safe601(python_sample, bare_off) == ['Function "test_computes" has no assertions']
+    assert _safe601(java_sample, bare_off) == []
+    assert _safe601(java_sample, {"assertion_call_prefixes_java": []}) == ['Function "checks" has no assertions']
