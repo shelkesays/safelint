@@ -62,12 +62,12 @@ def _all_rules_enabled_config(framework: str = "spring-boot") -> dict:
         "test_coupling",
     ):
         cfg["rules"].setdefault(rule, {})["enabled"] = True
-    # These five skip test code by default (#198), and the fixtures live under
-    # ``tests/fixtures/`` - so safelint classifies them as test files and is right
-    # to. They exist to make rules FIRE, so the scoping is turned off here: this
-    # file asserts rule mechanics on Spring-shaped code, not the scoping policy,
-    # which has its own tests.
-    for rule in ("function_length", "logging_on_error", "global_mutation", "side_effects", "resource_lifecycle"):
+    # These six skip test code by default (#198, and SAFE901 since #208), and the
+    # fixtures live under ``tests/fixtures/`` - so safelint classifies them as test
+    # files and is right to. They exist to make rules FIRE, so the scoping is
+    # turned off here: this file asserts rule mechanics on Spring-shaped code, not
+    # the scoping policy, which has its own tests.
+    for rule in ("function_length", "logging_on_error", "global_mutation", "side_effects", "resource_lifecycle", "spring_field_injection"):
         cfg["rules"].setdefault(rule, {})["skip_test_code"] = False
     # The framework preset already flips spring_* rules under
     # spring-boot; under vanilla they stay disabled, which matches

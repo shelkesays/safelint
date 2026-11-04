@@ -19,6 +19,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **SAFE901 `spring_field_injection` no longer reports test classes (#208).** Field injection in a test is the pattern Spring's own reference documentation and sample code use, and the argument for constructor injection does not carry over: the framework instantiates a `@SpringBootTest` class itself, so there is no constructor the user controls in the ordinary way, and the usual case for constructor injection is substantially about making a class easy to unit-test, which inverts when applied to the test.
+
+  Measured on Spring PetClinic, written by the Spring team as the reference example: **17 findings, all 17 in test classes**, 63% of the project's whole default output, and not one in production code. So on the project most likely to be used as a sanity check for Spring support, a majority of safelint's output argued against the framework's documented pattern. All 17 clear; the remaining 10 findings are untouched.
+
+  The rule joins the five `skip_test_code` rules from #198 rather than adding a second mechanism, so `skip_test_code` and `test_dirs` are the keys it reads and a project that has already told safelint where its tests live does not say it twice. The three Java test-filename conventions (`*Test.java` / `*Tests.java` / `*IT.java`) account for every PetClinic finding, so no annotation detection was needed. Set `skip_test_code = false` for the strict reading.
+
 - **SAFE601: a test's callbacks assert on the test's behalf (#252).** The assertion counters walk a body with `skip_types=function_types` and so stop at any nested function. For a callback-style test that is the wrong answer: the assertions live inside a callback the test hands to something else - an Express route handler, a promise continuation, a `forEach` lambda - and the test read as assertion-free. The skip is dropped for a function identified as a test, and kept for every function that is not one, which is the false negative it exists to prevent (an ordinary function must not be credited for an inner definition's asserts).
 
   Findings removed: framework 150, express 64, guzzle 63, guava 47, core 39, django 35, axios 34, chartjs 33, fzf 19, ruff 13. Express is the case the issue was filed from; its own estimate was 10, and the true figure is 64 because the suite's dominant idiom is `router.handle(req, {}, function (err) { assert.ifError(err); ... })`, with the assertions one callback deep throughout.
@@ -32,6 +38,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **SAFE601: four `node:assert` functions were missing from the JavaScript defaults (#256).** `notDeepEqual`, `notDeepStrictEqual`, `doesNotMatch` and `partialDeepStrictEqual` (Node 22.13+) were absent while their siblings `notEqual` and `notStrictEqual` were present, so a node:test / Jest / Vitest test asserting only with one of them reported as having no assertions. This surfaced in 2.16.0 rather than before it: reaching JS tests through their registration callback (#222) is what made the contents of the list matter, since the whole callback was previously skipped. The full `node:assert` surface is now pinned by a test so the list cannot drift from the module again without failing. A duplicate `assert` entry was dropped from the same list while here; `console.assert` needs no entry of its own, because `call_name` strips the receiver.
+
+- **A function bound to a name is no longer reported as `<anonymous>` (#165).** Modern JavaScript and TypeScript declare most functions as an expression bound to a name, and an `arrow_function` has no `name` field of its own: the name sits on the enclosing `variable_declarator` or object-literal `pair`. Every per-function rule read that field alone, so `const Footer = () => {}` over the length limit reported `Function "<anonymous>"` although the source names it. On one real project that was 8 of 8 SAFE101 findings, and with several in a file the reader had to open each line to learn what was being reported.
+
+  Measured across the JavaScript and TypeScript corpora: **380 findings now name their function**, and object-literal entries (`{ loadUser: () => {} }`) are covered too. A genuinely nameless function keeps `<anonymous>`, because inventing a label for an IIFE or an inline callback would be worse than an honest absence.
+
+  Six rules each carried their own copy of the naive lookup, which is how one gap came to affect all of them; there is now one resolver. It also closes two false positives in SAFE304, which exempts a function whose name already signals I/O: while the name read `<anonymous>` the exemption could not match, so the rule reported `readFile` and `sendCode` asking them to be renamed to signal what they plainly signal.
+
+  SAFE601 deliberately still identifies a test by the function's **own** name. A binding that happens to start with `test` is just a variable in JavaScript, and crediting it made chartjs read four `testA:` entries of a TypeScript type fixture as tests and elysia one `const test = (app) => app.group(...)` helper: five findings, all false, against no true one. JavaScript's real test-identity route is the registration call, which the rule handles separately.
 
 ## [2.16.0] - 2026-11-02
 

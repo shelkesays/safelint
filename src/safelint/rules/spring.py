@@ -35,6 +35,7 @@ from typing import TYPE_CHECKING
 
 from safelint.languages import java as _java
 from safelint.languages._node_utils import call_name, node_text, resolve_lang_name, walk
+from safelint.rules._test_files import skips_test_code
 from safelint.rules.base import BaseRule
 
 
@@ -175,6 +176,18 @@ class SpringFieldInjectionRule(BaseRule):
 
     Java-only. Default-disabled under the vanilla preset; the
     ``spring-boot`` framework preset flips ``enabled`` to True.
+
+    **Test classes are skipped** (``skip_test_code``, default True, #208).
+    Field injection in a test is the pattern Spring's own documentation and
+    sample code use, and the reasoning does not carry over: the framework
+    instantiates a ``@SpringBootTest`` class itself, so there is no constructor
+    the user controls in the ordinary way, and the usual case for constructor
+    injection is substantially about making a class easy to unit-test, which
+    inverts when applied to the test. Measured on Spring PetClinic, the Spring
+    team's own reference sample: 17 findings, **all 17 in test classes**, and
+    51% of the project's default output. Not one was in production code, so on
+    the project most likely to be used as a sanity check for Spring support a
+    majority of the output argued against the framework's documented pattern.
     """
 
     name = "spring_field_injection"
@@ -182,8 +195,11 @@ class SpringFieldInjectionRule(BaseRule):
     language = ("java",)
 
     def check_file(self, filepath: str, tree: tree_sitter.Tree) -> list[Violation]:
-        """Flag every ``@Autowired`` field declaration."""
-        if resolve_lang_name(filepath) != "java":  # pragma: no cover - engine dispatch already filters by language tuple
+        """Flag every ``@Autowired`` field declaration outside test code."""
+        lang_name = resolve_lang_name(filepath)
+        if lang_name != "java":  # pragma: no cover - engine dispatch already filters by language tuple
+            return []
+        if skips_test_code(self.config, filepath, lang_name):
             return []
         violations: list[Violation] = []
         for node in walk(tree.root_node):

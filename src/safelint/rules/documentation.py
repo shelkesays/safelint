@@ -14,7 +14,7 @@ from safelint.languages import php as _php
 from safelint.languages import python as _py
 from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
-from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import CALL_TYPES, call_name, function_display_name, function_name_node, node_text, resolve_lang_name, walk
 from safelint.rules._test_files import _DEFAULT_TEST_DIRS, _is_test_file
 from safelint.rules._test_identity import describe_function, is_harness, marked_as_test, registers_tests
 from safelint.rules.base import BaseRule
@@ -644,7 +644,7 @@ class MissingAssertionsRule(BaseRule):
         )
 
     @staticmethod
-    def _is_test_function(node: tree_sitter.Node, func_name: str, subject: TestSubject, scope: _FileScope) -> bool:
+    def _is_test_function(node: tree_sitter.Node, declared_name: str, subject: TestSubject, scope: _FileScope) -> bool:
         """Return True when *node* is a test, by any of the three identity routes.
 
         The marker route stands alone; the prefix and registration routes also
@@ -653,12 +653,23 @@ class MissingAssertionsRule(BaseRule):
         ``runner.test(...)`` callback in application code. A name the language's
         own toolchain reserves for a harness (Go's ``TestMain``) is excluded
         from those two routes: it matches the prefix but has nothing to assert.
+
+        *declared_name* is the function's OWN name, deliberately not the
+        resolved display name a binding can lend it (#165). Naming a test by
+        its declaration is a convention of the languages that have one -
+        Python's ``def test_x``, Go's ``func TestX`` - whereas in JavaScript a
+        binding that happens to start with ``test`` is just a variable, and the
+        ecosystem identifies tests by the registration call, which is its own
+        route here. Measured on the corpus: resolving the binding made chartjs
+        read four ``testA:``/``testB:`` entries of a TypeScript type fixture as
+        tests, and elysia one ``const test = (app) => app.group(...)`` helper.
+        Five findings, all false, against no true one.
         """
         if marked_as_test(node, scope.lang_name, scope.markers):
             return True
-        if not scope.file_is_test or is_harness(scope.lang_name, func_name):
+        if not scope.file_is_test or is_harness(scope.lang_name, declared_name):
             return False
-        return subject.is_registered_test or func_name.startswith(scope.prefixes)
+        return subject.is_registered_test or declared_name.startswith(scope.prefixes)
 
     def _check_function(self, filepath: str, node: tree_sitter.Node, scope: _FileScope) -> Violation | None:
         """Return the violation for one function node, or None when it is in the clear.
@@ -672,9 +683,10 @@ class MissingAssertionsRule(BaseRule):
         function from a closure's asserts is dropped for one.
         """
         name_node = function_name_node(node, scope.lang_name)
-        func_name = node_text(name_node) if name_node else "<anonymous>"
+        declared_name = node_text(name_node) if name_node else ""
+        func_name = function_display_name(node, scope.lang_name)
         subject = describe_function(node, scope.lang_name, scope.registrations, func_name)
-        is_test = self._is_test_function(node, func_name, subject, scope)
+        is_test = self._is_test_function(node, declared_name, subject, scope)
         if scope.scoped and not is_test:
             return None
         if registers_tests(node, scope.lang_name, scope.registrations, scope.function_types):
