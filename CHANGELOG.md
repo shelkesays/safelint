@@ -7,6 +7,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **A TypeScript non-null assertion no longer hides a function's name.** `const handler = (() => {})!` parses as `non_null_expression > parenthesized_expression > arrow_function`, and that wrapper was missing from the pass-through list added in 2.17.0, so every per-function rule reported `Function "<anonymous>"` for a function the source names. A non-null assertion is a type-level claim about the value and says nothing about the function, exactly like the `as` / `satisfies` / angle-assertion forms beside it. The wrappers compose, so `(((...) as Fn)!)` needs all of them peeled; both orders are pinned. Found by CodeAnt on the SAFE105 change below, where the same gap cost the new route a genuine recursion finding.
+
+- **SAFE105 `no_recursion`: recursion through a `const` / `let` / `var`-bound function is now detected (#259).** An `arrow_function` has no name of its own; the name sits on the binding holding it. The rule matched only the function's own name, so it was silent on the declaration form most of the JavaScript and TypeScript ecosystem uses, while firing correctly on `function fact() {}` beside it:
+
+  ```javascript
+  const fact = (n) => (n <= 1 ? 1 : n * fact(n - 1));   // was clean, now reported
+  function fact(n) { return n <= 1 ? 1 : n * fact(n - 1); }  // always reported
+  ```
+
+  A rule whose purpose is to find unbounded stack growth going quiet on the dominant shape is worse than no rule, because the clean run reads as reassurance.
+
+  **Measured across the JavaScript and TypeScript corpora: 91 new findings across 35 functions, none removed.** The two units differ because the rule reports one finding per call site, so a function with four self-calls is four findings; #259's own estimate of 39 counted functions, with a cruder script. What the 35 are is the point: `mergeDeep` (a deep merge whose depth is its input's), `hasAdditionalProperties` and `getDiscriminator` (recursive JSON-schema walks), Vue's `setScopeId` and `recursiveGetSubtree` over the vnode tree, axios's `visit` over an arbitrarily nested object. Thirteen were read by hand and every one is genuine recursion over user-shaped data. SAFE105 is `warning` severity, so these are advisory rather than blocking under the default `fail_on`.
+
+  **Only a variable declarator lends its name, and only to a bare call.** The three binding forms look alike and do not behave alike, which was verified against `node` rather than reasoned about: `const fact = (n) => fact(n - 1)` returns a value, while `{ walk: (n) => walk(n - 1) }` and `class T { fact = (n) => fact(n - 1) }` both raise `ReferenceError`, because an object property and a class field are not lexical bindings. An arrow also does not bind its own `this`, so `this.walk(...)` inside an object-literal arrow is not a self-call. Reporting on either would have been a finding about a call that cannot recurse.
+
+  Recorded rather than claimed fixed: `class T { fact = (n) => n * this.fact(n - 1) }` really does recurse and is still not reported. Reaching it means matching the enclosing class against the receiver so a sibling object's `this.fact(...)` is not mistaken for it, which is separate work from naming the function.
+
+  The existing guards do the rest, and they are what keeps this from becoming a wrapper-reporting machine: a member-access callee is never a bare call, so `const trim = (s) => s.trim()` stays clean; a nested binding of the same name shadows the outer one, now resolved through the binding as well so `const walk = (n) => { const walk = (m) => m; return walk(n); }` stays clean too; and a computed key lends no name, since the verdict would rest on a variable whose value is unknown. JavaScript and TypeScript only: Java's lambdas sit in a `variable_declarator` spelled identically, so the route is gated by language rather than left to match for free.
+
+
 ## [2.17.0] - 2026-11-04
 
 ### Added

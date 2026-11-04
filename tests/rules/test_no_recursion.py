@@ -104,12 +104,24 @@ def test_javascript_other_receiver_is_clean(tmp_path: Path) -> None:
     assert _safe105(_engine().check_file(str(sample))) == []
 
 
-def test_javascript_anonymous_arrow_not_flagged(tmp_path: Path) -> None:
-    """Anonymous arrow recursion via a binding is a documented blind spot - no false crash."""
+def test_javascript_bound_arrow_recursion_fires(tmp_path: Path) -> None:
+    """An arrow calling its own ``const`` binding is recursion, and reports since 2.17.1 (#259).
+
+    This test used to assert the opposite and pin the blind spot: the arrow has
+    no ``name`` field, so the rule matched nothing. ``const f = (n) => f(n - 1)``
+    is the dominant declaration form in the ecosystem, so the gap meant a clean
+    run on the shape most likely to hold the recursion. The companion file
+    ``test_no_recursion_bound_arrow.py`` covers the boundaries.
+    """
     sample = tmp_path / "anon.js"
     sample.write_text("const f = (n) => (n <= 0 ? 0 : f(n - 1));\n", encoding="utf-8")
-    # No name on the arrow function, so nothing fires. The point is the rule
-    # neither crashes nor mis-fires on anonymous functions.
+    assert len(_safe105(_engine().check_file(str(sample)))) == 1
+
+
+def test_javascript_truly_anonymous_arrow_not_flagged(tmp_path: Path) -> None:
+    """The half that stays: with no binding there is no name, and no false crash."""
+    sample = tmp_path / "anon.js"
+    sample.write_text("register((n) => (n <= 0 ? 0 : f(n - 1)));\n", encoding="utf-8")
     assert _safe105(_engine().check_file(str(sample))) == []
 
 
