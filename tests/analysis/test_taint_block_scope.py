@@ -346,3 +346,142 @@ def test_walk_yields_nodes_in_non_decreasing_start_byte_order(filename: str, sou
     tree = definition.create_parser().parse(source.encode())
     starts = [node.start_byte for node in walk(tree.root_node)]
     assert starts == sorted(starts)
+
+
+# A declaration in a loop or control-statement HEADER is not inside the body
+# block - the body is its sibling - so the ancestor walk has to recognise the
+# statement itself. Both bots found this independently, and the code comment
+# asserted the opposite. Each case has a tainted outer binding, a clean header
+# binding, and a sink AFTER the statement that reads the outer one.
+_HEADER_SHADOWS: list[tuple[str, str, str]] = [
+    (
+        "javascript for head",
+        "h.js",
+        'function f() {\n  let code = prompt("code?");\n  for (let code = 0; code < 3; code++) { console.log(code); }\n  eval(code);\n}\n',
+    ),
+    (
+        "c for head",
+        "h.c",
+        '#include <stdlib.h>\nvoid f(void) {\n  char *p = getenv("CMD");\n  for (char *p = "safe"; *p; p++) { puts(p); }\n  system(p);\n}\n',
+    ),
+    (
+        "go if initialiser, read in the else branch",
+        "h.go",
+        'package main\nimport ("os"; "os/exec")\nfunc main() {\n  cmd := os.Getenv("CMD")\n  if cmd := "safe"; cmd != "" {\n    _ = cmd\n  } else {\n    _ = cmd\n  }\n  exec.Command(cmd)\n}\n',
+    ),
+    (
+        "go for initialiser",
+        "i.go",
+        'package main\nimport ("os"; "os/exec")\nfunc main() {\n  cmd := os.Getenv("CMD")\n  for cmd := 0; cmd < 3; cmd++ {\n    _ = cmd\n  }\n  exec.Command(cmd)\n}\n',
+    ),
+    (
+        "go switch initialiser",
+        "j.go",
+        'package main\nimport ("os"; "os/exec")\nfunc main() {\n  cmd := os.Getenv("CMD")\n  switch cmd := "safe"; cmd {\n  case "a":\n    _ = cmd\n  }\n  exec.Command(cmd)\n}\n',
+    ),
+]
+
+
+@pytest.mark.parametrize(["label", "filename", "source"], _HEADER_SHADOWS, ids=[case[0] for case in _HEADER_SHADOWS])
+def test_a_header_binding_does_not_outlive_its_statement(tmp_path: Path, label: str, filename: str, source: str) -> None:
+    """A clean header binding must not mask the tainted outer one after the statement."""
+    sample = tmp_path / filename
+    sample.write_text(source, encoding="utf-8")
+    assert len(_safe801(sample)) == 1, label
+
+
+_HEADER_SHADOWS_REVERSED: list[tuple[str, str, str]] = [
+    (
+        "javascript for head",
+        "r.js",
+        'function f() {\n  let code = "safe";\n  for (let code = prompt("code?"); code; ) { console.log(code); }\n  eval(code);\n}\n',
+    ),
+    (
+        "c for head",
+        "r.c",
+        '#include <stdlib.h>\nvoid f(void) {\n  char *p = "safe";\n  for (char *p = getenv("CMD"); *p; p++) { puts(p); }\n  system(p);\n}\n',
+    ),
+    (
+        "go if initialiser",
+        "r.go",
+        'package main\nimport ("os"; "os/exec")\nfunc main() {\n  cmd := "safe"\n  if cmd := os.Getenv("CMD"); cmd != "" {\n    _ = cmd\n  }\n  exec.Command(cmd)\n}\n',
+    ),
+]
+
+
+@pytest.mark.parametrize(["label", "filename", "source"], _HEADER_SHADOWS_REVERSED, ids=[case[0] for case in _HEADER_SHADOWS_REVERSED])
+def test_a_tainted_header_binding_does_not_leak_past_its_statement(tmp_path: Path, label: str, filename: str, source: str) -> None:
+    """The other direction: the sink reads the clean outer binding, so it is clean."""
+    sample = tmp_path / filename
+    sample.write_text(source, encoding="utf-8")
+    assert _safe801(sample) == [], label
+
+
+def test_a_tainted_header_binding_still_reports_inside_its_own_statement(tmp_path: Path) -> None:
+    """The control for the two above: scoping must not make the loop body blind."""
+    sample = tmp_path / "b.c"
+    sample.write_text(
+        '#include <stdlib.h>\nvoid f(void) {\n  for (char *p = getenv("CMD"); *p; p++) { system(p); }\n}\n',
+        encoding="utf-8",
+    )
+    assert len(_safe801(sample)) == 1
+
+
+def test_a_c_multi_declarator_reads_its_initialiser_before_the_later_name_is_bound(tmp_path: Path) -> None:
+    """C scopes each declarator from the END of its own declarator, not the declaration.
+
+    ```c
+    char *b = getenv("CMD");
+    { char *a = b, *b = "safe"; system(a); }
+    ```
+
+    The ``b`` in ``a``'s initialiser is the OUTER, tainted one, because the inner
+    ``b`` is not in scope until its own declarator ends. Clearing every name in
+    the declaration up front cleared it before ``a``'s initialiser was read, and
+    the finding on ``system(a)`` was lost - so the clearing is done per
+    declarator, as the walk reaches it.
+    """
+    sample = tmp_path / "m.c"
+    sample.write_text(
+        '#include <stdlib.h>\nvoid f(void) {\n  char *b = getenv("CMD");\n  { char *a = b, *b = "safe"; system(a); }\n}\n',
+        encoding="utf-8",
+    )
+    assert len(_safe801(sample)) == 1
+
+
+def test_a_file_scope_declaration_is_not_block_scoped(tmp_path: Path) -> None:
+    """A declaration outside any block has nothing to be restored from.
+
+    The scoping has to be a no-op there rather than an error. ``char *g =
+    NULL;`` at C file scope lives for the whole translation unit, so the sink
+    still reports; the same path runs for a JavaScript ``let`` at module top
+    level, which has no enclosing block either.
+    """
+    initialised = tmp_path / "g.c"
+    initialised.write_text(
+        "#include <stdlib.h>\nchar *g = NULL;\nvoid f(char *arg) {\n  g = arg;\n  system(g);\n}\n",
+        encoding="utf-8",
+    )
+    assert len(_safe801(initialised)) == 1
+    # The uninitialised form takes the other branch, on the declaration rather
+    # than on an init_declarator, and must be a no-op there too.
+    uninitialised = tmp_path / "g2.c"
+    uninitialised.write_text(
+        "#include <stdlib.h>\nchar *g;\nvoid f(char *arg) {\n  g = arg;\n  system(g);\n}\n",
+        encoding="utf-8",
+    )
+    assert len(_safe801(uninitialised)) == 1
+
+
+def test_a_module_top_level_flow_is_outside_the_trackers_scope(tmp_path: Path) -> None:
+    """Recorded rather than asserted as a success: SAFE801 is per FUNCTION.
+
+    ``const code = prompt(); eval(code);`` at JavaScript module top level is not
+    analysed at all - the rule walks each function's body with its own parameter
+    set, and module-level statements belong to no function. That is pre-existing
+    and unrelated to the block scoping, but it is exactly the shape a reader
+    would expect this fix to have covered, so it is pinned here with the reason.
+    """
+    sample = tmp_path / "g.js"
+    sample.write_text('const code = prompt("code?");\neval(code);\n', encoding="utf-8")
+    assert _safe801(sample) == []

@@ -101,7 +101,25 @@ def _expression_items(node: tree_sitter.Node) -> list[tree_sitter.Node]:
 
 
 #: Where a Go block-scoped declaration goes out of scope.
-_BLOCK_TYPES = frozenset({_go.BLOCK})
+#:
+#: The control statements are here because Go scopes an initialiser binding to
+#: the WHOLE statement, not to one of its blocks: ``if cmd := get(); c { } else
+#: { ... }`` keeps ``cmd`` in scope through the ``else``, and the three-clause
+#: ``for cmd := 0; ...`` keeps it for the whole loop. The ancestor walk from the
+#: initialiser reaches the statement (via ``for_clause`` in the loop case)
+#: before any block, so listing them is what makes the restore land at the end
+#: of the statement. Without them it landed at the end of the first body block,
+#: which loses an else-branch finding - the dangerous direction - as well as
+#: reporting one that is not there.
+_BLOCK_TYPES = frozenset(
+    {
+        _go.BLOCK,
+        _go.IF_STATEMENT,
+        _go.FOR_STATEMENT,
+        _go.EXPRESSION_SWITCH_STATEMENT,
+        _go.TYPE_SWITCH_STATEMENT,
+    }
+)
 
 
 class GoTaintTracker:
@@ -208,10 +226,12 @@ class GoTaintTracker:
         at every later sink.
 
         An ``if v := f(); cond`` binding scopes to the whole ``if`` statement
-        including its ``else``, while the nearest ``block`` is the ``if`` body,
-        so the restore can come one branch early. That is the conservative
-        direction - the outer binding's taint returns sooner - and it is noted
-        rather than silently relied on.
+        including its ``else``, which is why :data:`_BLOCK_TYPES` lists the
+        control statements and not only ``block``. Restoring at the end of the
+        then-block instead was wrong in both directions, and calling it merely
+        "conservative" was wrong too: with a TAINTED initialiser and a clean
+        outer binding, an else-branch sink read the clean one and the finding
+        was lost.
         """
         if names_root is None:  # pragma: no cover - defensive: both forms carry their names
             return

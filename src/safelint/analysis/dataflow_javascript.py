@@ -110,9 +110,26 @@ _PATTERN_CONTAINER_TYPES = frozenset({_js.ARRAY_PATTERN, _js.OBJECT_PATTERN, _js
 
 #: Where a ``let`` / ``const`` goes out of scope. A ``switch_body`` is one
 #: scope shared by every clause (the same reading SAFE305 uses), and a
-#: ``class_static_block`` is its own scope. A ``for`` head's binding dies with
-#: the loop body, which is the ``statement_block`` found first.
-_LEXICAL_BLOCK_TYPES = frozenset({_js.STATEMENT_BLOCK, _js.SWITCH_BODY, _js.CLASS_STATIC_BLOCK})
+#: ``class_static_block`` is its own scope.
+#:
+#: The two loop statements are here because a head declaration is NOT inside the
+#: loop body: ``for (let p = 0; ...) { ... }`` puts the ``lexical_declaration``
+#: under ``for_statement``, with the body as its SIBLING. Without the loop in
+#: this set the ancestor walk goes straight past it to the enclosing block, so a
+#: head binding kept its state until that block closed - which is both a false
+#: negative (a clean head binding masking a tainted outer one) and a false
+#: positive (a tainted head binding reported at a later sink reading the outer).
+#: Found by CodeRabbit and CodeAnt independently; the comment here previously
+#: asserted the opposite.
+_LEXICAL_BLOCK_TYPES = frozenset(
+    {
+        _js.STATEMENT_BLOCK,
+        _js.SWITCH_BODY,
+        _js.CLASS_STATIC_BLOCK,
+        _js.FOR_STATEMENT,
+        _js.FOR_IN_STATEMENT,
+    }
+)
 
 
 def _destructure_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
