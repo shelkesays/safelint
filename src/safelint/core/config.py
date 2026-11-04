@@ -852,14 +852,17 @@ DEFAULTS: dict[str, Any] = {
             # ``@Test``. ``@BeforeEach`` / ``@AfterEach`` are not here: a
             # fixture method legitimately asserts nothing.
             #
-            # ``@TestFactory`` is deliberately absent too, for a structural
-            # reason rather than a stylistic one: a factory returns a stream of
-            # ``DynamicTest``s and its assertions live inside those lambdas, so
-            # its own body never asserts. The assertion counters stop at nested
-            # functions (``lambda_expression`` is one), so including it reported
-            # every well-written factory as assertion-free. Tracked as #252,
-            # which is the general case of an assertion inside a callback.
-            "test_markers_java": ["Test", "ParameterizedTest", "RepeatedTest", "TestTemplate"],
+            # ``@TestFactory`` was excluded in 2.16.0 for a structural reason:
+            # a factory returns a stream of ``DynamicTest``s whose assertions
+            # live inside lambdas, its own body never asserts, and the counters
+            # stopped at nested functions, so including it reported every
+            # well-written factory. #252 removed that limitation for a function
+            # identified as a test, which is exactly what a factory is, so the
+            # exclusion no longer buys anything and is reversed here: a factory
+            # whose lambdas assert is clean, and one that asserts nothing is
+            # reported, which is the whole point of the rule. Measured on
+            # commons-lang's four ``@TestFactory`` methods: zero new findings.
+            "test_markers_java": ["Test", "ParameterizedTest", "RepeatedTest", "TestTemplate", "TestFactory"],
             # Go's registration callbacks: ``t.Run(name, func(t *testing.T){})``
             # subtests and ``f.Fuzz(func(t *testing.T, ...){})`` fuzz targets.
             # Matched anywhere in the callee chain, so the ``t.`` / ``f.``
@@ -874,7 +877,10 @@ DEFAULTS: dict[str, Any] = {
             "test_function_prefixes_go": ["Test", "Fuzz"],
             # Directories that mark a file as a test file, matched as a
             # path-component subsequence (same semantics + default as SAFE701 /
-            # SAFE702). Only consulted when ``test_functions_only`` is on.
+            # SAFE702). Consulted whatever ``test_functions_only`` says, because
+            # test identity also decides whether an ``assert*`` helper and a
+            # callback's assertions count (#251, #252), not just whether the
+            # function is checked.
             "test_dirs": ["tests", "test", "__tests__", "spec"],
             # Python assertion-CALL names (bare key, per the Python
             # convention - every other language suffixes with ``_<lang>``).
@@ -887,6 +893,26 @@ DEFAULTS: dict[str, Any] = {
             # ``self.assertEqual`` and ``pytest.raises`` resolve to the
             # bareword names below. Defaults cover the unittest
             # ``assert*`` surface plus pytest's ``raises`` / ``warns``.
+            # Call-name PREFIXES that count as an assertion, matched only
+            # inside a function the rule identified as a test. A large test
+            # suite grows its own assertion helpers by the hundred
+            # (``assertIllegalArgumentException``, ``assertEqualCharNodes``,
+            # ``assertMapEquals``), and exact-name matching read every test
+            # whose only assertion went through one as assertion-free: 53% of
+            # commons-lang's findings and 34% of Guava's, once the rule was
+            # scoped to tests (#251). Enumerating them per project does not
+            # scale - commons-lang alone needed eight ``extend_assertion_calls``
+            # entries to clear half of its findings.
+            #
+            # Restricted to tests deliberately: inside a test an
+            # ``assert``-prefixed call IS an assertion, while a production
+            # method named ``assertValid()`` is nobody's assertion and is never
+            # credited (which it would be if the prefix applied everywhere and
+            # ``test_functions_only`` were off). Set to ``[]`` to switch the
+            # route off and go back to exact names alone. Per language through
+            # the usual key chain, so ``assertion_call_prefixes_go = ["assert",
+            # "must"]`` covers a project that also writes ``mustEqual``.
+            "assertion_call_prefixes": ["assert"],
             "assertion_calls": [
                 "assertEqual",
                 "assertNotEqual",
@@ -989,6 +1015,8 @@ DEFAULTS: dict[str, Any] = {
                 "deepStrictEqual",
                 "notEqual",
                 "notStrictEqual",
+                "notDeepEqual",
+                "notDeepStrictEqual",
                 "rejects",
                 "throws",
                 "doesNotThrow",
@@ -996,8 +1024,13 @@ DEFAULTS: dict[str, Any] = {
                 "fail",
                 "ifError",
                 "match",
-                # console.assert (browser + Node)
-                "assert",  # already listed; harmless duplicate
+                "doesNotMatch",
+                # ``node:assert`` since Node 22.13; harmless on older runtimes,
+                # where the name simply never appears.
+                "partialDeepStrictEqual",
+                # ``console.assert`` (browser + Node) needs no entry of its own:
+                # ``call_name`` strips the receiver, so it resolves to the
+                # ``assert`` already listed above.
                 # Test frameworks (call-name level - receiver is irrelevant)
                 "expect",  # Jest, Chai (when used via expect()), Vitest's vi.expect
                 "should",  # Should.js

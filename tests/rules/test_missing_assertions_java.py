@@ -69,17 +69,69 @@ def test_a_java_test_with_no_assertion_still_reports(tmp_path: Path) -> None:
     assert _safe601(tmp_path, "int x = 1;") == ['Function "checksSomething" has no assertions']
 
 
-def test_a_project_assertion_helper_is_not_recognised_by_default(tmp_path: Path) -> None:
-    """A project's own ``assert*`` helper does not count, and ``extend_assertion_calls_java`` is the answer.
+def test_a_project_assertion_helper_counts_by_prefix(tmp_path: Path) -> None:
+    """A project's own ``assert*`` helper counts inside a test, without being enumerated (#251).
 
-    Matching is by exact name, not by an ``assert`` prefix, so
-    ``assertIllegalArgumentException(...)`` (commons-lang's own helper) reads as
-    assertion-free. Measured on the corpus: 53% of commons-lang's and 34% of
-    Guava's remaining findings call such a helper. Pinned here as the shipped
-    behaviour rather than left implicit, because it is the main class of finding
-    a Java project will still see.
+    ``assertIllegalArgumentException(...)`` is commons-lang's own helper and the
+    test that calls it asserts. Exact-name matching read it as assertion-free,
+    which was 53% of commons-lang's and 34% of Guava's findings once the rule
+    was scoped to tests. ``extend_assertion_calls_java`` still works and is
+    still the way to add a helper that is NOT ``assert``-prefixed.
     """
     sample = _write(tmp_path, "assertIllegalArgumentException(() -> thing());")
-    assert _messages(sample) == ['Function "checksSomething" has no assertions']
-    extended = {"rules": {"missing_assertions": {"enabled": True, "extend_assertion_calls_java": ["assertIllegalArgumentException"]}}}
+    assert _messages(sample) == []
+    # Turning the prefix route off restores exact matching, and then the helper
+    # has to be named.
+    exact = {"rules": {"missing_assertions": {"enabled": True, "assertion_call_prefixes_java": []}}}
+    assert _messages(sample, exact) == ['Function "checksSomething" has no assertions']
+    extended = {"rules": {"missing_assertions": {"enabled": True, "assertion_call_prefixes_java": [], "extend_assertion_calls_java": ["assertIllegalArgumentException"]}}}
     assert _messages(sample, extended) == []
+
+
+def test_a_non_assert_prefixed_helper_still_needs_naming(tmp_path: Path) -> None:
+    """The prefix route is not a licence to count anything: ``verify*`` is not ``assert*``.
+
+    Guava and commons-lang name their helpers ``assert*``, which is what makes
+    the prefix worth having. A helper named anything else is exactly as
+    unrecognised as before, so ``extend_assertion_calls_java`` keeps its job.
+    """
+    sample = _write(tmp_path, "checkRoundTrip(value);")
+    assert _messages(sample) == ['Function "checksSomething" has no assertions']
+    extended = {"rules": {"missing_assertions": {"enabled": True, "extend_assertion_calls_java": ["checkRoundTrip"]}}}
+    assert _messages(sample, extended) == []
+
+
+def _write_factory(tmp_path: Path, body: str) -> Path:
+    """Write a ``@TestFactory`` method with *body* into a Java test class."""
+    sample = tmp_path / "FactoryTest.java"
+    sample.write_text(f"class FactoryTest {{\n    @TestFactory\n    Stream<DynamicTest> makesTests() {{\n        {body}\n    }}\n}}\n", encoding="utf-8")
+    return sample
+
+
+def test_a_test_factory_whose_lambdas_assert_is_clean(tmp_path: Path) -> None:
+    """``@TestFactory`` is a default marker again, now that #252 makes it work.
+
+    2.16.0 excluded it because a factory's assertions live inside the
+    ``DynamicTest`` lambdas it returns and the counters stopped at nested
+    functions, so every well-written factory reported. A factory IS a test, so
+    #252 counts its lambdas and the exclusion buys nothing. Measured on
+    commons-lang's four factories: zero new findings.
+    """
+    sample = _write_factory(tmp_path, 'return Stream.of("racecar").map(s -> DynamicTest.dynamicTest(s, () -> assertTrue(isPalindrome(s))));')
+    assert _messages(sample) == []
+
+
+def test_a_test_factory_that_asserts_nothing_is_reported(tmp_path: Path) -> None:
+    """The coverage the exclusion used to give up: a factory that never asserts.
+
+    The reason for reversing the exclusion rather than leaving it. While
+    ``@TestFactory`` was not a marker, a factory was not a test at all, so one
+    producing ``DynamicTest``s that assert nothing was invisible to the rule.
+    """
+    sample = _write_factory(tmp_path, 'return Stream.of("a").map(s -> DynamicTest.dynamicTest(s, () -> compute(s)));')
+    assert _messages(sample) == ['Function "makesTests" has no assertions']
+
+
+def test_the_java_marker_defaults_carry_test_factory() -> None:
+    """Pinned against DEFAULTS, because the behaviour above rides on the default list."""
+    assert "TestFactory" in DEFAULTS["rules"]["missing_assertions"]["test_markers_java"]

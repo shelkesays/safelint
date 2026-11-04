@@ -7,6 +7,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **SAFE601 `missing_assertions`: `assertion_call_prefixes`, so a project's own `assert*` helper counts (#251).** Matching was by exact call name, so a test whose only assertion went through the project's own helper read as assertion-free. A call whose name starts with an entry in this list (`["assert"]` by default) now counts, and enumerating helpers per project is no longer the only option: commons-lang alone would have needed eight `extend_assertion_calls_java` entries to clear half of its findings.
+
+  **Live only inside a function the rule has identified as a test**, which is what makes it safe: inside a test an `assert`-prefixed call is an assertion, while a production method named `assertValid()` is nobody's assertion and is never credited. Set `assertion_call_prefixes = []` for exact names alone. Per language through the usual key chain, so a Go project that also writes `mustEqual` can say `assertion_call_prefixes_go = ["assert", "must"]`.
+
+  In Rust this is the one route that reaches a plain call. `assertion_calls_rust` is matched against macro names only, deliberately - a function literally named `panic` is not an assertion - so a helper written as `fn assert_roundtrip(...)` was previously never credited whatever the config said. That limit is now lifted for `assert*`-named helpers and documented for the rest.
+
+  Findings removed by this route, measured across the validation corpus: django 1637, framework (Laravel) 1472, guava 1162, ruff 880, commons-lang 451, ripgrep 98, monolog 93, guzzle 67, core 60, zod 53, axios 18, cobra 15, fzf 13. These are the class #251 predicted from the other direction: it measured 464 of commons-lang's 873 findings and 1160 of Guava's 3363 as calling an `assert*` helper, against the 451 and 1162 removed here.
+
+### Changed
+
+- **SAFE601: a test's callbacks assert on the test's behalf (#252).** The assertion counters walk a body with `skip_types=function_types` and so stop at any nested function. For a callback-style test that is the wrong answer: the assertions live inside a callback the test hands to something else - an Express route handler, a promise continuation, a `forEach` lambda - and the test read as assertion-free. The skip is dropped for a function identified as a test, and kept for every function that is not one, which is the false negative it exists to prevent (an ordinary function must not be credited for an inner definition's asserts).
+
+  Findings removed: framework 150, express 64, guzzle 63, guava 47, core 39, django 35, axios 34, chartjs 33, fzf 19, ruff 13. Express is the case the issue was filed from; its own estimate was 10, and the true figure is 64 because the suite's dominant idiom is `router.handle(req, {}, function (err) { assert.ifError(err); ... })`, with the assertions one callback deep throughout.
+
+  The trade, recorded rather than left to be found: an inner definition inside a test now credits the test even when nothing calls it, because "handed to someone else" and "defined and never used" are the same tree shape - a callback is passed by reference too, so telling them apart would mean following the value. A test carrying a dead assertion helper is a rare thing to miss, and the finding would be about dead code rather than about assertions.
+
+- **SAFE601: `@TestFactory` is a default Java marker again, as a consequence of #252.** It was excluded in 2.16.0 for a structural reason: a factory returns a stream of `DynamicTest`s whose assertions live inside lambdas, its own body never asserts, and the counters stopped at nested functions, so including it reported every well-written factory. That limitation is exactly what #252 removed for a function identified as a test, and a factory is one, so the exclusion no longer buys anything. It also cost real coverage: while `@TestFactory` was not a marker, a factory was not a test at all, so one producing `DynamicTest`s that assert nothing was invisible to the rule. Measured on commons-lang's four `@TestFactory` methods (the only ones in the corpus): zero new findings, all four correctly read as asserting.
+
+- **SAFE601: test identity is resolved whatever `test_functions_only` says.** It was read only when the scoping was on, which was fine while identity decided one thing. It now decides three (whether the function is checked, whether an `assert*` helper counts, whether a callback's assertions count), so under `test_functions_only = false` a genuine test silently lost both new routes while production functions kept them off as intended. No change to which functions are *checked* in either mode.
+
+### Fixed
+
+- **SAFE601: four `node:assert` functions were missing from the JavaScript defaults (#256).** `notDeepEqual`, `notDeepStrictEqual`, `doesNotMatch` and `partialDeepStrictEqual` (Node 22.13+) were absent while their siblings `notEqual` and `notStrictEqual` were present, so a node:test / Jest / Vitest test asserting only with one of them reported as having no assertions. This surfaced in 2.16.0 rather than before it: reaching JS tests through their registration callback (#222) is what made the contents of the list matter, since the whole callback was previously skipped. The full `node:assert` surface is now pinned by a test so the list cannot drift from the module again without failing. A duplicate `assert` entry was dropped from the same list while here; `console.assert` needs no entry of its own, because `call_name` strips the receiver.
+
 ## [2.16.0] - 2026-11-02
 
 ### Added
