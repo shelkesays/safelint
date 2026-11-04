@@ -2065,7 +2065,22 @@ DEFAULTS: dict[str, Any] = {
         # see no behaviour change; the ``[tool.safelint.java] framework
         # = "spring-boot"`` preset flips ``enabled`` to True for the
         # whole set via ``_JAVA_FRAMEWORK_PRESETS["spring-boot"]``.
-        "spring_field_injection": {"enabled": False, "severity": "warning"},
+        "spring_field_injection": {
+            "enabled": False,
+            "severity": "warning",
+            # #208: skip test code, joining the five #198 rules rather than
+            # inventing a second mechanism. Field injection in a test is what
+            # Spring's own documentation and sample code do, and the case for
+            # constructor injection inverts when applied to the test itself.
+            # Measured on Spring PetClinic, written by the Spring team as the
+            # reference example: 17 findings, all 17 in test classes, 51% of
+            # the project's default output, none in production code. The
+            # filename convention alone (``*Test.java`` / ``*Tests.java`` /
+            # ``*IT.java``) resolves every one, so no annotation detection is
+            # needed. Set ``skip_test_code = false`` for the strict reading.
+            "skip_test_code": True,
+            "test_dirs": ["tests", "test", "__tests__", "spec"],
+        },
         "spring_missing_transactional": {"enabled": False, "severity": "error"},
         "spring_unvalidated_input": {"enabled": False, "severity": "error"},
         "spring_async_checked_exception": {"enabled": False, "severity": "warning"},

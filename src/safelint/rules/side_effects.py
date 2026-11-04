@@ -14,7 +14,7 @@ from safelint.languages import php as _php
 from safelint.languages import python as _py
 from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
-from safelint.languages._node_utils import CALL_TYPES, call_name, function_name_node, node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import CALL_TYPES, call_name, function_display_name, node_text, resolve_lang_name, walk
 from safelint.rules._test_files import skips_test_code
 from safelint.rules.base import BaseRule
 
@@ -286,33 +286,6 @@ def _rust_macro_name_text(macro_invocation: tree_sitter.Node) -> str | None:
     return None  # pragma: no cover - defensive: macro field is always identifier or scoped_identifier
 
 
-def _func_display_name(func_node: tree_sitter.Node, lang_name: str) -> str:
-    """Return the function's effective name for display / prefix matching.
-
-    Direct ``name`` field wins (Python ``def foo``, JS named function
-    declarations). Anonymous JS forms (``arrow_function``,
-    ``function_expression`` without a name) have no ``name`` field but
-    are usually bound through a surrounding ``const x = () => ...`` /
-    ``let x = function() {}``; in that shape Tree-sitter makes the
-    function expression a child of a ``variable_declarator`` whose
-    ``name`` field carries the binding identifier - surface that
-    identifier as the effective name. Without this fallback,
-    ``const fetchUser = () => ...`` renders as ``<anonymous>`` *and*
-    the SAFE303 ``pure_prefixes`` check (which matches against the
-    name's lowercase prefix) silently drops every named arrow binding
-    that's exactly the case the rule is designed to catch.
-    """
-    name_node = function_name_node(func_node, lang_name)
-    if name_node is not None:
-        return node_text(name_node)
-    parent = func_node.parent
-    if parent is not None and parent.type == _java.VARIABLE_DECLARATOR:
-        binding = parent.child_by_field_name("name")
-        if binding is not None:
-            return node_text(binding)
-    return "<anonymous>"
-
-
 class SideEffectsHiddenRule(BaseRule):
     """Reject functions with pure-sounding names that perform I/O."""
 
@@ -333,7 +306,7 @@ class SideEffectsHiddenRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
-            func_name = _func_display_name(node, lang_name)
+            func_name = function_display_name(node, lang_name)
             name_lower = func_name.lower()
             if not any(name_lower.startswith(p) or name_lower == p.rstrip("_") for p in pure_prefixes):
                 continue
@@ -376,7 +349,7 @@ class SideEffectsRule(BaseRule):
         for node in walk(tree.root_node):
             if node.type not in function_types:
                 continue
-            func_name = _func_display_name(node, lang_name)
+            func_name = function_display_name(node, lang_name)
             name_lower = func_name.lower()
             if any(kw in name_lower for kw in io_keywords):
                 continue

@@ -203,6 +203,56 @@ def function_name_node(func_node: tree_sitter.Node, lang_name: str) -> tree_sitt
     return None
 
 
+ANONYMOUS_FUNCTION_LABEL = "<anonymous>"
+
+# Parent node types that bind an otherwise-nameless function expression to a
+# name, mapped to the field carrying that name. ``variable_declarator`` covers
+# ``const f = () => {}`` / ``let f = function () {}`` in JS and TS and
+# ``Runnable r = () -> {}`` in Java (the node type string is the same in both
+# grammars, which is why one entry serves both). ``pair`` covers an
+# object-literal entry, ``{ f: () => {} }``, whose name is on ``key``.
+_FUNCTION_NAME_BINDERS: dict[str, str] = {
+    _js.VARIABLE_DECLARATOR: "name",
+    _js.PAIR: "key",
+}
+
+
+def function_display_name(func_node: tree_sitter.Node, lang_name: str) -> str:
+    """Return the name to call *func_node* by, or ``<anonymous>``.
+
+    One owner for the question "what is this function called", because the
+    answer is not simply its ``name`` field and six rules had each reimplemented
+    the naive version (#165). Modern JavaScript and TypeScript declare most
+    functions as an expression bound to a name - ``const Footer = () => {}`` -
+    and an ``arrow_function`` / ``function_expression`` has no ``name`` field of
+    its own: the name sits on the enclosing ``variable_declarator`` or ``pair``.
+    Reading only the ``name`` field therefore reported ``Function
+    "<anonymous>"`` for code that names every function, which was 8 of 8
+    findings on a real project and leaves the reader opening each line to learn
+    what is being reported.
+
+    Genuinely nameless functions keep ``<anonymous>``: an IIFE, a callback
+    passed inline, ``export default () => {}``. The label is deliberately not
+    invented for those, because a wrong name is worse than an honest absence.
+
+    Not display-only. ``SAFE303``'s ``pure_prefixes`` check and ``SAFE601``'s
+    ``test_function_prefixes`` check both match against this name, so a named
+    arrow binding that reads ``<anonymous>`` also escapes the matching those
+    rules exist to do.
+    """
+    name_node = function_name_node(func_node, lang_name)
+    if name_node is not None:
+        return node_text(name_node)
+    parent = func_node.parent
+    if parent is None:
+        return ANONYMOUS_FUNCTION_LABEL
+    field = _FUNCTION_NAME_BINDERS.get(parent.type)
+    if field is None:
+        return ANONYMOUS_FUNCTION_LABEL
+    binding = parent.child_by_field_name(field)
+    return node_text(binding) if binding is not None else ANONYMOUS_FUNCTION_LABEL
+
+
 def _last_type_identifier(type_node: tree_sitter.Node) -> tree_sitter.Node | None:
     """Return the last ``type_identifier`` named child of *type_node*, or None."""
     last_id = None

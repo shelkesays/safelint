@@ -13,7 +13,7 @@ from safelint.languages import javascript as _js
 from safelint.languages import php as _php
 from safelint.languages import python as _py
 from safelint.languages import typescript as _ts
-from safelint.languages._node_utils import node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import function_display_name, node_text, resolve_lang_name, walk
 from safelint.rules._test_files import skips_test_code
 from safelint.rules.base import BaseRule
 
@@ -26,10 +26,15 @@ if TYPE_CHECKING:
     from safelint.rules.base import Violation
 
 
-def _func_name(func_node: tree_sitter.Node) -> str:
-    """Return the declared name of *func_node*, or ``"<anonymous>"``."""
-    name_node = func_node.child_by_field_name("name")
-    return node_text(name_node) if name_node else "<anonymous>"
+def _func_name(func_node: tree_sitter.Node, lang_name: str) -> str:
+    """Return the name to call *func_node* by, or ``"<anonymous>"``.
+
+    Delegates to the shared resolver so a JavaScript ``const Foo = () => {}``
+    is reported as ``Foo`` rather than ``<anonymous>`` (#165); the other
+    languages here always carry a ``name`` field, so the answer is unchanged
+    for them.
+    """
+    return function_display_name(func_node, lang_name)
 
 
 def _c_declarator_identifier(node: tree_sitter.Node) -> tree_sitter.Node | None:
@@ -492,7 +497,7 @@ class GlobalStateRule(BaseRule):
 
     def _violations_for_func(self, filepath: str, func: tree_sitter.Node) -> list[Violation]:
         """Return one violation per ``global`` statement inside *func* (Python)."""
-        func_name = _func_name(func)
+        func_name = _func_name(func, _py.EXTRA_NAME)
         return [
             self._make_violation_for_node(
                 filepath,
@@ -504,7 +509,7 @@ class GlobalStateRule(BaseRule):
 
     def _php_violations_for_func(self, filepath: str, func: tree_sitter.Node) -> list[Violation]:
         """Return one violation per ``global`` statement inside *func* (PHP)."""
-        func_name = _func_name(func)
+        func_name = _func_name(func, _php.EXTRA_NAME)
         return [
             self._make_violation_for_node(
                 filepath,
@@ -585,7 +590,7 @@ class GlobalMutationRule(BaseRule):
         global_names = self._python_collect_global_names(func)
         if not global_names:
             return []
-        func_name = _func_name(func)
+        func_name = _func_name(func, _py.EXTRA_NAME)
         if self.config.get("strict", False):
             # strict mode: fire on the ``global`` statement itself,
             # regardless of whether the name is later written to.
@@ -606,7 +611,7 @@ class GlobalMutationRule(BaseRule):
             for assignment, name in self._python_mutating_assignments(func, global_names)
         ]
 
-    def _javascript_violations_for_func(self, filepath: str, func: tree_sitter.Node, namespaces: frozenset[str]) -> list[Violation]:
+    def _javascript_violations_for_func(self, filepath: str, func: tree_sitter.Node, namespaces: frozenset[str], lang_name: str) -> list[Violation]:
         """Return violations for global-namespace writes inside *func* (JavaScript).
 
         Walks the function body for ``assignment_expression``,
@@ -615,7 +620,7 @@ class GlobalMutationRule(BaseRule):
         rooted in one of *namespaces*. Skips nested function bodies
         (assignments there belong to that inner scope).
         """
-        func_name = _func_name(func)
+        func_name = _func_name(func, lang_name)
         violations: list[Violation] = []
         for node in walk(func, skip_types=tuple(_js.FUNCTION_TYPES)):
             if node is func:
@@ -979,7 +984,7 @@ class GlobalMutationRule(BaseRule):
         global_names = self._php_collect_global_names(func)
         if not global_names:
             return []
-        func_name = _func_name(func)
+        func_name = _func_name(func, _php.EXTRA_NAME)
         if self.config.get("strict", False):
             return [
                 self._make_violation_for_node(
@@ -1051,7 +1056,7 @@ class GlobalMutationRule(BaseRule):
         namespaces = frozenset(_validated_string_list(raw, error_key))
         violations: list[Violation] = []
         for func in _iter_javascript_functions(tree):
-            violations.extend(self._javascript_violations_for_func(filepath, func, namespaces))
+            violations.extend(self._javascript_violations_for_func(filepath, func, namespaces, lang_name))
         return violations
 
 
