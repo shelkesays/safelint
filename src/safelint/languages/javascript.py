@@ -123,6 +123,11 @@ DO_STATEMENT = "do_statement"
 SWITCH_STATEMENT = "switch_statement"
 SWITCH_BODY = "switch_body"  # the ``{ ... }`` holding every case; ONE lexical scope
 SWITCH_CASE = "switch_case"
+# ``default:`` is its own node type, a sibling of SWITCH_CASE inside
+# SWITCH_BODY rather than a case with no value. A table that lists only
+# SWITCH_CASE therefore puts ``default:`` somewhere else entirely, which is
+# how the two came to disagree about which scope they lived in before 2.16.0.
+SWITCH_DEFAULT = "switch_default"
 TRY_STATEMENT = "try_statement"
 CATCH_CLAUSE = "catch_clause"
 FINALLY_CLAUSE = "finally_clause"
