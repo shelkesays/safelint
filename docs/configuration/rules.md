@@ -1470,6 +1470,22 @@ These combine AST analysis with intra-procedural taint tracking. They are more e
 
 The rule tracks data flow through assignments: if `x = user_data` then `x` is tainted. If `y = x + "_suffix"` then `y` is tainted too. Calling `eval(y)` then triggers a violation. Passing the value through a configured sanitizer (e.g. `escape(x)`) clears the taint.
 
+**Taint is scoped to the block that declares a binding.** *Changed in 2.17.1.* A nested block that rebinds a name used to overwrite the function-wide entry, so the outer binding came back from the block without its taint ([#250](https://github.com/shelkesays/safelint/issues/250)):
+
+```rust
+let input = std::env::var("CMD").unwrap();   // tainted
+{ let input = "safe"; }                      // used to clear the entry
+cmd.arg(input);                              // tainted - was NOT reported
+```
+
+The same flat map was wrong in the other direction too, reporting a sink that reads a clean outer binding after an inner block tainted the name. Both are fixed in Rust, JavaScript / TypeScript, C, C++ and Go - every language where a nested block may rebind a name already in scope.
+
+Three languages are deliberately unchanged, and the reason matters if you are reading a finding in one of them. Python has no block scope. PHP's locals are function-scoped, so an inner `if (...) { $c = "safe"; }` genuinely overwrites the outer `$c` and the flat model is the correct one. Shadowing a local in a nested block is a compile error in Java. JavaScript `var` is likewise still function-scoped and hoisted: an inner-block `var` really does rebind the function-wide name, which is the hazard [SAFE305](#safe305-wide_scope_declaration) exists to report, so only `let` and `const` are scoped.
+
+A binding declared in a loop or control-statement **header** is scoped to that statement rather than to a block, since the body is its sibling rather than its parent: a `for (let p = 0; ...)` head binding ends with the loop, and Go's `if cmd := get(); c { } else { ... }` binding stays in scope through the `else`.
+
+Only **declaring** forms are scoped. A plain `x = value` inside a block writes through to the binding already in scope, so its taint survives the block, as it must.
+
 **Two wordings, by what the analysis actually traced.** *Changed in 2.16.0.* Taint is seeded from two
 places that are not equally good evidence, so the message now says which one a finding rests on:
 

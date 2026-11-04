@@ -37,11 +37,13 @@ from typing import TYPE_CHECKING
 
 from safelint.analysis._taint_contract import (
     CLEAN_STATE,
+    BlockScopes,
     PropertyContract,
     SinkKinds,
     assignment_sink_name,
     combine_state,
     combine_with_recorded,
+    enclosing_block_end,
     hit_key,
     identifier_tainted,
     record_state,
@@ -98,6 +100,28 @@ def _expression_items(node: tree_sitter.Node) -> list[tree_sitter.Node]:
     return list(node.named_children) if node.type == _go.EXPRESSION_LIST else [node]
 
 
+#: Where a Go block-scoped declaration goes out of scope.
+#:
+#: The control statements are here because Go scopes an initialiser binding to
+#: the WHOLE statement, not to one of its blocks: ``if cmd := get(); c { } else
+#: { ... }`` keeps ``cmd`` in scope through the ``else``, and the three-clause
+#: ``for cmd := 0; ...`` keeps it for the whole loop. The ancestor walk from the
+#: initialiser reaches the statement (via ``for_clause`` in the loop case)
+#: before any block, so listing them is what makes the restore land at the end
+#: of the statement. Without them it landed at the end of the first body block,
+#: which loses an else-branch finding - the dangerous direction - as well as
+#: reporting one that is not there.
+_BLOCK_TYPES = frozenset(
+    {
+        _go.BLOCK,
+        _go.IF_STATEMENT,
+        _go.FOR_STATEMENT,
+        _go.EXPRESSION_SWITCH_STATEMENT,
+        _go.TYPE_SWITCH_STATEMENT,
+    }
+)
+
+
 class GoTaintTracker:
     """Track tainted variable flow through a Go function / method / closure body.
 
@@ -133,6 +157,10 @@ class GoTaintTracker:
         # seed ``tainted`` but deliberately NOT ``source_seeded``.
         self.source_seeded: set[str] = set()
         self.source_traced: set[tuple[int, str, str]] = set()
+        # ``:=`` and ``var`` bind only their enclosing block, so the taint they
+        # record has to be undone when that block closes (#250). A plain ``=``
+        # writes to an existing binding and is deliberately NOT scoped.
+        self._block_scopes = BlockScopes()
 
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
@@ -146,11 +174,15 @@ class GoTaintTracker:
 
     def _visit_node(self, node: tree_sitter.Node) -> None:
         """Dispatch *node* to the right per-shape handler."""
+        self._block_scopes.expire(self.tainted, self.source_seeded, node.start_byte)
         node_type = node.type
         if node_type in (_go.SHORT_VAR_DECLARATION, _go.ASSIGNMENT_STATEMENT):
             self._check_assignment_sink(node)
+            if node_type == _go.SHORT_VAR_DECLARATION:
+                self._scope_declared_names(node, node.child_by_field_name("left"))
             self._visit_assignment(node)
         elif node_type == _go.VAR_SPEC:
+            self._scope_declared_names(node, node)
             self._visit_var_spec(node)
         elif node_type == _go.CALL_EXPRESSION:
             self._visit_call(node)
@@ -180,6 +212,34 @@ class GoTaintTracker:
         rhs_list = next((c for c in node.named_children if c.type == _go.EXPRESSION_LIST), None)
         rhs = list(rhs_list.named_children) if rhs_list is not None else []
         self._propagate(name_nodes, rhs)
+
+    def _scope_declared_names(self, decl: tree_sitter.Node, names_root: tree_sitter.Node | None) -> None:
+        """Scope every name *decl* binds to its enclosing block (#250).
+
+        Only the DECLARING forms, ``x := v`` and ``var x = v``. A plain ``x = v``
+        writes through to the binding already in scope, so scoping it would
+        discard a genuine assignment at the end of the block.
+
+        Go's shadowing is the same hazard ``go vet``'s own ``shadow`` check
+        exists for, and the direction that matters here is the false negative:
+        an inner ``cmd := "safe"`` left the outer, tainted ``cmd`` reading clean
+        at every later sink.
+
+        An ``if v := f(); cond`` binding scopes to the whole ``if`` statement
+        including its ``else``, which is why :data:`_BLOCK_TYPES` lists the
+        control statements and not only ``block``. Restoring at the end of the
+        then-block instead was wrong in both directions, and calling it merely
+        "conservative" was wrong too: with a TAINTED initialiser and a clean
+        outer binding, an else-branch sink read the clean one and the finding
+        was lost.
+        """
+        if names_root is None:  # pragma: no cover - defensive: both forms carry their names
+            return
+        block_end = enclosing_block_end(decl, _BLOCK_TYPES)
+        if block_end is None:  # pragma: no cover - defensive: a declaration inside a function has a block
+            return
+        for name_node in (c for c in names_root.named_children if c.type == _go.IDENTIFIER):
+            self._block_scopes.rebind(self.tainted, self.source_seeded, node_text(name_node), block_end)
 
     def _propagate(self, name_nodes: list[tree_sitter.Node], rhs_exprs: list[tree_sitter.Node], *, keep_existing: bool = False) -> None:
         """Set taint on each bound name from the right-hand expressions.

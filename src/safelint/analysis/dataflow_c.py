@@ -29,10 +29,13 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 from safelint.analysis._taint_contract import (
+    CLEAN_STATE,
     AssignmentShapes,
+    BlockScopes,
     PropertyContract,
     SinkKinds,
     combine_with_recorded,
+    enclosing_block_end,
     hit_key,
     identifier_tainted,
     iter_assignment_writes,
@@ -97,6 +100,18 @@ _DESCENDABLE_DECLARATORS = frozenset(
         _cpp.REFERENCE_DECLARATOR,
     }
 )
+
+
+#: Where a C / C++ block-scoped declaration goes out of scope. The same node
+#: types in both grammars, which is why the C++ subclass needs no override.
+#:
+#: ``for_statement`` is here because a loop-head declaration is NOT inside the
+#: loop body: ``for (char *p = "safe"; ...) { ... }`` puts the ``declaration``
+#: under ``for_statement``, with the body as its sibling, so the ancestor walk
+#: would otherwise reach the enclosing block and keep the head binding alive
+#: past the loop. A declaration in the body still finds its own
+#: ``compound_statement`` first, so body scoping is unchanged.
+_BLOCK_TYPES = frozenset({_c.COMPOUND_STATEMENT, _c.FOR_STATEMENT})
 
 
 def _declarator_identifier(node: tree_sitter.Node | None) -> tree_sitter.Node | None:
@@ -178,6 +193,9 @@ class CTaintTracker:
         # seed ``tainted`` but deliberately NOT ``source_seeded``.
         self.source_seeded: set[str] = set()
         self.source_traced: set[tuple[int, str, str]] = set()
+        # A C / C++ declaration binds only its enclosing block, so the taint
+        # it records has to be undone when that block closes (#250).
+        self._block_scopes = BlockScopes()
 
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation (nested functions skipped)."""
@@ -186,8 +204,11 @@ class CTaintTracker:
 
     def _visit_node(self, node: tree_sitter.Node) -> None:
         """Dispatch *node* to the right per-shape handler."""
+        self._block_scopes.expire(self.tainted, self.source_seeded, node.start_byte)
         node_type = node.type
-        if node_type == _c.INIT_DECLARATOR:
+        if node_type == _c.DECLARATION:
+            self._visit_declaration(node)
+        elif node_type == _c.INIT_DECLARATOR:
             self._visit_init_declarator(node)
         elif node_type == _c.ASSIGNMENT_EXPRESSION:
             self._check_assignment_sink(node)
@@ -195,14 +216,65 @@ class CTaintTracker:
         elif node_type == _c.CALL_EXPRESSION:
             self._visit_call(node)
 
+    def _visit_declaration(self, node: tree_sitter.Node) -> None:
+        """Scope each UNINITIALISED name *node* declares to its block, and clear it (#250).
+
+        ``char *p;`` with no initialiser must shadow a tainted outer ``p`` for
+        the length of the block: it is a distinct, uninitialised variable, so
+        reading it as tainted is a finding about the wrong binding. There is no
+        ``init_declarator`` for it, so the clearing has to happen here.
+
+        An INITIALISED declarator is deliberately left to
+        :meth:`_visit_init_declarator`, which the pre-order walk reaches after
+        this node. Clearing those here as well looked tidier and was wrong: in
+
+        .. code-block:: c
+
+            char *b = getenv("CMD");
+            { char *a = b, *b = "safe"; system(a); }
+
+        C scopes each declarator from the end of its own declarator, so the
+        ``b`` in ``a``'s initialiser is the OUTER, tainted one. Clearing every
+        name in the declaration up front cleared that ``b`` before ``a``'s
+        initialiser was read, and the finding on ``system(a)`` was lost. Doing
+        the work per declarator, as the walk reaches it, matches C's rule.
+
+        A declaration at file scope has no enclosing block and needs neither.
+        """
+        block_end = enclosing_block_end(node, _BLOCK_TYPES)
+        if block_end is None:  # pragma: no cover - defensive: the tracker only walks inside a function body
+            return
+        for declarator in node.named_children:
+            if declarator.type == _c.INIT_DECLARATOR:
+                continue
+            name_node = _declarator_identifier(declarator)
+            if name_node is None:
+                continue
+            name = node_text(name_node)
+            self._block_scopes.rebind(self.tainted, self.source_seeded, name, block_end)
+            record_state(self.tainted, self.source_seeded, name, CLEAN_STATE)
+
     def _visit_init_declarator(self, node: tree_sitter.Node) -> None:
-        """Propagate taint through ``T x = value;`` (declarator name <- value taint)."""
+        """Propagate taint through ``T x = value;`` (declarator name <- value taint).
+
+        Also scopes the name to its block (#250), here rather than on the
+        enclosing declaration, so the initialiser is read against the state that
+        was in force when the walk reached it - see
+        :meth:`_visit_declaration` for the multi-declarator case that forces it.
+        """
         value = node.child_by_field_name("value")
         if value is None:  # pragma: no cover - defensive: an init_declarator always has a value field
             return
         name_node = _declarator_identifier(node.child_by_field_name("declarator"))
-        if name_node is not None:
-            self._update_name(name_node, self._state_of(value))
+        if name_node is None:  # pragma: no cover - defensive: declarator chains bottom out in an identifier
+            return
+        state = self._state_of(value)
+        # Always a block here, for the same reason as in ``_visit_declaration``;
+        # the guard keeps the call honest rather than asserting it.
+        block_end = enclosing_block_end(node, _BLOCK_TYPES)
+        if block_end is not None:  # pragma: no branch - see above
+            self._block_scopes.rebind(self.tainted, self.source_seeded, node_text(name_node), block_end)
+        self._update_name(name_node, state)
 
     def _visit_assignment(self, node: tree_sitter.Node) -> None:
         """Propagate taint through ``x = value`` / ``x += value`` (compound keeps prior taint)."""

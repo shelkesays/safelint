@@ -29,9 +29,11 @@ from typing import TYPE_CHECKING
 
 from safelint.analysis._taint_contract import (
     AssignmentShapes,
+    BlockScopes,
     PropertyContract,
     SinkKinds,
     combine_with_recorded,
+    enclosing_block_end,
     hit_key,
     identifier_tainted,
     iter_assignment_writes,
@@ -106,6 +108,30 @@ _PATTERN_BINDING_FIELD = {_js.PAIR_PATTERN: "value", _js.ASSIGNMENT_PATTERN: "le
 _PATTERN_CONTAINER_TYPES = frozenset({_js.ARRAY_PATTERN, _js.OBJECT_PATTERN, _js.REST_PATTERN})
 
 
+#: Where a ``let`` / ``const`` goes out of scope. A ``switch_body`` is one
+#: scope shared by every clause (the same reading SAFE305 uses), and a
+#: ``class_static_block`` is its own scope.
+#:
+#: The two loop statements are here because a head declaration is NOT inside the
+#: loop body: ``for (let p = 0; ...) { ... }`` puts the ``lexical_declaration``
+#: under ``for_statement``, with the body as its SIBLING. Without the loop in
+#: this set the ancestor walk goes straight past it to the enclosing block, so a
+#: head binding kept its state until that block closed - which is both a false
+#: negative (a clean head binding masking a tainted outer one) and a false
+#: positive (a tainted head binding reported at a later sink reading the outer).
+#: Found by CodeRabbit and CodeAnt independently; the comment here previously
+#: asserted the opposite.
+_LEXICAL_BLOCK_TYPES = frozenset(
+    {
+        _js.STATEMENT_BLOCK,
+        _js.SWITCH_BODY,
+        _js.CLASS_STATIC_BLOCK,
+        _js.FOR_STATEMENT,
+        _js.FOR_IN_STATEMENT,
+    }
+)
+
+
 def _destructure_children(node: tree_sitter.Node) -> list[tree_sitter.Node]:
     """Return the binding sub-nodes of a destructuring pattern *node*.
 
@@ -168,6 +194,10 @@ class JsTaintTracker:
         # seed ``tainted`` but deliberately NOT ``source_seeded``.
         self.source_seeded: set[str] = set()
         self.source_traced: set[tuple[int, str, str]] = set()
+        # ``let`` / ``const`` bind only their enclosing block, so the taint they
+        # record has to be undone when that block closes (#250). ``var`` is
+        # function-scoped and deliberately NOT scoped here.
+        self._block_scopes = BlockScopes()
 
     def visit(self, root: tree_sitter.Node) -> None:
         """Process every node under *root* for taint propagation.
@@ -181,6 +211,7 @@ class JsTaintTracker:
 
     def _visit_node(self, node: tree_sitter.Node) -> None:
         """Dispatch *node* to the right per-shape handler."""
+        self._block_scopes.expire(self.tainted, self.source_seeded, node.start_byte)
         if node.type == _js.ASSIGNMENT_EXPRESSION:
             self._visit_assignment(node)
         elif node.type == _js.AUGMENTED_ASSIGNMENT_EXPRESSION:
@@ -274,8 +305,27 @@ class JsTaintTracker:
         if name is None or value is None:
             return
         status = self._state_of(value)
+        block_end = self._lexical_block_end(node)
         for ident in self._iter_target_identifiers(name):
+            if block_end is not None:
+                self._block_scopes.rebind(self.tainted, self.source_seeded, node_text(ident), block_end)
             self._update_name(ident, status)
+
+    @staticmethod
+    def _lexical_block_end(declarator: tree_sitter.Node) -> int | None:
+        """Return where *declarator*'s binding goes out of scope, or None if it does not.
+
+        Only ``let`` / ``const``. ``var`` is function-scoped and hoisted, so an
+        inner-block ``var`` really does rebind the function-wide name and the
+        flat map is already right for it - scoping it would turn a true positive
+        into a false negative, which SAFE305 exists to explain. The two forms
+        are distinguished by the parent declaration's node type, since
+        ``variable_declarator`` itself is shared between them.
+        """
+        parent = declarator.parent
+        if parent is None or parent.type != _js.LEXICAL_DECLARATION:
+            return None
+        return enclosing_block_end(declarator, _LEXICAL_BLOCK_TYPES)
 
     def _visit_call(self, node: tree_sitter.Node) -> None:
         """Check whether this call reaches a sink via a tainted argument or method receiver."""
