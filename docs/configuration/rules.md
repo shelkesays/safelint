@@ -816,7 +816,17 @@ As `var` that reads `undefined`; as `let` it throws. `default:` counts in both d
 
 If a `var` both crosses clauses and leaves the switch entirely, the escape message is shown, because it describes the more pressing half.
 
-The fix is mechanical in the first three cases: replace `var` with `let` (when the binding is reassigned later) or `const` (when it isn't). The cross-clause shape needs the declaration moved above the `switch`, and the redeclaration needs a rename. The rule fires once per `variable_declaration` node, so a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
+**The fix is a keyword swap for one shape only.** Swapping `var` for `let` in place changes behaviour in three of the five, which is the point of reporting them but is not a drop-in replacement. Each line below was run against `node`:
+
+| Shape | What the fix is |
+|---|---|
+| Used outside the block | **move the declaration above the block**, then `let` / `const`. Swapping the keyword where it stands gives `ReferenceError: w is not defined`, because the binding no longer exists at the use |
+| Read before its declaration | **the read is the bug**: move it after the declaration. Swapping the keyword turns a silent `undefined` into `ReferenceError: Cannot access 'w' before initialization`, which makes the hazard visible rather than fixing it |
+| Captured by a closure in a loop | a genuine one-token swap. `let` gives each iteration its own binding, so the closures print `0,1,2` instead of `3,3,3` - the behaviour changes, and that change *is* the fix |
+| Re-declares a name in an overlapping scope | rename one of them |
+| Declared in one `switch` clause, read from a later one | declare it above the `switch` |
+
+Use `let` where the binding is reassigned later and `const` where it is not. The rule fires once per `variable_declaration` node, so a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
 
 If you want the old behaviour - every `var` reported, as a codemod trigger for a "modernise this codebase" pass - the rule does not provide it; use a linter rule built for that (`eslint no-var`), which is what it was competing with.
 

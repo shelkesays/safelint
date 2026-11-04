@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SAFE305: the documented fix was a keyword swap for only one of the five shapes.** The rule's docs, the JavaScript and TypeScript pages, the JavaScript addendum and all 14 client files said the first three shapes were "a mechanical fix: replace `var` with `let`". Run against `node`, two of those three throw when the keyword is swapped where it stands: a block escape becomes `ReferenceError: w is not defined`, because the binding no longer exists at the use, and a read before the declaration becomes `ReferenceError: Cannot access 'w' before initialization`, which makes the hazard visible rather than fixing it. Only the loop-capture shape is a true one-token swap (`3,3,3` becomes `0,1,2`, and that change is the fix). Each shape now states its own fix: move the declaration above the block, move the read, swap the keyword, rename, or declare above the `switch`. Found by CodeAnt as three Major findings; the wrong advice mattered most in the bundled skill files, which agents act on directly.
+
 - **SAFE305 `wide_scope_declaration`: a `var` read from a later `switch` clause is now reported (#255).** The fifth shape, and the one each of the other four misses for a different reason. It is not an escape, because a case clause is not a lexical scope and both sites share the one the switch's braces open; and it is not a read before the declaration, because that compares *source* order and the declaration comes first. What makes it a hazard is *execution* order, since a switch may be entered at any of its clauses:
 
   ```javascript
