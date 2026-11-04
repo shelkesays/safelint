@@ -1482,6 +1482,8 @@ The same flat map was wrong in the other direction too, reporting a sink that re
 
 Three languages are deliberately unchanged, and the reason matters if you are reading a finding in one of them. Python has no block scope. PHP's locals are function-scoped, so an inner `if (...) { $c = "safe"; }` genuinely overwrites the outer `$c` and the flat model is the correct one. Shadowing a local in a nested block is a compile error in Java. JavaScript `var` is likewise still function-scoped and hoisted: an inner-block `var` really does rebind the function-wide name, which is the hazard [SAFE305](#safe305-wide_scope_declaration) exists to report, so only `let` and `const` are scoped.
 
+A binding declared in a loop or control-statement **header** is scoped to that statement rather than to a block, since the body is its sibling rather than its parent: a `for (let p = 0; ...)` head binding ends with the loop, and Go's `if cmd := get(); c { } else { ... }` binding stays in scope through the `else`.
+
 Only **declaring** forms are scoped. A plain `x = value` inside a block writes through to the binding already in scope, so its taint survives the block, as it must.
 
 **Two wordings, by what the analysis actually traced.** *Changed in 2.16.0.* Taint is seeded from two
