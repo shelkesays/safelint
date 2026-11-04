@@ -13,7 +13,7 @@ from safelint.languages import php as _php
 from safelint.languages import python as _py
 from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
-from safelint.languages._node_utils import function_name_node, node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import function_display_name, node_text, resolve_lang_name, walk
 from safelint.rules.base import BaseRule
 
 
@@ -324,8 +324,7 @@ class MaxArgumentsRule(BaseRule):
             if first_name in ("self", "cls"):
                 count -= 1
             if count > max_args:
-                name_node = function_name_node(node, lang_name)
-                func_name = node_text(name_node) if name_node else "<anonymous>"
+                func_name = function_display_name(node, lang_name)
                 violations.append(
                     self._make_violation_for_node(
                         filepath,

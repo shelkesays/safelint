@@ -14,7 +14,7 @@ from safelint.languages import php as _php
 from safelint.languages import python as _py
 from safelint.languages import rust as _rust
 from safelint.languages import typescript as _ts
-from safelint.languages._node_utils import end_lineno, function_name_node, lineno, node_text, resolve_lang_name, walk
+from safelint.languages._node_utils import end_lineno, function_display_name, lineno, node_text, resolve_lang_name, walk
 from safelint.rules._test_files import skips_test_code
 from safelint.rules.base import BaseRule
 
@@ -177,8 +177,7 @@ class FunctionLengthRule(BaseRule):
                 continue
             length = self._function_size(node, count_mode, lang_name, function_types, comment_prefix)
             if length > max_lines:
-                name_node = function_name_node(node, lang_name)
-                func_name = node_text(name_node) if name_node else "<anonymous>"
+                func_name = function_display_name(node, lang_name)
                 unit = _UNIT_BY_MODE.get(count_mode, "lines")
                 violations.append(
                     self._make_violation_for_node(

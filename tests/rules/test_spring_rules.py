@@ -16,6 +16,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from safelint.core.config import DEFAULTS
 from safelint.languages.java import JAVA
 from safelint.rules.spring import (
     SpringAsyncCheckedExceptionRule,
@@ -77,6 +78,83 @@ def test_safe901_skips_non_java_files() -> None:
     tree = _parse("class Foo { @Autowired private Bar b; }")
     rule = SpringFieldInjectionRule({"enabled": True, "severity": "warning"})
     assert rule.check_file("Foo.py", tree) == []
+
+
+_TEST_CLASS_FILENAMES: list[str] = [
+    "ClinicServiceTests.java",
+    "OwnerControllerTests.java",
+    "MySqlIntegrationTests.java",
+    "VetControllerTest.java",
+    "PetClinicIT.java",
+    "src/test/java/org/example/ThingTests.java",
+    "test/OwnerRepositoryTests.java",
+]
+
+
+@pytest.mark.parametrize("filename", _TEST_CLASS_FILENAMES)
+def test_safe901_skips_test_classes(filename: str) -> None:
+    """Field injection in a test is Spring's own documented pattern (#208).
+
+    Measured on Spring PetClinic, written by the Spring team as the reference
+    example: 17 findings, all 17 in test classes, 51% of the project's default
+    output, none in production code. The framework instantiates a
+    ``@SpringBootTest`` class itself, so there is no constructor the user
+    controls in the ordinary way, and the usual case for constructor injection
+    is largely about making a class easy to unit-test, which inverts when
+    applied to the test. These are the real PetClinic filenames plus the
+    Maven/Gradle directory convention.
+    """
+    tree = _parse(
+        """
+        class ThingTests {
+            @Autowired
+            private VetRepository vets;
+        }
+        """
+    )
+    rule = SpringFieldInjectionRule({"enabled": True, "severity": "warning"})
+    assert rule.check_file(filename, tree) == []
+
+
+def test_safe901_still_fires_in_production_code() -> None:
+    """The control: the exemption is by test-file identity, not by annotation.
+
+    A production class is exactly as answerable as before, which is the
+    coverage the exemption must not cost.
+    """
+    tree = _parse(
+        """
+        class VetService {
+            @Autowired
+            private VetRepository vets;
+        }
+        """
+    )
+    rule = SpringFieldInjectionRule({"enabled": True, "severity": "warning"})
+    violations = rule.check_file("src/main/java/org/example/VetService.java", tree)
+    assert len(violations) == 1
+    assert "vets" in violations[0].message
+
+
+def test_safe901_test_scoping_is_configurable() -> None:
+    """``skip_test_code = false`` restores the strict reading, as on the five #198 rules."""
+    tree = _parse(
+        """
+        class ThingTests {
+            @Autowired
+            private VetRepository vets;
+        }
+        """
+    )
+    strict = SpringFieldInjectionRule({"enabled": True, "severity": "warning", "skip_test_code": False})
+    assert len(strict.check_file("ThingTests.java", tree)) == 1
+
+
+def test_safe901_defaults_carry_the_test_scoping_keys() -> None:
+    """Pinned against DEFAULTS, because the behaviour above rides on them."""
+    defaults = DEFAULTS["rules"]["spring_field_injection"]
+    assert defaults["skip_test_code"] is True
+    assert defaults["test_dirs"] == ["tests", "test", "__tests__", "spec"]
 
 
 # ---------------------------------------------------------------------------
