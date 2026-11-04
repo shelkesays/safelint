@@ -142,16 +142,26 @@ def test_assertion_calls_still_replaces(tmp_path: Path) -> None:
     Narrowing the list is a supported thing to want, so the two keys must stay
     distinguishable: this sample asserts only via a default name, and setting
     ``assertion_calls`` to something else must make it report.
+
+    The sample asserts through ``pytest.raises`` rather than a ``TestCase``
+    method on purpose. Every unittest and Django name is ``assert``-prefixed, so
+    since #251 one of those would be matched by ``assertion_call_prefixes``
+    whatever ``assertion_calls`` is narrowed to, and the test would pass or fail
+    on the prefix route instead of the thing it is checking.
     """
     sample = _write(
         tmp_path,
         "test_t.py",
         """\
-        def test_django_only(self, response):
-            self.assertContains(response, "ok")
+        def test_pytest_only():
+            with pytest.raises(ValueError):
+                thing()
         """,
     )
-    assert _safe601(sample, {"assertion_calls": ["verify_invariant"]}) == ["test_django_only"]
+    assert _safe601(sample, {"assertion_calls": ["verify_invariant"]}) == ["test_pytest_only"]
+    # Sanity: the sample does assert under the shipped defaults, so the
+    # expectation above is about the narrowing and not a broken sample.
+    assert _safe601(sample) == []
 
 
 def test_extend_assertion_calls_is_per_language_and_typescript_inherits(tmp_path: Path) -> None:
