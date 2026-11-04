@@ -758,7 +758,7 @@ function logOrder(order) {              // name contains ``log``, exempt
 
 *Changed in 2.16.0.* The rule used to report **every** `var`. That inverted its own value: on Express 1748 of 1960 default findings (89%, across 136 of 141 files) were SAFE305, so the handful of `var`s whose hoisting actually bites were indistinguishable from the rest, and the other ten rules were drowned out ([#201](https://github.com/shelkesays/safelint/issues/201)). A module-scope `var path = require("node:path")` has no observable difference from `const`; there is nothing to fix, so there is nothing to report.
 
-Four shapes are reported, each with its own message naming the hazard:
+Five shapes are reported, each with its own message naming the hazard:
 
 | Shape | Why `let` differs |
 |---|---|
@@ -766,6 +766,7 @@ Four shapes are reported, each with its own message naming the hazard:
 | Read **before its declaration** in the same execution scope | `var` yields `undefined`; `let` rejects it (TDZ) |
 | Declared in a loop and **captured by a closure** inside it | every `var` closure shares one binding and sees the final value; `let` gives each iteration its own |
 | **Re-declares** a name already bound in an overlapping scope (an earlier `var`, or a parameter) | at the same scope `let` / `const` reject the duplicate outright; from a nested block they bind a *separate* shadowing variable instead of the one already there, so assignments stop being visible outside the block. Either way the fix is a rename, not a keyword swap |
+| Declared in one **`switch` clause** and read from a later one *(2.17.1)* | entering the switch at the reading clause skips the declaration, so `var` reads `undefined` while `let` / `const` throw `Cannot access 'w' before initialization`. The fix is to declare it above the `switch` |
 
 Deliberately silent on everything else, including a `var` at function top level used only within that function, a loop counter used only inside its loop, and a `var` declared and used in the same block. A read from inside a nested function does not count as a read-before-declaration, because the closure runs after the declaration has executed. A reference inside a nested function that binds the same name is that function's own binding and is ignored.
 
@@ -800,9 +801,32 @@ function g(c) {
 }
 ```
 
-**Known limit.** A `var` declared in one `case` and read from a **later** `case` is not reported. It works as `var` and throws `Cannot access 'w' before initialization` as `let`, so it does block the conversion, but it is none of the four shapes: the declaration comes first in source order, and both sites are in the one switch scope.
+*New in 2.17.1.* Because the switch is one scope, a `var` declared in one clause and read from a later one is its own shape ([#255](https://github.com/shelkesays/safelint/issues/255)). The other four each miss it for a different reason: the declaration comes first in **source** order, so it is not a read-before-declaration, and both sites share the one switch scope, so it is not an escape. What makes it a hazard is **execution** order:
 
-The fix is mechanical in the first three cases: replace `var` with `let` (when the binding is reassigned later) or `const` (when it isn't). The rule fires once per `variable_declaration` node, so a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
+```javascript
+function f(k) {
+  switch (k) {
+    case 1: var w = 1; break;
+    case 2: use(w); break;   // k === 2 never ran case 1
+  }
+}
+```
+
+As `var` that reads `undefined`; as `let` it throws. `default:` counts in both directions, since it is a clause like any other. No fall-through analysis is involved and none would help: a clause carrying a label is directly reachable whenever the discriminant matches it, so the hazard holds whether or not the declaring clause ends in `break`, and the discriminant's value is exactly what cannot be known here. A read in the *same* clause is fine, and a read in an *earlier* one is already reported as a read before the declaration.
+
+If a `var` both crosses clauses and leaves the switch entirely, the escape message is shown, because it describes the more pressing half.
+
+**The fix is a keyword swap for one shape only.** Swapping `var` for `let` in place changes behaviour in three of the five, which is the point of reporting them but is not a drop-in replacement. Each line below was run against `node`:
+
+| Shape | What the fix is |
+|---|---|
+| Used outside the block | **move the declaration above the block**, then `let` / `const`. Swapping the keyword where it stands gives `ReferenceError: w is not defined`, because the binding no longer exists at the use |
+| Read before its declaration | **the read is the bug**: move it after the declaration. Swapping the keyword turns a silent `undefined` into `ReferenceError: Cannot access 'w' before initialization`, which makes the hazard visible rather than fixing it |
+| Captured by a closure in a loop | a genuine one-token swap. `let` gives each iteration its own binding, so the closures print `0,1,2` instead of `3,3,3` - the behaviour changes, and that change *is* the fix |
+| Re-declares a name in an overlapping scope | rename one of them |
+| Declared in one `switch` clause, read from a later one | declare it above the `switch` |
+
+Use `let` where the binding is reassigned later and `const` where it is not. The rule fires once per `variable_declaration` node, so a multi-binding form like `var x = 1, y = 2;` produces a single violation (the line is the unit of fix, not each bound name).
 
 If you want the old behaviour - every `var` reported, as a codemod trigger for a "modernise this codebase" pass - the rule does not provide it; use a linter rule built for that (`eslint no-var`), which is what it was competing with.
 

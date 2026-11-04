@@ -9,6 +9,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SAFE305: the documented fix was a keyword swap for only one of the five shapes.** The rule's docs, the JavaScript and TypeScript pages, the JavaScript addendum and all 14 client files said the first three shapes were "a mechanical fix: replace `var` with `let`". Run against `node`, two of those three throw when the keyword is swapped where it stands: a block escape becomes `ReferenceError: w is not defined`, because the binding no longer exists at the use, and a read before the declaration becomes `ReferenceError: Cannot access 'w' before initialization`, which makes the hazard visible rather than fixing it. Only the loop-capture shape is a true one-token swap (`3,3,3` becomes `0,1,2`, and that change is the fix). Each shape now states its own fix: move the declaration above the block, move the read, swap the keyword, rename, or declare above the `switch`. Found by CodeAnt as three Major findings; the wrong advice mattered most in the bundled skill files, which agents act on directly.
+
+- **SAFE305 `wide_scope_declaration`: a `var` read from a later `switch` clause is now reported (#255).** The fifth shape, and the one each of the other four misses for a different reason. It is not an escape, because a case clause is not a lexical scope and both sites share the one the switch's braces open; and it is not a read before the declaration, because that compares *source* order and the declaration comes first. What makes it a hazard is *execution* order, since a switch may be entered at any of its clauses:
+
+  ```javascript
+  switch (k) {
+    case 1: var w = 1; break;
+    case 2: use(w); break;   // k === 2 never ran case 1
+  }
+  ```
+
+  Verified against `node`: as `var` the read is `undefined`, and as `let` it throws `Cannot access 'w' before initialization`. So the declaration genuinely blocks the `let` conversion the rule exists to recommend, which is why leaving it out was an inconsistency in the rule's own contract (since #201 it reports exactly where the hoisting is observable, and this is observable). The fix is to declare the variable above the `switch`, which the message says.
+
+  **Measured: zero occurrences across the JavaScript and TypeScript corpora**, so this adds no findings to any project measured and buys no noise either. It is shipped for the correctness of the contract rather than for a count, and the shape it closes was recorded as a known limit in 2.16.0 rather than discovered since. `default:` counts in both directions, being a clause like any other and a distinct node type that has disagreed with `switch_case` about scope before.
+
+  No fall-through analysis is involved and none would help: a clause carrying a label is directly reachable whenever the discriminant matches, so the hazard holds whether or not the declaring clause ends in `break`, and the discriminant's value is exactly what cannot be known. A read in the same clause is clean, a read in an earlier clause keeps the read-before-declaration wording, and a `var` that also leaves the switch keeps the escape wording, which describes the more pressing half.
+
 - **A TypeScript non-null assertion no longer hides a function's name.** `const handler = (() => {})!` parses as `non_null_expression > parenthesized_expression > arrow_function`, and that wrapper was missing from the pass-through list added in 2.17.0, so every per-function rule reported `Function "<anonymous>"` for a function the source names. A non-null assertion is a type-level claim about the value and says nothing about the function, exactly like the `as` / `satisfies` / angle-assertion forms beside it. The wrappers compose, so `(((...) as Fn)!)` needs all of them peeled; both orders are pinned. Found by CodeAnt on the SAFE105 change below, where the same gap cost the new route a genuine recursion finding.
 
 - **SAFE105 `no_recursion`: recursion through a `const` / `let` / `var`-bound function is now detected (#259).** An `arrow_function` has no name of its own; the name sits on the binding holding it. The rule matched only the function's own name, so it was silent on the declaration form most of the JavaScript and TypeScript ecosystem uses, while firing correctly on `function fact() {}` beside it:

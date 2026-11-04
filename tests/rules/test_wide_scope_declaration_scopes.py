@@ -113,24 +113,151 @@ def test_switch_cases_share_one_scope(tmp_path: Path, label: str, source: str, e
     assert len(_safe305(_write(tmp_path, source))) == expected, label
 
 
-def test_cross_case_read_is_a_known_limit(tmp_path: Path) -> None:
-    """A read in a LATER case than the declaration is not reported, and that is a gap.
+_CROSS_CASE = (
+    "`var` declared in one `switch` clause is read from a later one - entering the switch "
+    "there skips the declaration, so `var` reads `undefined` while `let` / `const` throw; "
+    "declare it above the `switch`"
+)
 
-    `var w` in `case 1` read from `case 2` runs today, and as `let` it throws
-    "Cannot access 'w' before initialization" whenever case 2 is entered without
-    case 1 - a real blocker for the conversion. It is not any of the rule's four
-    shapes though: source order has the declaration first, so it is not a
-    read-before-declaration, and both sites are in the one switch scope, so it
-    is not an escape.
 
-    Scoping per case used to report it as an escape, which was the right answer
-    for the wrong reason and cost the redeclaration shape above. Pinned here so
-    the gap is recorded rather than rediscovered; filed as #255.
+_CROSS_CLAUSE_SHAPES: list[tuple[str, str]] = [
+    (
+        "case declares, later case reads",
+        """\
+        function f(k) {
+          switch (k) {
+            case 1: var w = 1; break;
+            case 2: use(w); break;
+          }
+        }
+        """,
+    ),
+    (
+        "default declares, later case reads",
+        """\
+        function f(k) {
+          switch (k) {
+            default: var d = 0; break;
+            case 2: use(d); break;
+          }
+        }
+        """,
+    ),
+    (
+        "case declares, default reads",
+        """\
+        function f(k) {
+          switch (k) {
+            case 1: var w = 1; break;
+            default: use(w); break;
+          }
+        }
+        """,
+    ),
+    (
+        "no break between them",
+        """\
+        function f(k) {
+          switch (k) {
+            case 1: var w = 1;
+            case 2: use(w); break;
+          }
+        }
+        """,
+    ),
+    (
+        "nested switch, both sites in the inner one",
+        """\
+        function f(k, j) {
+          switch (k) {
+            case 1:
+              switch (j) {
+                case 3: var w = 1; break;
+                case 4: use(w); break;
+              }
+              break;
+          }
+        }
+        """,
+    ),
+]
+
+
+@pytest.mark.parametrize(["label", "source"], _CROSS_CLAUSE_SHAPES, ids=[case[0] for case in _CROSS_CLAUSE_SHAPES])
+def test_a_var_read_from_a_later_switch_clause_is_reported(tmp_path: Path, label: str, source: str) -> None:
+    """The fifth shape (#255). This test asserted the opposite until 2.17.1.
+
+    Each of these runs as `var` and throws ``Cannot access 'w' before
+    initialization`` as `let`, verified against ``node``: entering the switch at
+    the reading clause skips the declaration entirely. So the `var` genuinely
+    blocks the conversion, and the four earlier shapes each miss it for a
+    different reason - source order puts the declaration first, and a case
+    clause is not a lexical scope, so both sites share the one the braces open.
+
+    ``default:`` is covered in both directions because it is a distinct node
+    type, not a case with no value, and the two have disagreed about which
+    scope they live in before.
+
+    The no-break row matters: fall-through would initialise `w` when entering at
+    `case 1`, but `case 2` carries a label and so is directly reachable whenever
+    the discriminant matches it. The hazard does not depend on the `break`, and
+    the discriminant's value is exactly what cannot be known here.
+    """
+    assert _safe305(_write(tmp_path, source)) == [_CROSS_CASE], label
+
+
+def test_a_read_inside_the_declaring_clause_is_still_clean(tmp_path: Path) -> None:
+    """The boundary. Within one clause the declaration always runs before the read."""
+    source = """\
+    function f(k) {
+      switch (k) {
+        case 1: var w = 1; use(w); break;
+      }
+    }
+    """
+    assert _safe305(_write(tmp_path, source)) == []
+
+
+def test_an_earlier_clause_reading_it_keeps_the_read_before_wording(tmp_path: Path) -> None:
+    """A read in an EARLIER clause is before the declaration in source order too.
+
+    That shape was already reported, and its own message describes it better, so
+    the new check must not take it over.
+    """
+    source = """\
+    function f(k) {
+      switch (k) {
+        case 1: use(w); break;
+        case 2: var w = 1; break;
+      }
+    }
+    """
+    assert _safe305(_write(tmp_path, source)) == ["`var` is read before its declaration - hoisting makes that `undefined` instead of an error; `let` / `const` would reject it"]
+
+
+def test_a_read_outside_the_switch_keeps_the_escape_wording(tmp_path: Path) -> None:
+    """Both hazards hold here; the escape message is the more useful one, so it wins.
+
+    This is why the new check is last in the hazard table rather than first.
     """
     source = """\
     function f(k) {
       switch (k) {
         case 1: var w = 1; break;
+      }
+      return w;
+    }
+    """
+    assert _safe305(_write(tmp_path, source)) == ["`var` is used outside the block it is declared in - function-scope hoisting is what makes that work; `let` / `const` would be a ReferenceError"]
+
+
+def test_declaring_above_the_switch_is_the_fix_the_message_suggests(tmp_path: Path) -> None:
+    """The advice has to leave the code clean, or the message sends the reader in circles."""
+    source = """\
+    function f(k) {
+      var w;
+      switch (k) {
+        case 1: w = 1; break;
         case 2: use(w); break;
       }
     }
