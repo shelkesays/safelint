@@ -11,6 +11,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **SAFE000 on C and C++ no longer blames the user for valid code (#206).** `Parse error (syntax error) at line 135, column 4 - check syntax near this location` was wrong on both counts: the syntax is fine and there is nothing at that location to check. safelint parses the source as written and never runs the preprocessor, so ordinary C that a compiler accepts once `cpp` has run is not standalone-valid to the parser:
+
+  ```c
+  // conditional compilation INSIDE an expression (curl, block_ip.c)
+  if(ip->maskbits <= 0 ||
+  #ifdef AF_INET6
+     (ip->family == AF_INET6 && ip->maskbits > 128) ||
+  #endif
+     ip->maskbits > 32)
+
+  // a function-like macro standing in for parameters (curl, evhiperfifo.c)
+  static void timer_cb(EV_P_ struct ev_timer *w, int revents)
+  ```
+
+  C and C++ now carry their own parse-error advice, naming the preprocessor as the likely cause. `LanguageDefinition` gained an optional `parse_error_hint`; it defaults to `None`, so every other language keeps the generic wording - Python's parse errors really are syntax errors.
+
+  The hint is per-language, not per-cause, and that limit is recorded in a test rather than glossed: safelint cannot tell valid-but-unpreprocessed code from a genuine typo, because both arrive as the same `ERROR` node, so a real mistake now also reads as a possible preprocessor issue. Naming the likelier cause is still the better default at the measured rate.
+
+- **The C and C++ parse-coverage limit is now documented with measurements (#206).** The language pages listed C and C++ as supported without qualification, so a clean run read as a clean project. On stock defaults, a quarter to a half of the files in four widely deployed codebases fail to parse and are therefore **dropped from every other rule**: curl `61a31e0` 277/1101 (25%), redis `b540ca4` 351/845 (42%), fmt `4afd0e4` 43/79 (54%), leveldb `7ee830d` 60/133 (45%). Headers fare worst, which is why the two C++ projects come out above the two C ones.
+
+  Re-measuring also **corrected the figures in the issue itself**, which put fmt at 24% and leveldb at 9%. Those two rows had counted only `.cc` files and omitted the headers, where most of the failures are; the C rows counted both, which is why curl and redis reproduced exactly and the C++ pair did not. An isolated 2.14.3 returns identical counts on the same checkouts, so this is the approach's behaviour and not a regression in any release since.
+
+  Added as a "Parse coverage" section on `docs/languages/c.md` and `cpp.md` (causes, per-error-kind breakdown, and what to do about it), a note under SAFE000 in `docs/configuration/rules.md`, and a block in the bundled C and C++ skill addenda telling an agent not to read a clean run as a clean project and not to rewrite working code to satisfy the parser. **Bundled skill content changed: run `safelint skill install --force`.**
+
+  Not addressed here: the summary still gives no skipped-file count (#175), and a preprocessor-tolerant parse pass (item 4 of #206) remains open.
+
 - **SAFE801 `tainted_sink`: a binding's taint is scoped to the block that declares it (#250).** Every tracker kept one flat `name -> status` map per function, so a nested block that rebound a name overwrote the function-wide entry and the outer binding came back without its taint:
 
   ```rust

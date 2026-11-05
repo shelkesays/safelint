@@ -67,6 +67,8 @@ A few codes are emitted by the engine directly rather than by registered `BaseRu
 
 Always severity `error`. Cannot be configured per-rule.
 
+**On C and C++ the message names the preprocessor instead of advising you to check syntax.** safelint parses the source as written, so an `#ifdef` spanning part of a construct or a macro standing in for a declarator is unparseable even though the file compiles; on four real projects this is 25-54% of files, and each one is dropped from every other rule. The generic "check syntax near this location" would be a false accusation at that rate. See [Parse coverage: the preprocessor limit](../languages/c.md#parse-coverage-the-preprocessor-limit) for the measurements and what to do about it. *(Since 2.17.2.)*
+
 **Inline `# nosafe: SAFE000` does *not* work.** Parse errors are raised by `SafetyEngine._lint_parsed_source` *before* it parses inline suppression directives off the Tree-sitter tree (see the early-return at the parse-error check). The only way to silence SAFE000 is the global `ignore` list, which is read at engine init from your config file:
 
 ```toml

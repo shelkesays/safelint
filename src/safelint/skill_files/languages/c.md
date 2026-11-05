@@ -30,6 +30,19 @@ For pre-commit integration you normally only need to add the grammar extra via `
 
 `.c` and `.h`. **`.h` ownership:** `.h` headers are linted as **C**. A C++ project that uses `.h` headers gets them linted as C (content sniffing is out of scope); C++ keeps the C++-only header extensions (`.hpp` etc.). This is a documented limitation.
 
+## Parse coverage: do not read a clean run as a clean project
+
+safelint parses the source as written and **never runs the preprocessor**, so ordinary C that a compiler accepts after `cpp` has run can be unparseable here. Such a file gets a `SAFE000` parse error and **every other rule is skipped for it**. Measured on stock defaults: curl `61a31e0` 277/1101 files (25%), redis `b540ca4` 351/845 (42%). The C++ pair is worse (fmt 54%, leveldb 45%); headers fare worst of all.
+
+What this means when you are acting on a report:
+
+- **Check the `SAFE000` count before telling anyone the code is clean.** On these projects `SAFE000` is 10-14% of all default findings; a report with no other violations can still mean half the tree was never read. There is no skipped-file count in the summary yet.
+- **Do not "fix" a `SAFE000` on C or C++ by editing the source.** The usual causes are valid: an `#ifdef` spanning part of an expression, a function-like macro standing in for parameters (`static void cb(EV_P_ int revents)`), a guarded `__attribute__` before a declaration, a compiler builtin with non-C argument syntax (`__builtin_available(macOS 10.12, *)`). Rewriting working code to satisfy the parser is the wrong trade.
+- The `SAFE000` message on C and C++ says so, naming the preprocessor instead of advising you to check syntax. It is per-language, not per-cause, so a **genuine** typo also reads as a possible preprocessor issue - confirm by compiling before concluding either way.
+- `ignore = ["SAFE000"]` hides the parse errors but not the gap in coverage. Prefer leaving them visible.
+
+Tracked as issue #206.
+
 ## Rule count
 
 21 rules apply to C: the 16 cross-language ports plus the 5 new C-family rules (SAFE106 / SAFE310-313, shared with C++). Comments use `//` (line-directive form): `// nosafe`, `// nosafe: SAFE106`, `// safelint: ignore`.
