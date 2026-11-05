@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import tree_sitter
 
-from safelint.languages._types import LanguageDefinition
+from safelint.languages._types import LanguageDefinition, preprocessor_parse_hint
 
 
 # Grammar import is *optional* - C++ support ships in the ``[cpp]`` extra.
@@ -68,6 +68,7 @@ CPP: LanguageDefinition = LanguageDefinition(
     comment_node_type="comment",
     comment_prefix="//",
     create_parser=_create_cpp_parser,
+    parse_error_hint=preprocessor_parse_hint("C++"),
 )
 
 

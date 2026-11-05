@@ -20,6 +20,23 @@ safelint check src/              # lint a directory
 
 The `tree-sitter-cpp` grammar ships as the opt-in `[cpp]` extra; the base install bundles no grammars.
 
+## Parse coverage: the preprocessor limit
+
+**Around half of a real C++ project's files may not be analysed at all.** safelint parses the source as written; it does not run the preprocessor. C++ that a compiler accepts after `cpp` has run is therefore not always standalone-valid to the parser, the file surfaces a `SAFE000` parse error, and **every other rule is skipped for it**. A clean run on such a project is not the same as a clean project.
+
+Measured on stock defaults, counting every file in the project (including the `.h` headers that lint as C):
+
+| Project | Files scanned | Parse failures | Share |
+|---|---|---|---|
+| [fmt](https://github.com/fmtlib/fmt) `4afd0e4` | 79 | 43 (19 `.cc`, 24 `.h`) | **54%** |
+| [leveldb](https://github.com/google/leveldb) `7ee830d` | 133 | 60 (13 `.cc`, 47 `.h`) | **45%** |
+
+Headers fare worst, and for a header-only or header-heavy library that is most of the code: both projects above fail more headers than translation units. The two C projects measured alongside them come out lower (curl 25%, redis 42%), so C++ is the worse case, not the better one.
+
+Note that a C++ project's `.h` files lint as **C**, per the header-ownership limitation above, so they carry the C `SAFE000` wording rather than the C++ one.
+
+The causes, the per-error-kind breakdown, and what you can do about it are on the [C page](c.md#parse-coverage-the-preprocessor-limit); they are identical for both languages. Tracked as [#206](https://github.com/shelkesays/safelint/issues/206).
+
 ## Suppression directives
 
 C++ uses line-comment directives (`//` form): `// nosafe` (all rules on the line), `// nosafe: SAFE315` (a specific rule), and the file-scope `// safelint: ignore`. Block-comment (`/* */`) directives parse but are not recognised, matching every other language's line-directive-only convention.

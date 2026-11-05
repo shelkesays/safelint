@@ -846,7 +846,7 @@ class SafetyEngine:
             # BaseRule, so their suppression is handled here directly.
             if self._engine_internal_ignored("SAFE000", "parse"):
                 return LintResult(path=filepath, violations=[], suppressed=[])
-            return self._build_parse_error_result(filepath, tree.root_node)
+            return self._build_parse_error_result(filepath, tree.root_node, lang)
 
         # Single tree walk - produces both line-level ``# nosafe``
         # suppressions and file-level ``# safelint: ignore`` payload.
@@ -875,8 +875,15 @@ class SafetyEngine:
             return None
         return _cache.compute_file_key(source_bytes, self._get_engine_fingerprint(), filepath)
 
-    def _build_parse_error_result(self, filepath: str, root: tree_sitter.Node) -> LintResult:
+    def _build_parse_error_result(self, filepath: str, root: tree_sitter.Node, lang: LanguageDefinition) -> LintResult:
         """Construct the SAFE000 ``LintResult`` for a tree with parse errors.
+
+        The trailing advice comes from *lang*: a language whose source
+        safelint reads before any build step runs carries its own
+        ``parse_error_hint``, because "check syntax near this location" is a
+        false accusation there (see #206 - the code compiles; the parser
+        cannot see it preprocessed). Every other language keeps the generic
+        wording.
 
         Parse errors aren't cached: they're typically transient (a file
         mid-edit), and re-parsing a still-broken buffer is cheap - Tree-sitter
@@ -887,7 +894,8 @@ class SafetyEngine:
         if location is None:  # pragma: no cover
             return self._parse_error_result(filepath, "Parse error: tree-sitter could not fully parse this file", lineno=0, column=None)
         line, col, kind = location
-        msg = f"Parse error ({kind}) at line {line}, column {col + 1} - check syntax near this location"
+        advice = lang.parse_error_hint if lang.parse_error_hint is not None else "check syntax near this location"
+        msg = f"Parse error ({kind}) at line {line}, column {col + 1} - {advice}"
         return self._parse_error_result(filepath, msg, lineno=line, column=col + 1)
 
     def _append_unused_suppressions(
