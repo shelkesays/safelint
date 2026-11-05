@@ -20,6 +20,56 @@ safelint check src/              # lint a directory
 
 The `tree-sitter-c` grammar ships as the opt-in `[c]` extra; the base install bundles no grammars.
 
+## Parse coverage: the preprocessor limit
+
+**A quarter to a half of a real C or C++ project's files may not be analysed at all.** safelint parses the source as written; it does not run the preprocessor. Ordinary C that a compiler accepts after `cpp` has run is therefore not always standalone-valid to the parser, the file surfaces a `SAFE000` parse error, and **every other rule is skipped for it**. A clean run on such a project is not the same as a clean project.
+
+Measured on stock defaults against four widely deployed codebases:
+
+| Project | Language | Files scanned | Parse failures | Share |
+|---|---|---|---|---|
+| [curl](https://github.com/curl/curl) `61a31e0` | C | 1101 | 277 (239 `.c`, 38 `.h`) | **25%** |
+| [redis](https://github.com/redis/redis) `b540ca4` | C | 845 | 351 (243 `.c`, 104 `.h`, 4 `.cpp`) | **42%** |
+| [fmt](https://github.com/fmtlib/fmt) `4afd0e4` | C++ | 79 | 43 (19 `.cc`, 24 `.h`) | **54%** |
+| [leveldb](https://github.com/google/leveldb) `7ee830d` | C++ | 133 | 60 (13 `.cc`, 47 `.h`) | **45%** |
+
+Headers fare worst, which matters most for a header-heavy library: fmt's failures are more `.h` than `.cc`. The figures have been stable since 2.14.3 (identical counts), so they describe the approach rather than a regression in any one release.
+
+### What defeats the parser
+
+Every cause traced so far is the preprocessor or a compiler extension, and the code is valid:
+
+```c
+// conditional compilation INSIDE an expression
+if(ip->maskbits <= 0 ||
+#ifdef AF_INET6
+   (ip->family == AF_INET6 && ip->maskbits > 128) ||
+#endif
+   ip->maskbits > 32)
+
+// a function-like macro standing in for parameters
+static void timer_cb(EV_P_ struct ev_timer *w, int revents)
+
+// a guarded attribute before a declaration
+#if defined(__GNUC__) || defined(__clang__)
+__attribute__((format(printf, 2, 3)))
+#endif
+static int mem_addf(struct mem *mem, const char *format, ...)
+
+// a compiler builtin with non-C argument syntax
+if(__builtin_available(macOS 10.12, iOS 5, *)) {}
+```
+
+Because of this the `SAFE000` message on C and C++ names the preprocessor instead of telling you to check your syntax. The hint is per-language, not per-cause: safelint cannot distinguish "valid code the preprocessor would fix" from a genuine typo, so a real syntax error also reads as a possible preprocessor issue. By error kind, roughly three quarters of the failures are a bare `syntax error` and a fifth a `missing ';'` (the macro-as-declarator shape); redis also shows 14 `missing '#endif'`, the conditional-compilation shape proper.
+
+### Working with it
+
+- **Count the `SAFE000` findings before trusting a clean report.** They are 10-14% of all default findings on the projects above, so a run with no other violations may still have read only half the tree. A summary line for skipped files is tracked in [#175](https://github.com/shelkesays/safelint/issues/175).
+- **Lint preprocessed output** where a build can produce it (`cc -E`), at the cost of losing line numbers that map back to your source.
+- **`ignore = ["SAFE000"]`** silences the parse errors if the noise outweighs the signal for you. It does not make the files analysable; it only hides the fact that they were skipped. Prefer leaving them visible.
+
+Tracked as [#206](https://github.com/shelkesays/safelint/issues/206), with a preprocessor-tolerant parse pass as the open question.
+
 ## Suppression directives
 
 C uses line-comment directives (`//` form): `// nosafe` (all rules on the line), `// nosafe: SAFE106` (a specific rule), and the file-scope `// safelint: ignore`. Block-comment (`/* */`) directives parse but are not recognised, matching every other language's line-directive-only convention.

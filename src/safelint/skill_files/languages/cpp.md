@@ -30,6 +30,19 @@ For pre-commit integration you normally only need to add the grammar extra via `
 
 `.cpp`, `.cxx`, `.cc`, `.hpp`, `.hxx`, `.hh`. **`.h` ownership:** a plain `.h` header is linted as **C**, not C++ (content sniffing is out of scope). A C++ project whose headers use `.h` gets them linted as C; use the C++-specific header extensions (`.hpp` / `.hxx` / `.hh`) for C++ header linting. This is a documented limitation shared with the C page.
 
+## Parse coverage: do not read a clean run as a clean project
+
+safelint parses the source as written and **never runs the preprocessor**, so ordinary C++ that a compiler accepts after `cpp` has run can be unparseable here. Such a file gets a `SAFE000` parse error and **every other rule is skipped for it**. Measured on stock defaults: fmt `4afd0e4` 43/79 files (54%), leveldb `7ee830d` 60/133 (45%), counting every file including the `.h` headers that lint as C. Headers fare worst, so a header-heavy library is the worst case; the two C projects measured alongside come out lower (curl 25%, redis 42%).
+
+What this means when you are acting on a report:
+
+- **Check the `SAFE000` count before telling anyone the code is clean.** On these projects `SAFE000` is 10-14% of all default findings; a report with no other violations can still mean half the tree was never read. There is no skipped-file count in the summary yet.
+- **Do not "fix" a `SAFE000` on C or C++ by editing the source.** The usual causes are valid (the examples are C, but C++ headers hit the same shapes): an `#ifdef` spanning part of an expression, a function-like macro standing in for parameters (`static void cb(EV_P_ int revents)`), a guarded `__attribute__` before a declaration, a compiler builtin with non-C argument syntax (`__builtin_available(macOS 10.12, *)`). Rewriting working code to satisfy the parser is the wrong trade.
+- The `SAFE000` message on C and C++ says so, naming the preprocessor instead of advising you to check syntax. It is per-language, not per-cause, so a **genuine** typo also reads as a possible preprocessor issue - confirm by compiling before concluding either way.
+- `ignore = ["SAFE000"]` hides the parse errors but not the gap in coverage. Prefer leaving them visible.
+
+Tracked as issue #206.
+
 ## Rule count
 
 26 rules apply to C++: the cross-language ports, the five C-family rules widened to `("c", "cpp")`, the three try/catch rules, and the two C++-only idiom rules (SAFE315 / SAFE316). Comments use `//` (line-directive form): `// nosafe`, `// nosafe: SAFE315`, `// safelint: ignore`.
