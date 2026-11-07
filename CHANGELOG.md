@@ -44,6 +44,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Validation harness: ask the binary what it scanned instead of modelling it (#192).** `_check_selection_has_files` guarded the one outcome the validation programme must never produce, a committed zero-findings report for source that was never examined, by re-deriving safelint's file discovery inside the harness: extension, excluded directory names, file-versus-directory, symlink-or-not. That second model drifted **five** separate times, each drift its own route to a false clean, and each found in review rather than by the check itself.
+
+  The mirrored tables are **deleted**, not corrected. `SCANNER_EXCLUDED_DIR_NAMES` (a copy of safelint's own `exclude_paths` defaults), `EXCLUDED_DIR_NAMES` and `_is_scannable`'s symlink and file-versus-directory guessing are gone. What replaced them cannot drift:
+
+  | Route to a false clean | Now caught by |
+  |---|---|
+  | Wrong `--lang` | `summary.files_checked_by_language[lang] == 0`, safelint's own per-language tally (new, #196) |
+  | Files only under `.venv/` or `node_modules/` | `summary.files_checked == 0` (shipped 2.14.3) |
+  | A symlinked source file | `summary.files_checked == 0` |
+  | A directory named `generated.py` | `summary.files_checked == 0` |
+  | Mistyped `--include` | the harness, which is correct: `--include` is a harness-side filter safelint never sees, so no amount of asking the binary can reveal a typo in it |
+
+  The wrong-`--lang` route is the one `files_checked` alone could never catch, because it counts every language: `--lang rust` against a Python repository reports a healthy positive count, filters every finding out by extension, and writes up `scanned=N, findings=0`. That is why this half waited on the per-language breakdown.
+
+  **A missing `files_checked_by_language` degrades to "cannot check" rather than failing.** The harness exists to validate a *published* release, which may predate the key, and the map is sparse by design, so "absent because old binary" and "absent because this language contributed nothing" are indistinguishable from the map alone. `files_checked == 0` still guards an older binary. Pinned by a test, because treating absence as zero would have made the harness unusable against every earlier release.
+
+  `EXTENSIONS` stays: the harness needs it to filter findings by language regardless, and it is not a model of discovery.
+
 - **SAFE104 `complexity`: a `match` / `switch` counts once, not once per arm (#181).** McCabe measures hand-written control flow, and a dispatch table is not that. The arms are value comparisons, or in Rust a compiler-checked exhaustive match: no fall-through, no ordering dependency, and adding a variant is a compile error rather than a silent gap. A twenty-arm lookup carries a cognitive load nearer 1 than 20.
 
   Counting each arm made dispatch tables the dominant finding on real code. `match_arm` alone was 50% of every counted decision point across [astral-sh/ty](https://github.com/astral-sh/ty), and **54% of [ruff](https://github.com/astral-sh/ruff)'s 656 SAFE104 findings** fell to at or under the threshold once arms stopped counting individually, every one of them a lookup table where "split into smaller functions" was not applicable advice. The issue's headline example, a 13-arm string lookup, drops from **14 to 2**.

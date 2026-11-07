@@ -77,35 +77,6 @@ EXTENSIONS: dict[str, tuple[str, ...]] = {
 #: exclude by default. These are what the harness adds.
 HARNESS_EXCLUDED_DIR_NAMES: tuple[str, ...] = ("vendor", "target", "third_party")
 
-#: Directory names safelint's own ``exclude_paths`` default already skips.
-#: Mirrored rather than imported, for the same reason as EXTENSIONS: the harness
-#: must not depend on the dev checkout matching the binary under test.
-#:
-#: The eligibility check needs these, not just the harness's own: a project whose
-#: only files of the target language sit under ``.venv/`` or ``node_modules/``
-#: would otherwise satisfy it while the scanner skipped every one of them -
-#: ``scanned=0, findings=0`` written up as a clean result, which is the exact
-#: false pass that check exists to prevent.
-SCANNER_EXCLUDED_DIR_NAMES: tuple[str, ...] = (
-    ".venv",
-    "venv",
-    ".tox",
-    ".nox",
-    "__pycache__",
-    ".pytest_cache",
-    ".ruff_cache",
-    ".mypy_cache",
-    ".ty_cache",
-    "build",
-    "dist",
-    "htmlcov",
-    "node_modules",
-    "site-packages",
-)
-
-#: Every directory name a file can sit under and still never be scanned.
-EXCLUDED_DIR_NAMES: tuple[str, ...] = (*HARNESS_EXCLUDED_DIR_NAMES, *SCANNER_EXCLUDED_DIR_NAMES)
-
 #: The harness-added trees as the glob patterns ``extend_exclude_paths`` wants.
 #: Derived from the names above so the generated config and the eligibility check
 #: cannot drift apart. Only the harness-specific names go here - re-listing
@@ -413,6 +384,7 @@ def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
         reason = next((line for line in detail if "no files linted" in line), "safelint gave no reason")
         msg = f"{mode}: safelint read 0 files, so there is nothing to report - {reason}"
         raise HarnessError(msg)
+    _check_language_was_read(payload, target, mode)
     # ``rss_mb`` is None where the platform has no rusage (Windows); 0.0 keeps
     # the field a plain float for the report's ``:.0f`` formatting, and reads as
     # "not measured" rather than pretending to a number.
@@ -423,50 +395,98 @@ def run_safelint(target: Target, config_dir: Path, mode: str) -> RunResult:
     return result
 
 
-def _check_selection_has_files(target: Target) -> None:
-    """Fail if the selection holds no file of the target language.
+def _check_language_was_read(payload: dict[str, Any], target: Target, mode: str) -> None:
+    """Fail if safelint read no file of the target language, per safelint itself.
 
-    Two ways to end up scanning nothing while the report still looks clean, both
-    of which write a committed zero-findings summary for source that was never
-    examined:
+    ``files_checked`` counts every language, so it cannot catch the wrong
+    ``--lang``: pointing ``--lang rust`` at a Python repository reports a
+    healthy positive count, filters every finding out by extension, and writes
+    up ``scanned=N, findings=0`` as a clean result. That was route 2 of the five
+    false-clean routes in #192.
 
-    * a mistyped ``--include`` - the filter empties the findings while
-      ``files_checked`` stays positive, because it counts the whole project;
-    * the **wrong ``--lang``** for the project, which needs no typo at all:
-      ``--lang rust`` against a Python repository scans the Python files, filters
-      every finding out by extension, and reports ``scanned=N, findings=0``.
+    ``summary.files_checked_by_language`` answers it exactly and needs no
+    mirroring: it is safelint's own per-language tally, derived from the
+    language registry, so it cannot drift from what the scanner did. This is
+    what replaced the harness's second model of file discovery.
 
-    A selection that genuinely holds eligible files and no findings still passes -
-    only "nothing was ever eligible" is rejected.
+    **Absent key means an older binary, not zero files.** The harness exists to
+    validate a *published* release, which may predate the key (added 2.18.0),
+    and the map is sparse by design - a language that contributed nothing is
+    omitted rather than present with a zero. Those two facts are
+    indistinguishable from the map alone, so a missing key degrades to "cannot
+    check" rather than failing every older release. ``files_checked == 0``
+    above still covers that binary for routes 3, 4 and 5.
     """
-    exts = EXTENSIONS[target.lang]
-    # ``os.walk`` rather than ``rglob`` so excluded trees are PRUNED instead of
-    # enumerated and discarded. The success path barely notices - it returns on
-    # the first qualifying file - but the failure path has to exhaust the tree,
-    # and that is exactly when a built project is at its worst: 40k artifacts
-    # under ``target/`` cost 0.47s to walk and throw away. It also stops at
-    # directory symlinks (``followlinks=False``), which a ``rglob`` can follow.
-    for dirpath, dirnames, filenames in os.walk(target.project):
-        dirnames[:] = [d for d in dirnames if d not in EXCLUDED_DIR_NAMES]
-        if _any_eligible(Path(dirpath), filenames, target, exts):
-            return
-    where = f"--include {target.include!r} selects" if target.include else f"{target.project} holds"
-    hint = "check the path (it is matched against paths relative to --project)" if target.include else "check --lang"
-    msg = f"{where} no scannable {target.lang} file - {hint}, or whether every match sits in an excluded tree ({', '.join(EXCLUDED_DIR_NAMES)})"
+    summary: dict[str, Any] = payload.get("summary", {})
+    if "files_checked_by_language" not in summary:
+        return
+    by_language: dict[str, Any] = summary["files_checked_by_language"]
+    if int(by_language.get(target.lang, 0)) > 0:
+        return
+    seen = ", ".join(f"{name}={count}" for name, count in sorted(by_language.items())) or "nothing"
+    msg = f"{mode}: safelint read no {target.lang} file, so a zero-findings result would be meaningless - it read {seen}. Check --lang against what the project actually contains."
     raise HarnessError(msg)
 
 
-def _any_eligible(dirpath: Path, filenames: list[str], target: Target, exts: tuple[str, ...]) -> bool:
-    """Return True if any of *filenames* in *dirpath* is a file safelint would scan.
+def _check_include_selects_files(target: Target) -> None:
+    """Fail if ``--include`` selects no file of the target language.
+
+    This is the one eligibility question that remains the HARNESS's to answer,
+    and it is deliberately not a model of safelint: ``--include`` is a
+    harness-side filter on findings that safelint never sees, so no amount of
+    asking the binary can reveal a typo in it. "Does my own pattern match
+    anything in this tree?" needs only the pattern and the tree.
+
+    Everything else moved to :func:`run_safelint`, which asks the binary what
+    it actually read (see #192). What used to live here - safelint's default
+    exclusion list, its reject-all symlink stance, a file-versus-directory
+    test - was a second, independent model of safelint's discovery, and that
+    model drifted five separate times, each drift a route to a committed
+    zero-findings report for source that was never examined. Those tables are
+    gone rather than merely corrected.
+
+    Only the harness's OWN excluded trees are pruned here, because the harness
+    put them in the generated config itself: an include matching nothing but
+    ``vendor/`` legitimately selects nothing scannable.
+    """
+    include = target.include
+    if not include:
+        return  # nothing of ours to verify; the binary's own count is the check
+    exts = EXTENSIONS[target.lang]
+    # ``os.walk`` rather than ``rglob`` so excluded trees are PRUNED instead of
+    # enumerated and discarded. The success path returns on the first match, but
+    # the failure path has to exhaust the tree, and that is exactly when a built
+    # project is at its worst: 40k artifacts under ``target/`` cost 0.47s to
+    # walk and throw away. It also stops at directory symlinks
+    # (``followlinks=False``), which an ``rglob`` can follow.
+    for dirpath, dirnames, filenames in os.walk(target.project):
+        dirnames[:] = [d for d in dirnames if d not in HARNESS_EXCLUDED_DIR_NAMES]
+        if _any_include_match(Path(dirpath), filenames, target.project, include, exts):
+            return
+    msg = (
+        f"--include {target.include!r} selects no {target.lang} file under {target.project} - "
+        "check the path (it is matched against paths relative to --project), or whether every "
+        f"match sits in a tree the harness excludes ({', '.join(HARNESS_EXCLUDED_DIR_NAMES)})"
+    )
+    raise HarnessError(msg)
+
+
+def _any_include_match(dirpath: Path, filenames: list[str], project: Path, include: str, exts: tuple[str, ...]) -> bool:
+    """Return True if any of *filenames* has a target extension and is under *include*.
 
     Split out of the walk so each function keeps safelint's own nesting limit of
     2 - the walk plus an inner file loop plus the predicate is depth 3, which
     SAFE102 rejects in this repository.
+
+    *include* is taken as a plain ``str`` rather than read off the target: the
+    caller has already established it is set, and a type checker cannot carry
+    that narrowing across the call.
     """
     for name in filenames:
-        path = dirpath / name
-        rel = path.relative_to(target.project)
-        if _is_scannable(path, exts) and (not target.include or _path_under(str(rel), target.include)):
+        if not name.endswith(exts):
+            continue
+        rel = (dirpath / name).relative_to(project)
+        if _path_under(str(rel), include):
             return True
     return False
 
@@ -490,25 +510,9 @@ def _project_relative(filepath: str, root: Path) -> str:
         return filepath
 
 
-def _is_scannable(path: Path, exts: tuple[str, ...]) -> bool:
-    """Return True if safelint would actually read *path* as a source file.
-
-    Three things have to hold, and each was a way to pass eligibility over
-    something the scanner never looks at:
-
-    * a real FILE - a *directory* named ``generated.py`` satisfies the extension
-      test on its own;
-    * not a SYMLINK - safelint refuses to follow them (the 2.8.4 hardening, kept
-      deliberately as a reject-all), while ``is_file()`` follows them happily, so
-      a symlinked source counted as eligible and was then skipped;
-    * the right extension for the language under test.
-    """
-    return path.is_file() and not path.is_symlink() and path.name.endswith(exts)
-
-
 def validate(target: Target) -> list[RunResult]:
     """Run the all-rules pass and the stock-defaults pass; return both."""
-    _check_selection_has_files(target)
+    _check_include_selects_files(target)
     names = rules_for(target.safelint, target.lang)
     results: list[RunResult] = []
     with tempfile.TemporaryDirectory(prefix="safelint-validate-") as tmp:
