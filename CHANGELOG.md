@@ -7,7 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [2.17.1] - 2026-11-07
+### Changed
+
+- **CI: bump `anthropics/claude-code-action` v1.0.264 -> v1.0.269** (folded in from Dependabot PR #267, which asked for v1.0.267; taken to the current latest so the next Dependabot round has nothing to raise). Still SHA-pinned. The SHA was verified against its **dereferenced** tag object, since these tags are annotated and the naive ref lookup returns the tag object rather than the commit: `refs/tags/v1.0.269` dereferences to commit `61a9c27`. The five upstream commits in the range touch only the bundled Claude Code / Agent SDK version (2.1.312 -> 2.1.319) plus lockfiles; no action input was added, renamed or removed, so `anthropic_api_key`, `prompt` and `claude_args` in `claude-review.yml` are unaffected. Workflow only - nothing in the published wheel changes.
 
 ### Fixed
 
@@ -36,6 +38,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Added as a "Parse coverage" section on `docs/languages/c.md` and `cpp.md` (causes, per-error-kind breakdown, and what to do about it), a note under SAFE000 in `docs/configuration/rules.md`, and a block in the bundled C and C++ skill addenda telling an agent not to read a clean run as a clean project and not to rewrite working code to satisfy the parser. **Bundled skill content changed: run `safelint skill install --force`.**
 
   Not addressed here: the summary still gives no skipped-file count (#175), and a preprocessor-tolerant parse pass (item 4 of #206) remains open.
+
+## [2.17.1] - 2026-11-07
+
+### Fixed
 
 - **SAFE801 `tainted_sink`: a binding's taint is scoped to the block that declares it (#250).** Every tracker kept one flat `name -> status` map per function, so a nested block that rebound a name overwrote the function-wide entry and the outer binding came back without its taint:
 
