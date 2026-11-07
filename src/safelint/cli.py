@@ -158,13 +158,16 @@ def _make_skipped_line(files_skipped: int) -> str:
     of the files were never parsed is the exact failure #175 was filed about,
     and a count buried among six thousand findings is no better.
 
-    "not analysed" rather than "not parsed" because this also covers a file
-    safelint could not read at all; both mean no rule ran.
+    The parenthetical names all four causes rather than only parsing. An
+    earlier wording said "could not be parsed", which was wrong for a file
+    larger than ``max_file_size_bytes`` or refused before reading - neither is
+    ever handed to the parser. Each of those also prints its own stderr
+    warning saying which file and why; this line is the aggregate.
     """
     noun = "file" if files_skipped == 1 else "files"
     was = "was" if files_skipped == 1 else "were"
     count = _c(str(files_skipped), _BOLD, _YELLOW)
-    return f"{count} {noun} could not be parsed and {was} NOT analysed."
+    return f"{count} {noun} {was} NOT analysed (unparseable, unreadable, or skipped before reading)."
 
 
 def _print_summary(
@@ -373,14 +376,14 @@ class _RunCounts:
         """Derive every count from the run's results.
 
         One constructor so the numbers cannot drift apart at a call site. The
-        skipped count comes from ``LintResult.parse_failed`` rather than from
+        skipped count comes from ``LintResult.analysis_skipped`` rather than from
         counting ``SAFE000`` violations, which would read zero under
         ``ignore = ["SAFE000"]`` while the coverage gap remained.
         """
         return cls(
             files_checked=len(results),
             coverage=RunCoverage(
-                files_skipped=sum(1 for r in results if r.parse_failed),
+                files_skipped=sum(1 for r in results if r.analysis_skipped),
                 by_language=_language_counts(r.path for r in results),
             ),
         )
@@ -505,7 +508,7 @@ def _run_stdin(args: argparse.Namespace) -> int:
     # every time anyway) and writing to ``.safelint_cache/`` per keystroke
     # would just churn the project tree. ``--no-cache`` is therefore
     # irrelevant here - caching is unconditionally off.
-    engine = SafetyEngine(config, changed_files=[args.stdin_filename], cache=None)
+    engine = SafetyEngine(config, changed_files=[args.stdin_filename], cache=None, stdin_mode=True)
 
     source = sys.stdin.read()
     result = engine.check_source(args.stdin_filename, source)
@@ -550,7 +553,7 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
     all_blocking: list[Violation] = []
     all_violations: list[Violation] = []
     all_suppressed: list[Violation] = []
-    # Kept so the summary counts come from ``LintResult.parse_failed`` here too:
+    # Kept so the summary counts come from ``LintResult.analysis_skipped`` here too:
     # a parse failure whose SAFE000 is ignored adds no violation, so counting
     # from ``files`` alone would report full coverage on a file never analysed.
     all_results: list[LintResult] = []

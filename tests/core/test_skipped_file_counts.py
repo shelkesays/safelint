@@ -10,13 +10,14 @@ a polyglot tree: "how many files of *my* language did you actually read?"
 The load-bearing case throughout is the **clean** run. "All checks passed."
 printed over a tree where a quarter of the files were never parsed is the
 failure both issues were filed about, and it is why the count is derived from
-``LintResult.parse_failed`` rather than from counting ``SAFE000`` violations,
+``LintResult.analysis_skipped`` rather than from counting ``SAFE000`` violations,
 which read zero the moment someone sets ``ignore = ["SAFE000"]``.
 """
 
 from __future__ import annotations
 
 import json
+import os
 from types import MappingProxyType
 from typing import TYPE_CHECKING
 
@@ -60,7 +61,7 @@ def test_a_parse_failure_marks_the_result_not_analysed(tmp_path: Path) -> None:
 
     result = _engine().check_file(str(sample))
 
-    assert result.parse_failed is True
+    assert result.analysis_skipped is True
     assert [v.code for v in result.violations] == ["SAFE000"]
 
 
@@ -69,7 +70,7 @@ def test_a_parsed_file_is_not_counted_as_skipped(tmp_path: Path) -> None:
     sample = tmp_path / "good.py"
     sample.write_text(_CLEAN_PY, encoding="utf-8")
 
-    assert _engine().check_file(str(sample)).parse_failed is False
+    assert _engine().check_file(str(sample)).analysis_skipped is False
 
 
 def test_the_flag_survives_a_globally_ignored_safe000(tmp_path: Path) -> None:
@@ -85,7 +86,7 @@ def test_the_flag_survives_a_globally_ignored_safe000(tmp_path: Path) -> None:
     result = _engine(ignore=["SAFE000"]).check_file(str(sample))
 
     assert result.violations == []  # nothing left to count
-    assert result.parse_failed is True  # but the file still was not analysed
+    assert result.analysis_skipped is True  # but the file still was not analysed
 
 
 def test_an_unreadable_file_also_counts_as_not_analysed(tmp_path: Path) -> None:
@@ -100,13 +101,13 @@ def test_an_unreadable_file_also_counts_as_not_analysed(tmp_path: Path) -> None:
 
     result = _engine().check_file(str(sample))
 
-    assert result.parse_failed is True
+    assert result.analysis_skipped is True
 
 
 def test_an_excluded_or_unregistered_file_is_not_lost_coverage(tmp_path: Path) -> None:
     """Nothing was attempted for these, so they are not a coverage gap.
 
-    This is why the field is ``parse_failed`` (default False) rather than a
+    This is why the field is ``analysis_skipped`` (default False) rather than a
     ``parsed`` flag defaulting True, which would have claimed a successful
     parse for files that were never opened.
     """
@@ -115,7 +116,7 @@ def test_an_excluded_or_unregistered_file_is_not_lost_coverage(tmp_path: Path) -
 
     result = _engine().check_file(str(unregistered))
 
-    assert result.parse_failed is False
+    assert result.analysis_skipped is False
     assert result.violations == []
 
 
@@ -147,7 +148,7 @@ def test_run_counts_derive_every_number_from_the_results() -> None:
     """One constructor, so checked / skipped / per-language cannot drift apart."""
     results = [
         LintResult(path="a.py"),
-        LintResult(path="b.py", parse_failed=True),
+        LintResult(path="b.py", analysis_skipped=True),
         LintResult(path="c.rs"),
     ]
 
@@ -236,3 +237,44 @@ def test_lost_coverage_is_still_reported_when_safe000_is_ignored(tmp_path: Path,
     assert summary["violations"] == 0  # no SAFE000 left to count
     assert summary["files_skipped"] == 1  # the gap is still visible
     assert summary["files_analysed"] == 1
+
+
+def test_an_oversize_file_counts_as_lost_coverage(tmp_path: Path) -> None:
+    """A file too large to read ran no rules, so it is not analysed (#274 review).
+
+    It was previously counted as analysed, which let `files_analysed` claim
+    full coverage and defeated the documented CI check: a project with one
+    enormous generated file would report `files_skipped: 0` while that file was
+    never examined. The pre-read refusals produce no violation at all - only a
+    stderr warning - so the flag is the only place this can surface.
+    """
+    sample = tmp_path / "huge.py"
+    sample.write_text("x = 1\n" * 200, encoding="utf-8")
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"max_file_size_bytes": 10}))
+
+    result = engine.check_file(str(sample))
+
+    assert result.analysis_skipped is True
+    assert result.violations == []  # no violation, which is exactly why the flag matters
+
+
+def test_a_non_regular_file_counts_as_lost_coverage(tmp_path: Path) -> None:
+    """A FIFO is refused before reading, and that is still lost coverage."""
+    fifo = tmp_path / "pipe.py"
+    os.mkfifo(fifo)
+
+    assert _engine().check_file(str(fifo)).analysis_skipped is True
+
+
+def test_an_excluded_file_is_still_not_lost_coverage(tmp_path: Path) -> None:
+    """The line the other side of the distinction, pinned so it cannot drift.
+
+    An excluded file is out of scope by configuration, not lost. Counting it
+    would make ``files_analysed`` meaningless on any project with an exclude
+    list, which is every real project.
+    """
+    sample = tmp_path / "vendored.py"
+    sample.write_text(_CLEAN_PY, encoding="utf-8")
+    engine = SafetyEngine(deep_merge(DEFAULTS, {"extend_exclude_paths": [str(sample)]}))
+
+    assert engine.check_file(str(sample)).analysis_skipped is False

@@ -64,11 +64,12 @@ Aggregated counts across the whole run. All counts are integers ≥ 0.
 For a coverage assertion in CI, use `files_analysed` and treat a non-zero `files_skipped` as a signal rather than noise. To **fail** the job when anything was skipped, let `jq -e` set the exit status and do not swallow it:
 
 ```bash
+set -o pipefail
 safelint check . --all-files --format json \
   | jq -e '.summary.files_skipped == 0' > /dev/null
 ```
 
-`jq -e` exits non-zero when its last output is `false`, so the pipeline fails exactly when files were skipped. To warn **without** failing, report the count and exit 0 deliberately:
+`jq -e` exits non-zero when its last output is `false`, so the pipeline fails exactly when files were skipped. **`set -o pipefail` is load-bearing:** without it a pipeline reports only the *last* command's status, so `jq` succeeding would mask a non-zero exit from safelint itself and the gate would pass on a run that found violations. To warn **without** failing, report the count and exit 0 deliberately:
 
 ```bash
 skipped=$(safelint check . --all-files --format json | jq '.summary.files_skipped')
@@ -77,7 +78,7 @@ skipped=$(safelint check . --all-files --format json | jq '.summary.files_skippe
 
 Note that appending `|| echo ...` to the first form turns it into the second: `||` substitutes its own exit status, so the check can no longer fail the job.
 
-**SARIF does not carry these three fields.** SARIF has no natural home for run-level counts, and inventing a `properties` bag entry would be a safelint-specific extension no SARIF consumer reads. The parse failures themselves are present in SARIF as ordinary `SAFE000` results, so nothing is hidden; only the aggregate is JSON-only.
+**SARIF does not carry these three fields.** SARIF has no natural home for run-level counts, and inventing a `properties` bag entry would be a safelint-specific extension no SARIF consumer reads. The parse failures are normally present in SARIF as ordinary `SAFE000` results, so only the aggregate is JSON-only. **Two exceptions where SARIF genuinely cannot show the gap:** under `ignore = ["SAFE000"]` there is no result to carry, and a file refused before reading (oversize, or a symlink escaping the tree) produces a stderr warning rather than any result at all. If lost coverage has to be visible to a SARIF consumer, read `files_skipped` from a parallel JSON run.
 
 ### `violations` *(array of Violation)*
 

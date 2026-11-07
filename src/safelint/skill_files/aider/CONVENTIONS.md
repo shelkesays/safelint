@@ -136,8 +136,9 @@ The `suggestions[]` array (added in v1.8.0) is **advisory only**. Each `Suggesti
 Order matters: lead with what the user needs first:
 
 1. **One-line headline.** Examples:
-   - `Clean run: 12 files analysed, no violations.` (if zero, and `files_skipped` is 0)
-   - `11 of 12 files analysed, no violations. 1 file could not be parsed and was NOT analysed.` (if `files_skipped` is non-zero: never report a clean run without this)
+   - `Clean run: 12 files analysed, no violations.` (only when `violations` is 0 **and** `files_skipped` is 0)
+   - `No violations, but only 11 of 12 files were analysed - 1 was skipped.` (when `violations` is 0 and `files_skipped` is non-zero: that happens when `SAFE000` is in the project's `ignore` list, or a file was refused before reading)
+   - `Found 1 error across 12 files; 11 of 12 analysed, 1 skipped.` (when files were skipped **and** there are violations - a parse failure normally IS one of them, reported as `SAFE000`, so do not say "no violations" here)
    - `Clean run: 12 files checked. 3 violations suppressed (2 SAFE501, 1 SAFE304).` (clean but with suppressions)
    - `Found 4 errors and 7 warnings across 5 files (1 suppressed).` (otherwise)
 

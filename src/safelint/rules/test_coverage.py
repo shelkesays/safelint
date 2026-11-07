@@ -236,7 +236,7 @@ def _canonical_path(p: Path) -> Path:
         return p.absolute()
 
 
-def _warn_if_no_changed_path_exists(changed: list[str], resolved: frozenset[Path]) -> None:
+def _warn_if_no_changed_path_exists(changed: list[str], resolved: frozenset[Path], *, stdin_mode: bool) -> None:
     """Warn once when no changed-file path can be located on disk.
 
     SAFE702 compares the file being linted against the changed set by
@@ -253,8 +253,13 @@ def _warn_if_no_changed_path_exists(changed: list[str], resolved: frozenset[Path
 
     Follows the project's typo-guard convention: one ``safelint: warning:`` line
     on stderr, never a failed run.
+
+    Silent under ``--stdin``, where the changed set is the buffer's name and a
+    buffer need not correspond to a file on disk at all. Warning there would
+    fire on every editor keystroke and say SAFE702 will not apply, which is not
+    even true: the pseudo-filename still drives the coupling lookup.
     """
-    if not changed:
+    if stdin_mode or not changed:
         return
     # ``Path.exists()`` re-raises OSError for a non-ignored errno (an unreadable
     # ancestor, say), so guard it: a diagnostic must never be the thing that
@@ -405,7 +410,7 @@ class TestCouplingRule(BaseRule):
             resolved = frozenset(_canonical_path(Path(f)) for f in changed)
             # The cache-miss branch runs once per distinct changed set, which is
             # once per run, so this is the right place for a run-level warning.
-            _warn_if_no_changed_path_exists(changed, resolved)
+            _warn_if_no_changed_path_exists(changed, resolved, stdin_mode=bool(self.config.get("_stdin_mode", False)))
             cached = (changed, resolved)
             self._resolved_changed_cache = cached
         return cached[1]
