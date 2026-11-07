@@ -172,3 +172,38 @@ def test_the_c_preprocessor_hint_still_applies(tmp_path: Path) -> None:
 def test_python_still_gets_the_generic_advice(tmp_path: Path) -> None:
     """Tier 3 is intact: a language with neither hook is unchanged."""
     assert _GENERIC in _message(tmp_path, "def broken(\n", name="broken.py")
+
+
+# ── a file with BOTH problems must not be excused (#275 review) ──────────────
+
+
+@pytest.mark.parametrize(
+    ["label", "source"],
+    (
+        ["genuine error first", "fn broken( {\n    let x = 1;\n}\nfn t() {\n    let s = str![1];\n}\n"],
+        ["macro first", "fn t() {\n    let s = str![1];\n}\nfn broken( {\n    let x = 1;\n}\n"],
+    ),
+)
+def test_a_file_with_a_real_error_too_is_not_excused(label: str, source: str) -> None:
+    """ "Nothing here to fix" is only honest when nothing else is broken.
+
+    Returning the advice on the first match was wrong in both directions. With
+    the genuine error EARLIER, ``SAFE000`` reports that line while the message
+    said there was nothing to fix - pointing at a real mistake and reassuring
+    the reader about it. With the macro first, the message is right about its
+    own location but still tells someone a broken file is fine.
+
+    So every error in the file has to be the macro shape, including a MISSING
+    token, which carries no text and is how an unbalanced delimiter surfaces.
+    """
+    assert _cause(source) is None, f"{label}: a file with a real error was excused"
+
+
+def test_the_mixed_file_message_is_the_generic_one_end_to_end(tmp_path: Path) -> None:
+    """The user-visible half: such a file keeps "check syntax"."""
+    source = "fn broken( {\n    let x = 1;\n}\nfn t() {\n    let s = str![1];\n}\n"
+
+    message = _message(tmp_path, source, name="mixed.rs")
+
+    assert _GENERIC in message
+    assert _CAUSE not in message
