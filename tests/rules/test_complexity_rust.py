@@ -41,15 +41,45 @@ def test_rust_high_complexity_fires_safe104(tmp_path: Path) -> None:
     assert "complex" in safe104[0].message
 
 
-def test_rust_match_arms_count_as_branches(tmp_path: Path) -> None:
-    """Each ``match_arm`` adds one to cyclomatic complexity."""
+def test_rust_match_counts_once_not_per_arm(tmp_path: Path) -> None:
+    """An exhaustive dispatch table scores 2, not one per arm (#181).
+
+    This was the dominant SAFE104 finding on real Rust: ``match_arm`` was 50%
+    of every counted decision point across astral-sh/ty, and 54% of ruff's 656
+    findings fell to at or under the threshold once arms stopped counting
+    individually. An exhaustive ``match`` is compiler-checked, has no
+    fall-through and no ordering dependency, so its cognitive load is nearer 1
+    than N.
+    """
     sample = tmp_path / "match_cc.rs"
     arms = "\n".join(f"        {i} => {i}," for i in range(12))
     sample.write_text(
         f"fn m(x: i32) -> i32 {{\n    match x {{\n{arms}\n        _ => 0,\n    }}\n}}\n",
         encoding="utf-8",
     )
+
     result = _engine().check_file(str(sample))
+
+    assert not any(v.code == "SAFE104" for v in result.violations)
+
+
+def test_rust_guarded_match_arms_still_count(tmp_path: Path) -> None:
+    """A guard is a real branch, so it keeps its surcharge.
+
+    ``n if cond`` can fall through to a later arm, so exhaustiveness proves
+    nothing about it and the reader must follow an actual condition. Ten
+    guarded arms therefore still exceed the default cap of 10, while the same
+    ten unguarded arms would not.
+    """
+    sample = tmp_path / "guarded.rs"
+    arms = "\n".join(f"        n if n == {i} => {i}," for i in range(10))
+    sample.write_text(
+        f"fn m(x: i32) -> i32 {{\n    match x {{\n{arms}\n        _ => 0,\n    }}\n}}\n",
+        encoding="utf-8",
+    )
+
+    result = _engine().check_file(str(sample))
+
     assert any(v.code == "SAFE104" for v in result.violations)
 
 

@@ -83,6 +83,9 @@ WHILE_STATEMENT = "while_statement"
 WITH_STATEMENT = "with_statement"
 TRY_STATEMENT = "try_statement"
 MATCH_STATEMENT = "match_statement"
+#: One ``case`` arm. Its optional ``guard`` field holds the ``if`` of
+#: ``case X if cond:`` - a real conditional, unlike the pattern match itself.
+CASE_CLAUSE = "case_clause"
 EXCEPT_CLAUSE = "except_clause"
 ELIF_CLAUSE = "elif_clause"
 ELSE_CLAUSE = "else_clause"
