@@ -6,7 +6,7 @@ import json
 from typing import TYPE_CHECKING
 
 from safelint import __version__
-from safelint.formatters import format_json, format_sarif
+from safelint.formatters import RunCoverage, format_json, format_sarif
 from safelint.rules.base import Violation
 
 
@@ -445,3 +445,79 @@ def test_sarif_rules_descriptor_deduplicates() -> None:
     doc = json.loads(out)
     rule_ids = [r["id"] for r in doc["runs"][0]["tool"]["driver"]["rules"]]
     assert rule_ids == ["SAFE101", "SAFE304", "SAFE501"]
+
+
+# ---------------------------------------------------------------------------
+# run-level coverage counts (#175 skipped files, #196 per-language)
+# ---------------------------------------------------------------------------
+
+
+def test_json_summary_splits_analysed_from_checked() -> None:
+    """``files_checked`` was overstating coverage: a skipped file was read, not analysed."""
+    out = format_json(
+        [],
+        [],
+        blocking_count=0,
+        fail_on="error",
+        files_checked=10,
+        coverage=RunCoverage(files_skipped=3),
+    )
+    summary = json.loads(out)["summary"]
+
+    assert summary["files_checked"] == 10  # unchanged meaning: everything reached
+    assert summary["files_skipped"] == 3
+    assert summary["files_analysed"] == 7
+
+
+def test_json_summary_emits_a_sparse_per_language_breakdown() -> None:
+    """Sorted for stable output, and absent means none read rather than zero."""
+    out = format_json(
+        [],
+        [],
+        blocking_count=0,
+        fail_on="error",
+        files_checked=5,
+        coverage=RunCoverage(by_language={"rust": 2, "python": 3}),
+    )
+    summary = json.loads(out)["summary"]
+
+    assert summary["files_checked_by_language"] == {"python": 3, "rust": 2}
+    assert list(summary["files_checked_by_language"]) == ["python", "rust"]
+
+
+def test_json_summary_coverage_defaults_keep_the_old_shape_meaningful() -> None:
+    """Back-compat: an existing caller passing no ``coverage`` is unaffected.
+
+    ``format_json`` is exported in ``safelint.formatters.__all__`` and
+    documented for editor integrations, so the additive keyword must not
+    change what a caller who omits it sees. Zero skipped means
+    ``files_analysed == files_checked``.
+    """
+    summary = json.loads(format_json([], [], blocking_count=0, fail_on="error", files_checked=4))["summary"]
+
+    assert summary["files_skipped"] == 0
+    assert summary["files_analysed"] == 4
+    assert summary["files_checked_by_language"] == {}
+
+
+def test_sarif_ignores_the_coverage_counts_without_failing() -> None:
+    """SARIF is JSON-only by decision, but must still accept the shared signature.
+
+    The CLI dispatches both formatters through one call, so the keyword has to
+    exist here. SARIF has no natural home for run-level counts and inventing a
+    property bag entry would be an extension no consumer reads; the parse
+    failures themselves still appear as ordinary ``SAFE000`` results.
+    """
+    out = format_sarif(
+        [],
+        [],
+        blocking_count=0,
+        fail_on="error",
+        files_checked=10,
+        coverage=RunCoverage(files_skipped=3, by_language={"python": 7}),
+    )
+    doc = json.loads(out)
+
+    assert doc["version"] == "2.1.0"
+    assert "files_skipped" not in out
+    assert "files_checked_by_language" not in out

@@ -262,7 +262,7 @@ echo 'function x() { if (true) { if (true) { console.log("hi"); } } }' \
   | uv run safelint --stdin --stdin-filename buf.ts --format json
 ```
 
-If the JSON output's `summary.files_checked` is `1` (rather than `0` for "no language match"), discovery is working. The `violations` list will be empty until you port at least one rule's node-type lookups to the new language.
+If the JSON output's `summary.files_checked` is `1` (rather than `0` for "no language match"), discovery is working. `summary.files_checked_by_language` should also show `{"<lang>": 1}`, which is the more specific check: it confirms the registry maps the extension to the language you just added rather than merely that *some* file was reached. The `violations` list will be empty until you port at least one rule's node-type lookups to the new language.
 
 ## When to involve maintainers
 

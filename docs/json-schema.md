@@ -17,6 +17,9 @@ The *set of possible rule codes* has expanded as new languages landed (Java + th
   "version": "1.9.0",
   "summary": {
     "files_checked": 12,
+    "files_analysed": 11,
+    "files_skipped": 1,
+    "files_checked_by_language": { "python": 9, "rust": 3 },
     "violations": 4,
     "errors": 2,
     "warnings": 2,
@@ -42,7 +45,10 @@ Aggregated counts across the whole run. All counts are integers ≥ 0.
 
 | Field | Type | Meaning |
 |---|---|---|
-| `files_checked` | int | Number of files the engine attempted to lint after exclusions. |
+| `files_checked` | int | Number of files the engine attempted to lint after exclusions. **Unchanged meaning**: this counts everything reached, including files that then failed to parse. |
+| `files_analysed` | int | `files_checked - files_skipped`: the files that rules actually ran against. **This is the coverage number.** *Since 2.18.0.* |
+| `files_skipped` | int | Files that were reached but could not be turned into a usable tree, so **no rule ran against them**. A parse failure (or an unreadable file) removes a file from analysis entirely, and this is the only place the run says so. Non-zero means your coverage is lower than `files_checked` suggests. It stays accurate under `ignore = ["SAFE000"]`, which silences the violation but not the gap. *Since 2.18.0.* |
+| `files_checked_by_language` | `{language: int}` | Per-language breakdown of `files_checked`, keyed by the names `--language` accepts (`python`, `rust`, `c`, ...). **Sparse**: a language that contributed no files is absent rather than present with a zero, so absent means none read. Sorted alphabetically. Lets a consumer assert "this run did read my Go" instead of inferring it from a polyglot total. *Since 2.18.0.* |
 | `violations` | int | Active violations (i.e. `len(top.violations)`). |
 | `errors` | int | Count of active violations with `severity == "error"`. |
 | `warnings` | int | Count of active violations with `severity == "warning"`. |
@@ -50,6 +56,20 @@ Aggregated counts across the whole run. All counts are integers ≥ 0.
 | `fail_on` | `"error"` \| `"warning"` | Effective threshold for this run. |
 | `suppressed.total` | int | Count of violations that fired but were suppressed (`# nosafe` or `per_file_ignores`). |
 | `suppressed.by_code` | `{code: int}` | Per-code breakdown of suppressed violations. Codes are sorted alphabetically; keys are SAFE-codes (e.g. `"SAFE501"`). |
+
+#### Reading coverage honestly
+
+`files_checked` on its own overstates what was analysed, which is what [#175](https://github.com/shelkesays/safelint/issues/175) was filed about. A file that fails to parse is read, counted, and then skipped by every rule, so a run can report `files_checked: 1101` with a quarter of that never analysed (measured on real C projects: see [Parse coverage](languages/c.md#parse-coverage-the-preprocessor-limit)).
+
+For a coverage assertion in CI, use `files_analysed` and treat a non-zero `files_skipped` as a signal rather than noise:
+
+```bash
+safelint check . --all-files --format json \
+  | jq -e '.summary.files_skipped == 0' > /dev/null \
+  || echo "warning: some files were not analysed"
+```
+
+**SARIF does not carry these three fields.** SARIF has no natural home for run-level counts, and inventing a `properties` bag entry would be a safelint-specific extension no SARIF consumer reads. The parse failures themselves are present in SARIF as ordinary `SAFE000` results, so nothing is hidden; only the aggregate is JSON-only.
 
 ### `violations` *(array of Violation)*
 

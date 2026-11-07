@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import argparse
 from collections import Counter
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import fnmatch
 import functools
 import os
@@ -42,11 +42,14 @@ from safelint.core._validators import ConfigValueError
 from safelint.core.config import MODE_FAIL_ON, SEVERITY_ORDER, load_config
 from safelint.core.engine import SafetyEngine
 from safelint.core.runner import resolve_cache_dir, run
-from safelint.formatters import format_json, format_sarif
-from safelint.languages import extra_name_for, supported_extensions, unavailable_extensions
+from safelint.formatters import RunCoverage, format_json, format_sarif
+from safelint.languages import extra_name_for, get_language_for_file, supported_extensions, unavailable_extensions
 
 
 if TYPE_CHECKING:
+    from collections.abc import Iterable, Sequence
+
+    from safelint.core.engine import LintResult
     from safelint.rules.base import Violation
 
 
@@ -127,17 +130,57 @@ def _print_violations(violations: list[Violation]) -> None:
         print()  # blank line between violations for readability
 
 
+def _language_counts(paths: Iterable[str]) -> dict[str, int]:
+    """Return a sparse ``{language name: file count}`` map for *paths*.
+
+    Derived from the language registry via ``get_language_for_file``, so all
+    registered languages are covered and a tenth would be too: there is no
+    per-language branching to keep in step (#196). A path whose language is
+    not registered contributes nothing rather than a ``None`` bucket.
+
+    The names are exactly the ones ``--language`` accepts, which is what makes
+    the map answerable against a caller's own filter.
+    """
+    counts: Counter[str] = Counter()
+    for path in paths:
+        lang = get_language_for_file(path)
+        if lang is not None:
+            counts[lang.name] += 1
+    return dict(counts)
+
+
+def _make_skipped_line(files_skipped: int) -> str:
+    """Return the lost-coverage line for *files_skipped*, which must be non-zero.
+
+    Deliberately its own line rather than a clause on the found/all-clear
+    line, because it has to read the same way in both cases. The dangerous
+    run is the *clean* one: "All checks passed." above a tree where a quarter
+    of the files were never parsed is the exact failure #175 was filed about,
+    and a count buried among six thousand findings is no better.
+
+    "not analysed" rather than "not parsed" because this also covers a file
+    safelint could not read at all; both mean no rule ran.
+    """
+    noun = "file" if files_skipped == 1 else "files"
+    was = "was" if files_skipped == 1 else "were"
+    count = _c(str(files_skipped), _BOLD, _YELLOW)
+    return f"{count} {noun} could not be parsed and {was} NOT analysed."
+
+
 def _print_summary(
     all_violations: list[Violation],
     n_blocking: int,
     fail_on: str,
     suppressed: list[Violation] | None = None,
+    files_skipped: int = 0,
 ) -> None:
     """Print a ruff-style summary block to stdout."""
     found, fixes = _make_summary(all_violations, n_blocking, fail_on, suppressed or [])
     print(found)
     if fixes is not None:
         print(fixes)
+    if files_skipped:
+        print(_make_skipped_line(files_skipped))
 
 
 def _print_status(message: str, *, output_format: str = "pretty") -> None:
@@ -307,6 +350,46 @@ class _PrintOptions:
 _DEFAULT_PRINT_OPTIONS = _PrintOptions()
 
 
+@dataclass(frozen=True)
+class _RunCounts:
+    """What this run reached, split into analysed and not.
+
+    Bundled for the same reason as :class:`_PrintOptions`: the loose counts
+    would push ``_print_results`` past the ``max_arguments`` threshold. It is
+    also the honest shape, since these are one answer to one question rather
+    than unrelated knobs.
+
+    ``files_checked`` stays separate from *coverage* because that is exactly
+    how the formatters take them: ``files_checked`` is their existing public
+    keyword and keeps its original meaning (every file reached), while
+    :class:`~safelint.formatters.RunCoverage` is the additive part.
+    """
+
+    files_checked: int = 0
+    coverage: RunCoverage = field(default_factory=RunCoverage)
+
+    @classmethod
+    def from_results(cls, results: Sequence[LintResult]) -> _RunCounts:
+        """Derive every count from the run's results.
+
+        One constructor so the numbers cannot drift apart at a call site. The
+        skipped count comes from ``LintResult.parse_failed`` rather than from
+        counting ``SAFE000`` violations, which would read zero under
+        ``ignore = ["SAFE000"]`` while the coverage gap remained.
+        """
+        return cls(
+            files_checked=len(results),
+            coverage=RunCoverage(
+                files_skipped=sum(1 for r in results if r.parse_failed),
+                by_language=_language_counts(r.path for r in results),
+            ),
+        )
+
+
+# Default for ``_print_results(counts=...)``, same B008 rationale as above.
+_EMPTY_RUN_COUNTS = _RunCounts()
+
+
 def _print_results(
     output_format: str,
     violations: list[Violation],
@@ -314,7 +397,7 @@ def _print_results(
     *,
     blocking_count: int,
     fail_on: str,
-    files_checked: int,
+    counts: _RunCounts = _EMPTY_RUN_COUNTS,
     options: _PrintOptions = _DEFAULT_PRINT_OPTIONS,
 ) -> None:
     """Emit accumulated lint results in the chosen format.
@@ -344,7 +427,7 @@ def _print_results(
         # so this gate is what keeps a clean pre-commit batch quiet - issue #50).
         emit = bool(violations) or not options.silent_on_clean
         if emit:
-            _print_summary(violations, blocking_count, fail_on, suppressed)
+            _print_summary(violations, blocking_count, fail_on, suppressed, counts.coverage.files_skipped)
         if options.statistics and emit:
             _print_statistics(violations, suppressed)
         return
@@ -358,7 +441,8 @@ def _print_results(
             suppressed,
             blocking_count=blocking_count,
             fail_on=fail_on,
-            files_checked=files_checked,
+            files_checked=counts.files_checked,
+            coverage=counts.coverage,
         )
     )
 
@@ -407,7 +491,7 @@ def _run_stdin(args: argparse.Namespace) -> int:
         result.suppressed,
         blocking_count=len(blocking),
         fail_on=fail_on,
-        files_checked=1,
+        counts=_RunCounts.from_results([result]),
         options=_PrintOptions(silent_on_clean=True, statistics=getattr(args, "statistics", False)),
     )
     return 1 if blocking else 0
@@ -436,9 +520,14 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
     all_blocking: list[Violation] = []
     all_violations: list[Violation] = []
     all_suppressed: list[Violation] = []
+    # Kept so the summary counts come from ``LintResult.parse_failed`` here too:
+    # a parse failure whose SAFE000 is ignored adds no violation, so counting
+    # from ``files`` alone would report full coverage on a file never analysed.
+    all_results: list[LintResult] = []
 
     for filepath in files:
         result = engine.check_file(filepath)
+        all_results.append(result)
         all_suppressed.extend(result.suppressed)
         if not result.violations:
             continue
@@ -457,7 +546,7 @@ def _run_hook(args: argparse.Namespace, files: list[str]) -> int:
         all_suppressed,
         blocking_count=len(all_blocking),
         fail_on=fail_on,
-        files_checked=len(files),
+        counts=_RunCounts.from_results(all_results),
         options=_PrintOptions(silent_on_clean=True, statistics=getattr(args, "statistics", False)),
     )
     return 1 if all_blocking else 0
@@ -1280,7 +1369,7 @@ def _print_check_results(results: list, output_format: str, fail_on: str, blocki
         all_suppressed,
         blocking_count=blocking_count,
         fail_on=fail_on,
-        files_checked=len(results),
+        counts=_RunCounts.from_results(results),
         options=_PrintOptions(statistics=statistics, silent_on_clean=silent_on_clean),
     )
 
@@ -1398,7 +1487,7 @@ def _run_check(args: argparse.Namespace) -> int:
 
 def _finish_unlinted(output_format: str, fail_on: str, *, silent_pass: bool, unavailable: set[str]) -> int:
     """Emit the empty results document for a run that linted nothing; exit 2 on a grammar silent-pass else 0."""
-    _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, files_checked=0, options=_PrintOptions(silent_on_clean=True))
+    _print_results(output_format, [], [], blocking_count=0, fail_on=fail_on, options=_PrintOptions(silent_on_clean=True))
     if silent_pass:
         _print_unlinted_error(unavailable)
         return 2

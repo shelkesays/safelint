@@ -37,6 +37,7 @@ from safelint.core._diagnostics import visible
 
 
 if TYPE_CHECKING:
+    from safelint.formatters._counts import RunCoverage
     from safelint.rules.base import TextEdit, Violation
 
 
@@ -249,9 +250,19 @@ def format_sarif(
     blocking_count: int,  # noqa: ARG001 - reserved for future SARIF properties extensions
     fail_on: str,  # noqa: ARG001 - reserved for future SARIF properties extensions
     files_checked: int,  # noqa: ARG001 - reserved for future SARIF properties extensions
+    coverage: RunCoverage | None = None,  # noqa: ARG001 - JSON-only by decision, see the docstring
     indent: int | None = 2,
 ) -> str:
-    """Return a SARIF 2.1.0 JSON document representing the lint run."""
+    """Return a SARIF 2.1.0 JSON document representing the lint run.
+
+    Accepts the full formatter signature so the CLI can dispatch JSON and
+    SARIF through one call, and ignores the run-level counts. SARIF has no
+    natural home for them: inventing a ``properties`` bag entry would be a
+    safelint-specific extension that no SARIF consumer reads, so the
+    skipped-file and per-language counts (#175, #196) are **deliberately
+    JSON-only**. The parse failures themselves are still fully present here
+    as ordinary ``SAFE000`` results.
+    """
     rules = _rules_descriptor_for(violations, suppressed)
     results = [
         *(_result_for_violation(v, suppressed=False) for v in violations),

@@ -24,8 +24,10 @@ from safelint.cli import (
     _file_summary_line,
     _format_install_action,
     _guard_hook_silent_failure,
+    _make_skipped_line,
     _make_summary,
     _matching_suffixes,
+    _print_summary,
     _print_violations,
     _resolve_check_targets,
     _run_hook,
@@ -156,6 +158,45 @@ def test_file_summary_line_empty_violations_raises() -> None:
     """Empty violations list raises ValueError."""
     with pytest.raises(ValueError, match="violations must be non-empty"):
         _file_summary_line("path/file.py", [])
+
+
+# ---------------------------------------------------------------------------
+# _make_skipped_line (lost-coverage notice, #175)
+# ---------------------------------------------------------------------------
+
+
+def test_skipped_line_is_singular_for_one_file() -> None:
+    """Agreement matters here: the line is read by people, not parsed."""
+    assert _strip(_make_skipped_line(1)) == "1 file could not be parsed and was NOT analysed."
+
+
+def test_skipped_line_is_plural_for_several_files() -> None:
+    """Both the noun and the verb have to move."""
+    assert _strip(_make_skipped_line(3)) == "3 files could not be parsed and were NOT analysed."
+
+
+def test_skipped_line_follows_the_all_clear_on_a_clean_run(capsys: pytest.CaptureFixture[str]) -> None:
+    """The case #175 was filed about.
+
+    "All checks passed." standing alone over a tree where files were never
+    parsed is the exact failure: the reader has no way to know coverage was
+    lost. The notice is a separate line precisely so it reads the same whether
+    or not there were findings.
+    """
+    _print_summary([], 0, "error", [], files_skipped=2)
+
+    lines = [_strip(line) for line in capsys.readouterr().out.splitlines() if line.strip()]
+    assert lines == [
+        "All checks passed.",
+        "2 files could not be parsed and were NOT analysed.",
+    ]
+
+
+def test_no_skipped_line_when_nothing_was_skipped(capsys: pytest.CaptureFixture[str]) -> None:
+    """No new noise on the overwhelmingly common run."""
+    _print_summary([], 0, "error", [])
+
+    assert "NOT analysed" not in capsys.readouterr().out
 
 
 # ---------------------------------------------------------------------------
