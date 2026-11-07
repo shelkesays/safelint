@@ -83,6 +83,39 @@ def test_every_mutation_shape_still_reports(tmp_path: Path, label: str, body: st
     assert [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE302"], label
 
 
+@pytest.mark.parametrize(
+    ["label", "body"],
+    (
+        ["delete from a map", 'var target = map[string]int{}\n\nfunc f() { delete(target, "k") }'],
+        ["clear a map", "var target = map[string]int{}\n\nfunc f() { clear(target) }"],
+        ["copy into a slice", "var target = make([]byte, 4)\n\nfunc f(src []byte) { copy(target, src) }"],
+    ),
+)
+def test_the_mutating_builtins_count(tmp_path: Path, label: str, body: str) -> None:
+    """``delete`` / ``clear`` / ``copy`` mutate without any assignment (#276 review).
+
+    None of these rebinds the name or takes its address, so they appeared in
+    none of the shapes the first implementation looked for: a package-level map
+    emptied by ``delete(cache, k)`` was silently unreported, which is shared
+    mutable state every bit as much as one reassigned.
+    """
+    sample = tmp_path / "builtin.go"
+    sample.write_text(f"package main\n\n{body}\n", encoding="utf-8")
+
+    assert [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE302"], label
+
+
+def test_a_non_mutating_builtin_call_does_not_count(tmp_path: Path) -> None:
+    """Only the mutating builtins; reading a var's length is not a write."""
+    sample = tmp_path / "readonly_builtin.go"
+    sample.write_text(
+        'package main\n\nvar shapes = []string{"a"}\n\nfunc f() int { return len(shapes) + cap(shapes) }\n',
+        encoding="utf-8",
+    )
+
+    assert not [v for v in _engine().check_file(str(sample)).violations if v.code == "SAFE302"]
+
+
 def test_mutating_a_vars_contents_counts(tmp_path: Path) -> None:
     """Element and field writes mutate the shared state, so they must report.
 

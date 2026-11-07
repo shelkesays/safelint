@@ -26,7 +26,7 @@ import pytest
 from safelint.core.config import DEFAULTS, deep_merge
 from safelint.core.engine import SafetyEngine
 from safelint.languages import RUST
-from safelint.languages.rust import primitive_macro_parse_cause
+from safelint.languages.rust import _PRIMITIVE_TYPE_NAMES, primitive_macro_parse_cause
 
 
 if TYPE_CHECKING:
@@ -79,9 +79,15 @@ def test_every_delimiter_form_is_recognised(label: str, source: str) -> None:
     assert _cause(source) is not None, f"{label}: not recognised"
 
 
-@pytest.mark.parametrize("primitive", ("str", "i32", "u8", "bool", "char", "f64", "usize", "i128"))
+@pytest.mark.parametrize("primitive", tuple(sorted(_PRIMITIVE_TYPE_NAMES)))
 def test_every_primitive_name_is_recognised(primitive: str) -> None:
-    """The trigger is the name being a primitive, so the whole set must match."""
+    """The trigger is the name being a primitive, so the whole set must match.
+
+    Driven from ``_PRIMITIVE_TYPE_NAMES`` rather than a hand-written list.
+    The list held 8 of the 17 names while the docstring claimed the whole set,
+    so a regression in any of the other nine would have passed (#276 review).
+    Sourcing it from the constant means adding a name adds a case for free.
+    """
     assert _cause(f"fn t() {{\n    let s = {primitive}![1];\n}}\n") is not None
 
 
